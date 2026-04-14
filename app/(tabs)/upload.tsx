@@ -108,7 +108,7 @@ export default function SellScreen() {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
           {/* Title */}
           <Text className="text-[34px] font-bold text-gray-900 leading-[42px] mb-2">
-            What do you want to list?
+            What do you want to add?
           </Text>
 
           {/* Instruction card */}
