@@ -11,7 +11,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { ListingCard } from '@/components/ListingCard';
-import { LinearGradient } from 'expo-linear-gradient';
 import type { Listing } from '@/types';
 
 const MOCK_LISTINGS: Listing[] = [
@@ -109,14 +108,14 @@ export default function HomeScreen() {
     <SafeAreaView edges={['top']} className="flex-1 bg-white">
       {/* Search Header */}
       <View className="flex-row items-center px-4 pt-2 pb-3">
-        <View className="flex-1 flex-row items-center bg-gray-100 rounded-full px-4 py-3 mr-3 outline outline-1 outline-gray-200">
+        <View className="flex-1 flex-row items-center bg-[#F2F2F2] rounded-full px-4 py-[10px] mr-3">
           <Feather name="search" size={20} color="#9ca3af" />
-          <Text className="ml-3 flex-1 text-[16px] text-gray-400">
+          <Text className="ml-3 flex-1 text-[16px] text-gray-500">
             What are you looking for today?
           </Text>
         </View>
-        <Pressable className="w-[42px] h-[42px] border border-gray-200 rounded-full items-center justify-center bg-white shadow-sm">
-          <Ionicons name="document-text-outline" size={20} color="#000" />
+        <Pressable className="w-[42px] h-[42px] border border-gray-200 rounded-[12px] items-center justify-center bg-white shadow-sm">
+          <Feather name="menu" size={20} color="#000" />
         </Pressable>
       </View>
 
@@ -132,8 +131,8 @@ export default function HomeScreen() {
             <Pressable
               key={tab}
               onPress={() => setActiveTab(tab)}
-              className={`mr-2 px-4 py-2.5 rounded-full border flex-row items-center ${isActive ? 'border-transparent' : 'border-gray-200 bg-white'}`}
-              style={isActive ? { backgroundColor: '#5433fb' } : {}}
+              className={`mr-2 px-4 py-2 rounded-full border flex-row items-center ${isActive ? 'border-transparent' : 'border-transparent bg-[#F2F2F2]'}`}
+              style={isActive ? { backgroundColor: '#5C5CFF' } : {}}
             >
               <Ionicons name={iconName} size={14} color={isActive ? '#ffffff' : '#111827'} style={{ marginRight: 6 }} />
               <Text
@@ -153,59 +152,19 @@ export default function HomeScreen() {
         data={listings}
         keyExtractor={(item) => item.id}
         numColumns={3}
-        columnWrapperStyle={{ gap: 4, paddingHorizontal: 4 }}
+        columnWrapperStyle={{ gap: 8, paddingHorizontal: 16 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#e4ff3a" />
         }
         ListHeaderComponent={
           activeTab === 'For you' ? (
-            <View className="pb-4">
-              {/* Banner */}
-              <View style={{ backgroundColor: '#3b0764', minHeight: 170 }} className="w-full overflow-hidden flex-row">
-                {/* Left content */}
-                <View className="w-[58%] z-10 px-5 pt-5 pb-5 justify-between">
-                  <View>
-                    <Text style={{ letterSpacing: 4 }} className="text-white text-[9px] font-bold mb-3">CERANIX</Text>
-                    <View style={{ backgroundColor: '#e4ff3a', alignSelf: 'flex-start' }} className="px-2 py-[2px] mb-[3px]">
-                      <Text className="text-black font-black text-[20px] leading-tight">Win a gift card</Text>
-                    </View>
-                    <View style={{ backgroundColor: '#e4ff3a', alignSelf: 'flex-start' }} className="px-2 py-[2px] mb-3">
-                      <Text className="text-black font-black text-[20px] leading-tight">worth 5000 PKR</Text>
-                    </View>
-                    <Text className="text-white font-semibold text-xs mb-1">The Ceranix lottery*</Text>
-                    <Text style={{ opacity: 0.75 }} className="text-white text-[9px] leading-relaxed">
-                      1 uploaded listing = 1 entry.{'\n'}Three winners. April 12–20.
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Right image collage */}
-                <View className="absolute right-0 top-0 bottom-0 w-[44%] flex-row">
-                  <View className="flex-1">
-                    <Image source={{ uri: 'https://picsum.photos/seed/lux1/110/90' }} style={{ flex: 1 }} resizeMode="cover" />
-                    <Image source={{ uri: 'https://picsum.photos/seed/lux3/110/90' }} style={{ flex: 1 }} resizeMode="cover" />
-                  </View>
-                  <View className="flex-1">
-                    <Image source={{ uri: 'https://picsum.photos/seed/lux2/110/90' }} style={{ flex: 1 }} resizeMode="cover" />
-                    <Image source={{ uri: 'https://picsum.photos/seed/lux4/110/90' }} style={{ flex: 1 }} resizeMode="cover" />
-                  </View>
-                  {/* Fade left edge into background */}
-                  <LinearGradient
-                    colors={['#3b0764', 'transparent']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 40 }}
-                  />
-                </View>
-
-                {/* Learn more button */}
-                <Pressable
-                  style={{ backgroundColor: '#3b82f6', position: 'absolute', bottom: 16, right: 16, zIndex: 10, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8 }}
-                >
-                  <Text className="text-white font-bold text-sm">Learn more</Text>
-                </Pressable>
-              </View>
+            <View className="pb-4 px-4 w-full">
+              <Image
+                source={require('../../Sreenshots/asdfWhatsApp Image 2026-04-16 at 12.38.07 AM.jpeg')}
+                style={{ width: '100%', height: 160, borderRadius: 12 }}
+                resizeMode="cover"
+              />
             </View>
           ) : (
             <View className="pt-3 pb-2" />

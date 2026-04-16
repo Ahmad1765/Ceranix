@@ -13,7 +13,7 @@ export function ListingCard({ listing }: Props) {
       onPress={() => router.push(`/product/${listing.id}`)}
       className="flex-1 mb-6 px-1"
     >
-      <View className="relative w-full" style={{ aspectRatio: 1 / 1.33 }}>
+      <View className="relative w-full" style={{ aspectRatio: 1 / 1.33, overflow: 'hidden' }}>
         <Image
           source={{ uri: listing.images[0] }}
           style={{ width: '100%', height: '100%' }}
@@ -21,23 +21,23 @@ export function ListingCard({ listing }: Props) {
           contentFit="cover"
         />
         {listing.is_sold && (
-          <View className="absolute inset-0 bg-black/40 rounded-sm items-center justify-center">
+          <View className="absolute inset-0 bg-black/40 items-center justify-center">
             <Text className="text-white font-bold text-sm">SOLD</Text>
           </View>
         )}
       </View>
 
-      <View className="mt-1.5 px-0.5 w-full">
-        <View className="flex-row items-center justify-between pr-2 mt-1">
-          <Text className="text-[14px] font-bold text-gray-900 flex-1" numberOfLines={1}>
+      <View className="mt-1.5 w-full">
+        <View className="flex-row items-center justify-between mt-1">
+          <Text className="text-[13px] font-medium text-gray-900 flex-1" numberOfLines={1}>
             {listing.brand || listing.title}
           </Text>
           {listing.size && (
-            <Text className="text-[13px] font-bold text-gray-500 ml-1">{listing.size}</Text>
+            <Text className="text-[13px] font-medium text-gray-500 ml-1">{listing.size}</Text>
           )}
         </View>
         <Text className="text-[14px] font-bold text-black mt-0.5">
-          {listing.price} kr
+          {listing.price} SEK
         </Text>
       </View>
     </Pressable>
