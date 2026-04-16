@@ -5,6 +5,7 @@ import {
   FlatList,
   RefreshControl,
   Pressable,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -159,38 +160,51 @@ export default function HomeScreen() {
         }
         ListHeaderComponent={
           activeTab === 'For you' ? (
-            <View className="px-0 pb-4">
-              <LinearGradient
-                colors={['#8b5cf6', '#a78bfa', '#e4ff3a']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0.5 }}
-                className="w-full rounded-none px-6 py-8 flex-row overflow-hidden relative min-h-[170px]"
-              >
-                <View className="w-2/3 z-10 pt-2">
-                  <Text className="text-black font-semibold text-lg mb-1">
-                    The plick lottery
-                  </Text>
-                  <Text className="text-black font-black text-3xl leading-none">
-                    Win a plick gift card{'\n'}worth 5000 SEK
-                  </Text>
+            <View className="pb-4">
+              {/* Banner */}
+              <View style={{ backgroundColor: '#3b0764', minHeight: 170 }} className="w-full overflow-hidden flex-row">
+                {/* Left content */}
+                <View className="w-[58%] z-10 px-5 pt-5 pb-5 justify-between">
+                  <View>
+                    <Text style={{ letterSpacing: 4 }} className="text-white text-[9px] font-bold mb-3">CERANIX</Text>
+                    <View style={{ backgroundColor: '#e4ff3a', alignSelf: 'flex-start' }} className="px-2 py-[2px] mb-[3px]">
+                      <Text className="text-black font-black text-[20px] leading-tight">Win a gift card</Text>
+                    </View>
+                    <View style={{ backgroundColor: '#e4ff3a', alignSelf: 'flex-start' }} className="px-2 py-[2px] mb-3">
+                      <Text className="text-black font-black text-[20px] leading-tight">worth 5000 PKR</Text>
+                    </View>
+                    <Text className="text-white font-semibold text-xs mb-1">The Ceranix lottery*</Text>
+                    <Text style={{ opacity: 0.75 }} className="text-white text-[9px] leading-relaxed">
+                      1 uploaded listing = 1 entry.{'\n'}Three winners. April 12–20.
+                    </Text>
+                  </View>
                 </View>
-                <View className="absolute right-[-40px] top-6 w-[200px] h-[120px] bg-[#e4ff3a] transform -rotate-12 rounded-xl flex items-center justify-center border-4 border-white overflow-hidden shadow-xl" style={{elevation:10}}>
-                   <LinearGradient colors={['#7e22ce', '#3b82f6']} start={{x:0,y:0}} end={{x:1,y:1}} className="absolute inset-0" />
-                   <Text className="text-black font-black text-4xl transform -rotate-6">plick</Text>
-                   <View className="absolute top-0 right-0 left-0 h-4 bg-[#4ade80] transform -rotate-45 translate-y-6" />
+
+                {/* Right image collage */}
+                <View className="absolute right-0 top-0 bottom-0 w-[44%] flex-row">
+                  <View className="flex-1">
+                    <Image source={{ uri: 'https://picsum.photos/seed/lux1/110/90' }} style={{ flex: 1 }} resizeMode="cover" />
+                    <Image source={{ uri: 'https://picsum.photos/seed/lux3/110/90' }} style={{ flex: 1 }} resizeMode="cover" />
+                  </View>
+                  <View className="flex-1">
+                    <Image source={{ uri: 'https://picsum.photos/seed/lux2/110/90' }} style={{ flex: 1 }} resizeMode="cover" />
+                    <Image source={{ uri: 'https://picsum.photos/seed/lux4/110/90' }} style={{ flex: 1 }} resizeMode="cover" />
+                  </View>
+                  {/* Fade left edge into background */}
+                  <LinearGradient
+                    colors={['#3b0764', 'transparent']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 40 }}
+                  />
                 </View>
-                <View className="absolute bottom-4 right-4 z-10 bg-black rounded-md px-6 py-2.5">
-                  <Text className="text-white font-bold text-base">Read more</Text>
-                </View>
-                <View className="absolute bottom-2 left-0 right-0 z-10 w-full items-center">
-                  <Text className="text-black text-[9px] font-bold text-center px-4 py-1" style={{backgroundColor: 'rgba(255,255,255,0.4)'}}>
-                     1 uploaded listing = 1 entry in the lottery. Three winners in total. The campaign runs from April 12 to April 20.
-                  </Text>
-                </View>
-              </LinearGradient>
-              <View className="flex-row justify-center space-x-1 mt-4">
-                <View className="w-10 h-1.5 bg-black rounded-full" />
-                <View className="w-10 h-1.5 bg-gray-200 rounded-full" />
+
+                {/* Learn more button */}
+                <Pressable
+                  style={{ backgroundColor: '#3b82f6', position: 'absolute', bottom: 16, right: 16, zIndex: 10, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8 }}
+                >
+                  <Text className="text-white font-bold text-sm">Learn more</Text>
+                </Pressable>
               </View>
             </View>
           ) : (
