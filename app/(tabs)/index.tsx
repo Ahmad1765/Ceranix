@@ -337,69 +337,72 @@ export default function HomeScreen() {
         ))}
       </ScrollView>
 
-      {activeTab === 'Following' ? (
-        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
-          <Text className="text-center text-[15px] text-gray-800 leading-[22px] px-8 pt-6 pb-5">
-            {'Oops, you are not following anyone yet! 😭\nFollow other Carrinexers to get one step closer to your dream clothes! Here are some recommendations 🌀💛'}
-          </Text>
-          {SUGGESTED_USERS.map((user) => (
-            <View key={user.id} className="flex-row items-center px-4 py-3">
-              <Image
-                source={{ uri: user.avatar }}
-                style={{ width: 52, height: 52, borderRadius: 26 }}
-                className="bg-gray-200"
-                contentFit="cover"
-              />
-              <View className="flex-1 ml-3">
-                <Text className="text-[15px] font-bold text-gray-900">{user.display_name}</Text>
-                <Text className="text-[13px] text-gray-500 mt-0.5">{user.username}</Text>
-              </View>
-              <Pressable className="bg-black rounded-[10px] px-5 py-2 flex-row items-center">
-                <Feather name="plus" size={13} color="#fff" style={{ marginRight: 4 }} />
-                <Text className="text-white text-[13px] font-semibold">Follow</Text>
-              </Pressable>
+      {/* Following view — always mounted, hidden when inactive */}
+      <ScrollView
+        style={{ flex: 1, display: activeTab === 'Following' ? 'flex' : 'none' }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 32 }}
+      >
+        <Text className="text-center text-[15px] text-gray-800 leading-[22px] px-8 pt-6 pb-5">
+          {'Oops, you are not following anyone yet! 😭\nFollow other Carrinexers to get one step closer to your dream clothes! Here are some recommendations 🌀💛'}
+        </Text>
+        {SUGGESTED_USERS.map((user) => (
+          <View key={user.id} className="flex-row items-center px-4 py-3">
+            <Image
+              source={{ uri: user.avatar }}
+              style={{ width: 52, height: 52, borderRadius: 26 }}
+              className="bg-gray-200"
+              contentFit="cover"
+              cachePolicy="memory-disk"
+            />
+            <View className="flex-1 ml-3">
+              <Text className="text-[15px] font-bold text-gray-900">{user.display_name}</Text>
+              <Text className="text-[13px] text-gray-500 mt-0.5">{user.username}</Text>
             </View>
-          ))}
-        </ScrollView>
-      ) : (
-        <FlatList
-          key="feed-3"
-          style={{ flex: 1 }}
-          data={loading ? [] : listings}
-          keyExtractor={(item) => item.id}
-          numColumns={3}
-          columnWrapperStyle={{ gap: 6, paddingHorizontal: 12 }}
-          showsVerticalScrollIndicator={false}
-          // ── Performance tuning ──────────────────────────
-          initialNumToRender={9}
-          maxToRenderPerBatch={9}
-          updateCellsBatchingPeriod={50}
-          windowSize={8}
-          removeClippedSubviews={Platform.OS !== 'web'}
-          // ────────────────────────────────────────────────
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6C47FF" />
-          }
-          ListHeaderComponent={
-            activeTab === 'For you' ? (
-              <View className="pb-4">
-                <PromoBanner onReadMore={() => {}} />
-              </View>
-            ) : (
-              <View className="pt-3 pb-2" />
-            )
-          }
-          ListEmptyComponent={loading ? (
-            <View>
-              {renderSkeleton()}
-              {renderSkeleton()}
-              {renderSkeleton()}
+            <Pressable className="bg-black rounded-[10px] px-5 py-2 flex-row items-center">
+              <Feather name="plus" size={13} color="#fff" style={{ marginRight: 4 }} />
+              <Text className="text-white text-[13px] font-semibold">Follow</Text>
+            </Pressable>
+          </View>
+        ))}
+      </ScrollView>
+
+      {/* Product grid — always mounted, hidden when Following is active */}
+      <FlatList
+        key="feed-3"
+        style={{ flex: 1, display: activeTab !== 'Following' ? 'flex' : 'none' }}
+        data={loading ? [] : listings}
+        keyExtractor={(item) => item.id}
+        numColumns={3}
+        columnWrapperStyle={{ gap: 6, paddingHorizontal: 12 }}
+        showsVerticalScrollIndicator={false}
+        initialNumToRender={9}
+        maxToRenderPerBatch={9}
+        updateCellsBatchingPeriod={50}
+        windowSize={8}
+        removeClippedSubviews={Platform.OS !== 'web'}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6C47FF" />
+        }
+        ListHeaderComponent={
+          activeTab === 'For you' ? (
+            <View className="pb-4">
+              <PromoBanner onReadMore={() => {}} />
             </View>
-          ) : null}
-          renderItem={renderItem}
-          contentContainerStyle={{ paddingBottom: 24 }}
-        />
-      )}
+          ) : (
+            <View className="pt-3 pb-2" />
+          )
+        }
+        ListEmptyComponent={loading ? (
+          <View>
+            {renderSkeleton()}
+            {renderSkeleton()}
+            {renderSkeleton()}
+          </View>
+        ) : null}
+        renderItem={renderItem}
+        contentContainerStyle={{ paddingBottom: 24 }}
+      />
     </SafeAreaView>
   );
 }
