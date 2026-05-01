@@ -1,5 +1,6 @@
 import '../global.css';
 import { useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -10,28 +11,26 @@ import { Ionicons, Feather } from '@expo/vector-icons';
 
 SplashScreen.preventAutoHideAsync();
 
-async function preloadAssets() {
-  await Promise.all([
-    // Bundle all icon fonts
-    Font.loadAsync({
-      ...Ionicons.font,
-      ...Feather.font,
-    }),
-    // Bundle local image assets
-    Asset.loadAsync([
-      require('../assets/images/icon.png'),
-      require('../assets/images/splash.png'),
-      require('../assets/images/adaptive-icon.png'),
-      require('../assets/images/favicon.png'),
-    ]),
-  ]);
-}
-
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    preloadAssets()
+    if (Platform.OS === 'web') {
+      // On web: don't block render — fonts load via CSS @font-face in background
+      Font.loadAsync({ ...Ionicons.font, ...Feather.font }).catch(console.warn);
+      setReady(true);
+      SplashScreen.hideAsync();
+      return;
+    }
+
+    // On native: preload fonts + local image assets before first paint
+    Promise.all([
+      Font.loadAsync({ ...Ionicons.font, ...Feather.font }),
+      Asset.loadAsync([
+        require('../assets/images/adaptive-icon.png'),
+        require('../assets/images/favicon.png'),
+      ]),
+    ])
       .catch(console.warn)
       .finally(() => {
         setReady(true);
