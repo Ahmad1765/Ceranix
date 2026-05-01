@@ -33,6 +33,10 @@
         }
       ]
     ],
+    "web": {
+      "favicon": "./public/favicon.svg",
+      "bundler": "metro"
+    },
     "experiments": {
       "typedRoutes": true
     }

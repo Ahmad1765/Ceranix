@@ -16,9 +16,9 @@ export function PromoBanner({ onReadMore }: PromoBannerProps) {
       >
         <View className="flex-row items-center">
           <View className="flex-1 pr-3">
-            <Text className="text-[11px] text-white/80 font-medium">The plick lottery</Text>
+            <Text className="text-[11px] text-white/80 font-medium">The Carrinex lottery</Text>
             <Text className="text-[15px] font-bold text-white leading-[21px] mt-0.5">
-              Win a plick gift card{'\n'}worth 5000 SEK
+              Win a Carrinex gift card{'\n'}worth 5000 SEK
             </Text>
             <Pressable
               onPress={onReadMore}
@@ -45,7 +45,7 @@ export function PromoBanner({ onReadMore }: PromoBannerProps) {
               }}
             >
               <Text style={{ color: 'white', fontStyle: 'italic', fontWeight: '800', fontSize: 14 }}>
-                plick
+                Carrinex
               </Text>
               <View
                 style={{

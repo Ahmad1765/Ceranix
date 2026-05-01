@@ -320,13 +320,13 @@ export default function ProductScreen() {
 
           <Accordion
             icon={<Ionicons name="bag-handle" size={20} color="#6C47FF" />}
-            title="Buy via plick"
+            title="Buy via Carrinex"
           >
             <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827', marginBottom: 6 }}>
               Buy Directly or via Price Offer
             </Text>
             <Text style={{ fontSize: 13, color: '#6b7280', lineHeight: 20 }}>
-              To purchase an item through plick, you can buy the item directly via <Text style={{ fontWeight: '700' }}>Buy</Text> or suggest a price via <Text style={{ fontWeight: '700' }}>Price Offer.</Text> All purchases through plick have discounted and trackable shipping, as well as buyer protection.
+              To purchase an item through Carrinex, you can buy the item directly via <Text style={{ fontWeight: '700' }}>Buy</Text> or suggest a price via <Text style={{ fontWeight: '700' }}>Price Offer.</Text> All purchases through Carrinex have discounted and trackable shipping, as well as buyer protection.
             </Text>
           </Accordion>
         </View>

@@ -62,7 +62,7 @@ export default function DiscoverScreen() {
                <View className="flex-1">
                  <Text className="text-[16px] font-bold text-gray-900 mb-1">About you</Text>
                  <Text className="text-[14px] text-gray-700 leading-tight mb-3">
-                   Take the first step towards being verified on plick
+                   Take the first step towards being verified on Carrinex
                  </Text>
                  <View className="flex-row items-center justify-between">
                    <View className="flex-row" style={{gap: 4}}>

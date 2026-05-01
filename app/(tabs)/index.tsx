@@ -313,7 +313,7 @@ export default function HomeScreen() {
       {activeTab === 'Following' ? (
         <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
           <Text className="text-center text-[15px] text-gray-800 leading-[22px] px-8 pt-6 pb-5">
-            {'Oops, you are not following anyone yet! 😭\nFollow other plickers to get one step closer to your dream clothes! Here are some recommendations 🌀💛'}
+            {'Oops, you are not following anyone yet! 😭\nFollow other Carrinexers to get one step closer to your dream clothes! Here are some recommendations 🌀💛'}
           </Text>
           {SUGGESTED_USERS.map((user) => (
             <View key={user.id} className="flex-row items-center px-4 py-3">

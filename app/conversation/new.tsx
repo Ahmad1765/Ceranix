@@ -68,7 +68,7 @@ export default function NewConversationScreen() {
 
         <View className="mt-4">
           <Text className="text-xs text-gray-400">
-            Be kind and respectful. Use Plick's payment system for a safe transaction. 
+            Be kind and respectful. Use Carrinex's payment system for a safe transaction. 
           </Text>
         </View>
       </ScrollView>

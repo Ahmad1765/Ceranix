@@ -48,7 +48,7 @@ export default function NybegagnatScreen() {
                 
                 {/* Screen content */}
                 <LinearGradient colors={['#D8B4FE', '#BAE6FD', '#FEF08A']} className="absolute inset-0 opacity-20 z-0" />
-                <Text className="text-[#9333EA] font-extrabold text-[24px] absolute z-10 bottom-14 italic tracking-tighter">plick</Text>
+                <Text className="text-[#9333EA] font-extrabold text-[24px] absolute z-10 bottom-14 italic tracking-tighter">Carrinex</Text>
              </View>
           </View>
         </LinearGradient>
