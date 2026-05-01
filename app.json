@@ -23,6 +23,10 @@
       },
       "package": "com.ceranix.app"
     },
+    "assetBundlePatterns": [
+      "assets/**",
+      "node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/*"
+    ],
     "plugins": [
       "expo-router",
       "expo-secure-store",

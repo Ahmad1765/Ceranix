@@ -1,25 +1,45 @@
 import '../global.css';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as SplashScreen from 'expo-splash-screen';
-import { useFonts } from 'expo-font';
+import * as Font from 'expo-font';
+import { Asset } from 'expo-asset';
 import { Ionicons, Feather } from '@expo/vector-icons';
 
 SplashScreen.preventAutoHideAsync();
 
+async function preloadAssets() {
+  await Promise.all([
+    // Bundle all icon fonts
+    Font.loadAsync({
+      ...Ionicons.font,
+      ...Feather.font,
+    }),
+    // Bundle local image assets
+    Asset.loadAsync([
+      require('../assets/images/icon.png'),
+      require('../assets/images/splash.png'),
+      require('../assets/images/adaptive-icon.png'),
+      require('../assets/images/favicon.png'),
+    ]),
+  ]);
+}
+
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
-    ...Ionicons.font,
-    ...Feather.font,
-  });
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (fontsLoaded) SplashScreen.hideAsync();
-  }, [fontsLoaded]);
+    preloadAssets()
+      .catch(console.warn)
+      .finally(() => {
+        setReady(true);
+        SplashScreen.hideAsync();
+      });
+  }, []);
 
-  if (!fontsLoaded) return null;
+  if (!ready) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
