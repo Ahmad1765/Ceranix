@@ -7,11 +7,13 @@ import {
   Pressable,
   ScrollView,
   Animated,
+  Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { ListingCard } from '@/components/ListingCard';
+import { SkeletonCard } from '@/components/SkeletonCard';
 import { PromoBanner } from '@/components/PromoBanner';
 import type { Listing } from '@/types';
 
@@ -264,9 +266,19 @@ const MOCK_LISTINGS: Listing[] = [
 
 const TABS: TabName[] = ['For you', 'Popular', 'Following'];
 
+// Prefetch all image URLs so they're in cache before user scrolls to them
+Image.prefetch(MOCK_LISTINGS.map(l => l.images[0]));
+
 export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState<TabName>('For you');
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Simulate a short data-fetch delay; replace with real Supabase call
+    const t = setTimeout(() => setLoading(false), 600);
+    return () => clearTimeout(t);
+  }, []);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -276,6 +288,21 @@ export default function HomeScreen() {
   const listings = activeTab === 'Popular'
     ? [...MOCK_LISTINGS].sort((a, b) => b.likes - a.likes)
     : MOCK_LISTINGS;
+
+  const renderItem = useCallback(
+    ({ item }: { item: Listing }) => <ListingCard listing={item} />,
+    []
+  );
+
+  const skeletonData = Array.from({ length: 9 }, (_, i) => ({ id: `sk-${i}` }));
+  const renderSkeleton = useCallback(
+    () => (
+      <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 12, marginBottom: 6 }}>
+        {[0,1,2].map(i => <SkeletonCard key={i} />)}
+      </View>
+    ),
+    []
+  );
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-white">
@@ -338,11 +365,18 @@ export default function HomeScreen() {
         <FlatList
           key="feed-3"
           style={{ flex: 1 }}
-          data={listings}
+          data={loading ? [] : listings}
           keyExtractor={(item) => item.id}
           numColumns={3}
           columnWrapperStyle={{ gap: 6, paddingHorizontal: 12 }}
           showsVerticalScrollIndicator={false}
+          // ── Performance tuning ──────────────────────────
+          initialNumToRender={9}
+          maxToRenderPerBatch={9}
+          updateCellsBatchingPeriod={50}
+          windowSize={8}
+          removeClippedSubviews={Platform.OS !== 'web'}
+          // ────────────────────────────────────────────────
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6C47FF" />
           }
@@ -355,7 +389,14 @@ export default function HomeScreen() {
               <View className="pt-3 pb-2" />
             )
           }
-          renderItem={({ item }) => <ListingCard listing={item} />}
+          ListEmptyComponent={loading ? (
+            <View>
+              {renderSkeleton()}
+              {renderSkeleton()}
+              {renderSkeleton()}
+            </View>
+          ) : null}
+          renderItem={renderItem}
           contentContainerStyle={{ paddingBottom: 24 }}
         />
       )}

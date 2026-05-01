@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
@@ -7,13 +8,13 @@ interface Props {
   listing: Listing;
 }
 
-export function ListingCard({ listing }: Props) {
+export const ListingCard = memo(function ListingCard({ listing }: Props) {
   return (
     <Pressable
       onPress={() => router.push(`/product/${listing.id}`)}
       className="flex-1 mb-4"
     >
-      <View className="relative w-full" style={{ aspectRatio: 1 / 1.33, overflow: 'hidden' }}>
+      <View className="relative w-full" style={{ aspectRatio: 1 / 1.33, overflow: 'hidden', borderRadius: 6 }}>
         <Image
           source={{ uri: listing.images[0] }}
           style={{ width: '100%', height: '100%' }}
@@ -21,6 +22,7 @@ export function ListingCard({ listing }: Props) {
           contentFit="cover"
           cachePolicy="memory-disk"
           recyclingKey={listing.images[0]}
+          transition={250}
         />
         {listing.is_sold && (
           <View className="absolute inset-0 bg-black/40 items-center justify-center">
@@ -44,4 +46,4 @@ export function ListingCard({ listing }: Props) {
       </View>
     </Pressable>
   );
-}
+});
