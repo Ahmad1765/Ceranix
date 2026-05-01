@@ -19,6 +19,8 @@ export function ListingCard({ listing }: Props) {
           style={{ width: '100%', height: '100%' }}
           className="bg-gray-100"
           contentFit="cover"
+          cachePolicy="memory-disk"
+          recyclingKey={listing.images[0]}
         />
         {listing.is_sold && (
           <View className="absolute inset-0 bg-black/40 items-center justify-center">

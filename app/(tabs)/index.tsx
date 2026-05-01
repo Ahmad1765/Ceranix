@@ -336,7 +336,7 @@ export default function HomeScreen() {
         </ScrollView>
       ) : (
         <FlatList
-          key={`${activeTab}-3`}
+          key="feed-3"
           style={{ flex: 1 }}
           data={listings}
           keyExtractor={(item) => item.id}
