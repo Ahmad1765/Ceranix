@@ -34,7 +34,7 @@
       ]
     ],
     "web": {
-      "favicon": "./public/favicon.svg",
+      "favicon": "./assets/images/icon.png",
       "bundler": "metro"
     },
     "experiments": {
