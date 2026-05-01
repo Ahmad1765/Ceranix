@@ -35,9 +35,9 @@
         {
           "photosPermission": "Ceranix needs access to your photos to upload listings."
         }
-      ]
+      ],
+      "expo-asset"
     ],
-
     "web": {
       "favicon": "./assets/images/favicon.png"
     },
