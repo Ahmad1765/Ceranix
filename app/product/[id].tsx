@@ -5,192 +5,393 @@ import {
   ScrollView,
   Pressable,
   Dimensions,
-  SafeAreaView,
   Alert,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Listing } from '@/types';
 
 const { width } = Dimensions.get('window');
+const IMAGE_HEIGHT = width * 1.1;
 
 const CONDITION_LABELS: Record<string, string> = {
   new_with_tags: 'New with tags',
   like_new: 'Like new',
-  good: 'Good',
+  good: 'Very good condition',
   fair: 'Fair',
 };
 
-// TODO: fetch from Supabase by id
 const MOCK_LISTING: Listing = {
   id: '1',
   seller_id: 'u1',
   seller: {
     id: 'u1',
-    username: 'sara_fashion',
+    username: 'axel_lundberg1',
     avatar_url: null,
-    full_name: 'Sara Ahmed',
-    bio: 'Fashion lover from Karachi',
-    location: 'Karachi',
+    full_name: 'Axel Lundberg',
+    bio: null,
+    location: 'Stockholm',
     rating: 4.8,
     total_sales: 34,
     created_at: '',
   },
-  title: 'Zara Floral Midi Dress',
-  description: 'Beautiful floral midi dress from Zara. Worn once to a wedding, in excellent condition. No stains, no pulls. Fits a UK 8 / US 4.',
-  price: 2500,
+  title: 'POC – Cycling Boxer',
+  description: 'Cykelbyxor använda 1 gång. Köpt för 899kr förra sommaren.',
+  price: 425,
   category: 'clothing',
-  gender: 'women',
-  brand: 'Zara',
-  size: 'S',
-  condition: 'like_new',
+  gender: 'men',
+  brand: 'POC',
+  size: 'L',
+  condition: 'good',
   images: [
-    'https://picsum.photos/seed/1a/400/520',
-    'https://picsum.photos/seed/1b/400/520',
-    'https://picsum.photos/seed/1c/400/520',
+    'https://picsum.photos/seed/poc1/400/520',
+    'https://picsum.photos/seed/poc2/400/520',
   ],
   is_sold: false,
   views: 120,
-  likes: 18,
+  likes: 1,
   created_at: '',
 };
 
+const RELATED_ADS = [
+  { id: 'r1', brand: 'Poc', size: 'L', price: 400, image: 'https://picsum.photos/seed/rel1/300/400' },
+  { id: 'r2', brand: 'Poc', size: 'M/L', price: 1000, image: 'https://picsum.photos/seed/rel2/300/400', freeShipping: true },
+  { id: 'r3', brand: 'Mystery Box', size: 'S', price: 249, image: 'https://picsum.photos/seed/rel3/300/400' },
+];
+
+
+function DetailRow({
+  label,
+  value,
+  showArrow,
+  showInfo,
+  colorDot,
+}: {
+  label: string;
+  value: string;
+  showArrow?: boolean;
+  showInfo?: boolean;
+  colorDot?: string;
+}) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 13, borderTopWidth: 1, borderTopColor: '#f3f4f6' }}>
+      <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827', width: 100 }}>{label}</Text>
+      <Text style={{ fontSize: 14, color: '#374151', flex: 1 }}>{value}</Text>
+      {colorDot && (
+        <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: colorDot, marginRight: 6, borderWidth: 1, borderColor: '#e5e7eb' }} />
+      )}
+      {showInfo && <Feather name="info" size={16} color="#9ca3af" style={{ marginLeft: 4 }} />}
+      {showArrow && <Feather name="arrow-up-right" size={16} color="#9ca3af" />}
+    </View>
+  );
+}
+
+function Accordion({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <View style={{ borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 16, marginBottom: 12, overflow: 'hidden' }}>
+      <Pressable
+        onPress={() => setOpen(!open)}
+        style={{ flexDirection: 'row', alignItems: 'center', padding: 16 }}
+      >
+        {icon}
+        <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827', flex: 1, marginLeft: 8 }}>{title}</Text>
+        <Feather name={open ? 'chevron-up' : 'chevron-down'} size={18} color="#6b7280" />
+      </Pressable>
+      {open && (
+        <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
+          {children}
+        </View>
+      )}
+    </View>
+  );
+}
+
 export default function ProductScreen() {
   const { id } = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
   const [activeImage, setActiveImage] = useState(0);
   const [liked, setLiked] = useState(false);
-  const listing = MOCK_LISTING; // replace with Supabase fetch by id
+  const [pinned, setPinned] = useState(false);
+  const [followed, setFollowed] = useState(false);
+  const [showStickyHeader, setShowStickyHeader] = useState(false);
+  const listing = MOCK_LISTING;
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Image carousel */}
-        <ScrollView
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onScroll={(e) => {
-            const page = Math.round(e.nativeEvent.contentOffset.x / width);
-            setActiveImage(page);
-          }}
-          scrollEventThrottle={16}
-        >
-          {listing.images.map((uri, i) => (
-            <Image
-              key={i}
-              source={{ uri }}
-              style={{ width, height: width * 1.2 }}
-              contentFit="cover"
-            />
-          ))}
-        </ScrollView>
+    <View style={{ flex: 1, backgroundColor: 'white' }}>
+      {/* Sticky header (visible after scrolling past image) */}
+      {showStickyHeader && (
+        <View style={{
+          position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100,
+          backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#f3f4f6',
+          paddingTop: insets.top,
+          flexDirection: 'row', alignItems: 'center',
+          paddingHorizontal: 16, paddingBottom: 12,
+        }}>
+          <Pressable onPress={() => router.back()} style={{ marginRight: 12 }}>
+            <Feather name="arrow-left" size={22} color="#111827" />
+          </Pressable>
+          <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: '#111827' }} numberOfLines={1}>
+            {listing.title}
+          </Text>
+          <Text style={{ fontSize: 15, fontWeight: '600', color: '#111827' }}>
+            {listing.price} SEK
+          </Text>
+        </View>
+      )}
 
-        {/* Pagination dots */}
-        {listing.images.length > 1 && (
-          <View className="flex-row justify-center mt-2 gap-1.5">
-            {listing.images.map((_, i) => (
-              <View
-                key={i}
-                className={`w-1.5 h-1.5 rounded-full ${i === activeImage ? 'bg-gray-800' : 'bg-gray-300'}`}
-              />
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 100, width }}
+        onScroll={(e) => {
+          setShowStickyHeader(e.nativeEvent.contentOffset.y > IMAGE_HEIGHT - 80);
+        }}
+        scrollEventThrottle={16}
+      >
+        {/* ── Image carousel ── */}
+        <View style={{ position: 'relative' }}>
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onScroll={(e) => setActiveImage(Math.round(e.nativeEvent.contentOffset.x / width))}
+            scrollEventThrottle={16}
+          >
+            {listing.images.map((uri, i) => (
+              <Image key={i} source={{ uri }} style={{ width, height: IMAGE_HEIGHT }} contentFit="cover" />
             ))}
-          </View>
-        )}
+          </ScrollView>
 
-        <View className="px-4 pt-4">
-          {/* Price + like */}
-          <View className="flex-row items-start justify-between">
-            <View>
-              <Text className="text-2xl font-bold text-gray-900">
-                Rs {listing.price.toLocaleString()}
-              </Text>
-              {listing.brand && (
-                <Text className="text-sm text-gray-500 mt-0.5">{listing.brand}</Text>
-              )}
-            </View>
+          {/* Back button */}
+          <Pressable
+            onPress={() => router.back()}
+            style={{ position: 'absolute', top: insets.top + 12, left: 16 }}
+          >
+            <Feather name="arrow-left" size={24} color="#111827" />
+          </Pressable>
+
+          {/* Boost button (lime circle) */}
+          <View style={{
+            position: 'absolute', top: insets.top + 8, right: 16,
+            width: 42, height: 42, borderRadius: 21,
+            backgroundColor: '#e4ff3a',
+            alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Ionicons name="rocket" size={20} color="#111827" />
+          </View>
+
+          {/* Right-side action buttons */}
+          <View style={{ position: 'absolute', right: 16, bottom: 56, gap: 10 }}>
+            <Pressable
+              onPress={() => setPinned(!pinned)}
+              style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: 'white', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 6, elevation: 4 }}
+            >
+              <Feather name="bookmark" size={20} color={pinned ? '#6C47FF' : '#111827'} />
+              <Text style={{ fontSize: 11, color: '#374151', marginTop: 1 }}>{pinned ? 1 : 0}</Text>
+            </Pressable>
             <Pressable
               onPress={() => setLiked(!liked)}
-              className="p-2"
+              style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: 'white', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 6, elevation: 4 }}
             >
-              <Feather
-                name="heart"
-                size={24}
-                color={liked ? '#ef4444' : '#6b7280'}
-                fill={liked ? '#ef4444' : 'none'}
-              />
+              <Feather name="heart" size={20} color={liked ? '#ef4444' : '#111827'} />
+              <Text style={{ fontSize: 11, color: '#374151', marginTop: 1 }}>{liked ? listing.likes + 1 : listing.likes}</Text>
+            </Pressable>
+            <Pressable
+              style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: 'white', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 6, elevation: 4 }}
+            >
+              <Ionicons name="sparkles" size={20} color="#111827" />
             </Pressable>
           </View>
 
-          <Text className="text-lg font-semibold text-gray-900 mt-2">{listing.title}</Text>
-
-          {/* Tags */}
-          <View className="flex-row flex-wrap gap-2 mt-3">
-            {listing.size && (
-              <View className="bg-gray-100 rounded-full px-3 py-1">
-                <Text className="text-xs text-gray-600">Size: {listing.size}</Text>
-              </View>
-            )}
-            <View className="bg-gray-100 rounded-full px-3 py-1">
-              <Text className="text-xs text-gray-600">{CONDITION_LABELS[listing.condition]}</Text>
+          {/* Pagination dots */}
+          {listing.images.length > 1 && (
+            <View style={{ position: 'absolute', bottom: 16, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5 }}>
+              {listing.images.map((_, i) => (
+                <View
+                  key={i}
+                  style={{
+                    width: i === activeImage ? 20 : 6,
+                    height: 6,
+                    borderRadius: 3,
+                    backgroundColor: i === activeImage ? '#1f2937' : '#d1d5db',
+                  }}
+                />
+              ))}
             </View>
-            <View className="bg-gray-100 rounded-full px-3 py-1">
-              <Text className="text-xs text-gray-600 capitalize">{listing.gender}</Text>
+          )}
+        </View>
+
+        {/* ── Title / price / size ── */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 16 }}>
+          <Text style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>
+            Liked by <Text style={{ color: '#111827' }}>@sagaost</Text>
+          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: '#111827', flex: 1 }}>
+              {listing.title}
+            </Text>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827', marginLeft: 12 }}>
+              {listing.price} SEK
+            </Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>Size </Text>
+            <Text style={{ fontSize: 15, color: '#111827' }}>{listing.size}</Text>
+          </View>
+          <Text style={{ fontSize: 12, color: '#9ca3af', textAlign: 'center', marginTop: 14 }}>Annons</Text>
+        </View>
+
+
+        {/* ── Seller ── */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 }}>
+          <Text style={{ fontSize: 12, color: '#9ca3af', marginBottom: 10 }}>Seller</Text>
+          <View style={{ borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 16, padding: 14 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: '#e5e7eb', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                <Feather name="user" size={24} color="#9ca3af" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>{listing.seller.full_name}</Text>
+                <Text style={{ fontSize: 13, color: '#6b7280', marginTop: 1 }}>@{listing.seller.username}</Text>
+              </View>
+              <Pressable
+                onPress={() => setFollowed(!followed)}
+                style={{ backgroundColor: followed ? '#f3f4f6' : '#111827', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 9, flexDirection: 'row', alignItems: 'center' }}
+              >
+                <Feather name="plus" size={13} color={followed ? '#111827' : 'white'} style={{ marginRight: 4 }} />
+                <Text style={{ fontSize: 13, fontWeight: '600', color: followed ? '#111827' : 'white' }}>
+                  {followed ? 'Following' : 'Follow'}
+                </Text>
+              </Pressable>
+            </View>
+            <View style={{ marginTop: 10 }}>
+              <Text style={{ fontSize: 12, color: '#9ca3af' }}>Last seen</Text>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827', marginTop: 1 }}>This week</Text>
             </View>
           </View>
+        </View>
 
-          {/* Description */}
-          <Text className="text-sm text-gray-600 mt-4 leading-5">{listing.description}</Text>
 
-          {/* Divider */}
-          <View className="h-px bg-gray-100 my-4" />
+        {/* ── Item description ── */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 }}>
+          <Text style={{ fontSize: 12, color: '#9ca3af', marginBottom: 10 }}>Item description</Text>
+          <View style={{ borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 16, paddingHorizontal: 14, paddingTop: 14, paddingBottom: 4 }}>
+            <Text style={{ fontSize: 14, color: '#374151', lineHeight: 20 }}>{listing.description}</Text>
+            <Pressable style={{ marginTop: 6, marginBottom: 2 }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: '#6C47FF' }}>Show translation</Text>
+            </Pressable>
+            <DetailRow label="Category" value="Clothes" showArrow />
+            <DetailRow label="Size" value={listing.size || '–'} />
+            <DetailRow label="Condition" value={CONDITION_LABELS[listing.condition] || listing.condition} showInfo />
+            <DetailRow label="Color" value="Black" colorDot="#111827" />
+            <DetailRow label="Brand" value={listing.brand || '–'} showArrow />
+          </View>
+        </View>
 
-          {/* Seller */}
-          <Pressable
-            onPress={() => router.push(`/user/${listing.seller_id}`)}
-            className="flex-row items-center"
+
+        {/* ── Contact / Share / Report ── */}
+        <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 16, justifyContent: 'space-around' }}>
+          {[
+            { icon: 'message-circle', label: 'Contact' },
+            { icon: 'share-2', label: 'Share' },
+            { icon: 'alert-triangle', label: 'Report' },
+          ].map(({ icon, label }) => (
+            <Pressable key={label} style={{ alignItems: 'center', gap: 6 }} onPress={() => Alert.alert(label)}>
+              <Feather name={icon as any} size={20} color="#374151" />
+              <Text style={{ fontSize: 13, color: '#374151' }}>{label}</Text>
+            </Pressable>
+          ))}
+        </View>
+
+
+        {/* ── Accordions ── */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
+          <Accordion
+            icon={<Ionicons name="shield" size={20} color="#6C47FF" />}
+            title="About buyers protection"
           >
-            <View className="w-10 h-10 rounded-full bg-gray-200 items-center justify-center mr-3">
-              <Feather name="user" size={20} color="#9ca3af" />
-            </View>
-            <View className="flex-1">
-              <Text className="text-sm font-semibold text-gray-900">
-                {listing.seller.username}
-              </Text>
-              <View className="flex-row items-center">
-                <Feather name="star" size={11} color="#f97316" />
-                <Text className="text-xs text-gray-500 ml-1">
-                  {listing.seller.rating} · {listing.seller.total_sales} sales · {listing.seller.location}
+            <Text style={{ fontSize: 13, color: '#6b7280', lineHeight: 20 }}>
+              Buyer protection is an insurance that safeguards your purchase. The fee, based on the item's price, allows us to reimburse you if something goes wrong. Report any issue within 24 hours of receiving the package.{' '}
+              <Text style={{ textDecorationLine: 'underline' }}>Read more about it here.</Text>
+            </Text>
+          </Accordion>
+
+          <Accordion
+            icon={<Ionicons name="bag-handle" size={20} color="#6C47FF" />}
+            title="Buy via plick"
+          >
+            <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827', marginBottom: 6 }}>
+              Buy Directly or via Price Offer
+            </Text>
+            <Text style={{ fontSize: 13, color: '#6b7280', lineHeight: 20 }}>
+              To purchase an item through plick, you can buy the item directly via <Text style={{ fontWeight: '700' }}>Buy</Text> or suggest a price via <Text style={{ fontWeight: '700' }}>Price Offer.</Text> All purchases through plick have discounted and trackable shipping, as well as buyer protection.
+            </Text>
+          </Accordion>
+        </View>
+
+        <Text style={{ fontSize: 12, color: '#9ca3af', textAlign: 'center', marginVertical: 12 }}>Annons</Text>
+
+
+        {/* ── Related ads ── */}
+        <View style={{ paddingTop: 16, paddingBottom: 8 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, marginBottom: 12 }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>Related ads</Text>
+            <Pressable style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={{ fontSize: 13, color: '#374151' }}>Show all</Text>
+              <Feather name="chevron-right" size={14} color="#374151" />
+            </Pressable>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 12 }}>
+            {RELATED_ADS.map((item) => (
+              <Pressable key={item.id} style={{ flex: 1 }} onPress={() => router.push(`/product/${item.id}`)}>
+                <View style={{ position: 'relative', aspectRatio: 3 / 4, borderRadius: 8, overflow: 'hidden', backgroundColor: '#f3f4f6' }}>
+                  <Image source={{ uri: item.image }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+                  {item.freeShipping && (
+                    <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.55)', paddingVertical: 4, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center' }}>
+                      <Feather name="truck" size={10} color="white" style={{ marginRight: 3 }} />
+                      <Text style={{ fontSize: 10, color: 'white', fontWeight: '600' }}>Free shipping</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={{ fontSize: 12, color: '#374151', marginTop: 4 }} numberOfLines={1}>
+                  {item.brand} <Text style={{ fontWeight: '700' }}>{item.size}</Text>
                 </Text>
-              </View>
-            </View>
-            <Feather name="chevron-right" size={16} color="#9ca3af" />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#111827' }}>{item.price} SEK</Text>
+              </Pressable>
+            ))}
+          </View>
+          <Pressable
+            style={{ marginHorizontal: 16, marginTop: 16, backgroundColor: '#e4ff3a', borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}
+          >
+            <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>See more</Text>
           </Pressable>
-
-          <View className="h-px bg-gray-100 my-4" />
-
-          {/* Views */}
-          <Text className="text-xs text-gray-400 text-center mb-4">
-            {listing.views} views · {listing.likes} likes
-          </Text>
         </View>
       </ScrollView>
 
-      {/* Bottom bar */}
-      <View className="px-4 pb-6 pt-2 border-t border-gray-100 flex-row gap-3">
+      {/* ── Fixed bottom bar ── */}
+      <View style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        backgroundColor: 'white',
+        borderTopWidth: 1, borderTopColor: '#f3f4f6',
+        paddingHorizontal: 16, paddingTop: 12,
+        paddingBottom: insets.bottom || 16,
+        flexDirection: 'row', gap: 12,
+      }}>
         <Pressable
-          onPress={() => router.push(`/conversation/new?listing=${listing.id}&seller=${listing.seller_id}`)}
-          className="flex-1 border border-gray-200 rounded-xl py-3.5 items-center"
+          onPress={() => Alert.alert('Price suggestion', 'Enter your offer')}
+          style={{ flex: 1, borderWidth: 1.5, borderColor: '#d1d5db', borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}
         >
-          <Text className="text-sm font-semibold text-gray-800">Message Seller</Text>
+          <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827' }}>Price suggestion</Text>
         </Pressable>
         <Pressable
           onPress={() => Alert.alert('Buy', 'Payment flow coming soon')}
-          className="flex-1 bg-brand-500 rounded-xl py-3.5 items-center"
+          style={{ flex: 1, backgroundColor: '#4ade80', borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}
         >
-          <Text className="text-sm font-bold text-white">Buy Now</Text>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>Buy</Text>
         </Pressable>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }

@@ -1,17 +1,101 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   FlatList,
   RefreshControl,
   Pressable,
-  Image,
+  ScrollView,
+  Animated,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { ListingCard } from '@/components/ListingCard';
+import { PromoBanner } from '@/components/PromoBanner';
 import type { Listing } from '@/types';
+
+type TabName = 'For you' | 'Popular' | 'Following';
+
+function AnimatedTabPill({
+  tab,
+  isActive,
+  onPress,
+}: {
+  tab: TabName;
+  isActive: boolean;
+  onPress: () => void;
+}) {
+  // JS-driver anim for color (can't use native driver with backgroundColor)
+  const colorAnim = useRef(new Animated.Value(isActive ? 1 : 0)).current;
+  // Native-driver anim for scale (fast, jank-free)
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.timing(colorAnim, {
+      toValue: isActive ? 1 : 0,
+      duration: 250,
+      useNativeDriver: false,
+    }).start();
+  }, [isActive]);
+
+  const backgroundColor = colorAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#F2F2F2', '#6C47FF'],
+  });
+
+  const textColor = colorAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#374151', '#ffffff'],
+  });
+
+  const iconName = tab === 'For you' ? 'sparkles' : tab === 'Popular' ? 'flame' : 'person';
+
+  return (
+    <Pressable
+      onPress={onPress}
+      onPressIn={() =>
+        Animated.spring(scaleAnim, { toValue: 0.93, useNativeDriver: true, speed: 30, bounciness: 4 }).start()
+      }
+      onPressOut={() =>
+        Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 6 }).start()
+      }
+    >
+      {/* Outer view handles scale (native driver) */}
+      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+        {/* Inner view handles background color (JS driver) */}
+        <Animated.View
+          style={{
+            backgroundColor,
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 16,
+            paddingVertical: 8,
+            borderRadius: 999,
+          }}
+        >
+          <Ionicons
+            name={iconName as any}
+            size={14}
+            color={isActive ? '#ffffff' : '#374151'}
+            style={{ marginRight: 5 }}
+          />
+          <Animated.Text style={{ fontSize: 14, fontWeight: '600', color: textColor }}>
+            {tab}
+          </Animated.Text>
+        </Animated.View>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+const SUGGESTED_USERS = [
+  { id: 'u1', display_name: 'dafneee', username: '@dafneee', avatar: 'https://picsum.photos/seed/dafne/80/80' },
+  { id: 'u2', display_name: 'T.Fashion', username: '@t.fashion', avatar: 'https://picsum.photos/seed/tfash/80/80' },
+  { id: 'u3', display_name: 'Thea settergren', username: '@theasettergren', avatar: 'https://picsum.photos/seed/thea/80/80' },
+  { id: 'u4', display_name: 'Leah Ferm', username: '@leah.ferm', avatar: 'https://picsum.photos/seed/leah/80/80' },
+  { id: 'u5', display_name: 'Edita Kondrat Art', username: '@editakondratjewelry', avatar: 'https://picsum.photos/seed/edita/80/80' },
+];
 
 const MOCK_LISTINGS: Listing[] = [
   {
@@ -86,13 +170,102 @@ const MOCK_LISTINGS: Listing[] = [
     likes: 14,
     created_at: '',
   },
+  {
+    id: '10',
+    seller_id: 'u7',
+    seller: { id: 'u7', username: 'sara_style', avatar_url: null, full_name: 'Sara', bio: null, location: 'Stockholm', rating: 4.9, total_sales: 40, created_at: '' },
+    title: 'Acne Studios',
+    description: 'Barely used.',
+    price: 899,
+    category: 'clothing',
+    gender: 'women',
+    brand: 'Acne Studios',
+    size: 'M',
+    condition: 'like_new',
+    images: ['https://picsum.photos/seed/10/400/520'],
+    is_sold: false,
+    views: 120,
+    likes: 31,
+    created_at: '',
+  },
+  {
+    id: '11',
+    seller_id: 'u8',
+    seller: { id: 'u8', username: 'karl_fits', avatar_url: null, full_name: 'Karl', bio: null, location: 'Gothenburg', rating: 4.5, total_sales: 12, created_at: '' },
+    title: 'Carhartt WIP',
+    description: 'Great condition.',
+    price: 450,
+    category: 'clothing',
+    gender: 'men',
+    brand: 'Carhartt',
+    size: 'L',
+    condition: 'good',
+    images: ['https://picsum.photos/seed/21/400/520'],
+    is_sold: false,
+    views: 64,
+    likes: 9,
+    created_at: '',
+  },
+  {
+    id: '12',
+    seller_id: 'u9',
+    seller: { id: 'u9', username: 'lena_preloved', avatar_url: null, full_name: 'Lena', bio: null, location: 'Malmö', rating: 4.6, total_sales: 18, created_at: '' },
+    title: 'Weekday',
+    description: 'Worn twice.',
+    price: 299,
+    category: 'clothing',
+    gender: 'women',
+    brand: 'Weekday',
+    size: 'S',
+    condition: 'like_new',
+    images: ['https://picsum.photos/seed/33/400/520'],
+    is_sold: false,
+    views: 47,
+    likes: 7,
+    created_at: '',
+  },
+  {
+    id: '13',
+    seller_id: 'u10',
+    seller: { id: 'u10', username: 'oskar_shop', avatar_url: null, full_name: 'Oskar', bio: null, location: 'Uppsala', rating: 4.2, total_sales: 8, created_at: '' },
+    title: 'Tiger of Sweden',
+    description: 'Perfect condition.',
+    price: 750,
+    category: 'clothing',
+    gender: 'men',
+    brand: 'Tiger of Sweden',
+    size: '50',
+    condition: 'like_new',
+    images: ['https://picsum.photos/seed/44/400/520'],
+    is_sold: false,
+    views: 89,
+    likes: 20,
+    created_at: '',
+  },
+  {
+    id: '14',
+    seller_id: 'u11',
+    seller: { id: 'u11', username: 'maja_closet', avatar_url: null, full_name: 'Maja', bio: null, location: 'Lund', rating: 4.8, total_sales: 33, created_at: '' },
+    title: 'Filippa K',
+    description: 'Elegant, light wear.',
+    price: 620,
+    category: 'clothing',
+    gender: 'women',
+    brand: 'Filippa K',
+    size: 'XS',
+    condition: 'good',
+    images: ['https://picsum.photos/seed/55/400/520'],
+    is_sold: false,
+    views: 103,
+    likes: 27,
+    created_at: '',
+  },
 ];
 
-const TABS = ['For you', 'Popular', 'Following'] as const;
-type FeedTab = typeof TABS[number];
+const TABS: TabName[] = ['For you', 'Popular', 'Following'];
 
 export default function HomeScreen() {
-  const [activeTab, setActiveTab] = useState<FeedTab>('For you');
+  const [activeTab, setActiveTab] = useState<TabName>('For you');
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = useCallback(() => {
@@ -109,71 +282,83 @@ export default function HomeScreen() {
       {/* Search Header */}
       <View className="flex-row items-center px-4 pt-2 pb-3">
         <View className="flex-1 flex-row items-center bg-[#F2F2F2] rounded-full px-4 py-[10px] mr-3">
-          <Feather name="search" size={20} color="#9ca3af" />
-          <Text className="ml-3 flex-1 text-[16px] text-gray-500">
+          <Feather name="search" size={18} color="#9ca3af" />
+          <Text className="ml-2.5 flex-1 text-[15px] text-gray-400">
             What are you looking for today?
           </Text>
         </View>
-        <Pressable className="w-[42px] h-[42px] border border-gray-200 rounded-[12px] items-center justify-center bg-white shadow-sm">
-          <Feather name="menu" size={20} color="#000" />
+        <Pressable className="w-[42px] h-[42px] border border-gray-200 rounded-[10px] items-center justify-center bg-white">
+          <Feather name="sliders" size={18} color="#111827" />
         </Pressable>
       </View>
 
       {/* Feed tabs */}
-      <View className="flex-row px-4 pb-4">
-        {TABS.map((tab) => {
-          const isActive = activeTab === tab;
-          let iconName: any = 'sparkles';
-          if (tab === 'Popular') iconName = 'flame';
-          if (tab === 'Following') iconName = 'person';
-          
-          return (
-            <Pressable
-              key={tab}
-              onPress={() => setActiveTab(tab)}
-              className={`mr-2 px-4 py-2 rounded-full border flex-row items-center ${isActive ? 'border-transparent' : 'border-transparent bg-[#F2F2F2]'}`}
-              style={isActive ? { backgroundColor: '#5C5CFF' } : {}}
-            >
-              <Ionicons name={iconName} size={14} color={isActive ? '#ffffff' : '#111827'} style={{ marginRight: 6 }} />
-              <Text
-                className={`text-[15px] font-bold ${
-                  isActive ? 'text-white' : 'text-gray-900'
-                }`}
-              >
-                {tab}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        className="px-4"
+        style={{ flexGrow: 0 }}
+        contentContainerStyle={{ paddingBottom: 12, gap: 8 }}
+      >
+        {TABS.map((tab) => (
+          <AnimatedTabPill
+            key={tab}
+            tab={tab}
+            isActive={activeTab === tab}
+            onPress={() => setActiveTab(tab)}
+          />
+        ))}
+      </ScrollView>
 
-      <FlatList
-        key={3} // Add key to force re-render when changing columns
-        data={listings}
-        keyExtractor={(item) => item.id}
-        numColumns={3}
-        columnWrapperStyle={{ gap: 8, paddingHorizontal: 16 }}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#e4ff3a" />
-        }
-        ListHeaderComponent={
-          activeTab === 'For you' ? (
-            <View className="pb-4 px-4 w-full">
+      {activeTab === 'Following' ? (
+        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
+          <Text className="text-center text-[15px] text-gray-800 leading-[22px] px-8 pt-6 pb-5">
+            {'Oops, you are not following anyone yet! 😭\nFollow other plickers to get one step closer to your dream clothes! Here are some recommendations 🌀💛'}
+          </Text>
+          {SUGGESTED_USERS.map((user) => (
+            <View key={user.id} className="flex-row items-center px-4 py-3">
               <Image
-                source={require('../../Sreenshots/asdfWhatsApp Image 2026-04-16 at 12.38.07 AM.jpeg')}
-                style={{ width: '100%', height: 160, borderRadius: 12 }}
-                resizeMode="cover"
+                source={{ uri: user.avatar }}
+                style={{ width: 52, height: 52, borderRadius: 26 }}
+                className="bg-gray-200"
+                contentFit="cover"
               />
+              <View className="flex-1 ml-3">
+                <Text className="text-[15px] font-bold text-gray-900">{user.display_name}</Text>
+                <Text className="text-[13px] text-gray-500 mt-0.5">{user.username}</Text>
+              </View>
+              <Pressable className="bg-black rounded-[10px] px-5 py-2 flex-row items-center">
+                <Feather name="plus" size={13} color="#fff" style={{ marginRight: 4 }} />
+                <Text className="text-white text-[13px] font-semibold">Follow</Text>
+              </Pressable>
             </View>
-          ) : (
-            <View className="pt-3 pb-2" />
-          )
-        }
-        renderItem={({ item }) => <ListingCard listing={item} />}
-        contentContainerStyle={{ paddingBottom: 24 }}
-      />
+          ))}
+        </ScrollView>
+      ) : (
+        <FlatList
+          key={`${activeTab}-3`}
+          style={{ flex: 1 }}
+          data={listings}
+          keyExtractor={(item) => item.id}
+          numColumns={3}
+          columnWrapperStyle={{ gap: 6, paddingHorizontal: 12 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6C47FF" />
+          }
+          ListHeaderComponent={
+            activeTab === 'For you' ? (
+              <View className="pb-4">
+                <PromoBanner onReadMore={() => {}} />
+              </View>
+            ) : (
+              <View className="pt-3 pb-2" />
+            )
+          }
+          renderItem={({ item }) => <ListingCard listing={item} />}
+          contentContainerStyle={{ paddingBottom: 24 }}
+        />
+      )}
     </SafeAreaView>
   );
 }
-

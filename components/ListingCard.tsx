@@ -11,7 +11,7 @@ export function ListingCard({ listing }: Props) {
   return (
     <Pressable
       onPress={() => router.push(`/product/${listing.id}`)}
-      className="flex-1 mb-6 px-1"
+      className="flex-1 mb-4"
     >
       <View className="relative w-full" style={{ aspectRatio: 1 / 1.33, overflow: 'hidden' }}>
         <Image
@@ -33,7 +33,7 @@ export function ListingCard({ listing }: Props) {
             {listing.brand || listing.title}
           </Text>
           {listing.size && (
-            <Text className="text-[13px] font-medium text-gray-500 ml-1">{listing.size}</Text>
+            <Text className="text-[13px] font-bold text-gray-700 ml-1">{listing.size}</Text>
           )}
         </View>
         <Text className="text-[14px] font-bold text-black mt-0.5">
