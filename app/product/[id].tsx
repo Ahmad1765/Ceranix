@@ -63,7 +63,7 @@ const MOCK_LISTING: Listing = {
 
 type RelatedItem = {
   id: string;
-  image: string;
+  images: string[];
   brand: string;
   meta: string;
   price: number;
@@ -74,7 +74,11 @@ type RelatedItem = {
 const MEMBER_ITEMS: RelatedItem[] = [
   {
     id: 'm1',
-    image: 'https://picsum.photos/seed/mi1/400/520',
+    images: [
+      'https://picsum.photos/seed/mi1/400/520',
+      'https://picsum.photos/seed/mi1b/400/520',
+      'https://picsum.photos/seed/mi1c/400/520',
+    ],
     brand: 'Ralph Lauren',
     meta: 'S · Very good',
     price: 49,
@@ -83,7 +87,11 @@ const MEMBER_ITEMS: RelatedItem[] = [
   },
   {
     id: 'm2',
-    image: 'https://picsum.photos/seed/mi2/400/520',
+    images: [
+      'https://picsum.photos/seed/mi2/400/520',
+      'https://picsum.photos/seed/mi2b/400/520',
+      'https://picsum.photos/seed/mi2c/400/520',
+    ],
     brand: 'Carolina Herrera',
     meta: 'S / 36 / 8 · New with tags',
     price: 190,
@@ -92,7 +100,11 @@ const MEMBER_ITEMS: RelatedItem[] = [
   },
   {
     id: 'm3',
-    image: 'https://picsum.photos/seed/mi3/400/520',
+    images: [
+      'https://picsum.photos/seed/mi3/400/520',
+      'https://picsum.photos/seed/mi3b/400/520',
+      'https://picsum.photos/seed/mi3c/400/520',
+    ],
     brand: 'Hugo Boss',
     meta: 'M · Good',
     price: 35,
@@ -101,7 +113,11 @@ const MEMBER_ITEMS: RelatedItem[] = [
   },
   {
     id: 'm4',
-    image: 'https://picsum.photos/seed/mi4/400/520',
+    images: [
+      'https://picsum.photos/seed/mi4/400/520',
+      'https://picsum.photos/seed/mi4b/400/520',
+      'https://picsum.photos/seed/mi4c/400/520',
+    ],
     brand: 'Burberry',
     meta: 'L · Very good',
     price: 89,
@@ -113,7 +129,11 @@ const MEMBER_ITEMS: RelatedItem[] = [
 const SIMILAR_ITEMS: RelatedItem[] = [
   {
     id: 's1',
-    image: 'https://picsum.photos/seed/si1/400/520',
+    images: [
+      'https://picsum.photos/seed/si1/400/520',
+      'https://picsum.photos/seed/si1b/400/520',
+      'https://picsum.photos/seed/si1c/400/520',
+    ],
     brand: "Arc'teryx",
     meta: 'M · Very good',
     price: 175,
@@ -122,7 +142,11 @@ const SIMILAR_ITEMS: RelatedItem[] = [
   },
   {
     id: 's2',
-    image: 'https://picsum.photos/seed/si2/400/520',
+    images: [
+      'https://picsum.photos/seed/si2/400/520',
+      'https://picsum.photos/seed/si2b/400/520',
+      'https://picsum.photos/seed/si2c/400/520',
+    ],
     brand: 'Patagonia',
     meta: 'L · Like new',
     price: 120,
@@ -131,7 +155,11 @@ const SIMILAR_ITEMS: RelatedItem[] = [
   },
   {
     id: 's3',
-    image: 'https://picsum.photos/seed/si3/400/520',
+    images: [
+      'https://picsum.photos/seed/si3/400/520',
+      'https://picsum.photos/seed/si3b/400/520',
+      'https://picsum.photos/seed/si3c/400/520',
+    ],
     brand: 'The North Face',
     meta: 'M · Good',
     price: 95,
@@ -140,7 +168,11 @@ const SIMILAR_ITEMS: RelatedItem[] = [
   },
   {
     id: 's4',
-    image: 'https://picsum.photos/seed/si4/400/520',
+    images: [
+      'https://picsum.photos/seed/si4/400/520',
+      'https://picsum.photos/seed/si4b/400/520',
+      'https://picsum.photos/seed/si4c/400/520',
+    ],
     brand: 'Stone Island',
     meta: 'L · Very good',
     price: 245,
@@ -157,14 +189,77 @@ const CARD_WIDTH = (width - CARD_OUTER_PAD * 2 - CARD_GAP) / 2;
 const CARD_IMAGE_HEIGHT = CARD_WIDTH * 1.25;
 
 function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress: () => void }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const hasMultiple = item.images.length > 1;
   return (
     <Pressable onPress={onPress} style={{ width: CARD_WIDTH, marginBottom: 18 }}>
-      <View style={{ position: 'relative' }}>
-        <Image
-          source={{ uri: item.image }}
-          style={{ width: CARD_WIDTH, height: CARD_IMAGE_HEIGHT, borderRadius: 4, backgroundColor: '#f3f4f6' }}
-          contentFit="cover"
-        />
+      <View
+        style={{
+          position: 'relative',
+          width: CARD_WIDTH,
+          height: CARD_IMAGE_HEIGHT,
+          borderRadius: 4,
+          overflow: 'hidden',
+          backgroundColor: '#f3f4f6',
+        }}
+      >
+        {hasMultiple ? (
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            nestedScrollEnabled
+            onScroll={(e) =>
+              setActiveIndex(Math.round(e.nativeEvent.contentOffset.x / CARD_WIDTH))
+            }
+            scrollEventThrottle={16}
+            disableIntervalMomentum
+          >
+            {item.images.map((uri, i) => (
+              <Image
+                key={i}
+                source={{ uri }}
+                style={{ width: CARD_WIDTH, height: CARD_IMAGE_HEIGHT }}
+                contentFit="cover"
+              />
+            ))}
+          </ScrollView>
+        ) : (
+          <Image
+            source={{ uri: item.images[0] }}
+            style={{ width: CARD_WIDTH, height: CARD_IMAGE_HEIGHT }}
+            contentFit="cover"
+          />
+        )}
+
+        {hasMultiple && (
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              bottom: 6,
+              left: 0,
+              right: 0,
+              flexDirection: 'row',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            {item.images.map((_, i) => (
+              <View
+                key={i}
+                style={{
+                  width: 5,
+                  height: 5,
+                  borderRadius: 3,
+                  backgroundColor: i === activeIndex ? 'white' : 'rgba(255,255,255,0.55)',
+                }}
+              />
+            ))}
+          </View>
+        )}
+
         <View
           style={{
             position: 'absolute',
@@ -503,11 +598,11 @@ export default function ProductScreen() {
           </View>
         </View>
 
-        {/* ── Grailed Verified card ── */}
+        {/* ── Carrinex Verified card ── */}
         <View style={{ marginHorizontal: 16, marginBottom: 12, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 16 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
             <Ionicons name="checkmark-circle" size={28} color="#2563eb" />
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>Grailed Verified</Text>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>Carrinex Verified</Text>
           </View>
           <Text style={{ fontSize: 13, color: '#374151', lineHeight: 19 }}>
             This item has been verified by our in-house team or a trusted partner.{' '}
@@ -519,10 +614,10 @@ export default function ProductScreen() {
         <View style={{ marginHorizontal: 16, marginBottom: 16, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 16 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
             <Ionicons name="shield" size={26} color="#2563eb" />
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>Grailed Purchase Protection</Text>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>Carrinex Purchase Protection</Text>
           </View>
           <Text style={{ fontSize: 13, color: '#374151', lineHeight: 19, marginBottom: 14 }}>
-            We want you to feel safe buying and selling on Grailed. Qualifying orders are covered by our Purchase Protection in the rare case something goes wrong.
+            We want you to feel safe buying and selling on Carrinex. Qualifying orders are covered by our Purchase Protection in the rare case something goes wrong.
           </Text>
           <Pressable style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }} onPress={() => {}}>
             <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827' }}>How You're Protected</Text>
