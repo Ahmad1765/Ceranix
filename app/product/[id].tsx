@@ -61,14 +61,149 @@ const MOCK_LISTING: Listing = {
   created_at: '',
 };
 
-const SIMILAR_LISTINGS = [
-  { id: 's1', image: 'https://picsum.photos/seed/sim1/200/200' },
-  { id: 's2', image: 'https://picsum.photos/seed/sim2/200/200' },
-  { id: 's3', image: 'https://picsum.photos/seed/sim3/200/200' },
-  { id: 's4', image: 'https://picsum.photos/seed/sim4/200/200' },
-  { id: 's5', image: 'https://picsum.photos/seed/sim5/200/200' },
-  { id: 's6', image: 'https://picsum.photos/seed/sim6/200/200' },
+type RelatedItem = {
+  id: string;
+  image: string;
+  brand: string;
+  meta: string;
+  price: number;
+  inclPrice: number;
+  likes: number;
+};
+
+const MEMBER_ITEMS: RelatedItem[] = [
+  {
+    id: 'm1',
+    image: 'https://picsum.photos/seed/mi1/400/520',
+    brand: 'Ralph Lauren',
+    meta: 'S · Very good',
+    price: 49,
+    inclPrice: 52.15,
+    likes: 7,
+  },
+  {
+    id: 'm2',
+    image: 'https://picsum.photos/seed/mi2/400/520',
+    brand: 'Carolina Herrera',
+    meta: 'S / 36 / 8 · New with tags',
+    price: 190,
+    inclPrice: 200.2,
+    likes: 8,
+  },
+  {
+    id: 'm3',
+    image: 'https://picsum.photos/seed/mi3/400/520',
+    brand: 'Hugo Boss',
+    meta: 'M · Good',
+    price: 35,
+    inclPrice: 37.65,
+    likes: 4,
+  },
+  {
+    id: 'm4',
+    image: 'https://picsum.photos/seed/mi4/400/520',
+    brand: 'Burberry',
+    meta: 'L · Very good',
+    price: 89,
+    inclPrice: 94.2,
+    likes: 12,
+  },
 ];
+
+const SIMILAR_ITEMS: RelatedItem[] = [
+  {
+    id: 's1',
+    image: 'https://picsum.photos/seed/si1/400/520',
+    brand: "Arc'teryx",
+    meta: 'M · Very good',
+    price: 175,
+    inclPrice: 184.65,
+    likes: 23,
+  },
+  {
+    id: 's2',
+    image: 'https://picsum.photos/seed/si2/400/520',
+    brand: 'Patagonia',
+    meta: 'L · Like new',
+    price: 120,
+    inclPrice: 126.6,
+    likes: 15,
+  },
+  {
+    id: 's3',
+    image: 'https://picsum.photos/seed/si3/400/520',
+    brand: 'The North Face',
+    meta: 'M · Good',
+    price: 95,
+    inclPrice: 100.45,
+    likes: 9,
+  },
+  {
+    id: 's4',
+    image: 'https://picsum.photos/seed/si4/400/520',
+    brand: 'Stone Island',
+    meta: 'L · Very good',
+    price: 245,
+    inclPrice: 258.95,
+    likes: 31,
+  },
+];
+
+const TEAL = '#007782';
+
+const CARD_GAP = 8;
+const CARD_OUTER_PAD = 12;
+const CARD_WIDTH = (width - CARD_OUTER_PAD * 2 - CARD_GAP) / 2;
+const CARD_IMAGE_HEIGHT = CARD_WIDTH * 1.25;
+
+function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={{ width: CARD_WIDTH, marginBottom: 18 }}>
+      <View style={{ position: 'relative' }}>
+        <Image
+          source={{ uri: item.image }}
+          style={{ width: CARD_WIDTH, height: CARD_IMAGE_HEIGHT, borderRadius: 4, backgroundColor: '#f3f4f6' }}
+          contentFit="cover"
+        />
+        <View
+          style={{
+            position: 'absolute',
+            bottom: 8,
+            right: 8,
+            backgroundColor: 'white',
+            borderRadius: 16,
+            paddingHorizontal: 9,
+            paddingVertical: 5,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+            shadowColor: '#000',
+            shadowOpacity: 0.1,
+            shadowRadius: 4,
+            shadowOffset: { width: 0, height: 1 },
+            elevation: 2,
+          }}
+        >
+          <Feather name="heart" size={13} color="#374151" />
+          <Text style={{ fontSize: 12, fontWeight: '600', color: '#374151' }}>{item.likes}</Text>
+        </View>
+      </View>
+      <Text style={{ fontSize: 14, color: '#374151', marginTop: 8 }} numberOfLines={1}>
+        {item.brand}
+      </Text>
+      <Text style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }} numberOfLines={1}>
+        {item.meta}
+      </Text>
+      <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827', marginTop: 4 }}>
+        €{item.price.toFixed(2)}
+      </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+        <Text style={{ fontSize: 13, color: TEAL }}>€{item.inclPrice.toFixed(2)} incl.</Text>
+        <Ionicons name="shield-checkmark" size={13} color={TEAL} />
+      </View>
+    </Pressable>
+  );
+}
 
 function StarRating({ rating }: { rating: number }) {
   const full = Math.round(rating);
@@ -94,6 +229,7 @@ export default function ProductScreen() {
   const [pinned, setPinned] = useState(false);
   const [followed, setFollowed] = useState(false);
   const [showStickyHeader, setShowStickyHeader] = useState(false);
+  const [relatedTab, setRelatedTab] = useState<'members' | 'similar'>('members');
   const listing = MOCK_LISTING;
 
   const originalPrice = Math.round(listing.price * 1.24);
@@ -191,30 +327,6 @@ export default function ProductScreen() {
               ))}
             </View>
           )}
-        </View>
-
-        {/* ── Similar Listings ── */}
-        <View style={{ paddingTop: 14, paddingBottom: 14 }}>
-          <Text style={{ fontSize: 14, fontWeight: '500', color: '#111827', paddingHorizontal: 16, marginBottom: 10 }}>
-            Similar Listings
-          </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} nestedScrollEnabled contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
-            {SIMILAR_LISTINGS.map((item) => (
-              <Pressable key={item.id} onPress={() => {}}>
-                <Image
-                  source={{ uri: item.image }}
-                  style={{ width: 72, height: 72, borderRadius: 4 }}
-                  contentFit="cover"
-                />
-              </Pressable>
-            ))}
-            <Pressable
-              style={{ width: 72, height: 72, borderRadius: 4, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' }}
-              onPress={() => {}}
-            >
-              <Text style={{ fontSize: 11, fontWeight: '700', color: '#374151', textAlign: 'center' }}>SEE{'\n'}MORE</Text>
-            </Pressable>
-          </ScrollView>
         </View>
 
         {/* ── Product info ── */}
@@ -404,7 +516,7 @@ export default function ProductScreen() {
         </View>
 
         {/* ── Purchase Protection card ── */}
-        <View style={{ marginHorizontal: 16, marginBottom: 24, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 16 }}>
+        <View style={{ marginHorizontal: 16, marginBottom: 16, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 16 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
             <Ionicons name="shield" size={26} color="#2563eb" />
             <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>Grailed Purchase Protection</Text>
@@ -416,6 +528,106 @@ export default function ProductScreen() {
             <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827' }}>How You're Protected</Text>
             <Feather name="chevron-down" size={18} color="#6b7280" />
           </Pressable>
+        </View>
+
+        {/* ── Member's items / Similar items tabs ── */}
+        <View style={{ borderTopWidth: 1, borderTopColor: '#e5e7eb' }}>
+          <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#e5e7eb' }}>
+            <Pressable
+              onPress={() => setRelatedTab('members')}
+              style={{
+                flex: 1,
+                paddingVertical: 16,
+                alignItems: 'center',
+                borderBottomWidth: 3,
+                borderBottomColor: relatedTab === 'members' ? TEAL : 'transparent',
+                marginBottom: -1,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 15,
+                  fontWeight: relatedTab === 'members' ? '700' : '400',
+                  color: relatedTab === 'members' ? '#111827' : '#6b7280',
+                }}
+              >
+                Member's items
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setRelatedTab('similar')}
+              style={{
+                flex: 1,
+                paddingVertical: 16,
+                alignItems: 'center',
+                borderBottomWidth: 3,
+                borderBottomColor: relatedTab === 'similar' ? TEAL : 'transparent',
+                marginBottom: -1,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 15,
+                  fontWeight: relatedTab === 'similar' ? '700' : '400',
+                  color: relatedTab === 'similar' ? '#111827' : '#6b7280',
+                }}
+              >
+                Similar items
+              </Text>
+            </Pressable>
+          </View>
+
+          {relatedTab === 'members' ? (
+            <View style={{ paddingTop: 18 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingHorizontal: 16,
+                  marginBottom: 16,
+                }}
+              >
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>Shop bundles</Text>
+                  <Text style={{ fontSize: 14, color: '#6b7280', marginTop: 2 }}>Get up to 20% off</Text>
+                </View>
+                <Pressable
+                  onPress={() => Alert.alert('Create bundle')}
+                  style={{ backgroundColor: TEAL, borderRadius: 6, paddingVertical: 12, paddingHorizontal: 18 }}
+                >
+                  <Text style={{ color: 'white', fontSize: 14, fontWeight: '700' }}>Create bundle</Text>
+                </Pressable>
+              </View>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  paddingHorizontal: CARD_OUTER_PAD,
+                  columnGap: CARD_GAP,
+                }}
+              >
+                {MEMBER_ITEMS.map((item) => (
+                  <RelatedItemCard key={item.id} item={item} onPress={() => router.push(`/product/${item.id}`)} />
+                ))}
+              </View>
+            </View>
+          ) : (
+            <View style={{ paddingTop: 18 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  paddingHorizontal: CARD_OUTER_PAD,
+                  columnGap: CARD_GAP,
+                }}
+              >
+                {SIMILAR_ITEMS.map((item) => (
+                  <RelatedItemCard key={item.id} item={item} onPress={() => router.push(`/product/${item.id}`)} />
+                ))}
+              </View>
+            </View>
+          )}
         </View>
       </ScrollView>
 
