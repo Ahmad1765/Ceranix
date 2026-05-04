@@ -450,79 +450,103 @@ export default function ProductScreen() {
           )}
         </View>
 
-        {/* ── Product info ── */}
-        <View style={{ paddingHorizontal: 16, paddingBottom: 16, borderTopWidth: 1, borderTopColor: '#f3f4f6', paddingTop: 14 }}>
-          {/* Brand + bookmark/heart row */}
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-            <Pressable onPress={() => {}}>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827', textDecorationLine: 'underline' }}>
-                {listing.brand}
-              </Text>
+        {/* ── Brand + actions row ── */}
+        <View style={{ paddingHorizontal: 16, paddingVertical: 14, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+          <Pressable onPress={() => {}}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827', textDecorationLine: 'underline' }}>
+              {listing.brand}
+            </Text>
+          </Pressable>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
+            <Pressable onPress={() => setPinned(!pinned)}>
+              <Feather name="bookmark" size={22} color={pinned ? '#111827' : '#374151'} />
             </Pressable>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
-              <Pressable onPress={() => setPinned(!pinned)}>
-                <Feather name="bookmark" size={22} color={pinned ? '#111827' : '#374151'} />
+            <View style={{ alignItems: 'center' }}>
+              <Pressable onPress={() => setLiked(!liked)}>
+                <Feather name="heart" size={22} color={liked ? '#ef4444' : '#374151'} />
               </Pressable>
-              <View style={{ alignItems: 'center' }}>
-                <Pressable onPress={() => setLiked(!liked)}>
-                  <Feather name="heart" size={22} color={liked ? '#ef4444' : '#374151'} />
-                </Pressable>
-                <Text style={{ fontSize: 12, color: '#374151', marginTop: 2 }}>{heartCount}</Text>
+              <Text style={{ fontSize: 12, color: '#374151', marginTop: 2 }}>{heartCount}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* ── Seller card ── */}
+        <View style={{ paddingHorizontal: 16, paddingVertical: 16, borderTopWidth: 1, borderTopColor: '#e5e7eb' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
+            {/* Avatar */}
+            <View style={{ width: 52, height: 52, borderRadius: 26, overflow: 'hidden', backgroundColor: '#e5e7eb', alignItems: 'center', justifyContent: 'center' }}>
+              {listing.seller.avatar_url ? (
+                <Image source={{ uri: listing.seller.avatar_url }} style={{ width: 52, height: 52 }} contentFit="cover" />
+              ) : (
+                <Feather name="user" size={24} color="#9ca3af" />
+              )}
+            </View>
+
+            {/* Seller info */}
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>
+                {listing.seller.username}
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                <StarRating rating={listing.seller.rating} />
+                <Text style={{ fontSize: 13, color: '#374151' }}>{REVIEWS_COUNT} Reviews</Text>
               </View>
+              <Text style={{ fontSize: 13, color: '#6b7280', marginTop: 3 }}>
+                {TRANSACTIONS_COUNT} Transactions{'  '}
+                <Text style={{ textDecorationLine: 'underline' }}>{ITEMS_FOR_SALE} items for sale</Text>
+              </Text>
             </View>
           </View>
 
-          {/* Title */}
-          <Text style={{ fontSize: 15, color: '#111827', marginTop: 4 }}>
-            {listing.title}
-          </Text>
-
-          {/* Metadata */}
-          <Text style={{ fontSize: 13, color: '#6b7280', marginTop: 4, lineHeight: 18 }}>
-            {metaLine}
-          </Text>
-
-          {/* Price row */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 8 }}>
-            <Text style={{ fontSize: 22, fontWeight: '700', color: '#c0392b' }}>
-              ${listing.price}
-            </Text>
-            <Text style={{ fontSize: 16, color: '#9ca3af', textDecorationLine: 'line-through' }}>
-              ${originalPrice}
-            </Text>
-            <Text style={{ fontSize: 14, color: '#6b7280' }}>
-              {discountPct}% off
-            </Text>
+          {/* Follow + Message buttons */}
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <Pressable
+              onPress={() => setFollowed(!followed)}
+              style={{
+                flex: 1, borderRadius: 6, paddingVertical: 12, alignItems: 'center',
+                backgroundColor: followed ? '#f3f4f6' : '#111827',
+                borderWidth: followed ? 1 : 0, borderColor: '#d1d5db',
+              }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: '700', color: followed ? '#111827' : 'white', letterSpacing: 0.5 }}>
+                {followed ? 'FOLLOWING' : 'FOLLOW'}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => Alert.alert('Message', 'Opening chat...')}
+              style={{ flex: 1, borderRadius: 6, paddingVertical: 12, alignItems: 'center', backgroundColor: '#1d4ed8' }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: '700', color: 'white', letterSpacing: 0.5 }}>
+                SEND A MESSAGE
+              </Text>
+            </Pressable>
           </View>
-
-          {/* Shipping */}
-          <Pressable style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }} onPress={() => {}}>
-            <Text style={{ fontSize: 13, color: '#374151' }}>
-              + $23.99 Shipping: {listing.seller.location ?? 'US'} to{' '}
-              <Text style={{ textDecorationLine: 'underline' }}>United States</Text>
-            </Text>
-            <Feather name="chevron-down" size={14} color="#374151" style={{ marginLeft: 4 }} />
-          </Pressable>
         </View>
 
-        {/* ── Measurements ── */}
-        <View style={{ paddingHorizontal: 16, paddingVertical: 20, borderTopWidth: 1, borderTopColor: '#e5e7eb' }}>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 8 }}>
-            Measurements
+        {/* ── Carrinex Verified card ── */}
+        <View style={{ marginHorizontal: 16, marginBottom: 12, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 16 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+            <Ionicons name="checkmark-circle" size={28} color="#2563eb" />
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>Carrinex Verified</Text>
+          </View>
+          <Text style={{ fontSize: 13, color: '#374151', lineHeight: 19 }}>
+            This item has been verified by our in-house team or a trusted partner.{' '}
+            <Text style={{ color: '#2563eb' }} onPress={() => {}}>Learn More.</Text>
           </Text>
-          <Text style={{ fontSize: 13, color: '#6b7280', lineHeight: 18, marginBottom: 16 }}>
-            Let the seller know you're interested in measurement details. We'll notify you as soon as they're added.
+        </View>
+
+        {/* ── Purchase Protection card ── */}
+        <View style={{ marginHorizontal: 16, marginBottom: 16, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 16 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+            <Ionicons name="shield" size={26} color="#2563eb" />
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>Carrinex Purchase Protection</Text>
+          </View>
+          <Text style={{ fontSize: 13, color: '#374151', lineHeight: 19, marginBottom: 14 }}>
+            We want you to feel safe buying and selling on Carrinex. Qualifying orders are covered by our Purchase Protection in the rare case something goes wrong.
           </Text>
-          <Pressable
-            style={{
-              borderWidth: 1, borderColor: '#d1d5db', borderRadius: 6,
-              paddingVertical: 14, alignItems: 'center',
-            }}
-            onPress={() => Alert.alert('Request sent')}
-          >
-            <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827', letterSpacing: 0.5 }}>
-              REQUEST MEASUREMENTS
-            </Text>
+          <Pressable style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }} onPress={() => {}}>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827' }}>How You're Protected</Text>
+            <Feather name="chevron-down" size={18} color="#6b7280" />
           </Pressable>
         </View>
 
@@ -664,86 +688,6 @@ export default function ProductScreen() {
           <Text style={{ fontSize: 12, color: '#9ca3af', marginTop: 16, paddingHorizontal: 8 }}>
             Listing ID {LISTING_ID}
           </Text>
-        </View>
-
-        {/* ── Seller card ── */}
-        <View style={{ paddingHorizontal: 16, paddingVertical: 16, borderTopWidth: 1, borderTopColor: '#e5e7eb' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
-            {/* Avatar */}
-            <View style={{ width: 52, height: 52, borderRadius: 26, overflow: 'hidden', backgroundColor: '#e5e7eb', alignItems: 'center', justifyContent: 'center' }}>
-              {listing.seller.avatar_url ? (
-                <Image source={{ uri: listing.seller.avatar_url }} style={{ width: 52, height: 52 }} contentFit="cover" />
-              ) : (
-                <Feather name="user" size={24} color="#9ca3af" />
-              )}
-            </View>
-
-            {/* Seller info */}
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>
-                {listing.seller.username}
-              </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
-                <StarRating rating={listing.seller.rating} />
-                <Text style={{ fontSize: 13, color: '#374151' }}>{REVIEWS_COUNT} Reviews</Text>
-              </View>
-              <Text style={{ fontSize: 13, color: '#6b7280', marginTop: 3 }}>
-                {TRANSACTIONS_COUNT} Transactions{'  '}
-                <Text style={{ textDecorationLine: 'underline' }}>{ITEMS_FOR_SALE} items for sale</Text>
-              </Text>
-            </View>
-          </View>
-
-          {/* Follow + Message buttons */}
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <Pressable
-              onPress={() => setFollowed(!followed)}
-              style={{
-                flex: 1, borderRadius: 6, paddingVertical: 12, alignItems: 'center',
-                backgroundColor: followed ? '#f3f4f6' : '#111827',
-                borderWidth: followed ? 1 : 0, borderColor: '#d1d5db',
-              }}
-            >
-              <Text style={{ fontSize: 13, fontWeight: '700', color: followed ? '#111827' : 'white', letterSpacing: 0.5 }}>
-                {followed ? 'FOLLOWING' : 'FOLLOW'}
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => Alert.alert('Message', 'Opening chat...')}
-              style={{ flex: 1, borderRadius: 6, paddingVertical: 12, alignItems: 'center', backgroundColor: '#1d4ed8' }}
-            >
-              <Text style={{ fontSize: 13, fontWeight: '700', color: 'white', letterSpacing: 0.5 }}>
-                SEND A MESSAGE
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-
-        {/* ── Carrinex Verified card ── */}
-        <View style={{ marginHorizontal: 16, marginBottom: 12, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 16 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <Ionicons name="checkmark-circle" size={28} color="#2563eb" />
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>Carrinex Verified</Text>
-          </View>
-          <Text style={{ fontSize: 13, color: '#374151', lineHeight: 19 }}>
-            This item has been verified by our in-house team or a trusted partner.{' '}
-            <Text style={{ color: '#2563eb' }} onPress={() => {}}>Learn More.</Text>
-          </Text>
-        </View>
-
-        {/* ── Purchase Protection card ── */}
-        <View style={{ marginHorizontal: 16, marginBottom: 16, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 16 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <Ionicons name="shield" size={26} color="#2563eb" />
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>Carrinex Purchase Protection</Text>
-          </View>
-          <Text style={{ fontSize: 13, color: '#374151', lineHeight: 19, marginBottom: 14 }}>
-            We want you to feel safe buying and selling on Carrinex. Qualifying orders are covered by our Purchase Protection in the rare case something goes wrong.
-          </Text>
-          <Pressable style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }} onPress={() => {}}>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827' }}>How You're Protected</Text>
-            <Feather name="chevron-down" size={18} color="#6b7280" />
-          </Pressable>
         </View>
 
         {/* ── Member's items / Similar items tabs ── */}
