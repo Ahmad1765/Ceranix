@@ -19,9 +19,35 @@ const IMAGE_HEIGHT = width * 1.15;
 const CONDITION_LABELS: Record<string, string> = {
   new_with_tags: 'New with tags',
   like_new: 'Like new',
-  good: 'Gently Used',
+  good: 'Very good condition',
   fair: 'Fair',
 };
+
+const CATEGORY_LABELS: Record<string, string> = {
+  clothing: 'Clothing',
+  shoes: 'Shoes',
+  bags: 'Bags',
+  accessories: 'Accessories',
+  electronics: 'Electronics',
+  beauty: 'Beauty',
+  other: 'Other',
+};
+
+const ITEM_COLOR = { name: 'Marine blue', hex: '#1d4ed8' };
+
+const ITEM_TAGS = [
+  'arcteryx',
+  'jacket',
+  'gorpcore',
+  'midlayer',
+  'hiking',
+  'skiing',
+  'lightweight',
+  'breathable',
+];
+
+const TAG_BG = '#dcfb6b';
+const LINK_PURPLE = '#5b21b6';
 
 const REVIEWS_COUNT = 7;
 const TRANSACTIONS_COUNT = 12;
@@ -500,49 +526,144 @@ export default function ProductScreen() {
           </Pressable>
         </View>
 
-        {/* ── Seller Description ── */}
-        <View style={{ paddingHorizontal: 16, paddingVertical: 20, borderTopWidth: 1, borderTopColor: '#e5e7eb' }}>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 12 }}>
-            Seller Description
+        {/* ── Item description ── */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 20, paddingBottom: 8, borderTopWidth: 1, borderTopColor: '#e5e7eb' }}>
+          <Text style={{ fontSize: 14, color: '#6b7280', marginBottom: 10 }}>
+            Item description
           </Text>
 
-          {/* Color/style tags */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 6 }}>
-            <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: '#9ca3af', borderWidth: 1, borderColor: '#d1d5db' }} />
-            <Text style={{ fontSize: 13, color: '#374151' }}>Gray • Gorpcore</Text>
+          <View style={{ borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 16, backgroundColor: 'white' }}>
+            {/* Description text */}
+            <Text style={{ fontSize: 16, color: '#111827', lineHeight: 24 }}>
+              {listing.description}
+            </Text>
+
+            {/* Show translation */}
+            <Pressable onPress={() => Alert.alert('Translation')} style={{ marginTop: 14, alignSelf: 'flex-start' }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: LINK_PURPLE }}>
+                Show translation
+              </Text>
+            </Pressable>
+
+            <View style={{ height: 1, backgroundColor: '#e5e7eb', marginVertical: 18 }} />
+
+            {/* Category */}
+            <Pressable onPress={() => {}} style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={{ fontSize: 16, color: '#111827', flex: 1 }}>
+                <Text style={{ fontWeight: '700' }}>Category </Text>
+                {CATEGORY_LABELS[listing.category] ?? listing.category}
+              </Text>
+              <Feather name="arrow-up-right" size={20} color="#111827" />
+            </Pressable>
+
+            <View style={{ height: 1, backgroundColor: '#e5e7eb', marginVertical: 16 }} />
+
+            {/* Size */}
+            <Text style={{ fontSize: 16, color: '#111827' }}>
+              <Text style={{ fontWeight: '700' }}>Size </Text>
+              {listing.size}
+            </Text>
+
+            <View style={{ height: 1, backgroundColor: '#e5e7eb', marginVertical: 16 }} />
+
+            {/* Condition */}
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={{ fontSize: 16, color: '#111827', flex: 1 }}>
+                <Text style={{ fontWeight: '700' }}>Condition </Text>
+                {CONDITION_LABELS[listing.condition] ?? listing.condition}
+              </Text>
+              <Pressable onPress={() => Alert.alert('Condition info', 'Details about condition grading')} hitSlop={8}>
+                <Feather name="info" size={20} color="#111827" />
+              </Pressable>
+            </View>
+
+            <View style={{ height: 1, backgroundColor: '#e5e7eb', marginVertical: 16 }} />
+
+            {/* Color */}
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={{ fontSize: 16, color: '#111827' }}>
+                <Text style={{ fontWeight: '700' }}>Color </Text>
+                {ITEM_COLOR.name}
+              </Text>
+              <View
+                style={{
+                  width: 18,
+                  height: 18,
+                  borderRadius: 9,
+                  marginLeft: 8,
+                  backgroundColor: ITEM_COLOR.hex,
+                  borderWidth: 2,
+                  borderColor: '#e5e7eb',
+                }}
+              />
+            </View>
+
+            <View style={{ height: 1, backgroundColor: '#e5e7eb', marginVertical: 16 }} />
+
+            {/* Brand */}
+            <Pressable onPress={() => {}} style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={{ fontSize: 16, color: '#111827', flex: 1 }}>
+                <Text style={{ fontWeight: '700' }}>Brand </Text>
+                {listing.brand}
+              </Text>
+              <Feather name="arrow-up-right" size={20} color="#111827" />
+            </Pressable>
           </View>
 
-          <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 6 }}>
-            {listing.title} Jacket
-          </Text>
-          <Text style={{ fontSize: 14, color: '#374151', lineHeight: 20, marginBottom: 12 }}>
-            {listing.description}
-          </Text>
+          {/* Tags */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 16, gap: 8 }}>
+            {ITEM_TAGS.map((tag) => (
+              <View
+                key={tag}
+                style={{
+                  backgroundColor: TAG_BG,
+                  borderRadius: 999,
+                  paddingHorizontal: 14,
+                  paddingVertical: 7,
+                }}
+              >
+                <Text style={{ fontSize: 14, color: '#374151' }}>{tag}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Contact / Share / Report */}
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginTop: 24,
+              paddingHorizontal: 8,
+            }}
+          >
+            <Pressable
+              onPress={() => Alert.alert('Contact')}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+            >
+              <Feather name="message-circle" size={22} color="#111827" />
+              <Text style={{ fontSize: 16, color: '#111827' }}>Contact</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => Alert.alert('Share')}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+            >
+              <Feather name="share-2" size={22} color="#111827" />
+              <Text style={{ fontSize: 16, color: '#111827' }}>Share</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => Alert.alert('Report')}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+            >
+              <Feather name="alert-triangle" size={22} color="#111827" />
+              <Text style={{ fontSize: 16, color: '#111827' }}>Report</Text>
+            </Pressable>
+          </View>
 
           {/* Listing meta */}
-          <Text style={{ fontSize: 12, color: '#9ca3af', marginBottom: 16 }}>
-            Posted in Hype{' '}
-            <Text style={{ fontWeight: '700', color: '#374151' }}>3 months ago</Text>
-            {'  '}Listing ID {LISTING_ID}
+          <Text style={{ fontSize: 12, color: '#9ca3af', marginTop: 16, paddingHorizontal: 8 }}>
+            Listing ID {LISTING_ID}
           </Text>
-
-          {/* Report + Price Comparison buttons */}
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <Pressable
-              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 6, paddingVertical: 11 }}
-              onPress={() => Alert.alert('Report Listing')}
-            >
-              <Feather name="alert-triangle" size={13} color="#374151" />
-              <Text style={{ fontSize: 12, fontWeight: '600', color: '#374151', letterSpacing: 0.3 }}>REPORT LISTING</Text>
-            </Pressable>
-            <Pressable
-              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 6, paddingVertical: 11 }}
-              onPress={() => Alert.alert('Price Comparison')}
-            >
-              <Feather name="dollar-sign" size={13} color="#374151" />
-              <Text style={{ fontSize: 12, fontWeight: '600', color: '#374151', letterSpacing: 0.3 }}>PRICE COMPARISON</Text>
-            </Pressable>
-          </View>
         </View>
 
         {/* ── Seller card ── */}
