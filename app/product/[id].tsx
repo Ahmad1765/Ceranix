@@ -412,11 +412,29 @@ export default function ProductScreen() {
             ))}
           </ScrollView>
 
+          {/* Back button */}
+          <Pressable
+            onPress={() => router.back()}
+            style={{
+              position: 'absolute',
+              top: insets.top + 12,
+              left: 16,
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              backgroundColor: 'rgba(0,0,0,0.55)',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Feather name="arrow-left" size={20} color="white" />
+          </Pressable>
+
           {/* VERIFIED badge */}
           <View style={{
             position: 'absolute',
             top: insets.top + 12,
-            left: 16,
+            left: 64,
             flexDirection: 'row',
             alignItems: 'center',
             backgroundColor: 'rgba(0,0,0,0.82)',
