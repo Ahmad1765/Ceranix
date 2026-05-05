@@ -208,6 +208,15 @@ const SIMILAR_ITEMS: RelatedItem[] = [
 ];
 
 const TEAL = '#007782';
+const BUNDLE_BLUE = '#5b5bd6';
+
+const BUNDLE_MILESTONES = [
+  { items: '1 item', discount: '0% off', active: false },
+  { items: '2 items', discount: '5% off', active: true },
+  { items: '3 items', discount: '10% off', active: true },
+  { items: '4 items', discount: '15% off', active: true },
+  { items: '5+ items', discount: '20% off', active: true },
+];
 
 const CARD_GAP = 8;
 const CARD_OUTER_PAD = 12;
@@ -737,25 +746,45 @@ export default function ProductScreen() {
 
           {relatedTab === 'members' ? (
             <View style={{ paddingTop: 18 }}>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  paddingHorizontal: 16,
-                  marginBottom: 16,
-                }}
-              >
-                <View style={{ flex: 1, paddingRight: 12 }}>
-                  <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>Shop bundles</Text>
-                  <Text style={{ fontSize: 14, color: '#6b7280', marginTop: 2 }}>Get up to 20% off</Text>
+              {/* Bundle discounts title */}
+              <Text style={{ fontSize: 18, fontWeight: '600', lineHeight: 24, letterSpacing: -0.24, color: '#111827', paddingHorizontal: 16, marginBottom: 14 }}>
+                Bundle discounts from {listing.seller.username}
+              </Text>
+
+              {/* Bundle discount banner */}
+              <View style={{ marginHorizontal: 16, marginBottom: 20, backgroundColor: '#ededfa', borderRadius: 16, padding: 18 }}>
+                <Text style={{ fontSize: 16, color: '#111827', lineHeight: 24, marginBottom: 22 }}>
+                  Add items from this seller to your cart to unlock discounts—plus potential savings on shipping!
+                </Text>
+
+                {/* Progress track */}
+                <View style={{ height: 16, marginBottom: 14, position: 'relative' }}>
+                  {/* Gray track */}
+                  <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: '#d0d0ea', borderRadius: 99 }} />
+                  {/* Blue fill */}
+                  <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '25%' }}>
+                    <View style={{ flex: 1, backgroundColor: BUNDLE_BLUE, borderTopLeftRadius: 99, borderBottomLeftRadius: 99 }} />
+                    {/* Arrow tip */}
+                    <View style={{
+                      position: 'absolute', right: -11, top: 0,
+                      width: 0, height: 0,
+                      borderTopWidth: 8, borderBottomWidth: 8, borderLeftWidth: 12,
+                      borderTopColor: 'transparent', borderBottomColor: 'transparent',
+                      borderLeftColor: BUNDLE_BLUE,
+                    }} />
+                  </View>
                 </View>
-                <Pressable
-                  onPress={() => Alert.alert('Create bundle')}
-                  style={{ backgroundColor: TEAL, borderRadius: 6, paddingVertical: 12, paddingHorizontal: 18 }}
-                >
-                  <Text style={{ color: 'white', fontSize: 14, fontWeight: '700' }}>Create bundle</Text>
-                </Pressable>
+
+                {/* Milestones */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  {BUNDLE_MILESTONES.map((m, i) => (
+                    <View key={i} style={{ alignItems: 'center' }}>
+                      <View style={{ width: 1.5, height: 10, backgroundColor: '#9ca3af', marginBottom: 6 }} />
+                      <Text style={{ fontSize: 13, color: '#111827', textAlign: 'center' }}>{m.items}</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: m.active ? BUNDLE_BLUE : '#6b7280', textAlign: 'center' }}>{m.discount}</Text>
+                    </View>
+                  ))}
+                </View>
               </View>
               <View
                 style={{
