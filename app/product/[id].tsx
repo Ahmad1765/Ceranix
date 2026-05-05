@@ -468,26 +468,6 @@ export default function ProductScreen() {
           )}
         </View>
 
-        {/* ── Brand + actions row ── */}
-        <View style={{ paddingHorizontal: 16, paddingVertical: 14, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-          <Pressable onPress={() => {}}>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827', textDecorationLine: 'underline' }}>
-              {listing.brand}
-            </Text>
-          </Pressable>
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
-            <Pressable onPress={() => setPinned(!pinned)}>
-              <Feather name="bookmark" size={22} color={pinned ? '#111827' : '#374151'} />
-            </Pressable>
-            <View style={{ alignItems: 'center' }}>
-              <Pressable onPress={() => setLiked(!liked)}>
-                <Feather name="heart" size={22} color={liked ? '#ef4444' : '#374151'} />
-              </Pressable>
-              <Text style={{ fontSize: 12, color: '#374151', marginTop: 2 }}>{heartCount}</Text>
-            </View>
-          </View>
-        </View>
-
         {/* ── Seller card ── */}
         <View style={{ paddingHorizontal: 16, paddingVertical: 16, borderTopWidth: 1, borderTopColor: '#e5e7eb' }}>
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
@@ -539,33 +519,6 @@ export default function ProductScreen() {
               </Text>
             </Pressable>
           </View>
-        </View>
-
-        {/* ── Carrinex Verified card ── */}
-        <View style={{ marginHorizontal: 16, marginBottom: 12, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 16 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <Ionicons name="checkmark-circle" size={28} color="#2563eb" />
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>Carrinex Verified</Text>
-          </View>
-          <Text style={{ fontSize: 13, color: '#374151', lineHeight: 19 }}>
-            This item has been verified by our in-house team or a trusted partner.{' '}
-            <Text style={{ color: '#2563eb' }} onPress={() => {}}>Learn More.</Text>
-          </Text>
-        </View>
-
-        {/* ── Purchase Protection card ── */}
-        <View style={{ marginHorizontal: 16, marginBottom: 16, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 16 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <Ionicons name="shield" size={26} color="#2563eb" />
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>Carrinex Purchase Protection</Text>
-          </View>
-          <Text style={{ fontSize: 13, color: '#374151', lineHeight: 19, marginBottom: 14 }}>
-            We want you to feel safe buying and selling on Carrinex. Qualifying orders are covered by our Purchase Protection in the rare case something goes wrong.
-          </Text>
-          <Pressable style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }} onPress={() => {}}>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827' }}>How You're Protected</Text>
-            <Feather name="chevron-down" size={18} color="#6b7280" />
-          </Pressable>
         </View>
 
         {/* ── Item description ── */}
@@ -706,6 +659,33 @@ export default function ProductScreen() {
           <Text style={{ fontSize: 12, color: '#9ca3af', marginTop: 16, paddingHorizontal: 8 }}>
             Listing ID {LISTING_ID}
           </Text>
+        </View>
+
+        {/* ── Carrinex Verified card ── */}
+        <View style={{ marginHorizontal: 16, marginBottom: 12, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 16 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+            <Ionicons name="checkmark-circle" size={28} color="#2563eb" />
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>Carrinex Verified</Text>
+          </View>
+          <Text style={{ fontSize: 13, color: '#374151', lineHeight: 19 }}>
+            This item has been verified by our in-house team or a trusted partner.{' '}
+            <Text style={{ color: '#2563eb' }} onPress={() => {}}>Learn More.</Text>
+          </Text>
+        </View>
+
+        {/* ── Purchase Protection card ── */}
+        <View style={{ marginHorizontal: 16, marginBottom: 16, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 16 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+            <Ionicons name="shield" size={26} color="#2563eb" />
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>Carrinex Purchase Protection</Text>
+          </View>
+          <Text style={{ fontSize: 13, color: '#374151', lineHeight: 19, marginBottom: 14 }}>
+            We want you to feel safe buying and selling on Carrinex. Qualifying orders are covered by our Purchase Protection in the rare case something goes wrong.
+          </Text>
+          <Pressable style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }} onPress={() => {}}>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827' }}>How You're Protected</Text>
+            <Feather name="chevron-down" size={18} color="#6b7280" />
+          </Pressable>
         </View>
 
         {/* ── Member's items / Similar items tabs ── */}
