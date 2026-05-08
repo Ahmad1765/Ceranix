@@ -9,12 +9,36 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Listing } from '@/types';
 
 const { width } = Dimensions.get('window');
 const IMAGE_HEIGHT = width * 1.45;
+
+function PinIcon({
+  size = 22,
+  color = '#111827',
+  filled = false,
+}: { size?: number; color?: string; filled?: boolean }) {
+  return (
+    <Svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={filled ? color : 'none'}
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ transform: [{ rotate: '45deg' }] }}
+    >
+      <Path d="M12 17v5" />
+      <Path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
+    </Svg>
+  );
+}
 
 const CONDITION_LABELS: Record<string, string> = {
   new_with_tags: 'New with tags',
@@ -466,11 +490,7 @@ export default function ProductScreen() {
                 elevation: 3,
               }}
             >
-              <MaterialCommunityIcons
-                name={pinned ? 'pin' : 'pin-outline'}
-                size={24}
-                color="#111827"
-              />
+              <PinIcon size={22} color="#111827" filled={pinned} />
               <Text style={{ fontSize: 12, fontWeight: '600', color: '#111827', marginTop: -2 }}>
                 {PIN_COUNT + (pinned ? 1 : 0)}
               </Text>
