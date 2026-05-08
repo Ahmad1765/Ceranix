@@ -122,7 +122,7 @@ export default function NybegagnatScreen() {
               {/* Product Text */}
               <View className="px-2">
                 <Text className="text-[14px] font-medium text-black mb-1">iPhone 11</Text>
-                <Text className="text-[16px] font-bold text-black">From 1399 SEK</Text>
+                <Text className="text-[16px] font-bold text-black">From $1399</Text>
               </View>
             </Pressable>
 
@@ -140,7 +140,7 @@ export default function NybegagnatScreen() {
               {/* Product Text */}
               <View className="px-2">
                 <Text className="text-[14px] font-medium text-black mb-1">iPhone 11 Pro</Text>
-                <Text className="text-[16px] font-bold text-black">From 1890 SEK</Text>
+                <Text className="text-[16px] font-bold text-black">From $1890</Text>
               </View>
             </Pressable>
           </View>

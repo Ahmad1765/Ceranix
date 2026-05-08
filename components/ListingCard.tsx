@@ -124,7 +124,7 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
           )}
         </View>
         <Text className="text-[14px] font-bold text-black mt-0.5">
-          {listing.price} SEK
+          ${listing.price}
         </Text>
       </View>
     </Pressable>

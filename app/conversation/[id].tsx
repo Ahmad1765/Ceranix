@@ -15,7 +15,7 @@ interface Message {
 const MOCK_MESSAGES: Message[] = [
   { id: '1', text: 'Hi, is this still available?', senderId: 'other', timestamp: '10:30 AM' },
   { id: '2', text: 'Yes, it is!', senderId: 'me', timestamp: '10:32 AM' },
-  { id: '3', text: 'Would you take 400 SEK for it?', senderId: 'other', timestamp: '10:35 AM' },
+  { id: '3', text: 'Would you take $400 for it?', senderId: 'other', timestamp: '10:35 AM' },
 ];
 
 export default function ConversationScreen() {
@@ -67,7 +67,7 @@ export default function ConversationScreen() {
         />
         <View className="flex-1">
           <Text className="text-sm font-semibold" numberOfLines={1}>Zara Floral Midi Dress</Text>
-          <Text className="text-xs text-gray-500">499 SEK</Text>
+          <Text className="text-xs text-gray-500">$499</Text>
         </View>
         <Pressable className="bg-black px-4 py-1.5 rounded-full">
           <Text className="text-white text-xs font-bold">Buy</Text>

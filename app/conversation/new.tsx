@@ -48,7 +48,7 @@ export default function NewConversationScreen() {
           />
           <View className="flex-1">
             <Text className="text-base font-bold text-black" numberOfLines={1}>Zara Floral Midi Dress</Text>
-            <Text className="text-sm text-gray-500">499 SEK · Size S</Text>
+            <Text className="text-sm text-gray-500">$499 · Size S</Text>
             <Text className="text-sm text-gray-900 mt-1 font-semibold">Condition: Like new</Text>
           </View>
         </View>

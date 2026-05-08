@@ -600,10 +600,10 @@ function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress: () => 
         {item.meta}
       </Text>
       <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827', marginTop: 4 }}>
-        €{item.price.toFixed(2)}
+        ${item.price.toFixed(2)}
       </Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-        <Text style={{ fontSize: 13, color: TEAL }}>€{item.inclPrice.toFixed(2)} incl.</Text>
+        <Text style={{ fontSize: 13, color: TEAL }}>${item.inclPrice.toFixed(2)} incl.</Text>
         <Ionicons name="shield-checkmark" size={13} color={TEAL} />
       </View>
     </Pressable>
@@ -716,7 +716,7 @@ export default function ProductScreen() {
             {listing.title}
           </Text>
           <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>
-            {listing.price} SEK
+            ${listing.price}
           </Text>
         </View>
       )}
@@ -905,7 +905,7 @@ export default function ProductScreen() {
               </Text>
             </View>
             <Text style={{ fontSize: 22, fontWeight: '800', color: '#111827' }}>
-              {listing.price} SEK
+              ${listing.price}
             </Text>
           </View>
 

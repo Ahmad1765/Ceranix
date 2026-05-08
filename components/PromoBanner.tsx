@@ -18,7 +18,7 @@ export function PromoBanner({ onReadMore }: PromoBannerProps) {
           <View className="flex-1 pr-3">
             <Text className="text-[11px] text-white/80 font-medium">The Carrinex lottery</Text>
             <Text className="text-[15px] font-bold text-white leading-[21px] mt-0.5">
-              Win a Carrinex gift card{'\n'}worth 5000 SEK
+              Win a Carrinex gift card{'\n'}worth $5000
             </Text>
             <Pressable
               onPress={onReadMore}
