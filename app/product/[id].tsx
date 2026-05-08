@@ -9,12 +9,12 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Listing } from '@/types';
 
 const { width } = Dimensions.get('window');
-const IMAGE_HEIGHT = width * 1.15;
+const IMAGE_HEIGHT = width * 1.45;
 
 const CONDITION_LABELS: Record<string, string> = {
   new_with_tags: 'New with tags',
@@ -48,11 +48,13 @@ const ITEM_TAGS = [
 
 const TAG_BG = '#dcfb6b';
 const LINK_PURPLE = '#5b21b6';
+const PLICK_LIME = '#dcfb6b';
 
 const REVIEWS_COUNT = 7;
 const TRANSACTIONS_COUNT = 12;
 const ITEMS_FOR_SALE = 9;
 const LISTING_ID = '91740406';
+const PIN_COUNT = 2;
 
 const MOCK_LISTING: Listing = {
   id: '1',
@@ -406,7 +408,7 @@ export default function ProductScreen() {
         }}
         scrollEventThrottle={16}
       >
-        {/* ── Image carousel ── */}
+        {/* ── Image carousel (full-bleed to top, Plick style) ── */}
         <View style={{ position: 'relative' }}>
           <ScrollView
             horizontal
@@ -421,60 +423,154 @@ export default function ProductScreen() {
             ))}
           </ScrollView>
 
-          {/* Back button */}
+          {/* Back arrow — plain dark icon, no background */}
           <Pressable
             onPress={() => router.back()}
+            hitSlop={12}
             style={{
               position: 'absolute',
-              top: insets.top + 12,
+              top: insets.top + 10,
               left: 16,
               width: 36,
               height: 36,
-              borderRadius: 18,
-              backgroundColor: 'rgba(0,0,0,0.55)',
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
-            <Feather name="arrow-left" size={20} color="white" />
+            <Feather name="arrow-left" size={24} color="#111827" />
           </Pressable>
 
-          {/* VERIFIED badge */}
-          <View style={{
-            position: 'absolute',
-            top: insets.top + 12,
-            left: 64,
-            flexDirection: 'row',
-            alignItems: 'center',
-            backgroundColor: 'rgba(0,0,0,0.82)',
-            borderRadius: 20,
-            paddingHorizontal: 10,
-            paddingVertical: 5,
-            gap: 4,
-          }}>
-            <Ionicons name="checkmark-circle" size={14} color="white" />
-            <Text style={{ fontSize: 12, fontWeight: '700', color: 'white', letterSpacing: 0.5 }}>
-              VERIFIED
-            </Text>
+          {/* Right-side floating action stack (pin + heart) */}
+          <View
+            style={{
+              position: 'absolute',
+              right: 14,
+              bottom: 60,
+              alignItems: 'center',
+              gap: 14,
+            }}
+          >
+            <Pressable
+              onPress={() => setPinned(!pinned)}
+              style={{
+                width: 52,
+                height: 52,
+                borderRadius: 26,
+                backgroundColor: 'white',
+                alignItems: 'center',
+                justifyContent: 'center',
+                shadowColor: '#000',
+                shadowOpacity: 0.12,
+                shadowRadius: 6,
+                shadowOffset: { width: 0, height: 2 },
+                elevation: 3,
+              }}
+            >
+              <MaterialCommunityIcons
+                name={pinned ? 'pin' : 'pin-outline'}
+                size={24}
+                color="#111827"
+              />
+              <Text style={{ fontSize: 12, fontWeight: '600', color: '#111827', marginTop: -2 }}>
+                {PIN_COUNT + (pinned ? 1 : 0)}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => setLiked(!liked)}
+              style={{
+                width: 52,
+                height: 52,
+                borderRadius: 26,
+                backgroundColor: 'white',
+                alignItems: 'center',
+                justifyContent: 'center',
+                shadowColor: '#000',
+                shadowOpacity: 0.12,
+                shadowRadius: 6,
+                shadowOffset: { width: 0, height: 2 },
+                elevation: 3,
+              }}
+            >
+              <Ionicons
+                name={liked ? 'heart' : 'heart-outline'}
+                size={22}
+                color={liked ? '#ef4444' : '#111827'}
+              />
+              <Text style={{ fontSize: 12, fontWeight: '600', color: '#111827', marginTop: -2 }}>
+                {heartCount}
+              </Text>
+            </Pressable>
           </View>
 
-          {/* Pagination dots */}
+          {/* Pagination — Plick-style dashes */}
           {listing.images.length > 1 && (
-            <View style={{
-              position: 'absolute', bottom: 14, left: 0, right: 0,
-              flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5,
-            }}>
+            <View
+              style={{
+                position: 'absolute',
+                bottom: 18,
+                left: 0,
+                right: 0,
+                flexDirection: 'row',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
               {listing.images.map((_, i) => (
                 <View
                   key={i}
                   style={{
-                    width: 7, height: 7, borderRadius: 4,
-                    backgroundColor: i === activeImage ? '#111827' : '#d1d5db',
+                    width: 28,
+                    height: 3,
+                    borderRadius: 2,
+                    backgroundColor: i === activeImage ? 'white' : '#111827',
                   }}
                 />
               ))}
             </View>
           )}
+        </View>
+
+        {/* ── Plick-style heading section ── */}
+        <View style={{ backgroundColor: PLICK_LIME, paddingHorizontal: 20, paddingVertical: 16 }}>
+          <Text style={{ fontSize: 16, color: '#111827', textAlign: 'center' }}>
+            Get 10% off! Buy a bundle from the seller
+          </Text>
+        </View>
+
+        <View style={{ paddingHorizontal: 20, paddingTop: 18 }}>
+          <Text style={{ fontSize: 14, color: '#111827' }}>
+            Liked by{' '}
+            <Text style={{ fontWeight: '700' }}>@alice.333</Text>
+            {' '}and {heartCount - 1} others
+          </Text>
+
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              marginTop: 14,
+            }}
+          >
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={{ fontSize: 26, fontWeight: '800', color: '#111827' }}>
+                {listing.title}
+              </Text>
+              <Text style={{ fontSize: 16, color: '#111827', marginTop: 4 }}>
+                <Text style={{ fontWeight: '700' }}>Size </Text>
+                {listing.size}
+              </Text>
+            </View>
+            <Text style={{ fontSize: 22, fontWeight: '800', color: '#111827' }}>
+              {listing.price} SEK
+            </Text>
+          </View>
+
+          <Text style={{ fontSize: 13, color: '#9ca3af', textAlign: 'center', marginTop: 18 }}>
+            Annons
+          </Text>
         </View>
 
         {/* ── Seller card ── */}
