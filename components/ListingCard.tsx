@@ -1,8 +1,11 @@
 import { memo, useState } from 'react';
 import { View, Text, Pressable, ScrollView, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
 import { Image } from 'expo-image';
+import Animated from 'react-native-reanimated';
 import { router } from 'expo-router';
 import type { Listing } from '@/types';
+
+const AnimatedExpoImage = Animated.createAnimatedComponent(Image);
 
 interface Props {
   listing: Listing;
@@ -39,26 +42,40 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
             scrollEventThrottle={16}
             disableIntervalMomentum
           >
-            {images.map((uri, i) => (
-              <Image
-                key={i}
-                source={{ uri }}
-                style={{ width: cardWidth, height: '100%' }}
-                contentFit="cover"
-                cachePolicy="memory-disk"
-                recyclingKey={uri}
-                transition={250}
-              />
-            ))}
+            {images.map((uri, i) =>
+              i === 0 ? (
+                <AnimatedExpoImage
+                  key={i}
+                  source={{ uri }}
+                  style={{ width: cardWidth, height: '100%' }}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  recyclingKey={uri}
+                  transition={250}
+                  sharedTransitionTag={`product-image-${listing.id}`}
+                />
+              ) : (
+                <Image
+                  key={i}
+                  source={{ uri }}
+                  style={{ width: cardWidth, height: '100%' }}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  recyclingKey={uri}
+                  transition={250}
+                />
+              )
+            )}
           </ScrollView>
         ) : (
-          <Image
+          <AnimatedExpoImage
             source={{ uri: images[0] }}
             style={{ width: '100%', height: '100%' }}
             contentFit="cover"
             cachePolicy="memory-disk"
             recyclingKey={images[0]}
             transition={250}
+            sharedTransitionTag={`product-image-${listing.id}`}
           />
         )}
 
