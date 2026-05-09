@@ -909,14 +909,11 @@ export default function ProductScreen() {
             </Text>
           </View>
 
-          <Text style={{ fontSize: 13, color: '#9ca3af', textAlign: 'center', marginTop: 18 }}>
-            Annons
-          </Text>
         </View>
 
         {/* ── Seller card ── */}
         <View style={{ paddingHorizontal: 16, paddingVertical: 16, borderTopWidth: HAIRLINE, borderTopColor: '#e5e7eb' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 }}>
             {/* Avatar */}
             <View style={{ width: 52, height: 52, borderRadius: 26, overflow: 'hidden', backgroundColor: '#e5e7eb', alignItems: 'center', justifyContent: 'center' }}>
               {listing.seller.avatar_url ? (
@@ -1274,25 +1271,26 @@ export default function ProductScreen() {
         }),
       }}>
         <Pressable
-          onPress={() => { tap('medium'); Alert.alert('Offer', `Send offer of $${offerPrice}?`); }}
+          onPress={() => { tap('medium'); Alert.alert('Make an offer', `Suggest a price?`); }}
           style={({ pressed }) => ({
-            flex: 1, borderWidth: 1.5, borderColor: BRAND_DARK,
-            borderRadius: 12, paddingVertical: IS_IOS ? 16 : 15, alignItems: 'center',
+            flex: 1, borderWidth: 1, borderColor: '#d1d5db',
+            borderRadius: 12, paddingTop: 12, paddingBottom: 8, paddingHorizontal: 21, alignItems: 'center', justifyContent: 'center',
+            backgroundColor: 'white',
             opacity: pressed ? 0.7 : 1,
             transform: [{ scale: pressed ? 0.98 : 1 }],
           })}
         >
-          <Text style={{ fontSize: 14, fontWeight: '700', color: BRAND_DARK, letterSpacing: 0.3 }}>OFFER ${offerPrice}</Text>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: BRAND_DARK, textAlign: 'center', lineHeight: 20 }}>Make an{'\n'}offer</Text>
         </Pressable>
         <Pressable
-          onPress={() => { tap('medium'); Alert.alert('Buy Now', 'Payment flow coming soon'); }}
+          onPress={() => { tap('medium'); Alert.alert('Buy', 'Payment flow coming soon'); }}
           style={({ pressed }) => ({
-            flex: 1, backgroundColor: BRAND_DARK, borderRadius: 12, paddingVertical: IS_IOS ? 16 : 15, alignItems: 'center',
+            flex: 1, backgroundColor: '#22c55e', borderRadius: 12, paddingTop: 12, paddingBottom: 8, paddingHorizontal: 21, alignItems: 'center', justifyContent: 'center',
             opacity: pressed ? 0.85 : 1,
             transform: [{ scale: pressed ? 0.98 : 1 }],
           })}
         >
-          <Text style={{ fontSize: 14, fontWeight: '700', color: 'white', letterSpacing: 0.3 }}>BUY NOW</Text>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: BRAND_DARK, letterSpacing: 0.3 }}>Buy</Text>
         </Pressable>
       </View>
 
