@@ -880,7 +880,7 @@ export default function ProductScreen() {
           </Text>
         </View>
 
-        <View style={{ paddingHorizontal: 20, paddingTop: 18 }}>
+        <View style={{ paddingHorizontal: 20, paddingTop: 18, paddingBottom: 18 }}>
           <Text style={{ fontSize: 14, color: '#111827' }}>
             Liked by{' '}
             <Text style={{ fontWeight: '700' }}>@alice.333</Text>
@@ -1274,23 +1274,23 @@ export default function ProductScreen() {
           onPress={() => { tap('medium'); Alert.alert('Make an offer', `Suggest a price?`); }}
           style={({ pressed }) => ({
             flex: 1, borderWidth: 1, borderColor: '#d1d5db',
-            borderRadius: 12, paddingTop: 12, paddingBottom: 8, paddingHorizontal: 21, alignItems: 'center', justifyContent: 'center',
+            borderRadius: 10, paddingTop: 10, paddingBottom: 6, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center',
             backgroundColor: 'white',
             opacity: pressed ? 0.7 : 1,
             transform: [{ scale: pressed ? 0.98 : 1 }],
           })}
         >
-          <Text style={{ fontSize: 16, fontWeight: '700', color: BRAND_DARK, textAlign: 'center', lineHeight: 20 }}>Make an{'\n'}offer</Text>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: BRAND_DARK, textAlign: 'center', lineHeight: 16 }}>Make an{'\n'}offer</Text>
         </Pressable>
         <Pressable
           onPress={() => { tap('medium'); Alert.alert('Buy', 'Payment flow coming soon'); }}
           style={({ pressed }) => ({
-            flex: 1, backgroundColor: '#22c55e', borderRadius: 12, paddingTop: 12, paddingBottom: 8, paddingHorizontal: 21, alignItems: 'center', justifyContent: 'center',
+            flex: 1, backgroundColor: '#22c55e', borderRadius: 10, paddingTop: 10, paddingBottom: 6, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center',
             opacity: pressed ? 0.85 : 1,
             transform: [{ scale: pressed ? 0.98 : 1 }],
           })}
         >
-          <Text style={{ fontSize: 18, fontWeight: '700', color: BRAND_DARK, letterSpacing: 0.3 }}>Buy</Text>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: BRAND_DARK, letterSpacing: 0.3 }}>Buy</Text>
         </Pressable>
       </View>
 
