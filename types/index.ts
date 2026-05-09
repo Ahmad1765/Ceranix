@@ -29,7 +29,7 @@ export interface Listing {
   seller: User;
   title: string;
   description: string;
-  price: number; // in PKR
+  price: number; // in USD
   category: Category;
   gender: Gender;
   brand: string | null;

@@ -266,7 +266,7 @@ export default function SellScreen() {
         />
 
         {/* Price */}
-        <Text className="text-sm font-medium text-gray-700 mb-1">Price (PKR) *</Text>
+        <Text className="text-sm font-medium text-gray-700 mb-1">Price (USD) *</Text>
         <TextInput
           className="border border-gray-200 rounded-xl px-3 py-3 text-sm text-gray-900 mb-4"
           placeholder="e.g. 2500"

@@ -136,15 +136,15 @@ Here's a full buyer journey in plain terms:
 
 4. Ahmed taps "Message Seller" → a chat thread is created (if it doesn't exist)
 
-5. Ahmed makes an offer of Rs 2,000 (listing is Rs 2,500)
+5. Ahmed makes an offer of $2,000 (listing is $2,500)
    → Sara gets a notification: "New offer on your Zara dress"
 
-6. Sara counters with Rs 2,300
+6. Sara counters with $2,300
    → Ahmed gets a notification: "Sara countered your offer"
 
 7. Ahmed accepts
    → An order is automatically created
-   → Platform fee (e.g. 5%) is added: Rs 2,300 + Rs 115 = Rs 2,415 total
+   → Platform fee (e.g. 5%) is added: $2,300 + $115 = $2,415 total
    → Both are notified
 
 8. Sara ships the item, enters TCS tracking number

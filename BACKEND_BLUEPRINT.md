@@ -185,7 +185,7 @@ create table public.listings (
   seller_id       uuid references public.profiles(id) on delete cascade not null,
   title           text not null,
   description     text,
-  price           integer not null,             -- PKR
+  price           integer not null,             -- USD
   original_price  integer,                      -- for price_drop detection
   category        text not null,
   subcategory     text,
@@ -311,7 +311,7 @@ create table public.offers (
   conversation_id uuid references public.conversations(id) on delete cascade not null,
   buyer_id        uuid references public.profiles(id) on delete cascade not null,
   seller_id       uuid references public.profiles(id) on delete cascade not null,
-  amount          integer not null,             -- PKR
+  amount          integer not null,             -- USD
   status          text default 'pending'
                   check (status in ('pending','accepted','rejected','countered','expired','cancelled')),
   counter_amount  integer,                      -- if seller counters
@@ -333,7 +333,7 @@ create table public.orders (
   offer_id        uuid references public.offers(id) on delete set null,
   buyer_id        uuid references public.profiles(id) on delete cascade not null,
   seller_id       uuid references public.profiles(id) on delete cascade not null,
-  item_price      integer not null,             -- PKR
+  item_price      integer not null,             -- USD
   service_fee     integer not null,             -- computed at time of order
   total_amount    integer not null,             -- item_price + service_fee
   service_fee_pct numeric(5,2) not null,        -- fee % snapshot
@@ -1497,7 +1497,7 @@ try {
 | Admin abuse of Edge Functions       | Medium     | High   | Admin flag in DB, not JWT claim; double-check on every action          |
 | Supabase Realtime connection limits | Medium     | High   | Supabase Pro: 500 concurrent. Upgrade or implement polling fallback    |
 | Search quality                      | Medium     | Low    | PostgreSQL full-text search is adequate for launch; add Algolia later  |
-| Service fee rounding errors         | Low        | High   | Always use integer arithmetic (paisa), never floats for money          |
+| Service fee rounding errors         | Low        | High   | Always use integer arithmetic (cents), never floats for money          |
 | Schema migration in production      | High       | High   | Test migrations on staging with prod data snapshot first               |
 
 ### 12.2 Specific Technical Risks
