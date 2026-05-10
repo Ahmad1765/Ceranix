@@ -2,6 +2,7 @@ import { View, Text, Pressable, ScrollView, SafeAreaView, Alert } from 'react-na
 import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@/lib/auth';
+import { useToast } from '@/lib/toast';
 
 const SETTINGS_SECTIONS = [
   {
@@ -56,6 +57,7 @@ const SETTINGS_SECTIONS = [
 
 export default function SettingsScreen() {
   const { signOut, session } = useAuth();
+  const toast = useToast();
 
   const handleLogout = () => {
     Alert.alert('Log out', 'Are you sure you want to log out?', [
@@ -65,6 +67,7 @@ export default function SettingsScreen() {
         style: 'destructive',
         onPress: async () => {
           await signOut();
+          toast.show('Signed out', { variant: 'default', icon: 'log-out' });
           router.replace('/(tabs)');
         },
       },

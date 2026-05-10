@@ -15,6 +15,7 @@ import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { StatusBar } from 'expo-status-bar';
 import Svg, { Path } from 'react-native-svg';
@@ -27,10 +28,15 @@ import Animated, {
   useAnimatedReaction,
   runOnJS,
   withSpring,
+  withTiming,
+  Easing,
 } from 'react-native-reanimated';
 import type { Listing } from '@/types';
 import { fetchListingById, isLiked, toggleLike } from '@/lib/listings';
 import { useAuth } from '@/lib/auth';
+import { useToast } from '@/lib/toast';
+import { LikeBurst } from '@/components/LikeBurst';
+import { AnimatedNumber } from '@/components/AnimatedNumber';
 
 const AnimatedExpoImage = Animated.createAnimatedComponent(Image);
 
@@ -109,13 +115,14 @@ const ITEM_TAGS = [
   'breathable',
 ];
 
-// Unified brand palette (matches home tabs + PromoBanner)
+// Unified brand palette (matches home tabs + PromoBanner + LiveActivityTicker)
 const BRAND_PURPLE = '#6C47FF';
-const BRAND_LIME = '#c8e83a';
-const BRAND_DARK = '#111827';
-const TAG_BG = BRAND_LIME;
+const BRAND_PURPLE_SOFT = '#f1edff';
+const BRAND_LIME = '#d8f53a';
+const BRAND_INK = '#0a0a0a';
+const TAG_BG = '#f3f4f6';
+const TAG_BORDER = '#e5e7eb';
 const LINK_PURPLE = BRAND_PURPLE;
-const PLICK_LIME = BRAND_LIME;
 
 const REVIEWS_COUNT = 7;
 const TRANSACTIONS_COUNT = 12;
@@ -257,9 +264,6 @@ const SIMILAR_ITEMS: RelatedItem[] = [
   },
 ];
 
-const TEAL = BRAND_PURPLE;
-const BUNDLE_BLUE = BRAND_PURPLE;
-
 type SaveList = { id: string; name: string; emoji: string; count: number };
 const SAVE_LISTS: SaveList[] = [
   { id: 'liked', name: 'Liked items', emoji: '❤️', count: 47 },
@@ -301,6 +305,10 @@ function ZoomableImage({
   sharedTag?: string;
   onZoomChange?: (zoomed: boolean) => void;
 }) {
+  const MIN_SCALE = 1;
+  const MAX_SCALE = 4;
+  const DOUBLE_TAP_SCALE = 2.4;
+
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
   const tx = useSharedValue(0);
@@ -308,7 +316,15 @@ function ZoomableImage({
   const savedTx = useSharedValue(0);
   const savedTy = useSharedValue(0);
 
-  // Lock parent pager while zoomed
+  // Pinch focal-point (relative to the View center, in screen pixels).
+  // We translate so the pinch origin maps to the same point post-scale.
+  const focalX = useSharedValue(0);
+  const focalY = useSharedValue(0);
+  const startTx = useSharedValue(0);
+  const startTy = useSharedValue(0);
+  const startScale = useSharedValue(1);
+
+  // Notify parent whenever zoom-state crosses the 1.04 threshold.
   useAnimatedReaction(
     () => scale.value > 1.04,
     (zoomed, prev) => {
@@ -317,23 +333,62 @@ function ZoomableImage({
     [onZoomChange]
   );
 
-  const reset = () => {
+  // Maximum offset we can pan to without revealing edges.
+  // At scale s, content size is imgWidth*s; viewport is imgWidth.
+  // Allowed translate range is ±(imgWidth*s - imgWidth)/2.
+  function clampX(value: number, s: number) {
     'worklet';
-    scale.value = withSpring(1, { damping: 18, stiffness: 180 });
+    const limit = Math.max(0, (imgWidth * s - imgWidth) / 2);
+    return Math.min(limit, Math.max(-limit, value));
+  }
+  function clampY(value: number, s: number) {
+    'worklet';
+    const limit = Math.max(0, (imgHeight * s - imgHeight) / 2);
+    return Math.min(limit, Math.max(-limit, value));
+  }
+
+  const resetZoom = () => {
+    'worklet';
+    scale.value = withTiming(1, { duration: 220, easing: Easing.out(Easing.cubic) });
     savedScale.value = 1;
-    tx.value = withSpring(0);
-    ty.value = withSpring(0);
+    tx.value = withTiming(0, { duration: 220, easing: Easing.out(Easing.cubic) });
+    ty.value = withTiming(0, { duration: 220, easing: Easing.out(Easing.cubic) });
     savedTx.value = 0;
     savedTy.value = 0;
   };
 
   const pinch = Gesture.Pinch()
+    .onStart((e) => {
+      // Convert focal point from view-local coords to "offset from center"
+      focalX.value = e.focalX - imgWidth / 2;
+      focalY.value = e.focalY - imgHeight / 2;
+      startTx.value = tx.value;
+      startTy.value = ty.value;
+      startScale.value = scale.value;
+    })
     .onUpdate((e) => {
-      scale.value = Math.max(1, Math.min(savedScale.value * e.scale, 4));
+      const next = Math.max(MIN_SCALE, Math.min(savedScale.value * e.scale, MAX_SCALE));
+      // Keep focal point pinned: shift translation by (1 - next/start) * (focal - startT)
+      const k = 1 - next / startScale.value;
+      const proposedTx = startTx.value + (focalX.value - startTx.value) * k;
+      const proposedTy = startTy.value + (focalY.value - startTy.value) * k;
+      scale.value = next;
+      tx.value = clampX(proposedTx, next);
+      ty.value = clampY(proposedTy, next);
     })
     .onEnd(() => {
-      savedScale.value = scale.value;
-      if (scale.value < 1.05) reset();
+      if (scale.value < 1.05) {
+        resetZoom();
+      } else {
+        savedScale.value = scale.value;
+        // Snap-back into bounds with a spring, then save the rested values.
+        const targetTx = clampX(tx.value, scale.value);
+        const targetTy = clampY(ty.value, scale.value);
+        tx.value = withSpring(targetTx, { damping: 22, stiffness: 220 });
+        ty.value = withSpring(targetTy, { damping: 22, stiffness: 220 });
+        savedTx.value = targetTx;
+        savedTy.value = targetTy;
+      }
     });
 
   // Single-finger pan only activates while zoomed; otherwise fails so the
@@ -341,13 +396,25 @@ function ZoomableImage({
   const pan = Gesture.Pan()
     .manualActivation(true)
     .maxPointers(1)
-    .onTouchesMove((_, manager) => {
-      if (scale.value > 1.04) manager.activate();
-      else manager.fail();
+    .averageTouches(true)
+    .onTouchesMove((e, manager) => {
+      // Require zoomed AND a small movement threshold so a tap that drifts
+      // a couple of pixels never steals from the double-tap recognizer.
+      if (scale.value <= 1.04) {
+        manager.fail();
+        return;
+      }
+      const t = e.allTouches[0];
+      if (!t) return;
+      const dx = Math.abs((t.absoluteX ?? 0) - (t.x ?? 0));
+      const dy = Math.abs((t.absoluteY ?? 0) - (t.y ?? 0));
+      if (dx > 4 || dy > 4) manager.activate();
     })
     .onUpdate((e) => {
-      tx.value = savedTx.value + e.translationX;
-      ty.value = savedTy.value + e.translationY;
+      const proposedTx = savedTx.value + e.translationX;
+      const proposedTy = savedTy.value + e.translationY;
+      tx.value = clampX(proposedTx, scale.value);
+      ty.value = clampY(proposedTy, scale.value);
     })
     .onEnd(() => {
       savedTx.value = tx.value;
@@ -357,16 +424,29 @@ function ZoomableImage({
   const doubleTap = Gesture.Tap()
     .numberOfTaps(2)
     .maxDuration(280)
-    .onEnd(() => {
+    .maxDistance(20)
+    .onEnd((e) => {
       if (scale.value > 1.05) {
-        reset();
+        resetZoom();
       } else {
-        scale.value = withSpring(2.2, { damping: 18, stiffness: 180 });
-        savedScale.value = 2.2;
+        // Zoom toward the tap location so the tapped pixel stays put.
+        const fx = e.x - imgWidth / 2;
+        const fy = e.y - imgHeight / 2;
+        const next = DOUBLE_TAP_SCALE;
+        const k = 1 - next / 1;
+        const targetTx = clampX(fx * k, next);
+        const targetTy = clampY(fy * k, next);
+        scale.value = withTiming(next, { duration: 240, easing: Easing.out(Easing.cubic) });
+        tx.value = withTiming(targetTx, { duration: 240, easing: Easing.out(Easing.cubic) });
+        ty.value = withTiming(targetTy, { duration: 240, easing: Easing.out(Easing.cubic) });
+        savedScale.value = next;
+        savedTx.value = targetTx;
+        savedTy.value = targetTy;
       }
     });
 
-  const composed = Gesture.Simultaneous(pinch, Gesture.Race(doubleTap, pan));
+  // Pinch + (doubleTap → pan) so doubleTap always wins a stationary 2-finger event.
+  const composed = Gesture.Simultaneous(pinch, Gesture.Exclusive(doubleTap, pan));
 
   const animStyle = useAnimatedStyle(() => ({
     transform: [
@@ -378,13 +458,18 @@ function ZoomableImage({
 
   return (
     <GestureDetector gesture={composed}>
-      <Animated.View style={[{ width: imgWidth, height: imgHeight, overflow: 'hidden' }, animStyle]}>
-        <AnimatedExpoImage
-          source={{ uri }}
-          style={{ width: imgWidth, height: imgHeight }}
-          contentFit="cover"
-          sharedTransitionTag={sharedTag}
-        />
+      <Animated.View
+        collapsable={false}
+        style={{ width: imgWidth, height: imgHeight, overflow: 'hidden' }}
+      >
+        <Animated.View style={[{ width: imgWidth, height: imgHeight }, animStyle]}>
+          <AnimatedExpoImage
+            source={{ uri }}
+            style={{ width: imgWidth, height: imgHeight }}
+            contentFit="cover"
+            sharedTransitionTag={sharedTag}
+          />
+        </Animated.View>
       </Animated.View>
     </GestureDetector>
   );
@@ -492,7 +577,7 @@ function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress: () => 
           position: 'relative',
           width: CARD_WIDTH,
           height: CARD_IMAGE_HEIGHT,
-          borderRadius: 6,
+          borderRadius: 14,
           overflow: 'hidden',
           backgroundColor: '#f3f4f6',
         }}
@@ -531,7 +616,7 @@ function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress: () => 
             pointerEvents="none"
             style={{
               position: 'absolute',
-              bottom: 6,
+              bottom: 8,
               left: 0,
               right: 0,
               flexDirection: 'row',
@@ -554,43 +639,65 @@ function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress: () => 
           </View>
         )}
 
+        {/* Like chip */}
         <View
           style={{
             position: 'absolute',
-            bottom: 8,
+            top: 8,
             right: 8,
-            backgroundColor: 'white',
-            borderRadius: 16,
+            backgroundColor: 'rgba(255,255,255,0.94)',
+            borderRadius: 999,
             paddingHorizontal: 9,
-            paddingVertical: 5,
+            paddingVertical: 4,
             flexDirection: 'row',
             alignItems: 'center',
             gap: 4,
-            shadowColor: '#000',
-            shadowOpacity: 0.1,
-            shadowRadius: 4,
-            shadowOffset: { width: 0, height: 1 },
-            elevation: 2,
           }}
         >
-          <Feather name="heart" size={13} color="#374151" />
-          <Text style={{ fontSize: 12, fontWeight: '600', color: '#374151' }}>{item.likes}</Text>
+          <Feather name="heart" size={11} color={BRAND_INK} />
+          <Text style={{ fontSize: 11, fontWeight: '700', color: BRAND_INK }}>{item.likes}</Text>
         </View>
       </View>
-      <Text style={{ fontSize: 14, color: '#374151', marginTop: 8 }} numberOfLines={1}>
-        {item.brand}
-      </Text>
-      <Text style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }} numberOfLines={1}>
-        {item.meta}
-      </Text>
-      <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827', marginTop: 4 }}>
-        ${item.price.toFixed(2)}
-      </Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-        <Text style={{ fontSize: 13, color: TEAL }}>${item.inclPrice.toFixed(2)} incl.</Text>
-        <Ionicons name="shield-checkmark" size={13} color={TEAL} />
+
+      <View style={{ marginTop: 10 }}>
+        <Text style={{ fontSize: 13, fontWeight: '700', color: BRAND_INK }} numberOfLines={1}>
+          {item.brand}
+        </Text>
+        <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }} numberOfLines={1}>
+          {item.meta}
+        </Text>
+        <Text style={{ fontSize: 14, fontWeight: '800', color: BRAND_INK, marginTop: 4 }}>
+          ${item.price.toFixed(0)}
+        </Text>
       </View>
     </Pressable>
+  );
+}
+
+function SectionEyebrow({ label, color = BRAND_INK }: { label: string; color?: string }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+      <View
+        style={{
+          width: 6,
+          height: 6,
+          borderRadius: 3,
+          backgroundColor: BRAND_LIME,
+          marginRight: 8,
+        }}
+      />
+      <Text
+        style={{
+          fontSize: 11,
+          fontWeight: '800',
+          color,
+          letterSpacing: 1.4,
+          textTransform: 'uppercase',
+        }}
+      >
+        {label}
+      </Text>
+    </View>
   );
 }
 
@@ -614,6 +721,7 @@ export default function ProductScreen() {
   const { id } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const toast = useToast();
   const productIdParam = Array.isArray(id) ? id[0] : id;
 
   const [activeImage, setActiveImage] = useState(0);
@@ -673,14 +781,30 @@ export default function ProductScreen() {
   const handleHeartPress = async () => {
     tap('light');
     if (!user) {
+      toast.show('Sign in to like items', { variant: 'info', icon: 'log-in' });
       router.push('/auth/login');
       return;
     }
     if (!productIdParam || likeBusy) return;
     setLikeBusy(true);
+    // Optimistic flip — animation runs immediately, even before the round-trip.
+    setLiked((prev) => !prev);
     const next = await toggleLike(productIdParam, user.id, liked);
     setLiked(next);
+    if (next) toast.show('Added to your favorites', { variant: 'success', icon: 'heart' });
     setLikeBusy(false);
+  };
+
+  const handleFollowPress = () => {
+    tap('selection');
+    setFollowed((prev) => {
+      const next = !prev;
+      toast.show(
+        next ? `Following @${listing?.seller?.username ?? 'seller'}` : 'Unfollowed',
+        { variant: next ? 'info' : 'default', icon: next ? 'user-check' : 'user-x' },
+      );
+      return next;
+    });
   };
 
   const sharedTagId = productIdParam ?? listing?.id ?? '';
@@ -747,17 +871,8 @@ export default function ProductScreen() {
 
   const originalPrice = Math.round(listing.price * 1.24);
   const discountPct = Math.round((1 - listing.price / originalPrice) * 100);
-  const offerPrice = Math.floor(listing.price * 0.9);
   const baseLikes = listing.likes ?? 0;
   const heartCount = Math.max(0, baseLikes + (liked ? 1 : 0));
-
-  const metaLine = [
-    listing.gender === 'men' ? `Men's US ${listing.size} / EU 48-50 / 2` : listing.size,
-    CONDITION_LABELS[listing.condition] ?? listing.condition,
-    listing.seller?.location ? `Located in ${listing.seller.location}` : null,
-  ]
-    .filter(Boolean)
-    .join(' • ');
 
   return (
     <View style={{ flex: 1, backgroundColor: 'white' }}>
@@ -797,6 +912,7 @@ export default function ProductScreen() {
         contentContainerStyle={{ paddingBottom: 120 }}
         onScroll={scrollHandler}
         scrollEventThrottle={16}
+        scrollEnabled={heroPagerEnabled}
       >
         {/* ── Image carousel (full-bleed to top, Plick style) ── */}
         <View style={{ position: 'relative' }}>
@@ -850,72 +966,62 @@ export default function ProductScreen() {
             <Feather name="arrow-left" size={22} color="#111827" />
           </Pressable>
 
-          {/* Right-side floating action stack (pin + heart) */}
+          {/* Right-side floating action cluster — unified glass pill */}
           <View
             style={{
               position: 'absolute',
               right: 14,
               bottom: 60,
-              alignItems: 'center',
-              gap: 14,
+              borderRadius: 28,
+              overflow: 'hidden',
+              ...iosShadow,
             }}
           >
+            {IS_IOS ? (
+              <BlurView intensity={85} tint="systemUltraThinMaterialLight" style={StyleSheet.absoluteFill} />
+            ) : (
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255,255,255,0.94)' }]} />
+            )}
             <Pressable
               onPress={() => { tap('light'); setPinned(!pinned); }}
               style={({ pressed }) => ({
-                width: 54,
-                height: 54,
-                borderRadius: 27,
-                overflow: 'hidden',
+                width: 50,
+                paddingTop: 12,
+                paddingBottom: 8,
                 alignItems: 'center',
                 justifyContent: 'center',
                 transform: [{ scale: pressed ? 0.94 : 1 }],
-                ...iosShadow,
               })}
             >
-              {IS_IOS ? (
-                <BlurView intensity={80} tint="systemUltraThinMaterialLight" style={StyleSheet.absoluteFill} />
-              ) : (
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'white' }]} />
-              )}
-              <PinIcon size={22} color="#111827" filled={pinned} />
-              <Text style={{ fontSize: 12, fontWeight: '600', color: '#111827', marginTop: -2 }}>
+              <PinIcon size={20} color={BRAND_INK} filled={pinned} />
+              <Text style={{ fontSize: 11, fontWeight: '700', color: BRAND_INK, marginTop: 2 }}>
                 {PIN_COUNT + (pinned ? 1 : 0)}
               </Text>
             </Pressable>
-
+            <View style={{ height: HAIRLINE, marginHorizontal: 10, backgroundColor: 'rgba(10,10,10,0.12)' }} />
             <Pressable
               onPress={handleHeartPress}
               onLongPress={() => { tap('medium'); setSaveListVisible(true); }}
               delayLongPress={350}
               style={({ pressed }) => ({
-                width: 54,
-                height: 54,
-                borderRadius: 27,
-                overflow: 'hidden',
+                width: 50,
+                paddingTop: 8,
+                paddingBottom: 12,
                 alignItems: 'center',
                 justifyContent: 'center',
                 transform: [{ scale: pressed ? 0.94 : 1 }],
-                ...iosShadow,
               })}
             >
-              {IS_IOS ? (
-                <BlurView intensity={80} tint="systemUltraThinMaterialLight" style={StyleSheet.absoluteFill} />
-              ) : (
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'white' }]} />
-              )}
-              <Ionicons
-                name={liked ? 'heart' : 'heart-outline'}
-                size={22}
-                color={liked ? '#ef4444' : '#111827'}
+              <LikeBurst liked={liked} size={20} color="#ef4444" inactiveColor={BRAND_INK} />
+              <AnimatedNumber
+                value={heartCount}
+                height={14}
+                style={{ fontSize: 11, fontWeight: '700', color: BRAND_INK, marginTop: 2 }}
               />
-              <Text style={{ fontSize: 12, fontWeight: '600', color: '#111827', marginTop: -2 }}>
-                {heartCount}
-              </Text>
             </Pressable>
           </View>
 
-          {/* Pagination — Plick-style dashes */}
+          {/* Pagination dashes */}
           {listing.images.length > 1 && (
             <View
               style={{
@@ -933,10 +1039,10 @@ export default function ProductScreen() {
                 <View
                   key={i}
                   style={{
-                    width: 28,
-                    height: 3,
+                    width: i === activeImage ? 24 : 6,
+                    height: 4,
                     borderRadius: 2,
-                    backgroundColor: i === activeImage ? 'white' : '#111827',
+                    backgroundColor: i === activeImage ? 'white' : 'rgba(255,255,255,0.5)',
                   }}
                 />
               ))}
@@ -944,352 +1050,697 @@ export default function ProductScreen() {
           )}
         </View>
 
-        {/* ── Plick-style heading section ── */}
-        <View style={{ backgroundColor: PLICK_LIME, paddingHorizontal: 20, paddingVertical: 16 }}>
-          <Text style={{ fontSize: 16, color: '#111827', textAlign: 'center' }}>
-            Get 10% off! Buy a bundle from the seller
-          </Text>
-        </View>
+        {/* ── Title block (editorial) ── */}
+        <View style={{ paddingHorizontal: 20, paddingTop: 22, paddingBottom: 18 }}>
+          {/* Eyebrow — brand + condition */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+            <View
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: BRAND_LIME,
+                marginRight: 8,
+              }}
+            />
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: '800',
+                color: BRAND_INK,
+                letterSpacing: 1.4,
+                textTransform: 'uppercase',
+              }}
+              numberOfLines={1}
+            >
+              {listing.brand}  ·  {CONDITION_LABELS[listing.condition] ?? listing.condition}
+            </Text>
+          </View>
 
-        <View style={{ paddingHorizontal: 20, paddingTop: 18, paddingBottom: 18 }}>
-          <Text style={{ fontSize: 14, color: '#111827' }}>
-            Liked by{' '}
-            <Text style={{ fontWeight: '700' }}>@alice.333</Text>
-            {' '}and {heartCount - 1} others
-          </Text>
-
+          {/* Title + price row */}
           <View
             style={{
               flexDirection: 'row',
-              alignItems: 'flex-start',
+              alignItems: 'flex-end',
               justifyContent: 'space-between',
-              marginTop: 14,
             }}
           >
-            <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={{ fontSize: 26, fontWeight: '800', color: '#111827' }}>
+            <View style={{ flex: 1, paddingRight: 14 }}>
+              <Text
+                style={{
+                  fontSize: 28,
+                  fontWeight: '900',
+                  color: BRAND_INK,
+                  lineHeight: 32,
+                  letterSpacing: -0.6,
+                }}
+              >
                 {listing.title}
               </Text>
-              <Text style={{ fontSize: 16, color: '#111827', marginTop: 4 }}>
-                <Text style={{ fontWeight: '700' }}>Size </Text>
-                {listing.size}
-              </Text>
-            </View>
-            <Text style={{ fontSize: 22, fontWeight: '800', color: '#111827' }}>
-              ${listing.price}
-            </Text>
-          </View>
-
-        </View>
-
-        {/* ── Seller card ── */}
-        <View style={{ paddingHorizontal: 16, paddingVertical: 16, borderTopWidth: HAIRLINE, borderTopColor: '#e5e7eb' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-            {/* Avatar */}
-            <View style={{ width: 52, height: 52, borderRadius: 26, overflow: 'hidden', backgroundColor: '#e5e7eb', alignItems: 'center', justifyContent: 'center' }}>
-              {listing.seller.avatar_url ? (
-                <Image source={{ uri: listing.seller.avatar_url }} style={{ width: 52, height: 52 }} contentFit="cover" />
-              ) : (
-                <Feather name="user" size={24} color="#9ca3af" />
-              )}
-            </View>
-
-            {/* Seller info */}
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>
-                {listing.seller.username}
-              </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
-                <StarRating rating={listing.seller.rating} />
-                <Text style={{ fontSize: 13, color: '#374151' }}>{REVIEWS_COUNT} Reviews</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 8 }}>
+                <View
+                  style={{
+                    backgroundColor: '#f3f4f6',
+                    borderRadius: 999,
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                  }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: BRAND_INK }}>
+                    Size {listing.size}
+                  </Text>
+                </View>
+                {listing.seller?.location ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Feather name="map-pin" size={11} color="#6b7280" />
+                    <Text style={{ fontSize: 12, color: '#6b7280' }} numberOfLines={1}>
+                      {listing.seller.location}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
-              <Text style={{ fontSize: 13, color: '#6b7280', marginTop: 3 }}>
-                {TRANSACTIONS_COUNT} Transactions{'  '}
-                <Text style={{ textDecorationLine: 'underline' }}>{ITEMS_FOR_SALE} items for sale</Text>
-              </Text>
             </View>
-          </View>
-
-          {/* Follow + Message buttons */}
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <Pressable
-              onPress={() => { tap('selection'); setFollowed(!followed); }}
-              style={({ pressed }) => ({
-                flex: 1, borderRadius: 10, paddingVertical: 12, alignItems: 'center',
-                backgroundColor: followed ? '#f3f4f6' : BRAND_DARK,
-                borderWidth: followed ? HAIRLINE : 0, borderColor: '#d1d5db',
-                opacity: pressed ? 0.85 : 1,
-              })}
-            >
-              <Text style={{ fontSize: 13, fontWeight: '700', color: followed ? BRAND_DARK : 'white', letterSpacing: 0.5 }}>
-                {followed ? 'FOLLOWING' : 'FOLLOW'}
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={{ fontSize: 13, color: '#9ca3af', textDecorationLine: 'line-through' }}>
+                ${originalPrice}
               </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => { tap('medium'); Alert.alert('Message', 'Opening chat...'); }}
-              style={({ pressed }) => ({ flex: 1, borderRadius: 10, paddingVertical: 12, alignItems: 'center', backgroundColor: BRAND_PURPLE, opacity: pressed ? 0.85 : 1 })}
-            >
-              <Text style={{ fontSize: 13, fontWeight: '700', color: 'white', letterSpacing: 0.5 }}>
-                SEND A MESSAGE
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-
-        {/* ── Item description ── */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 20, paddingBottom: 8, borderTopWidth: HAIRLINE, borderTopColor: '#e5e7eb' }}>
-          <Text style={{ fontSize: 14, color: '#6b7280', marginBottom: 10 }}>
-            Item description
-          </Text>
-
-          <View style={{ borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 16, backgroundColor: 'white' }}>
-            {/* Description text */}
-            <Text style={{ fontSize: 16, color: '#111827', lineHeight: 24 }}>
-              {listing.description}
-            </Text>
-
-            {/* Show translation */}
-            <Pressable onPress={() => Alert.alert('Translation')} style={{ marginTop: 14, alignSelf: 'flex-start' }}>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: LINK_PURPLE }}>
-                Show translation
-              </Text>
-            </Pressable>
-
-            <View style={{ height: 1, backgroundColor: '#e5e7eb', marginVertical: 18 }} />
-
-            {/* Category */}
-            <Pressable onPress={() => {}} style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={{ fontSize: 16, color: '#111827', flex: 1 }}>
-                <Text style={{ fontWeight: '700' }}>Category </Text>
-                {CATEGORY_LABELS[listing.category] ?? listing.category}
-              </Text>
-              <Feather name="arrow-up-right" size={20} color="#111827" />
-            </Pressable>
-
-            <View style={{ height: 1, backgroundColor: '#e5e7eb', marginVertical: 16 }} />
-
-            {/* Size */}
-            <Text style={{ fontSize: 16, color: '#111827' }}>
-              <Text style={{ fontWeight: '700' }}>Size </Text>
-              {listing.size}
-            </Text>
-
-            <View style={{ height: 1, backgroundColor: '#e5e7eb', marginVertical: 16 }} />
-
-            {/* Condition */}
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={{ fontSize: 16, color: '#111827', flex: 1 }}>
-                <Text style={{ fontWeight: '700' }}>Condition </Text>
-                {CONDITION_LABELS[listing.condition] ?? listing.condition}
-              </Text>
-              <Pressable onPress={() => Alert.alert('Condition info', 'Details about condition grading')} hitSlop={8}>
-                <Feather name="info" size={20} color="#111827" />
-              </Pressable>
-            </View>
-
-            <View style={{ height: 1, backgroundColor: '#e5e7eb', marginVertical: 16 }} />
-
-            {/* Color */}
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={{ fontSize: 16, color: '#111827' }}>
-                <Text style={{ fontWeight: '700' }}>Color </Text>
-                {ITEM_COLOR.name}
+              <Text
+                style={{
+                  fontSize: 26,
+                  fontWeight: '900',
+                  color: BRAND_INK,
+                  lineHeight: 30,
+                  letterSpacing: -0.4,
+                }}
+              >
+                ${listing.price}
               </Text>
               <View
                 style={{
-                  width: 18,
-                  height: 18,
-                  borderRadius: 9,
-                  marginLeft: 8,
-                  backgroundColor: ITEM_COLOR.hex,
-                  borderWidth: 2,
-                  borderColor: '#e5e7eb',
+                  marginTop: 4,
+                  backgroundColor: BRAND_LIME,
+                  borderRadius: 999,
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
                 }}
-              />
+              >
+                <Text style={{ fontSize: 11, fontWeight: '900', color: BRAND_INK, letterSpacing: 0.4 }}>
+                  −{discountPct}%
+                </Text>
+              </View>
             </View>
-
-            <View style={{ height: 1, backgroundColor: '#e5e7eb', marginVertical: 16 }} />
-
-            {/* Brand */}
-            <Pressable onPress={() => {}} style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={{ fontSize: 16, color: '#111827', flex: 1 }}>
-                <Text style={{ fontWeight: '700' }}>Brand </Text>
-                {listing.brand}
-              </Text>
-              <Feather name="arrow-up-right" size={20} color="#111827" />
-            </Pressable>
           </View>
 
-          {/* Tags */}
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 16, gap: 8 }}>
+          {/* Likes line */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 14, gap: 6 }}>
+            <Feather name="heart" size={13} color="#6b7280" />
+            <Text style={{ fontSize: 13, color: '#6b7280' }}>
+              Liked by <Text style={{ fontWeight: '700', color: BRAND_INK }}>@alice.333</Text>
+              {heartCount > 1 ? ` and ${heartCount - 1} others` : ''}
+            </Text>
+          </View>
+        </View>
+
+        {/* ── Bundle teaser pill (matches LiveActivityTicker voice) ── */}
+        <Pressable
+          onPress={() => { tap('selection'); setRelatedTab('members'); }}
+          style={({ pressed }) => ({
+            marginHorizontal: 16,
+            marginBottom: 4,
+            backgroundColor: BRAND_INK,
+            borderRadius: 18,
+            paddingLeft: 16,
+            paddingRight: 8,
+            paddingVertical: 12,
+            flexDirection: 'row',
+            alignItems: 'center',
+            opacity: pressed ? 0.9 : 1,
+            transform: [{ scale: pressed ? 0.98 : 1 }],
+            ...(IS_IOS && {
+              shadowColor: '#000',
+              shadowOpacity: 0.12,
+              shadowRadius: 10,
+              shadowOffset: { width: 0, height: 4 },
+            }),
+            ...(!IS_IOS && { elevation: 3 }),
+          })}
+        >
+          <View
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: 4,
+              backgroundColor: BRAND_LIME,
+              marginRight: 10,
+            }}
+          />
+          <Text
+            style={{
+              fontSize: 10,
+              fontWeight: '900',
+              color: BRAND_LIME,
+              letterSpacing: 1.4,
+              marginRight: 12,
+            }}
+          >
+            BUNDLE
+          </Text>
+          <Text style={{ flex: 1, color: 'white', fontSize: 13, fontWeight: '600' }} numberOfLines={1}>
+            Add 1 more —{' '}
+            <Text style={{ fontWeight: '800' }}>save 10%</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.55)' }}> · view items</Text>
+          </Text>
+          <View
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: 15,
+              backgroundColor: 'rgba(255,255,255,0.12)',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginLeft: 8,
+            }}
+          >
+            <Feather name="arrow-up-right" size={14} color="white" />
+          </View>
+        </Pressable>
+
+        {/* ── Seller card ── */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 18, paddingBottom: 16 }}>
+          <View
+            style={{
+              backgroundColor: '#fafafa',
+              borderRadius: 18,
+              borderWidth: HAIRLINE,
+              borderColor: '#ececec',
+              padding: 14,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              {/* Avatar with subtle ring */}
+              <View
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  padding: 2,
+                  backgroundColor: 'white',
+                  borderWidth: HAIRLINE,
+                  borderColor: '#e5e7eb',
+                }}
+              >
+                <View
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: 26,
+                    overflow: 'hidden',
+                    backgroundColor: '#e5e7eb',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {listing.seller.avatar_url ? (
+                    <Image
+                      source={{ uri: listing.seller.avatar_url }}
+                      style={{ width: 52, height: 52 }}
+                      contentFit="cover"
+                    />
+                  ) : (
+                    <Feather name="user" size={22} color="#9ca3af" />
+                  )}
+                </View>
+              </View>
+
+              {/* Seller info */}
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: '800', color: BRAND_INK }} numberOfLines={1}>
+                  @{listing.seller.username}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                  <StarRating rating={listing.seller.rating} />
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: BRAND_INK }}>
+                    {listing.seller.rating?.toFixed?.(1) ?? '—'}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#6b7280' }}>
+                    ({REVIEWS_COUNT})
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 3 }}>
+                  {TRANSACTIONS_COUNT} sales · {ITEMS_FOR_SALE} listed
+                </Text>
+              </View>
+            </View>
+
+            {/* Follow + Message */}
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+              <Pressable
+                onPress={handleFollowPress}
+                style={({ pressed }) => ({
+                  flex: 1,
+                  borderRadius: 12,
+                  paddingVertical: 11,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexDirection: 'row',
+                  gap: 6,
+                  backgroundColor: followed ? 'white' : BRAND_PURPLE,
+                  borderWidth: followed ? HAIRLINE : 0,
+                  borderColor: '#e5e7eb',
+                  opacity: pressed ? 0.88 : 1,
+                  transform: [{ scale: pressed ? 0.98 : 1 }],
+                })}
+              >
+                <Feather
+                  name={followed ? 'check' : 'plus'}
+                  size={14}
+                  color={followed ? BRAND_INK : 'white'}
+                />
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: '700',
+                    color: followed ? BRAND_INK : 'white',
+                  }}
+                >
+                  {followed ? 'Following' : 'Follow'}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => { tap('medium'); Alert.alert('Message', 'Opening chat...'); }}
+                style={({ pressed }) => ({
+                  flex: 1,
+                  borderRadius: 12,
+                  paddingVertical: 11,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexDirection: 'row',
+                  gap: 6,
+                  backgroundColor: 'white',
+                  borderWidth: HAIRLINE,
+                  borderColor: '#e5e7eb',
+                  opacity: pressed ? 0.7 : 1,
+                  transform: [{ scale: pressed ? 0.98 : 1 }],
+                })}
+              >
+                <Feather name="message-circle" size={14} color={BRAND_INK} />
+                <Text style={{ fontSize: 13, fontWeight: '700', color: BRAND_INK }}>
+                  Message
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+
+        {/* ── Description ── */}
+        <View style={{ paddingHorizontal: 20, paddingTop: 22, paddingBottom: 4 }}>
+          <SectionEyebrow label="Description" />
+          <Text style={{ fontSize: 15, color: BRAND_INK, lineHeight: 23 }}>
+            {listing.description}
+          </Text>
+          <Pressable
+            onPress={() => Alert.alert('Translation')}
+            style={({ pressed }) => ({
+              marginTop: 12,
+              alignSelf: 'flex-start',
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 4,
+              opacity: pressed ? 0.6 : 1,
+            })}
+          >
+            <Feather name="globe" size={13} color={LINK_PURPLE} />
+            <Text style={{ fontSize: 13, fontWeight: '700', color: LINK_PURPLE }}>
+              Show translation
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* ── Details ── */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 22, paddingBottom: 6 }}>
+          <View style={{ paddingHorizontal: 4 }}>
+            <SectionEyebrow label="Details" />
+          </View>
+          <View
+            style={{
+              backgroundColor: 'white',
+              borderRadius: 18,
+              borderWidth: HAIRLINE,
+              borderColor: '#ececec',
+              overflow: 'hidden',
+            }}
+          >
+            {[
+              {
+                label: 'Category',
+                value: CATEGORY_LABELS[listing.category] ?? listing.category,
+                onPress: () => {},
+                trailing: <Feather name="chevron-right" size={18} color="#9ca3af" />,
+              },
+              {
+                label: 'Brand',
+                value: listing.brand,
+                onPress: () => {},
+                trailing: <Feather name="chevron-right" size={18} color="#9ca3af" />,
+              },
+              {
+                label: 'Size',
+                value: listing.size,
+              },
+              {
+                label: 'Condition',
+                value: CONDITION_LABELS[listing.condition] ?? listing.condition,
+                onPress: () => Alert.alert('Condition info', 'Details about condition grading'),
+                trailing: <Feather name="info" size={16} color="#9ca3af" />,
+              },
+              {
+                label: 'Color',
+                value: ITEM_COLOR.name,
+                trailing: (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <View
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: 9,
+                        padding: 2,
+                        backgroundColor: 'white',
+                        borderWidth: HAIRLINE,
+                        borderColor: '#e5e7eb',
+                      }}
+                    >
+                      <View
+                        style={{
+                          flex: 1,
+                          borderRadius: 7,
+                          backgroundColor: ITEM_COLOR.hex,
+                        }}
+                      />
+                    </View>
+                  </View>
+                ),
+              },
+            ].map((row, i, arr) => {
+              return (
+                <Pressable
+                  key={row.label}
+                  onPress={row.onPress}
+                  disabled={!row.onPress}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: 16,
+                    paddingVertical: 14,
+                    borderBottomWidth: i === arr.length - 1 ? 0 : HAIRLINE,
+                    borderBottomColor: '#ececec',
+                    backgroundColor: pressed && row.onPress ? '#fafafa' : 'white',
+                  })}
+                >
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: '600',
+                      color: '#6b7280',
+                      width: 88,
+                    }}
+                  >
+                    {row.label}
+                  </Text>
+                  <Text style={{ flex: 1, fontSize: 15, fontWeight: '600', color: BRAND_INK }} numberOfLines={1}>
+                    {row.value}
+                  </Text>
+                  {row.trailing}
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* Tags — subtle outline chips */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 16, gap: 8, paddingHorizontal: 4 }}>
             {ITEM_TAGS.map((tag) => (
               <View
                 key={tag}
                 style={{
                   backgroundColor: TAG_BG,
+                  borderWidth: HAIRLINE,
+                  borderColor: TAG_BORDER,
                   borderRadius: 999,
-                  paddingHorizontal: 14,
-                  paddingVertical: 7,
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
                 }}
               >
-                <Text style={{ fontSize: 14, color: '#374151' }}>{tag}</Text>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: '#4b5563' }}>#{tag}</Text>
               </View>
             ))}
           </View>
 
-          {/* Contact / Share / Report */}
+          {/* Share / Report row */}
           <View
             style={{
               flexDirection: 'row',
-              justifyContent: 'space-between',
               alignItems: 'center',
-              marginTop: 24,
-              paddingHorizontal: 8,
+              justifyContent: 'space-between',
+              marginTop: 22,
+              paddingHorizontal: 4,
             }}
           >
             <Pressable
-              onPress={() => Alert.alert('Contact')}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
-            >
-              <Feather name="message-circle" size={22} color="#111827" />
-              <Text style={{ fontSize: 16, color: '#111827' }}>Contact</Text>
-            </Pressable>
-            <Pressable
               onPress={() => Alert.alert('Share')}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8,
+                paddingVertical: 6,
+                opacity: pressed ? 0.6 : 1,
+              })}
             >
-              <Feather name="share-2" size={22} color="#111827" />
-              <Text style={{ fontSize: 16, color: '#111827' }}>Share</Text>
+              <Feather name="share-2" size={16} color={BRAND_INK} />
+              <Text style={{ fontSize: 13, fontWeight: '600', color: BRAND_INK }}>Share</Text>
             </Pressable>
             <Pressable
               onPress={() => Alert.alert('Report')}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
-            >
-              <Feather name="alert-triangle" size={22} color="#111827" />
-              <Text style={{ fontSize: 16, color: '#111827' }}>Report</Text>
-            </Pressable>
-          </View>
-
-          {/* Listing meta */}
-          <Text style={{ fontSize: 12, color: '#9ca3af', marginTop: 16, paddingHorizontal: 8 }}>
-            Listing ID {LISTING_ID}
-          </Text>
-        </View>
-
-        {/* ── Carrinex Verified card ── */}
-        <View style={{ marginHorizontal: 16, marginBottom: 12, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 16 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <Ionicons name="checkmark-circle" size={28} color={BRAND_PURPLE} />
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>Carrinex Verified</Text>
-          </View>
-          <Text style={{ fontSize: 13, color: '#374151', lineHeight: 19 }}>
-            This item has been verified by our in-house team or a trusted partner.{' '}
-            <Text style={{ color: BRAND_PURPLE, fontWeight: '700' }} onPress={() => {}}>Learn More.</Text>
-          </Text>
-        </View>
-
-        {/* ── Purchase Protection card ── */}
-        <View style={{ marginHorizontal: 16, marginBottom: 16, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 16 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <Ionicons name="shield" size={26} color={BRAND_PURPLE} />
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>Carrinex Purchase Protection</Text>
-          </View>
-          <Text style={{ fontSize: 13, color: '#374151', lineHeight: 19, marginBottom: 14 }}>
-            We want you to feel safe buying and selling on Carrinex. Qualifying orders are covered by our Purchase Protection in the rare case something goes wrong.
-          </Text>
-          <Pressable style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }} onPress={() => {}}>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827' }}>How You're Protected</Text>
-            <Feather name="chevron-down" size={18} color="#6b7280" />
-          </Pressable>
-        </View>
-
-        {/* ── Member's items / Similar items tabs ── */}
-        <View style={{ borderTopWidth: HAIRLINE, borderTopColor: '#e5e7eb' }}>
-          <View style={{ flexDirection: 'row', borderBottomWidth: HAIRLINE, borderBottomColor: '#e5e7eb' }}>
-            <Pressable
-              onPress={() => { tap('selection'); setRelatedTab('members'); }}
-              style={{
-                flex: 1,
-                paddingVertical: 16,
+              style={({ pressed }) => ({
+                flexDirection: 'row',
                 alignItems: 'center',
-                borderBottomWidth: 3,
-                borderBottomColor: relatedTab === 'members' ? TEAL : 'transparent',
-                marginBottom: -1,
-              }}
+                gap: 8,
+                paddingVertical: 6,
+                opacity: pressed ? 0.6 : 1,
+              })}
             >
-              <Text
+              <Feather name="flag" size={16} color="#6b7280" />
+              <Text style={{ fontSize: 13, fontWeight: '600', color: '#6b7280' }}>Report</Text>
+            </Pressable>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={{ fontSize: 11, color: '#9ca3af', letterSpacing: 0.4 }}>
+                ID · {LISTING_ID}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* ── Trust card (Verified + Protection combined) ── */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 22, paddingBottom: 6 }}>
+          <View style={{ paddingHorizontal: 4 }}>
+            <SectionEyebrow label="Buyer trust" />
+          </View>
+          <View
+            style={{
+              backgroundColor: BRAND_PURPLE_SOFT,
+              borderRadius: 18,
+              overflow: 'hidden',
+            }}
+          >
+            <Pressable
+              onPress={() => {}}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'flex-start',
+                padding: 16,
+                gap: 12,
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
+              <View
                 style={{
-                  fontSize: 15,
-                  fontWeight: relatedTab === 'members' ? '700' : '400',
-                  color: relatedTab === 'members' ? '#111827' : '#6b7280',
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: 'white',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
               >
-                Member's items
-              </Text>
+                <Ionicons name="checkmark-circle" size={22} color={BRAND_PURPLE} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: '800', color: BRAND_INK, marginBottom: 3 }}>
+                  Carrinex Verified
+                </Text>
+                <Text style={{ fontSize: 12, color: '#4b5563', lineHeight: 18 }}>
+                  Authenticated by our in-house team or a trusted partner.
+                </Text>
+              </View>
+              <Feather name="chevron-right" size={18} color={BRAND_PURPLE} />
             </Pressable>
+
+            <View style={{ height: HAIRLINE, marginHorizontal: 16, backgroundColor: 'rgba(108,71,255,0.18)' }} />
+
             <Pressable
-              onPress={() => { tap('selection'); setRelatedTab('similar'); }}
-              style={{
-                flex: 1,
-                paddingVertical: 16,
-                alignItems: 'center',
-                borderBottomWidth: 3,
-                borderBottomColor: relatedTab === 'similar' ? TEAL : 'transparent',
-                marginBottom: -1,
-              }}
+              onPress={() => {}}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'flex-start',
+                padding: 16,
+                gap: 12,
+                opacity: pressed ? 0.7 : 1,
+              })}
             >
-              <Text
+              <View
                 style={{
-                  fontSize: 15,
-                  fontWeight: relatedTab === 'similar' ? '700' : '400',
-                  color: relatedTab === 'similar' ? '#111827' : '#6b7280',
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: 'white',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
               >
-                Similar items
-              </Text>
+                <Ionicons name="shield-checkmark" size={20} color={BRAND_PURPLE} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: '800', color: BRAND_INK, marginBottom: 3 }}>
+                  Purchase Protection
+                </Text>
+                <Text style={{ fontSize: 12, color: '#4b5563', lineHeight: 18 }}>
+                  Qualifying orders covered if something goes wrong.
+                </Text>
+              </View>
+              <Feather name="chevron-right" size={18} color={BRAND_PURPLE} />
             </Pressable>
+          </View>
+        </View>
+
+        {/* ── Member's / Similar tabs (pill style) ── */}
+        <View style={{ marginTop: 22 }}>
+          <View style={{ flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 4 }}>
+            {(['members', 'similar'] as const).map((tab) => {
+              const active = relatedTab === tab;
+              return (
+                <Pressable
+                  key={tab}
+                  onPress={() => { tap('selection'); setRelatedTab(tab); }}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: 16,
+                    paddingVertical: 9,
+                    borderRadius: 999,
+                    backgroundColor: active ? BRAND_PURPLE : '#F2F2F2',
+                    transform: [{ scale: pressed ? 0.96 : 1 }],
+                  })}
+                >
+                  <Ionicons
+                    name={tab === 'members' ? 'person' : 'sparkles'}
+                    size={13}
+                    color={active ? 'white' : '#374151'}
+                    style={{ marginRight: 6 }}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: '700',
+                      color: active ? 'white' : '#374151',
+                    }}
+                  >
+                    {tab === 'members' ? "Seller's items" : 'Similar items'}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
 
           {/* TODO: replace MEMBER_ITEMS / SIMILAR_ITEMS with real Supabase queries
               (seller_id eq for member items; brand+category match for similar). */}
           {relatedTab === 'members' ? (
             <View style={{ paddingTop: 18 }}>
-              {/* Bundle discounts title */}
-              <Text style={{ fontSize: 18, fontWeight: '600', lineHeight: 24, letterSpacing: -0.24, color: '#111827', paddingHorizontal: 16, marginBottom: 14 }}>
-                Bundle discounts from {listing.seller.username}
-              </Text>
+              {/* Bundle discounts header */}
+              <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>
+                <SectionEyebrow label={`Bundle from @${listing.seller.username}`} />
+                <Text style={{ fontSize: 13, color: '#6b7280', lineHeight: 19 }}>
+                  Add items from this seller to unlock progressive discounts plus shipping savings.
+                </Text>
+              </View>
 
               {/* Bundle discount banner */}
-              <View style={{ marginHorizontal: 16, marginBottom: 20, backgroundColor: '#f1edff', borderRadius: 16, padding: 18 }}>
-                <Text style={{ fontSize: 16, color: '#111827', lineHeight: 24, marginBottom: 22 }}>
-                  Add items from this seller to your cart to unlock discounts—plus potential savings on shipping!
-                </Text>
-
+              <View
+                style={{
+                  marginHorizontal: 16,
+                  marginBottom: 22,
+                  backgroundColor: BRAND_PURPLE_SOFT,
+                  borderRadius: 18,
+                  padding: 18,
+                }}
+              >
                 {/* Progress track */}
-                <View style={{ height: 16, marginBottom: 14, position: 'relative' }}>
-                  {/* Gray track */}
-                  <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: '#dcd3ff', borderRadius: 99 }} />
-                  {/* Blue fill */}
+                <View style={{ height: 8, marginBottom: 18, position: 'relative' }}>
+                  <View
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      right: 0,
+                      top: 0,
+                      bottom: 0,
+                      backgroundColor: 'rgba(108,71,255,0.2)',
+                      borderRadius: 99,
+                    }}
+                  />
                   <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '25%' }}>
-                    <View style={{ flex: 1, backgroundColor: BUNDLE_BLUE, borderTopLeftRadius: 99, borderBottomLeftRadius: 99 }} />
-                    {/* Arrow tip */}
-                    <View style={{
-                      position: 'absolute', right: -11, top: 0,
-                      width: 0, height: 0,
-                      borderTopWidth: 8, borderBottomWidth: 8, borderLeftWidth: 12,
-                      borderTopColor: 'transparent', borderBottomColor: 'transparent',
-                      borderLeftColor: BUNDLE_BLUE,
-                    }} />
+                    <LinearGradient
+                      colors={[BRAND_PURPLE, '#9b7dff']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={{ flex: 1, borderRadius: 99 }}
+                    />
+                    {/* Thumb */}
+                    <View
+                      style={{
+                        position: 'absolute',
+                        right: -8,
+                        top: -4,
+                        width: 16,
+                        height: 16,
+                        borderRadius: 8,
+                        backgroundColor: 'white',
+                        borderWidth: 3,
+                        borderColor: BRAND_PURPLE,
+                        ...(IS_IOS && {
+                          shadowColor: '#000',
+                          shadowOpacity: 0.15,
+                          shadowRadius: 4,
+                          shadowOffset: { width: 0, height: 2 },
+                        }),
+                      }}
+                    />
                   </View>
                 </View>
 
                 {/* Milestones */}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                   {BUNDLE_MILESTONES.map((m, i) => (
-                    <View key={i} style={{ alignItems: 'center' }}>
-                      <View style={{ width: 1.5, height: 10, backgroundColor: '#9ca3af', marginBottom: 6 }} />
-                      <Text style={{ fontSize: 13, color: '#111827', textAlign: 'center' }}>{m.items}</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '600', color: m.active ? BUNDLE_BLUE : '#6b7280', textAlign: 'center' }}>{m.discount}</Text>
+                    <View key={i} style={{ alignItems: 'center', flex: 1 }}>
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          fontWeight: '700',
+                          color: m.active ? BRAND_PURPLE : '#9ca3af',
+                          textAlign: 'center',
+                        }}
+                      >
+                        {m.discount}
+                      </Text>
+                      <Text style={{ fontSize: 10, color: '#6b7280', textAlign: 'center', marginTop: 2 }}>
+                        {m.items}
+                      </Text>
                     </View>
                   ))}
                 </View>
@@ -1329,41 +1780,82 @@ export default function ProductScreen() {
       </Animated.ScrollView>
 
       {/* ── Fixed bottom bar ── */}
-      <View style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        backgroundColor: 'white',
-        borderTopWidth: HAIRLINE, borderTopColor: '#e5e7eb',
-        paddingHorizontal: 16, paddingTop: 12,
-        paddingBottom: insets.bottom || 16,
-        flexDirection: 'row', gap: 10,
-        ...(IS_IOS && {
-          shadowColor: '#000',
-          shadowOpacity: 0.05,
-          shadowRadius: 10,
-          shadowOffset: { width: 0, height: -2 },
-        }),
-      }}>
+      <View
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          backgroundColor: 'white',
+          borderTopWidth: HAIRLINE,
+          borderTopColor: '#ececec',
+          paddingHorizontal: 16,
+          paddingTop: 12,
+          paddingBottom: insets.bottom || 16,
+          flexDirection: 'row',
+          gap: 10,
+          alignItems: 'center',
+          ...(IS_IOS && {
+            shadowColor: '#000',
+            shadowOpacity: 0.06,
+            shadowRadius: 12,
+            shadowOffset: { width: 0, height: -3 },
+          }),
+        }}
+      >
         <Pressable
-          onPress={() => { tap('medium'); Alert.alert('Make an offer', `Suggest a price?`); }}
+          onPress={() => { tap('medium'); Alert.alert('Make an offer', 'Suggest a price?'); }}
           style={({ pressed }) => ({
-            flex: 1, borderWidth: 1, borderColor: '#d1d5db',
-            borderRadius: 10, paddingTop: 10, paddingBottom: 6, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center',
+            paddingHorizontal: 18,
+            height: 50,
+            borderRadius: 14,
+            borderWidth: HAIRLINE,
+            borderColor: '#e5e7eb',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'row',
+            gap: 6,
             backgroundColor: 'white',
             opacity: pressed ? 0.7 : 1,
             transform: [{ scale: pressed ? 0.98 : 1 }],
           })}
         >
-          <Text style={{ fontSize: 13, fontWeight: '700', color: BRAND_DARK, textAlign: 'center', lineHeight: 16 }}>Make an{'\n'}offer</Text>
+          <Feather name="tag" size={15} color={BRAND_INK} />
+          <Text style={{ fontSize: 13, fontWeight: '700', color: BRAND_INK }}>
+            Offer
+          </Text>
         </Pressable>
         <Pressable
           onPress={() => { tap('medium'); Alert.alert('Buy', 'Payment flow coming soon'); }}
           style={({ pressed }) => ({
-            flex: 1, backgroundColor: '#22c55e', borderRadius: 10, paddingTop: 10, paddingBottom: 6, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center',
-            opacity: pressed ? 0.85 : 1,
+            flex: 1,
+            height: 50,
+            backgroundColor: BRAND_INK,
+            borderRadius: 14,
+            paddingHorizontal: 16,
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'row',
+            opacity: pressed ? 0.9 : 1,
             transform: [{ scale: pressed ? 0.98 : 1 }],
           })}
         >
-          <Text style={{ fontSize: 14, fontWeight: '700', color: BRAND_DARK, letterSpacing: 0.3 }}>Buy</Text>
+          <Text style={{ fontSize: 15, fontWeight: '800', color: 'white', letterSpacing: 0.2 }}>
+            Buy now
+          </Text>
+          <View
+            style={{
+              marginLeft: 10,
+              backgroundColor: BRAND_LIME,
+              borderRadius: 999,
+              paddingHorizontal: 10,
+              paddingVertical: 3,
+            }}
+          >
+            <Text style={{ fontSize: 13, fontWeight: '900', color: BRAND_INK, letterSpacing: 0.2 }}>
+              ${listing.price}
+            </Text>
+          </View>
         </Pressable>
       </View>
 

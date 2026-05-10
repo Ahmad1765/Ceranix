@@ -17,6 +17,7 @@ import { RequireAuth } from '@/components/RequireAuth';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { uploadListingImages, type LocalImage } from '@/lib/upload';
+import { useToast } from '@/lib/toast';
 import type { Category, Condition, Gender } from '@/types';
 
 type Step = 'photos' | 'details';
@@ -48,6 +49,7 @@ const MAX_IMAGES = 7;
 
 function SellScreenInner() {
   const { user } = useAuth();
+  const toast = useToast();
   const [step, setStep] = useState<Step>('photos');
   const [images, setImages] = useState<LocalImage[]>([]);
   const [aiPrefill, setAiPrefill] = useState(true);
@@ -148,6 +150,7 @@ function SellScreenInner() {
 
       const newId = data!.id as string;
       resetForm();
+      toast.show('Listing is live 🔥', { variant: 'success', icon: 'check' });
       router.push(`/product/${newId}`);
     } catch (e: any) {
       Alert.alert('Could not publish', e?.message ?? 'Unknown error');
@@ -407,12 +410,46 @@ function SellScreenInner() {
         <Pressable
           onPress={handlePublish}
           disabled={publishing}
-          className="bg-[#6C47FF] rounded-xl py-4 items-center flex-row justify-center"
-          style={{ opacity: publishing ? 0.7 : 1 }}
+          style={({ pressed }) => ({
+            height: 58,
+            borderRadius: 16,
+            backgroundColor: '#0a0a0a',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: publishing ? 0.7 : 1,
+            transform: [{ scale: pressed ? 0.985 : 1 }],
+            overflow: 'hidden',
+          })}
         >
-          {publishing && <ActivityIndicator color="white" style={{ marginRight: 10 }} />}
-          <Text className="text-white font-bold text-base">
-            {publishing ? 'Publishing...' : 'Publish Listing'}
+          <View
+            style={{
+              position: 'absolute',
+              right: 0,
+              top: 0,
+              bottom: 0,
+              width: 58,
+              backgroundColor: '#d8f53a',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {publishing ? (
+              <ActivityIndicator color="#0a0a0a" />
+            ) : (
+              <Feather name="arrow-up-right" size={20} color="#0a0a0a" />
+            )}
+          </View>
+          <Text
+            style={{
+              fontSize: 16,
+              fontWeight: '800',
+              color: 'white',
+              letterSpacing: 0.2,
+              marginRight: 58,
+            }}
+          >
+            {publishing ? 'Publishing…' : 'Publish listing'}
           </Text>
         </Pressable>
       </ScrollView>

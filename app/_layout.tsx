@@ -9,6 +9,7 @@ import * as Font from 'expo-font';
 import { Asset } from 'expo-asset';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { AuthProvider } from '@/lib/auth';
+import { ToastProvider } from '@/lib/toast';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -45,6 +46,7 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <StatusBar style="dark" />
       <AuthProvider>
+        <ToastProvider>
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen
@@ -84,6 +86,7 @@ export default function RootLayout() {
             options={{ headerShown: false }}
           />
         </Stack>
+        </ToastProvider>
       </AuthProvider>
     </GestureHandlerRootView>
   );

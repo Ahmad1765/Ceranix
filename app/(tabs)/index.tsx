@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,10 +15,18 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { ListingCard } from '@/components/ListingCard';
 import { SkeletonCard } from '@/components/SkeletonCard';
 import { PromoBanner } from '@/components/PromoBanner';
+import { LiveActivityTicker } from '@/components/LiveActivityTicker';
 import { fetchListings, type FeedTab } from '@/lib/listings';
 import type { Listing } from '@/types';
 
 type TabName = 'For you' | 'Popular' | 'Following';
+
+const FEED_COLUMNS = 3;
+type FeedItem = Listing | { __placeholder: true; id: string };
+
+function isPlaceholder(item: FeedItem): item is { __placeholder: true; id: string } {
+  return (item as { __placeholder?: boolean }).__placeholder === true;
+}
 
 function AnimatedTabPill({
   tab,
@@ -135,8 +143,25 @@ export default function HomeScreen() {
     setRefreshing(false);
   }, [activeTab, load]);
 
+  // Pad to a multiple of FEED_COLUMNS so trailing rows don't stretch their
+  // cards across the full width when listings.length isn't divisible by 3.
+  const data = useMemo<FeedItem[]>(() => {
+    if (loading || listings.length === 0) return [];
+    const remainder = listings.length % FEED_COLUMNS;
+    if (remainder === 0) return listings;
+    const padCount = FEED_COLUMNS - remainder;
+    const pads: FeedItem[] = Array.from({ length: padCount }, (_, i) => ({
+      __placeholder: true as const,
+      id: `__pad-${i}`,
+    }));
+    return [...listings, ...pads];
+  }, [listings, loading]);
+
+  const keyExtractor = useCallback((item: FeedItem) => item.id, []);
+
   const renderItem = useCallback(
-    ({ item }: { item: Listing }) => <ListingCard listing={item} />,
+    ({ item }: { item: FeedItem }) =>
+      isPlaceholder(item) ? <View style={{ flex: 1 }} /> : <ListingCard listing={item} />,
     [],
   );
 
@@ -151,6 +176,9 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-white">
+      {/* Live activity ribbon — only renders when there are recent listings */}
+      <LiveActivityTicker />
+
       {/* Search Header */}
       <View className="flex-row items-center px-4 pt-2 pb-3">
         <View className="flex-1 flex-row items-center bg-[#F2F2F2] rounded-full px-4 py-[10px] mr-3">
@@ -216,9 +244,9 @@ export default function HomeScreen() {
       <FlatList
         key="feed-3"
         style={{ flex: 1, display: activeTab !== 'Following' ? 'flex' : 'none' }}
-        data={loading ? [] : listings}
-        keyExtractor={(item) => item.id}
-        numColumns={3}
+        data={data}
+        keyExtractor={keyExtractor}
+        numColumns={FEED_COLUMNS}
         columnWrapperStyle={{ gap: 6, paddingHorizontal: 12 }}
         showsVerticalScrollIndicator={false}
         initialNumToRender={9}
@@ -246,11 +274,26 @@ export default function HomeScreen() {
               {renderSkeleton()}
             </View>
           ) : (
-            <View className="px-6 py-16 items-center">
-              <Feather name="package" size={42} color="#d1d5db" />
-              <Text className="text-base font-semibold text-gray-900 mt-4">No listings yet</Text>
-              <Text className="text-sm text-gray-500 mt-1 text-center">
-                Pull down to refresh, or tap Upload to be the first to post.
+            <View style={{ paddingHorizontal: 24, paddingVertical: 56, alignItems: 'flex-start' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 18 }}>
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#d8f53a', marginRight: 10 }} />
+                <Text style={{ fontSize: 11, fontWeight: '800', color: '#0a0a0a', letterSpacing: 1.4, textTransform: 'uppercase' }}>
+                  Empty rack
+                </Text>
+              </View>
+              <Text
+                style={{
+                  fontSize: 38,
+                  fontWeight: '900',
+                  color: '#0a0a0a',
+                  lineHeight: 40,
+                  letterSpacing: -1.4,
+                }}
+              >
+                Nothing here{'\n'}yet.
+              </Text>
+              <Text style={{ fontSize: 14, color: '#6b7280', marginTop: 10, lineHeight: 20 }}>
+                Pull down to refresh, or be the first to post — the upload tab is one tap away.
               </Text>
             </View>
           )
