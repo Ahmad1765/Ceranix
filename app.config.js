@@ -1,0 +1,58 @@
+// Migrated from app.json so env vars (EXPO_PUBLIC_*) are explicitly embedded
+// into expoConfig.extra at config-load time. This guarantees the supabase
+// client gets the right URL/key on every Metro start, regardless of whether
+// a stale process.env value is cached in the bundle.
+
+module.exports = ({ config }) => ({
+  ...config,
+  expo: {
+    name: 'Ceranix',
+    slug: 'ceranix',
+    version: '1.0.0',
+    orientation: 'portrait',
+    icon: './assets/images/icon.png',
+    scheme: 'ceranix',
+    userInterfaceStyle: 'light',
+    splash: {
+      image: './assets/images/splash.png',
+      resizeMode: 'contain',
+      backgroundColor: '#ffffff',
+    },
+    ios: {
+      supportsTablet: false,
+      bundleIdentifier: 'com.ceranix.app',
+    },
+    android: {
+      adaptiveIcon: {
+        foregroundImage: './assets/images/adaptive-icon.png',
+        backgroundColor: '#ffffff',
+      },
+      package: 'com.ceranix.app',
+    },
+    assetBundlePatterns: [
+      'assets/**',
+      'node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/*',
+    ],
+    plugins: [
+      'expo-router',
+      'expo-secure-store',
+      [
+        'expo-image-picker',
+        {
+          photosPermission: 'Ceranix needs access to your photos to upload listings.',
+        },
+      ],
+      'expo-asset',
+    ],
+    web: {
+      favicon: './assets/images/favicon.png',
+    },
+    experiments: {
+      typedRoutes: true,
+    },
+    extra: {
+      supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
+      supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+    },
+  },
+});
