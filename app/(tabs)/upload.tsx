@@ -6,14 +6,17 @@ import {
   Pressable,
   ScrollView,
   Alert,
-  Switch,
-  Animated,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { RequireAuth } from '@/components/RequireAuth';
+import { useAuth } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
+import { uploadListingImages, type LocalImage } from '@/lib/upload';
 import type { Category, Condition, Gender } from '@/types';
 
 type Step = 'photos' | 'details';
@@ -43,10 +46,12 @@ const GENDERS: { label: string; value: Gender }[] = [
 
 const MAX_IMAGES = 7;
 
-export default function SellScreen() {
+function SellScreenInner() {
+  const { user } = useAuth();
   const [step, setStep] = useState<Step>('photos');
-  const [images, setImages] = useState<string[]>([]);
+  const [images, setImages] = useState<LocalImage[]>([]);
   const [aiPrefill, setAiPrefill] = useState(true);
+  const [publishing, setPublishing] = useState(false);
 
   // Details step
   const [title, setTitle] = useState('');
@@ -64,10 +69,30 @@ export default function SellScreen() {
       allowsMultipleSelection: true,
       quality: 0.8,
       selectionLimit: MAX_IMAGES,
+      base64: true,
     });
     if (!result.canceled) {
-      setImages((prev) => [...prev, ...result.assets.map((a) => a.uri)].slice(0, MAX_IMAGES));
+      setImages((prev) => {
+        const next = [
+          ...prev,
+          ...result.assets.map((a) => ({ uri: a.uri, base64: a.base64 ?? null })),
+        ];
+        return next.slice(0, MAX_IMAGES);
+      });
     }
+  };
+
+  const resetForm = () => {
+    setStep('photos');
+    setImages([]);
+    setTitle('');
+    setPrice('');
+    setBrand('');
+    setSize('');
+    setDescription('');
+    setCondition('good');
+    setCategory('clothing');
+    setGender('women');
   };
 
   const handleContinue = () => {
@@ -78,20 +103,57 @@ export default function SellScreen() {
     setStep('details');
   };
 
-  const handlePublish = () => {
-    if (!title || !price) {
-      Alert.alert('Missing info', 'Please add a title and price.');
+  const handlePublish = async () => {
+    if (!user) {
+      Alert.alert('Sign in required', 'Please sign in to publish a listing.');
       return;
     }
-    Alert.alert('Success', 'Listing published!');
-    // Reset
-    setStep('photos');
-    setImages([]);
-    setTitle('');
-    setPrice('');
-    setBrand('');
-    setSize('');
-    setDescription('');
+    if (!title.trim()) {
+      Alert.alert('Missing info', 'Please add a title.');
+      return;
+    }
+    const priceNum = parseInt(price, 10);
+    if (!priceNum || priceNum <= 0) {
+      Alert.alert('Missing info', 'Enter a valid price.');
+      return;
+    }
+    if (images.length === 0) {
+      Alert.alert('Missing photos', 'Add at least one photo first.');
+      return;
+    }
+
+    setPublishing(true);
+    try {
+      const urls = await uploadListingImages(images, user.id);
+
+      const { data, error } = await supabase
+        .from('listings')
+        .insert({
+          seller_id: user.id,
+          title: title.trim(),
+          description: description.trim() || null,
+          price: priceNum,
+          category,
+          gender,
+          brand: brand.trim() || null,
+          size: size.trim() || null,
+          condition,
+          images: urls,
+          is_sold: false,
+        })
+        .select('id')
+        .single();
+
+      if (error) throw error;
+
+      const newId = data!.id as string;
+      resetForm();
+      router.push(`/product/${newId}`);
+    } catch (e: any) {
+      Alert.alert('Could not publish', e?.message ?? 'Unknown error');
+    } finally {
+      setPublishing(false);
+    }
   };
 
   if (step === 'photos') {
@@ -127,10 +189,10 @@ export default function SellScreen() {
           </Text>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-8" contentContainerStyle={{ gap: 12 }}>
-            {images.map((uri, i) => (
+            {images.map((img, i) => (
               <View key={i} style={{ width: 160, height: 210 }} className="relative">
                 <Image
-                  source={{ uri }}
+                  source={{ uri: img.uri }}
                   style={{ width: '100%', height: '100%' }}
                   className="rounded-lg bg-gray-100 border border-gray-100"
                   contentFit="cover"
@@ -143,7 +205,7 @@ export default function SellScreen() {
                 </Pressable>
               </View>
             ))}
-            
+
             {images.length < MAX_IMAGES && (
               <Pressable
                 onPress={pickImages}
@@ -166,7 +228,7 @@ export default function SellScreen() {
                <Text className="text-[17px] text-gray-900 mt-1">Add</Text>
              </Pressable>
             )}
-            
+
             {/* Third placeholder for visual consistency with screenshot */}
             {images.length < MAX_IMAGES - 2 && (
                <View
@@ -187,18 +249,18 @@ export default function SellScreen() {
                 Let our AI help you describe your item. It won't get easier than this!
               </Text>
             </View>
-            <Pressable 
+            <Pressable
               onPress={() => setAiPrefill(!aiPrefill)}
               className={`w-[52px] h-[32px] rounded-full p-1 transition-colors duration-300 ${aiPrefill ? 'bg-[#651FFF]' : 'bg-gray-200'}`}
-              style={{ 
-                flexDirection: 'row', 
+              style={{
+                flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: aiPrefill ? 'flex-end' : 'flex-start'
               }}
             >
-              <View 
+              <View
                 className="w-6 h-6 rounded-full bg-white shadow-sm"
-                style={{ 
+                style={{
                   elevation: 2,
                   shadowColor: '#000',
                   shadowOffset: { width: 0, height: 1 },
@@ -236,10 +298,10 @@ export default function SellScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
         {/* Thumbnail strip */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }} contentContainerStyle={{ gap: 8 }}>
-          {images.map((uri, i) => (
+          {images.map((img, i) => (
             <Image
               key={i}
-              source={{ uri }}
+              source={{ uri: img.uri }}
               style={{ width: 80, height: 80 }}
               className="rounded-xl bg-gray-100"
               contentFit="cover"
@@ -310,10 +372,10 @@ export default function SellScreen() {
             <Pressable
               key={c.value}
               onPress={() => setCondition(c.value)}
-              className={`flex-row items-center px-3 py-3 rounded-xl border ${condition === c.value ? 'border-brand-500 bg-orange-50' : 'border-gray-200'}`}
+              className={`flex-row items-center px-3 py-3 rounded-xl border ${condition === c.value ? 'border-[#6C47FF] bg-[#f1edff]' : 'border-gray-200'}`}
             >
-              <View className={`w-4 h-4 rounded-full border-2 mr-3 items-center justify-center ${condition === c.value ? 'border-brand-500' : 'border-gray-300'}`}>
-                {condition === c.value && <View className="w-2 h-2 rounded-full bg-brand-500" />}
+              <View className={`w-4 h-4 rounded-full border-2 mr-3 items-center justify-center ${condition === c.value ? 'border-[#6C47FF]' : 'border-gray-300'}`}>
+                {condition === c.value && <View className="w-2 h-2 rounded-full bg-[#6C47FF]" />}
               </View>
               <Text className="text-sm text-gray-800">{c.label}</Text>
             </Pressable>
@@ -344,11 +406,24 @@ export default function SellScreen() {
 
         <Pressable
           onPress={handlePublish}
-          className="bg-brand-500 rounded-xl py-4 items-center"
+          disabled={publishing}
+          className="bg-[#6C47FF] rounded-xl py-4 items-center flex-row justify-center"
+          style={{ opacity: publishing ? 0.7 : 1 }}
         >
-          <Text className="text-white font-bold text-base">Publish Listing</Text>
+          {publishing && <ActivityIndicator color="white" style={{ marginRight: 10 }} />}
+          <Text className="text-white font-bold text-base">
+            {publishing ? 'Publishing...' : 'Publish Listing'}
+          </Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+export default function SellScreen() {
+  return (
+    <RequireAuth>
+      <SellScreenInner />
+    </RequireAuth>
   );
 }

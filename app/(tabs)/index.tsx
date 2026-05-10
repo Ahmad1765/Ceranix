@@ -15,6 +15,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { ListingCard } from '@/components/ListingCard';
 import { SkeletonCard } from '@/components/SkeletonCard';
 import { PromoBanner } from '@/components/PromoBanner';
+import { fetchListings, type FeedTab } from '@/lib/listings';
 import type { Listing } from '@/types';
 
 type TabName = 'For you' | 'Popular' | 'Following';
@@ -28,9 +29,7 @@ function AnimatedTabPill({
   isActive: boolean;
   onPress: () => void;
 }) {
-  // JS-driver anim for color (can't use native driver with backgroundColor)
   const colorAnim = useRef(new Animated.Value(isActive ? 1 : 0)).current;
-  // Native-driver anim for scale (fast, jank-free)
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -63,9 +62,7 @@ function AnimatedTabPill({
         Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 6 }).start()
       }
     >
-      {/* Outer view handles scale (native driver) */}
       <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-        {/* Inner view handles background color (JS driver) */}
         <Animated.View
           style={{
             backgroundColor,
@@ -99,209 +96,57 @@ const SUGGESTED_USERS = [
   { id: 'u5', display_name: 'Edita Kondrat Art', username: '@editakondratjewelry', avatar: 'https://picsum.photos/seed/edita/80/80' },
 ];
 
-const MOCK_LISTINGS: Listing[] = [
-  {
-    id: '7',
-    seller_id: 'u5',
-    seller: { id: 'u5', username: 'maryam_closet', avatar_url: null, full_name: 'Maryam', bio: null, location: 'Karachi', rating: 4.7, total_sales: 22, created_at: '' },
-    title: 'Superdry',
-    description: 'Barely worn, great condition.',
-    price: 499,
-    category: 'clothing',
-    gender: 'women',
-    brand: 'Superdry',
-    size: 'XS',
-    condition: 'like_new',
-    images: ['https://picsum.photos/seed/7/400/520', 'https://picsum.photos/seed/7b/400/520', 'https://picsum.photos/seed/7c/400/520'],
-    is_sold: false,
-    views: 55,
-    likes: 11,
-    created_at: '',
-  },
-  {
-    id: '1',
-    seller_id: 'u5',
-    seller: { id: 'u5', username: 'maryam_closet', avatar_url: null, full_name: 'Maryam', bio: null, location: 'Karachi', rating: 4.7, total_sales: 22, created_at: '' },
-    title: 'Superdry',
-    description: 'Barely worn, great condition.',
-    price: 649,
-    category: 'clothing',
-    gender: 'women',
-    brand: 'Superdry',
-    size: 'S',
-    condition: 'like_new',
-    images: ['https://picsum.photos/seed/17/400/520', 'https://picsum.photos/seed/17b/400/520', 'https://picsum.photos/seed/17c/400/520'],
-    is_sold: false,
-    views: 55,
-    likes: 11,
-    created_at: '',
-  },
-  {
-    id: '8',
-    seller_id: 'u6',
-    seller: { id: 'u6', username: 'junaid_fits', avatar_url: null, full_name: 'Junaid', bio: null, location: 'Lahore', rating: 4.3, total_sales: 5, created_at: '' },
-    title: 'Nudie',
-    description: 'Slim fit, authentic.',
-    price: 549,
-    category: 'clothing',
-    gender: 'men',
-    brand: 'Nudie',
-    size: '31/...',
-    condition: 'good',
-    images: ['https://picsum.photos/seed/8/400/520', 'https://picsum.photos/seed/8b/400/520', 'https://picsum.photos/seed/8c/400/520'],
-    is_sold: false,
-    views: 78,
-    likes: 14,
-    created_at: '',
-  },
-  {
-    id: '9',
-    seller_id: 'u6',
-    seller: { id: 'u6', username: 'junaid_fits', avatar_url: null, full_name: 'Junaid', bio: null, location: 'Lahore', rating: 4.3, total_sales: 5, created_at: '' },
-    title: 'Nudie Jeans',
-    description: 'Slim fit',
-    price: 549,
-    category: 'clothing',
-    gender: 'men',
-    brand: 'Nudie',
-    size: '31/...',
-    condition: 'good',
-    images: ['https://picsum.photos/seed/9/400/520', 'https://picsum.photos/seed/9b/400/520', 'https://picsum.photos/seed/9c/400/520'],
-    is_sold: false,
-    views: 78,
-    likes: 14,
-    created_at: '',
-  },
-  {
-    id: '10',
-    seller_id: 'u7',
-    seller: { id: 'u7', username: 'sara_style', avatar_url: null, full_name: 'Sara', bio: null, location: 'Stockholm', rating: 4.9, total_sales: 40, created_at: '' },
-    title: 'Acne Studios',
-    description: 'Barely used.',
-    price: 899,
-    category: 'clothing',
-    gender: 'women',
-    brand: 'Acne Studios',
-    size: 'M',
-    condition: 'like_new',
-    images: ['https://picsum.photos/seed/10/400/520', 'https://picsum.photos/seed/10b/400/520', 'https://picsum.photos/seed/10c/400/520'],
-    is_sold: false,
-    views: 120,
-    likes: 31,
-    created_at: '',
-  },
-  {
-    id: '11',
-    seller_id: 'u8',
-    seller: { id: 'u8', username: 'karl_fits', avatar_url: null, full_name: 'Karl', bio: null, location: 'Gothenburg', rating: 4.5, total_sales: 12, created_at: '' },
-    title: 'Carhartt WIP',
-    description: 'Great condition.',
-    price: 450,
-    category: 'clothing',
-    gender: 'men',
-    brand: 'Carhartt',
-    size: 'L',
-    condition: 'good',
-    images: ['https://picsum.photos/seed/21/400/520', 'https://picsum.photos/seed/21b/400/520', 'https://picsum.photos/seed/21c/400/520'],
-    is_sold: false,
-    views: 64,
-    likes: 9,
-    created_at: '',
-  },
-  {
-    id: '12',
-    seller_id: 'u9',
-    seller: { id: 'u9', username: 'lena_preloved', avatar_url: null, full_name: 'Lena', bio: null, location: 'Malmö', rating: 4.6, total_sales: 18, created_at: '' },
-    title: 'Weekday',
-    description: 'Worn twice.',
-    price: 299,
-    category: 'clothing',
-    gender: 'women',
-    brand: 'Weekday',
-    size: 'S',
-    condition: 'like_new',
-    images: ['https://picsum.photos/seed/33/400/520', 'https://picsum.photos/seed/33b/400/520', 'https://picsum.photos/seed/33c/400/520'],
-    is_sold: false,
-    views: 47,
-    likes: 7,
-    created_at: '',
-  },
-  {
-    id: '13',
-    seller_id: 'u10',
-    seller: { id: 'u10', username: 'oskar_shop', avatar_url: null, full_name: 'Oskar', bio: null, location: 'Uppsala', rating: 4.2, total_sales: 8, created_at: '' },
-    title: 'Tiger of Sweden',
-    description: 'Perfect condition.',
-    price: 750,
-    category: 'clothing',
-    gender: 'men',
-    brand: 'Tiger of Sweden',
-    size: '50',
-    condition: 'like_new',
-    images: ['https://picsum.photos/seed/44/400/520', 'https://picsum.photos/seed/44b/400/520', 'https://picsum.photos/seed/44c/400/520'],
-    is_sold: false,
-    views: 89,
-    likes: 20,
-    created_at: '',
-  },
-  {
-    id: '14',
-    seller_id: 'u11',
-    seller: { id: 'u11', username: 'maja_closet', avatar_url: null, full_name: 'Maja', bio: null, location: 'Lund', rating: 4.8, total_sales: 33, created_at: '' },
-    title: 'Filippa K',
-    description: 'Elegant, light wear.',
-    price: 620,
-    category: 'clothing',
-    gender: 'women',
-    brand: 'Filippa K',
-    size: 'XS',
-    condition: 'good',
-    images: ['https://picsum.photos/seed/55/400/520', 'https://picsum.photos/seed/55b/400/520', 'https://picsum.photos/seed/55c/400/520'],
-    is_sold: false,
-    views: 103,
-    likes: 27,
-    created_at: '',
-  },
-];
-
 const TABS: TabName[] = ['For you', 'Popular', 'Following'];
 
-// Prefetch all image URLs so they're in cache before user scrolls to them
-Image.prefetch(MOCK_LISTINGS.map(l => l.images[0]));
+const TAB_TO_FEED: Record<Exclude<TabName, 'Following'>, FeedTab> = {
+  'For you': 'for_you',
+  Popular: 'popular',
+};
 
 export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState<TabName>('For you');
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [listings, setListings] = useState<Listing[]>([]);
+
+  const load = useCallback(async (tab: TabName) => {
+    if (tab === 'Following') return;
+    const rows = await fetchListings({ tab: TAB_TO_FEED[tab as Exclude<TabName, 'Following'>] });
+    setListings(rows);
+    // Warm the image cache for the first few cards.
+    const firstUrls = rows.slice(0, 12).map((l) => l.images?.[0]).filter(Boolean) as string[];
+    if (firstUrls.length) Image.prefetch(firstUrls);
+  }, []);
 
   useEffect(() => {
-    // Simulate a short data-fetch delay; replace with real Supabase call
-    const t = setTimeout(() => setLoading(false), 600);
-    return () => clearTimeout(t);
-  }, []);
+    let cancelled = false;
+    setLoading(true);
+    load(activeTab).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, load]);
 
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
-
-  const listings = activeTab === 'Popular'
-    ? [...MOCK_LISTINGS].sort((a, b) => b.likes - a.likes)
-    : MOCK_LISTINGS;
+    await load(activeTab);
+    setRefreshing(false);
+  }, [activeTab, load]);
 
   const renderItem = useCallback(
     ({ item }: { item: Listing }) => <ListingCard listing={item} />,
-    []
+    [],
   );
 
-  const skeletonData = Array.from({ length: 9 }, (_, i) => ({ id: `sk-${i}` }));
   const renderSkeleton = useCallback(
     () => (
       <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 12, marginBottom: 6 }}>
-        {[0,1,2].map(i => <SkeletonCard key={i} />)}
+        {[0, 1, 2].map((i) => <SkeletonCard key={i} />)}
       </View>
     ),
-    []
+    [],
   );
 
   return (
@@ -393,13 +238,23 @@ export default function HomeScreen() {
             <View className="pt-3 pb-2" />
           )
         }
-        ListEmptyComponent={loading ? (
-          <View>
-            {renderSkeleton()}
-            {renderSkeleton()}
-            {renderSkeleton()}
-          </View>
-        ) : null}
+        ListEmptyComponent={
+          loading ? (
+            <View>
+              {renderSkeleton()}
+              {renderSkeleton()}
+              {renderSkeleton()}
+            </View>
+          ) : (
+            <View className="px-6 py-16 items-center">
+              <Feather name="package" size={42} color="#d1d5db" />
+              <Text className="text-base font-semibold text-gray-900 mt-4">No listings yet</Text>
+              <Text className="text-sm text-gray-500 mt-1 text-center">
+                Pull down to refresh, or tap Upload to be the first to post.
+              </Text>
+            </View>
+          )
+        }
         renderItem={renderItem}
         contentContainerStyle={{ paddingBottom: 24 }}
       />

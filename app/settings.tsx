@@ -1,6 +1,7 @@
 import { View, Text, Pressable, ScrollView, SafeAreaView, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { useAuth } from '@/lib/auth';
 
 const SETTINGS_SECTIONS = [
   {
@@ -9,7 +10,7 @@ const SETTINGS_SECTIONS = [
     icon: 'user',
     iconBg: '#f3f4f6',
     iconColor: '#374151',
-    route: '/edit-profile',
+    route: '/profile/edit',
   },
   {
     title: 'Purchases & Sales',
@@ -54,10 +55,19 @@ const SETTINGS_SECTIONS = [
 ] as const;
 
 export default function SettingsScreen() {
+  const { signOut, session } = useAuth();
+
   const handleLogout = () => {
     Alert.alert('Log out', 'Are you sure you want to log out?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Log out', style: 'destructive', onPress: () => router.replace('/auth/login') },
+      {
+        text: 'Log out',
+        style: 'destructive',
+        onPress: async () => {
+          await signOut();
+          router.replace('/(tabs)');
+        },
+      },
     ]);
   };
 
@@ -74,7 +84,10 @@ export default function SettingsScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
         {/* Profile card */}
         <View className="bg-white rounded-2xl overflow-hidden mb-4">
-          <Pressable className="flex-row items-center px-4 py-4">
+          <Pressable
+            className="flex-row items-center px-4 py-4"
+            onPress={() => router.push('/profile/edit')}
+          >
             <View className="w-12 h-12 rounded-full bg-gray-200 items-center justify-center mr-3">
               <Feather name="user" size={22} color="#9ca3af" />
             </View>
@@ -111,12 +124,14 @@ export default function SettingsScreen() {
         ))}
 
         {/* Log out */}
-        <Pressable
-          onPress={handleLogout}
-          className="bg-gray-900 rounded-2xl py-4 items-center mb-3"
-        >
-          <Text className="text-white font-bold text-base">Log out</Text>
-        </Pressable>
+        {session && (
+          <Pressable
+            onPress={handleLogout}
+            className="bg-gray-900 rounded-2xl py-4 items-center mb-3"
+          >
+            <Text className="text-white font-bold text-base">Log out</Text>
+          </Pressable>
+        )}
 
         <Text className="text-center text-xs text-gray-400">Version 1.0.0</Text>
       </ScrollView>

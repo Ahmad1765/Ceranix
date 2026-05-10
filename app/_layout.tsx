@@ -8,6 +8,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import * as Font from 'expo-font';
 import { Asset } from 'expo-asset';
 import { Ionicons, Feather } from '@expo/vector-icons';
+import { AuthProvider } from '@/lib/auth';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -43,41 +44,47 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <StatusBar style="dark" />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen
-          name="product/[id]"
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="user/[id]"
-          options={{ headerShown: true, title: '', headerBackTitle: '' }}
-        />
-        <Stack.Screen
-          name="conversation/[id]"
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="conversation/new"
-          options={{ headerShown: false, presentation: 'modal' }}
-        />
-        <Stack.Screen
-          name="auth/login"
-          options={{ presentation: 'modal' }}
-        />
-        <Stack.Screen
-          name="settings"
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="news"
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="ratings"
-          options={{ headerShown: false }}
-        />
-      </Stack>
+      <AuthProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen
+            name="product/[id]"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="user/[id]"
+            options={{ headerShown: true, title: '', headerBackTitle: '' }}
+          />
+          <Stack.Screen
+            name="conversation/[id]"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="conversation/new"
+            options={{ headerShown: false, presentation: 'modal' }}
+          />
+          <Stack.Screen
+            name="auth/login"
+            options={{ presentation: 'modal' }}
+          />
+          <Stack.Screen
+            name="profile/edit"
+            options={{ presentation: 'modal' }}
+          />
+          <Stack.Screen
+            name="settings"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="news"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="ratings"
+            options={{ headerShown: false }}
+          />
+        </Stack>
+      </AuthProvider>
     </GestureHandlerRootView>
   );
 }

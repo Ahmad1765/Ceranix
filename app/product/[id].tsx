@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Platform,
   StyleSheet,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -28,6 +29,8 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import type { Listing } from '@/types';
+import { fetchListingById, isLiked, toggleLike } from '@/lib/listings';
+import { useAuth } from '@/lib/auth';
 
 const AnimatedExpoImage = Animated.createAnimatedComponent(Image);
 
@@ -120,36 +123,17 @@ const ITEMS_FOR_SALE = 9;
 const LISTING_ID = '91740406';
 const PIN_COUNT = 2;
 
-const MOCK_LISTING: Listing = {
-  id: '1',
-  seller_id: 'u1',
-  seller: {
-    id: 'u1',
-    username: 'mattsunil4048',
-    avatar_url: 'https://picsum.photos/seed/avatar1/100/100',
-    full_name: 'Matt Sunil',
-    bio: null,
-    location: 'Canada',
-    rating: 5,
-    total_sales: 12,
-    created_at: '',
-  },
-  title: 'Arcteryx Atom SL Hoody',
-  description: 'Great mid-layer jacket!\nSuper warm while hiking or skiing',
-  price: 202,
-  category: 'clothing',
-  gender: 'men',
-  brand: "Arc'teryx",
-  size: 'M',
-  condition: 'good',
-  images: [
-    'https://picsum.photos/seed/poc1/400/520',
-    'https://picsum.photos/seed/poc2/400/520',
-    'https://picsum.photos/seed/poc3/400/520',
-  ],
-  is_sold: false,
-  views: 120,
-  likes: 83,
+// Fallback shape used while the real listing is loading; render is gated on
+// `listing` being non-null below, so this is never visible in the UI.
+const FALLBACK_SELLER = {
+  id: '',
+  username: '',
+  avatar_url: null,
+  full_name: '',
+  bio: null,
+  location: null,
+  rating: 0,
+  total_sales: 0,
   created_at: '',
 };
 
@@ -629,8 +613,12 @@ function StarRating({ rating }: { rating: number }) {
 export default function ProductScreen() {
   const { id } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const productIdParam = Array.isArray(id) ? id[0] : id;
+
   const [activeImage, setActiveImage] = useState(0);
   const [liked, setLiked] = useState(false);
+  const [likeBusy, setLikeBusy] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [followed, setFollowed] = useState(false);
   const [showStickyHeader, setShowStickyHeader] = useState(false);
@@ -638,9 +626,64 @@ export default function ProductScreen() {
   const [heroPagerEnabled, setHeroPagerEnabled] = useState(true);
   const [saveListVisible, setSaveListVisible] = useState(false);
   const [savedToList, setSavedToList] = useState<string | null>(null);
-  const listing = MOCK_LISTING;
-  const productIdParam = Array.isArray(id) ? id[0] : id;
-  const sharedTagId = productIdParam ?? listing.id;
+  const [listing, setListing] = useState<Listing | null>(null);
+  const [loadingListing, setLoadingListing] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    if (!productIdParam) {
+      setLoadingListing(false);
+      setNotFound(true);
+      return;
+    }
+    setLoadingListing(true);
+    setNotFound(false);
+    fetchListingById(productIdParam).then((row) => {
+      if (!active) return;
+      if (!row) {
+        setNotFound(true);
+      } else {
+        setListing({
+          ...row,
+          seller: row.seller ?? (FALLBACK_SELLER as Listing['seller']),
+        });
+      }
+      setLoadingListing(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [productIdParam]);
+
+  useEffect(() => {
+    let active = true;
+    if (!productIdParam || !user?.id) {
+      setLiked(false);
+      return;
+    }
+    isLiked(productIdParam, user.id).then((v) => {
+      if (active) setLiked(v);
+    });
+    return () => {
+      active = false;
+    };
+  }, [productIdParam, user?.id]);
+
+  const handleHeartPress = async () => {
+    tap('light');
+    if (!user) {
+      router.push('/auth/login');
+      return;
+    }
+    if (!productIdParam || likeBusy) return;
+    setLikeBusy(true);
+    const next = await toggleLike(productIdParam, user.id, liked);
+    setLiked(next);
+    setLikeBusy(false);
+  };
+
+  const sharedTagId = productIdParam ?? listing?.id ?? '';
 
   // Vertical scroll-driven parallax + sticky-header toggle
   const scrollY = useSharedValue(0);
@@ -675,15 +718,43 @@ export default function ProductScreen() {
     };
   });
 
+  if (loadingListing) {
+    return (
+      <View style={{ flex: 1, backgroundColor: 'white', alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color={BRAND_PURPLE} />
+      </View>
+    );
+  }
+
+  if (notFound || !listing) {
+    return (
+      <View style={{ flex: 1, backgroundColor: 'white', paddingTop: insets.top }}>
+        <Pressable onPress={() => router.back()} hitSlop={10} style={{ padding: 16 }}>
+          <Feather name="arrow-left" size={22} color="#111827" />
+        </Pressable>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
+          <Feather name="alert-circle" size={42} color="#9ca3af" />
+          <Text style={{ fontSize: 17, fontWeight: '700', color: '#111827', marginTop: 14 }}>
+            Listing not available
+          </Text>
+          <Text style={{ fontSize: 14, color: '#6b7280', marginTop: 6, textAlign: 'center' }}>
+            It may have been removed or never existed.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
   const originalPrice = Math.round(listing.price * 1.24);
   const discountPct = Math.round((1 - listing.price / originalPrice) * 100);
   const offerPrice = Math.floor(listing.price * 0.9);
-  const heartCount = liked ? listing.likes + 1 : listing.likes;
+  const baseLikes = listing.likes ?? 0;
+  const heartCount = Math.max(0, baseLikes + (liked ? 1 : 0));
 
   const metaLine = [
     listing.gender === 'men' ? `Men's US ${listing.size} / EU 48-50 / 2` : listing.size,
     CONDITION_LABELS[listing.condition] ?? listing.condition,
-    listing.seller.location ? `Located in ${listing.seller.location}` : null,
+    listing.seller?.location ? `Located in ${listing.seller.location}` : null,
   ]
     .filter(Boolean)
     .join(' • ');
@@ -814,7 +885,7 @@ export default function ProductScreen() {
             </Pressable>
 
             <Pressable
-              onPress={() => { tap('light'); setLiked(!liked); }}
+              onPress={handleHeartPress}
               onLongPress={() => { tap('medium'); setSaveListVisible(true); }}
               delayLongPress={350}
               style={({ pressed }) => ({
@@ -1179,6 +1250,8 @@ export default function ProductScreen() {
             </Pressable>
           </View>
 
+          {/* TODO: replace MEMBER_ITEMS / SIMILAR_ITEMS with real Supabase queries
+              (seller_id eq for member items; brand+category match for similar). */}
           {relatedTab === 'members' ? (
             <View style={{ paddingTop: 18 }}>
               {/* Bundle discounts title */}
@@ -1298,7 +1371,10 @@ export default function ProductScreen() {
       <SaveListSheet
         visible={saveListVisible}
         onClose={() => setSaveListVisible(false)}
-        onSelect={(listId) => { setSavedToList(listId); setLiked(true); }}
+        onSelect={(listId) => {
+          setSavedToList(listId);
+          if (!liked) handleHeartPress();
+        }}
         selectedId={savedToList}
       />
     </View>
