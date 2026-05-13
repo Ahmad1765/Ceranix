@@ -1291,31 +1291,16 @@ export default function ProductScreen() {
 
         {/* ── Description + Details ── */}
         <View style={{ paddingHorizontal: 16, paddingTop: 22, paddingBottom: 6 }}>
-          <View style={{ paddingHorizontal: 4, marginBottom: 18 }}>
-            <SectionEyebrow label="Description" />
-            <Text style={{ fontSize: 15, color: BRAND_INK, lineHeight: 23 }}>
-              {listing.description}
-            </Text>
-            <Pressable
-              onPress={() => Alert.alert('Translation')}
-              style={({ pressed }) => ({
-                marginTop: 12,
-                alignSelf: 'flex-start',
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 4,
-                opacity: pressed ? 0.6 : 1,
-              })}
-            >
-              <Feather name="globe" size={13} color={LINK_PURPLE} />
-              <Text style={{ fontSize: 13, fontWeight: '700', color: LINK_PURPLE }}>
-                Show translation
-              </Text>
-            </Pressable>
-          </View>
-          <View style={{ paddingHorizontal: 4 }}>
-            <SectionEyebrow label="Details" />
-          </View>
+          <Text
+            style={{
+              fontSize: 13,
+              color: '#9ca3af',
+              marginBottom: 10,
+              marginLeft: 4,
+            }}
+          >
+            Item description
+          </Text>
           <View
             style={{
               backgroundColor: 'white',
@@ -1325,18 +1310,38 @@ export default function ProductScreen() {
               overflow: 'hidden',
             }}
           >
+            {/* Description block */}
+            <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 14 }}>
+              <Text style={{ fontSize: 16, color: BRAND_INK, lineHeight: 23 }}>
+                {listing.description}
+              </Text>
+              <Pressable
+                onPress={() => Alert.alert('Translation')}
+                style={({ pressed }) => ({
+                  marginTop: 12,
+                  alignSelf: 'flex-start',
+                  opacity: pressed ? 0.6 : 1,
+                })}
+              >
+                <Text style={{ fontSize: 15, fontWeight: '700', color: LINK_PURPLE }}>
+                  Show translation
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Details rows */}
             {[
               {
                 label: 'Category',
                 value: CATEGORY_LABELS[listing.category] ?? listing.category,
                 onPress: () => {},
-                trailing: <Feather name="chevron-right" size={18} color="#9ca3af" />,
+                trailing: <Feather name="arrow-up-right" size={20} color={BRAND_INK} />,
               },
               {
                 label: 'Brand',
                 value: listing.brand,
                 onPress: () => {},
-                trailing: <Feather name="chevron-right" size={18} color="#9ca3af" />,
+                trailing: <Feather name="arrow-up-right" size={20} color={BRAND_INK} />,
               },
               {
                 label: 'Size',
@@ -1346,36 +1351,34 @@ export default function ProductScreen() {
                 label: 'Condition',
                 value: CONDITION_LABELS[listing.condition] ?? listing.condition,
                 onPress: () => Alert.alert('Condition info', 'Details about condition grading'),
-                trailing: <Feather name="info" size={16} color="#9ca3af" />,
+                trailing: <Feather name="arrow-up-right" size={20} color={BRAND_INK} />,
               },
               {
                 label: 'Color',
                 value: ITEM_COLOR.name,
                 trailing: (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <View
+                    style={{
+                      width: 18,
+                      height: 18,
+                      borderRadius: 9,
+                      padding: 2,
+                      backgroundColor: 'white',
+                      borderWidth: HAIRLINE,
+                      borderColor: '#e5e7eb',
+                    }}
+                  >
                     <View
                       style={{
-                        width: 18,
-                        height: 18,
-                        borderRadius: 9,
-                        padding: 2,
-                        backgroundColor: 'white',
-                        borderWidth: HAIRLINE,
-                        borderColor: '#e5e7eb',
+                        flex: 1,
+                        borderRadius: 7,
+                        backgroundColor: ITEM_COLOR.hex,
                       }}
-                    >
-                      <View
-                        style={{
-                          flex: 1,
-                          borderRadius: 7,
-                          backgroundColor: ITEM_COLOR.hex,
-                        }}
-                      />
-                    </View>
+                    />
                   </View>
                 ),
               },
-            ].map((row, i, arr) => {
+            ].map((row) => {
               return (
                 <Pressable
                   key={row.label}
@@ -1386,23 +1389,15 @@ export default function ProductScreen() {
                     alignItems: 'center',
                     paddingHorizontal: 16,
                     paddingVertical: 14,
-                    borderBottomWidth: i === arr.length - 1 ? 0 : HAIRLINE,
-                    borderBottomColor: '#ececec',
+                    borderTopWidth: HAIRLINE,
+                    borderTopColor: '#ececec',
                     backgroundColor: pressed && row.onPress ? '#fafafa' : 'white',
                   })}
                 >
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: '600',
-                      color: '#6b7280',
-                      width: 88,
-                    }}
-                  >
-                    {row.label}
-                  </Text>
-                  <Text style={{ flex: 1, fontSize: 15, fontWeight: '600', color: BRAND_INK }} numberOfLines={1}>
-                    {row.value}
+                  <Text style={{ flex: 1, fontSize: 16, color: BRAND_INK }} numberOfLines={1}>
+                    <Text style={{ fontWeight: '800' }}>{row.label}</Text>
+                    {'  '}
+                    <Text style={{ fontWeight: '400' }}>{row.value}</Text>
                   </Text>
                   {row.trailing}
                 </Pressable>
