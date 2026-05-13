@@ -1052,31 +1052,6 @@ export default function ProductScreen() {
 
         {/* ── Title block (editorial) ── */}
         <View style={{ paddingHorizontal: 20, paddingTop: 22, paddingBottom: 18 }}>
-          {/* Eyebrow — brand + condition */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-            <View
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: 3,
-                backgroundColor: BRAND_LIME,
-                marginRight: 8,
-              }}
-            />
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: '800',
-                color: BRAND_INK,
-                letterSpacing: 1.4,
-                textTransform: 'uppercase',
-              }}
-              numberOfLines={1}
-            >
-              {listing.brand}  ·  {CONDITION_LABELS[listing.condition] ?? listing.condition}
-            </Text>
-          </View>
-
           {/* Title + price row */}
           <View
             style={{
@@ -1086,6 +1061,13 @@ export default function ProductScreen() {
             }}
           >
             <View style={{ flex: 1, paddingRight: 14 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6, gap: 6 }}>
+                <Feather name="heart" size={13} color="#6b7280" />
+                <Text style={{ fontSize: 13, color: '#6b7280' }}>
+                  Liked by <Text style={{ fontWeight: '700', color: BRAND_INK }}>@alice.333</Text>
+                  {heartCount > 1 ? ` and ${heartCount - 1} others` : ''}
+                </Text>
+              </View>
               <Text
                 style={{
                   fontSize: 28,
@@ -1151,18 +1133,10 @@ export default function ProductScreen() {
             </View>
           </View>
 
-          {/* Likes line */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 14, gap: 6 }}>
-            <Feather name="heart" size={13} color="#6b7280" />
-            <Text style={{ fontSize: 13, color: '#6b7280' }}>
-              Liked by <Text style={{ fontWeight: '700', color: BRAND_INK }}>@alice.333</Text>
-              {heartCount > 1 ? ` and ${heartCount - 1} others` : ''}
-            </Text>
-          </View>
         </View>
 
-        {/* ── Bundle teaser pill (matches LiveActivityTicker voice) ── */}
-        <Pressable
+        {/* ── Bundle teaser pill — commented out ── */}
+        {/* <Pressable
           onPress={() => { tap('selection'); setRelatedTab('members'); }}
           style={({ pressed }) => ({
             marginHorizontal: 16,
@@ -1176,54 +1150,17 @@ export default function ProductScreen() {
             alignItems: 'center',
             opacity: pressed ? 0.9 : 1,
             transform: [{ scale: pressed ? 0.98 : 1 }],
-            ...(IS_IOS && {
-              shadowColor: '#000',
-              shadowOpacity: 0.12,
-              shadowRadius: 10,
-              shadowOffset: { width: 0, height: 4 },
-            }),
-            ...(!IS_IOS && { elevation: 3 }),
           })}
         >
-          <View
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: 4,
-              backgroundColor: BRAND_LIME,
-              marginRight: 10,
-            }}
-          />
-          <Text
-            style={{
-              fontSize: 10,
-              fontWeight: '900',
-              color: BRAND_LIME,
-              letterSpacing: 1.4,
-              marginRight: 12,
-            }}
-          >
-            BUNDLE
-          </Text>
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: BRAND_LIME, marginRight: 10 }} />
+          <Text style={{ fontSize: 10, fontWeight: '900', color: BRAND_LIME, letterSpacing: 1.4, marginRight: 12 }}>BUNDLE</Text>
           <Text style={{ flex: 1, color: 'white', fontSize: 13, fontWeight: '600' }} numberOfLines={1}>
-            Add 1 more —{' '}
-            <Text style={{ fontWeight: '800' }}>save 10%</Text>
-            <Text style={{ color: 'rgba(255,255,255,0.55)' }}> · view items</Text>
+            Add 1 more — <Text style={{ fontWeight: '800' }}>save 10%</Text><Text style={{ color: 'rgba(255,255,255,0.55)' }}> · view items</Text>
           </Text>
-          <View
-            style={{
-              width: 30,
-              height: 30,
-              borderRadius: 15,
-              backgroundColor: 'rgba(255,255,255,0.12)',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginLeft: 8,
-            }}
-          >
+          <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center', marginLeft: 8 }}>
             <Feather name="arrow-up-right" size={14} color="white" />
           </View>
-        </Pressable>
+        </Pressable> */}
 
         {/* ── Seller card ── */}
         <View style={{ paddingHorizontal: 16, paddingTop: 18, paddingBottom: 16 }}>
@@ -1352,32 +1289,30 @@ export default function ProductScreen() {
           </View>
         </View>
 
-        {/* ── Description ── */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 22, paddingBottom: 4 }}>
-          <SectionEyebrow label="Description" />
-          <Text style={{ fontSize: 15, color: BRAND_INK, lineHeight: 23 }}>
-            {listing.description}
-          </Text>
-          <Pressable
-            onPress={() => Alert.alert('Translation')}
-            style={({ pressed }) => ({
-              marginTop: 12,
-              alignSelf: 'flex-start',
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 4,
-              opacity: pressed ? 0.6 : 1,
-            })}
-          >
-            <Feather name="globe" size={13} color={LINK_PURPLE} />
-            <Text style={{ fontSize: 13, fontWeight: '700', color: LINK_PURPLE }}>
-              Show translation
-            </Text>
-          </Pressable>
-        </View>
-
-        {/* ── Details ── */}
+        {/* ── Description + Details ── */}
         <View style={{ paddingHorizontal: 16, paddingTop: 22, paddingBottom: 6 }}>
+          <View style={{ paddingHorizontal: 4, marginBottom: 18 }}>
+            <SectionEyebrow label="Description" />
+            <Text style={{ fontSize: 15, color: BRAND_INK, lineHeight: 23 }}>
+              {listing.description}
+            </Text>
+            <Pressable
+              onPress={() => Alert.alert('Translation')}
+              style={({ pressed }) => ({
+                marginTop: 12,
+                alignSelf: 'flex-start',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+                opacity: pressed ? 0.6 : 1,
+              })}
+            >
+              <Feather name="globe" size={13} color={LINK_PURPLE} />
+              <Text style={{ fontSize: 13, fontWeight: '700', color: LINK_PURPLE }}>
+                Show translation
+              </Text>
+            </Pressable>
+          </View>
           <View style={{ paddingHorizontal: 4 }}>
             <SectionEyebrow label="Details" />
           </View>
