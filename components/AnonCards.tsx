@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { View, Text, Pressable, ScrollView, Dimensions } from 'react-native';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -16,11 +17,9 @@ type CategoryTileData = {
   eyebrow: string;
   title: string;
   tagline: string;
-  gradient: [string, string, string];
-  ink: string;
   accent: string;
   icon: IoniconName;
-  textAlign?: 'left' | 'right';
+  src: any;
 };
 
 const HERO_CARDS: CategoryTileData[] = [
@@ -29,30 +28,27 @@ const HERO_CARDS: CategoryTileData[] = [
     eyebrow: 'The Vintage Edit',
     title: 'Pre-loved\ntreasures.',
     tagline: 'Curated finds with a story',
-    gradient: ['#f4e8d0', '#e8c89a', '#c8a472'],
-    ink: '#3d2817',
-    accent: '#7a3f1e',
+    accent: '#f4e8d0',
     icon: 'leaf-outline',
+    src: require('../assets/images/categories/vintage.jpg'),
   },
   {
-    key: 'sneakerdrop',
+    key: 'sneakers',
     eyebrow: 'Sneaker Drop',
     title: 'Hype\nawaits.',
     tagline: 'Fresh kicks, daily',
-    gradient: ['#0a0a0a', '#1a1a2e', '#16213e'],
-    ink: '#ffffff',
     accent: '#d8f53a',
     icon: 'flash-outline',
+    src: require('../assets/images/categories/sneakers.jpg'),
   },
   {
     key: 'editors',
     eyebrow: "Editor's Picks",
     title: 'Hand-picked\nfor you.',
     tagline: 'Selected by the Carrinex team',
-    gradient: ['#6C47FF', '#8E6FFF', '#b39bff'],
-    ink: '#ffffff',
-    accent: '#d8f53a',
+    accent: '#c4b5fd',
     icon: 'sparkles-outline',
+    src: require('../assets/images/categories/editors.jpg'),
   },
 ];
 
@@ -62,73 +58,66 @@ const GRID_CARDS: CategoryTileData[] = [
     eyebrow: 'Tech',
     title: 'Electronics',
     tagline: 'Phones · audio · games',
-    gradient: ['#1e293b', '#334155', '#475569'],
-    ink: '#ffffff',
     accent: '#67e8f9',
     icon: 'hardware-chip-outline',
+    src: require('../assets/images/categories/electronics.jpg'),
   },
   {
     key: 'beauty',
     eyebrow: 'Glow',
     title: 'Beauty',
     tagline: 'Skin · scent · self-care',
-    gradient: ['#fce7f3', '#fbcfe8', '#f9a8d4'],
-    ink: '#831843',
-    accent: '#be185d',
+    accent: '#f9a8d4',
     icon: 'flower-outline',
+    src: require('../assets/images/categories/beauty.jpg'),
   },
   {
     key: 'home',
     eyebrow: 'Live well',
     title: 'Home & Living',
     tagline: 'Décor · ceramics · linens',
-    gradient: ['#ecfccb', '#d9f99d', '#a3d977'],
-    ink: '#1a2e05',
-    accent: '#4d7c0f',
+    accent: '#a3d977',
     icon: 'home-outline',
+    src: require('../assets/images/categories/home.jpg'),
   },
   {
     key: 'handbags',
     eyebrow: 'Designer',
     title: 'Handbags',
     tagline: 'Authenticated luxury',
-    gradient: ['#fef3c7', '#fcd34d', '#d97706'],
-    ink: '#451a03',
-    accent: '#92400e',
+    accent: '#fcd34d',
     icon: 'bag-handle-outline',
+    src: require('../assets/images/categories/handbags.jpg'),
   },
 ];
 
 const MID_CARDS: CategoryTileData[] = [
   {
-    key: 'carrinex-app',
+    key: 'app',
     eyebrow: 'Get the app',
     title: 'Carrinex,\nin your pocket.',
     tagline: 'Faster checkout · push deals',
-    gradient: ['#0a0a0a', '#262626', '#3d3d3d'],
-    ink: '#ffffff',
     accent: '#d8f53a',
     icon: 'phone-portrait-outline',
+    src: require('../assets/images/categories/app.jpg'),
   },
   {
     key: 'activewear',
     eyebrow: 'Move',
     title: 'Activewear.',
     tagline: 'Train · run · stretch',
-    gradient: ['#fb923c', '#f97316', '#dc2626'],
-    ink: '#ffffff',
-    accent: '#fef3c7',
+    accent: '#fb923c',
     icon: 'pulse-outline',
+    src: require('../assets/images/categories/activewear.jpg'),
   },
   {
     key: 'streetwear',
     eyebrow: 'Drops',
     title: 'Streetwear.',
     tagline: 'Hype tees · hoodies · caps',
-    gradient: ['#18181b', '#27272a', '#52525b'],
-    ink: '#d8f53a',
-    accent: '#ffffff',
+    accent: '#d8f53a',
     icon: 'flame-outline',
+    src: require('../assets/images/categories/streetwear.jpg'),
   },
 ];
 
@@ -138,45 +127,41 @@ const PORTRAIT_CARDS: CategoryTileData[] = [
     eyebrow: 'Department',
     title: 'Women',
     tagline: 'Dresses · denim · knits',
-    gradient: ['#fdf2f8', '#fbcfe8', '#f472b6'],
-    ink: '#500724',
-    accent: '#be185d',
+    accent: '#f9a8d4',
     icon: 'heart-outline',
+    src: require('../assets/images/categories/women.jpg'),
   },
   {
     key: 'men',
     eyebrow: 'Department',
     title: 'Men',
     tagline: 'Tailoring · tees · sneakers',
-    gradient: ['#082f49', '#0c4a6e', '#0369a1'],
-    ink: '#ffffff',
     accent: '#7dd3fc',
     icon: 'shirt-outline',
+    src: require('../assets/images/categories/men.jpg'),
   },
   {
     key: 'kids',
     eyebrow: 'Department',
     title: 'Kids',
     tagline: 'Tiny outfits · toys · books',
-    gradient: ['#fef9c3', '#fde047', '#facc15'],
-    ink: '#422006',
-    accent: '#a16207',
+    accent: '#fde047',
     icon: 'happy-outline',
+    src: require('../assets/images/categories/kids.jpg'),
   },
   {
-    key: 'living',
+    key: 'lifestyle',
     eyebrow: 'Department',
     title: 'Lifestyle',
     tagline: 'Bikes · plants · books',
-    gradient: ['#ecfdf5', '#a7f3d0', '#10b981'],
-    ink: '#022c22',
-    accent: '#047857',
+    accent: '#86efac',
     icon: 'bicycle-outline',
+    src: require('../assets/images/categories/lifestyle.jpg'),
   },
 ];
 
 const HERO_W = Math.round(SCREEN_WIDTH * 0.74);
-const HERO_H = Math.round(HERO_W * 0.78);
+const HERO_H = Math.round(HERO_W * 0.82);
 
 const GRID_TILE_W = Math.floor((SCREEN_WIDTH - SCREEN_PAD * 2 - 12) / 2);
 const GRID_TILE_H = GRID_TILE_W;
@@ -235,9 +220,9 @@ function CategoryTile({
   const orb = useMemo(() => {
     const seed = data.key.charCodeAt(0) + data.key.charCodeAt(data.key.length - 1);
     return {
-      top: 12 + (seed % 18),
-      right: 16 + ((seed * 3) % 24),
-      size: 78 + ((seed * 7) % 36),
+      top: 10 + (seed % 14),
+      right: 14 + ((seed * 3) % 20),
+      size: 60 + ((seed * 7) % 28),
     };
   }, [data.key]);
 
@@ -256,142 +241,143 @@ function CategoryTile({
           height,
           borderRadius: TILE_RADIUS,
           overflow: 'hidden',
+          backgroundColor: '#1a1a1a',
         }}
       >
+        {/* Photographic background */}
+        <Image
+          source={data.src}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={250}
+        />
+
+        {/* Bottom-to-top dark gradient for text legibility */}
         <LinearGradient
-          colors={data.gradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={{ flex: 1 }}
+          colors={['rgba(10,10,10,0.05)', 'rgba(10,10,10,0.45)', 'rgba(10,10,10,0.85)']}
+          locations={[0, 0.55, 1]}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        />
+
+        {/* Soft accent-tinted orb for depth */}
+        <View
+          style={{
+            position: 'absolute',
+            top: orb.top,
+            right: orb.right,
+            width: orb.size,
+            height: orb.size,
+            borderRadius: orb.size / 2,
+            backgroundColor: data.accent,
+            opacity: 0.22,
+          }}
+        />
+
+        {/* Icon chip — top-left, frosted */}
+        <View
+          style={{
+            position: 'absolute',
+            top: 14,
+            left: 14,
+            width: 34,
+            height: 34,
+            borderRadius: 17,
+            backgroundColor: 'rgba(255,255,255,0.18)',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.28)',
+          }}
         >
-          {/* Decorative blurred orb — abstract, brand-safe */}
+          <Ionicons name={data.icon} size={17} color="#ffffff" />
+        </View>
+
+        {/* Accent corner sticker — top-right */}
+        <View
+          style={{
+            position: 'absolute',
+            top: 14,
+            right: 14,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 5,
+            backgroundColor: data.accent,
+            paddingHorizontal: 8,
+            paddingVertical: 3,
+            borderRadius: 999,
+          }}
+        >
           <View
             style={{
-              position: 'absolute',
-              top: orb.top,
-              right: orb.right,
-              width: orb.size,
-              height: orb.size,
-              borderRadius: orb.size / 2,
-              backgroundColor: data.accent,
-              opacity: 0.18,
+              width: 4,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: '#0a0a0a',
             }}
           />
-          <View
+          <Text
             style={{
-              position: 'absolute',
-              bottom: -20,
-              left: -20,
-              width: 90,
-              height: 90,
-              borderRadius: 45,
-              backgroundColor: data.accent,
-              opacity: 0.1,
-            }}
-          />
-
-          {/* Icon chip — top-left */}
-          <View
-            style={{
-              position: 'absolute',
-              top: 14,
-              left: 14,
-              width: 34,
-              height: 34,
-              borderRadius: 17,
-              backgroundColor: 'rgba(255,255,255,0.16)',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderWidth: 1,
-              borderColor: 'rgba(255,255,255,0.22)',
+              fontSize: 9,
+              color: '#0a0a0a',
+              letterSpacing: 1.2,
+              textTransform: 'uppercase',
+              fontFamily: 'Inter_700Bold',
             }}
           >
-            <Ionicons name={data.icon} size={17} color={data.ink} />
-          </View>
+            Carrinex
+          </Text>
+        </View>
 
-          {/* Accent corner sticker — top-right */}
-          <View
+        {/* Text content — bottom-left, layered */}
+        <View
+          style={{
+            position: 'absolute',
+            left: 16,
+            right: 16,
+            bottom: 14,
+          }}
+        >
+          <Text
             style={{
-              position: 'absolute',
-              top: 14,
-              right: 14,
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 5,
-              backgroundColor: data.accent,
-              paddingHorizontal: 8,
-              paddingVertical: 3,
-              borderRadius: 999,
+              fontSize: 10,
+              color: 'rgba(255,255,255,0.78)',
+              letterSpacing: 1.4,
+              textTransform: 'uppercase',
+              marginBottom: 4,
+              fontFamily: 'Inter_600SemiBold',
             }}
           >
-            <View
-              style={{
-                width: 4,
-                height: 4,
-                borderRadius: 2,
-                backgroundColor: data.ink,
-              }}
-            />
-            <Text
-              style={{
-                fontSize: 9,
-                color: data.ink,
-                letterSpacing: 1.2,
-                textTransform: 'uppercase',
-                fontFamily: 'Inter_700Bold',
-              }}
-            >
-              Carrinex
-            </Text>
-          </View>
-
-          {/* Text content — bottom-left, layered */}
-          <View
+            {data.eyebrow}
+          </Text>
+          <Text
             style={{
-              position: 'absolute',
-              left: 16,
-              right: 16,
-              bottom: 14,
+              fontSize: titleSize,
+              color: '#ffffff',
+              letterSpacing: -0.6,
+              lineHeight: titleSize * 1.05,
+              fontFamily: 'Fraunces_700Bold',
+              textShadowColor: 'rgba(0,0,0,0.35)',
+              textShadowOffset: { width: 0, height: 1 },
+              textShadowRadius: 6,
             }}
           >
-            <Text
-              style={{
-                fontSize: 10,
-                color: data.ink,
-                opacity: 0.72,
-                letterSpacing: 1.4,
-                textTransform: 'uppercase',
-                marginBottom: 4,
-                fontFamily: 'Inter_600SemiBold',
-              }}
-            >
-              {data.eyebrow}
-            </Text>
-            <Text
-              style={{
-                fontSize: titleSize,
-                color: data.ink,
-                letterSpacing: -0.6,
-                lineHeight: titleSize * 1.05,
-                fontFamily: 'Fraunces_700Bold',
-              }}
-            >
-              {data.title}
-            </Text>
-            <Text
-              style={{
-                fontSize: 11,
-                color: data.ink,
-                opacity: 0.72,
-                marginTop: 5,
-                fontFamily: 'Inter_400Regular',
-              }}
-              numberOfLines={1}
-            >
-              {data.tagline}
-            </Text>
-          </View>
-        </LinearGradient>
+            {data.title}
+          </Text>
+          <Text
+            style={{
+              fontSize: 11,
+              color: 'rgba(255,255,255,0.78)',
+              marginTop: 5,
+              fontFamily: 'Inter_400Regular',
+            }}
+            numberOfLines={1}
+          >
+            {data.tagline}
+          </Text>
+        </View>
       </View>
     </Pressable>
   );

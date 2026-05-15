@@ -261,9 +261,9 @@ export default function HomeScreen() {
         ListHeaderComponent={
           activeTab === 'For you' ? (
             <View className="pb-4">
-              <AnonCards />
-              <View style={{ height: 8 }} />
               <PromoBanner onReadMore={() => {}} />
+              <View style={{ height: 4 }} />
+              <AnonCards />
             </View>
           ) : (
             <View className="pt-3 pb-2" />
