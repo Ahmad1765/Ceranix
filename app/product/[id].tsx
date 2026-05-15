@@ -1291,19 +1291,35 @@ export default function ProductScreen() {
 
         {/* ── Description + Details ── */}
         <View style={{ paddingHorizontal: 16, paddingTop: 22, paddingBottom: 6 }}>
-          <Text
+          <View
             style={{
-              fontSize: 11,
-              color: '#9ca3af',
+              flexDirection: 'row',
+              alignItems: 'center',
               marginBottom: 10,
               marginLeft: 4,
-              letterSpacing: 1.6,
-              textTransform: 'uppercase',
-              fontFamily: 'Inter_700Bold',
             }}
           >
-            Item description
-          </Text>
+            <View
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: BRAND_LIME,
+                marginRight: 8,
+              }}
+            />
+            <Text
+              style={{
+                fontSize: 11,
+                color: '#9ca3af',
+                letterSpacing: 1.6,
+                textTransform: 'uppercase',
+                fontFamily: 'Inter_700Bold',
+              }}
+            >
+              Item description
+            </Text>
+          </View>
           <View
             style={{
               backgroundColor: 'white',

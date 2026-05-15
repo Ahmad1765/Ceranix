@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, Animated, Easing, Platform } from 'react-native';
+import { View, Text, Pressable, Animated, Easing, Platform, Dimensions } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -16,6 +16,11 @@ type Activity = {
 const CYCLE_MS = 5200;
 const INK = '#0a0a0a';
 const LIME = '#d8f53a';
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+// Sized like the iPhone Dynamic Island: centered, capsule, sits just below the
+// status bar with breathing room on both sides.
+const ISLAND_MIN_W = 240;
+const ISLAND_MAX_W = Math.min(360, SCREEN_WIDTH - 64);
 
 function timeAgo(iso: string): string {
   const d = new Date(iso).getTime();
@@ -37,6 +42,11 @@ export function LiveActivityTicker() {
   const slide = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const dotPulse = useRef(new Animated.Value(0)).current;
+  // Dynamic Island-style entrance: tiny "blob" that expands into the pill
+  const islandScale = useRef(new Animated.Value(0.2)).current;
+  const islandOpacity = useRef(new Animated.Value(0)).current;
+  // Press-to-expand spring (subtle squish-grow like iOS interactive widgets)
+  const pressScale = useRef(new Animated.Value(1)).current;
 
   // Pulse the live dot continuously
   useEffect(() => {
@@ -79,6 +89,24 @@ export function LiveActivityTicker() {
   // Cycle through items
   useEffect(() => {
     if (items.length === 0) return;
+    // Dynamic Island expand-in: blob → pill
+    islandScale.setValue(0.2);
+    islandOpacity.setValue(0);
+    Animated.parallel([
+      Animated.spring(islandScale, {
+        toValue: 1,
+        useNativeDriver: true,
+        damping: 14,
+        stiffness: 180,
+        mass: 0.9,
+      }),
+      Animated.timing(islandOpacity, {
+        toValue: 1,
+        duration: 260,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start();
     // Initial fade-in
     opacity.setValue(0);
     Animated.timing(opacity, {
@@ -141,93 +169,121 @@ export function LiveActivityTicker() {
   };
 
   return (
-    <Pressable
-      onPress={() => router.push(`/product/${current.id}`)}
-      style={{
-        marginHorizontal: 16,
-        marginTop: 4,
-        marginBottom: 8,
-        backgroundColor: INK,
-        borderRadius: 999,
-        paddingLeft: 14,
-        paddingRight: 6,
-        paddingVertical: 6,
-        flexDirection: 'row',
-        alignItems: 'center',
-        ...Platform.select({
-          ios: {
-            shadowColor: '#000',
-            shadowOpacity: 0.12,
-            shadowRadius: 10,
-            shadowOffset: { width: 0, height: 4 },
-          },
-          android: { elevation: 3 },
-        }),
-      }}
-    >
-      {/* Live pulse dot */}
-      <Animated.View
-        style={[
-          {
-            width: 8,
-            height: 8,
-            borderRadius: 4,
-            backgroundColor: LIME,
-            marginRight: 10,
-          },
-          dotStyle,
-        ]}
-      />
-      <Text
-        style={{
-          fontSize: 10,
-          fontWeight: '900',
-          color: LIME,
-          letterSpacing: 1.4,
-          marginRight: 12,
-        }}
-      >
-        LIVE
-      </Text>
-
+    <View style={{ alignItems: 'center', paddingTop: 4, paddingBottom: 8 }}>
       <Animated.View
         style={{
-          flex: 1,
-          flexDirection: 'row',
-          alignItems: 'center',
-          opacity,
-          transform: [{ translateY: slide }],
+          opacity: islandOpacity,
+          transform: [{ scale: Animated.multiply(islandScale, pressScale) }],
+          ...Platform.select({
+            ios: {
+              shadowColor: '#000',
+              shadowOpacity: 0.28,
+              shadowRadius: 14,
+              shadowOffset: { width: 0, height: 6 },
+            },
+            android: { elevation: 6 },
+          }),
         }}
       >
-        <Text
-          numberOfLines={1}
+        <Pressable
+          onPress={() => router.push(`/product/${current.id}`)}
+          onPressIn={() =>
+            Animated.spring(pressScale, {
+              toValue: 1.04,
+              useNativeDriver: true,
+              damping: 14,
+              stiffness: 280,
+            }).start()
+          }
+          onPressOut={() =>
+            Animated.spring(pressScale, {
+              toValue: 1,
+              useNativeDriver: true,
+              damping: 14,
+              stiffness: 280,
+            }).start()
+          }
           style={{
-            color: 'white',
-            fontSize: 13,
-            fontWeight: '600',
-            flex: 1,
+            minWidth: ISLAND_MIN_W,
+            maxWidth: ISLAND_MAX_W,
+            backgroundColor: INK,
+            borderRadius: 999,
+            paddingLeft: 10,
+            paddingRight: 4,
+            paddingVertical: 4,
+            flexDirection: 'row',
+            alignItems: 'center',
+            // Subtle inner highlight rim — sells the "depth" of the notch
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.06)',
           }}
         >
-          <Text style={{ fontWeight: '800' }}>@{current.username}</Text>
-          {' just listed '}
-          <Text style={{ fontWeight: '800' }}>{label}</Text>
-          <Text style={{ color: 'rgba(255,255,255,0.55)' }}> · {timeAgo(current.created_at)}</Text>
-        </Text>
-      </Animated.View>
+          {/* Live pulse dot */}
+          <Animated.View
+            style={[
+              {
+                width: 7,
+                height: 7,
+                borderRadius: 3.5,
+                backgroundColor: LIME,
+                marginLeft: 2,
+                marginRight: 8,
+              },
+              dotStyle,
+            ]}
+          />
+          <Text
+            style={{
+              fontSize: 9,
+              fontWeight: '900',
+              color: LIME,
+              letterSpacing: 1.2,
+              marginRight: 10,
+            }}
+          >
+            LIVE
+          </Text>
 
-      <View
-        style={{
-          width: 30,
-          height: 30,
-          borderRadius: 15,
-          backgroundColor: 'rgba(255,255,255,0.12)',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginLeft: 8,
-        }}
-      >
-        <Feather name="arrow-up-right" size={14} color="white" />
-      </View>
-    </Pressable>
+          <Animated.View
+            style={{
+              flex: 1,
+              flexDirection: 'row',
+              alignItems: 'center',
+              opacity,
+              transform: [{ translateY: slide }],
+            }}
+          >
+            <Text
+              numberOfLines={1}
+              style={{
+                color: 'white',
+                fontSize: 12,
+                fontWeight: '600',
+                flex: 1,
+              }}
+            >
+              <Text style={{ fontWeight: '800' }}>@{current.username}</Text>
+              {' · '}
+              <Text style={{ fontWeight: '800' }}>{label}</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.55)' }}> · {timeAgo(current.created_at)}</Text>
+            </Text>
+          </Animated.View>
+
+          <View
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: 13,
+              backgroundColor: 'rgba(255,255,255,0.14)',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginLeft: 6,
+            }}
+          >
+            <Feather name="arrow-up-right" size={12} color="white" />
+          </View>
+        </Pressable>
+      </Animated.View>
+    </View>
   );
 }
