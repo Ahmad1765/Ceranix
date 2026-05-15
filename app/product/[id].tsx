@@ -1293,10 +1293,13 @@ export default function ProductScreen() {
         <View style={{ paddingHorizontal: 16, paddingTop: 22, paddingBottom: 6 }}>
           <Text
             style={{
-              fontSize: 13,
+              fontSize: 11,
               color: '#9ca3af',
               marginBottom: 10,
               marginLeft: 4,
+              letterSpacing: 1.6,
+              textTransform: 'uppercase',
+              fontFamily: 'Inter_700Bold',
             }}
           >
             Item description
@@ -1311,19 +1314,34 @@ export default function ProductScreen() {
             }}
           >
             {/* Description block */}
-            <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 14 }}>
-              <Text style={{ fontSize: 16, color: BRAND_INK, lineHeight: 23 }}>
+            <View style={{ paddingHorizontal: 18, paddingTop: 18, paddingBottom: 16 }}>
+              <Text
+                style={{
+                  fontSize: 18,
+                  color: BRAND_INK,
+                  lineHeight: 28,
+                  fontFamily: 'Fraunces_400Regular',
+                  letterSpacing: -0.1,
+                }}
+              >
                 {listing.description}
               </Text>
               <Pressable
                 onPress={() => Alert.alert('Translation')}
                 style={({ pressed }) => ({
-                  marginTop: 12,
+                  marginTop: 14,
                   alignSelf: 'flex-start',
                   opacity: pressed ? 0.6 : 1,
                 })}
               >
-                <Text style={{ fontSize: 15, fontWeight: '700', color: LINK_PURPLE }}>
+                <Text
+                  style={{
+                    fontSize: 14,
+                    color: LINK_PURPLE,
+                    fontFamily: 'Inter_600SemiBold',
+                    letterSpacing: 0.1,
+                  }}
+                >
                   Show translation
                 </Text>
               </Pressable>
@@ -1387,17 +1405,17 @@ export default function ProductScreen() {
                   style={({ pressed }) => ({
                     flexDirection: 'row',
                     alignItems: 'center',
-                    paddingHorizontal: 16,
+                    paddingHorizontal: 18,
                     paddingVertical: 14,
                     borderTopWidth: HAIRLINE,
                     borderTopColor: '#ececec',
                     backgroundColor: pressed && row.onPress ? '#fafafa' : 'white',
                   })}
                 >
-                  <Text style={{ flex: 1, fontSize: 16, color: BRAND_INK }} numberOfLines={1}>
-                    <Text style={{ fontWeight: '800' }}>{row.label}</Text>
-                    {'  '}
-                    <Text style={{ fontWeight: '400' }}>{row.value}</Text>
+                  <Text style={{ flex: 1, fontSize: 15, color: BRAND_INK }} numberOfLines={1}>
+                    <Text style={{ fontFamily: 'Inter_700Bold', letterSpacing: 0.1 }}>{row.label}</Text>
+                    <Text style={{ fontFamily: 'Inter_400Regular' }}>   </Text>
+                    <Text style={{ fontFamily: 'Fraunces_400Regular', fontSize: 16 }}>{row.value}</Text>
                   </Text>
                   {row.trailing}
                 </Pressable>
@@ -1419,7 +1437,16 @@ export default function ProductScreen() {
                   paddingVertical: 6,
                 }}
               >
-                <Text style={{ fontSize: 12, fontWeight: '600', color: '#4b5563' }}>#{tag}</Text>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: '#4b5563',
+                    fontFamily: 'Inter_500Medium',
+                    letterSpacing: 0.1,
+                  }}
+                >
+                  #{tag}
+                </Text>
               </View>
             ))}
           </View>
@@ -1445,7 +1472,16 @@ export default function ProductScreen() {
               })}
             >
               <Feather name="share-2" size={16} color={BRAND_INK} />
-              <Text style={{ fontSize: 13, fontWeight: '600', color: BRAND_INK }}>Share</Text>
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: BRAND_INK,
+                  fontFamily: 'Inter_600SemiBold',
+                  letterSpacing: 0.2,
+                }}
+              >
+                Share
+              </Text>
             </Pressable>
             <Pressable
               onPress={() => Alert.alert('Report')}
@@ -1458,10 +1494,26 @@ export default function ProductScreen() {
               })}
             >
               <Feather name="flag" size={16} color="#6b7280" />
-              <Text style={{ fontSize: 13, fontWeight: '600', color: '#6b7280' }}>Report</Text>
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: '#6b7280',
+                  fontFamily: 'Inter_600SemiBold',
+                  letterSpacing: 0.2,
+                }}
+              >
+                Report
+              </Text>
             </Pressable>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={{ fontSize: 11, color: '#9ca3af', letterSpacing: 0.4 }}>
+              <Text
+                style={{
+                  fontSize: 11,
+                  color: '#9ca3af',
+                  letterSpacing: 0.6,
+                  fontFamily: 'Inter_500Medium',
+                }}
+              >
                 ID · {LISTING_ID}
               </Text>
             </View>

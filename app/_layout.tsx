@@ -8,8 +8,33 @@ import * as SplashScreen from 'expo-splash-screen';
 import * as Font from 'expo-font';
 import { Asset } from 'expo-asset';
 import { Ionicons, Feather } from '@expo/vector-icons';
+import {
+  Fraunces_400Regular,
+  Fraunces_600SemiBold,
+  Fraunces_700Bold,
+  Fraunces_400Regular_Italic,
+  Fraunces_700Bold_Italic,
+} from '@expo-google-fonts/fraunces';
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+} from '@expo-google-fonts/inter';
 import { AuthProvider } from '@/lib/auth';
 import { ToastProvider } from '@/lib/toast';
+
+const AESTHETIC_FONTS = {
+  Fraunces_400Regular,
+  Fraunces_600SemiBold,
+  Fraunces_700Bold,
+  Fraunces_400Regular_Italic,
+  Fraunces_700Bold_Italic,
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+};
 
 SplashScreen.preventAutoHideAsync();
 
@@ -19,7 +44,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (Platform.OS === 'web') {
       // On web: don't block render — fonts load via CSS @font-face in background
-      Font.loadAsync({ ...Ionicons.font, ...Feather.font }).catch(console.warn);
+      Font.loadAsync({ ...Ionicons.font, ...Feather.font, ...AESTHETIC_FONTS }).catch(console.warn);
       setReady(true);
       SplashScreen.hideAsync();
       return;
@@ -27,7 +52,7 @@ export default function RootLayout() {
 
     // On native: preload fonts + local image assets before first paint
     Promise.all([
-      Font.loadAsync({ ...Ionicons.font, ...Feather.font }),
+      Font.loadAsync({ ...Ionicons.font, ...Feather.font, ...AESTHETIC_FONTS }),
       Asset.loadAsync([
         require('../assets/images/adaptive-icon.png'),
         require('../assets/images/favicon.png'),

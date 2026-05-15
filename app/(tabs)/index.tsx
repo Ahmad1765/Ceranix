@@ -16,6 +16,7 @@ import { ListingCard } from '@/components/ListingCard';
 import { SkeletonCard } from '@/components/SkeletonCard';
 import { PromoBanner } from '@/components/PromoBanner';
 import { LiveActivityTicker } from '@/components/LiveActivityTicker';
+import { AnonCards } from '@/components/AnonCards';
 import { fetchListings, type FeedTab } from '@/lib/listings';
 import type { Listing } from '@/types';
 
@@ -260,6 +261,8 @@ export default function HomeScreen() {
         ListHeaderComponent={
           activeTab === 'For you' ? (
             <View className="pb-4">
+              <AnonCards />
+              <View style={{ height: 8 }} />
               <PromoBanner onReadMore={() => {}} />
             </View>
           ) : (
