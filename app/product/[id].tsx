@@ -1311,7 +1311,7 @@ export default function ProductScreen() {
             <Text
               style={{
                 fontSize: 11,
-                color: '#9ca3af',
+                color: BRAND_INK,
                 letterSpacing: 1.6,
                 textTransform: 'uppercase',
                 fontFamily: 'Inter_700Bold',

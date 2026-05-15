@@ -15,7 +15,6 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { ListingCard } from '@/components/ListingCard';
 import { SkeletonCard } from '@/components/SkeletonCard';
 import { PromoBanner } from '@/components/PromoBanner';
-import { LiveActivityTicker } from '@/components/LiveActivityTicker';
 import { AnonCards } from '@/components/AnonCards';
 import { fetchListings, type FeedTab } from '@/lib/listings';
 import type { Listing } from '@/types';
@@ -177,9 +176,6 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-white">
-      {/* Live activity ribbon — only renders when there are recent listings */}
-      <LiveActivityTicker />
-
       {/* Search Header */}
       <View className="flex-row items-center px-4 pt-2 pb-3">
         <View className="flex-1 flex-row items-center bg-[#F2F2F2] rounded-full px-4 py-[10px] mr-3">
