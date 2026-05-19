@@ -16,6 +16,7 @@ import { ListingCard } from '@/components/ListingCard';
 import { SkeletonCard } from '@/components/SkeletonCard';
 import { AnonCards } from '@/components/AnonCards';
 import { fetchListings, type FeedTab } from '@/lib/listings';
+import { getOptimizedImageUrl } from '@/lib/images';
 import type { Listing } from '@/types';
 
 type TabName = 'For you' | 'Popular' | 'Following';
@@ -120,9 +121,14 @@ export default function HomeScreen() {
     if (tab === 'Following') return;
     const rows = await fetchListings({ tab: TAB_TO_FEED[tab as Exclude<TabName, 'Following'>] });
     setListings(rows);
-    // Warm the image cache for the first few cards.
-    const firstUrls = rows.slice(0, 12).map((l) => l.images?.[0]).filter(Boolean) as string[];
-    if (firstUrls.length) Image.prefetch(firstUrls);
+    // Warm the image cache for the first few cards — request the optimized
+    // thumbnail variant so the cache key matches what the ListingCard renders.
+    const firstUrls = rows
+      .slice(0, 12)
+      .map((l) => l.images?.[0])
+      .filter(Boolean)
+      .map((u) => getOptimizedImageUrl(u as string, { width: 400 }));
+    if (firstUrls.length) Image.prefetch(firstUrls, { cachePolicy: 'memory-disk' });
   }, []);
 
   useEffect(() => {
@@ -218,11 +224,12 @@ export default function HomeScreen() {
         {SUGGESTED_USERS.map((user) => (
           <View key={user.id} className="flex-row items-center px-4 py-3">
             <Image
-              source={{ uri: user.avatar }}
+              source={{ uri: getOptimizedImageUrl(user.avatar, { width: 120 }) }}
               style={{ width: 52, height: 52, borderRadius: 26 }}
               className="bg-gray-200"
               contentFit="cover"
               cachePolicy="memory-disk"
+              transition={150}
             />
             <View className="flex-1 ml-3">
               <Text className="text-[15px] font-bold text-gray-900">{user.display_name}</Text>

@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
 import { Image } from 'expo-image';
 import Animated, {
@@ -10,6 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { PressableScale } from '@/components/PressableScale';
+import { getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
 import type { Listing } from '@/types';
 
 const AnimatedExpoImage = Animated.createAnimatedComponent(Image);
@@ -21,6 +22,10 @@ interface Props {
 export const ListingCard = memo(function ListingCard({ listing }: Props) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [cardWidth, setCardWidth] = useState(0);
+  // Sibling carousel images only mount after the user actually engages with
+  // the card. This shaves ~2/3 of image requests on multi-image listings in
+  // the home grid since most users never swipe individual cards.
+  const [carouselArmed, setCarouselArmed] = useState(false);
   const images = listing.images.length > 0 ? listing.images : [''];
   const hasMultiple = images.length > 1;
 
@@ -36,10 +41,17 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
     transform: [{ translateY: enterY.value }],
   }));
 
-  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+  const handleScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (cardWidth <= 0) return;
     setActiveIndex(Math.round(e.nativeEvent.contentOffset.x / cardWidth));
-  };
+  }, [cardWidth]);
+
+  const armCarousel = useCallback(() => {
+    if (!carouselArmed) setCarouselArmed(true);
+  }, [carouselArmed]);
+
+  const srcWidth = thumbWidthFor(cardWidth || 200);
+  const firstSrc = getOptimizedImageUrl(images[0], { width: srcWidth });
 
   return (
     <Animated.View style={[{ flex: 1, marginBottom: 16 }, enterStyle]}>
@@ -59,42 +71,53 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
             showsHorizontalScrollIndicator={false}
             nestedScrollEnabled
             onScroll={handleScroll}
+            onTouchStart={armCarousel}
+            onScrollBeginDrag={armCarousel}
             scrollEventThrottle={16}
             disableIntervalMomentum
           >
-            {images.map((uri, i) =>
-              i === 0 ? (
-                <AnimatedExpoImage
-                  key={i}
-                  source={{ uri }}
-                  style={{ width: cardWidth, height: '100%' }}
-                  contentFit="cover"
-                  cachePolicy="memory-disk"
-                  recyclingKey={uri}
-                  transition={250}
-                  sharedTransitionTag={`product-image-${listing.id}`}
-                />
-              ) : (
+            {images.map((uri, i) => {
+              if (i === 0) {
+                return (
+                  <AnimatedExpoImage
+                    key={i}
+                    source={{ uri: firstSrc }}
+                    style={{ width: cardWidth, height: '100%' }}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                    recyclingKey={uri}
+                    transition={200}
+                    priority="high"
+                    sharedTransitionTag={`product-image-${listing.id}`}
+                  />
+                );
+              }
+              if (!carouselArmed) {
+                return <View key={i} style={{ width: cardWidth, height: '100%' }} />;
+              }
+              return (
                 <Image
                   key={i}
-                  source={{ uri }}
+                  source={{ uri: getOptimizedImageUrl(uri, { width: srcWidth }) }}
                   style={{ width: cardWidth, height: '100%' }}
                   contentFit="cover"
                   cachePolicy="memory-disk"
                   recyclingKey={uri}
-                  transition={250}
+                  transition={200}
+                  priority="low"
                 />
-              )
-            )}
+              );
+            })}
           </ScrollView>
         ) : (
           <AnimatedExpoImage
-            source={{ uri: images[0] }}
+            source={{ uri: firstSrc }}
             style={{ width: '100%', height: '100%' }}
             contentFit="cover"
             cachePolicy="memory-disk"
             recyclingKey={images[0]}
-            transition={250}
+            transition={200}
+            priority="high"
             sharedTransitionTag={`product-image-${listing.id}`}
           />
         )}

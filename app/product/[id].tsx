@@ -33,6 +33,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import type { Listing } from '@/types';
 import { fetchListingById, isLiked, toggleLike } from '@/lib/listings';
+import { getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { LikeBurst } from '@/components/LikeBurst';
@@ -464,9 +465,13 @@ function ZoomableImage({
       >
         <Animated.View style={[{ width: imgWidth, height: imgHeight }, animStyle]}>
           <AnimatedExpoImage
-            source={{ uri }}
+            source={{ uri: getOptimizedImageUrl(uri, { width: thumbWidthFor(imgWidth), quality: 80 }) }}
             style={{ width: imgWidth, height: imgHeight }}
             contentFit="cover"
+            cachePolicy="memory-disk"
+            recyclingKey={uri}
+            transition={150}
+            priority="high"
             sharedTransitionTag={sharedTag}
           />
         </Animated.View>
@@ -569,7 +574,12 @@ function SaveListSheet({
 
 function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress: () => void }) {
   const [activeIndex, setActiveIndex] = useState(0);
+  const [carouselArmed, setCarouselArmed] = useState(false);
   const hasMultiple = item.images.length > 1;
+  const srcWidth = thumbWidthFor(CARD_WIDTH);
+  const armCarousel = () => {
+    if (!carouselArmed) setCarouselArmed(true);
+  };
   return (
     <Pressable onPress={onPress} style={{ width: CARD_WIDTH, marginBottom: 18 }}>
       <View
@@ -591,23 +601,37 @@ function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress: () => 
             onScroll={(e) =>
               setActiveIndex(Math.round(e.nativeEvent.contentOffset.x / CARD_WIDTH))
             }
+            onTouchStart={armCarousel}
+            onScrollBeginDrag={armCarousel}
             scrollEventThrottle={16}
             disableIntervalMomentum
           >
-            {item.images.map((uri, i) => (
-              <Image
-                key={i}
-                source={{ uri }}
-                style={{ width: CARD_WIDTH, height: CARD_IMAGE_HEIGHT }}
-                contentFit="cover"
-              />
-            ))}
+            {item.images.map((uri, i) => {
+              if (i !== 0 && !carouselArmed) {
+                return <View key={i} style={{ width: CARD_WIDTH, height: CARD_IMAGE_HEIGHT }} />;
+              }
+              return (
+                <Image
+                  key={i}
+                  source={{ uri: getOptimizedImageUrl(uri, { width: srcWidth }) }}
+                  style={{ width: CARD_WIDTH, height: CARD_IMAGE_HEIGHT }}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  recyclingKey={uri}
+                  transition={180}
+                  priority={i === 0 ? 'normal' : 'low'}
+                />
+              );
+            })}
           </ScrollView>
         ) : (
           <Image
-            source={{ uri: item.images[0] }}
+            source={{ uri: getOptimizedImageUrl(item.images[0], { width: srcWidth }) }}
             style={{ width: CARD_WIDTH, height: CARD_IMAGE_HEIGHT }}
             contentFit="cover"
+            cachePolicy="memory-disk"
+            recyclingKey={item.images[0]}
+            transition={180}
           />
         )}
 
@@ -1199,9 +1223,11 @@ export default function ProductScreen() {
                 >
                   {listing.seller.avatar_url ? (
                     <Image
-                      source={{ uri: listing.seller.avatar_url }}
+                      source={{ uri: getOptimizedImageUrl(listing.seller.avatar_url, { width: 120 }) }}
                       style={{ width: 52, height: 52 }}
                       contentFit="cover"
+                      cachePolicy="memory-disk"
+                      transition={150}
                     />
                   ) : (
                     <Feather name="user" size={22} color="#9ca3af" />
