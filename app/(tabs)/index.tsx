@@ -14,7 +14,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { ListingCard } from '@/components/ListingCard';
 import { SkeletonCard } from '@/components/SkeletonCard';
-import { PromoBanner } from '@/components/PromoBanner';
 import { AnonCards } from '@/components/AnonCards';
 import { fetchListings, type FeedTab } from '@/lib/listings';
 import type { Listing } from '@/types';
@@ -257,8 +256,6 @@ export default function HomeScreen() {
         ListHeaderComponent={
           activeTab === 'For you' ? (
             <View className="pb-4">
-              <PromoBanner onReadMore={() => {}} />
-              <View style={{ height: 4 }} />
               <AnonCards />
             </View>
           ) : (
