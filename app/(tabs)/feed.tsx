@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 
-export default function NybegagnatScreen() {
+export default function FeedScreen() {
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-white">
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>

@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import { View, Text } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabsLayout() {
@@ -45,20 +45,15 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="nybegagnat"
+        name="feed"
         options={{
-          title: 'Nybegagnat',
+          title: 'My Feed',
           tabBarIcon: ({ focused, color, size }) => (
             <View className="items-center justify-center relative">
               {focused && (
                 <View className="absolute bg-[#e4ff3a] rounded-full w-10 h-10 blur-xl opacity-80" style={{ shadowColor: '#e4ff3a', shadowOpacity: 1, shadowRadius: 15, elevation: 10 }} />
               )}
-              <View className="relative">
-                <Feather name="smartphone" size={24} color={focused ? "#000" : "#666"} />
-                <View className="absolute -top-1 -right-1 bg-white rounded-full">
-                  <Feather name="check-circle" size={12} color="#4f46e5" />
-                </View>
-              </View>
+              <MaterialCommunityIcons name="view-dashboard" size={24} color={focused ? "#000" : "#666"} />
             </View>
           ),
         }}
