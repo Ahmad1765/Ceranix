@@ -1,6 +1,23 @@
 import { Tabs } from 'expo-router';
 import { View, Text } from 'react-native';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
+
+// Pure-View icon — no font load, no SVG. Mirrors MCI `view-dashboard`
+// (asymmetric 2×2 of rounded squares: large/small/small/large).
+function MyFeedIcon({ size, color }: { size: number; color: string }) {
+  const big = size * 0.46;
+  const small = size * 0.32;
+  const radiusBig = big * 0.22;
+  const radiusSmall = small * 0.22;
+  return (
+    <View style={{ width: size, height: size }}>
+      <View style={{ position: 'absolute', top: 0, left: 0, width: big, height: big, borderRadius: radiusBig, backgroundColor: color }} />
+      <View style={{ position: 'absolute', top: 0, right: 0, width: small, height: small, borderRadius: radiusSmall, backgroundColor: color }} />
+      <View style={{ position: 'absolute', bottom: 0, left: 0, width: small, height: small, borderRadius: radiusSmall, backgroundColor: color }} />
+      <View style={{ position: 'absolute', bottom: 0, right: 0, width: big, height: big, borderRadius: radiusBig, backgroundColor: color }} />
+    </View>
+  );
+}
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabsLayout() {
@@ -53,7 +70,7 @@ export default function TabsLayout() {
               {focused && (
                 <View className="absolute bg-[#e4ff3a] rounded-full w-10 h-10 blur-xl opacity-80" style={{ shadowColor: '#e4ff3a', shadowOpacity: 1, shadowRadius: 15, elevation: 10 }} />
               )}
-              <MaterialCommunityIcons name="view-dashboard" size={24} color={focused ? "#000" : "#666"} />
+              <MyFeedIcon size={22} color={focused ? "#000" : "#666"} />
             </View>
           ),
         }}

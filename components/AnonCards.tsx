@@ -388,28 +388,6 @@ export function AnonCards() {
     <View style={{ paddingTop: 8, paddingBottom: 8 }}>
       {/* Editorial heading */}
       <View style={{ paddingHorizontal: SCREEN_PAD, marginBottom: 4 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-          <View
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: 3,
-              backgroundColor: '#d8f53a',
-              marginRight: 8,
-            }}
-          />
-          <Text
-            style={{
-              fontSize: 11,
-              color: '#6b7280',
-              letterSpacing: 1.6,
-              textTransform: 'uppercase',
-              fontFamily: 'Inter_700Bold',
-            }}
-          >
-            Today on Carrinex
-          </Text>
-        </View>
         <Text
           style={{
             fontSize: 34,
