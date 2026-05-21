@@ -21,6 +21,54 @@ export interface User {
   rating: number;
   total_sales: number;
   created_at: string;
+  // Settings-driven fields (optional for backwards compat with existing reads)
+  vacation_mode?: boolean;
+  bundle_discount_pct?: number;
+  is_verified?: boolean;
+  is_pro?: boolean;
+  expo_push_token?: string | null;
+}
+
+export interface ShippingAddress {
+  id: string;
+  user_id: string;
+  recipient_name: string;
+  line1: string;
+  line2: string | null;
+  city: string;
+  state: string | null;
+  postal_code: string;
+  country: string;
+  phone: string | null;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PayoutKind = 'bank' | 'wallet';
+
+export interface PayoutMethod {
+  id: string;
+  user_id: string;
+  kind: PayoutKind;
+  label: string;
+  account_last4: string;
+  is_default: boolean;
+  created_at: string;
+}
+
+export type VerificationStatus = 'submitted' | 'approved' | 'rejected';
+export type DocumentKind = 'passport' | 'national_id' | 'drivers_license';
+
+export interface Verification {
+  user_id: string;
+  status: VerificationStatus;
+  legal_name: string;
+  document_kind: DocumentKind;
+  document_number_last4: string | null;
+  notes: string | null;
+  submitted_at: string;
+  reviewed_at: string | null;
 }
 
 export interface Listing {

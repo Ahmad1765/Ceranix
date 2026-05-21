@@ -2,6 +2,8 @@ import { supabase } from '@/lib/supabase';
 import type { Listing } from '@/types';
 
 const SELECT_WITH_SELLER = '*, seller:profiles!listings_seller_id_fkey(*)';
+// Inner join so vacation_mode filter applies. Existing listings always have a seller, so no rows are lost.
+const SELECT_WITH_SELLER_INNER = '*, seller:profiles!listings_seller_id_fkey!inner(*)';
 
 export type FeedTab = 'for_you' | 'popular';
 
@@ -9,8 +11,9 @@ export async function fetchListings(opts: { tab?: FeedTab; limit?: number } = {}
   const { tab = 'for_you', limit = 60 } = opts;
   let query = supabase
     .from('listings')
-    .select(SELECT_WITH_SELLER)
-    .eq('is_sold', false);
+    .select(SELECT_WITH_SELLER_INNER)
+    .eq('is_sold', false)
+    .eq('seller.vacation_mode', false);
 
   if (tab === 'popular') {
     query = query.order('likes', { ascending: false }).order('created_at', { ascending: false });
