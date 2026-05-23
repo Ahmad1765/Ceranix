@@ -831,6 +831,24 @@ export default function ProductScreen() {
     });
   };
 
+  const openChat = (mode: 'message' | 'offer') => {
+    tap('medium');
+    if (!user) {
+      toast.show('Sign in to message sellers', { variant: 'info', icon: 'log-in' });
+      router.push('/auth/login');
+      return;
+    }
+    if (!listing) return;
+    if (listing.seller_id === user.id) {
+      toast.show("That's your own listing", { variant: 'default', icon: 'info' });
+      return;
+    }
+    router.push({
+      pathname: '/conversation/new',
+      params: { listing: listing.id, mode },
+    } as any);
+  };
+
   const sharedTagId = productIdParam ?? listing?.id ?? '';
 
   // Vertical scroll-driven parallax + sticky-header toggle
@@ -1290,7 +1308,7 @@ export default function ProductScreen() {
                 </Text>
               </Pressable>
               <Pressable
-                onPress={() => { tap('medium'); Alert.alert('Message', 'Opening chat...'); }}
+                onPress={() => openChat('message')}
                 style={({ pressed }) => ({
                   flex: 1,
                   borderRadius: 12,
@@ -1828,7 +1846,7 @@ export default function ProductScreen() {
         }}
       >
         <Pressable
-          onPress={() => { tap('medium'); Alert.alert('Make an offer', 'Suggest a price?'); }}
+          onPress={() => openChat('offer')}
           style={({ pressed }) => ({
             paddingHorizontal: 18,
             height: 50,

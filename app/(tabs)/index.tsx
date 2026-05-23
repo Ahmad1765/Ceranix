@@ -12,6 +12,7 @@ import {
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from 'expo-router';
 import { ListingCard } from '@/components/ListingCard';
 import { SkeletonCard } from '@/components/SkeletonCard';
 import { AnonCards } from '@/components/AnonCards';
@@ -116,6 +117,7 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [listings, setListings] = useState<Listing[]>([]);
+  const hasLoadedRef = useRef(false);
 
   const load = useCallback(async (tab: TabName) => {
     if (tab === 'Following') return;
@@ -131,16 +133,38 @@ export default function HomeScreen() {
     if (firstUrls.length) Image.prefetch(firstUrls, { cachePolicy: 'memory-disk' });
   }, []);
 
+  // Initial + tab-change load: show skeletons.
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     load(activeTab).finally(() => {
-      if (!cancelled) setLoading(false);
+      if (!cancelled) {
+        setLoading(false);
+        hasLoadedRef.current = true;
+      }
     });
     return () => {
       cancelled = true;
     };
   }, [activeTab, load]);
+
+  // Silently refetch whenever the tab gains focus (e.g. after publishing a
+  // listing from the upload tab). Skipping the first focus avoids running
+  // back-to-back with the initial mount fetch above. Without this, freshly
+  // uploaded listings only appeared after the app was restarted.
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasLoadedRef.current) return;
+      if (activeTab === 'Following') return;
+      let cancelled = false;
+      load(activeTab).catch(() => {
+        if (cancelled) return;
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [activeTab, load]),
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

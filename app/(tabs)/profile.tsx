@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -6,39 +6,34 @@ import {
   ScrollView,
   ActivityIndicator,
   RefreshControl,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import Animated from 'react-native-reanimated';
 import { ListingCard } from '@/components/ListingCard';
 import { RequireAuth } from '@/components/RequireAuth';
 import { useAuth } from '@/lib/auth';
 import { fetchUserListings, fetchLikedListings } from '@/lib/listings';
+import { colors, radii, shadow, eyebrow } from '@/lib/theme';
+import { useGridDimensions, HIT_SLOP_8 } from '@/lib/responsive';
+import { useStaggeredEntrance, useFadeIn } from '@/lib/motion';
 import type { Listing } from '@/types';
 
-type ProfileTab = 'Selling' | 'Seller mode' | 'Liked' | 'Collections';
+type ProfileTab = 'Selling' | 'Liked' | 'Shop' | 'Collections';
+const TABS: ProfileTab[] = ['Selling', 'Liked', 'Shop', 'Collections'];
 
-const SELLER_MODE_ITEMS = [
-  {
-    title: 'My shop',
-    subtitle: 'View purchased and sold items and handle payouts',
-  },
-  {
-    title: 'Bundle discount',
-    subtitle: 'Give your buyers a discount when purchasing multiple items to increase your chances of selling more items',
-    badge: 'Off',
-  },
-  {
-    title: 'Vacation mode',
-    subtitle: 'Turn the vacation mode on if you want your ads to not be purchasable whilst you are on vacation',
-    badge: 'Off',
-  },
-  {
-    title: 'Share your profile',
-    subtitle: 'Send your profile to your friends to reach more potential buyers',
-  },
+const SHOP_ITEMS = [
+  { icon: 'tag' as const, title: 'My shop', subtitle: 'Purchases, sales & payouts' },
+  { icon: 'percent' as const, title: 'Bundle discount', subtitle: 'Reward buyers who shop multiple items', badge: 'Off' },
+  { icon: 'pause-circle' as const, title: 'Vacation mode', subtitle: 'Pause listings while away', badge: 'Off' },
+  { icon: 'share-2' as const, title: 'Share your profile', subtitle: 'Send a link to your shop' },
 ];
+
+const HORIZONTAL_PAD = 16;
+const GRID_GAP = 10;
 
 function ProfileScreenInner() {
   const { profile } = useAuth();
@@ -49,7 +44,16 @@ function ProfileScreenInner() {
   const [loadingLiked, setLoadingLiked] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const tabs: ProfileTab[] = ['Selling', 'Seller mode', 'Liked', 'Collections'];
+  const heroFade = useFadeIn(0, 320);
+
+  // Compute responsive grid: 2 cols on phones, 3 on big phones, 4 on tablets.
+  const { columns, cardWidth: cardW } = useGridDimensions({
+    min: 2,
+    max: 4,
+    thresholds: [420, 768, 1024],
+    horizontalPadding: HORIZONTAL_PAD,
+    gap: GRID_GAP,
+  });
 
   const loadSelling = useCallback(async () => {
     if (!profile?.id) return;
@@ -72,7 +76,6 @@ function ProfileScreenInner() {
     loadLiked();
   }, [loadSelling, loadLiked]);
 
-  // Re-fetch when tab regains focus (covers post-publish nav back).
   useFocusEffect(
     useCallback(() => {
       loadSelling();
@@ -88,244 +91,377 @@ function ProfileScreenInner() {
 
   if (!profile) {
     return (
-      <SafeAreaView edges={['top']} className="flex-1 bg-white items-center justify-center">
-        <ActivityIndicator color="#6C47FF" />
+      <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color={colors.ink} />
       </SafeAreaView>
     );
   }
 
   const sellingCount = selling.length;
   const likedCount = liked.length;
+  const initial = (profile.full_name || profile.username || 'U').trim().charAt(0).toUpperCase();
 
   return (
-    <SafeAreaView edges={['top']} className="flex-1 bg-white">
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.soft }}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        stickyHeaderIndices={[1]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6C47FF" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.ink} />}
+        contentContainerStyle={{ paddingBottom: 56 }}
       >
-        {/* Banner */}
-        <View
-          style={{
-            height: 160,
-            backgroundColor: '#c8f53a',
-            position: 'relative',
-            overflow: 'hidden',
-          }}
-        >
-          <Image
-            source={require('../../assets/images/profile_banner_new.png')}
-            style={{ width: '100%', height: '100%' }}
-            contentFit="cover"
-          />
-
-          {/* Top-right action stack */}
-          <View style={{ position: 'absolute', top: 12, right: 16, flexDirection: 'row', gap: 8 }}>
+        {/* Top action bar */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 6 }}>
+          <Text style={eyebrow}>My profile</Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
             <Pressable
               onPress={() => router.push('/profile/edit')}
-              className="bg-white rounded-full p-2 shadow-sm"
+              hitSlop={HIT_SLOP_8}
+              style={({ pressed }) => ({
+                width: 38, height: 38, borderRadius: 19, backgroundColor: colors.white,
+                alignItems: 'center', justifyContent: 'center',
+                borderWidth: 1, borderColor: colors.hair,
+                opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.96 : 1 }],
+              })}
             >
-              <Feather name="edit-2" size={18} color="#000" />
+              <Feather name="edit-2" size={16} color={colors.ink} />
             </Pressable>
             <Pressable
               onPress={() => router.push('/settings')}
-              className="bg-white rounded-full p-2 shadow-sm"
+              hitSlop={HIT_SLOP_8}
+              style={({ pressed }) => ({
+                width: 38, height: 38, borderRadius: 19, backgroundColor: colors.white,
+                alignItems: 'center', justifyContent: 'center',
+                borderWidth: 1, borderColor: colors.hair,
+                opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.96 : 1 }],
+              })}
             >
-              <Feather name="settings" size={20} color="#000" />
+              <Feather name="settings" size={16} color={colors.ink} />
             </Pressable>
           </View>
+        </View>
 
-          {/* User Info inside Banner */}
-          <View style={{ position: 'absolute', bottom: 15, left: 16, flexDirection: 'row', alignItems: 'center' }}>
-            <View className="w-24 h-24 rounded-full bg-[#d1d5db] border-[4px] border-white/40 items-center justify-center overflow-hidden">
-              {profile.avatar_url ? (
-                <Image
-                  source={{ uri: profile.avatar_url }}
-                  style={{ width: '100%', height: '100%' }}
-                  contentFit="cover"
-                />
-              ) : (
-                <View className="w-full h-full bg-[#cbd5e1] items-center justify-center">
-                  <Feather name="user" size={48} color="#94a3b8" style={{ marginTop: 12 }} />
+        {/* Hero identity card */}
+        <Animated.View style={[{ paddingHorizontal: 20, marginTop: 6 }, heroFade]}>
+          <View style={{
+            backgroundColor: colors.ink,
+            borderRadius: radii['3xl'],
+            padding: 18,
+            ...shadow.md,
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{
+                width: 64, height: 64, borderRadius: 32, backgroundColor: colors.lime,
+                alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginRight: 14,
+              }}>
+                {profile.avatar_url ? (
+                  <Image source={{ uri: profile.avatar_url }} style={{ width: 64, height: 64 }} contentFit="cover" />
+                ) : (
+                  <Text style={{ fontSize: 26, fontWeight: '900', color: colors.ink }}>{initial}</Text>
+                )}
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <Text style={{ fontSize: 20, fontWeight: '900', color: colors.white, letterSpacing: -0.4 }} numberOfLines={1}>
+                    {profile.full_name || profile.username}
+                  </Text>
+                  {profile.is_verified && (
+                    <View style={{ marginLeft: 6 }}>
+                      <Feather name="check-circle" size={14} color={colors.lime} />
+                    </View>
+                  )}
                 </View>
-              )}
-            </View>
-            <View className="ml-4">
-              <Text className="text-[24px] font-bold text-white" style={{ letterSpacing: -0.5 }}>
-                {profile.full_name || profile.username}
-              </Text>
-              <Text className="text-[15px] font-medium text-white/90">@{profile.username}</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Stats row */}
-        <View className="flex-row px-4 mt-8 mb-4 items-center" style={{ justifyContent: 'space-between' }}>
-          <View className="items-center flex-1">
-            <View className="flex-row items-center">
-              <Feather name="heart" size={16} color="#ef4444" />
-              <Text className="text-[17px] font-bold text-gray-900 ml-1">
-                {Number(profile.rating ?? 0).toFixed(1)}
-              </Text>
-            </View>
-            <Text className="text-[12px] text-gray-400 font-medium">{profile.total_sales ?? 0} qty.</Text>
-          </View>
-          <View style={{ width: 1, height: 35, backgroundColor: '#f3f4f6' }} />
-          <View className="items-center flex-1">
-            <Text className="text-[17px] font-bold text-gray-900">Today</Text>
-            <Text className="text-[12px] text-gray-400 font-medium">Last seen</Text>
-          </View>
-          <View style={{ width: 1, height: 35, backgroundColor: '#f3f4f6' }} />
-          <View className="items-center flex-1">
-            <Text className="text-[17px] font-bold text-gray-900">0</Text>
-            <Text className="text-[12px] text-gray-400 font-medium">Followers</Text>
-          </View>
-          <View style={{ width: 1, height: 35, backgroundColor: '#f3f4f6' }} />
-          <View className="items-center flex-1">
-            <Text className="text-[17px] font-bold text-gray-900">0</Text>
-            <Text className="text-[12px] text-gray-400 font-medium">Follows</Text>
-          </View>
-        </View>
-
-        {/* Tab pills */}
-        <View className="mt-2">
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
-            {tabs.map((tab) => (
-              <Pressable
-                key={tab}
-                onPress={() => setActiveTab(tab)}
-                className={`px-6 py-2.5 rounded-full border ${
-                  activeTab === tab
-                    ? 'bg-[#4338ca] border-[#4338ca]'
-                    : 'border-gray-200 bg-white'
-                }`}
-              >
-                <Text
-                  className={`text-[15px] font-bold ${
-                    activeTab === tab ? 'text-white' : 'text-gray-900'
-                  }`}
-                >
-                  {tab === 'Selling'
-                    ? `Selling (${sellingCount})`
-                    : tab === 'Liked'
-                    ? `Liked (${likedCount})`
-                    : tab === 'Collections'
-                    ? `Collections (0)`
-                    : tab}
+                <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', marginTop: 2 }} numberOfLines={1}>
+                  @{profile.username}
                 </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
+                {profile.location && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
+                    <Feather name="map-pin" size={11} color="rgba(255,255,255,0.55)" />
+                    <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginLeft: 4 }} numberOfLines={1}>
+                      {profile.location}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            {/* Stats strip */}
+            <View style={{ flexDirection: 'row', marginTop: 16, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: radii.lg, padding: 12 }}>
+              <Stat value={Number(profile.rating ?? 0).toFixed(1)} label="Rating" />
+              <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginHorizontal: 8 }} />
+              <Stat value={String(profile.total_sales ?? 0)} label="Sales" />
+              <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginHorizontal: 8 }} />
+              <Stat value={String(sellingCount)} label="Listings" />
+              <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginHorizontal: 8 }} />
+              <Stat value={String(likedCount)} label="Liked" />
+            </View>
+          </View>
+        </Animated.View>
 
         {/* Promote banner */}
-        <Pressable className="mt-6 bg-[#e4ff3a] py-3 flex-row items-center justify-center">
-          <MaterialCommunityIcons name="rocket" size={20} color="#000" style={{ marginRight: 8 }} />
-          <Text className="text-[15px] font-bold text-gray-900">
-            Promote your profile <Text className="underline font-black">here</Text>
+        <Pressable
+          onPress={() => router.push('/settings')}
+          style={({ pressed }) => ({
+            marginHorizontal: 20, marginTop: 14,
+            backgroundColor: colors.lime, borderRadius: radii['2xl'],
+            paddingVertical: 12, paddingHorizontal: 16,
+            flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+            opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.99 : 1 }],
+          })}
+        >
+          <MaterialCommunityIcons name="rocket-launch-outline" size={18} color={colors.ink} style={{ marginRight: 8 }} />
+          <Text style={{ fontSize: 13, fontWeight: '800', color: colors.ink, letterSpacing: 0.2 }}>
+            Promote your profile
           </Text>
         </Pressable>
 
-        {/* Tab content */}
-        <View className="mt-6">
-          {activeTab === 'Selling' && (
-            loadingSelling ? (
-              <View className="px-4 py-12 items-center">
-                <ActivityIndicator color="#6C47FF" />
-              </View>
-            ) : selling.length === 0 ? (
-              <View className="px-4 py-12">
-                <Text className="text-4xl font-black tracking-tight text-gray-900">Appears empty{'\n'}here...</Text>
-              </View>
-            ) : (
-              <View className="flex-row flex-wrap px-3 justify-between">
-                {selling.map((item) => (
-                  <View key={item.id} style={{ width: '48%', marginBottom: 12 }}>
-                    <ListingCard listing={item} />
-                  </View>
-                ))}
-              </View>
-            )
-          )}
+        {/* Tab pills */}
+        <View style={{ marginTop: 18 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}>
+            {TABS.map((tab) => {
+              const active = activeTab === tab;
+              const count =
+                tab === 'Selling' ? sellingCount :
+                tab === 'Liked' ? likedCount :
+                tab === 'Collections' ? 0 : null;
+              return (
+                <Pressable
+                  key={tab}
+                  onPress={() => setActiveTab(tab)}
+                  style={({ pressed }) => ({
+                    paddingHorizontal: 16, paddingVertical: 9,
+                    borderRadius: radii.pill,
+                    backgroundColor: active ? colors.ink : colors.white,
+                    borderWidth: 1.5, borderColor: active ? colors.ink : colors.hair,
+                    flexDirection: 'row', alignItems: 'center', gap: 6,
+                    opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.97 : 1 }],
+                  })}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: active ? colors.white : colors.ink }}>
+                    {tab}
+                  </Text>
+                  {count !== null && (
+                    <View style={{
+                      paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6,
+                      backgroundColor: active ? colors.lime : colors.soft,
+                      minWidth: 18, alignItems: 'center',
+                    }}>
+                      <Text style={{ fontSize: 10, fontWeight: '900', color: colors.ink }}>{count}</Text>
+                    </View>
+                  )}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
 
-          {activeTab === 'Seller mode' && (
-            <View className="px-4 pt-2">
-              <Text className="text-[18px] font-bold text-gray-900 mb-4">Handle your shop</Text>
-              <View className="rounded-2xl border border-gray-100 overflow-hidden shadow-sm bg-white">
-                {SELLER_MODE_ITEMS.map((item, i) => (
+        {/* Tab content */}
+        <View style={{ marginTop: 18 }}>
+          {activeTab === 'Selling' && (
+            <ListingsGrid
+              listings={selling}
+              loading={loadingSelling}
+              columns={columns}
+              cardW={cardW}
+              emptyTitle={'Your shop is\nempty.'}
+              emptyDescription="Tap Upload to list your first item — it takes under a minute."
+              emptyCta={{ label: 'Upload an item', onPress: () => router.push('/(tabs)/upload') }}
+            />
+          )}
+          {activeTab === 'Liked' && (
+            <ListingsGrid
+              listings={liked}
+              loading={loadingLiked}
+              columns={columns}
+              cardW={cardW}
+              emptyTitle={'Nothing\nliked yet.'}
+              emptyDescription="Tap the heart on items you love — they'll all live here."
+            />
+          )}
+          {activeTab === 'Shop' && (
+            <View style={{ paddingHorizontal: 20 }}>
+              <View style={{ backgroundColor: colors.white, borderRadius: radii['2xl'], borderWidth: 1, borderColor: colors.hair, overflow: 'hidden' }}>
+                {SHOP_ITEMS.map((item, i) => (
                   <Pressable
-                    key={i}
-                    className={`flex-row items-center px-5 py-5 ${
-                      i < SELLER_MODE_ITEMS.length - 1 ? 'border-b border-gray-100' : ''
-                    }`}
+                    key={item.title}
+                    onPress={() => router.push('/settings' as any)}
+                    style={({ pressed }) => ({
+                      flexDirection: 'row', alignItems: 'center',
+                      paddingHorizontal: 16, paddingVertical: 14,
+                      borderBottomWidth: i < SHOP_ITEMS.length - 1 ? 1 : 0,
+                      borderBottomColor: colors.hair,
+                      opacity: pressed ? 0.6 : 1,
+                    })}
                   >
-                    <View className="flex-1">
-                      <View className="flex-row items-center">
-                        <Text className="text-[16px] font-normal text-gray-900">{item.title}</Text>
+                    <View style={{
+                      width: 36, height: 36, borderRadius: radii.md,
+                      backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center', marginRight: 14,
+                    }}>
+                      <Feather name={item.icon} size={16} color={colors.ink} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: colors.ink }}>{item.title}</Text>
                         {item.badge && (
-                          <Text className="ml-2 text-sm text-[#ef4444] font-normal">{item.badge}</Text>
+                          <View style={{
+                            marginLeft: 8, paddingHorizontal: 6, paddingVertical: 1,
+                            borderRadius: 999, backgroundColor: colors.soft,
+                          }}>
+                            <Text style={{ fontSize: 10, fontWeight: '800', color: colors.mute, letterSpacing: 0.4 }}>
+                              {item.badge.toUpperCase()}
+                            </Text>
+                          </View>
                         )}
                       </View>
-                      <Text className="text-sm text-gray-500 mt-1 leading-5">{item.subtitle}</Text>
+                      <Text style={{ fontSize: 12, color: colors.mute, marginTop: 2 }} numberOfLines={2}>{item.subtitle}</Text>
                     </View>
-                    <Feather name="chevron-right" size={24} color="#6b7280" />
+                    <Feather name="chevron-right" size={16} color={colors.mute} />
                   </Pressable>
                 ))}
               </View>
             </View>
           )}
-
-          {activeTab === 'Liked' && (
-            loadingLiked ? (
-              <View className="px-4 py-12 items-center">
-                <ActivityIndicator color="#6C47FF" />
-              </View>
-            ) : liked.length === 0 ? (
-              <View className="px-4 py-12">
-                <Text className="text-4xl font-black tracking-tight text-gray-900">Appears empty{'\n'}here...</Text>
-              </View>
-            ) : (
-              <View className="flex-row flex-wrap px-3 justify-between">
-                {liked.map((item) => (
-                  <View key={item.id} style={{ width: '48%', marginBottom: 12 }}>
-                    <ListingCard listing={item} />
-                  </View>
-                ))}
-              </View>
-            )
-          )}
-
           {activeTab === 'Collections' && (
-            <View className="px-4 py-8">
-              <View className="items-center mb-10">
-                <Text style={{ fontSize: 24, color: '#c4b5fd', marginBottom: -10, alignSelf: 'center', opacity: 0.5 }}>✦</Text>
-                <View style={{ position: 'relative', alignItems: 'center', marginTop: 10 }}>
-                  <Text style={{ fontSize: 24, color: '#c4b5fd', position: 'absolute', right: -30, top: 10, opacity: 0.5 }}>✦</Text>
-                  <View style={{ width: 180, height: 140, borderTopWidth: 6, borderLeftWidth: 6, borderRightWidth: 6, borderColor: '#6366f1', borderRadius: 12, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
-                    <View style={{ position: 'absolute', bottom: -6, left: -15, width: 30, height: 6, backgroundColor: '#6366f1', transform: [{ rotate: '-30deg' }] }} />
-                    <View style={{ position: 'absolute', bottom: -6, right: -15, width: 30, height: 6, backgroundColor: '#6366f1', transform: [{ rotate: '30deg' }] }} />
-                    <Feather name="triangle" size={40} color="#6366f1" style={{ position: 'absolute', top: 10, left: 50, transform: [{ scaleY: -1 }, { rotate: '20deg' }], borderWidth: 3, borderColor: '#6366f1', borderRadius: 2 }} />
-                  </View>
-                  <View style={{
-                    position: 'absolute',
-                    bottom: -20,
-                    width: 140,
-                    height: 40,
-                    backgroundColor: '#ddd6fe',
-                    borderRadius: 70,
-                    transform: [{ scaleY: 0.5 }],
-                    zIndex: -1,
-                  }} />
-                </View>
-              </View>
-              <Text className="text-4xl font-black tracking-tight text-gray-900 mt-8">Appears empty{'\n'}here...</Text>
-            </View>
+            <EmptyState
+              title={'No collections\nyet.'}
+              description="Group your favorite items into themed boards. Coming soon."
+              icon="grid"
+            />
           )}
         </View>
-
-        <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function Stat({ value, label }: { value: string; label: string }) {
+  return (
+    <View style={{ flex: 1, alignItems: 'center' }}>
+      <Text style={{ fontSize: 18, fontWeight: '900', color: colors.white, letterSpacing: -0.3 }}>{value}</Text>
+      <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginTop: 3, letterSpacing: 0.6, textTransform: 'uppercase', fontWeight: '700' }}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function ListingsGrid({
+  listings,
+  loading,
+  columns,
+  cardW,
+  emptyTitle,
+  emptyDescription,
+  emptyCta,
+}: {
+  listings: Listing[];
+  loading: boolean;
+  columns: number;
+  cardW: number;
+  emptyTitle: string;
+  emptyDescription: string;
+  emptyCta?: { label: string; onPress: () => void };
+}) {
+  if (loading) {
+    return (
+      <View style={{ paddingHorizontal: HORIZONTAL_PAD, flexDirection: 'row', gap: GRID_GAP }}>
+        {Array.from({ length: columns }).map((_, i) => (
+          <SkeletonTile key={i} width={cardW} />
+        ))}
+      </View>
+    );
+  }
+
+  if (listings.length === 0) {
+    return <EmptyState title={emptyTitle} description={emptyDescription} cta={emptyCta} />;
+  }
+
+  // Group into rows of `columns` so we get equal gaps + clean alignment.
+  const rows: Listing[][] = [];
+  for (let i = 0; i < listings.length; i += columns) {
+    rows.push(listings.slice(i, i + columns));
+  }
+
+  return (
+    <View style={{ paddingHorizontal: HORIZONTAL_PAD, gap: GRID_GAP }}>
+      {rows.map((row, ri) => (
+        <View key={ri} style={{ flexDirection: 'row', gap: GRID_GAP }}>
+          {row.map((listing, ci) => (
+            <GridCard key={listing.id} index={ri * columns + ci} width={cardW}>
+              <ListingCard listing={listing} />
+            </GridCard>
+          ))}
+          {/* Pad incomplete trailing row so cards don't stretch */}
+          {row.length < columns &&
+            Array.from({ length: columns - row.length }).map((_, i) => (
+              <View key={`pad-${i}`} style={{ width: cardW }} />
+            ))}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function GridCard({ index, width, children }: { index: number; width: number; children: React.ReactNode }) {
+  const style = useStaggeredEntrance(index, { delayStep: 28, offsetY: 6 });
+  return (
+    <Animated.View style={[{ width }, style]}>{children}</Animated.View>
+  );
+}
+
+function SkeletonTile({ width }: { width: number }) {
+  return (
+    <View style={{ width }}>
+      <View style={{
+        width: '100%', aspectRatio: 1 / 1.33, borderRadius: radii.sm,
+        backgroundColor: colors.divider,
+      }} />
+      <View style={{ height: 12, borderRadius: 4, backgroundColor: colors.divider, marginTop: 8, width: '80%' }} />
+      <View style={{ height: 12, borderRadius: 4, backgroundColor: colors.divider, marginTop: 4, width: '40%' }} />
+    </View>
+  );
+}
+
+function EmptyState({
+  title,
+  description,
+  icon = 'package',
+  cta,
+}: {
+  title: string;
+  description: string;
+  icon?: keyof typeof Feather.glyphMap;
+  cta?: { label: string; onPress: () => void };
+}) {
+  return (
+    <View style={{ paddingHorizontal: 20, paddingTop: 24 }}>
+      <View style={{
+        width: 56, height: 56, borderRadius: 28, backgroundColor: colors.white,
+        borderWidth: 1, borderColor: colors.hair,
+        alignItems: 'center', justifyContent: 'center', marginBottom: 14,
+      }}>
+        <Feather name={icon} size={22} color={colors.ink} />
+      </View>
+      <Text style={{ fontSize: 32, fontWeight: '900', color: colors.ink, lineHeight: 34, letterSpacing: -1 }}>
+        {title}
+      </Text>
+      <Text style={{ fontSize: 13, color: colors.mute, marginTop: 10, lineHeight: 19, maxWidth: 280 }}>
+        {description}
+      </Text>
+      {cta && (
+        <Pressable
+          onPress={cta.onPress}
+          style={({ pressed }) => ({
+            marginTop: 18, alignSelf: 'flex-start',
+            backgroundColor: colors.ink, borderRadius: radii.xl,
+            paddingHorizontal: 18, paddingVertical: 12,
+            flexDirection: 'row', alignItems: 'center', gap: 6,
+            opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.98 : 1 }],
+          })}
+        >
+          <Feather name="plus" size={14} color={colors.lime} />
+          <Text style={{ fontSize: 13, fontWeight: '800', color: colors.white }}>{cta.label}</Text>
+        </Pressable>
+      )}
+    </View>
   );
 }
 
