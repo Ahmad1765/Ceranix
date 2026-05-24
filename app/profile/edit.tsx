@@ -23,11 +23,11 @@ import { uploadAvatar, type LocalImage } from '@/lib/upload';
 import { useToast } from '@/lib/toast';
 
 const PURPLE = '#6C47FF';
-const LIME = '#d8f53a';
+const LIME = '#6C47FF';
 const INK = '#0a0a0a';
 const MUTE = '#6b7280';
-const SOFT = '#f5f4ef';
-const HAIR = '#e8e6e0';
+const SOFT = '#ffffff';
+const HAIR = '#efefef';
 const RED = '#ef4444';
 
 const LIMITS = {

@@ -29,11 +29,9 @@ import {
 } from '@/lib/chat';
 import { getOptimizedImageUrl } from '@/lib/images';
 import { useToast } from '@/lib/toast';
-
-const BRAND_PURPLE = '#6C47FF';
-const BRAND_PURPLE_SOFT = '#f1edff';
-const BRAND_INK = '#0a0a0a';
-const BRAND_LIME = '#d8f53a';
+import { colors, radii } from '@/lib/theme';
+import { Button, EmptyState } from '@/components/ui';
+import { HIT_SLOP_8 } from '@/lib/responsive';
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -56,14 +54,13 @@ function MessageBubble({
     const amount = msg.metadata?.amount ?? 0;
     const status = msg.offer_status ?? 'pending';
     const canRespond = !mine && isSeller && status === 'pending';
+
     return (
       <View style={{ paddingHorizontal: 14, marginBottom: 12, alignItems: mine ? 'flex-end' : 'flex-start' }}>
         <View
           style={{
             maxWidth: '85%',
-            backgroundColor: mine ? BRAND_PURPLE : '#fafafa',
-            borderWidth: mine ? 0 : 1,
-            borderColor: '#eee',
+            backgroundColor: mine ? colors.purple : colors.purpleSoft,
             borderRadius: 18,
             padding: 14,
           }}
@@ -74,23 +71,44 @@ function MessageBubble({
                 width: 22,
                 height: 22,
                 borderRadius: 11,
-                backgroundColor: mine ? 'rgba(255,255,255,0.18)' : BRAND_PURPLE_SOFT,
+                backgroundColor: mine ? 'rgba(255,255,255,0.22)' : 'white',
                 alignItems: 'center',
                 justifyContent: 'center',
                 marginRight: 6,
               }}
             >
-              <Feather name="tag" size={11} color={mine ? 'white' : BRAND_PURPLE} />
+              <Feather name="tag" size={11} color={mine ? 'white' : colors.purple} />
             </View>
-            <Text style={{ fontSize: 11, fontWeight: '800', letterSpacing: 1.2, color: mine ? 'rgba(255,255,255,0.85)' : BRAND_PURPLE, textTransform: 'uppercase' }}>
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: '800',
+                letterSpacing: 1,
+                color: mine ? 'rgba(255,255,255,0.9)' : colors.purple,
+                textTransform: 'uppercase',
+              }}
+            >
               {mine ? 'You offered' : 'Offer'}
             </Text>
           </View>
-          <Text style={{ fontSize: 28, fontWeight: '900', color: mine ? 'white' : BRAND_INK, letterSpacing: -0.8 }}>
+          <Text
+            style={{
+              fontSize: 28,
+              fontWeight: '900',
+              color: mine ? 'white' : colors.ink,
+              letterSpacing: -0.8,
+            }}
+          >
             ${amount}
           </Text>
           {msg.metadata?.note ? (
-            <Text style={{ fontSize: 13, color: mine ? 'rgba(255,255,255,0.85)' : '#374151', marginTop: 6 }}>
+            <Text
+              style={{
+                fontSize: 13,
+                color: mine ? 'rgba(255,255,255,0.9)' : colors.ink,
+                marginTop: 6,
+              }}
+            >
               {msg.metadata.note}
             </Text>
           ) : null}
@@ -100,29 +118,29 @@ function MessageBubble({
               style={{
                 marginTop: 10,
                 alignSelf: 'flex-start',
-                paddingHorizontal: 10,
-                paddingVertical: 4,
+                paddingHorizontal: 9,
+                paddingVertical: 3,
                 borderRadius: 999,
                 backgroundColor:
                   status === 'accepted'
                     ? 'rgba(34,197,94,0.18)'
                     : status === 'declined'
-                    ? 'rgba(239,68,68,0.18)'
-                    : 'rgba(255,255,255,0.18)',
+                      ? 'rgba(239,68,68,0.18)'
+                      : 'rgba(255,255,255,0.18)',
               }}
             >
               <Text
                 style={{
-                  fontSize: 11,
+                  fontSize: 10.5,
                   fontWeight: '800',
-                  letterSpacing: 0.4,
+                  letterSpacing: 0.6,
                   color: mine
                     ? 'white'
                     : status === 'accepted'
-                    ? '#15803d'
-                    : status === 'declined'
-                    ? '#b91c1c'
-                    : '#6b7280',
+                      ? '#15803d'
+                      : status === 'declined'
+                        ? '#b91c1c'
+                        : colors.mute,
                   textTransform: 'uppercase',
                 }}
               >
@@ -138,38 +156,44 @@ function MessageBubble({
                 style={({ pressed }) => ({
                   flex: 1,
                   height: 38,
-                  borderRadius: 10,
+                  borderRadius: 999,
                   borderWidth: 1,
-                  borderColor: '#e5e7eb',
+                  borderColor: colors.hairline,
                   alignItems: 'center',
                   justifyContent: 'center',
                   backgroundColor: 'white',
-                  opacity: pressed ? 0.7 : 1,
+                  opacity: pressed ? 0.75 : 1,
                 })}
               >
-                <Text style={{ fontSize: 13, fontWeight: '700', color: BRAND_INK }}>Decline</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.ink }}>Decline</Text>
               </Pressable>
               <Pressable
                 onPress={onAccept}
                 style={({ pressed }) => ({
                   flex: 1,
                   height: 38,
-                  borderRadius: 10,
-                  backgroundColor: BRAND_INK,
+                  borderRadius: 999,
+                  backgroundColor: colors.ink,
                   alignItems: 'center',
                   justifyContent: 'center',
                   opacity: pressed ? 0.85 : 1,
                   flexDirection: 'row',
-                  gap: 4,
+                  gap: 5,
                 })}
               >
-                <Feather name="check" size={14} color={BRAND_LIME} />
+                <Feather name="check" size={14} color="white" />
                 <Text style={{ fontSize: 13, fontWeight: '800', color: 'white' }}>Accept</Text>
               </Pressable>
             </View>
           )}
 
-          <Text style={{ fontSize: 10, color: mine ? 'rgba(255,255,255,0.6)' : '#9ca3af', marginTop: 8 }}>
+          <Text
+            style={{
+              fontSize: 10,
+              color: mine ? 'rgba(255,255,255,0.6)' : colors.muteSoft,
+              marginTop: 8,
+            }}
+          >
             {formatTime(msg.created_at)}
           </Text>
         </View>
@@ -178,22 +202,36 @@ function MessageBubble({
   }
 
   return (
-    <View style={{ flexDirection: 'row', marginBottom: 8, paddingHorizontal: 14, justifyContent: mine ? 'flex-end' : 'flex-start' }}>
+    <View
+      style={{
+        flexDirection: 'row',
+        marginBottom: 6,
+        paddingHorizontal: 14,
+        justifyContent: mine ? 'flex-end' : 'flex-start',
+      }}
+    >
       <View
         style={{
-          maxWidth: '80%',
+          maxWidth: '78%',
           paddingHorizontal: 14,
           paddingVertical: 9,
           borderRadius: 18,
-          borderTopRightRadius: mine ? 4 : 18,
-          borderTopLeftRadius: mine ? 18 : 4,
-          backgroundColor: mine ? BRAND_INK : '#f4f4f5',
+          borderTopRightRadius: mine ? 6 : 18,
+          borderTopLeftRadius: mine ? 18 : 6,
+          backgroundColor: mine ? colors.purple : colors.panel,
         }}
       >
-        <Text style={{ fontSize: 15, lineHeight: 20, color: mine ? 'white' : BRAND_INK }}>
+        <Text style={{ fontSize: 15, lineHeight: 20, color: mine ? 'white' : colors.ink }}>
           {msg.content}
         </Text>
-        <Text style={{ fontSize: 10, marginTop: 4, color: mine ? 'rgba(255,255,255,0.55)' : '#9ca3af' }}>
+        <Text
+          style={{
+            fontSize: 10,
+            marginTop: 3,
+            color: mine ? 'rgba(255,255,255,0.6)' : colors.muteSoft,
+            textAlign: mine ? 'right' : 'left',
+          }}
+        >
           {formatTime(msg.created_at)}
         </Text>
       </View>
@@ -245,14 +283,35 @@ function OfferSheet({
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }}>
+      <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }}>
         <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <Pressable onPress={() => {}} style={{ backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 28 }}>
-            <View style={{ alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: '#e5e7eb', marginBottom: 14 }} />
-            <Text style={{ fontSize: 20, fontWeight: '900', color: BRAND_INK, letterSpacing: -0.3 }}>Make an offer</Text>
+          <Pressable
+            onPress={() => {}}
+            style={{
+              backgroundColor: 'white',
+              borderTopLeftRadius: 28,
+              borderTopRightRadius: 28,
+              paddingHorizontal: 20,
+              paddingTop: 12,
+              paddingBottom: 28,
+            }}
+          >
+            <View
+              style={{
+                alignSelf: 'center',
+                width: 44,
+                height: 5,
+                borderRadius: 3,
+                backgroundColor: colors.hairline,
+                marginBottom: 16,
+              }}
+            />
+            <Text style={{ fontSize: 20, fontWeight: '800', color: colors.ink, letterSpacing: -0.3 }}>
+              Make an offer
+            </Text>
             {listingPrice && (
-              <Text style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>
-                Listed at <Text style={{ fontWeight: '700', color: BRAND_INK }}>${listingPrice}</Text>
+              <Text style={{ fontSize: 13, color: colors.mute, marginTop: 4 }}>
+                Listed at <Text style={{ fontWeight: '700', color: colors.ink }}>${listingPrice}</Text>
               </Text>
             )}
 
@@ -261,53 +320,61 @@ function OfferSheet({
                 marginTop: 18,
                 paddingHorizontal: 16,
                 paddingVertical: 14,
-                backgroundColor: '#fafafa',
+                backgroundColor: colors.purpleSoft,
                 borderRadius: 16,
-                borderWidth: 1,
-                borderColor: '#eee',
                 flexDirection: 'row',
                 alignItems: 'center',
               }}
             >
-              <Text style={{ fontSize: 28, fontWeight: '900', color: BRAND_INK, marginRight: 6 }}>$</Text>
+              <Text style={{ fontSize: 28, fontWeight: '900', color: colors.purple, marginRight: 6 }}>$</Text>
               <TextInput
                 placeholder="0"
                 value={amount}
                 onChangeText={(t) => setAmount(t.replace(/[^0-9]/g, ''))}
                 keyboardType="number-pad"
-                style={{ fontSize: 28, fontWeight: '900', color: BRAND_INK, flex: 1, padding: 0 }}
-                placeholderTextColor="#d1d5db"
+                style={{ fontSize: 28, fontWeight: '900', color: colors.ink, flex: 1, padding: 0 }}
+                placeholderTextColor="#c9b8ff"
                 autoFocus
               />
             </View>
 
             {suggestions.length > 0 && (
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-                {suggestions.map((v) => (
-                  <Pressable
-                    key={v}
-                    onPress={() => setAmount(String(v))}
-                    style={({ pressed }) => ({
-                      flex: 1,
-                      paddingVertical: 10,
-                      borderRadius: 999,
-                      borderWidth: 1,
-                      borderColor: parsed === v ? BRAND_INK : '#e5e7eb',
-                      backgroundColor: parsed === v ? BRAND_INK : 'white',
-                      alignItems: 'center',
-                      opacity: pressed ? 0.7 : 1,
-                    })}
-                  >
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: parsed === v ? 'white' : BRAND_INK }}>
-                      ${v}
-                    </Text>
-                  </Pressable>
-                ))}
+                {suggestions.map((v) => {
+                  const selected = parsed === v;
+                  return (
+                    <Pressable
+                      key={v}
+                      onPress={() => setAmount(String(v))}
+                      style={({ pressed }) => ({
+                        flex: 1,
+                        paddingVertical: 10,
+                        borderRadius: 999,
+                        backgroundColor: selected ? colors.ink : colors.panel,
+                        alignItems: 'center',
+                        opacity: pressed ? 0.75 : 1,
+                      })}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: selected ? 'white' : colors.ink }}>
+                        ${v}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
             )}
 
-            <Text style={{ fontSize: 12, fontWeight: '700', color: '#6b7280', marginTop: 18, marginBottom: 6, letterSpacing: 0.4, textTransform: 'uppercase' }}>
-              Note (optional)
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: '800',
+                color: colors.mute,
+                marginTop: 18,
+                marginBottom: 6,
+                letterSpacing: 0.6,
+              }}
+            >
+              NOTE (OPTIONAL)
             </Text>
             <TextInput
               placeholder="Add a quick note to the seller"
@@ -316,40 +383,28 @@ function OfferSheet({
               multiline
               style={{
                 fontSize: 14,
-                color: BRAND_INK,
-                backgroundColor: '#fafafa',
-                borderWidth: 1,
-                borderColor: '#eee',
+                color: colors.ink,
+                backgroundColor: colors.panel,
                 borderRadius: 14,
                 paddingHorizontal: 14,
                 paddingVertical: 12,
                 minHeight: 60,
                 textAlignVertical: 'top',
               }}
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={colors.muteSoft}
             />
 
-            <Pressable
-              onPress={handleSubmit}
-              disabled={!valid || sending}
-              style={({ pressed }) => ({
-                marginTop: 18,
-                height: 52,
-                borderRadius: 14,
-                backgroundColor: valid ? BRAND_INK : '#e5e7eb',
-                alignItems: 'center',
-                justifyContent: 'center',
-                opacity: pressed ? 0.85 : 1,
-              })}
-            >
-              {sending ? (
-                <ActivityIndicator color="white" />
-              ) : (
-                <Text style={{ fontSize: 15, fontWeight: '800', color: valid ? 'white' : '#9ca3af', letterSpacing: 0.2 }}>
-                  Send offer
-                </Text>
-              )}
-            </Pressable>
+            <View style={{ marginTop: 18 }}>
+              <Button
+                label={sending ? 'Sending…' : 'Send offer'}
+                variant="primary"
+                size="lg"
+                full
+                disabled={!valid || sending}
+                loading={sending}
+                onPress={handleSubmit}
+              />
+            </View>
           </Pressable>
         </View>
       </Pressable>
@@ -374,8 +429,8 @@ export default function ConversationScreen() {
   useEffect(() => {
     if (!conversationId) return;
     let cancelled = false;
+    setLoading(true);
     (async () => {
-      setLoading(true);
       const [c, m] = await Promise.all([
         getConversation(conversationId),
         fetchMessages(conversationId),
@@ -420,7 +475,6 @@ export default function ConversationScreen() {
     const text = input.trim();
     if (!text) return;
     setSending(true);
-    // Optimistic insert
     const temp: ChatMessage = {
       id: `temp-${Date.now()}`,
       conversation_id: conversationId,
@@ -449,9 +503,7 @@ export default function ConversationScreen() {
       if (!user || !conversationId) return;
       const saved = await sendOffer({ conversationId, senderId: user.id, amount, note });
       if (saved) {
-        setMessages((prev) =>
-          prev.some((m) => m.id === saved.id) ? prev : [...prev, saved],
-        );
+        setMessages((prev) => (prev.some((m) => m.id === saved.id) ? prev : [...prev, saved]));
         setOfferVisible(false);
         toast.show('Offer sent', { variant: 'success', icon: 'check' });
       } else {
@@ -464,17 +516,13 @@ export default function ConversationScreen() {
   const handleOfferResponse = useCallback(
     async (msg: ChatMessage, status: 'accepted' | 'declined') => {
       const prev = msg.offer_status ?? 'pending';
-      setMessages((m) =>
-        m.map((x) => (x.id === msg.id ? { ...x, offer_status: status } : x)),
-      );
+      setMessages((m) => m.map((x) => (x.id === msg.id ? { ...x, offer_status: status } : x)));
       const ok = await updateOfferStatus(msg.id, status);
       if (!ok) {
-        setMessages((m) =>
-          m.map((x) => (x.id === msg.id ? { ...x, offer_status: prev } : x)),
-        );
+        setMessages((m) => m.map((x) => (x.id === msg.id ? { ...x, offer_status: prev } : x)));
         Alert.alert('Could not update offer', 'Please try again.');
       } else {
-        toast.show(status === 'accepted' ? 'Offer accepted 🎉' : 'Offer declined', {
+        toast.show(status === 'accepted' ? 'Offer accepted' : 'Offer declined', {
           variant: status === 'accepted' ? 'success' : 'info',
         });
       }
@@ -497,8 +545,11 @@ export default function ConversationScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: 'white', alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={BRAND_PURPLE} />
+      <SafeAreaView
+        edges={['top']}
+        style={{ flex: 1, backgroundColor: 'white', alignItems: 'center', justifyContent: 'center' }}
+      >
+        <ActivityIndicator color={colors.purple} />
       </SafeAreaView>
     );
   }
@@ -508,15 +559,10 @@ export default function ConversationScreen() {
       <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: 'white' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', padding: 14 }}>
           <Pressable onPress={() => router.back()}>
-            <Feather name="chevron-left" size={26} color="black" />
+            <Feather name="chevron-left" size={26} color={colors.ink} />
           </Pressable>
         </View>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30 }}>
-          <Text style={{ fontSize: 17, fontWeight: '700', color: BRAND_INK }}>Conversation unavailable</Text>
-          <Text style={{ fontSize: 13, color: '#6b7280', marginTop: 6, textAlign: 'center' }}>
-            This thread may have been removed or you might not have access.
-          </Text>
-        </View>
+        <EmptyState icon="alert-circle" title="Conversation unavailable" description="This thread may have been removed." />
       </SafeAreaView>
     );
   }
@@ -525,79 +571,126 @@ export default function ConversationScreen() {
   const listingThumb = conv.listing?.images?.[0]
     ? getOptimizedImageUrl(conv.listing.images[0], { width: 200 })
     : null;
+  const otherInitial = (other?.full_name || other?.username || 'U').trim().charAt(0).toUpperCase();
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: 'white' }}>
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
       {/* Header */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f1f1f1' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-          <Pressable onPress={() => router.back()} style={{ marginRight: 8, padding: 4 }}>
-            <Feather name="chevron-left" size={26} color="black" />
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: 12,
+          paddingTop: 6,
+          paddingBottom: 10,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.hairline,
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0 }}>
+          <Pressable
+            onPress={() => router.back()}
+            hitSlop={HIT_SLOP_8}
+            style={({ pressed }) => ({
+              width: 36,
+              height: 36,
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: pressed ? 0.6 : 1,
+            })}
+          >
+            <Feather name="chevron-left" size={24} color={colors.ink} />
           </Pressable>
           <View
             style={{
               width: 38,
               height: 38,
               borderRadius: 19,
-              backgroundColor: '#f3f4f6',
+              backgroundColor: colors.purpleSoft,
               overflow: 'hidden',
+              alignItems: 'center',
+              justifyContent: 'center',
               marginRight: 10,
+              marginLeft: 2,
             }}
           >
             {otherAvatar ? (
               <Image source={{ uri: otherAvatar }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
             ) : (
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                <Feather name="user" size={18} color="#9ca3af" />
-              </View>
+              <Text style={{ fontSize: 15, fontWeight: '800', color: colors.purple }}>{otherInitial}</Text>
             )}
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 15, fontWeight: '800', color: BRAND_INK }} numberOfLines={1}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={{ fontSize: 15, fontWeight: '800', color: colors.ink }} numberOfLines={1}>
               {other?.full_name || other?.username || 'User'}
             </Text>
             {other?.username && (
-              <Text style={{ fontSize: 11, color: '#6b7280' }} numberOfLines={1}>
+              <Text style={{ fontSize: 11, color: colors.mute }} numberOfLines={1}>
                 @{other.username}
               </Text>
             )}
           </View>
         </View>
         {other?.id && (
-          <Pressable onPress={() => router.push(`/user/${other.id}` as any)} hitSlop={8} style={{ padding: 6 }}>
-            <Feather name="info" size={20} color={BRAND_INK} />
+          <Pressable
+            onPress={() => router.push(`/user/${other.id}` as any)}
+            hitSlop={HIT_SLOP_8}
+            style={({ pressed }) => ({
+              width: 38,
+              height: 38,
+              borderRadius: 19,
+              backgroundColor: colors.panel,
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: pressed ? 0.7 : 1,
+            })}
+          >
+            <Feather name="user" size={16} color={colors.ink} />
           </Pressable>
         )}
       </View>
 
-      {/* Product context */}
+      {/* Product ticket */}
       {conv.listing && (
         <Pressable
           onPress={() => conv.listing_id && router.push(`/product/${conv.listing_id}` as any)}
           style={({ pressed }) => ({
+            marginHorizontal: 12,
+            marginTop: 10,
+            marginBottom: 6,
             flexDirection: 'row',
             alignItems: 'center',
-            paddingHorizontal: 14,
-            paddingVertical: 10,
-            backgroundColor: pressed ? '#f3f0ff' : '#fafafa',
-            borderBottomWidth: 1,
-            borderBottomColor: '#f1f1f1',
+            paddingHorizontal: 10,
+            paddingVertical: 8,
+            borderRadius: radii.xl,
+            backgroundColor: pressed ? colors.purpleSoft : colors.panel,
           })}
         >
-          <View style={{ width: 44, height: 44, borderRadius: 10, overflow: 'hidden', backgroundColor: '#eee', marginRight: 12 }}>
+          <View
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 10,
+              overflow: 'hidden',
+              backgroundColor: colors.divider,
+              marginRight: 12,
+            }}
+          >
             {listingThumb && (
               <Image source={{ uri: listingThumb }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
             )}
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: BRAND_INK }} numberOfLines={1}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={{ fontSize: 13.5, fontWeight: '700', color: colors.ink }} numberOfLines={1}>
               {conv.listing.title}
             </Text>
-            <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-              ${conv.listing.price}{conv.listing.is_sold ? ' · Sold' : ''}
+            <Text style={{ fontSize: 13, fontWeight: '800', color: colors.purple, marginTop: 2 }}>
+              ${conv.listing.price}
+              {conv.listing.is_sold ? ' · Sold' : ''}
             </Text>
           </View>
-          <Feather name="chevron-right" size={18} color="#9ca3af" />
+          <Feather name="chevron-right" size={18} color={colors.muteSoft} />
         </Pressable>
       )}
 
@@ -606,30 +699,14 @@ export default function ConversationScreen() {
         data={messages}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
-        contentContainerStyle={{ paddingTop: 14, paddingBottom: 14 }}
+        contentContainerStyle={{ paddingTop: 10, paddingBottom: 14 }}
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
         ListEmptyComponent={
-          <View style={{ alignItems: 'center', paddingHorizontal: 40, paddingTop: 60 }}>
-            <View
-              style={{
-                width: 56,
-                height: 56,
-                borderRadius: 28,
-                backgroundColor: BRAND_PURPLE_SOFT,
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: 10,
-              }}
-            >
-              <Feather name="message-circle" size={22} color={BRAND_PURPLE} />
-            </View>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: BRAND_INK, textAlign: 'center' }}>
-              Say hi — start the conversation
-            </Text>
-            <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 4, textAlign: 'center' }}>
-              Ask a question, request more photos, or send an offer.
-            </Text>
-          </View>
+          <EmptyState
+            icon="message-circle"
+            title="Say hi"
+            description="Start the conversation — ask a question or send an offer."
+          />
         }
       />
 
@@ -637,8 +714,18 @@ export default function ConversationScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#f1f1f1', backgroundColor: 'white', gap: 8 }}>
-          {/* Offer trigger — only buyer can send an offer */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'flex-end',
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+            borderTopWidth: 1,
+            borderTopColor: colors.hairline,
+            backgroundColor: 'white',
+            gap: 8,
+          }}
+        >
           {!isSeller && (
             <Pressable
               onPress={() => setOfferVisible(true)}
@@ -646,15 +733,15 @@ export default function ConversationScreen() {
                 height: 40,
                 paddingHorizontal: 12,
                 borderRadius: 999,
-                backgroundColor: BRAND_PURPLE_SOFT,
+                backgroundColor: colors.purpleSoft,
                 flexDirection: 'row',
                 alignItems: 'center',
-                gap: 4,
-                opacity: pressed ? 0.7 : 1,
+                gap: 5,
+                opacity: pressed ? 0.75 : 1,
               })}
             >
-              <Feather name="tag" size={14} color={BRAND_PURPLE} />
-              <Text style={{ fontSize: 12, fontWeight: '700', color: BRAND_PURPLE }}>Offer</Text>
+              <Feather name="tag" size={14} color={colors.purple} />
+              <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.purple }}>Offer</Text>
             </Pressable>
           )}
           <View
@@ -662,7 +749,7 @@ export default function ConversationScreen() {
               flex: 1,
               minHeight: 40,
               maxHeight: 120,
-              backgroundColor: '#f4f4f5',
+              backgroundColor: colors.panel,
               borderRadius: 20,
               paddingHorizontal: 14,
               paddingVertical: 8,
@@ -671,11 +758,11 @@ export default function ConversationScreen() {
           >
             <TextInput
               placeholder="Write a message..."
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={colors.muteSoft}
               value={input}
               onChangeText={setInput}
               multiline
-              style={{ fontSize: 15, color: BRAND_INK, padding: 0, maxHeight: 100 }}
+              style={{ fontSize: 15, color: colors.ink, padding: 0, maxHeight: 100 }}
             />
           </View>
           <Pressable
@@ -687,14 +774,14 @@ export default function ConversationScreen() {
               borderRadius: 20,
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: input.trim() ? BRAND_INK : '#e5e7eb',
+              backgroundColor: input.trim() ? colors.purple : colors.panel,
               opacity: pressed ? 0.85 : 1,
             })}
           >
             {sending ? (
-              <ActivityIndicator size="small" color={input.trim() ? 'white' : '#9ca3af'} />
+              <ActivityIndicator size="small" color={input.trim() ? 'white' : colors.muteSoft} />
             ) : (
-              <Ionicons name="arrow-up" size={20} color={input.trim() ? 'white' : '#9ca3af'} />
+              <Ionicons name="arrow-up" size={20} color={input.trim() ? 'white' : colors.muteSoft} />
             )}
           </Pressable>
         </View>

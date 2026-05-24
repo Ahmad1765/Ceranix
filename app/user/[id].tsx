@@ -17,13 +17,15 @@ import { fetchUserListings } from '@/lib/listings';
 import { getOptimizedImageUrl } from '@/lib/images';
 import { useAuth } from '@/lib/auth';
 import { ListingCard } from '@/components/ListingCard';
-import { colors, radii, shadow, eyebrow } from '@/lib/theme';
+import { colors, radii } from '@/lib/theme';
 import { useGridDimensions, HIT_SLOP_8 } from '@/lib/responsive';
 import { useFadeIn, useStaggeredEntrance } from '@/lib/motion';
 import type { User as Profile, Listing } from '@/types';
+import { Button, EmptyState, SectionHeader } from '@/components/ui';
 
-const HORIZONTAL_PAD = 16;
-const GRID_GAP = 10;
+const HORIZONTAL_PAD = 12;
+const GRID_GAP = 8;
+const AVATAR_SIZE = 88;
 
 export default function UserProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -35,78 +37,87 @@ export default function UserProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [followed, setFollowed] = useState(false);
 
-  const heroFade = useFadeIn(0, 320);
+  const fade = useFadeIn(0, 320);
 
   const { columns, cardWidth: cardW } = useGridDimensions({
     min: 2,
     max: 4,
-    thresholds: [420, 768, 1024],
+    thresholds: [560, 900, 1200],
     horizontalPadding: HORIZONTAL_PAD,
     gap: GRID_GAP,
   });
 
-  const load = async () => {
+  useEffect(() => {
     if (!userId) {
       setLoading(false);
       return;
     }
+    let cancelled = false;
+    setLoading(true);
+    Promise.all([
+      supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
+      fetchUserListings(userId),
+    ])
+      .then(([p, l]) => {
+        if (cancelled) return;
+        setProfile((p.data as Profile | null) ?? null);
+        setListings(l);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  const onRefresh = async () => {
+    if (!userId) return;
+    setRefreshing(true);
     const [p, l] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
       fetchUserListings(userId),
     ]);
     setProfile((p.data as Profile | null) ?? null);
     setListings(l);
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    setLoading(true);
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await load();
     setRefreshing(false);
   };
 
   if (loading) {
     return (
-      <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={colors.ink} />
+      <SafeAreaView
+        edges={['top']}
+        style={{ flex: 1, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' }}
+      >
+        <ActivityIndicator color={colors.purple} />
       </SafeAreaView>
     );
   }
 
   if (!profile) {
     return (
-      <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.soft }}>
+      <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
         <View style={{ padding: 14, flexDirection: 'row', alignItems: 'center' }}>
           <Pressable onPress={() => router.back()} hitSlop={HIT_SLOP_8}>
-            <Feather name="arrow-left" size={22} color={colors.ink} />
+            <Feather name="chevron-left" size={26} color={colors.ink} />
           </Pressable>
         </View>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30 }}>
-          <Text style={{ fontSize: 17, fontWeight: '800', color: colors.ink }}>User not found</Text>
-          <Text style={{ fontSize: 13, color: colors.mute, marginTop: 6, textAlign: 'center' }}>
-            This profile may have been removed.
-          </Text>
-        </View>
+        <EmptyState icon="user-x" title="User not found" description="This profile may have been removed." />
       </SafeAreaView>
     );
   }
 
-  const avatar = profile.avatar_url ? getOptimizedImageUrl(profile.avatar_url, { width: 200 }) : null;
+  const avatar = profile.avatar_url ? getOptimizedImageUrl(profile.avatar_url, { width: 240 }) : null;
   const initial = (profile.full_name || profile.username || 'U').trim().charAt(0).toUpperCase();
   const isSelf = authUser?.id === profile.id;
+  const rating = Number(profile.rating ?? 0);
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.soft }}>
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.ink} />}
-        contentContainerStyle={{ paddingBottom: 56 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />}
+        contentContainerStyle={{ paddingBottom: 80 }}
       >
         {/* Top bar */}
         <View
@@ -114,9 +125,9 @@ export default function UserProfileScreen() {
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
-            paddingHorizontal: 20,
-            paddingTop: 8,
-            paddingBottom: 6,
+            paddingHorizontal: 14,
+            paddingTop: 6,
+            paddingBottom: 8,
           }}
         >
           <Pressable
@@ -126,196 +137,145 @@ export default function UserProfileScreen() {
               width: 38,
               height: 38,
               borderRadius: 19,
-              backgroundColor: colors.white,
               alignItems: 'center',
               justifyContent: 'center',
-              borderWidth: 1,
-              borderColor: colors.hair,
-              opacity: pressed ? 0.85 : 1,
+              opacity: pressed ? 0.6 : 1,
             })}
           >
-            <Feather name="arrow-left" size={18} color={colors.ink} />
+            <Feather name="chevron-left" size={24} color={colors.ink} />
           </Pressable>
-          <Text style={eyebrow}>Profile</Text>
-          <View style={{ width: 38 }} />
+          <Text style={{ fontSize: 15, fontWeight: '800', color: colors.ink }} numberOfLines={1}>
+            @{profile.username}
+          </Text>
+          <Pressable
+            hitSlop={HIT_SLOP_8}
+            style={({ pressed }) => ({
+              width: 38,
+              height: 38,
+              borderRadius: 19,
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: pressed ? 0.6 : 1,
+            })}
+          >
+            <Feather name="more-horizontal" size={20} color={colors.ink} />
+          </Pressable>
         </View>
 
-        {/* Identity card */}
-        <Animated.View style={[{ paddingHorizontal: 20, marginTop: 6 }, heroFade]}>
-          <View
-            style={{
-              backgroundColor: colors.ink,
-              borderRadius: radii['3xl'],
-              padding: 18,
-              ...shadow.md,
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        {/* Hero */}
+        <Animated.View style={[{ paddingHorizontal: 16, paddingTop: 4 }, fade]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View
+              style={{
+                width: AVATAR_SIZE,
+                height: AVATAR_SIZE,
+                borderRadius: AVATAR_SIZE / 2,
+                borderWidth: 2,
+                borderColor: colors.purple,
+                padding: 3,
+              }}
+            >
               <View
                 style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: 32,
-                  backgroundColor: colors.lime,
+                  flex: 1,
+                  borderRadius: (AVATAR_SIZE - 10) / 2,
+                  overflow: 'hidden',
+                  backgroundColor: colors.purpleSoft,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  overflow: 'hidden',
-                  marginRight: 14,
                 }}
               >
                 {avatar ? (
-                  <Image source={{ uri: avatar }} style={{ width: 64, height: 64 }} contentFit="cover" />
+                  <Image source={{ uri: avatar }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
                 ) : (
-                  <Text style={{ fontSize: 26, fontWeight: '900', color: colors.ink }}>{initial}</Text>
+                  <Text style={{ fontSize: 30, fontWeight: '900', color: colors.purple }}>{initial}</Text>
                 )}
               </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <Text
-                    style={{ fontSize: 20, fontWeight: '900', color: colors.white, letterSpacing: -0.4 }}
-                    numberOfLines={1}
-                  >
-                    {profile.full_name || profile.username}
-                  </Text>
-                  {profile.is_verified && (
-                    <View style={{ marginLeft: 6 }}>
-                      <Feather name="check-circle" size={14} color={colors.lime} />
-                    </View>
-                  )}
-                </View>
-                <Text
-                  style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', marginTop: 2 }}
-                  numberOfLines={1}
+              {profile.is_verified && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    right: -2,
+                    bottom: -2,
+                    width: 22,
+                    height: 22,
+                    borderRadius: 11,
+                    backgroundColor: colors.purple,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 2,
+                    borderColor: 'white',
+                  }}
                 >
-                  @{profile.username}
-                </Text>
-                {profile.location && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
-                    <Feather name="map-pin" size={11} color="rgba(255,255,255,0.55)" />
-                    <Text
-                      style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginLeft: 4 }}
-                      numberOfLines={1}
-                    >
-                      {profile.location}
-                    </Text>
-                  </View>
-                )}
-              </View>
+                  <Feather name="check" size={11} color="white" />
+                </View>
+              )}
             </View>
 
+            <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-around', marginLeft: 16 }}>
+              <Stat value={String(listings.length)} label="Posts" />
+              <Stat value={String(profile.total_sales ?? 0)} label="Sold" />
+              <Stat value={rating.toFixed(1)} label="Rating" />
+            </View>
+          </View>
+
+          {/* Name + bio */}
+          <View style={{ marginTop: 14 }}>
+            <Text style={{ fontSize: 16, fontWeight: '800', color: colors.ink, letterSpacing: -0.2 }} numberOfLines={1}>
+              {profile.full_name || profile.username}
+            </Text>
             {profile.bio && (
-              <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 14, lineHeight: 19 }}>
+              <Text style={{ fontSize: 14, color: colors.ink, marginTop: 4, lineHeight: 19 }}>
                 {profile.bio}
               </Text>
             )}
-
-            {/* Stats strip */}
-            <View
-              style={{
-                flexDirection: 'row',
-                marginTop: 14,
-                backgroundColor: 'rgba(255,255,255,0.06)',
-                borderRadius: radii.lg,
-                padding: 12,
-              }}
-            >
-              <Stat value={Number(profile.rating ?? 0).toFixed(1)} label="Rating" />
-              <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginHorizontal: 8 }} />
-              <Stat value={String(profile.total_sales ?? 0)} label="Sales" />
-              <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginHorizontal: 8 }} />
-              <Stat value={String(listings.length)} label="Listings" />
-            </View>
-
-            {/* CTA row */}
-            {!isSelf && (
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
-                <Pressable
-                  onPress={() => setFollowed((v) => !v)}
-                  style={({ pressed }) => ({
-                    flex: 1,
-                    height: 44,
-                    borderRadius: radii.lg,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexDirection: 'row',
-                    gap: 6,
-                    backgroundColor: followed ? 'rgba(255,255,255,0.1)' : colors.lime,
-                    borderWidth: followed ? 1 : 0,
-                    borderColor: 'rgba(255,255,255,0.2)',
-                    opacity: pressed ? 0.85 : 1,
-                  })}
-                >
-                  <Feather name={followed ? 'check' : 'plus'} size={14} color={followed ? colors.white : colors.ink} />
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: '800',
-                      color: followed ? colors.white : colors.ink,
-                    }}
-                  >
-                    {followed ? 'Following' : 'Follow'}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={({ pressed }) => ({
-                    flex: 1,
-                    height: 44,
-                    borderRadius: radii.lg,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexDirection: 'row',
-                    gap: 6,
-                    backgroundColor: 'rgba(255,255,255,0.1)',
-                    borderWidth: 1,
-                    borderColor: 'rgba(255,255,255,0.2)',
-                    opacity: pressed ? 0.85 : 1,
-                  })}
-                >
-                  <Feather name="message-circle" size={14} color={colors.white} />
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: colors.white }}>Message</Text>
-                </Pressable>
+            {profile.location && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 4 }}>
+                <Feather name="map-pin" size={12} color={colors.mute} />
+                <Text style={{ fontSize: 12, color: colors.mute }}>{profile.location}</Text>
               </View>
             )}
           </View>
+
+          {/* CTA row */}
+          {!isSelf && (
+            <View style={{ flexDirection: 'row', marginTop: 14, gap: 8 }}>
+              <View style={{ flex: 1 }}>
+                <Button
+                  label={followed ? 'Following' : 'Follow'}
+                  icon={followed ? 'check' : 'user-plus'}
+                  variant={followed ? 'ghost' : 'primary'}
+                  full
+                  onPress={() => setFollowed((v) => !v)}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button
+                  label="Message"
+                  icon="message-circle"
+                  variant="ghost"
+                  full
+                  onPress={() => router.push('/conversation/new' as any)}
+                />
+              </View>
+            </View>
+          )}
         </Animated.View>
 
-        {/* Section header */}
-        <View style={{ paddingHorizontal: 20, marginTop: 22, marginBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Text style={{ fontSize: 18, fontWeight: '900', color: colors.ink, letterSpacing: -0.3 }}>
-            Listings
-          </Text>
-          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.mute }}>
-            {listings.length} {listings.length === 1 ? 'item' : 'items'}
-          </Text>
-        </View>
+        {/* Listings */}
+        <View style={{ marginTop: 26 }}>
+          <SectionHeader title="Listings" count={listings.length} rightText={listings.length === 1 ? 'item' : 'items'} />
 
-        {listings.length === 0 ? (
-          <View style={{ paddingHorizontal: 20, paddingTop: 8 }}>
-            <View
-              style={{
-                width: 56,
-                height: 56,
-                borderRadius: 28,
-                backgroundColor: colors.white,
-                borderWidth: 1,
-                borderColor: colors.hair,
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: 14,
-              }}
-            >
-              <Feather name="package" size={22} color={colors.ink} />
-            </View>
-            <Text style={{ fontSize: 28, fontWeight: '900', color: colors.ink, lineHeight: 32, letterSpacing: -0.8 }}>
-              No listings yet.
-            </Text>
-            <Text style={{ fontSize: 13, color: colors.mute, marginTop: 8, lineHeight: 19, maxWidth: 280 }}>
-              {profile.full_name || profile.username} hasn't posted anything yet. Check back soon.
-            </Text>
-          </View>
-        ) : (
-          <GridSection listings={listings} columns={columns} cardW={cardW} />
-        )}
+          {listings.length === 0 ? (
+            <EmptyState
+              icon="package"
+              title="No listings yet"
+              description={`${profile.full_name || profile.username} hasn't posted anything yet.`}
+            />
+          ) : (
+            <GridSection listings={listings} columns={columns} cardW={cardW} />
+          )}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -323,20 +283,11 @@ export default function UserProfileScreen() {
 
 function Stat({ value, label }: { value: string; label: string }) {
   return (
-    <View style={{ flex: 1, alignItems: 'center' }}>
-      <Text style={{ fontSize: 18, fontWeight: '900', color: colors.white, letterSpacing: -0.3 }}>{value}</Text>
-      <Text
-        style={{
-          fontSize: 10,
-          color: 'rgba(255,255,255,0.55)',
-          marginTop: 3,
-          letterSpacing: 0.6,
-          textTransform: 'uppercase',
-          fontWeight: '700',
-        }}
-      >
-        {label}
+    <View style={{ alignItems: 'center' }}>
+      <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink, letterSpacing: -0.2 }}>
+        {value}
       </Text>
+      <Text style={{ fontSize: 12, color: colors.mute, marginTop: 2 }}>{label}</Text>
     </View>
   );
 }
@@ -366,6 +317,6 @@ function GridSection({ listings, columns, cardW }: { listings: Listing[]; column
 }
 
 function GridCard({ index, width, children }: { index: number; width: number; children: React.ReactNode }) {
-  const style = useStaggeredEntrance(index, { delayStep: 28, offsetY: 6 });
+  const style = useStaggeredEntrance(index, { delayStep: 22, offsetY: 6 });
   return <Animated.View style={[{ width }, style]}>{children}</Animated.View>;
 }

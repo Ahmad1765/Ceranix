@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,38 +6,53 @@ import {
   ScrollView,
   ActivityIndicator,
   RefreshControl,
-  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import Animated from 'react-native-reanimated';
 import { ListingCard } from '@/components/ListingCard';
 import { RequireAuth } from '@/components/RequireAuth';
 import { useAuth } from '@/lib/auth';
 import { fetchUserListings, fetchLikedListings } from '@/lib/listings';
-import { colors, radii, shadow, eyebrow } from '@/lib/theme';
+import { colors, radii } from '@/lib/theme';
 import { useGridDimensions, HIT_SLOP_8 } from '@/lib/responsive';
 import { useStaggeredEntrance, useFadeIn } from '@/lib/motion';
 import type { Listing } from '@/types';
+import { Button, Card, ListRow, EmptyState, Tabs } from '@/components/ui';
 
-type ProfileTab = 'Selling' | 'Liked' | 'Shop' | 'Collections';
-const TABS: ProfileTab[] = ['Selling', 'Liked', 'Shop', 'Collections'];
+type ProfileTab = 'selling' | 'liked' | 'shop' | 'collections';
 
-const SHOP_ITEMS = [
-  { icon: 'tag' as const, title: 'My shop', subtitle: 'Purchases, sales & payouts' },
-  { icon: 'percent' as const, title: 'Bundle discount', subtitle: 'Reward buyers who shop multiple items', badge: 'Off' },
-  { icon: 'pause-circle' as const, title: 'Vacation mode', subtitle: 'Pause listings while away', badge: 'Off' },
-  { icon: 'share-2' as const, title: 'Share your profile', subtitle: 'Send a link to your shop' },
+const SHOP_ITEMS: {
+  icon: any;
+  title: string;
+  subtitle: string;
+  badge?: string;
+}[] = [
+  { icon: 'shopping-bag', title: 'My shop', subtitle: 'Purchases, sales & payouts' },
+  {
+    icon: 'percent',
+    title: 'Bundle discount',
+    subtitle: 'Reward buyers who shop multiple items',
+    badge: 'Off',
+  },
+  {
+    icon: 'pause-circle',
+    title: 'Vacation mode',
+    subtitle: 'Pause listings while away',
+    badge: 'Off',
+  },
+  { icon: 'share-2', title: 'Share your profile', subtitle: 'Send a link to your shop' },
 ];
 
-const HORIZONTAL_PAD = 16;
-const GRID_GAP = 10;
+const HORIZONTAL_PAD = 12;
+const GRID_GAP = 8;
+const AVATAR_SIZE = 88;
 
 function ProfileScreenInner() {
   const { profile } = useAuth();
-  const [activeTab, setActiveTab] = useState<ProfileTab>('Selling');
+  const [activeTab, setActiveTab] = useState<ProfileTab>('selling');
   const [selling, setSelling] = useState<Listing[]>([]);
   const [liked, setLiked] = useState<Listing[]>([]);
   const [loadingSelling, setLoadingSelling] = useState(true);
@@ -46,11 +61,10 @@ function ProfileScreenInner() {
 
   const heroFade = useFadeIn(0, 320);
 
-  // Compute responsive grid: 2 cols on phones, 3 on big phones, 4 on tablets.
   const { columns, cardWidth: cardW } = useGridDimensions({
     min: 2,
     max: 4,
-    thresholds: [420, 768, 1024],
+    thresholds: [560, 900, 1200],
     horizontalPadding: HORIZONTAL_PAD,
     gap: GRID_GAP,
   });
@@ -71,16 +85,33 @@ function ProfileScreenInner() {
     setLoadingLiked(false);
   }, [profile?.id]);
 
+  // Initial load — explicitly tied to profile.id arrival.
   useEffect(() => {
-    loadSelling();
-    loadLiked();
-  }, [loadSelling, loadLiked]);
+    if (!profile?.id) return;
+    let cancelled = false;
+    (async () => {
+      const [s, l] = await Promise.all([
+        fetchUserListings(profile.id),
+        fetchLikedListings(profile.id),
+      ]);
+      if (cancelled) return;
+      setSelling(s);
+      setLiked(l);
+      setLoadingSelling(false);
+      setLoadingLiked(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.id]);
 
+  // Re-fetch silently when tab regains focus (after a new upload, etc.)
   useFocusEffect(
     useCallback(() => {
+      if (!profile?.id) return;
       loadSelling();
       loadLiked();
-    }, [loadSelling, loadLiked]),
+    }, [profile?.id, loadSelling, loadLiked]),
   );
 
   const onRefresh = useCallback(async () => {
@@ -91,8 +122,11 @@ function ProfileScreenInner() {
 
   if (!profile) {
     return (
-      <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={colors.ink} />
+      <SafeAreaView
+        edges={['top']}
+        style={{ flex: 1, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' }}
+      >
+        <ActivityIndicator color={colors.purple} />
       </SafeAreaView>
     );
   }
@@ -100,230 +134,252 @@ function ProfileScreenInner() {
   const sellingCount = selling.length;
   const likedCount = liked.length;
   const initial = (profile.full_name || profile.username || 'U').trim().charAt(0).toUpperCase();
+  const rating = Number(profile.rating ?? 0);
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.soft }}>
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.ink} />}
-        contentContainerStyle={{ paddingBottom: 56 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />
+        }
+        contentContainerStyle={{ paddingBottom: 96 }}
       >
-        {/* Top action bar */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 6 }}>
-          <Text style={eyebrow}>My profile</Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Pressable
-              onPress={() => router.push('/profile/edit')}
-              hitSlop={HIT_SLOP_8}
-              style={({ pressed }) => ({
-                width: 38, height: 38, borderRadius: 19, backgroundColor: colors.white,
-                alignItems: 'center', justifyContent: 'center',
-                borderWidth: 1, borderColor: colors.hair,
-                opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.96 : 1 }],
-              })}
-            >
-              <Feather name="edit-2" size={16} color={colors.ink} />
+        {/* Top bar */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 16,
+            paddingTop: 6,
+            paddingBottom: 8,
+          }}
+        >
+          <Text
+            style={{ fontSize: 18, fontWeight: '800', color: colors.ink, letterSpacing: -0.3 }}
+            numberOfLines={1}
+          >
+            @{profile.username}
+          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18 }}>
+            <Pressable onPress={() => router.push('/news' as any)} hitSlop={HIT_SLOP_8}>
+              <Feather name="bell" size={22} color={colors.ink} />
             </Pressable>
+            <Pressable onPress={() => router.push('/settings')} hitSlop={HIT_SLOP_8}>
+              <Feather name="menu" size={24} color={colors.ink} />
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Hero — clean white card */}
+        <Animated.View style={[{ paddingHorizontal: 16, paddingTop: 4 }, heroFade]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {/* Avatar with thin purple ring */}
+            <View
+              style={{
+                width: AVATAR_SIZE,
+                height: AVATAR_SIZE,
+                borderRadius: AVATAR_SIZE / 2,
+                borderWidth: 2,
+                borderColor: colors.purple,
+                padding: 3,
+              }}
+            >
+              <View
+                style={{
+                  flex: 1,
+                  borderRadius: (AVATAR_SIZE - 10) / 2,
+                  overflow: 'hidden',
+                  backgroundColor: colors.purpleSoft,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {profile.avatar_url ? (
+                  <Image
+                    source={{ uri: profile.avatar_url }}
+                    style={{ width: '100%', height: '100%' }}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                  />
+                ) : (
+                  <Text style={{ fontSize: 30, fontWeight: '900', color: colors.purple }}>
+                    {initial}
+                  </Text>
+                )}
+              </View>
+              {profile.is_verified && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    right: -2,
+                    bottom: -2,
+                    width: 22,
+                    height: 22,
+                    borderRadius: 11,
+                    backgroundColor: colors.purple,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 2,
+                    borderColor: 'white',
+                  }}
+                >
+                  <Feather name="check" size={11} color="white" />
+                </View>
+              )}
+            </View>
+
+            {/* Stats inline */}
+            <View
+              style={{
+                flex: 1,
+                flexDirection: 'row',
+                justifyContent: 'space-around',
+                marginLeft: 16,
+              }}
+            >
+              <Stat value={String(sellingCount)} label="Posts" />
+              <Stat value={String(profile.total_sales ?? 0)} label="Sold" />
+              <Stat value={rating.toFixed(1)} label="Rating" />
+            </View>
+          </View>
+
+          {/* Name + bio */}
+          <View style={{ marginTop: 14 }}>
+            <Text
+              style={{ fontSize: 16, fontWeight: '800', color: colors.ink, letterSpacing: -0.2 }}
+              numberOfLines={1}
+            >
+              {profile.full_name || profile.username}
+            </Text>
+            {profile.bio && (
+              <Text style={{ fontSize: 14, color: colors.ink, marginTop: 4, lineHeight: 19 }}>
+                {profile.bio}
+              </Text>
+            )}
+            {profile.location && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 4 }}>
+                <Feather name="map-pin" size={12} color={colors.mute} />
+                <Text style={{ fontSize: 12, color: colors.mute }}>{profile.location}</Text>
+              </View>
+            )}
+          </View>
+
+          {/* CTA row */}
+          <View style={{ flexDirection: 'row', marginTop: 14, gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Button
+                label="Edit profile"
+                variant="ghost"
+                full
+                onPress={() => router.push('/profile/edit')}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button label="Share profile" variant="ghost" full onPress={() => {}} />
+            </View>
             <Pressable
               onPress={() => router.push('/settings')}
               hitSlop={HIT_SLOP_8}
               style={({ pressed }) => ({
-                width: 38, height: 38, borderRadius: 19, backgroundColor: colors.white,
-                alignItems: 'center', justifyContent: 'center',
-                borderWidth: 1, borderColor: colors.hair,
-                opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.96 : 1 }],
+                width: 44,
+                height: 44,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: colors.hairline,
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: pressed ? 0.7 : 1,
               })}
             >
-              <Feather name="settings" size={16} color={colors.ink} />
+              <Feather name="user-plus" size={16} color={colors.ink} />
             </Pressable>
-          </View>
-        </View>
-
-        {/* Hero identity card */}
-        <Animated.View style={[{ paddingHorizontal: 20, marginTop: 6 }, heroFade]}>
-          <View style={{
-            backgroundColor: colors.ink,
-            borderRadius: radii['3xl'],
-            padding: 18,
-            ...shadow.md,
-          }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <View style={{
-                width: 64, height: 64, borderRadius: 32, backgroundColor: colors.lime,
-                alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginRight: 14,
-              }}>
-                {profile.avatar_url ? (
-                  <Image source={{ uri: profile.avatar_url }} style={{ width: 64, height: 64 }} contentFit="cover" />
-                ) : (
-                  <Text style={{ fontSize: 26, fontWeight: '900', color: colors.ink }}>{initial}</Text>
-                )}
-              </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <Text style={{ fontSize: 20, fontWeight: '900', color: colors.white, letterSpacing: -0.4 }} numberOfLines={1}>
-                    {profile.full_name || profile.username}
-                  </Text>
-                  {profile.is_verified && (
-                    <View style={{ marginLeft: 6 }}>
-                      <Feather name="check-circle" size={14} color={colors.lime} />
-                    </View>
-                  )}
-                </View>
-                <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', marginTop: 2 }} numberOfLines={1}>
-                  @{profile.username}
-                </Text>
-                {profile.location && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
-                    <Feather name="map-pin" size={11} color="rgba(255,255,255,0.55)" />
-                    <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginLeft: 4 }} numberOfLines={1}>
-                      {profile.location}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </View>
-
-            {/* Stats strip */}
-            <View style={{ flexDirection: 'row', marginTop: 16, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: radii.lg, padding: 12 }}>
-              <Stat value={Number(profile.rating ?? 0).toFixed(1)} label="Rating" />
-              <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginHorizontal: 8 }} />
-              <Stat value={String(profile.total_sales ?? 0)} label="Sales" />
-              <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginHorizontal: 8 }} />
-              <Stat value={String(sellingCount)} label="Listings" />
-              <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginHorizontal: 8 }} />
-              <Stat value={String(likedCount)} label="Liked" />
-            </View>
           </View>
         </Animated.View>
 
-        {/* Promote banner */}
-        <Pressable
-          onPress={() => router.push('/settings')}
-          style={({ pressed }) => ({
-            marginHorizontal: 20, marginTop: 14,
-            backgroundColor: colors.lime, borderRadius: radii['2xl'],
-            paddingVertical: 12, paddingHorizontal: 16,
-            flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-            opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.99 : 1 }],
-          })}
-        >
-          <MaterialCommunityIcons name="rocket-launch-outline" size={18} color={colors.ink} style={{ marginRight: 8 }} />
-          <Text style={{ fontSize: 13, fontWeight: '800', color: colors.ink, letterSpacing: 0.2 }}>
-            Promote your profile
-          </Text>
-        </Pressable>
-
-        {/* Tab pills */}
-        <View style={{ marginTop: 18 }}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}>
-            {TABS.map((tab) => {
-              const active = activeTab === tab;
-              const count =
-                tab === 'Selling' ? sellingCount :
-                tab === 'Liked' ? likedCount :
-                tab === 'Collections' ? 0 : null;
-              return (
-                <Pressable
-                  key={tab}
-                  onPress={() => setActiveTab(tab)}
-                  style={({ pressed }) => ({
-                    paddingHorizontal: 16, paddingVertical: 9,
-                    borderRadius: radii.pill,
-                    backgroundColor: active ? colors.ink : colors.white,
-                    borderWidth: 1.5, borderColor: active ? colors.ink : colors.hair,
-                    flexDirection: 'row', alignItems: 'center', gap: 6,
-                    opacity: pressed ? 0.85 : 1, transform: [{ scale: pressed ? 0.97 : 1 }],
-                  })}
-                >
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: active ? colors.white : colors.ink }}>
-                    {tab}
-                  </Text>
-                  {count !== null && (
-                    <View style={{
-                      paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6,
-                      backgroundColor: active ? colors.lime : colors.soft,
-                      minWidth: 18, alignItems: 'center',
-                    }}>
-                      <Text style={{ fontSize: 10, fontWeight: '900', color: colors.ink }}>{count}</Text>
-                    </View>
-                  )}
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+        {/* Tabs */}
+        <View style={{ marginTop: 22 }}>
+          <Tabs
+            variant="underline"
+            value={activeTab}
+            onChange={setActiveTab}
+            tabs={[
+              { value: 'selling', label: 'Selling', icon: 'grid', count: sellingCount },
+              { value: 'liked', label: 'Liked', icon: 'heart', count: likedCount },
+              { value: 'shop', label: 'Shop', icon: 'shopping-bag' },
+              { value: 'collections', label: 'Saved', icon: 'bookmark' },
+            ]}
+          />
         </View>
 
         {/* Tab content */}
-        <View style={{ marginTop: 18 }}>
-          {activeTab === 'Selling' && (
+        <View style={{ marginTop: 12 }}>
+          {activeTab === 'selling' && (
             <ListingsGrid
               listings={selling}
               loading={loadingSelling}
               columns={columns}
               cardW={cardW}
-              emptyTitle={'Your shop is\nempty.'}
-              emptyDescription="Tap Upload to list your first item — it takes under a minute."
-              emptyCta={{ label: 'Upload an item', onPress: () => router.push('/(tabs)/upload') }}
+              empty={{
+                icon: 'shopping-bag',
+                title: 'Your shop is empty',
+                description: 'Post your first item — takes less than a minute.',
+                cta: {
+                  label: 'Post an item',
+                  icon: 'plus',
+                  onPress: () => router.push('/(tabs)/upload'),
+                },
+              }}
             />
           )}
-          {activeTab === 'Liked' && (
+          {activeTab === 'liked' && (
             <ListingsGrid
               listings={liked}
               loading={loadingLiked}
               columns={columns}
               cardW={cardW}
-              emptyTitle={'Nothing\nliked yet.'}
-              emptyDescription="Tap the heart on items you love — they'll all live here."
+              empty={{
+                icon: 'heart',
+                title: 'Nothing liked yet',
+                description: "Tap the heart on items you love — they'll land here.",
+              }}
             />
           )}
-          {activeTab === 'Shop' && (
-            <View style={{ paddingHorizontal: 20 }}>
-              <View style={{ backgroundColor: colors.white, borderRadius: radii['2xl'], borderWidth: 1, borderColor: colors.hair, overflow: 'hidden' }}>
+          {activeTab === 'shop' && (
+            <View style={{ paddingHorizontal: 16 }}>
+              <Card pad={0} variant="paper">
                 {SHOP_ITEMS.map((item, i) => (
-                  <Pressable
-                    key={item.title}
-                    onPress={() => router.push('/settings' as any)}
-                    style={({ pressed }) => ({
-                      flexDirection: 'row', alignItems: 'center',
-                      paddingHorizontal: 16, paddingVertical: 14,
-                      borderBottomWidth: i < SHOP_ITEMS.length - 1 ? 1 : 0,
-                      borderBottomColor: colors.hair,
-                      opacity: pressed ? 0.6 : 1,
-                    })}
-                  >
-                    <View style={{
-                      width: 36, height: 36, borderRadius: radii.md,
-                      backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center', marginRight: 14,
-                    }}>
-                      <Feather name={item.icon} size={16} color={colors.ink} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: colors.ink }}>{item.title}</Text>
-                        {item.badge && (
-                          <View style={{
-                            marginLeft: 8, paddingHorizontal: 6, paddingVertical: 1,
-                            borderRadius: 999, backgroundColor: colors.soft,
-                          }}>
-                            <Text style={{ fontSize: 10, fontWeight: '800', color: colors.mute, letterSpacing: 0.4 }}>
-                              {item.badge.toUpperCase()}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                      <Text style={{ fontSize: 12, color: colors.mute, marginTop: 2 }} numberOfLines={2}>{item.subtitle}</Text>
-                    </View>
-                    <Feather name="chevron-right" size={16} color={colors.mute} />
-                  </Pressable>
+                  <View key={item.title}>
+                    <ListRow
+                      icon={item.icon}
+                      iconBg={colors.purpleSoft}
+                      iconColor={colors.purple}
+                      title={item.title}
+                      subtitle={item.subtitle}
+                      badge={item.badge}
+                      badgeTone="mute"
+                      onPress={() => router.push('/settings' as any)}
+                    />
+                    {i < SHOP_ITEMS.length - 1 && (
+                      <View
+                        style={{
+                          height: 1,
+                          backgroundColor: colors.hairline,
+                          marginLeft: 68,
+                        }}
+                      />
+                    )}
+                  </View>
                 ))}
-              </View>
+              </Card>
             </View>
           )}
-          {activeTab === 'Collections' && (
+          {activeTab === 'collections' && (
             <EmptyState
-              title={'No collections\nyet.'}
+              icon="bookmark"
+              title="No saved boards yet"
               description="Group your favorite items into themed boards. Coming soon."
-              icon="grid"
             />
           )}
         </View>
@@ -334,11 +390,13 @@ function ProfileScreenInner() {
 
 function Stat({ value, label }: { value: string; label: string }) {
   return (
-    <View style={{ flex: 1, alignItems: 'center' }}>
-      <Text style={{ fontSize: 18, fontWeight: '900', color: colors.white, letterSpacing: -0.3 }}>{value}</Text>
-      <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginTop: 3, letterSpacing: 0.6, textTransform: 'uppercase', fontWeight: '700' }}>
-        {label}
+    <View style={{ alignItems: 'center' }}>
+      <Text
+        style={{ fontSize: 18, fontWeight: '800', color: colors.ink, letterSpacing: -0.2 }}
+      >
+        {value}
       </Text>
+      <Text style={{ fontSize: 12, color: colors.mute, marginTop: 2 }}>{label}</Text>
     </View>
   );
 }
@@ -348,17 +406,18 @@ function ListingsGrid({
   loading,
   columns,
   cardW,
-  emptyTitle,
-  emptyDescription,
-  emptyCta,
+  empty,
 }: {
   listings: Listing[];
   loading: boolean;
   columns: number;
   cardW: number;
-  emptyTitle: string;
-  emptyDescription: string;
-  emptyCta?: { label: string; onPress: () => void };
+  empty: {
+    title: string;
+    description: string;
+    icon?: any;
+    cta?: { label: string; icon?: any; onPress: () => void };
+  };
 }) {
   if (loading) {
     return (
@@ -371,10 +430,16 @@ function ListingsGrid({
   }
 
   if (listings.length === 0) {
-    return <EmptyState title={emptyTitle} description={emptyDescription} cta={emptyCta} />;
+    return (
+      <EmptyState
+        icon={empty.icon}
+        title={empty.title}
+        description={empty.description}
+        cta={empty.cta}
+      />
+    );
   }
 
-  // Group into rows of `columns` so we get equal gaps + clean alignment.
   const rows: Listing[][] = [];
   for (let i = 0; i < listings.length; i += columns) {
     rows.push(listings.slice(i, i + columns));
@@ -389,7 +454,6 @@ function ListingsGrid({
               <ListingCard listing={listing} />
             </GridCard>
           ))}
-          {/* Pad incomplete trailing row so cards don't stretch */}
           {row.length < columns &&
             Array.from({ length: columns - row.length }).map((_, i) => (
               <View key={`pad-${i}`} style={{ width: cardW }} />
@@ -401,66 +465,21 @@ function ListingsGrid({
 }
 
 function GridCard({ index, width, children }: { index: number; width: number; children: React.ReactNode }) {
-  const style = useStaggeredEntrance(index, { delayStep: 28, offsetY: 6 });
-  return (
-    <Animated.View style={[{ width }, style]}>{children}</Animated.View>
-  );
+  const style = useStaggeredEntrance(index, { delayStep: 22, offsetY: 6 });
+  return <Animated.View style={[{ width }, style]}>{children}</Animated.View>;
 }
 
 function SkeletonTile({ width }: { width: number }) {
   return (
     <View style={{ width }}>
-      <View style={{
-        width: '100%', aspectRatio: 1 / 1.33, borderRadius: radii.sm,
-        backgroundColor: colors.divider,
-      }} />
-      <View style={{ height: 12, borderRadius: 4, backgroundColor: colors.divider, marginTop: 8, width: '80%' }} />
-      <View style={{ height: 12, borderRadius: 4, backgroundColor: colors.divider, marginTop: 4, width: '40%' }} />
-    </View>
-  );
-}
-
-function EmptyState({
-  title,
-  description,
-  icon = 'package',
-  cta,
-}: {
-  title: string;
-  description: string;
-  icon?: keyof typeof Feather.glyphMap;
-  cta?: { label: string; onPress: () => void };
-}) {
-  return (
-    <View style={{ paddingHorizontal: 20, paddingTop: 24 }}>
-      <View style={{
-        width: 56, height: 56, borderRadius: 28, backgroundColor: colors.white,
-        borderWidth: 1, borderColor: colors.hair,
-        alignItems: 'center', justifyContent: 'center', marginBottom: 14,
-      }}>
-        <Feather name={icon} size={22} color={colors.ink} />
-      </View>
-      <Text style={{ fontSize: 32, fontWeight: '900', color: colors.ink, lineHeight: 34, letterSpacing: -1 }}>
-        {title}
-      </Text>
-      <Text style={{ fontSize: 13, color: colors.mute, marginTop: 10, lineHeight: 19, maxWidth: 280 }}>
-        {description}
-      </Text>
-      {cta && (
-        <Pressable
-          onPress={cta.onPress}
-          style={({ pressed }) => ({
-            marginTop: 18, alignSelf: 'flex-start',
-            backgroundColor: colors.ink, borderRadius: radii.xl,
-            paddingHorizontal: 18, paddingVertical: 12,
-            flexDirection: 'row', alignItems: 'center', gap: 6,
-            opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.98 : 1 }],
-          })}
-        >
-          <Feather name="plus" size={14} color={colors.lime} />
-          <Text style={{ fontSize: 13, fontWeight: '800', color: colors.white }}>{cta.label}</Text>
-        </Pressable>
-      )}
+      <View
+        style={{
+          width: '100%',
+          aspectRatio: 1,
+          borderRadius: radii.md,
+          backgroundColor: colors.divider,
+        }}
+      />
     </View>
   );
 }

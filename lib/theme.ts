@@ -7,23 +7,40 @@
 import { Platform } from 'react-native';
 
 export const colors = {
-  // Brand
+  // Brand — aligned with home + product page
   ink: '#0a0a0a',
-  lime: '#d8f53a',
+  lime: '#d8f53a',           // legacy, only for home/product
   purple: '#6C47FF',
   purpleSoft: '#f1edff',
+  purpleDeep: '#5b3fd9',
+
+  // Aliased names — new screens reference these; values point to purple palette
+  pink: '#6C47FF',
+  pinkSoft: '#f1edff',
+  pinkDeep: '#5b3fd9',
+  coral: '#6C47FF',
+  amber: '#6C47FF',
+  sky: '#6C47FF',
+  gradStart: '#6C47FF',
+  gradMid: '#6C47FF',
+  gradEnd: '#6C47FF',
 
   // Surfaces
   white: '#ffffff',
-  soft: '#f5f4ef', // off-white app background
+  bg: '#ffffff',
+  soft: '#f5f4ef',           // legacy
   cream: '#fafaf7',
-  hair: '#e8e6e0', // hairline borders
+  panel: '#F2F2F2',          // light surface, matches home page
+  hair: '#e8e6e0',
+  hairline: '#efefef',
   divider: '#f1f1f1',
 
   // Text
+  ink2: '#0a0a0a',
   mute: '#6b7280',
   muteSoft: '#9ca3af',
   ghost: '#a8a59c',
+  smoke: '#6b7280',
 
   // Feedback
   red: '#ef4444',
@@ -34,6 +51,13 @@ export const colors = {
   // Overlays
   overlay: 'rgba(0,0,0,0.45)',
   overlayLight: 'rgba(0,0,0,0.18)',
+} as const;
+
+// All gradient stops collapse to purple — keeps API compat, renders flat purple.
+export const gradients = {
+  story: ['#6C47FF', '#6C47FF', '#6C47FF'] as const,
+  warm: ['#6C47FF', '#6C47FF'] as const,
+  pinkPeach: ['#6C47FF', '#6C47FF'] as const,
 } as const;
 
 export const radii = {
