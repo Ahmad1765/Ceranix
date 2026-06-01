@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, router } from 'expo-router';
+import { safeBack } from '@/lib/nav';
 import { Feather } from '@expo/vector-icons';
 import Animated from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
@@ -98,7 +99,7 @@ export default function UserProfileScreen() {
     return (
       <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
         <View style={{ padding: 14, flexDirection: 'row', alignItems: 'center' }}>
-          <Pressable onPress={() => router.back()} hitSlop={HIT_SLOP_8}>
+          <Pressable onPress={() => safeBack()} hitSlop={HIT_SLOP_8}>
             <Feather name="chevron-left" size={26} color={colors.ink} />
           </Pressable>
         </View>
@@ -131,7 +132,7 @@ export default function UserProfileScreen() {
           }}
         >
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => safeBack()}
             hitSlop={HIT_SLOP_8}
             style={({ pressed }) => ({
               width: 38,

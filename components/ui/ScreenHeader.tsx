@@ -1,8 +1,8 @@
 import { View, Text, Pressable } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import { colors } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
+import { safeBack } from '@/lib/nav';
 
 type Props = {
   title: string;
@@ -41,7 +41,7 @@ export function ScreenHeader({
         <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0 }}>
           {back && (
             <Pressable
-              onPress={onBack ?? (() => router.back())}
+              onPress={onBack ?? (() => safeBack())}
               hitSlop={HIT_SLOP_8}
               style={({ pressed }) => ({
                 width: 38,

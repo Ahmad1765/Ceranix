@@ -11,7 +11,7 @@ export default function FeedScreen() {
         
         {/* Header & Hero Section */}
         <LinearGradient
-          colors={['#D8B4FE', '#BAE6FD', '#FEF08A']}
+          colors={['#6C47FF', '#6C47FF', '#6C47FF']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           className="w-full pt-16 rounded-b-[40px] items-center justify-start relative mb-8"
@@ -20,35 +20,35 @@ export default function FeedScreen() {
           {/* Subtle noise overlay simulation (optional depending on platform, using simple transparent gradient for now) */}
           <View className="absolute inset-0 bg-white/10" style={{ mixBlendMode: 'overlay' as any }} />
 
-          <Text className="text-black text-[14px] mb-2 z-10">
+          <Text className="text-white text-[14px] mb-2 z-10">
             Say hi to <Text className="italic font-serif">Nybegagnat</Text>
           </Text>
-          
-          <Text className="text-black font-black text-[36px] text-center leading-[40px] tracking-[-0.7px] mb-4 px-4 z-10" style={{letterSpacing: -0.7}}>
+
+          <Text className="text-white font-black text-[36px] text-center leading-[40px] tracking-[-0.7px] mb-4 px-4 z-10" style={{letterSpacing: -0.7}}>
             Cheaper than new,{'\n'}better than used.
           </Text>
-          
-          <Text className="text-[#1F2937] font-medium text-center text-[16px] mb-8 leading-relaxed px-8 z-10">
+
+          <Text className="text-white font-medium text-center text-[16px] mb-8 leading-relaxed px-8 z-10" style={{ opacity: 0.85 }}>
             As new. Perfected by professionals. Warranty included.
           </Text>
 
           {/* iPhones */}
           <View className="flex-row items-end justify-center w-full absolute bottom-[-5] z-0">
              {/* Lavender iPhone Back */}
-             <View className="bg-[#D8B4FE] rounded-[24px] shadow-lg border border-[#C084FC] absolute" style={{ width: 85, height: 180, left: '12%', bottom: -10, transform: [{rotate: '-12deg'}], elevation: 2 }} />
+             <View className="bg-white/30 rounded-[24px] shadow-lg border border-white/40 absolute" style={{ width: 85, height: 180, left: '12%', bottom: -10, transform: [{rotate: '-12deg'}], elevation: 2 }} />
              {/* Pink iPhone Back */}
-             <View className="bg-[#F472B6] rounded-[24px] shadow-lg border border-[#EC4899] absolute" style={{ width: 90, height: 190, left: '26%', bottom: -5, zIndex: 3, transform: [{rotate: '-6deg'}], elevation: 3 }} />
+             <View className="bg-white/50 rounded-[24px] shadow-lg border border-white/60 absolute" style={{ width: 90, height: 190, left: '26%', bottom: -5, zIndex: 3, transform: [{rotate: '-6deg'}], elevation: 3 }} />
              {/* Silver/White iPhone Back */}
-             <View className="bg-[#F3F4F6] rounded-[24px] shadow-lg border border-[#D1D5DB] absolute" style={{ width: 90, height: 200, right: '23%', bottom: -15, zIndex: 4, transform: [{rotate: '8deg'}], elevation: 4 }} />
-             
+             <View className="bg-white/70 rounded-[24px] shadow-lg border border-white/80 absolute" style={{ width: 90, height: 200, right: '23%', bottom: -15, zIndex: 4, transform: [{rotate: '8deg'}], elevation: 4 }} />
+
              {/* Front-most iPhone showing screen with Dynamic Island */}
-             <View className="bg-white rounded-[26px] border-[6px] border-[#111827] items-center justify-center shadow-2xl absolute overflow-hidden" style={{ width: 110, height: 220, right: '35%', bottom: -20, zIndex: 10, transform: [{rotate: '2deg'}], elevation: 10 }}>
+             <View className="bg-white rounded-[26px] border-[6px] border-[#0F0F0F] items-center justify-center shadow-2xl absolute overflow-hidden" style={{ width: 110, height: 220, right: '35%', bottom: -20, zIndex: 10, transform: [{rotate: '2deg'}], elevation: 10 }}>
                 {/* Dynamic island */}
-                <View className="w-16 h-4 bg-[#111827] rounded-full absolute top-1 z-20" />
-                
+                <View className="w-16 h-4 bg-[#0F0F0F] rounded-full absolute top-1 z-20" />
+
                 {/* Screen content */}
-                <LinearGradient colors={['#D8B4FE', '#BAE6FD', '#FEF08A']} className="absolute inset-0 opacity-20 z-0" />
-                <Text className="text-[#9333EA] font-extrabold text-[24px] absolute z-10 bottom-14 italic tracking-tighter">Carrinex</Text>
+                <View className="absolute inset-0 z-0" style={{ backgroundColor: 'rgba(108,71,255,0.10)' }} />
+                <Text className="font-extrabold text-[24px] absolute z-10 bottom-14 italic tracking-tighter" style={{ color: '#6C47FF' }}>Carrinex</Text>
              </View>
           </View>
         </LinearGradient>
@@ -57,35 +57,35 @@ export default function FeedScreen() {
         <View className="px-5">
           <View className="flex-row flex-wrap justify-between" style={{ gap: 10 }}>
              {/* Certified */}
-             <View className="bg-[#FAF9FF] py-3 px-3 rounded-[10px] flex-row items-center flex-1 min-w-[45%]" style={{ shadowColor: '#4F46E5', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 3, elevation: 2 }}>
-               <MaterialCommunityIcons name="check-decagram" size={24} color="#4F46E5" className="mr-2" />
-               <Text className="text-[#4F46E5] font-semibold text-[13px] flex-1 leading-tight">Certified by experts</Text>
+             <View className="bg-primary-soft py-3 px-3 rounded-[10px] flex-row items-center flex-1 min-w-[45%]" style={{ shadowColor: '#6C47FF', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 3, elevation: 2 }}>
+               <MaterialCommunityIcons name="check-decagram" size={24} color="#6C47FF" className="mr-2" />
+               <Text className="text-primary font-semibold text-[13px] flex-1 leading-tight">Certified by experts</Text>
              </View>
              {/* Warranty */}
-             <View className="bg-[#FAF9FF] py-3 px-3 rounded-[10px] flex-row items-center flex-1 min-w-[45%]" style={{ shadowColor: '#4F46E5', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 3, elevation: 2 }}>
-               <MaterialCommunityIcons name="shield" size={24} color="#4F46E5" className="mr-2" />
-               <Text className="text-[#4F46E5] font-semibold text-[13px] flex-1 leading-tight">Minimum 1 year warranty</Text>
+             <View className="bg-primary-soft py-3 px-3 rounded-[10px] flex-row items-center flex-1 min-w-[45%]" style={{ shadowColor: '#6C47FF', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 3, elevation: 2 }}>
+               <MaterialCommunityIcons name="shield" size={24} color="#6C47FF" className="mr-2" />
+               <Text className="text-primary font-semibold text-[13px] flex-1 leading-tight">Minimum 1 year warranty</Text>
              </View>
              {/* Return policy */}
-             <View className="bg-[#FAF9FF] py-3 px-3 rounded-[10px] flex-row items-center flex-1 min-w-[45%]" style={{ shadowColor: '#4F46E5', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 3, elevation: 2 }}>
+             <View className="bg-primary-soft py-3 px-3 rounded-[10px] flex-row items-center flex-1 min-w-[45%]" style={{ shadowColor: '#6C47FF', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 3, elevation: 2 }}>
                <View className="mr-2 flex-row items-center relative">
                  <View className="absolute left-[-4] z-10" style={{gap: 2}}>
-                    <View className="w-2.5 h-[1.5px] bg-[#FAF9FF] rounded-full absolute top-[1px]" />
-                    <View className="w-3.5 h-[1.5px] bg-[#FAF9FF] rounded-full absolute top-[5px]" />
-                    <View className="w-2 h-[1.5px] bg-[#FAF9FF] rounded-full absolute top-[9px]" />
+                    <View className="w-2.5 h-[1.5px] bg-primary-soft rounded-full absolute top-[1px]" />
+                    <View className="w-3.5 h-[1.5px] bg-primary-soft rounded-full absolute top-[5px]" />
+                    <View className="w-2 h-[1.5px] bg-primary-soft rounded-full absolute top-[9px]" />
 
-                    <View className="w-2 h-[1.5px] bg-[#4F46E5] rounded-full" style={{transform:[{translateX: -1}]}} />
-                    <View className="w-3.5 h-[1.5px] bg-[#4F46E5] rounded-full" style={{transform:[{translateX: -2}]}} />
-                    <View className="w-2 h-[1.5px] bg-[#4F46E5] rounded-full" style={{transform:[{translateX: 0}]}} />
+                    <View className="w-2 h-[1.5px] bg-[#6C47FF] rounded-full" style={{transform:[{translateX: -1}]}} />
+                    <View className="w-3.5 h-[1.5px] bg-[#6C47FF] rounded-full" style={{transform:[{translateX: -2}]}} />
+                    <View className="w-2 h-[1.5px] bg-[#6C47FF] rounded-full" style={{transform:[{translateX: 0}]}} />
                  </View>
-                 <MaterialCommunityIcons name="shopping" size={22} color="#4F46E5" />
+                 <MaterialCommunityIcons name="shopping" size={22} color="#6C47FF" />
                </View>
-               <Text className="text-[#4F46E5] font-semibold text-[13px] flex-1 leading-tight">30 days return policy</Text>
+               <Text className="text-primary font-semibold text-[13px] flex-1 leading-tight">30 days return policy</Text>
              </View>
              {/* Delivery */}
-             <View className="bg-[#FAF9FF] py-3 px-3 rounded-[10px] flex-row items-center flex-1 min-w-[45%]" style={{ shadowColor: '#4F46E5', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 3, elevation: 2 }}>
-               <MaterialCommunityIcons name="truck-fast" size={24} color="#4F46E5" className="mr-2" />
-               <Text className="text-[#4F46E5] font-semibold text-[13px] flex-1 leading-tight">Express delivery</Text>
+             <View className="bg-primary-soft py-3 px-3 rounded-[10px] flex-row items-center flex-1 min-w-[45%]" style={{ shadowColor: '#6C47FF', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 3, elevation: 2 }}>
+               <MaterialCommunityIcons name="truck-fast" size={24} color="#6C47FF" className="mr-2" />
+               <Text className="text-primary font-semibold text-[13px] flex-1 leading-tight">Express delivery</Text>
              </View>
           </View>
         </View>
@@ -93,13 +93,13 @@ export default function FeedScreen() {
         {/* Category Selector (Pills) */}
         <View className="pt-8 mb-6">
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
-            <Pressable className="bg-[#4F46E5] px-4 py-2 rounded-full">
+            <Pressable className="bg-primary px-4 py-2 rounded-full">
               <Text className="font-semibold text-white text-[14px]">iPhones</Text>
             </Pressable>
-            <Pressable className="bg-[#F3F4F6] px-4 py-2 rounded-full border border-[#E5E7EB]">
+            <Pressable className="bg-ink-panel px-4 py-2 rounded-full border border-ink-hair">
               <Text className="text-black text-[14px]">Samsung mobiler</Text>
             </Pressable>
-            <Pressable className="bg-[#F3F4F6] px-4 py-2 rounded-full border border-[#E5E7EB]">
+            <Pressable className="bg-ink-panel px-4 py-2 rounded-full border border-ink-hair">
               <Text className="text-black text-[14px]">Smartklockor</Text>
             </Pressable>
           </ScrollView>
@@ -111,7 +111,7 @@ export default function FeedScreen() {
             {/* Card 1: iPhone 11 */}
             <Pressable className="flex-1 bg-white rounded-[16px] pb-3" style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 3 }}>
               {/* Image Box */}
-              <View className="bg-[#F9FAFB] rounded-[12px] aspect-[4/5] items-center justify-center relative mb-3 overflow-hidden">
+              <View className="bg-ink-panel rounded-[12px] aspect-[4/5] items-center justify-center relative mb-3 overflow-hidden">
                  <Image source={{ uri: 'https://images.unsplash.com/photo-1591337676887-a4b1fbe40c56?w=400&q=80' }} className="w-[85%] h-[85%]" contentFit="contain" />
                  
                  {/* Condition Badge (Bottom-left) */}
@@ -129,7 +129,7 @@ export default function FeedScreen() {
             {/* Card 2: iPhone 11 Pro */}
             <Pressable className="flex-1 bg-white rounded-[16px] pb-3" style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 3 }}>
               {/* Image Box */}
-              <View className="bg-[#F9FAFB] rounded-[12px] aspect-[4/5] items-center justify-center relative mb-3 overflow-hidden">
+              <View className="bg-ink-panel rounded-[12px] aspect-[4/5] items-center justify-center relative mb-3 overflow-hidden">
                  <Image source={{ uri: 'https://images.unsplash.com/photo-1603921326210-6edd2d60ca68?w=400&q=80' }} className="w-[85%] h-[85%]" contentFit="contain" />
                  
                  {/* Condition Badge (Bottom-left) */}

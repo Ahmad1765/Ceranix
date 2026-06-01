@@ -15,9 +15,9 @@ export function SkeletonCard() {
 
   return (
     <Animated.View style={{ flex: 1, opacity }}>
-      <View style={{ aspectRatio: 1 / 1.33, backgroundColor: '#e5e7eb', borderRadius: 6 }} />
-      <View style={{ height: 11, backgroundColor: '#e5e7eb', borderRadius: 4, marginTop: 8, width: '65%' }} />
-      <View style={{ height: 11, backgroundColor: '#e5e7eb', borderRadius: 4, marginTop: 5, width: '45%' }} />
+      <View style={{ aspectRatio: 1 / 1.33, backgroundColor: 'rgba(15,15,15,0.08)', borderRadius: 6 }} />
+      <View style={{ height: 11, backgroundColor: 'rgba(15,15,15,0.08)', borderRadius: 4, marginTop: 8, width: '65%' }} />
+      <View style={{ height: 11, backgroundColor: 'rgba(15,15,15,0.08)', borderRadius: 4, marginTop: 5, width: '45%' }} />
     </Animated.View>
   );
 }

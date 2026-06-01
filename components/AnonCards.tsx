@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { View, Text, Pressable, ScrollView, Dimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -28,7 +27,7 @@ const HERO_CARDS: CategoryTileData[] = [
     eyebrow: 'The Vintage Edit',
     title: 'Pre-loved\ntreasures.',
     tagline: 'Curated finds with a story',
-    accent: '#f4e8d0',
+    accent: '#6C47FF',
     icon: 'leaf-outline',
     src: require('../assets/images/categories/vintage.jpg'),
   },
@@ -37,7 +36,7 @@ const HERO_CARDS: CategoryTileData[] = [
     eyebrow: 'Sneaker Drop',
     title: 'Hype\nawaits.',
     tagline: 'Fresh kicks, daily',
-    accent: '#d8f53a',
+    accent: '#6C47FF',
     icon: 'flash-outline',
     src: require('../assets/images/categories/sneakers.jpg'),
   },
@@ -46,7 +45,7 @@ const HERO_CARDS: CategoryTileData[] = [
     eyebrow: "Editor's Picks",
     title: 'Hand-picked\nfor you.',
     tagline: 'Selected by the Carrinex team',
-    accent: '#c4b5fd',
+    accent: '#6C47FF',
     icon: 'sparkles-outline',
     src: require('../assets/images/categories/editors.jpg'),
   },
@@ -58,7 +57,7 @@ const GRID_CARDS: CategoryTileData[] = [
     eyebrow: 'Tech',
     title: 'Electronics',
     tagline: 'Phones · audio · games',
-    accent: '#67e8f9',
+    accent: '#6C47FF',
     icon: 'hardware-chip-outline',
     src: require('../assets/images/categories/electronics.jpg'),
   },
@@ -67,7 +66,7 @@ const GRID_CARDS: CategoryTileData[] = [
     eyebrow: 'Glow',
     title: 'Beauty',
     tagline: 'Skin · scent · self-care',
-    accent: '#f9a8d4',
+    accent: '#6C47FF',
     icon: 'flower-outline',
     src: require('../assets/images/categories/beauty.jpg'),
   },
@@ -76,7 +75,7 @@ const GRID_CARDS: CategoryTileData[] = [
     eyebrow: 'Live well',
     title: 'Home & Living',
     tagline: 'Décor · ceramics · linens',
-    accent: '#a3d977',
+    accent: '#6C47FF',
     icon: 'home-outline',
     src: require('../assets/images/categories/home.jpg'),
   },
@@ -85,7 +84,7 @@ const GRID_CARDS: CategoryTileData[] = [
     eyebrow: 'Designer',
     title: 'Handbags',
     tagline: 'Authenticated luxury',
-    accent: '#fcd34d',
+    accent: '#6C47FF',
     icon: 'bag-handle-outline',
     src: require('../assets/images/categories/handbags.jpg'),
   },
@@ -97,7 +96,7 @@ const MID_CARDS: CategoryTileData[] = [
     eyebrow: 'Get the app',
     title: 'Carrinex,\nin your pocket.',
     tagline: 'Faster checkout · push deals',
-    accent: '#d8f53a',
+    accent: '#6C47FF',
     icon: 'phone-portrait-outline',
     src: require('../assets/images/categories/app.jpg'),
   },
@@ -106,7 +105,7 @@ const MID_CARDS: CategoryTileData[] = [
     eyebrow: 'Move',
     title: 'Activewear.',
     tagline: 'Train · run · stretch',
-    accent: '#fb923c',
+    accent: '#6C47FF',
     icon: 'pulse-outline',
     src: require('../assets/images/categories/activewear.jpg'),
   },
@@ -115,7 +114,7 @@ const MID_CARDS: CategoryTileData[] = [
     eyebrow: 'Drops',
     title: 'Streetwear.',
     tagline: 'Hype tees · hoodies · caps',
-    accent: '#d8f53a',
+    accent: '#6C47FF',
     icon: 'flame-outline',
     src: require('../assets/images/categories/streetwear.jpg'),
   },
@@ -127,7 +126,7 @@ const PORTRAIT_CARDS: CategoryTileData[] = [
     eyebrow: 'Department',
     title: 'Women',
     tagline: 'Dresses · denim · knits',
-    accent: '#f9a8d4',
+    accent: '#6C47FF',
     icon: 'heart-outline',
     src: require('../assets/images/categories/women.jpg'),
   },
@@ -136,7 +135,7 @@ const PORTRAIT_CARDS: CategoryTileData[] = [
     eyebrow: 'Department',
     title: 'Men',
     tagline: 'Tailoring · tees · sneakers',
-    accent: '#7dd3fc',
+    accent: '#6C47FF',
     icon: 'shirt-outline',
     src: require('../assets/images/categories/men.jpg'),
   },
@@ -145,7 +144,7 @@ const PORTRAIT_CARDS: CategoryTileData[] = [
     eyebrow: 'Department',
     title: 'Kids',
     tagline: 'Tiny outfits · toys · books',
-    accent: '#fde047',
+    accent: '#6C47FF',
     icon: 'happy-outline',
     src: require('../assets/images/categories/kids.jpg'),
   },
@@ -154,7 +153,7 @@ const PORTRAIT_CARDS: CategoryTileData[] = [
     eyebrow: 'Department',
     title: 'Lifestyle',
     tagline: 'Bikes · plants · books',
-    accent: '#86efac',
+    accent: '#6C47FF',
     icon: 'bicycle-outline',
     src: require('../assets/images/categories/lifestyle.jpg'),
   },
@@ -187,12 +186,12 @@ function SectionEyebrow({ children }: { children: string }) {
       }}
     >
       <View
-        style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#d8f53a', marginRight: 8 }}
+        style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#6C47FF', marginRight: 8 }}
       />
       <Text
         style={{
           fontSize: 11,
-          color: '#0a0a0a',
+          color: '#0F0F0F',
           letterSpacing: 1.6,
           textTransform: 'uppercase',
           fontFamily: 'Inter_700Bold',
@@ -215,17 +214,6 @@ function CategoryTile({
   height: number;
   titleSize: number;
 }) {
-  // Tiny seeded scatter so each tile's decorative orb sits in a slightly
-  // different spot — feels less templated without needing per-card config.
-  const orb = useMemo(() => {
-    const seed = data.key.charCodeAt(0) + data.key.charCodeAt(data.key.length - 1);
-    return {
-      top: 10 + (seed % 14),
-      right: 14 + ((seed * 3) % 20),
-      size: 60 + ((seed * 7) % 28),
-    };
-  }, [data.key]);
-
   return (
     <Pressable
       onPress={go}
@@ -241,7 +229,7 @@ function CategoryTile({
           height,
           borderRadius: TILE_RADIUS,
           overflow: 'hidden',
-          backgroundColor: '#1a1a1a',
+          backgroundColor: '#0F0F0F',
         }}
       >
         {/* Photographic background */}
@@ -255,25 +243,11 @@ function CategoryTile({
 
         {/* Bottom-to-top dark gradient for text legibility */}
         <LinearGradient
-          colors={['rgba(10,10,10,0.05)', 'rgba(10,10,10,0.45)', 'rgba(10,10,10,0.85)']}
+          colors={['rgba(15,15,15,0.05)', 'rgba(15,15,15,0.45)', 'rgba(15,15,15,0.85)']}
           locations={[0, 0.55, 1]}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
           style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-        />
-
-        {/* Soft accent-tinted orb for depth */}
-        <View
-          style={{
-            position: 'absolute',
-            top: orb.top,
-            right: orb.right,
-            width: orb.size,
-            height: orb.size,
-            borderRadius: orb.size / 2,
-            backgroundColor: data.accent,
-            opacity: 0.22,
-          }}
         />
 
         {/* Icon chip — top-left, frosted */}
@@ -295,7 +269,7 @@ function CategoryTile({
           <Ionicons name={data.icon} size={17} color="#ffffff" />
         </View>
 
-        {/* Accent corner sticker — top-right */}
+        {/* Corner sticker — top-right. White pill, ink text. 17.6:1 AA pass. */}
         <View
           style={{
             position: 'absolute',
@@ -304,7 +278,7 @@ function CategoryTile({
             flexDirection: 'row',
             alignItems: 'center',
             gap: 5,
-            backgroundColor: data.accent,
+            backgroundColor: '#FFFFFF',
             paddingHorizontal: 8,
             paddingVertical: 3,
             borderRadius: 999,
@@ -315,13 +289,13 @@ function CategoryTile({
               width: 4,
               height: 4,
               borderRadius: 2,
-              backgroundColor: '#0a0a0a',
+              backgroundColor: '#0F0F0F',
             }}
           />
           <Text
             style={{
               fontSize: 9,
-              color: '#0a0a0a',
+              color: '#0F0F0F',
               letterSpacing: 1.2,
               textTransform: 'uppercase',
               fontFamily: 'Inter_700Bold',
@@ -391,7 +365,7 @@ export function AnonCards() {
         <Text
           style={{
             fontSize: 34,
-            color: '#0a0a0a',
+            color: '#0F0F0F',
             letterSpacing: -1.4,
             lineHeight: 38,
             fontFamily: 'Fraunces_600SemiBold',
@@ -406,7 +380,7 @@ export function AnonCards() {
         <Text
           style={{
             fontSize: 14,
-            color: '#6b7280',
+            color: 'rgba(15,15,15,0.62)',
             marginTop: 8,
             lineHeight: 20,
             fontFamily: 'Inter_400Regular',
@@ -499,11 +473,11 @@ export function AnonCards() {
 
       {/* Editorial divider into product feed below */}
       <View style={{ paddingHorizontal: SCREEN_PAD, marginTop: 30, marginBottom: 4 }}>
-        <View style={{ height: 1, backgroundColor: '#ececec', marginBottom: 18 }} />
+        <View style={{ height: 1, backgroundColor: 'rgba(15,15,15,0.08)', marginBottom: 18 }} />
         <Text
           style={{
             fontSize: 22,
-            color: '#0a0a0a',
+            color: '#0F0F0F',
             letterSpacing: -0.4,
             lineHeight: 26,
             fontFamily: 'Fraunces_600SemiBold',
@@ -514,7 +488,7 @@ export function AnonCards() {
         <Text
           style={{
             fontSize: 13,
-            color: '#6b7280',
+            color: 'rgba(15,15,15,0.62)',
             marginTop: 4,
             fontFamily: 'Inter_400Regular',
           }}

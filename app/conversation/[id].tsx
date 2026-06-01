@@ -12,6 +12,7 @@ import {
   Alert,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
+import { safeBack } from '@/lib/nav';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -123,9 +124,9 @@ function MessageBubble({
                 borderRadius: 999,
                 backgroundColor:
                   status === 'accepted'
-                    ? 'rgba(34,197,94,0.18)'
+                    ? 'rgba(108,71,255,0.18)'
                     : status === 'declined'
-                      ? 'rgba(239,68,68,0.18)'
+                      ? 'rgba(15,15,15,0.18)'
                       : 'rgba(255,255,255,0.18)',
               }}
             >
@@ -137,9 +138,9 @@ function MessageBubble({
                   color: mine
                     ? 'white'
                     : status === 'accepted'
-                      ? '#15803d'
+                      ? colors.primary
                       : status === 'declined'
-                        ? '#b91c1c'
+                        ? colors.ink
                         : colors.mute,
                   textTransform: 'uppercase',
                 }}
@@ -333,7 +334,7 @@ function OfferSheet({
                 onChangeText={(t) => setAmount(t.replace(/[^0-9]/g, ''))}
                 keyboardType="number-pad"
                 style={{ fontSize: 28, fontWeight: '900', color: colors.ink, flex: 1, padding: 0 }}
-                placeholderTextColor="#c9b8ff"
+                placeholderTextColor="rgba(15,15,15,0.45)"
                 autoFocus
               />
             </View>
@@ -558,7 +559,7 @@ export default function ConversationScreen() {
     return (
       <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: 'white' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', padding: 14 }}>
-          <Pressable onPress={() => router.back()}>
+          <Pressable onPress={() => safeBack()}>
             <Feather name="chevron-left" size={26} color={colors.ink} />
           </Pressable>
         </View>
@@ -590,7 +591,7 @@ export default function ConversationScreen() {
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0 }}>
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => safeBack()}
             hitSlop={HIT_SLOP_8}
             style={({ pressed }) => ({
               width: 36,

@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
+import { safeBack } from '@/lib/nav';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -65,7 +66,7 @@ const IMAGE_HEIGHT = width * 1.45;
 
 function PinIcon({
   size = 22,
-  color = '#111827',
+  color = '#0F0F0F',
   filled = false,
 }: { size?: number; color?: string; filled?: boolean }) {
   return (
@@ -103,7 +104,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   other: 'Other',
 };
 
-const ITEM_COLOR = { name: 'Marine blue', hex: '#1d4ed8' };
+const ITEM_COLOR = { name: 'Carrinex purple', hex: '#6C47FF' };
 
 const ITEM_TAGS = [
   'arcteryx',
@@ -118,11 +119,11 @@ const ITEM_TAGS = [
 
 // Unified brand palette (matches home tabs + PromoBanner + LiveActivityTicker)
 const BRAND_PURPLE = '#6C47FF';
-const BRAND_PURPLE_SOFT = '#f1edff';
-const BRAND_LIME = '#d8f53a';
-const BRAND_INK = '#0a0a0a';
-const TAG_BG = '#f3f4f6';
-const TAG_BORDER = '#e5e7eb';
+const BRAND_PURPLE_SOFT = 'rgba(108,71,255,0.10)';
+const BRAND_LIME = '#6C47FF';
+const BRAND_INK = '#0F0F0F';
+const TAG_BG = 'rgba(15,15,15,0.04)';
+const TAG_BORDER = 'rgba(15,15,15,0.08)';
 const LINK_PURPLE = BRAND_PURPLE;
 
 const REVIEWS_COUNT = 7;
@@ -514,7 +515,7 @@ function SaveListSheet({
             style={{
               fontSize: 13,
               fontWeight: '600',
-              color: '#6b7280',
+              color: 'rgba(15,15,15,0.62)',
               textAlign: 'center',
               paddingTop: 14,
               paddingBottom: 10,
@@ -523,7 +524,7 @@ function SaveListSheet({
           >
             Save to list
           </Text>
-          <View style={{ height: HAIRLINE, backgroundColor: '#e5e7eb', marginHorizontal: 12 }} />
+          <View style={{ height: HAIRLINE, backgroundColor: 'rgba(15,15,15,0.08)', marginHorizontal: 12 }} />
           {SAVE_LISTS.map((list, i) => {
             const isLast = i === SAVE_LISTS.length - 1;
             const isSelected = list.id === selectedId;
@@ -537,20 +538,20 @@ function SaveListSheet({
                   paddingVertical: 14,
                   paddingHorizontal: 18,
                   borderBottomWidth: isLast ? 0 : HAIRLINE,
-                  borderBottomColor: '#e5e7eb',
+                  borderBottomColor: 'rgba(15,15,15,0.08)',
                   opacity: pressed ? 0.55 : 1,
                 })}
               >
                 <Text style={{ fontSize: 22, marginRight: 12 }}>{list.emoji}</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 16, fontWeight: '600', color: '#111827' }}>{list.name}</Text>
-                  <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{list.count} items</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '600', color: '#0F0F0F' }}>{list.name}</Text>
+                  <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.62)', marginTop: 2 }}>{list.count} items</Text>
                 </View>
                 {isSelected && <Ionicons name="checkmark-circle" size={22} color={BRAND_PURPLE} />}
               </Pressable>
             );
           })}
-          <View style={{ height: HAIRLINE, backgroundColor: '#e5e7eb', marginHorizontal: 12 }} />
+          <View style={{ height: HAIRLINE, backgroundColor: 'rgba(15,15,15,0.08)', marginHorizontal: 12 }} />
           <Pressable
             onPress={() => { tap('selection'); Alert.alert('New list', 'Create list flow…'); onClose(); }}
             style={({ pressed }) => ({
@@ -589,7 +590,7 @@ function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress: () => 
           height: CARD_IMAGE_HEIGHT,
           borderRadius: 14,
           overflow: 'hidden',
-          backgroundColor: '#f3f4f6',
+          backgroundColor: 'rgba(15,15,15,0.04)',
         }}
       >
         {hasMultiple ? (
@@ -687,7 +688,7 @@ function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress: () => 
         <Text style={{ fontSize: 13, fontWeight: '700', color: BRAND_INK }} numberOfLines={1}>
           {item.brand}
         </Text>
-        <Text style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }} numberOfLines={1}>
+        <Text style={{ fontSize: 11, color: 'rgba(15,15,15,0.62)', marginTop: 2 }} numberOfLines={1}>
           {item.meta}
         </Text>
         <Text style={{ fontSize: 14, fontWeight: '800', color: BRAND_INK, marginTop: 4 }}>
@@ -734,7 +735,7 @@ function StarRating({ rating }: { rating: number }) {
           key={i}
           name={i < full ? 'star' : 'star-outline'}
           size={14}
-          color={i < full ? '#f59e0b' : '#d1d5db'}
+          color={i < full ? '#6C47FF' : 'rgba(15,15,15,0.18)'}
         />
       ))}
     </View>
@@ -895,15 +896,15 @@ export default function ProductScreen() {
   if (notFound || !listing) {
     return (
       <View style={{ flex: 1, backgroundColor: 'white', paddingTop: insets.top }}>
-        <Pressable onPress={() => router.back()} hitSlop={10} style={{ padding: 16 }}>
-          <Feather name="arrow-left" size={22} color="#111827" />
+        <Pressable onPress={() => safeBack()} hitSlop={10} style={{ padding: 16 }}>
+          <Feather name="arrow-left" size={22} color="#0F0F0F" />
         </Pressable>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
-          <Feather name="alert-circle" size={42} color="#9ca3af" />
-          <Text style={{ fontSize: 17, fontWeight: '700', color: '#111827', marginTop: 14 }}>
+          <Feather name="alert-circle" size={42} color="rgba(15,15,15,0.45)" />
+          <Text style={{ fontSize: 17, fontWeight: '700', color: '#0F0F0F', marginTop: 14 }}>
             Listing not available
           </Text>
-          <Text style={{ fontSize: 14, color: '#6b7280', marginTop: 6, textAlign: 'center' }}>
+          <Text style={{ fontSize: 14, color: 'rgba(15,15,15,0.62)', marginTop: 6, textAlign: 'center' }}>
             It may have been removed or never existed.
           </Text>
         </View>
@@ -926,7 +927,7 @@ export default function ProductScreen() {
         <View style={{
           position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100,
           backgroundColor: 'white',
-          borderBottomWidth: HAIRLINE, borderBottomColor: '#e5e7eb',
+          borderBottomWidth: HAIRLINE, borderBottomColor: 'rgba(15,15,15,0.08)',
           paddingTop: insets.top,
           flexDirection: 'row', alignItems: 'center',
           paddingHorizontal: 16, paddingBottom: 12,
@@ -937,13 +938,13 @@ export default function ProductScreen() {
             shadowOffset: { width: 0, height: 2 },
           }),
         }}>
-          <Pressable onPress={() => { tap('selection'); router.back(); }} hitSlop={10} style={({ pressed }) => ({ marginRight: 12, opacity: pressed ? 0.5 : 1 })}>
-            <Feather name="arrow-left" size={22} color="#111827" />
+          <Pressable onPress={() => { tap('selection'); safeBack(); }} hitSlop={10} style={({ pressed }) => ({ marginRight: 12, opacity: pressed ? 0.5 : 1 })}>
+            <Feather name="arrow-left" size={22} color="#0F0F0F" />
           </Pressable>
-          <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: '#111827' }} numberOfLines={1}>
+          <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: '#0F0F0F' }} numberOfLines={1}>
             {listing.title}
           </Text>
-          <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: '#0F0F0F' }}>
             ${listing.price}
           </Text>
         </View>
@@ -984,7 +985,7 @@ export default function ProductScreen() {
 
           {/* Back arrow — frosted glass on iOS so it stays visible over light photos */}
           <Pressable
-            onPress={() => { tap('selection'); router.back(); }}
+            onPress={() => { tap('selection'); safeBack(); }}
             hitSlop={12}
             style={({ pressed }) => ({
               position: 'absolute',
@@ -1005,7 +1006,7 @@ export default function ProductScreen() {
             ) : (
               <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255,255,255,0.85)' }]} />
             )}
-            <Feather name="arrow-left" size={22} color="#111827" />
+            <Feather name="arrow-left" size={22} color="#0F0F0F" />
           </Pressable>
 
           {/* Right-side floating action cluster — unified glass pill */}
@@ -1054,7 +1055,7 @@ export default function ProductScreen() {
                 transform: [{ scale: pressed ? 0.94 : 1 }],
               })}
             >
-              <LikeBurst liked={liked} size={20} color="#ef4444" inactiveColor={BRAND_INK} />
+              <LikeBurst liked={liked} size={20} color={BRAND_PURPLE} inactiveColor={BRAND_INK} />
               <AnimatedNumber
                 value={heartCount}
                 height={14}
@@ -1104,8 +1105,8 @@ export default function ProductScreen() {
           >
             <View style={{ flex: 1, paddingRight: 14 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6, gap: 6 }}>
-                <Feather name="heart" size={13} color="#6b7280" />
-                <Text style={{ fontSize: 13, color: '#6b7280' }}>
+                <Feather name="heart" size={13} color="rgba(15,15,15,0.62)" />
+                <Text style={{ fontSize: 13, color: 'rgba(15,15,15,0.62)' }}>
                   Liked by <Text style={{ fontWeight: '700', color: BRAND_INK }}>@alice.333</Text>
                   {heartCount > 1 ? ` and ${heartCount - 1} others` : ''}
                 </Text>
@@ -1124,7 +1125,7 @@ export default function ProductScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 8 }}>
                 <View
                   style={{
-                    backgroundColor: '#f3f4f6',
+                    backgroundColor: 'rgba(15,15,15,0.04)',
                     borderRadius: 999,
                     paddingHorizontal: 10,
                     paddingVertical: 4,
@@ -1136,8 +1137,8 @@ export default function ProductScreen() {
                 </View>
                 {listing.seller?.location ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Feather name="map-pin" size={11} color="#6b7280" />
-                    <Text style={{ fontSize: 12, color: '#6b7280' }} numberOfLines={1}>
+                    <Feather name="map-pin" size={11} color="rgba(15,15,15,0.62)" />
+                    <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.62)' }} numberOfLines={1}>
                       {listing.seller.location}
                     </Text>
                   </View>
@@ -1145,7 +1146,7 @@ export default function ProductScreen() {
               </View>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={{ fontSize: 13, color: '#9ca3af', textDecorationLine: 'line-through' }}>
+              <Text style={{ fontSize: 13, color: 'rgba(15,15,15,0.45)', textDecorationLine: 'line-through' }}>
                 ${originalPrice}
               </Text>
               <Text
@@ -1168,7 +1169,7 @@ export default function ProductScreen() {
                   paddingVertical: 3,
                 }}
               >
-                <Text style={{ fontSize: 11, fontWeight: '900', color: BRAND_INK, letterSpacing: 0.4 }}>
+                <Text style={{ fontSize: 11, fontWeight: '900', color: '#FFFFFF', letterSpacing: 0.4 }}>
                   −{discountPct}%
                 </Text>
               </View>
@@ -1208,10 +1209,10 @@ export default function ProductScreen() {
         <View style={{ paddingHorizontal: 16, paddingTop: 18, paddingBottom: 16 }}>
           <View
             style={{
-              backgroundColor: '#fafafa',
+              backgroundColor: 'rgba(15,15,15,0.04)',
               borderRadius: 18,
               borderWidth: HAIRLINE,
-              borderColor: '#ececec',
+              borderColor: 'rgba(15,15,15,0.08)',
               padding: 14,
             }}
           >
@@ -1225,7 +1226,7 @@ export default function ProductScreen() {
                   padding: 2,
                   backgroundColor: 'white',
                   borderWidth: HAIRLINE,
-                  borderColor: '#e5e7eb',
+                  borderColor: 'rgba(15,15,15,0.08)',
                 }}
               >
                 <View
@@ -1234,7 +1235,7 @@ export default function ProductScreen() {
                     height: 52,
                     borderRadius: 26,
                     overflow: 'hidden',
-                    backgroundColor: '#e5e7eb',
+                    backgroundColor: 'rgba(15,15,15,0.08)',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
@@ -1248,7 +1249,7 @@ export default function ProductScreen() {
                       transition={150}
                     />
                   ) : (
-                    <Feather name="user" size={22} color="#9ca3af" />
+                    <Feather name="user" size={22} color="rgba(15,15,15,0.45)" />
                   )}
                 </View>
               </View>
@@ -1263,11 +1264,11 @@ export default function ProductScreen() {
                   <Text style={{ fontSize: 12, fontWeight: '600', color: BRAND_INK }}>
                     {listing.seller.rating?.toFixed?.(1) ?? '—'}
                   </Text>
-                  <Text style={{ fontSize: 12, color: '#6b7280' }}>
+                  <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.62)' }}>
                     ({REVIEWS_COUNT})
                   </Text>
                 </View>
-                <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 3 }}>
+                <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.62)', marginTop: 3 }}>
                   {TRANSACTIONS_COUNT} sales · {ITEMS_FOR_SALE} listed
                 </Text>
               </View>
@@ -1287,7 +1288,7 @@ export default function ProductScreen() {
                   gap: 6,
                   backgroundColor: followed ? 'white' : BRAND_PURPLE,
                   borderWidth: followed ? HAIRLINE : 0,
-                  borderColor: '#e5e7eb',
+                  borderColor: 'rgba(15,15,15,0.08)',
                   opacity: pressed ? 0.88 : 1,
                   transform: [{ scale: pressed ? 0.98 : 1 }],
                 })}
@@ -1319,7 +1320,7 @@ export default function ProductScreen() {
                   gap: 6,
                   backgroundColor: 'white',
                   borderWidth: HAIRLINE,
-                  borderColor: '#e5e7eb',
+                  borderColor: 'rgba(15,15,15,0.08)',
                   opacity: pressed ? 0.7 : 1,
                   transform: [{ scale: pressed ? 0.98 : 1 }],
                 })}
@@ -1369,7 +1370,7 @@ export default function ProductScreen() {
               backgroundColor: 'white',
               borderRadius: 18,
               borderWidth: HAIRLINE,
-              borderColor: '#ececec',
+              borderColor: 'rgba(15,15,15,0.08)',
               overflow: 'hidden',
             }}
           >
@@ -1443,7 +1444,7 @@ export default function ProductScreen() {
                       padding: 2,
                       backgroundColor: 'white',
                       borderWidth: HAIRLINE,
-                      borderColor: '#e5e7eb',
+                      borderColor: 'rgba(15,15,15,0.08)',
                     }}
                   >
                     <View
@@ -1468,8 +1469,8 @@ export default function ProductScreen() {
                     paddingHorizontal: 18,
                     paddingVertical: 14,
                     borderTopWidth: HAIRLINE,
-                    borderTopColor: '#ececec',
-                    backgroundColor: pressed && row.onPress ? '#fafafa' : 'white',
+                    borderTopColor: 'rgba(15,15,15,0.08)',
+                    backgroundColor: pressed && row.onPress ? 'rgba(15,15,15,0.04)' : 'white',
                   })}
                 >
                   <Text style={{ flex: 1, fontSize: 15, color: BRAND_INK }} numberOfLines={1}>
@@ -1500,7 +1501,7 @@ export default function ProductScreen() {
                 <Text
                   style={{
                     fontSize: 12,
-                    color: '#4b5563',
+                    color: 'rgba(15,15,15,0.62)',
                     fontFamily: 'Inter_500Medium',
                     letterSpacing: 0.1,
                   }}
@@ -1553,11 +1554,11 @@ export default function ProductScreen() {
                 opacity: pressed ? 0.6 : 1,
               })}
             >
-              <Feather name="flag" size={16} color="#6b7280" />
+              <Feather name="flag" size={16} color="rgba(15,15,15,0.62)" />
               <Text
                 style={{
                   fontSize: 13,
-                  color: '#6b7280',
+                  color: 'rgba(15,15,15,0.62)',
                   fontFamily: 'Inter_600SemiBold',
                   letterSpacing: 0.2,
                 }}
@@ -1569,7 +1570,7 @@ export default function ProductScreen() {
               <Text
                 style={{
                   fontSize: 11,
-                  color: '#9ca3af',
+                  color: 'rgba(15,15,15,0.45)',
                   letterSpacing: 0.6,
                   fontFamily: 'Inter_500Medium',
                 }}
@@ -1618,7 +1619,7 @@ export default function ProductScreen() {
                 <Text style={{ fontSize: 14, fontWeight: '800', color: BRAND_INK, marginBottom: 3 }}>
                   Carrinex Verified
                 </Text>
-                <Text style={{ fontSize: 12, color: '#4b5563', lineHeight: 18 }}>
+                <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.62)', lineHeight: 18 }}>
                   Authenticated by our in-house team or a trusted partner.
                 </Text>
               </View>
@@ -1653,7 +1654,7 @@ export default function ProductScreen() {
                 <Text style={{ fontSize: 14, fontWeight: '800', color: BRAND_INK, marginBottom: 3 }}>
                   Purchase Protection
                 </Text>
-                <Text style={{ fontSize: 12, color: '#4b5563', lineHeight: 18 }}>
+                <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.62)', lineHeight: 18 }}>
                   Qualifying orders covered if something goes wrong.
                 </Text>
               </View>
@@ -1677,21 +1678,21 @@ export default function ProductScreen() {
                     paddingHorizontal: 16,
                     paddingVertical: 9,
                     borderRadius: 999,
-                    backgroundColor: active ? BRAND_PURPLE : '#F2F2F2',
+                    backgroundColor: active ? BRAND_PURPLE : 'rgba(15,15,15,0.04)',
                     transform: [{ scale: pressed ? 0.96 : 1 }],
                   })}
                 >
                   <Ionicons
                     name={tab === 'members' ? 'person' : 'sparkles'}
                     size={13}
-                    color={active ? 'white' : '#374151'}
+                    color={active ? 'white' : '#0F0F0F'}
                     style={{ marginRight: 6 }}
                   />
                   <Text
                     style={{
                       fontSize: 13,
                       fontWeight: '700',
-                      color: active ? 'white' : '#374151',
+                      color: active ? 'white' : '#0F0F0F',
                     }}
                   >
                     {tab === 'members' ? "Seller's items" : 'Similar items'}
@@ -1708,7 +1709,7 @@ export default function ProductScreen() {
               {/* Bundle discounts header */}
               <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>
                 <SectionEyebrow label={`Bundle from @${listing.seller.username}`} />
-                <Text style={{ fontSize: 13, color: '#6b7280', lineHeight: 19 }}>
+                <Text style={{ fontSize: 13, color: 'rgba(15,15,15,0.62)', lineHeight: 19 }}>
                   Add items from this seller to unlock progressive discounts plus shipping savings.
                 </Text>
               </View>
@@ -1738,7 +1739,7 @@ export default function ProductScreen() {
                   />
                   <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '25%' }}>
                     <LinearGradient
-                      colors={[BRAND_PURPLE, '#9b7dff']}
+                      colors={[BRAND_PURPLE, BRAND_PURPLE]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                       style={{ flex: 1, borderRadius: 99 }}
@@ -1774,13 +1775,13 @@ export default function ProductScreen() {
                         style={{
                           fontSize: 11,
                           fontWeight: '700',
-                          color: m.active ? BRAND_PURPLE : '#9ca3af',
+                          color: m.active ? BRAND_PURPLE : 'rgba(15,15,15,0.45)',
                           textAlign: 'center',
                         }}
                       >
                         {m.discount}
                       </Text>
-                      <Text style={{ fontSize: 10, color: '#6b7280', textAlign: 'center', marginTop: 2 }}>
+                      <Text style={{ fontSize: 10, color: 'rgba(15,15,15,0.62)', textAlign: 'center', marginTop: 2 }}>
                         {m.items}
                       </Text>
                     </View>
@@ -1830,7 +1831,7 @@ export default function ProductScreen() {
           right: 0,
           backgroundColor: 'white',
           borderTopWidth: HAIRLINE,
-          borderTopColor: '#ececec',
+          borderTopColor: 'rgba(15,15,15,0.08)',
           paddingHorizontal: 16,
           paddingTop: 12,
           paddingBottom: insets.bottom || 16,
@@ -1852,7 +1853,7 @@ export default function ProductScreen() {
             height: 50,
             borderRadius: 14,
             borderWidth: HAIRLINE,
-            borderColor: '#e5e7eb',
+            borderColor: 'rgba(15,15,15,0.08)',
             alignItems: 'center',
             justifyContent: 'center',
             flexDirection: 'row',
@@ -1868,7 +1869,20 @@ export default function ProductScreen() {
           </Text>
         </Pressable>
         <Pressable
-          onPress={() => { tap('medium'); Alert.alert('Buy', 'Payment flow coming soon'); }}
+          onPress={() => {
+            tap('medium');
+            if (!user) {
+              toast.show('Sign in to buy', { variant: 'info', icon: 'log-in' });
+              router.push('/auth/login');
+              return;
+            }
+            if (!listing?.id) return;
+            if (listing.seller_id === user.id) {
+              toast.show("That's your own listing", { variant: 'default', icon: 'info' });
+              return;
+            }
+            router.push(`/payment/${listing.id}` as any);
+          }}
           style={({ pressed }) => ({
             flex: 1,
             height: 50,
@@ -1894,7 +1908,7 @@ export default function ProductScreen() {
               paddingVertical: 3,
             }}
           >
-            <Text style={{ fontSize: 13, fontWeight: '900', color: BRAND_INK, letterSpacing: 0.2 }}>
+            <Text style={{ fontSize: 13, fontWeight: '900', color: '#FFFFFF', letterSpacing: 0.2 }}>
               ${listing.price}
             </Text>
           </View>

@@ -18,17 +18,18 @@ import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/lib/auth';
+import { safeBack } from '@/lib/nav';
 import { supabase } from '@/lib/supabase';
 import { uploadAvatar, type LocalImage } from '@/lib/upload';
 import { useToast } from '@/lib/toast';
 
 const PURPLE = '#6C47FF';
 const LIME = '#6C47FF';
-const INK = '#0a0a0a';
-const MUTE = '#6b7280';
-const SOFT = '#ffffff';
-const HAIR = '#efefef';
-const RED = '#ef4444';
+const INK = '#0F0F0F';
+const MUTE = 'rgba(15,15,15,0.62)';
+const SOFT = '#FFFFFF';
+const HAIR = 'rgba(15,15,15,0.08)';
+const RED = '#0F0F0F';
 
 const LIMITS = {
   username: 20,
@@ -73,8 +74,8 @@ function FieldShell({
     : overTwoThirds
       ? count! >= max!
         ? RED
-        : '#8a8a82'
-      : '#a8a59c';
+        : 'rgba(15,15,15,0.45)'
+      : 'rgba(15,15,15,0.45)';
 
   return (
     <View style={{ marginBottom: 14 }}>
@@ -116,7 +117,7 @@ function FieldShell({
             {count}/{max}
           </Text>
         ) : helper && !error ? (
-          <Text style={{ fontSize: 11, color: '#a8a59c' }}>{helper}</Text>
+          <Text style={{ fontSize: 11, color: 'rgba(15,15,15,0.45)' }}>{helper}</Text>
         ) : null}
       </View>
       <View
@@ -350,7 +351,7 @@ export default function ProfileEditScreen() {
   const confirmDiscard = useCallback(() => {
     Alert.alert('Discard changes?', 'Your unsaved changes will be lost.', [
       { text: 'Keep editing', style: 'cancel' },
-      { text: 'Discard', style: 'destructive', onPress: () => router.back() },
+      { text: 'Discard', style: 'destructive', onPress: () => safeBack() },
     ]);
   }, []);
 
@@ -375,7 +376,7 @@ export default function ProfileEditScreen() {
       confirmDiscard();
       return;
     }
-    router.back();
+    safeBack();
   }, [isDirty, isOnboarding, saving, confirmDiscard]);
 
   const handleSave = useCallback(async () => {
@@ -391,7 +392,7 @@ export default function ProfileEditScreen() {
       return;
     }
     if (!isOnboarding && !isDirty) {
-      router.back();
+      safeBack();
       return;
     }
     setUsernameError(null);
@@ -442,7 +443,7 @@ export default function ProfileEditScreen() {
       });
 
       if (isOnboarding) router.replace('/(tabs)');
-      else router.back();
+      else safeBack();
     } catch (e: any) {
       if (!mounted.current) return;
       toast.show(e?.message ?? 'Something went wrong', {
@@ -718,7 +719,7 @@ export default function ProfileEditScreen() {
               <Text style={{ fontSize: 16, color: MUTE, marginRight: 2 }}>@</Text>
               <TextInput
                 placeholder="ahmad_saleem"
-                placeholderTextColor="#a8a59c"
+                placeholderTextColor="rgba(15,15,15,0.45)"
                 value={username}
                 onChangeText={(t) => {
                   const cleaned = t.replace(/\s+/g, '').toLowerCase();
@@ -753,7 +754,7 @@ export default function ProfileEditScreen() {
                     marginLeft: 8,
                   }}
                 >
-                  <Feather name="check" size={13} color={INK} />
+                  <Feather name="check" size={13} color="#FFFFFF" />
                 </View>
               )}
               {usernameStatus === 'taken' && (
@@ -783,7 +784,7 @@ export default function ProfileEditScreen() {
             <TextInput
               ref={fullNameRef}
               placeholder="Ahmad Saleem"
-              placeholderTextColor="#a8a59c"
+              placeholderTextColor="rgba(15,15,15,0.45)"
               value={fullName}
               onChangeText={(t) => setFullName(t.slice(0, LIMITS.fullName))}
               onFocus={() => setFocused('fullName')}
@@ -808,7 +809,7 @@ export default function ProfileEditScreen() {
             <TextInput
               ref={bioRef}
               placeholder="A line about your shop"
-              placeholderTextColor="#a8a59c"
+              placeholderTextColor="rgba(15,15,15,0.45)"
               value={bio}
               onChangeText={(t) => setBio(t.slice(0, LIMITS.bio))}
               onFocus={() => setFocused('bio')}
@@ -830,7 +831,7 @@ export default function ProfileEditScreen() {
             <TextInput
               ref={locationRef}
               placeholder="Karachi"
-              placeholderTextColor="#a8a59c"
+              placeholderTextColor="rgba(15,15,15,0.45)"
               value={location}
               onChangeText={(t) => setLocation(t.slice(0, LIMITS.location))}
               onFocus={() => setFocused('location')}
@@ -920,7 +921,7 @@ export default function ProfileEditScreen() {
             paddingBottom: Platform.OS === 'ios' ? 32 : 20,
             backgroundColor: SOFT,
             borderTopWidth: 1,
-            borderTopColor: '#eceae3',
+            borderTopColor: 'rgba(15,15,15,0.08)',
           }}
         >
           <Pressable

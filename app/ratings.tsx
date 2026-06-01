@@ -1,10 +1,10 @@
 import { View, Text, Pressable, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@/lib/auth';
 import { colors, radii } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
+import { safeBack } from '@/lib/nav';
 
 export default function RatingsScreen() {
   const { profile } = useAuth();
@@ -28,7 +28,7 @@ export default function RatingsScreen() {
         }}
       >
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => safeBack()}
           hitSlop={HIT_SLOP_8}
           style={({ pressed }) => ({
             width: 38,

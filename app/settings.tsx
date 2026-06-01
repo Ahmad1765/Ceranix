@@ -23,6 +23,8 @@ import Constants from 'expo-constants';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
+import { confirm } from '@/lib/confirm';
+import { safeBack } from '@/lib/nav';
 import type {
   DocumentKind,
   PayoutKind,
@@ -32,11 +34,11 @@ import type {
 } from '@/types';
 
 const LIME = '#6C47FF';
-const INK = '#0a0a0a';
-const MUTE = '#6b7280';
-const SOFT = '#ffffff';
-const HAIR = '#efefef';
-const RED = '#ef4444';
+const INK = '#0F0F0F';
+const MUTE = 'rgba(15,15,15,0.62)';
+const SOFT = '#FFFFFF';
+const HAIR = 'rgba(15,15,15,0.08)';
+const RED = '#0F0F0F';
 
 const SUPPORT_EMAIL = 'support@ceranix.app';
 const TERMS_URL = 'https://ceranix.vercel.app/terms';
@@ -222,124 +224,95 @@ export default function SettingsScreen() {
   }, [profile?.username, toast]);
 
   // ---------- Auth flows ----------
-  const handleLogout = useCallback(() => {
+  const handleLogout = useCallback(async () => {
     if (busy) return;
-    Alert.alert('Log out', 'Are you sure you want to log out?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Log out',
-        style: 'destructive',
-        onPress: async () => {
-          setBusy('logout');
-          try {
-            await signOut();
-            toast.show('Signed out', { variant: 'default', icon: 'log-out' });
-            router.replace('/(tabs)');
-          } catch (e: any) {
-            toast.show(e?.message ?? 'Could not log out', {
-              variant: 'default',
-              icon: 'alert-triangle',
-            });
-          } finally {
-            if (mounted.current) setBusy(null);
-          }
-        },
-      },
-    ]);
+    const ok = await confirm({
+      title: 'Log out',
+      message: 'Are you sure you want to log out?',
+      confirmLabel: 'Log out',
+      destructive: true,
+    });
+    if (!ok) return;
+    setBusy('logout');
+    try {
+      await signOut();
+      toast.show('Signed out', { variant: 'default', icon: 'log-out' });
+      router.replace('/(tabs)');
+    } catch (e: any) {
+      toast.show(e?.message ?? 'Could not log out', {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
+    } finally {
+      if (mounted.current) setBusy(null);
+    }
   }, [busy, signOut, toast]);
 
-  const handleResetPassword = useCallback(() => {
+  const handleResetPassword = useCallback(async () => {
     if (!user?.email) {
       toast.show('No email on file', { variant: 'default', icon: 'alert-triangle' });
       return;
     }
     if (busy) return;
-    Alert.alert(
-      'Send password reset?',
-      `We'll email ${user.email} a link to change your password.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Send email',
-          onPress: async () => {
-            setBusy('password');
-            try {
-              const { error } = await supabase.auth.resetPasswordForEmail(user.email!);
-              if (error) throw error;
-              toast.show('Reset email sent', { variant: 'success', icon: 'mail' });
-            } catch (e: any) {
-              toast.show(e?.message ?? 'Could not send email', {
-                variant: 'default',
-                icon: 'alert-triangle',
-              });
-            } finally {
-              if (mounted.current) setBusy(null);
-            }
-          },
-        },
-      ],
-    );
+    const ok = await confirm({
+      title: 'Send password reset?',
+      message: `We'll email ${user.email} a link to change your password.`,
+      confirmLabel: 'Send email',
+    });
+    if (!ok) return;
+    setBusy('password');
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(user.email!);
+      if (error) throw error;
+      toast.show('Reset email sent', { variant: 'success', icon: 'mail' });
+    } catch (e: any) {
+      toast.show(e?.message ?? 'Could not send email', {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
+    } finally {
+      if (mounted.current) setBusy(null);
+    }
   }, [user?.email, busy, toast]);
 
-  const handleDeleteAccount = useCallback(() => {
+  const handleDeleteAccount = useCallback(async () => {
     if (busy) return;
-    Alert.alert(
-      'Delete account?',
-      'This permanently removes your profile, listings, likes, and messages. This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Continue',
-          style: 'destructive',
-          onPress: () => {
-            Alert.alert(
-              'Are you absolutely sure?',
-              'Your account will be deleted immediately.',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Delete forever',
-                  style: 'destructive',
-                  onPress: async () => {
-                    setBusy('delete');
-                    try {
-                      const { data, error } = await supabase.functions.invoke(
-                        'delete-account',
-                        { body: {} },
-                      );
-                      if (error) throw error;
-                      if ((data as any)?.error) throw new Error((data as any).error);
-                      // Session is now invalid — sign out locally.
-                      await signOut().catch(() => {});
-                      toast.show('Account deleted', {
-                        variant: 'default',
-                        icon: 'check',
-                      });
-                      router.replace('/(tabs)');
-                    } catch (e: any) {
-                      // Fallback: email support + sign out locally so user is freed
-                      const subject = encodeURIComponent('Account deletion request');
-                      const body = encodeURIComponent(
-                        `Please delete my account.\nUser ID: ${user?.id ?? 'unknown'}\nEmail: ${user?.email ?? 'unknown'}`,
-                      );
-                      Linking.openURL(
-                        `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`,
-                      ).catch(() => {});
-                      toast.show(e?.message ?? 'Could not delete now — emailed support', {
-                        variant: 'default',
-                        icon: 'alert-triangle',
-                      });
-                    } finally {
-                      if (mounted.current) setBusy(null);
-                    }
-                  },
-                },
-              ],
-            );
-          },
-        },
-      ],
-    );
+    const first = await confirm({
+      title: 'Delete account?',
+      message:
+        'This permanently removes your profile, listings, likes, and messages. This cannot be undone.',
+      confirmLabel: 'Continue',
+      destructive: true,
+    });
+    if (!first) return;
+    const second = await confirm({
+      title: 'Are you absolutely sure?',
+      message: 'Your account will be deleted immediately.',
+      confirmLabel: 'Delete forever',
+      destructive: true,
+    });
+    if (!second) return;
+    setBusy('delete');
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-account', { body: {} });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      await signOut().catch(() => {});
+      toast.show('Account deleted', { variant: 'default', icon: 'check' });
+      router.replace('/(tabs)');
+    } catch (e: any) {
+      const subject = encodeURIComponent('Account deletion request');
+      const body = encodeURIComponent(
+        `Please delete my account.\nUser ID: ${user?.id ?? 'unknown'}\nEmail: ${user?.email ?? 'unknown'}`,
+      );
+      Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`).catch(() => {});
+      toast.show(e?.message ?? 'Could not delete now — emailed support', {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
+    } finally {
+      if (mounted.current) setBusy(null);
+    }
   }, [busy, user, signOut, toast]);
 
   const handleComingSoon = useCallback(() => {
@@ -492,7 +465,7 @@ export default function SettingsScreen() {
         }}
       >
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => safeBack()}
           hitSlop={12}
           style={{
             width: 38,
@@ -596,7 +569,7 @@ export default function SettingsScreen() {
                   contentFit="cover"
                 />
               ) : (
-                <Text style={{ fontSize: 24, fontWeight: '900', color: INK }}>{initial}</Text>
+                <Text style={{ fontSize: 24, fontWeight: '900', color: '#FFFFFF' }}>{initial}</Text>
               )}
             </View>
             <View style={{ flex: 1 }}>
@@ -609,7 +582,7 @@ export default function SettingsScreen() {
                 </Text>
                 {profile.is_verified && (
                   <View style={{ marginLeft: 6 }}>
-                    <Feather name="check-circle" size={14} color={LIME} />
+                    <Feather name="check-circle" size={14} color="#FFFFFF" />
                   </View>
                 )}
               </View>
@@ -634,7 +607,7 @@ export default function SettingsScreen() {
                 justifyContent: 'center',
               }}
             >
-              <Feather name="edit-2" size={16} color={INK} />
+              <Feather name="edit-2" size={16} color="#FFFFFF" />
             </View>
           </Pressable>
         ) : session ? (
@@ -675,7 +648,7 @@ export default function SettingsScreen() {
                 marginRight: 14,
               }}
             >
-              <Feather name="log-in" size={18} color={INK} />
+              <Feather name="log-in" size={18} color="#FFFFFF" />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 15, fontWeight: '800', color: 'white' }}>Sign in</Text>
@@ -927,9 +900,9 @@ export default function SettingsScreen() {
               }}
             >
               {busy === 'logout' ? (
-                <ActivityIndicator color={INK} />
+                <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Feather name="log-out" size={18} color={INK} />
+                <Feather name="log-out" size={18} color="#FFFFFF" />
               )}
             </View>
             <Text
@@ -949,7 +922,7 @@ export default function SettingsScreen() {
           style={{
             textAlign: 'center',
             fontSize: 11,
-            color: '#a8a59c',
+            color: 'rgba(15,15,15,0.45)',
             marginTop: 18,
             fontWeight: '600',
             letterSpacing: 0.4,
@@ -1074,7 +1047,7 @@ function BundleDiscountModal({
                 style={{
                   fontSize: 14,
                   fontWeight: '800',
-                  color: active ? LIME : INK,
+                  color: active ? 'white' : INK,
                 }}
               >
                 {pct === 0 ? 'Off' : `${pct}%`}
@@ -1343,7 +1316,7 @@ function PayoutModal({
                   style={{
                     fontSize: 13,
                     fontWeight: '800',
-                    color: active ? LIME : INK,
+                    color: active ? 'white' : INK,
                     textTransform: 'capitalize',
                   }}
                 >
@@ -1465,7 +1438,7 @@ function VerificationModal({
               marginBottom: 12,
             }}
           >
-            <Feather name="check" size={24} color={INK} />
+            <Feather name="check" size={24} color="#FFFFFF" />
           </View>
           <Text style={{ fontSize: 16, fontWeight: '800', color: INK }}>You're verified</Text>
           <Text style={{ fontSize: 13, color: MUTE, marginTop: 4 }}>
@@ -1539,7 +1512,7 @@ function VerificationModal({
                     style={{
                       fontSize: 12,
                       fontWeight: '800',
-                      color: active ? LIME : INK,
+                      color: active ? 'white' : INK,
                     }}
                   >
                     {KIND_LABELS[k]}
@@ -1600,7 +1573,7 @@ function SheetModal({
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(15,15,15,0.45)', justifyContent: 'flex-end' }}>
         <Pressable style={{ flex: 1 }} onPress={onClose} />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -1726,7 +1699,7 @@ function SheetField({
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           placeholder={placeholder}
-          placeholderTextColor="#a8a59c"
+          placeholderTextColor="rgba(15,15,15,0.45)"
           keyboardType={keyboardType}
           style={{ fontSize: 15, color: INK, padding: 0 }}
         />
@@ -1768,9 +1741,9 @@ function SheetPrimary({
       })}
     >
       {loading ? (
-        <ActivityIndicator color={INK} />
+        <ActivityIndicator color="#FFFFFF" />
       ) : (
-        <Text style={{ fontSize: 15, fontWeight: '800', color: INK, letterSpacing: 0.2 }}>
+        <Text style={{ fontSize: 15, fontWeight: '800', color: '#FFFFFF', letterSpacing: 0.2 }}>
           {label}
         </Text>
       )}
@@ -1828,7 +1801,7 @@ function SectionCard({
             marginRight: 14,
           }}
         >
-          <Feather name={icon} size={18} color={INK} />
+          <Feather name={icon} size={18} color={expanded ? '#FFFFFF' : INK} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: 15, fontWeight: '800', color: INK, letterSpacing: -0.2 }}>
@@ -1918,7 +1891,7 @@ function Row({
                 backgroundColor: LIME,
               }}
             >
-              <Text style={{ fontSize: 10, fontWeight: '800', color: INK, letterSpacing: 0.4 }}>
+              <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFFFFF', letterSpacing: 0.4 }}>
                 {badge.toUpperCase()}
               </Text>
             </View>
@@ -1961,9 +1934,9 @@ function ToggleRow({
           onValueChange(v);
         }}
         disabled={disabled}
-        trackColor={{ false: '#e8e6e0', true: LIME }}
-        thumbColor={value ? INK : '#ffffff'}
-        ios_backgroundColor="#e8e6e0"
+        trackColor={{ false: 'rgba(15,15,15,0.12)', true: LIME }}
+        thumbColor={value ? '#FFFFFF' : '#FFFFFF'}
+        ios_backgroundColor="rgba(15,15,15,0.12)"
       />
     </View>
   );

@@ -14,8 +14,8 @@ type Activity = {
 };
 
 const CYCLE_MS = 5200;
-const INK = '#0a0a0a';
-const LIME = '#d8f53a';
+const INK = '#0F0F0F';
+const LIME = '#6C47FF';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // Sized like the iPhone Dynamic Island: centered, capsule, sits just below the
 // status bar with breathing room on both sides.

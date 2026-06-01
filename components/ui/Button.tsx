@@ -84,7 +84,7 @@ export function Button({
 
 function stylesFor(v: Variant, disabled?: boolean) {
   if (disabled) {
-    return { bg: '#f2f2f2', fg: '#bdbdbd', bw: 0, bc: 'transparent' };
+    return { bg: colors.panel, fg: colors.muteSoft, bw: 0, bc: 'transparent' };
   }
   switch (v) {
     case 'primary':

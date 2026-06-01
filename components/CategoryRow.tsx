@@ -5,12 +5,12 @@ import { colors, radii } from '@/lib/theme';
 import type { Category } from '@/types';
 
 const CATEGORIES: { label: string; value: Category; icon: keyof typeof Feather.glyphMap; accent: string }[] = [
-  { label: 'Clothing', value: 'clothing', icon: 'shopping-bag', accent: '#f1edff' },
-  { label: 'Shoes', value: 'shoes', icon: 'compass', accent: '#fef9c3' },
-  { label: 'Bags', value: 'bags', icon: 'briefcase', accent: '#fce7f3' },
-  { label: 'Accessories', value: 'accessories', icon: 'watch', accent: '#dbeafe' },
-  { label: 'Electronics', value: 'electronics', icon: 'monitor', accent: '#e0f2fe' },
-  { label: 'Beauty', value: 'beauty', icon: 'droplet', accent: '#fae8ff' },
+  { label: 'Clothing', value: 'clothing', icon: 'shopping-bag', accent: colors.primarySoft },
+  { label: 'Shoes', value: 'shoes', icon: 'compass', accent: colors.panel },
+  { label: 'Bags', value: 'bags', icon: 'briefcase', accent: colors.primarySoft },
+  { label: 'Accessories', value: 'accessories', icon: 'watch', accent: colors.panel },
+  { label: 'Electronics', value: 'electronics', icon: 'monitor', accent: colors.primarySoft },
+  { label: 'Beauty', value: 'beauty', icon: 'droplet', accent: colors.panel },
 ];
 
 export function CategoryRow() {

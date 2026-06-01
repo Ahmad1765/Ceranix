@@ -42,17 +42,24 @@ export default function RootLayout() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    // Icon fonts are tiny — always block first paint on these so glyphs never
+    // render as boxes. Aesthetic fonts (Inter/Fraunces) are large; load in
+    // background so they don't delay the UI.
+    const iconFonts = Font.loadAsync({ ...Ionicons.font, ...Feather.font });
+    Font.loadAsync(AESTHETIC_FONTS).catch(console.warn);
+
     if (Platform.OS === 'web') {
-      // On web: don't block render — fonts load via CSS @font-face in background
-      Font.loadAsync({ ...Ionicons.font, ...Feather.font, ...AESTHETIC_FONTS }).catch(console.warn);
-      setReady(true);
-      SplashScreen.hideAsync();
+      iconFonts
+        .catch(console.warn)
+        .finally(() => {
+          setReady(true);
+          SplashScreen.hideAsync();
+        });
       return;
     }
 
-    // On native: preload fonts + local image assets before first paint
     Promise.all([
-      Font.loadAsync({ ...Ionicons.font, ...Feather.font, ...AESTHETIC_FONTS }),
+      iconFonts,
       Asset.loadAsync([
         require('../assets/images/adaptive-icon.png'),
         require('../assets/images/favicon.png'),
@@ -109,6 +116,14 @@ export default function RootLayout() {
           <Stack.Screen
             name="ratings"
             options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="invoice/[id]"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="payment/[id]"
+            options={{ headerShown: false, presentation: 'modal' }}
           />
         </Stack>
         </ToastProvider>

@@ -26,12 +26,11 @@ type ToastApi = {
 
 const ToastContext = createContext<ToastApi | undefined>(undefined);
 
-const INK = '#0a0a0a';
-const LIME = '#d8f53a';
+const INK = '#0F0F0F';
 const PURPLE = '#6C47FF';
 
 function variantStyles(v: ToastVariant) {
-  if (v === 'success') return { bg: INK, fg: 'white', accent: LIME, accentFg: INK };
+  if (v === 'success') return { bg: INK, fg: 'white', accent: PURPLE, accentFg: 'white' };
   if (v === 'info') return { bg: INK, fg: 'white', accent: PURPLE, accentFg: 'white' };
   return { bg: INK, fg: 'white', accent: 'rgba(255,255,255,0.12)', accentFg: 'white' };
 }

@@ -6,6 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { colors } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { Tabs, EmptyState } from '@/components/ui';
+import { safeBack } from '@/lib/nav';
 
 type NewsTab = 'following' | 'foryou' | 'searches';
 
@@ -28,7 +29,7 @@ export default function NewsScreen() {
         }}
       >
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => safeBack()}
           hitSlop={HIT_SLOP_8}
           style={({ pressed }) => ({
             width: 38,

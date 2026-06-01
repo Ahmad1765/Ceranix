@@ -90,9 +90,9 @@ function stylesFor(t: Tone) {
     case 'ink':
       return { bg: colors.ink, fg: colors.white, bw: 0, bc: 'transparent' };
     case 'amber':
-      return { bg: '#fff3d6', fg: '#a36b00', bw: 0, bc: 'transparent' };
+      return { bg: colors.primarySoft, fg: colors.primaryDeep, bw: 0, bc: 'transparent' };
     case 'soft':
-      return { bg: '#f5f5f5', fg: colors.ink2, bw: 0, bc: 'transparent' };
+      return { bg: colors.panel, fg: colors.ink2, bw: 0, bc: 'transparent' };
     case 'panel':
       return { bg: colors.panel, fg: colors.ink2, bw: 1, bc: colors.hairline };
     case 'ghost':

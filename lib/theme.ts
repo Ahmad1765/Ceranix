@@ -1,63 +1,97 @@
 // Ceranix design tokens. Single source of truth.
 //
-// Pulled from the home + product pages (the "perfect" reference) and the
-// already-polished settings/login screens. Other screens should consume
-// these constants — no more ad-hoc #4338ca / gray-900 sprinkled around.
+// Strict 3-color system: purple (primary), white (surfaces), black (text/contrast).
+// Any "muted" tones are black at reduced opacity. Any "soft" purples are
+// purple at reduced opacity. Nothing else lives in this file.
 
 import { Platform } from 'react-native';
 
-export const colors = {
-  // Brand — aligned with home + product page
-  ink: '#0a0a0a',
-  lime: '#d8f53a',           // legacy, only for home/product
-  purple: '#6C47FF',
-  purpleSoft: '#f1edff',
-  purpleDeep: '#5b3fd9',
+// ── Raw palette ──────────────────────────────────────────────────────────
+// These are the only three hues allowed in the application.
+const PURPLE = '#6C47FF';
+const PURPLE_DEEP = '#5538D6';        // purple darkened for pressed/hover
+const PURPLE_TINT_10 = 'rgba(108,71,255,0.10)';
+const PURPLE_TINT_18 = 'rgba(108,71,255,0.18)';
+const PURPLE_TINT_45 = 'rgba(108,71,255,0.45)';
 
-  // Aliased names — new screens reference these; values point to purple palette
-  pink: '#6C47FF',
-  pinkSoft: '#f1edff',
-  pinkDeep: '#5b3fd9',
-  coral: '#6C47FF',
-  amber: '#6C47FF',
-  sky: '#6C47FF',
-  gradStart: '#6C47FF',
-  gradMid: '#6C47FF',
-  gradEnd: '#6C47FF',
+const WHITE = '#FFFFFF';
+
+const INK = '#0F0F0F';                // near-pure black for text
+const INK_PURE = '#000000';           // pure black, reserved for shadows
+const INK_MUTE = 'rgba(15,15,15,0.62)';   // 5.62:1 on white — AA normal text
+const INK_MUTE_SOFT = 'rgba(15,15,15,0.45)'; // large text / icons
+const INK_HAIRLINE = 'rgba(15,15,15,0.08)';  // borders, dividers
+const INK_PANEL = 'rgba(15,15,15,0.04)';     // subtle surface fill
+const INK_OVERLAY = 'rgba(15,15,15,0.45)';
+const INK_OVERLAY_LIGHT = 'rgba(15,15,15,0.18)';
+
+// ── Semantic colors ──────────────────────────────────────────────────────
+// Consumers should reach for these names; raw values stay above.
+// Legacy aliases (pink/coral/amber/lime/sky/red/green) are kept so older
+// screens keep compiling — they all collapse to purple/black per the
+// 3-color rule. Do NOT add new aliases here; new code must use the
+// semantic names directly.
+export const colors = {
+  // Core 3
+  primary: PURPLE,
+  primaryDeep: PURPLE_DEEP,
+  primarySoft: PURPLE_TINT_10,
+  primarySofter: PURPLE_TINT_18,
+  white: WHITE,
+  ink: INK,
 
   // Surfaces
-  white: '#ffffff',
-  bg: '#ffffff',
-  soft: '#f5f4ef',           // legacy
-  cream: '#fafaf7',
-  panel: '#F2F2F2',          // light surface, matches home page
-  hair: '#e8e6e0',
-  hairline: '#efefef',
-  divider: '#f1f1f1',
+  bg: WHITE,
+  surface: WHITE,
+  panel: INK_PANEL,
+  cream: WHITE,
+  soft: WHITE,
+
+  // Borders / dividers
+  hair: INK_HAIRLINE,
+  hairline: INK_HAIRLINE,
+  divider: INK_HAIRLINE,
 
   // Text
-  ink2: '#0a0a0a',
-  mute: '#6b7280',
-  muteSoft: '#9ca3af',
-  ghost: '#a8a59c',
-  smoke: '#6b7280',
+  ink2: INK,
+  text: INK,
+  mute: INK_MUTE,
+  muteSoft: INK_MUTE_SOFT,
+  ghost: INK_MUTE_SOFT,
+  smoke: INK_MUTE,
 
-  // Feedback
-  red: '#ef4444',
-  redSoft: 'rgba(239,68,68,0.18)',
-  green: '#15803d',
-  greenSoft: 'rgba(34,197,94,0.18)',
+  // Overlays (black at opacity — palette-compliant)
+  overlay: INK_OVERLAY,
+  overlayLight: INK_OVERLAY_LIGHT,
 
-  // Overlays
-  overlay: 'rgba(0,0,0,0.45)',
-  overlayLight: 'rgba(0,0,0,0.18)',
+  // Legacy aliases — all collapse to purple/black so the 3-color rule holds.
+  purple: PURPLE,
+  purpleDeep: PURPLE_DEEP,
+  purpleSoft: PURPLE_TINT_10,
+  pink: PURPLE,
+  pinkSoft: PURPLE_TINT_10,
+  pinkDeep: PURPLE_DEEP,
+  coral: PURPLE,
+  amber: PURPLE,
+  sky: PURPLE,
+  lime: PURPLE,
+  gradStart: PURPLE,
+  gradMid: PURPLE,
+  gradEnd: PURPLE,
+
+  // Feedback states — palette-compliant. Errors/success use purple+ink.
+  red: INK,
+  redSoft: INK_HAIRLINE,
+  green: PURPLE,
+  greenSoft: PURPLE_TINT_18,
 } as const;
 
-// All gradient stops collapse to purple — keeps API compat, renders flat purple.
+// Gradients are kept for API compatibility but collapse to flat purple so
+// nothing ever renders an off-palette interpolation between stops.
 export const gradients = {
-  story: ['#6C47FF', '#6C47FF', '#6C47FF'] as const,
-  warm: ['#6C47FF', '#6C47FF'] as const,
-  pinkPeach: ['#6C47FF', '#6C47FF'] as const,
+  story: [PURPLE, PURPLE, PURPLE] as const,
+  warm: [PURPLE, PURPLE] as const,
+  pinkPeach: [PURPLE, PURPLE] as const,
 } as const;
 
 export const radii = {
@@ -125,33 +159,31 @@ export const type = {
   },
 } as const;
 
-// Subtle shadows — iOS uses real shadow, Android falls back to elevation.
+// Shadows are pure black at low opacity — palette-compliant.
 export const shadow = {
   none: {},
   sm: Platform.select({
-    ios: { shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
+    ios: { shadowColor: INK_PURE, shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
     android: { elevation: 1 },
     default: {},
   })!,
   md: Platform.select({
-    ios: { shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
+    ios: { shadowColor: INK_PURE, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
     android: { elevation: 2 },
     default: {},
   })!,
   lg: Platform.select({
-    ios: { shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 20, shadowOffset: { width: 0, height: 8 } },
+    ios: { shadowColor: INK_PURE, shadowOpacity: 0.1, shadowRadius: 20, shadowOffset: { width: 0, height: 8 } },
     android: { elevation: 4 },
     default: {},
   })!,
-  // Inverse shadow used by fixed top bars on iOS (shadow above the bar).
   topBar: Platform.select({
-    ios: { shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: -3 } },
+    ios: { shadowColor: INK_PURE, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: -3 } },
     android: { elevation: 4 },
     default: {},
   })!,
 } as const;
 
-// Standard eyebrow label styling: small caps, wide tracking, used above hero text.
 export const eyebrow = {
   fontSize: type.size.xs,
   fontWeight: type.weight.bold,
@@ -160,9 +192,10 @@ export const eyebrow = {
   textTransform: 'uppercase' as const,
 };
 
-// A muted version for descriptions.
 export const eyebrowMute = {
   ...eyebrow,
   color: colors.mute,
   letterSpacing: 1.2,
 };
+
+export const tintedPurple = PURPLE_TINT_45;

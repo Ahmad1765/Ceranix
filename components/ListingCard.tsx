@@ -61,7 +61,7 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
     >
       <View
         className="relative w-full"
-        style={{ aspectRatio: 1 / 1.33, overflow: 'hidden', borderRadius: 6, backgroundColor: '#f3f4f6' }}
+        style={{ aspectRatio: 1 / 1.33, overflow: 'hidden', borderRadius: 6, backgroundColor: 'rgba(15,15,15,0.04)' }}
         onLayout={(e) => setCardWidth(e.nativeEvent.layout.width)}
       >
         {hasMultiple && cardWidth > 0 ? (
@@ -159,11 +159,11 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
 
       <View className="mt-1.5 w-full">
         <View className="flex-row items-center justify-between mt-1">
-          <Text className="text-[13px] font-medium text-gray-900 flex-1" numberOfLines={1}>
+          <Text className="text-[13px] font-medium text-ink flex-1" numberOfLines={1}>
             {listing.brand || listing.title}
           </Text>
           {listing.size && (
-            <Text className="text-[13px] font-bold text-gray-700 ml-1">{listing.size}</Text>
+            <Text className="text-[13px] font-bold text-ink ml-1">{listing.size}</Text>
           )}
         </View>
         <Text className="text-[14px] font-bold text-black mt-0.5">

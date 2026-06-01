@@ -84,8 +84,8 @@ export function LikeBurst({
   liked,
   onPress,
   size = 22,
-  color = '#ef4444',
-  inactiveColor = '#111827',
+  color = '#6C47FF',
+  inactiveColor = '#0F0F0F',
   style,
 }: Props) {
   const scale = useSharedValue(1);

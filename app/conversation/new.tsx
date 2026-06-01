@@ -12,6 +12,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
+import { safeBack } from '@/lib/nav';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -154,7 +155,7 @@ export default function NewConversationScreen() {
     return (
       <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: 'white' }}>
         <View style={{ padding: 14, flexDirection: 'row', alignItems: 'center' }}>
-          <Pressable onPress={() => router.back()}>
+          <Pressable onPress={() => safeBack()}>
             <Feather name="x" size={24} color={colors.ink} />
           </Pressable>
         </View>
@@ -197,7 +198,7 @@ export default function NewConversationScreen() {
             borderBottomColor: colors.hairline,
           }}
         >
-          <Pressable onPress={() => router.back()} hitSlop={HIT_SLOP_8} style={{ padding: 4 }}>
+          <Pressable onPress={() => safeBack()} hitSlop={HIT_SLOP_8} style={{ padding: 4 }}>
             <Feather name="x" size={22} color={colors.ink} />
           </Pressable>
           <Text style={{ fontSize: 16, fontWeight: '800', color: colors.ink }} numberOfLines={1}>
@@ -445,7 +446,7 @@ export default function NewConversationScreen() {
                     padding: 0,
                     lineHeight: amountFontSize * 1.15,
                   }}
-                  placeholderTextColor="#c9b8ff"
+                  placeholderTextColor="rgba(15,15,15,0.45)"
                   autoFocus={!hasToggled && initialMode === 'offer'}
                   maxLength={7}
                 />

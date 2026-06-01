@@ -27,13 +27,13 @@ export function GenderFilter({ selected, onChange }: Props) {
           onPress={() => onChange(f.value)}
           className={`px-4 py-1.5 rounded-full border ${
             selected === f.value
-              ? 'bg-gray-900 border-gray-900'
-              : 'bg-white border-gray-200'
+              ? 'bg-primary border-primary'
+              : 'bg-surface border-ink-hair'
           }`}
         >
           <Text
             className={`text-sm font-medium ${
-              selected === f.value ? 'text-white' : 'text-gray-700'
+              selected === f.value ? 'text-white' : 'text-ink'
             }`}
           >
             {f.label}
