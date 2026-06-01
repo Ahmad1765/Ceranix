@@ -323,15 +323,12 @@ export default function NewConversationScreen() {
                     justifyContent: 'center',
                     gap: 6,
                     opacity: pressed ? 0.8 : 1,
-                    ...(active && Platform.OS === 'ios'
+                    ...(active
                       ? {
-                          shadowColor: '#000',
-                          shadowOpacity: 0.06,
-                          shadowRadius: 3,
-                          shadowOffset: { width: 0, height: 1 },
+                          boxShadow: '0px 1px 3px rgba(0,0,0,0.06)',
+                          ...(Platform.OS === 'android' ? { elevation: 1 } : {}),
                         }
                       : {}),
-                    ...(active && Platform.OS === 'android' ? { elevation: 1 } : {}),
                   })}
                 >
                   <Feather

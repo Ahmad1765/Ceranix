@@ -1,5 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { View, Animated } from 'react-native';
+import { View, Animated, Platform } from 'react-native';
+
+// JS-driven on web (no RCTAnimation native module), native-driven elsewhere.
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 export function SkeletonCard() {
   const opacity = useRef(new Animated.Value(0.4)).current;
@@ -7,8 +10,8 @@ export function SkeletonCard() {
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0.4, duration: 700, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: USE_NATIVE_DRIVER }),
+        Animated.timing(opacity, { toValue: 0.4, duration: 700, useNativeDriver: USE_NATIVE_DRIVER }),
       ])
     ).start();
   }, []);

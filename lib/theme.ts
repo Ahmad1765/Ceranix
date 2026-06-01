@@ -160,27 +160,24 @@ export const type = {
 } as const;
 
 // Shadows are pure black at low opacity — palette-compliant.
+// Uses modern boxShadow (RN 0.76+). Android elevation kept as supplement.
 export const shadow = {
   none: {},
   sm: Platform.select({
-    ios: { shadowColor: INK_PURE, shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
-    android: { elevation: 1 },
-    default: {},
+    android: { boxShadow: '0px 2px 6px rgba(0,0,0,0.04)', elevation: 1 },
+    default: { boxShadow: '0px 2px 6px rgba(0,0,0,0.04)' },
   })!,
   md: Platform.select({
-    ios: { shadowColor: INK_PURE, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
-    android: { elevation: 2 },
-    default: {},
+    android: { boxShadow: '0px 4px 12px rgba(0,0,0,0.06)', elevation: 2 },
+    default: { boxShadow: '0px 4px 12px rgba(0,0,0,0.06)' },
   })!,
   lg: Platform.select({
-    ios: { shadowColor: INK_PURE, shadowOpacity: 0.1, shadowRadius: 20, shadowOffset: { width: 0, height: 8 } },
-    android: { elevation: 4 },
-    default: {},
+    android: { boxShadow: '0px 8px 20px rgba(0,0,0,0.1)', elevation: 4 },
+    default: { boxShadow: '0px 8px 20px rgba(0,0,0,0.1)' },
   })!,
   topBar: Platform.select({
-    ios: { shadowColor: INK_PURE, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: -3 } },
-    android: { elevation: 4 },
-    default: {},
+    android: { boxShadow: '0px -3px 12px rgba(0,0,0,0.06)', elevation: 4 },
+    default: { boxShadow: '0px -3px 12px rgba(0,0,0,0.06)' },
   })!,
 } as const;
 

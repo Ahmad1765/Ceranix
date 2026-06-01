@@ -8,6 +8,9 @@ import {
   type ReactNode,
 } from 'react';
 import { View, Text, Animated, Easing, Platform, StyleSheet } from 'react-native';
+
+// JS-driven on web (no RCTAnimation), native-driven on iOS/Android.
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -48,7 +51,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     Animated.parallel([
       Animated.spring(translateY, {
         toValue: 0,
-        useNativeDriver: true,
+        useNativeDriver: USE_NATIVE_DRIVER,
         damping: 18,
         stiffness: 220,
         mass: 0.7,
@@ -57,7 +60,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         toValue: 1,
         duration: 180,
         easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
+        useNativeDriver: USE_NATIVE_DRIVER,
       }),
     ]).start();
   }, [opacity, translateY]);
@@ -69,12 +72,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           toValue: -120,
           duration: 180,
           easing: Easing.in(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver: USE_NATIVE_DRIVER,
         }),
         Animated.timing(opacity, {
           toValue: 0,
           duration: 160,
-          useNativeDriver: true,
+          useNativeDriver: USE_NATIVE_DRIVER,
         }),
       ]).start(({ finished }) => {
         if (finished && cb) cb();
@@ -128,7 +131,6 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       {visible && toast && v && (
         <Animated.View
-          pointerEvents="none"
           style={{
             position: 'absolute',
             top: insets.top + 8,
@@ -137,6 +139,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             zIndex: 10000,
             transform: [{ translateY }],
             opacity,
+            pointerEvents: 'none',
           }}
         >
           <View
@@ -149,13 +152,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               paddingRight: 6,
               paddingVertical: 6,
               ...Platform.select({
-                ios: {
-                  shadowColor: '#000',
-                  shadowOpacity: 0.25,
-                  shadowRadius: 16,
-                  shadowOffset: { width: 0, height: 8 },
-                },
-                android: { elevation: 6 },
+                ios: { boxShadow: '0px 8px 16px rgba(0,0,0,0.25)' },
+                android: { boxShadow: '0px 8px 16px rgba(0,0,0,0.25)', elevation: 6 },
+                default: { boxShadow: '0px 8px 16px rgba(0,0,0,0.25)' },
               }),
             }}
           >

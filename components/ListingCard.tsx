@@ -124,7 +124,6 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
 
         {hasMultiple && (
           <View
-            pointerEvents="none"
             style={{
               position: 'absolute',
               bottom: 6,
@@ -134,6 +133,7 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
               justifyContent: 'center',
               alignItems: 'center',
               gap: 4,
+              pointerEvents: 'none',
             }}
           >
             {images.map((_, i) => (

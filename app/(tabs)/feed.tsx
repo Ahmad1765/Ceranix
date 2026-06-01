@@ -35,14 +35,14 @@ export default function FeedScreen() {
           {/* iPhones */}
           <View className="flex-row items-end justify-center w-full absolute bottom-[-5] z-0">
              {/* Lavender iPhone Back */}
-             <View className="bg-white/30 rounded-[24px] shadow-lg border border-white/40 absolute" style={{ width: 85, height: 180, left: '12%', bottom: -10, transform: [{rotate: '-12deg'}], elevation: 2 }} />
+             <View className="bg-white/30 rounded-[24px] border border-white/40 absolute" style={{ width: 85, height: 180, left: '12%', bottom: -10, transform: [{rotate: '-12deg'}], elevation: 2, boxShadow: '0px 10px 15px rgba(0,0,0,0.1)' }} />
              {/* Pink iPhone Back */}
-             <View className="bg-white/50 rounded-[24px] shadow-lg border border-white/60 absolute" style={{ width: 90, height: 190, left: '26%', bottom: -5, zIndex: 3, transform: [{rotate: '-6deg'}], elevation: 3 }} />
+             <View className="bg-white/50 rounded-[24px] border border-white/60 absolute" style={{ width: 90, height: 190, left: '26%', bottom: -5, zIndex: 3, transform: [{rotate: '-6deg'}], elevation: 3, boxShadow: '0px 10px 15px rgba(0,0,0,0.1)' }} />
              {/* Silver/White iPhone Back */}
-             <View className="bg-white/70 rounded-[24px] shadow-lg border border-white/80 absolute" style={{ width: 90, height: 200, right: '23%', bottom: -15, zIndex: 4, transform: [{rotate: '8deg'}], elevation: 4 }} />
+             <View className="bg-white/70 rounded-[24px] border border-white/80 absolute" style={{ width: 90, height: 200, right: '23%', bottom: -15, zIndex: 4, transform: [{rotate: '8deg'}], elevation: 4, boxShadow: '0px 10px 15px rgba(0,0,0,0.1)' }} />
 
              {/* Front-most iPhone showing screen with Dynamic Island */}
-             <View className="bg-white rounded-[26px] border-[6px] border-[#0F0F0F] items-center justify-center shadow-2xl absolute overflow-hidden" style={{ width: 110, height: 220, right: '35%', bottom: -20, zIndex: 10, transform: [{rotate: '2deg'}], elevation: 10 }}>
+             <View className="bg-white rounded-[26px] border-[6px] border-[#0F0F0F] items-center justify-center absolute overflow-hidden" style={{ width: 110, height: 220, right: '35%', bottom: -20, zIndex: 10, transform: [{rotate: '2deg'}], elevation: 10, boxShadow: '0px 25px 50px rgba(0,0,0,0.25)' }}>
                 {/* Dynamic island */}
                 <View className="w-16 h-4 bg-[#0F0F0F] rounded-full absolute top-1 z-20" />
 
@@ -57,17 +57,17 @@ export default function FeedScreen() {
         <View className="px-5">
           <View className="flex-row flex-wrap justify-between" style={{ gap: 10 }}>
              {/* Certified */}
-             <View className="bg-primary-soft py-3 px-3 rounded-[10px] flex-row items-center flex-1 min-w-[45%]" style={{ shadowColor: '#6C47FF', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 3, elevation: 2 }}>
+             <View className="bg-primary-soft py-3 px-3 rounded-[10px] flex-row items-center flex-1 min-w-[45%]" style={{ boxShadow: '0px 2px 3px rgba(108,71,255,0.08)', elevation: 2 }}>
                <MaterialCommunityIcons name="check-decagram" size={24} color="#6C47FF" className="mr-2" />
                <Text className="text-primary font-semibold text-[13px] flex-1 leading-tight">Certified by experts</Text>
              </View>
              {/* Warranty */}
-             <View className="bg-primary-soft py-3 px-3 rounded-[10px] flex-row items-center flex-1 min-w-[45%]" style={{ shadowColor: '#6C47FF', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 3, elevation: 2 }}>
+             <View className="bg-primary-soft py-3 px-3 rounded-[10px] flex-row items-center flex-1 min-w-[45%]" style={{ boxShadow: '0px 2px 3px rgba(108,71,255,0.08)', elevation: 2 }}>
                <MaterialCommunityIcons name="shield" size={24} color="#6C47FF" className="mr-2" />
                <Text className="text-primary font-semibold text-[13px] flex-1 leading-tight">Minimum 1 year warranty</Text>
              </View>
              {/* Return policy */}
-             <View className="bg-primary-soft py-3 px-3 rounded-[10px] flex-row items-center flex-1 min-w-[45%]" style={{ shadowColor: '#6C47FF', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 3, elevation: 2 }}>
+             <View className="bg-primary-soft py-3 px-3 rounded-[10px] flex-row items-center flex-1 min-w-[45%]" style={{ boxShadow: '0px 2px 3px rgba(108,71,255,0.08)', elevation: 2 }}>
                <View className="mr-2 flex-row items-center relative">
                  <View className="absolute left-[-4] z-10" style={{gap: 2}}>
                     <View className="w-2.5 h-[1.5px] bg-primary-soft rounded-full absolute top-[1px]" />
@@ -83,7 +83,7 @@ export default function FeedScreen() {
                <Text className="text-primary font-semibold text-[13px] flex-1 leading-tight">30 days return policy</Text>
              </View>
              {/* Delivery */}
-             <View className="bg-primary-soft py-3 px-3 rounded-[10px] flex-row items-center flex-1 min-w-[45%]" style={{ shadowColor: '#6C47FF', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 3, elevation: 2 }}>
+             <View className="bg-primary-soft py-3 px-3 rounded-[10px] flex-row items-center flex-1 min-w-[45%]" style={{ boxShadow: '0px 2px 3px rgba(108,71,255,0.08)', elevation: 2 }}>
                <MaterialCommunityIcons name="truck-fast" size={24} color="#6C47FF" className="mr-2" />
                <Text className="text-primary font-semibold text-[13px] flex-1 leading-tight">Express delivery</Text>
              </View>
@@ -109,7 +109,7 @@ export default function FeedScreen() {
         <View className="px-4">
           <View className="flex-row justify-between" style={{ gap: 16 }}>
             {/* Card 1: iPhone 11 */}
-            <Pressable className="flex-1 bg-white rounded-[16px] pb-3" style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 3 }}>
+            <Pressable className="flex-1 bg-white rounded-[16px] pb-3" style={{ boxShadow: '0px 4px 6px rgba(0,0,0,0.1)', elevation: 3 }}>
               {/* Image Box */}
               <View className="bg-ink-panel rounded-[12px] aspect-[4/5] items-center justify-center relative mb-3 overflow-hidden">
                  <Image source={{ uri: 'https://images.unsplash.com/photo-1591337676887-a4b1fbe40c56?w=400&q=80' }} className="w-[85%] h-[85%]" contentFit="contain" />
@@ -127,7 +127,7 @@ export default function FeedScreen() {
             </Pressable>
 
             {/* Card 2: iPhone 11 Pro */}
-            <Pressable className="flex-1 bg-white rounded-[16px] pb-3" style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 3 }}>
+            <Pressable className="flex-1 bg-white rounded-[16px] pb-3" style={{ boxShadow: '0px 4px 6px rgba(0,0,0,0.1)', elevation: 3 }}>
               {/* Image Box */}
               <View className="bg-ink-panel rounded-[12px] aspect-[4/5] items-center justify-center relative mb-3 overflow-hidden">
                  <Image source={{ uri: 'https://images.unsplash.com/photo-1603921326210-6edd2d60ca68?w=400&q=80' }} className="w-[85%] h-[85%]" contentFit="contain" />

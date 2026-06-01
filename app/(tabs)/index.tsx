@@ -7,15 +7,20 @@ import {
   Pressable,
   ScrollView,
   Animated,
+  Platform,
 } from 'react-native';
+
+// JS-driven on web (no RCTAnimation), native-driven on iOS/Android.
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { ListingCard } from '@/components/ListingCard';
 import { SkeletonCard } from '@/components/SkeletonCard';
 import { AnonCards } from '@/components/AnonCards';
 import { fetchListings, type FeedTab } from '@/lib/listings';
+import { onListingCreated } from '@/lib/listingEvents';
 import { getOptimizedImageUrl } from '@/lib/images';
 import type { Listing } from '@/types';
 
@@ -64,10 +69,10 @@ function AnimatedTabPill({
     <Pressable
       onPress={onPress}
       onPressIn={() =>
-        Animated.spring(scaleAnim, { toValue: 0.93, useNativeDriver: true, speed: 30, bounciness: 4 }).start()
+        Animated.spring(scaleAnim, { toValue: 0.93, useNativeDriver: USE_NATIVE_DRIVER, speed: 30, bounciness: 4 }).start()
       }
       onPressOut={() =>
-        Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 6 }).start()
+        Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: USE_NATIVE_DRIVER, speed: 20, bounciness: 6 }).start()
       }
     >
       <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
@@ -138,23 +143,58 @@ export default function HomeScreen() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    // Hard ceiling — if load() never resolves/rejects (a wedged fetch that
+    // somehow slips past every other safety net), clear the skeleton anyway
+    // so the user sees the empty state and can pull-to-refresh instead of
+    // staring at gray boxes forever.
+    const wedgeKiller = setTimeout(() => {
+      if (cancelled) return;
+      console.warn('[home] load() wedge ceiling fired — clearing skeleton');
+      setLoading(false);
+      hasLoadedRef.current = true;
+      // Fire-and-forget retry: a wedge that hit the ceiling is almost always
+      // transient on the next attempt. Don't await — the ceiling already
+      // unblocked the UI; if this retry happens to return rows we just
+      // prepend them silently.
+      load(activeTab)
+        .then((rows) => {
+          if (!cancelled && rows.length > 0) setListings(rows);
+        })
+        .catch(() => {});
+    }, 12_000);
     load(activeTab)
       .then((rows) => {
         if (cancelled) return;
+        clearTimeout(wedgeKiller);
         // Commit listings + loading=false together so React renders once with
         // the final state. Without this, the FlatList briefly sees
         // listings=rows while loading=true and the data memo zeroes them out.
         setListings(rows);
         setLoading(false);
         hasLoadedRef.current = true;
+        // If the first load came back empty (likely a transient wedge that
+        // hit a timeout rather than a genuinely empty feed), silently retry
+        // once after a short delay so the user doesn't have to refresh.
+        if (rows.length === 0 && activeTab !== 'Following') {
+          setTimeout(() => {
+            if (cancelled) return;
+            load(activeTab)
+              .then((retryRows) => {
+                if (!cancelled && retryRows.length > 0) setListings(retryRows);
+              })
+              .catch(() => {});
+          }, 1500);
+        }
       })
       .catch(() => {
         if (cancelled) return;
+        clearTimeout(wedgeKiller);
         setLoading(false);
         hasLoadedRef.current = true;
       });
     return () => {
       cancelled = true;
+      clearTimeout(wedgeKiller);
     };
   }, [activeTab, load]);
 
@@ -169,7 +209,15 @@ export default function HomeScreen() {
       let cancelled = false;
       load(activeTab)
         .then((rows) => {
-          if (!cancelled) setListings(rows);
+          if (cancelled) return;
+          // Silent refetch only commits when it actually returned content.
+          // If the underlying fetch was aborted (the supabase web wedge) or
+          // errored, fetchListings returns []; without this guard the user's
+          // real feed would be wiped on every tab focus and only a hard
+          // browser refresh would bring it back. Genuine "feed is empty"
+          // states are still observable via pull-to-refresh below, which
+          // always commits.
+          if (rows.length > 0) setListings(rows);
         })
         .catch(() => {});
       return () => {
@@ -177,6 +225,19 @@ export default function HomeScreen() {
       };
     }, [activeTab, load]),
   );
+
+  // Listen for freshly published listings and prepend them to the feed so
+  // the user sees their upload land at the top immediately — no need to
+  // wait for the next focus refetch (or refresh the page if that refetch
+  // raced/failed).
+  useEffect(() => {
+    return onListingCreated((listing) => {
+      setListings((prev) => {
+        if (prev.some((l) => l.id === listing.id)) return prev;
+        return [listing, ...prev];
+      });
+    });
+  }, []);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -228,8 +289,11 @@ export default function HomeScreen() {
             What are you looking for today?
           </Text>
         </View>
-        <Pressable className="w-[42px] h-[42px] border border-ink-hair rounded-[10px] items-center justify-center bg-surface">
-          <Feather name="sliders" size={18} color="#0F0F0F" />
+        <Pressable
+          onPress={() => router.push('/(tabs)/chat' as any)}
+          className="w-[42px] h-[42px] border border-ink-hair rounded-[10px] items-center justify-center bg-surface"
+        >
+          <Feather name="message-circle" size={18} color="#0F0F0F" />
         </Pressable>
       </View>
 

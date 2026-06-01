@@ -121,16 +121,12 @@ export function SlideToConfirm({
           flexDirection: 'row',
           alignItems: 'center',
           overflow: 'hidden',
-          shadowColor: '#000',
-          shadowOpacity: 0.16,
-          shadowRadius: 18,
-          shadowOffset: { width: 0, height: 10 },
+          boxShadow: '0px 10px 18px rgba(0,0,0,0.16)',
           elevation: 6,
         }}
       >
         {/* Fill — gives a satisfying "filling up" feedback as you drag */}
         <Animated.View
-          pointerEvents="none"
           style={[
             {
               position: 'absolute',
@@ -138,6 +134,7 @@ export function SlideToConfirm({
               top: 0,
               bottom: 0,
               backgroundColor: 'rgba(255,255,255,0.14)',
+              pointerEvents: 'none',
             },
             fillStyle,
           ]}
@@ -145,7 +142,6 @@ export function SlideToConfirm({
 
         {/* Label */}
         <Animated.View
-          pointerEvents="none"
           style={[
             {
               position: 'absolute',
@@ -153,6 +149,7 @@ export function SlideToConfirm({
               right: 0,
               alignItems: 'center',
               justifyContent: 'center',
+              pointerEvents: 'none',
             },
             labelStyle,
           ]}
@@ -171,7 +168,6 @@ export function SlideToConfirm({
 
         {/* Subtle chevrons hinting motion */}
         <View
-          pointerEvents="none"
           style={{
             position: 'absolute',
             right: 26,
@@ -179,6 +175,7 @@ export function SlideToConfirm({
             bottom: 0,
             flexDirection: 'row',
             alignItems: 'center',
+            pointerEvents: 'none',
           }}
         >
           <Feather name="chevrons-right" size={18} color="rgba(255,255,255,0.45)" />
@@ -195,10 +192,7 @@ export function SlideToConfirm({
                 backgroundColor: colors.white,
                 alignItems: 'center',
                 justifyContent: 'center',
-                shadowColor: '#000',
-                shadowOpacity: 0.18,
-                shadowRadius: 8,
-                shadowOffset: { width: 0, height: 4 },
+                boxShadow: '0px 4px 8px rgba(0,0,0,0.18)',
                 elevation: 4,
               },
               thumbStyle,

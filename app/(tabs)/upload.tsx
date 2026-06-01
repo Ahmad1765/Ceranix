@@ -19,7 +19,9 @@ import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { uploadListingImages, type LocalImage } from '@/lib/upload';
 import { useToast } from '@/lib/toast';
-import type { Category, Condition, Gender } from '@/types';
+import { putCachedListing } from '@/lib/listingCache';
+import { emitListingCreated } from '@/lib/listingEvents';
+import type { Category, Condition, Gender, Listing } from '@/types';
 
 type Step = 'photos' | 'details';
 
@@ -49,7 +51,7 @@ const GENDERS: { label: string; value: Gender }[] = [
 const MAX_IMAGES = 7;
 
 function SellScreenInner() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const toast = useToast();
   const [step, setStep] = useState<Step>('photos');
   const [images, setImages] = useState<LocalImage[]>([]);
@@ -150,6 +152,48 @@ function SellScreenInner() {
       if (error) throw error;
 
       const newId = data!.id as string;
+
+      // Seed the local cache + broadcast the new listing BEFORE navigating.
+      // This avoids the "had to refresh the page to see my listing" bug:
+      //   - The product page we push to reads from listingCache on mount and
+      //     renders instantly instead of skeleton-ing on a fresh fetch that
+      //     could wedge on web.
+      //   - The home feed's onListingCreated subscription prepends it to the
+      //     visible list immediately, so when the user navigates back the
+      //     upload is already at the top — no dependence on the silent
+      //     focus refetch (which can race against replication lag or get
+      //     aborted by the global fetch ceiling).
+      const newListing: Listing = {
+        id: newId,
+        seller_id: user.id,
+        seller: (profile as Listing['seller']) ?? ({
+          id: user.id,
+          username: '',
+          avatar_url: null,
+          full_name: '',
+          bio: null,
+          location: null,
+          rating: 0,
+          total_sales: 0,
+          created_at: new Date().toISOString(),
+        } as Listing['seller']),
+        title: title.trim(),
+        description: description.trim(),
+        price: priceNum,
+        category,
+        gender,
+        brand: brand.trim() || null,
+        size: size.trim() || null,
+        condition,
+        images: urls,
+        is_sold: false,
+        views: 0,
+        likes: 0,
+        created_at: new Date().toISOString(),
+      };
+      putCachedListing(newListing);
+      emitListingCreated(newListing);
+
       resetForm();
       toast.show('Listing is live 🔥', { variant: 'success', icon: 'check' });
       router.push(`/product/${newId}`);
@@ -263,13 +307,10 @@ function SellScreenInner() {
               }}
             >
               <View
-                className="w-6 h-6 rounded-full bg-white shadow-sm"
+                className="w-6 h-6 rounded-full bg-white"
                 style={{
                   elevation: 2,
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: 0.2,
-                  shadowRadius: 1.5,
+                  boxShadow: '0px 1px 1.5px rgba(0,0,0,0.2)',
                 }}
               />
             </Pressable>

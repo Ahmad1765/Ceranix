@@ -22,6 +22,9 @@ import { colors } from '@/lib/theme';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// JS-driven on web (no RCTAnimation), native-driven on iOS/Android.
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
+
 type Mode = 'signin' | 'signup';
 type Step = 'welcome' | 'form';
 
@@ -79,7 +82,7 @@ export default function LoginScreen() {
       toValue: step === 'welcome' ? 0 : 1,
       duration: 280,
       easing: Easing.bezier(0.23, 1, 0.32, 1),
-      useNativeDriver: true,
+      useNativeDriver: USE_NATIVE_DRIVER,
     }).start();
   }, [step, stepAnim]);
 
@@ -269,7 +272,6 @@ export default function LoginScreen() {
           >
             {/* Subtle pattern dots — palette-compliant decoration */}
             <View
-              pointerEvents="none"
               style={{
                 position: 'absolute',
                 right: -40,
@@ -278,10 +280,10 @@ export default function LoginScreen() {
                 height: 220,
                 borderRadius: 110,
                 backgroundColor: 'rgba(255,255,255,0.08)',
+                pointerEvents: 'none',
               }}
             />
             <View
-              pointerEvents="none"
               style={{
                 position: 'absolute',
                 left: -60,
@@ -290,6 +292,7 @@ export default function LoginScreen() {
                 height: 200,
                 borderRadius: 100,
                 backgroundColor: 'rgba(255,255,255,0.06)',
+                pointerEvents: 'none',
               }}
             />
 
@@ -471,10 +474,10 @@ export default function LoginScreen() {
                         fontSize: 16,
                         color: colors.ink,
                         padding: 0,
-                        // @ts-ignore — RN-Web only
+                        // RN-Web only — cast to bypass strict RN types
                         outlineStyle: 'none',
                         outlineWidth: 0,
-                      }}
+                      } as any}
                     />
                   </Field>
 
@@ -496,10 +499,10 @@ export default function LoginScreen() {
                           fontSize: 16,
                           color: colors.ink,
                           padding: 0,
-                          // @ts-ignore — RN-Web only
+                          // RN-Web only — cast to bypass strict RN types
                           outlineStyle: 'none',
                           outlineWidth: 0,
-                        }}
+                        } as any}
                       />
                       <Pressable
                         onPress={() => setShowPw((v) => !v)}
@@ -628,7 +631,6 @@ function ModeSwitch({
     >
       {pillWidth > 0 && (
         <Animated.View
-          pointerEvents="none"
           style={{
             position: 'absolute',
             top: PADDING,
@@ -638,11 +640,9 @@ function ModeSwitch({
             backgroundColor: colors.ink,
             borderRadius: 999,
             transform: [{ translateX }],
-            shadowColor: '#000',
-            shadowOpacity: 0.12,
-            shadowRadius: 10,
-            shadowOffset: { width: 0, height: 4 },
+            boxShadow: '0px 4px 10px rgba(0,0,0,0.12)',
             elevation: 3,
+            pointerEvents: 'none',
           }}
         />
       )}

@@ -38,8 +38,40 @@ const AESTHETIC_FONTS = {
 
 SplashScreen.preventAutoHideAsync();
 
+// Web-only: react-navigation hides off-screen stack/tab screens with
+// `display:none; aria-hidden="true"`. If a Pressable inside the leaving
+// screen still has focus, Chrome warns "Blocked aria-hidden on an element
+// because its descendant retained focus". We watch the DOM for that
+// attribute and blur the focused descendant the moment it's flagged
+// hidden, which keeps assistive-tech behavior correct and silences the
+// console warning. Idempotent + scoped to web so it has zero cost on
+// native.
+function useFocusOutOfAriaHidden() {
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    const obs = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        if (m.attributeName !== 'aria-hidden') continue;
+        const target = m.target as HTMLElement;
+        if (target.getAttribute('aria-hidden') !== 'true') continue;
+        const active = document.activeElement as HTMLElement | null;
+        if (active && active !== document.body && target.contains(active)) {
+          active.blur();
+        }
+      }
+    });
+    obs.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['aria-hidden'],
+      subtree: true,
+    });
+    return () => obs.disconnect();
+  }, []);
+}
+
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
+  useFocusOutOfAriaHidden();
 
   useEffect(() => {
     // Icon fonts are tiny — always block first paint on these so glyphs never

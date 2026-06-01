@@ -333,10 +333,8 @@ function CategoryTile({
               letterSpacing: -0.6,
               lineHeight: titleSize * 1.05,
               fontFamily: 'Fraunces_700Bold',
-              textShadowColor: 'rgba(0,0,0,0.35)',
-              textShadowOffset: { width: 0, height: 1 },
-              textShadowRadius: 6,
-            }}
+              textShadow: '0px 1px 6px rgba(0,0,0,0.35)',
+            } as any}
           >
             {data.title}
           </Text>

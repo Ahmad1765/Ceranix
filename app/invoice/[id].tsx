@@ -510,12 +510,12 @@ export default function InvoiceScreen() {
 
       {/* Bottom action — contextual primary, not a generic floating pill */}
       <View
-        pointerEvents="box-none"
         style={{
           position: 'absolute',
           left: 16,
           right: 16,
           bottom: 24,
+          pointerEvents: 'box-none',
         }}
       >
         {status === 'paid' ? (
@@ -531,10 +531,7 @@ export default function InvoiceScreen() {
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center',
-              shadowColor: '#000',
-              shadowOpacity: 0.14,
-              shadowRadius: 16,
-              shadowOffset: { width: 0, height: 8 },
+              boxShadow: '0px 8px 16px rgba(0,0,0,0.14)',
               elevation: 5,
               transform: [{ scale: pressed ? 0.985 : 1 }],
             })}
@@ -562,10 +559,7 @@ export default function InvoiceScreen() {
               flexDirection: 'row',
               alignItems: 'center',
               paddingHorizontal: 8,
-              shadowColor: '#000',
-              shadowOpacity: 0.16,
-              shadowRadius: 18,
-              shadowOffset: { width: 0, height: 10 },
+              boxShadow: '0px 10px 18px rgba(0,0,0,0.16)',
               elevation: 6,
               transform: [{ scale: pressed ? 0.985 : 1 }],
             })}

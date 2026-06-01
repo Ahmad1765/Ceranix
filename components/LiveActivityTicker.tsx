@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, Animated, Easing, Platform, Dimensions } from 'react-native';
+
+// JS-driven on web (no RCTAnimation), native-driven on iOS/Android.
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -52,8 +55,8 @@ export function LiveActivityTicker() {
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(dotPulse, { toValue: 1, duration: 800, useNativeDriver: true }),
-        Animated.timing(dotPulse, { toValue: 0, duration: 800, useNativeDriver: true }),
+        Animated.timing(dotPulse, { toValue: 1, duration: 800, useNativeDriver: USE_NATIVE_DRIVER }),
+        Animated.timing(dotPulse, { toValue: 0, duration: 800, useNativeDriver: USE_NATIVE_DRIVER }),
       ]),
     ).start();
   }, [dotPulse]);
@@ -95,7 +98,7 @@ export function LiveActivityTicker() {
     Animated.parallel([
       Animated.spring(islandScale, {
         toValue: 1,
-        useNativeDriver: true,
+        useNativeDriver: USE_NATIVE_DRIVER,
         damping: 14,
         stiffness: 180,
         mass: 0.9,
@@ -104,7 +107,7 @@ export function LiveActivityTicker() {
         toValue: 1,
         duration: 260,
         easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
+        useNativeDriver: USE_NATIVE_DRIVER,
       }),
     ]).start();
     // Initial fade-in
@@ -113,7 +116,7 @@ export function LiveActivityTicker() {
       toValue: 1,
       duration: 220,
       easing: Easing.out(Easing.quad),
-      useNativeDriver: true,
+      useNativeDriver: USE_NATIVE_DRIVER,
     }).start();
     if (items.length === 1) return;
 
@@ -124,12 +127,12 @@ export function LiveActivityTicker() {
           toValue: -16,
           duration: 220,
           easing: Easing.in(Easing.cubic),
-          useNativeDriver: true,
+          useNativeDriver: USE_NATIVE_DRIVER,
         }),
         Animated.timing(opacity, {
           toValue: 0,
           duration: 220,
-          useNativeDriver: true,
+          useNativeDriver: USE_NATIVE_DRIVER,
         }),
       ]).start(() => {
         setIndex((i) => (i + 1) % items.length);
@@ -138,7 +141,7 @@ export function LiveActivityTicker() {
         Animated.parallel([
           Animated.spring(slide, {
             toValue: 0,
-            useNativeDriver: true,
+            useNativeDriver: USE_NATIVE_DRIVER,
             damping: 18,
             stiffness: 220,
             mass: 0.7,
@@ -146,7 +149,7 @@ export function LiveActivityTicker() {
           Animated.timing(opacity, {
             toValue: 1,
             duration: 220,
-            useNativeDriver: true,
+            useNativeDriver: USE_NATIVE_DRIVER,
           }),
         ]).start();
       });
@@ -175,13 +178,9 @@ export function LiveActivityTicker() {
           opacity: islandOpacity,
           transform: [{ scale: Animated.multiply(islandScale, pressScale) }],
           ...Platform.select({
-            ios: {
-              shadowColor: '#000',
-              shadowOpacity: 0.28,
-              shadowRadius: 14,
-              shadowOffset: { width: 0, height: 6 },
-            },
-            android: { elevation: 6 },
+            ios: { boxShadow: '0px 6px 14px rgba(0,0,0,0.28)' },
+            android: { boxShadow: '0px 6px 14px rgba(0,0,0,0.28)', elevation: 6 },
+            default: { boxShadow: '0px 6px 14px rgba(0,0,0,0.28)' },
           }),
         }}
       >
@@ -190,7 +189,7 @@ export function LiveActivityTicker() {
           onPressIn={() =>
             Animated.spring(pressScale, {
               toValue: 1.04,
-              useNativeDriver: true,
+              useNativeDriver: USE_NATIVE_DRIVER,
               damping: 14,
               stiffness: 280,
             }).start()
@@ -198,7 +197,7 @@ export function LiveActivityTicker() {
           onPressOut={() =>
             Animated.spring(pressScale, {
               toValue: 1,
-              useNativeDriver: true,
+              useNativeDriver: USE_NATIVE_DRIVER,
               damping: 14,
               stiffness: 280,
             }).start()

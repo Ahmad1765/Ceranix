@@ -35,8 +35,13 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import type { Listing } from '@/types';
-import { supabase } from '@/lib/supabase';
-import { fetchListingById, fetchUserListings, isLiked, toggleLike } from '@/lib/listings';
+import {
+  fetchListingById,
+  fetchSellerOtherListings,
+  fetchSimilarListings,
+  isLiked,
+  toggleLike,
+} from '@/lib/listings';
 import { getCachedListing } from '@/lib/listingCache';
 import { fetchFollowState, toggleFollow } from '@/lib/follows';
 import { withTimeout } from '@/lib/async';
@@ -59,13 +64,8 @@ function tap(style: 'light' | 'medium' | 'selection' = 'selection') {
 }
 
 const iosShadow = IS_IOS
-  ? {
-      shadowColor: '#000',
-      shadowOpacity: 0.18,
-      shadowRadius: 10,
-      shadowOffset: { width: 0, height: 4 },
-    }
-  : { elevation: 3 };
+  ? { boxShadow: '0px 4px 10px rgba(0,0,0,0.18)' }
+  : { boxShadow: '0px 4px 10px rgba(0,0,0,0.18)', elevation: 3 };
 
 const { width } = Dimensions.get('window');
 const IMAGE_HEIGHT = width * 1.45;
@@ -562,7 +562,6 @@ function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress: () => 
 
         {hasMultiple && (
           <View
-            pointerEvents="none"
             style={{
               position: 'absolute',
               bottom: 8,
@@ -572,6 +571,7 @@ function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress: () => 
               justifyContent: 'center',
               alignItems: 'center',
               gap: 4,
+              pointerEvents: 'none',
             }}
           >
             {item.images.map((_, i) => (
@@ -812,17 +812,17 @@ export default function ProductScreen() {
     setLoadingListing(!haveCached);
     setNotFound(false);
     setLoadError(null);
+    const controller = new AbortController();
     (async () => {
       try {
-        const row = await Promise.race([
-          fetchListingById(productIdParam),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('Request timed out')), 25_000),
-          ),
-        ]);
+        // Supabase client already enforces a 12s fetch ceiling via
+        // timeoutFetch in lib/supabase.ts, so no outer race is needed.
+        // The AbortController here cancels the request when the effect
+        // re-runs (HMR, param change, unmount) so stale fetches don't
+        // resolve into state we no longer want.
+        const row = await fetchListingById(productIdParam, controller.signal);
         if (!active) return;
         if (!row) {
-          // Genuine 404 — only flag if we don't already have cached data.
           if (!haveCached) setNotFound(true);
         } else {
           setListing({
@@ -831,13 +831,18 @@ export default function ProductScreen() {
           });
         }
       } catch (e: any) {
-        // Transient: network error, supabase 5xx, timeout.
+        // Silently swallow cancellations — they fire on unmount/HMR and
+        // are expected, not errors.
+        const msg = e?.message ?? '';
+        const cancelled =
+          controller.signal.aborted ||
+          e?.name === 'AbortError' ||
+          msg.includes('aborted') ||
+          msg.includes('AbortError');
+        if (cancelled || !active) return;
         console.warn('[product] load failed', e);
-        // Only surface the error screen if we have no cached content
-        // to show — otherwise the user keeps the cached view and the
-        // background refresh silently failed.
-        if (active && !haveCached) {
-          setLoadError(e?.message ?? 'Could not load listing');
+        if (!haveCached) {
+          setLoadError(msg || 'Could not load listing');
         }
       } finally {
         if (active) setLoadingListing(false);
@@ -845,6 +850,7 @@ export default function ProductScreen() {
     })();
     return () => {
       active = false;
+      controller.abort();
     };
   }, [productIdParam, retryToken]);
 
@@ -880,53 +886,48 @@ export default function ProductScreen() {
     };
   }, [listing?.seller?.id, user?.id]);
 
-  // Other listings from this seller (excludes the current one).
+  // Other listings from this seller — ranked by likes desc, freshness tiebreak,
+  // excluding the current item + sold rows server-side via RPC.
   useEffect(() => {
     let active = true;
     const sellerId = listing?.seller_id;
+    const currentId = listing?.id ?? null;
     if (!sellerId) {
       setSellerItems([]);
       return;
     }
-    fetchUserListings(sellerId)
+    fetchSellerOtherListings(sellerId, currentId, 6)
       .then((rows) => {
         if (!active) return;
-        setSellerItems(rows.filter((r) => r.id !== listing?.id && !r.is_sold).slice(0, 6));
+        setSellerItems(rows);
       })
-      .catch((e) => console.warn('[product] fetchUserListings', e?.message ?? e));
+      .catch((e) => console.warn('[product] fetchSellerOtherListings', e?.message ?? e));
     return () => {
       active = false;
     };
   }, [listing?.seller_id, listing?.id]);
 
-  // Similar listings — same category, different seller, not sold.
+  // "You might also like" — weighted similarity (brand, gender, size,
+  // condition, price proximity, title trigram, likes, freshness). Filtered
+  // server-side to exclude the item itself, sold rows, the same seller, and
+  // sellers on vacation.
   useEffect(() => {
     let active = true;
-    if (!listing?.category || !listing.id) {
+    const currentId = listing?.id;
+    if (!currentId) {
       setSimilarItems([]);
       return;
     }
-    let q = supabase
-      .from('listings')
-      .select('*, seller:profiles!listings_seller_id_fkey(*)')
-      .eq('category', listing.category)
-      .eq('is_sold', false)
-      .neq('id', listing.id);
-    if (listing.seller_id) q = q.neq('seller_id', listing.seller_id);
-    q.order('created_at', { ascending: false })
-      .limit(6)
-      .then(({ data, error }) => {
+    fetchSimilarListings(currentId, 6)
+      .then((rows) => {
         if (!active) return;
-        if (error) {
-          console.warn('[product] similar', error.message);
-          return;
-        }
-        setSimilarItems((data ?? []) as unknown as Listing[]);
-      });
+        setSimilarItems(rows);
+      })
+      .catch((e) => console.warn('[product] fetchSimilarListings', e?.message ?? e));
     return () => {
       active = false;
     };
-  }, [listing?.category, listing?.seller_id, listing?.id]);
+  }, [listing?.id]);
 
   const handleHeartPress = async () => {
     tap('light');
@@ -1110,10 +1111,7 @@ export default function ProductScreen() {
           flexDirection: 'row', alignItems: 'center',
           paddingHorizontal: 16, paddingBottom: 12,
           ...(IS_IOS && {
-            shadowColor: '#000',
-            shadowOpacity: 0.06,
-            shadowRadius: 8,
-            shadowOffset: { width: 0, height: 2 },
+            boxShadow: '0px 2px 8px rgba(0,0,0,0.06)',
           }),
         }}>
           <Pressable onPress={() => { tap('selection'); safeBack(); }} hitSlop={10} style={({ pressed }) => ({ marginRight: 12, opacity: pressed ? 0.5 : 1 })}>
@@ -1919,10 +1917,7 @@ export default function ProductScreen() {
                         borderWidth: 3,
                         borderColor: BRAND_PURPLE,
                         ...(IS_IOS && {
-                          shadowColor: '#000',
-                          shadowOpacity: 0.15,
-                          shadowRadius: 4,
-                          shadowOffset: { width: 0, height: 2 },
+                          boxShadow: '0px 2px 4px rgba(0,0,0,0.15)',
                         }),
                       }}
                     />
@@ -2031,10 +2026,7 @@ export default function ProductScreen() {
           gap: 10,
           alignItems: 'center',
           ...(IS_IOS && {
-            shadowColor: '#000',
-            shadowOpacity: 0.06,
-            shadowRadius: 12,
-            shadowOffset: { width: 0, height: -3 },
+            boxShadow: '0px -3px 12px rgba(0,0,0,0.06)',
           }),
         }}
       >

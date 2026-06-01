@@ -442,12 +442,12 @@ export default function PaymentScreen() {
 
       {/* Slide to pay */}
       <View
-        pointerEvents="box-none"
         style={{
           position: 'absolute',
           left: 16,
           right: 16,
           bottom: 24,
+          pointerEvents: 'box-none',
         }}
       >
         <SlideToConfirm

@@ -30,14 +30,9 @@ export function Card({
           borderColor: sty.bc,
           ...(elevated
             ? Platform.select({
-                ios: {
-                  shadowColor: '#000',
-                  shadowOpacity: 0.06,
-                  shadowRadius: 14,
-                  shadowOffset: { width: 0, height: 4 },
-                },
-                android: { elevation: 2 },
-                default: {},
+                ios: { boxShadow: '0px 4px 14px rgba(0,0,0,0.06)' },
+                android: { boxShadow: '0px 4px 14px rgba(0,0,0,0.06)', elevation: 2 },
+                default: { boxShadow: '0px 4px 14px rgba(0,0,0,0.06)' },
               })
             : {}),
         },

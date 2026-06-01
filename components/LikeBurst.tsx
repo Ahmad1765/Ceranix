@@ -65,7 +65,6 @@ function Particle({
 
   return (
     <Animated.View
-      pointerEvents="none"
       style={[
         {
           position: 'absolute',
@@ -73,6 +72,7 @@ function Particle({
           height: 6,
           borderRadius: 3,
           backgroundColor: color,
+          pointerEvents: 'none',
         },
         animStyle,
       ]}
@@ -124,7 +124,6 @@ export function LikeBurst({
     <View style={{ width: size + 24, height: size + 24, alignItems: 'center', justifyContent: 'center' }}>
       {/* Expanding ring on like */}
       <Animated.View
-        pointerEvents="none"
         style={[
           {
             position: 'absolute',
@@ -133,6 +132,7 @@ export function LikeBurst({
             borderRadius: (size + 8) / 2,
             borderWidth: 2,
             borderColor: color,
+            pointerEvents: 'none',
           },
           ringStyle,
         ]}

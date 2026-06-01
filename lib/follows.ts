@@ -40,13 +40,19 @@ export async function followUser(
   followeeId: string,
 ): Promise<void> {
   if (followerId === followeeId) throw new Error("Can't follow yourself");
+  // Plain INSERT + tolerate unique-violation. The previous upsert+
+  // ignoreDuplicates returned 201/no-body whether the row was written or
+  // silently dropped by RLS / the conflict-target plumbing, which made it
+  // look like follows "succeeded" but never actually persisted. Letting
+  // PostgREST surface RLS rejections (42501) explicitly here means the UI's
+  // catch block flips the optimistic state back and shows the real error.
   const { error } = await supabase
     .from('user_follows')
-    .upsert(
-      { follower_id: followerId, followee_id: followeeId },
-      { onConflict: 'follower_id,followee_id', ignoreDuplicates: true },
-    );
-  if (error) throw new Error(error.message);
+    .insert({ follower_id: followerId, followee_id: followeeId });
+  if (error && error.code !== '23505') {
+    console.warn('[follows] followUser', error.code, error.message);
+    throw new Error(error.message);
+  }
 }
 
 export async function unfollowUser(

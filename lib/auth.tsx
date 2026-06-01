@@ -98,10 +98,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (session?.user?.id) await fetchProfileWithRetry(session.user.id);
       },
       signOut: async () => {
-        await supabase.auth.signOut();
+        // Clear local state first so the UI updates immediately. On web,
+        // supabase.auth.signOut()'s default global scope calls the server's
+        // /logout endpoint, which can hang under Chrome (extensions/SW/CORS)
+        // and leave the spinner stuck even though the session is gone.
         if (mounted.current) {
           setSession(null);
           setProfile(null);
+        }
+        // scope: 'local' wipes the AsyncStorage/localStorage session without
+        // a network round-trip. Race with a short timeout as a final safety
+        // net so the caller's await never blocks the UI.
+        try {
+          await Promise.race([
+            supabase.auth.signOut({ scope: 'local' }),
+            new Promise<void>((resolve) => setTimeout(resolve, 1500)),
+          ]);
+        } catch (e) {
+          console.warn('[auth] signOut error', e);
         }
       },
     }),
