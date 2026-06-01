@@ -1,3 +1,38 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Web only: kill every focus outline browsers draw around TextInputs and
+   any focusable Pressable. No replacement ring — zero borders, ever. */
+@layer base {
+  input,
+  textarea,
+  select,
+  button,
+  [role="button"],
+  [tabindex] {
+    outline: none !important;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  input:focus,
+  input:focus-visible,
+  textarea:focus,
+  textarea:focus-visible,
+  select:focus,
+  select:focus-visible,
+  button:focus,
+  button:focus-visible,
+  [role="button"]:focus,
+  [role="button"]:focus-visible,
+  [tabindex]:focus,
+  [tabindex]:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+    border-color: transparent !important;
+  }
+
+  *::selection {
+    background-color: rgba(108, 71, 255, 0.25);
+  }
+}

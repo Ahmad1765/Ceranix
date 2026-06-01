@@ -1,6 +1,13 @@
 import '../global.css';
 import { useEffect, useState } from 'react';
-import { Platform } from 'react-native';
+import { Platform, TextInput } from 'react-native';
+
+// Strip Android's default black TextInput underline and align selection
+// handles with the brand purple so focus/select never paints black.
+const _TI: any = TextInput;
+_TI.defaultProps = _TI.defaultProps || {};
+_TI.defaultProps.underlineColorAndroid = 'transparent';
+_TI.defaultProps.selectionColor = '#6C47FF';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';

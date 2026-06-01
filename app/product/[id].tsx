@@ -960,10 +960,10 @@ export default function ProductScreen() {
     setFollowed(optimistic); // optimistic flip
     try {
       const next = await toggleFollow(user.id, sellerId, followed);
-      setFollowed(next);
+      setFollowed(next.isFollowing);
       toast.show(
-        next ? `Following @${listing?.seller?.username ?? 'seller'}` : 'Unfollowed',
-        { variant: next ? 'info' : 'default', icon: next ? 'user-check' : 'user-x' },
+        next.isFollowing ? `Following @${listing?.seller?.username ?? 'seller'}` : 'Unfollowed',
+        { variant: next.isFollowing ? 'info' : 'default', icon: next.isFollowing ? 'user-check' : 'user-x' },
       );
     } catch (e: any) {
       // Roll back optimistic state on failure.

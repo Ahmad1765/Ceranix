@@ -100,7 +100,11 @@ export default function UserProfileScreen() {
     setFollowersCount((n) => Math.max(0, n + (wasFollowing ? -1 : 1)));
     try {
       const next = await toggleFollow(authUser.id, userId, wasFollowing);
-      setFollowed(next);
+      // Commit the server-truth state + counts atomically so optimistic
+      // drift can't leave the button or numbers stale.
+      setFollowed(next.isFollowing);
+      setFollowersCount(next.followersCount);
+      setFollowingCount(next.followingCount);
     } catch (e: any) {
       // Roll back.
       setFollowed(wasFollowing);
