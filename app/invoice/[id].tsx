@@ -15,6 +15,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { colors } from '@/lib/theme';
 import { fetchListingById } from '@/lib/listings';
+import { withTimeout } from '@/lib/async';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { safeBack } from '@/lib/nav';
@@ -77,12 +78,22 @@ export default function InvoiceScreen() {
 
   useEffect(() => {
     let active = true;
-    if (!id) return;
-    fetchListingById(String(id)).then((res) => {
-      if (!active) return;
-      setListing(res);
+    if (!id) {
       setLoading(false);
-    });
+      return;
+    }
+    setLoading(true);
+    (async () => {
+      try {
+        const res = await withTimeout(fetchListingById(String(id)), 12_000, null);
+        if (active) setListing(res);
+      } catch (e) {
+        console.warn('[invoice] load failed', e);
+        if (active) setListing(null);
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
     return () => {
       active = false;
     };

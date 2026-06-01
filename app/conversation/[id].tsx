@@ -33,6 +33,7 @@ import { useToast } from '@/lib/toast';
 import { colors, radii } from '@/lib/theme';
 import { Button, EmptyState } from '@/components/ui';
 import { HIT_SLOP_8 } from '@/lib/responsive';
+import { withTimeout } from '@/lib/async';
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -432,14 +433,19 @@ export default function ConversationScreen() {
     let cancelled = false;
     setLoading(true);
     (async () => {
-      const [c, m] = await Promise.all([
-        getConversation(conversationId),
-        fetchMessages(conversationId),
-      ]);
-      if (cancelled) return;
-      setConv(c);
-      setMessages(m);
-      setLoading(false);
+      try {
+        const [c, m] = await Promise.all([
+          withTimeout(getConversation(conversationId), 12_000, null),
+          withTimeout(fetchMessages(conversationId), 12_000, []),
+        ]);
+        if (cancelled) return;
+        setConv(c);
+        setMessages(m);
+      } catch (e) {
+        console.warn('[conversation] load failed', e);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     })();
     return () => {
       cancelled = true;

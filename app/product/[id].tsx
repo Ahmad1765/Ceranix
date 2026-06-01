@@ -34,6 +34,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import type { Listing } from '@/types';
 import { fetchListingById, isLiked, toggleLike } from '@/lib/listings';
+import { withTimeout } from '@/lib/async';
 import { getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
@@ -772,18 +773,25 @@ export default function ProductScreen() {
     }
     setLoadingListing(true);
     setNotFound(false);
-    fetchListingById(productIdParam).then((row) => {
-      if (!active) return;
-      if (!row) {
-        setNotFound(true);
-      } else {
-        setListing({
-          ...row,
-          seller: row.seller ?? (FALLBACK_SELLER as Listing['seller']),
-        });
+    (async () => {
+      try {
+        const row = await withTimeout(fetchListingById(productIdParam), 12_000, null);
+        if (!active) return;
+        if (!row) {
+          setNotFound(true);
+        } else {
+          setListing({
+            ...row,
+            seller: row.seller ?? (FALLBACK_SELLER as Listing['seller']),
+          });
+        }
+      } catch (e) {
+        console.warn('[product] load failed', e);
+        if (active) setNotFound(true);
+      } finally {
+        if (active) setLoadingListing(false);
       }
-      setLoadingListing(false);
-    });
+    })();
     return () => {
       active = false;
     };
