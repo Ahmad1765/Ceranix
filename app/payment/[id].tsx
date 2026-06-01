@@ -19,6 +19,7 @@ import { useToast } from '@/lib/toast';
 import { safeBack } from '@/lib/nav';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { createCheckoutSession, openCheckout, STRIPE_ENABLED } from '@/lib/payments';
+import { SlideToConfirm } from '@/components/SlideToConfirm';
 import type { Listing } from '@/types';
 
 function tap(style: 'light' | 'medium' = 'light') {
@@ -430,7 +431,7 @@ export default function PaymentScreen() {
         </View>
       </ScrollView>
 
-      {/* Pay button */}
+      {/* Slide to pay */}
       <View
         pointerEvents="box-none"
         style={{
@@ -440,55 +441,12 @@ export default function PaymentScreen() {
           bottom: 24,
         }}
       >
-        <Pressable
-          onPress={handlePay}
-          disabled={paying}
-          style={({ pressed }) => ({
-            height: 64,
-            borderRadius: 999,
-            backgroundColor: colors.primary,
-            flexDirection: 'row',
-            alignItems: 'center',
-            paddingHorizontal: 8,
-            shadowColor: '#000',
-            shadowOpacity: 0.16,
-            shadowRadius: 18,
-            shadowOffset: { width: 0, height: 10 },
-            elevation: 6,
-            opacity: paying ? 0.85 : 1,
-            transform: [{ scale: pressed && !paying ? 0.985 : 1 }],
-          })}
-        >
-          <View
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: 24,
-              backgroundColor: colors.white,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            {paying ? (
-              <ActivityIndicator color={colors.primary} />
-            ) : (
-              <Feather name="arrow-right" size={20} color={colors.primary} />
-            )}
-          </View>
-          <View style={{ flex: 1, alignItems: 'center' }}>
-            <Text
-              style={{
-                fontSize: 17,
-                fontWeight: '900',
-                color: colors.white,
-                letterSpacing: 0.2,
-                marginRight: 48,
-              }}
-            >
-              {paying ? 'Processing…' : 'Pay in full'}
-            </Text>
-          </View>
-        </Pressable>
+        <SlideToConfirm
+          label={`Slide to pay ${formatMoney(total)}`}
+          loadingLabel="Processing…"
+          loading={paying}
+          onConfirm={handlePay}
+        />
       </View>
     </SafeAreaView>
   );
