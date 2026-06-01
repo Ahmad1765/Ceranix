@@ -30,10 +30,15 @@ import Animated, {
   runOnJS,
   withSpring,
   withTiming,
+  withRepeat,
+  withSequence,
   Easing,
 } from 'react-native-reanimated';
 import type { Listing } from '@/types';
-import { fetchListingById, isLiked, toggleLike } from '@/lib/listings';
+import { supabase } from '@/lib/supabase';
+import { fetchListingById, fetchUserListings, isLiked, toggleLike } from '@/lib/listings';
+import { getCachedListing } from '@/lib/listingCache';
+import { fetchFollowState, toggleFollow } from '@/lib/follows';
 import { withTimeout } from '@/lib/async';
 import { getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
 import { useAuth } from '@/lib/auth';
@@ -157,115 +162,33 @@ type RelatedItem = {
   likes: number;
 };
 
-const MEMBER_ITEMS: RelatedItem[] = [
-  {
-    id: 'm1',
-    images: [
-      'https://picsum.photos/seed/mi1/400/520',
-      'https://picsum.photos/seed/mi1b/400/520',
-      'https://picsum.photos/seed/mi1c/400/520',
-    ],
-    brand: 'Ralph Lauren',
-    meta: 'S · Very good',
-    price: 49,
-    inclPrice: 52.15,
-    likes: 7,
-  },
-  {
-    id: 'm2',
-    images: [
-      'https://picsum.photos/seed/mi2/400/520',
-      'https://picsum.photos/seed/mi2b/400/520',
-      'https://picsum.photos/seed/mi2c/400/520',
-    ],
-    brand: 'Carolina Herrera',
-    meta: 'S / 36 / 8 · New with tags',
-    price: 190,
-    inclPrice: 200.2,
-    likes: 8,
-  },
-  {
-    id: 'm3',
-    images: [
-      'https://picsum.photos/seed/mi3/400/520',
-      'https://picsum.photos/seed/mi3b/400/520',
-      'https://picsum.photos/seed/mi3c/400/520',
-    ],
-    brand: 'Hugo Boss',
-    meta: 'M · Good',
-    price: 35,
-    inclPrice: 37.65,
-    likes: 4,
-  },
-  {
-    id: 'm4',
-    images: [
-      'https://picsum.photos/seed/mi4/400/520',
-      'https://picsum.photos/seed/mi4b/400/520',
-      'https://picsum.photos/seed/mi4c/400/520',
-    ],
-    brand: 'Burberry',
-    meta: 'L · Very good',
-    price: 89,
-    inclPrice: 94.2,
-    likes: 12,
-  },
-];
+function conditionLabel(c: Listing['condition']) {
+  switch (c) {
+    case 'new_with_tags':
+      return 'New with tags';
+    case 'like_new':
+      return 'Like new';
+    case 'good':
+      return 'Good';
+    case 'fair':
+      return 'Fair';
+    default:
+      return '';
+  }
+}
 
-const SIMILAR_ITEMS: RelatedItem[] = [
-  {
-    id: 's1',
-    images: [
-      'https://picsum.photos/seed/si1/400/520',
-      'https://picsum.photos/seed/si1b/400/520',
-      'https://picsum.photos/seed/si1c/400/520',
-    ],
-    brand: "Arc'teryx",
-    meta: 'M · Very good',
-    price: 175,
-    inclPrice: 184.65,
-    likes: 23,
-  },
-  {
-    id: 's2',
-    images: [
-      'https://picsum.photos/seed/si2/400/520',
-      'https://picsum.photos/seed/si2b/400/520',
-      'https://picsum.photos/seed/si2c/400/520',
-    ],
-    brand: 'Patagonia',
-    meta: 'L · Like new',
-    price: 120,
-    inclPrice: 126.6,
-    likes: 15,
-  },
-  {
-    id: 's3',
-    images: [
-      'https://picsum.photos/seed/si3/400/520',
-      'https://picsum.photos/seed/si3b/400/520',
-      'https://picsum.photos/seed/si3c/400/520',
-    ],
-    brand: 'The North Face',
-    meta: 'M · Good',
-    price: 95,
-    inclPrice: 100.45,
-    likes: 9,
-  },
-  {
-    id: 's4',
-    images: [
-      'https://picsum.photos/seed/si4/400/520',
-      'https://picsum.photos/seed/si4b/400/520',
-      'https://picsum.photos/seed/si4c/400/520',
-    ],
-    brand: 'Stone Island',
-    meta: 'L · Very good',
-    price: 245,
-    inclPrice: 258.95,
-    likes: 31,
-  },
-];
+function listingToRelated(row: Listing): RelatedItem {
+  const meta = [row.size, conditionLabel(row.condition)].filter(Boolean).join(' · ');
+  return {
+    id: row.id,
+    images: row.images && row.images.length > 0 ? row.images : [],
+    brand: row.brand || row.title,
+    meta: meta || row.category,
+    price: Number(row.price ?? 0),
+    inclPrice: Number(row.price ?? 0),
+    likes: Number(row.likes ?? 0),
+  };
+}
 
 type SaveList = { id: string; name: string; emoji: string; count: number };
 const SAVE_LISTS: SaveList[] = [
@@ -743,6 +666,106 @@ function StarRating({ rating }: { rating: number }) {
   );
 }
 
+function SkeletonBlock({
+  width,
+  height,
+  radius = 8,
+  style,
+}: {
+  width: number | string;
+  height: number;
+  radius?: number;
+  style?: any;
+}) {
+  const opacity = useSharedValue(0.5);
+  useEffect(() => {
+    opacity.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 700 }),
+        withTiming(0.5, { duration: 700 }),
+      ),
+      -1,
+      true,
+    );
+  }, [opacity]);
+  const animStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+  return (
+    <Animated.View
+      style={[
+        {
+          width,
+          height,
+          borderRadius: radius,
+          backgroundColor: 'rgba(15,15,15,0.06)',
+        },
+        animStyle,
+        style,
+      ]}
+    />
+  );
+}
+
+function ProductSkeleton({ insetsTop }: { insetsTop: number }) {
+  return (
+    <View style={{ flex: 1, backgroundColor: 'white' }}>
+      {/* Header (back button area) */}
+      <View
+        style={{
+          paddingTop: insetsTop + 8,
+          paddingHorizontal: 16,
+          paddingBottom: 8,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <SkeletonBlock width={40} height={40} radius={20} />
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <SkeletonBlock width={40} height={40} radius={20} />
+          <SkeletonBlock width={40} height={40} radius={20} />
+        </View>
+      </View>
+
+      {/* Hero image */}
+      <SkeletonBlock
+        width="100%"
+        height={420}
+        radius={0}
+        style={{ marginTop: 4 }}
+      />
+
+      {/* Content block */}
+      <View style={{ paddingHorizontal: 20, paddingTop: 22 }}>
+        <SkeletonBlock width={80} height={14} radius={4} />
+        <SkeletonBlock width="86%" height={22} radius={6} style={{ marginTop: 10 }} />
+        <SkeletonBlock width="60%" height={22} radius={6} style={{ marginTop: 8 }} />
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 20 }}>
+          <SkeletonBlock width={120} height={34} radius={8} />
+          <SkeletonBlock width={70} height={20} radius={4} style={{ marginLeft: 12 }} />
+        </View>
+
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginTop: 24,
+            paddingTop: 20,
+            borderTopWidth: 1,
+            borderTopColor: 'rgba(15,15,15,0.06)',
+          }}
+        >
+          <SkeletonBlock width={44} height={44} radius={22} />
+          <View style={{ marginLeft: 12, flex: 1 }}>
+            <SkeletonBlock width="55%" height={14} radius={4} />
+            <SkeletonBlock width="35%" height={11} radius={4} style={{ marginTop: 6 }} />
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export default function ProductScreen() {
   const { id } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
@@ -755,39 +778,67 @@ export default function ProductScreen() {
   const [likeBusy, setLikeBusy] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [followed, setFollowed] = useState(false);
+  const [followBusy, setFollowBusy] = useState(false);
+  const [sellerItems, setSellerItems] = useState<Listing[]>([]);
+  const [similarItems, setSimilarItems] = useState<Listing[]>([]);
   const [showStickyHeader, setShowStickyHeader] = useState(false);
   const [relatedTab, setRelatedTab] = useState<'members' | 'similar'>('members');
   const [heroPagerEnabled, setHeroPagerEnabled] = useState(true);
   const [saveListVisible, setSaveListVisible] = useState(false);
   const [savedToList, setSavedToList] = useState<string | null>(null);
-  const [listing, setListing] = useState<Listing | null>(null);
-  const [loadingListing, setLoadingListing] = useState(true);
+  // Prime from cache so re-opens are instant — bypasses any wedged supabase
+  // client on web while we refetch in the background.
+  const cached = getCachedListing(productIdParam);
+  const [listing, setListing] = useState<Listing | null>(
+    cached ? { ...cached, seller: cached.seller ?? (FALLBACK_SELLER as Listing['seller']) } : null,
+  );
+  const [loadingListing, setLoadingListing] = useState(!cached);
   const [notFound, setNotFound] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
+
+  const retry = () => setRetryToken((n) => n + 1);
 
   useEffect(() => {
     let active = true;
     if (!productIdParam) {
       setLoadingListing(false);
       setNotFound(true);
+      setLoadError(null);
       return;
     }
-    setLoadingListing(true);
+    const haveCached = !!getCachedListing(productIdParam);
+    // Only show the blocking skeleton when we have nothing to render.
+    setLoadingListing(!haveCached);
     setNotFound(false);
+    setLoadError(null);
     (async () => {
       try {
-        const row = await withTimeout(fetchListingById(productIdParam), 12_000, null);
+        const row = await Promise.race([
+          fetchListingById(productIdParam),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Request timed out')), 25_000),
+          ),
+        ]);
         if (!active) return;
         if (!row) {
-          setNotFound(true);
+          // Genuine 404 — only flag if we don't already have cached data.
+          if (!haveCached) setNotFound(true);
         } else {
           setListing({
             ...row,
             seller: row.seller ?? (FALLBACK_SELLER as Listing['seller']),
           });
         }
-      } catch (e) {
+      } catch (e: any) {
+        // Transient: network error, supabase 5xx, timeout.
         console.warn('[product] load failed', e);
-        if (active) setNotFound(true);
+        // Only surface the error screen if we have no cached content
+        // to show — otherwise the user keeps the cached view and the
+        // background refresh silently failed.
+        if (active && !haveCached) {
+          setLoadError(e?.message ?? 'Could not load listing');
+        }
       } finally {
         if (active) setLoadingListing(false);
       }
@@ -795,7 +846,7 @@ export default function ProductScreen() {
     return () => {
       active = false;
     };
-  }, [productIdParam]);
+  }, [productIdParam, retryToken]);
 
   useEffect(() => {
     let active = true;
@@ -810,6 +861,72 @@ export default function ProductScreen() {
       active = false;
     };
   }, [productIdParam, user?.id]);
+
+  // Real follow state — pulls from user_follows and the profile's denormalized counts.
+  useEffect(() => {
+    let active = true;
+    const sellerId = listing?.seller?.id;
+    if (!sellerId || sellerId === user?.id) {
+      setFollowed(false);
+      return;
+    }
+    fetchFollowState(user?.id ?? null, sellerId)
+      .then((s) => {
+        if (active) setFollowed(s.isFollowing);
+      })
+      .catch((e) => console.warn('[product] fetchFollowState', e?.message ?? e));
+    return () => {
+      active = false;
+    };
+  }, [listing?.seller?.id, user?.id]);
+
+  // Other listings from this seller (excludes the current one).
+  useEffect(() => {
+    let active = true;
+    const sellerId = listing?.seller_id;
+    if (!sellerId) {
+      setSellerItems([]);
+      return;
+    }
+    fetchUserListings(sellerId)
+      .then((rows) => {
+        if (!active) return;
+        setSellerItems(rows.filter((r) => r.id !== listing?.id && !r.is_sold).slice(0, 6));
+      })
+      .catch((e) => console.warn('[product] fetchUserListings', e?.message ?? e));
+    return () => {
+      active = false;
+    };
+  }, [listing?.seller_id, listing?.id]);
+
+  // Similar listings — same category, different seller, not sold.
+  useEffect(() => {
+    let active = true;
+    if (!listing?.category || !listing.id) {
+      setSimilarItems([]);
+      return;
+    }
+    let q = supabase
+      .from('listings')
+      .select('*, seller:profiles!listings_seller_id_fkey(*)')
+      .eq('category', listing.category)
+      .eq('is_sold', false)
+      .neq('id', listing.id);
+    if (listing.seller_id) q = q.neq('seller_id', listing.seller_id);
+    q.order('created_at', { ascending: false })
+      .limit(6)
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) {
+          console.warn('[product] similar', error.message);
+          return;
+        }
+        setSimilarItems((data ?? []) as unknown as Listing[]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [listing?.category, listing?.seller_id, listing?.id]);
 
   const handleHeartPress = async () => {
     tap('light');
@@ -828,16 +945,35 @@ export default function ProductScreen() {
     setLikeBusy(false);
   };
 
-  const handleFollowPress = () => {
+  const handleFollowPress = async () => {
     tap('selection');
-    setFollowed((prev) => {
-      const next = !prev;
+    if (!user) {
+      toast.show('Sign in to follow sellers', { variant: 'info', icon: 'log-in' });
+      router.push('/auth/login');
+      return;
+    }
+    const sellerId = listing?.seller?.id;
+    if (!sellerId || sellerId === user.id || followBusy) return;
+    setFollowBusy(true);
+    const optimistic = !followed;
+    setFollowed(optimistic); // optimistic flip
+    try {
+      const next = await toggleFollow(user.id, sellerId, followed);
+      setFollowed(next);
       toast.show(
         next ? `Following @${listing?.seller?.username ?? 'seller'}` : 'Unfollowed',
         { variant: next ? 'info' : 'default', icon: next ? 'user-check' : 'user-x' },
       );
-      return next;
-    });
+    } catch (e: any) {
+      // Roll back optimistic state on failure.
+      setFollowed(!optimistic);
+      toast.show(e?.message ?? 'Could not update follow', {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
+    } finally {
+      setFollowBusy(false);
+    }
   };
 
   const openChat = (mode: 'message' | 'offer') => {
@@ -893,10 +1029,46 @@ export default function ProductScreen() {
     };
   });
 
-  if (loadingListing) {
+  if (loadingListing && !listing) {
+    return <ProductSkeleton insetsTop={insets.top} />;
+  }
+
+  if (loadError && !listing) {
     return (
-      <View style={{ flex: 1, backgroundColor: 'white', alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={BRAND_PURPLE} />
+      <View style={{ flex: 1, backgroundColor: 'white', paddingTop: insets.top }}>
+        <Pressable onPress={() => safeBack()} hitSlop={10} style={{ padding: 16 }}>
+          <Feather name="arrow-left" size={22} color="#0F0F0F" />
+        </Pressable>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
+          <Feather name="wifi-off" size={36} color="rgba(15,15,15,0.45)" />
+          <Text style={{ fontSize: 17, fontWeight: '800', color: '#0F0F0F', marginTop: 14, letterSpacing: -0.3 }}>
+            Couldn't load this listing
+          </Text>
+          <Text style={{ fontSize: 13, color: 'rgba(15,15,15,0.62)', marginTop: 6, textAlign: 'center', lineHeight: 19 }}>
+            {loadError === 'Request timed out'
+              ? 'The connection is slow right now. Try again in a moment.'
+              : 'Something went wrong. Check your connection and try again.'}
+          </Text>
+          <Pressable
+            onPress={() => { tap('light'); retry(); }}
+            style={({ pressed }) => ({
+              marginTop: 22,
+              height: 48,
+              borderRadius: 14,
+              paddingHorizontal: 28,
+              backgroundColor: BRAND_INK,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: pressed ? 0.85 : 1,
+            })}
+          >
+            <Feather name="refresh-cw" size={14} color="#fff" />
+            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14, marginLeft: 8 }}>
+              Retry
+            </Text>
+          </Pressable>
+        </View>
       </View>
     );
   }
@@ -920,8 +1092,6 @@ export default function ProductScreen() {
     );
   }
 
-  const originalPrice = Math.round(listing.price * 1.24);
-  const discountPct = Math.round((1 - listing.price / originalPrice) * 100);
   const baseLikes = listing.likes ?? 0;
   const heartCount = Math.max(0, baseLikes + (liked ? 1 : 0));
 
@@ -1154,33 +1324,17 @@ export default function ProductScreen() {
               </View>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={{ fontSize: 13, color: 'rgba(15,15,15,0.45)', textDecorationLine: 'line-through' }}>
-                ${originalPrice}
-              </Text>
               <Text
                 style={{
-                  fontSize: 26,
+                  fontSize: 28,
                   fontWeight: '900',
                   color: BRAND_INK,
-                  lineHeight: 30,
-                  letterSpacing: -0.4,
+                  lineHeight: 32,
+                  letterSpacing: -0.6,
                 }}
               >
                 ${listing.price}
               </Text>
-              <View
-                style={{
-                  marginTop: 4,
-                  backgroundColor: BRAND_LIME,
-                  borderRadius: 999,
-                  paddingHorizontal: 8,
-                  paddingVertical: 3,
-                }}
-              >
-                <Text style={{ fontSize: 11, fontWeight: '900', color: '#FFFFFF', letterSpacing: 0.4 }}>
-                  −{discountPct}%
-                </Text>
-              </View>
             </View>
           </View>
 
@@ -1796,35 +1950,65 @@ export default function ProductScreen() {
                   ))}
                 </View>
               </View>
-              <View
-                style={{
-                  width: '100%',
-                  flexDirection: 'row',
-                  flexWrap: 'wrap',
-                  paddingHorizontal: CARD_OUTER_PAD,
-                  columnGap: CARD_GAP,
-                }}
-              >
-                {MEMBER_ITEMS.map((item) => (
-                  <RelatedItemCard key={item.id} item={item} onPress={() => router.push(`/product/${item.id}`)} />
-                ))}
-              </View>
+              {sellerItems.length === 0 ? (
+                <View style={{ paddingHorizontal: 20, paddingVertical: 14 }}>
+                  <Text style={{ fontSize: 13, color: 'rgba(15,15,15,0.62)' }}>
+                    @{listing.seller.username} has no other listings right now.
+                  </Text>
+                </View>
+              ) : (
+                <View
+                  style={{
+                    width: '100%',
+                    flexDirection: 'row',
+                    flexWrap: 'wrap',
+                    paddingHorizontal: CARD_OUTER_PAD,
+                    columnGap: CARD_GAP,
+                  }}
+                >
+                  {sellerItems.map((row) => {
+                    const item = listingToRelated(row);
+                    return (
+                      <RelatedItemCard
+                        key={item.id}
+                        item={item}
+                        onPress={() => router.push(`/product/${item.id}`)}
+                      />
+                    );
+                  })}
+                </View>
+              )}
             </View>
           ) : (
             <View style={{ paddingTop: 18 }}>
-              <View
-                style={{
-                  width: '100%',
-                  flexDirection: 'row',
-                  flexWrap: 'wrap',
-                  paddingHorizontal: CARD_OUTER_PAD,
-                  columnGap: CARD_GAP,
-                }}
-              >
-                {SIMILAR_ITEMS.map((item) => (
-                  <RelatedItemCard key={item.id} item={item} onPress={() => router.push(`/product/${item.id}`)} />
-                ))}
-              </View>
+              {similarItems.length === 0 ? (
+                <View style={{ paddingHorizontal: 20, paddingVertical: 14 }}>
+                  <Text style={{ fontSize: 13, color: 'rgba(15,15,15,0.62)' }}>
+                    No similar items found yet — check back soon.
+                  </Text>
+                </View>
+              ) : (
+                <View
+                  style={{
+                    width: '100%',
+                    flexDirection: 'row',
+                    flexWrap: 'wrap',
+                    paddingHorizontal: CARD_OUTER_PAD,
+                    columnGap: CARD_GAP,
+                  }}
+                >
+                  {similarItems.map((row) => {
+                    const item = listingToRelated(row);
+                    return (
+                      <RelatedItemCard
+                        key={item.id}
+                        item={item}
+                        onPress={() => router.push(`/product/${item.id}`)}
+                      />
+                    );
+                  })}
+                </View>
+              )}
             </View>
           )}
         </View>

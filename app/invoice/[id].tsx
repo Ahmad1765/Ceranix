@@ -15,6 +15,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { colors } from '@/lib/theme';
 import { fetchListingById } from '@/lib/listings';
+import { getCachedListing } from '@/lib/listingCache';
 import { withTimeout } from '@/lib/async';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
@@ -63,18 +64,33 @@ function deriveInvoiceNumber(id: string): string {
 
 // Supabase auto-generates handles like "user70c33" with random suffixes.
 // Trim trailing hex noise so the invoice doesn't show raw machine output.
+function stripHexSuffix(s: string): string {
+  const cleaned = s.replace(/[0-9a-f]{4,}$/i, '');
+  return cleaned.length >= 3 ? cleaned : s;
+}
+
 function displayHandle(username: string | null | undefined): string {
   if (!username) return '—';
-  const cleaned = username.replace(/[0-9a-f]{4,}$/i, '');
-  return '@' + (cleaned.length >= 3 ? cleaned : username);
+  return '@' + stripHexSuffix(username);
+}
+
+function displayName(
+  fullName: string | null | undefined,
+  username: string | null | undefined,
+): string {
+  const name = (fullName ?? '').trim();
+  if (name) return name;
+  if (!username) return 'User';
+  return stripHexSuffix(username);
 }
 
 export default function InvoiceScreen() {
   const { id, paid } = useLocalSearchParams<{ id: string; paid?: string }>();
   const { profile } = useAuth();
   const toast = useToast();
-  const [listing, setListing] = useState<Listing | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cached = getCachedListing(id ? String(id) : null);
+  const [listing, setListing] = useState<Listing | null>(cached);
+  const [loading, setLoading] = useState(!cached);
 
   useEffect(() => {
     let active = true;
@@ -82,14 +98,21 @@ export default function InvoiceScreen() {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    const haveCached = !!getCachedListing(String(id));
+    setLoading(!haveCached);
     (async () => {
       try {
-        const res = await withTimeout(fetchListingById(String(id)), 12_000, null);
-        if (active) setListing(res);
+        const res = await Promise.race([
+          fetchListingById(String(id)),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Request timed out')), 25_000),
+          ),
+        ]);
+        if (active && res) setListing(res);
+        else if (active && !haveCached) setListing(null);
       } catch (e) {
         console.warn('[invoice] load failed', e);
-        if (active) setListing(null);
+        if (active && !haveCached) setListing(null);
       } finally {
         if (active) setLoading(false);
       }
@@ -172,9 +195,9 @@ export default function InvoiceScreen() {
   const dueDate = listing.created_at
     ? new Date(new Date(listing.created_at).getTime() + 14 * 86400_000).toISOString()
     : null;
-  const sellerName = seller?.full_name || seller?.username || 'Seller';
-  const sellerHandle = seller?.username ? `@${seller.username}` : '—';
-  const buyerName = profile?.full_name || profile?.username || 'Guest buyer';
+  const sellerName = displayName(seller?.full_name, seller?.username);
+  const sellerHandle = displayHandle(seller?.username);
+  const buyerName = displayName(profile?.full_name, profile?.username);
   const buyerHandle = displayHandle(profile?.username);
   const status: 'paid' | 'pending' = listing.is_sold || paid === '1' ? 'paid' : 'pending';
   const heroImage = listing.images?.[0];
@@ -259,23 +282,44 @@ export default function InvoiceScreen() {
             style={{
               flexDirection: 'row',
               justifyContent: 'space-between',
+              alignItems: 'flex-start',
             }}
           >
-            <View style={{ flex: 1, paddingRight: 12 }}>
+            <View style={{ flex: 1, paddingRight: 16, minWidth: 0 }}>
               <Text style={InkEyebrow}>From</Text>
-              <Text style={InkAddress} numberOfLines={1}>
+              <Text
+                style={InkAddress}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
                 {sellerName}
               </Text>
-              <Text style={InkAddressMute} numberOfLines={1}>
+              <Text
+                style={InkAddressMute}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
                 {sellerHandle}
               </Text>
             </View>
-            <View style={{ flex: 1, alignItems: 'flex-end' }}>
+            <View style={{ flex: 1, alignItems: 'flex-end', minWidth: 0 }}>
               <Text style={[InkEyebrow, { textAlign: 'right' }]}>Billed to</Text>
-              <Text style={[InkAddress, { textAlign: 'right' }]} numberOfLines={1}>
+              <Text
+                style={[InkAddress, { textAlign: 'right' }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
                 {buyerName}
               </Text>
-              <Text style={[InkAddressMute, { textAlign: 'right' }]} numberOfLines={1}>
+              <Text
+                style={[InkAddressMute, { textAlign: 'right' }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
                 {buyerHandle}
               </Text>
             </View>
@@ -634,7 +678,6 @@ const InkAddress = {
   fontWeight: '700' as const,
   color: colors.ink,
   marginTop: 4,
-  letterSpacing: -0.1,
 };
 
 const InkAddressMute = {

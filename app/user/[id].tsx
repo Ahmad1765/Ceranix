@@ -15,8 +15,10 @@ import { Feather } from '@expo/vector-icons';
 import Animated from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
 import { fetchUserListings } from '@/lib/listings';
+import { fetchFollowState, toggleFollow } from '@/lib/follows';
 import { getOptimizedImageUrl } from '@/lib/images';
 import { useAuth } from '@/lib/auth';
+import { useToast } from '@/lib/toast';
 import { ListingCard } from '@/components/ListingCard';
 import { colors, radii } from '@/lib/theme';
 import { useGridDimensions, HIT_SLOP_8 } from '@/lib/responsive';
@@ -32,11 +34,15 @@ export default function UserProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const userId = typeof id === 'string' ? id : '';
   const { user: authUser } = useAuth();
+  const toast = useToast();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [followed, setFollowed] = useState(false);
+  const [followBusy, setFollowBusy] = useState(false);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
 
   const fade = useFadeIn(0, 320);
 
@@ -58,11 +64,19 @@ export default function UserProfileScreen() {
     Promise.all([
       supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
       fetchUserListings(userId),
+      fetchFollowState(authUser?.id ?? null, userId).catch(() => ({
+        followersCount: 0,
+        followingCount: 0,
+        isFollowing: false,
+      })),
     ])
-      .then(([p, l]) => {
+      .then(([p, l, f]) => {
         if (cancelled) return;
         setProfile((p.data as Profile | null) ?? null);
         setListings(l);
+        setFollowed(f.isFollowing);
+        setFollowersCount(f.followersCount);
+        setFollowingCount(f.followingCount);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -70,17 +84,51 @@ export default function UserProfileScreen() {
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [userId, authUser?.id]);
+
+  const handleFollowToggle = async () => {
+    if (!authUser) {
+      toast.show('Sign in to follow', { variant: 'info', icon: 'log-in' });
+      router.push('/auth/login' as any);
+      return;
+    }
+    if (!userId || authUser.id === userId || followBusy) return;
+    setFollowBusy(true);
+    const wasFollowing = followed;
+    // Optimistic UI flip + counts adjust.
+    setFollowed(!wasFollowing);
+    setFollowersCount((n) => Math.max(0, n + (wasFollowing ? -1 : 1)));
+    try {
+      const next = await toggleFollow(authUser.id, userId, wasFollowing);
+      setFollowed(next);
+    } catch (e: any) {
+      // Roll back.
+      setFollowed(wasFollowing);
+      setFollowersCount((n) => Math.max(0, n + (wasFollowing ? 1 : -1)));
+      toast.show(e?.message ?? 'Could not update follow', {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
+    } finally {
+      setFollowBusy(false);
+    }
+  };
 
   const onRefresh = async () => {
     if (!userId) return;
     setRefreshing(true);
-    const [p, l] = await Promise.all([
+    const [p, l, f] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
       fetchUserListings(userId),
+      fetchFollowState(authUser?.id ?? null, userId).catch(() => null),
     ]);
     setProfile((p.data as Profile | null) ?? null);
     setListings(l);
+    if (f) {
+      setFollowed(f.isFollowing);
+      setFollowersCount(f.followersCount);
+      setFollowingCount(f.followingCount);
+    }
     setRefreshing(false);
   };
 
@@ -214,9 +262,9 @@ export default function UserProfileScreen() {
             </View>
 
             <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-around', marginLeft: 16 }}>
-              <Stat value={String(listings.length)} label="Posts" />
-              <Stat value={String(profile.total_sales ?? 0)} label="Sold" />
-              <Stat value={rating.toFixed(1)} label="Rating" />
+              <Stat value={formatCount(listings.length)} label="Posts" />
+              <Stat value={formatCount(followersCount)} label="Followers" />
+              <Stat value={formatCount(followingCount)} label="Following" />
             </View>
           </View>
 
@@ -247,7 +295,8 @@ export default function UserProfileScreen() {
                   icon={followed ? 'check' : 'user-plus'}
                   variant={followed ? 'ghost' : 'primary'}
                   full
-                  onPress={() => setFollowed((v) => !v)}
+                  loading={followBusy}
+                  onPress={handleFollowToggle}
                 />
               </View>
               <View style={{ flex: 1 }}>
@@ -280,6 +329,13 @@ export default function UserProfileScreen() {
       </ScrollView>
     </SafeAreaView>
   );
+}
+
+function formatCount(n: number): string {
+  if (n < 1_000) return String(n);
+  if (n < 10_000) return (n / 1_000).toFixed(1).replace(/\.0$/, '') + 'K';
+  if (n < 1_000_000) return Math.round(n / 1_000) + 'K';
+  return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
 }
 
 function Stat({ value, label }: { value: string; label: string }) {

@@ -13,6 +13,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { colors } from '@/lib/theme';
 import { fetchListingById } from '@/lib/listings';
+import { getCachedListing } from '@/lib/listingCache';
 import { withTimeout } from '@/lib/async';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
@@ -50,8 +51,9 @@ export default function PaymentScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
   const toast = useToast();
-  const [listing, setListing] = useState<Listing | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cached = getCachedListing(id ? String(id) : null);
+  const [listing, setListing] = useState<Listing | null>(cached);
+  const [loading, setLoading] = useState(!cached);
   const [paying, setPaying] = useState(false);
 
   useEffect(() => {
@@ -60,14 +62,21 @@ export default function PaymentScreen() {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    const haveCached = !!getCachedListing(String(id));
+    setLoading(!haveCached);
     (async () => {
       try {
-        const res = await withTimeout(fetchListingById(String(id)), 12_000, null);
-        if (active) setListing(res);
+        const res = await Promise.race([
+          fetchListingById(String(id)),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Request timed out')), 25_000),
+          ),
+        ]);
+        if (active && res) setListing(res);
+        else if (active && !haveCached) setListing(null);
       } catch (e) {
         console.warn('[payment] load failed', e);
-        if (active) setListing(null);
+        if (active && !haveCached) setListing(null);
       } finally {
         if (active) setLoading(false);
       }

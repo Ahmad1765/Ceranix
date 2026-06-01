@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { Listing } from '@/types';
+import { putCachedListing, putCachedListings } from '@/lib/listingCache';
 
 const SELECT_WITH_SELLER = '*, seller:profiles!listings_seller_id_fkey(*)';
 // Inner join so vacation_mode filter applies. Existing listings always have a seller, so no rows are lost.
@@ -26,7 +27,9 @@ export async function fetchListings(opts: { tab?: FeedTab; limit?: number } = {}
     console.warn('[listings] fetchListings', error.message);
     return [];
   }
-  return (data ?? []) as unknown as Listing[];
+  const rows = (data ?? []) as unknown as Listing[];
+  putCachedListings(rows);
+  return rows;
 }
 
 export async function fetchListingById(id: string): Promise<Listing | null> {
@@ -36,10 +39,14 @@ export async function fetchListingById(id: string): Promise<Listing | null> {
     .eq('id', id)
     .maybeSingle();
   if (error) {
+    // Throw so callers can distinguish "genuinely not found" (returns null)
+    // from "request failed" (throws — usually transient, worth retrying).
     console.warn('[listings] fetchListingById', error.message);
-    return null;
+    throw new Error(error.message);
   }
-  return (data as unknown as Listing) ?? null;
+  const row = (data as unknown as Listing) ?? null;
+  if (row) putCachedListing(row);
+  return row;
 }
 
 export async function fetchUserListings(sellerId: string): Promise<Listing[]> {

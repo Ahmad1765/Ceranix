@@ -27,6 +27,8 @@ export interface User {
   is_verified?: boolean;
   is_pro?: boolean;
   expo_push_token?: string | null;
+  followers_count?: number;
+  following_count?: number;
 }
 
 export interface ShippingAddress {

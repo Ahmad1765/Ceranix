@@ -240,8 +240,8 @@ function ProfileScreenInner() {
               }}
             >
               <Stat value={String(sellingCount)} label="Posts" />
-              <Stat value={String(profile.total_sales ?? 0)} label="Sold" />
-              <Stat value={rating.toFixed(1)} label="Rating" />
+              <Stat value={String(profile.followers_count ?? 0)} label="Followers" />
+              <Stat value={String(profile.following_count ?? 0)} label="Following" />
             </View>
           </View>
 
