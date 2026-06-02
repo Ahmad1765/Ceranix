@@ -163,7 +163,24 @@ export default function PaymentScreen() {
       const { url } = await createCheckoutSession(String(id));
       await openCheckout(url);
       if (Platform.OS !== 'web') {
-        router.replace(`/invoice/${id}?paid=1` as any);
+        let verified = false;
+        for (let i = 0; i < 15; i++) {
+          await new Promise((r) => setTimeout(r, 2000));
+          try {
+            const updated = await fetchListingById(String(id));
+            if (updated?.is_sold) {
+              verified = true;
+              break;
+            }
+          } catch {
+            // ignore polling errors
+          }
+        }
+        if (verified) {
+          router.replace(`/invoice/${id}?paid=1` as any);
+        } else {
+          toast.show('Payment verification timed out', { variant: 'default' });
+        }
       }
     } catch (e: any) {
       toast.show(e?.message ?? 'Could not start checkout', {

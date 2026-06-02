@@ -104,7 +104,7 @@ export async function fetchSuggestedFollows(
     .from('profiles')
     .select('id, username, full_name, avatar_url, followers_count, is_verified')
     .order('followers_count', { ascending: false, nullsFirst: false })
-    .limit(limit);
+    .limit(limit + excluded.length);
   if (excluded.length > 0) {
     query = query.not('id', 'in', `(${excluded.map((id) => `"${id}"`).join(',')})`);
   }
@@ -113,7 +113,7 @@ export async function fetchSuggestedFollows(
     console.warn('[follows] fetchSuggestedFollows', error.message);
     return [];
   }
-  return (data ?? []) as any;
+  return ((data ?? []) as any[]).slice(0, limit) as any;
 }
 
 // Atomic toggle: one server call decides insert-vs-delete based on the row's

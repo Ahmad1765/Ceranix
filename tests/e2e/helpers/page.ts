@@ -79,7 +79,24 @@ function parseEnvFile(file: string): Record<string, string> {
   for (const line of fs.readFileSync(full, 'utf8').split(/\r?\n/)) {
     const m = line.match(/^([A-Z0-9_]+)\s*=\s*(.*)$/i);
     if (!m) continue;
-    out[m[1]] = m[2].replace(/^['"]|['"]$/g, '');
+    let rawValue = m[2];
+    let inQuote: string | null = null;
+    let hashIdx = -1;
+    for (let i = 0; i < rawValue.length; i++) {
+      const c = rawValue[i];
+      if ((c === '"' || c === "'") && !inQuote) inQuote = c;
+      else if (c === inQuote) inQuote = null;
+      else if (c === '#' && !inQuote) {
+        hashIdx = i;
+        break;
+      }
+    }
+    if (hashIdx !== -1) rawValue = rawValue.slice(0, hashIdx);
+    rawValue = rawValue.trim();
+    if (rawValue.length >= 2 && (rawValue[0] === '"' || rawValue[0] === "'") && rawValue[0] === rawValue[rawValue.length - 1]) {
+      rawValue = rawValue.slice(1, -1);
+    }
+    out[m[1]] = rawValue;
   }
   return out;
 }
@@ -108,24 +125,29 @@ export async function fetchAnyLiveListing(
   _page: Page,
 ): Promise<{ id: string; title: string; price: number; brand: string | null; seller_id: string | null } | null> {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return null;
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/listings?select=id,title,price,brand,seller_id&is_sold=eq.false&order=created_at.desc&limit=1`,
-    {
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/listings?select=id,title,price,brand,seller_id&is_sold=eq.false&order=created_at.desc&limit=1`,
+      {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        signal: AbortSignal.timeout(10_000),
       },
-    },
-  );
-  if (!res.ok) return null;
-  const rows = (await res.json()) as Array<{
-    id: string;
-    title: string;
-    price: number;
-    brand: string | null;
-    seller_id: string | null;
-  }>;
-  return rows[0] ?? null;
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Array<{
+      id: string;
+      title: string;
+      price: number;
+      brand: string | null;
+      seller_id: string | null;
+    }>;
+    return rows[0] ?? null;
+  } catch {
+    return null;
+  }
 }
 
 // Generate a fresh, unique email so signup tests don't collide between runs.

@@ -1,5 +1,5 @@
 // The static "My Feed" promo screen — purely presentational, covers the
-// hero headline, the four USP tiles, the category pills, and the two
+// hero headline, the four USP tiles, the category pills, and the three
 // product cards.
 
 import { test, expect, waitForAppReady } from './helpers/page';

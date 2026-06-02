@@ -47,19 +47,20 @@ export async function fetchListingsResult(
   // function can NEVER hang or throw. The home feed depends on this resolving
   // — a hung promise means an eternal skeleton, which is the worst UX.
   const limited = offset > 0 ? query : query.limit(limit);
+  let timer: ReturnType<typeof setTimeout>;
   try {
     const result = await Promise.race([
       limited,
-      new Promise<{ data: null; error: Error }>((resolve) =>
-        setTimeout(
+      new Promise<{ data: null; error: Error }>((resolve) => {
+        timer = setTimeout(
           () =>
             resolve({
               data: null,
               error: new Error('fetchListings hard timeout'),
             }),
           10_000,
-        ),
-      ),
+        );
+      }),
     ]);
     const { data, error } = result as { data: unknown; error: { message: string } | null };
     if (error) {
@@ -72,6 +73,8 @@ export async function fetchListingsResult(
   } catch (e: any) {
     console.warn('[listings] fetchListings threw', e?.message ?? e);
     return { ok: false };
+  } finally {
+    clearTimeout(timer!);
   }
 }
 

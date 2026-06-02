@@ -495,14 +495,29 @@ export default function ConversationScreen() {
     setMessages((prev) => [...prev, temp]);
     setInput('');
 
-    const saved = await sendMessage({ conversationId, senderId: user.id, content: text });
-    if (saved) {
-      setMessages((prev) => prev.map((m) => (m.id === temp.id ? saved : m)));
-    } else {
+    try {
+      const saved = await sendMessage({ conversationId, senderId: user.id, content: text });
+      if (saved) {
+        // Realtime may have already inserted the saved message — dedupe.
+        setMessages((prev) => {
+          const realtimeAlreadyInserted = prev.some((m) => m.id === saved.id);
+          if (realtimeAlreadyInserted) {
+            // Remove the temp; the real message is already present.
+            return prev.filter((m) => m.id !== temp.id);
+          }
+          // Replace the temp with the saved message.
+          return prev.map((m) => (m.id === temp.id ? saved : m));
+        });
+      } else {
+        setMessages((prev) => prev.filter((m) => m.id !== temp.id));
+        Alert.alert('Could not send', 'Please try again in a moment.');
+      }
+    } catch {
       setMessages((prev) => prev.filter((m) => m.id !== temp.id));
       Alert.alert('Could not send', 'Please try again in a moment.');
+    } finally {
+      setSending(false);
     }
-    setSending(false);
   }, [conversationId, input, sending, user]);
 
   const handleSendOffer = useCallback(

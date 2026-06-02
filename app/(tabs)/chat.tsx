@@ -213,7 +213,7 @@ export default function InboxScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!user?.id) return;
-      fetchInbox(user.id).then((rows) => setConversations(rows));
+      fetchInbox(user.id).then((rows) => setConversations(rows)).catch(() => {});
     }, [user?.id, fetchInbox]),
   );
 
@@ -221,7 +221,7 @@ export default function InboxScreen() {
   useEffect(() => {
     if (!user?.id) return;
     const unsub = subscribeToInbox(user.id, () => {
-      fetchInbox(user.id).then((rows) => setConversations(rows));
+      fetchInbox(user.id).then((rows) => setConversations(rows)).catch(() => {});
     });
     return unsub;
   }, [user?.id, fetchInbox]);
@@ -242,9 +242,14 @@ export default function InboxScreen() {
   const onRefresh = useCallback(async () => {
     if (!user?.id) return;
     setRefreshing(true);
-    const rows = await fetchInbox(user.id);
-    setConversations(rows);
-    setRefreshing(false);
+    try {
+      const rows = await fetchInbox(user.id);
+      setConversations(rows);
+    } catch (e) {
+      console.warn('[Inbox] refresh failed', e);
+    } finally {
+      setRefreshing(false);
+    }
   }, [user?.id, fetchInbox]);
 
   return (

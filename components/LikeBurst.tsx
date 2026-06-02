@@ -16,6 +16,7 @@ type Props = {
   onPress?: () => void;
   size?: number;
   color?: string;
+  secondaryColor?: string;
   inactiveColor?: string;
   style?: ViewStyle;
 };
@@ -85,6 +86,7 @@ export function LikeBurst({
   onPress,
   size = 22,
   color = '#6C47FF',
+  secondaryColor = '#6C47FF',
   inactiveColor = '#0F0F0F',
   style,
 }: Props) {
@@ -140,7 +142,7 @@ export function LikeBurst({
 
       {/* Particles */}
       {Array.from({ length: PARTICLES }).map((_, i) => (
-        <Particle key={i} index={i} liked={liked} color={i % 2 === 0 ? color : '#6C47FF'} />
+        <Particle key={i} index={i} liked={liked} color={i % 2 === 0 ? color : secondaryColor} />
       ))}
 
       {/* Heart */}

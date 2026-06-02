@@ -919,10 +919,17 @@ export default function ProductScreen() {
     setLikeBusy(true);
     // Optimistic flip — animation runs immediately, even before the round-trip.
     setLiked((prev) => !prev);
-    const next = await toggleLike(productIdParam, user.id, liked);
-    setLiked(next);
-    if (next) toast.show('Added to your favorites', { variant: 'success', icon: 'heart' });
-    setLikeBusy(false);
+    try {
+      const next = await toggleLike(productIdParam, user.id, liked);
+      setLiked(next);
+      if (next) toast.show('Added to your favorites', { variant: 'success', icon: 'heart' });
+    } catch {
+      // Revert optimistic flip.
+      setLiked((prev) => !prev);
+      toast.show('Could not update like', { variant: 'default', icon: 'alert-triangle' });
+    } finally {
+      setLikeBusy(false);
+    }
   };
 
   // Owner-only actions. Both update local state optimistically so the UI
@@ -1310,13 +1317,14 @@ export default function ProductScreen() {
             }}
           >
             <View style={{ flex: 1, paddingRight: 14 }}>
+              {heartCount > 0 && (
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6, gap: 6 }}>
                 <Feather name="heart" size={13} color="rgba(15,15,15,0.62)" />
                 <Text style={{ fontSize: 13, color: 'rgba(15,15,15,0.62)' }}>
-                  Liked by <Text style={{ fontWeight: '700', color: BRAND_INK }}>@alice.333</Text>
-                  {heartCount > 1 ? ` and ${heartCount - 1} others` : ''}
+                  Liked by <Text style={{ fontWeight: '700', color: BRAND_INK }}>{heartCount} {heartCount === 1 ? 'person' : 'people'}</Text>
                 </Text>
               </View>
+              )}
               <Text
                 style={{
                   fontSize: 28,

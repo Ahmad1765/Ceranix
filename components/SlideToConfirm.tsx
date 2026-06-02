@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, Text, ActivityIndicator, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import {
@@ -59,9 +59,17 @@ export function SlideToConfirm({
     onConfirm();
   };
 
-  const resetThumb = () => {
-    confirmedRef.current = false;
-  };
+  // External reset: if the parent flips `loading` back to false without
+  // unmounting (e.g. a thrown error), slide the thumb back and re-arm.
+  useEffect(() => {
+    if (!loading && confirmedRef.current) {
+      translateX.value = withTiming(0, {
+        duration: 300,
+        easing: Easing.out(Easing.exp),
+      });
+      confirmedRef.current = false;
+    }
+  }, [loading]);
 
   const pan = Gesture.Pan()
     .enabled(!loading)
@@ -89,12 +97,6 @@ export function SlideToConfirm({
         });
       }
     });
-
-  // External reset: if the parent flips `loading` back to false without the
-  // confirm having actually completed (e.g. a thrown error), slide back.
-  if (!loading && confirmedRef.current && translateX.value === maxTravel) {
-    // nothing — the parent is responsible for unmounting on success
-  }
 
   const thumbStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],

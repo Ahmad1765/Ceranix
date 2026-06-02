@@ -71,11 +71,16 @@ Deno.serve(async (req: Request) => {
       return json({ error: 'Invalid listing price' }, 400);
     }
 
+    const successUrlObj = new URL(returnUrl);
+    successUrlObj.searchParams.set('paid', '1');
+    const cancelUrlObj = new URL(returnUrl);
+    cancelUrlObj.searchParams.set('paid', '0');
+
     // Build Stripe Checkout Session via the REST API (no SDK needed in Deno).
     const params = new URLSearchParams();
     params.append('mode', 'payment');
-    params.append('success_url', returnUrl);
-    params.append('cancel_url', returnUrl.replace('paid=1', 'paid=0'));
+    params.append('success_url', successUrlObj.toString());
+    params.append('cancel_url', cancelUrlObj.toString());
     params.append('line_items[0][quantity]', '1');
     params.append('line_items[0][price_data][currency]', 'usd');
     params.append('line_items[0][price_data][unit_amount]', String(priceCents));

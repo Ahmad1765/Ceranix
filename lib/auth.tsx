@@ -70,12 +70,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (active) setLoading(false);
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (event, next) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
       if (!mounted.current) return;
       setSession(next ?? null);
       if (next?.user?.id) {
         if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
-          await fetchProfileWithRetry(next.user.id);
+          // Defer to avoid deadlocking on Supabase's internal auth lock.
+          const uid = next.user.id;
+          setTimeout(() => {
+            if (mounted.current) fetchProfileWithRetry(uid).catch(() => {});
+          }, 0);
         }
       } else {
         setProfile(null);

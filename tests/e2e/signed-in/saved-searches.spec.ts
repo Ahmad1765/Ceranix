@@ -27,7 +27,9 @@ function readAuthToken(): { token: string; userId: string } | null {
         if (parsed.access_token && parsed.user?.id) {
           return { token: parsed.access_token, userId: parsed.user.id };
         }
-      } catch {}
+      } catch (e) {
+        console.warn(`[saved-searches] Ignored invalid token at ${origin.origin} -> ${kv.name}:`, (e as Error)?.message);
+      }
     }
   }
   return null;

@@ -69,20 +69,20 @@ function ProfileScreenInner() {
     gap: GRID_GAP,
   });
 
-  const loadSelling = useCallback(async () => {
+  const loadSelling = useCallback(async (opts?: { silent?: boolean }) => {
     if (!profile?.id) return;
-    setLoadingSelling(true);
+    if (!opts?.silent) setLoadingSelling(true);
     const rows = await fetchUserListings(profile.id);
     setSelling(rows);
-    setLoadingSelling(false);
+    if (!opts?.silent) setLoadingSelling(false);
   }, [profile?.id]);
 
-  const loadLiked = useCallback(async () => {
+  const loadLiked = useCallback(async (opts?: { silent?: boolean }) => {
     if (!profile?.id) return;
-    setLoadingLiked(true);
+    if (!opts?.silent) setLoadingLiked(true);
     const rows = await fetchLikedListings(profile.id);
     setLiked(rows);
-    setLoadingLiked(false);
+    if (!opts?.silent) setLoadingLiked(false);
   }, [profile?.id]);
 
   // Initial load — explicitly tied to profile.id arrival.
@@ -109,15 +109,20 @@ function ProfileScreenInner() {
   useFocusEffect(
     useCallback(() => {
       if (!profile?.id) return;
-      loadSelling();
-      loadLiked();
+      loadSelling({ silent: true }).catch(() => {});
+      loadLiked({ silent: true }).catch(() => {});
     }, [profile?.id, loadSelling, loadLiked]),
   );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([loadSelling(), loadLiked()]);
-    setRefreshing(false);
+    try {
+      await Promise.all([loadSelling({ silent: true }), loadLiked({ silent: true })]);
+    } catch {
+      // swallow — RefreshControl feedback is sufficient
+    } finally {
+      setRefreshing(false);
+    }
   }, [loadSelling, loadLiked]);
 
   if (!profile) {

@@ -86,36 +86,44 @@ export default function SettingsScreen() {
 
   const loadExtras = useCallback(async () => {
     if (!user?.id) {
+      setAddress(null);
+      setPayout(null);
+      setVerification(null);
       setLoadingExtras(false);
       return;
     }
     setLoadingExtras(true);
-    const [a, p, v] = await Promise.all([
-      supabase
-        .from('shipping_addresses')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('is_default', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from('payout_methods')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('is_default', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from('verifications')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle(),
-    ]);
-    if (!mounted.current) return;
-    setAddress((a.data as ShippingAddress | null) ?? null);
-    setPayout((p.data as PayoutMethod | null) ?? null);
-    setVerification((v.data as Verification | null) ?? null);
-    setLoadingExtras(false);
+    try {
+      const [a, p, v] = await Promise.all([
+        supabase
+          .from('shipping_addresses')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('is_default', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from('payout_methods')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('is_default', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from('verifications')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle(),
+      ]);
+      if (!mounted.current) return;
+      setAddress((a.data as ShippingAddress | null) ?? null);
+      setPayout((p.data as PayoutMethod | null) ?? null);
+      setVerification((v.data as Verification | null) ?? null);
+    } catch (e) {
+      console.warn('[settings] loadExtras failed', e);
+    } finally {
+      if (mounted.current) setLoadingExtras(false);
+    }
   }, [user?.id]);
 
   useEffect(() => {
@@ -211,17 +219,17 @@ export default function SettingsScreen() {
   }, [toast]);
 
   const handleShare = useCallback(async () => {
-    if (!profile?.username) return;
+    if (!profile?.id) return;
     try {
       tap('light');
       await Share.share({
-        message: `Check out @${profile.username} on Ceranix`,
-        url: `${APP_URL_BASE}/user/${profile.username}`,
+        message: `Check out @${profile.username ?? 'this seller'} on Ceranix`,
+        url: `${APP_URL_BASE}/user/${profile.id}`,
       });
     } catch {
       toast.show('Share failed', { variant: 'default', icon: 'alert-triangle' });
     }
-  }, [profile?.username, toast]);
+  }, [profile?.id, profile?.username, toast]);
 
   // ---------- Auth flows ----------
   const handleLogout = useCallback(async () => {
@@ -703,7 +711,7 @@ export default function SettingsScreen() {
             desc={profile?.username ? `@${profile.username}` : 'Send a link to your shop'}
             onPress={handleShare}
             chevron
-            disabled={!profile?.username}
+            disabled={!profile?.id}
           />
         </SectionCard>
 

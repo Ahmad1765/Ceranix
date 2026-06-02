@@ -78,6 +78,9 @@ export default function UserProfileScreen() {
           setFollowingCount(f.followingCount);
         }
       })
+      .catch((e) => {
+        if (!cancelled) console.warn('[user] load failed', e?.message ?? e);
+      })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
@@ -121,19 +124,24 @@ export default function UserProfileScreen() {
   const onRefresh = async () => {
     if (!userId) return;
     setRefreshing(true);
-    const [p, l, f] = await Promise.all([
-      supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
-      fetchUserListings(userId),
-      fetchFollowState(authUser?.id ?? null, userId).catch(() => null),
-    ]);
-    setProfile((p.data as Profile | null) ?? null);
-    setListings(l);
-    if (f) {
-      setFollowed(f.isFollowing);
-      setFollowersCount(f.followersCount);
-      setFollowingCount(f.followingCount);
+    try {
+      const [p, l, f] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
+        fetchUserListings(userId),
+        fetchFollowState(authUser?.id ?? null, userId).catch(() => null),
+      ]);
+      setProfile((p.data as Profile | null) ?? null);
+      setListings(l);
+      if (f) {
+        setFollowed(f.isFollowing);
+        setFollowersCount(f.followersCount);
+        setFollowingCount(f.followingCount);
+      }
+    } catch (e: any) {
+      console.warn('[user] refresh failed', e?.message ?? e);
+    } finally {
+      setRefreshing(false);
     }
-    setRefreshing(false);
   };
 
   if (loading) {

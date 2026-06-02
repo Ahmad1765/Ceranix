@@ -1,4 +1,4 @@
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { View, Text, Pressable, ScrollView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -18,7 +18,7 @@ export default function FeedScreen() {
           style={{ minHeight: 460, overflow: 'hidden' }}
         >
           {/* Subtle noise overlay simulation (optional depending on platform, using simple transparent gradient for now) */}
-          <View className="absolute inset-0 bg-white/10" style={{ mixBlendMode: 'overlay' as any }} />
+          <View className="absolute inset-0 bg-white/10" style={Platform.OS === 'web' ? { mixBlendMode: 'overlay' as any } : undefined} />
 
           <Text className="text-white text-[14px] mb-2 z-10">
             Say hi to <Text className="italic font-serif">Nybegagnat</Text>

@@ -51,7 +51,7 @@ export function StoryAvatar({ uri, size = 56, ring = 'gradient', initial }: Prop
         height: size,
         borderRadius: size / 2,
         borderWidth: 2,
-        borderColor: colors.purple,
+        borderColor: ring === 'pink' ? colors.pink : colors.purple,
         padding: 1,
         alignItems: 'center',
         justifyContent: 'center',

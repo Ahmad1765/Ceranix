@@ -40,18 +40,30 @@ export default function NewsScreen() {
       return;
     }
     setLoadingSearches(true);
-    const rows = await listSavedSearches(user.id);
-    setSearches(rows);
-    setLoadingSearches(false);
-    setSearchesFetched(true);
-    if (rows.length === 0) {
-      setMatchCounts({});
-      return;
+    try {
+      const rows = await listSavedSearches(user.id);
+      setSearches(rows);
+      if (rows.length === 0) {
+        setMatchCounts({});
+        return;
+      }
+      const pairs = await Promise.all(
+        rows.map(async (s) => {
+          try {
+            return [s.id, await fetchNewMatchesCount(s.id)] as const;
+          } catch {
+            // Keep the previous count (or 0) for this search on failure.
+            return [s.id, matchCounts[s.id] ?? 0] as const;
+          }
+        }),
+      );
+      setMatchCounts(Object.fromEntries(pairs));
+    } catch (e) {
+      console.warn('[news] refreshSearches failed', e);
+    } finally {
+      setLoadingSearches(false);
+      setSearchesFetched(true);
     }
-    const pairs = await Promise.all(
-      rows.map(async (s) => [s.id, await fetchNewMatchesCount(s.id)] as const),
-    );
-    setMatchCounts(Object.fromEntries(pairs));
   }, [user?.id]);
 
   useFocusEffect(

@@ -5,6 +5,7 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
   Easing,
+  runOnJS,
 } from 'react-native-reanimated';
 
 type Props = {
@@ -37,14 +38,14 @@ export function AnimatedNumber({ value, style, height = 18 }: Props) {
       { duration: 360, easing: Easing.out(Easing.cubic) },
       (finished) => {
         if (finished) {
-          // Snap: current becomes next, reset translateY without animation
+          // Snap: current becomes next, reset translateY without animation.
+          // Drive the React state update from the animation callback so
+          // they are synchronised — avoids the flash a setTimeout would cause.
+          runOnJS(setCurrent)(value);
           translateY.value = 0;
         }
       },
     );
-    // Update `current` after the slide finishes so React state matches.
-    const t = setTimeout(() => setCurrent(value), 360);
-    return () => clearTimeout(t);
   }, [value, height, translateY]);
 
   const animStyle = useAnimatedStyle(() => ({

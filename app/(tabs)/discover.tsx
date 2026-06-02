@@ -112,9 +112,14 @@ export default function DiscoverScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    const rows = await fetchListings({ tab: 'popular', limit: 60 });
-    setListings(rows);
-    setRefreshing(false);
+    try {
+      const rows = await fetchListings({ tab: 'popular', limit: 60 });
+      setListings(rows);
+    } catch (e) {
+      console.warn('[Discover] refresh failed', e);
+    } finally {
+      setRefreshing(false);
+    }
   }, []);
 
   // Compose a normalised key for "have we already saved this in this session".
@@ -134,19 +139,24 @@ export default function DiscoverScreen() {
     }
     if (!currentSaveKey || savingSearch) return;
     setSavingSearch(true);
-    const row = await createSavedSearch({
-      userId: user.id,
-      query: query.trim() || null,
-      category: activeCat && activeCat !== 'trending' ? (activeCat as Category) : null,
-      gender: null,
-    });
-    setSavingSearch(false);
-    if (!row) {
+    try {
+      const row = await createSavedSearch({
+        userId: user.id,
+        query: query.trim() || null,
+        category: activeCat && activeCat !== 'trending' ? (activeCat as Category) : null,
+        gender: null,
+      });
+      if (!row) {
+        toast.show("Couldn't save the search", { variant: 'default', icon: 'alert-triangle' });
+        return;
+      }
+      setSavedKey(currentSaveKey);
+      toast.show('Search saved', { variant: 'success', icon: 'bookmark' });
+    } catch (e) {
       toast.show("Couldn't save the search", { variant: 'default', icon: 'alert-triangle' });
-      return;
+    } finally {
+      setSavingSearch(false);
     }
-    setSavedKey(currentSaveKey);
-    toast.show('Search saved', { variant: 'success', icon: 'bookmark' });
   }, [user, currentSaveKey, savingSearch, query, activeCat, toast]);
 
   const canSaveSearch = !!currentSaveKey && currentSaveKey !== savedKey;
