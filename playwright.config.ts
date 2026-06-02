@@ -48,11 +48,18 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium-desktop',
-      use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 900 } },
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 900 },
+        // Pin to full Chromium (avoids chrome-headless-shell, which doesn't
+        // always ship alongside the chromium binary on every Playwright
+        // version bump).
+        channel: 'chromium',
+      },
     },
     {
       name: 'chromium-mobile',
-      use: { ...devices['Pixel 7'] },
+      use: { ...devices['Pixel 7'], channel: 'chromium' },
       // Mobile-specific smoke run — the responsive layout switches columns.
       testMatch: /(tab-navigation|home-feed|discover|product-detail)\.spec\.ts$/,
     },

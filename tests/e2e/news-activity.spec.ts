@@ -1,5 +1,5 @@
 // Activity screen (/news) — Following / For you / Saved pill tabs, each with
-// its own empty state.
+// its own empty state. No backend dependency.
 
 import { test, expect, waitForAppReady } from './helpers/page';
 
@@ -29,7 +29,8 @@ test.describe('News / Activity', () => {
     await page.getByText('Saved', { exact: true }).click();
     await expect(page.getByText('No saved searches')).toBeVisible();
     await page.getByText('Search now').click();
-    await page.waitForURL(/\(tabs\)\/discover|discover/);
-    await expect(page.getByText('Discover', { exact: true })).toBeVisible();
+    await page.waitForURL(/discover/);
+    // "Discover" appears as both page title and the bottom tab label.
+    await expect(page.getByText('Discover', { exact: true }).first()).toBeVisible();
   });
 });

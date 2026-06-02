@@ -1,5 +1,6 @@
-// The static "My Feed" promo screen — purely presentational, covers USPs,
-// category pills, and a hand-crafted product grid.
+// The static "My Feed" promo screen — purely presentational, covers the
+// hero headline, the four USP tiles, the category pills, and the two
+// product cards.
 
 import { test, expect, waitForAppReady } from './helpers/page';
 
@@ -9,7 +10,7 @@ test.describe('My Feed (static promo)', () => {
     await waitForAppReady(page);
   });
 
-  test('renders the hero, USPs, category pills, and product cards', async ({ page }) => {
+  test('renders hero, USPs, category pills, and product cards', async ({ page }) => {
     await expect(page.getByText('Cheaper than new,', { exact: false })).toBeVisible();
     await expect(page.getByText('better than used.', { exact: false })).toBeVisible();
     await expect(page.getByText('Certified by experts')).toBeVisible();
