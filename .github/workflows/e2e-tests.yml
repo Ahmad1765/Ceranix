@@ -1,0 +1,218 @@
+name: E2E Tests
+
+# Fires on every push to the dedicated `test` branch. The workflow runs the
+# full Playwright suite against the freshly built web bundle and — only if
+# every spec passes — fast-forwards `main` to the same SHA. A test failure
+# never merges; the merge job has an explicit `needs: + if: success()` gate.
+on:
+  push:
+    branches: [test]
+  workflow_dispatch:
+
+# A newer push to `test` cancels an in-flight run so we don't merge a stale
+# green build over a fresher red one. `cancel-in-progress: true` is what
+# makes that work — the same group key, same ref, supersedes.
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write  # The auto-merge job needs to push to main.
+  pull-requests: write
+
+env:
+  # Placeholders that satisfy the build (lib/supabase.ts throws in __DEV__
+  # without them; the static export is __DEV__=false but the embedded values
+  # are still read at runtime, and the mocks intercept all requests to this
+  # hostname).
+  EXPO_PUBLIC_SUPABASE_URL: https://e2e.supabase.test
+  EXPO_PUBLIC_SUPABASE_ANON_KEY: e2e-anon-key
+  # Empty → demo mode. The payment-flow.spec asserts on "Demo" copy.
+  EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY: ''
+
+jobs:
+  e2e:
+    name: Playwright E2E (chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    outputs:
+      pass_count: ${{ steps.summary.outputs.pass_count }}
+      fail_count: ${{ steps.summary.outputs.fail_count }}
+      flaky_count: ${{ steps.summary.outputs.flaky_count }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history so the merge job can fast-forward main → test.
+          fetch-depth: 0
+
+      - name: Setup project (Node + npm ci)
+        uses: ./.github/actions/setup-project
+
+      # Cache the Playwright browser binary so reruns don't redownload ~150MB.
+      - name: Cache Playwright browsers
+        id: cache-playwright
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright browsers (Chromium + deps)
+        if: steps.cache-playwright.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Install OS deps for Chromium when cache hit
+        if: steps.cache-playwright.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      - name: Build web bundle
+        run: npm run build
+
+      - name: Run Playwright tests
+        id: tests
+        # `--reporter` is set in playwright.config.ts when CI=true → list +
+        # github + html. The html report lands in playwright-report/ and is
+        # uploaded as an artifact below.
+        run: npx playwright test
+        env:
+          CI: 'true'
+
+      - name: Summarise results
+        id: summary
+        if: always()
+        # Parse the JSON results.json that the HTML reporter emits alongside
+        # the report. We surface pass / fail / flaky counts in the job
+        # summary AND as outputs the merge job reads.
+        shell: bash
+        run: |
+          set -euo pipefail
+          report_dir=playwright-report
+          results_file="${report_dir}/results.json"
+
+          # Walk arbitrarily-nested suites (file → describe → describe…).
+          # `..|.specs?` flattens every specs[] array regardless of depth.
+          pass=0; fail=0; flaky=0; total=0
+          if [[ -f "$results_file" ]]; then
+            pass=$(jq '[.. | .specs? // empty | .[] | .tests[]? | select(.results[-1].status=="passed")] | length' "$results_file")
+            fail=$(jq '[.. | .specs? // empty | .[] | .tests[]? | select(.results[-1].status=="failed" or .results[-1].status=="timedOut")] | length' "$results_file")
+            flaky=$(jq '[.. | .specs? // empty | .[] | .tests[]? | select((.results | length) > 1 and (.results[-1].status=="passed"))] | length' "$results_file")
+            total=$(jq '[.. | .specs? // empty | .[] | .tests[]?] | length' "$results_file")
+          fi
+
+          echo "pass_count=$pass" >> "$GITHUB_OUTPUT"
+          echo "fail_count=$fail" >> "$GITHUB_OUTPUT"
+          echo "flaky_count=$flaky" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## E2E results"
+            echo ""
+            echo "| Outcome | Count |"
+            echo "|---------|------:|"
+            echo "| Passed  | $pass |"
+            echo "| Failed  | $fail |"
+            echo "| Flaky   | $flaky |"
+            echo "| Total   | $total |"
+            echo ""
+            if [[ "${{ steps.tests.outcome }}" == "success" ]]; then
+              echo "_All specs green — main will be fast-forwarded._"
+            else
+              echo "_Tests failed — main is not touched. See uploaded report for traces, screenshots, and video._"
+              # List the failing spec titles.
+              if [[ -f "$results_file" ]]; then
+                echo ""
+                echo "### Failing tests"
+                echo ""
+                jq -r '.. | .specs? // empty | .[] | .tests[]? | select(.results[-1].status=="failed" or .results[-1].status=="timedOut") | "- " + (.title // "<untitled>") + "  (`" + ((.location.file // "?") + ":" + ((.location.line // 0)|tostring)) + "`)"' "$results_file" || true
+              fi
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.sha }}
+          path: playwright-report
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Upload Playwright raw traces / screenshots / videos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-test-results-${{ github.sha }}
+          path: test-results
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload built web bundle (debugging aid)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-bundle-${{ github.sha }}
+          path: dist
+          retention-days: 7
+          if-no-files-found: warn
+
+  merge:
+    name: Fast-forward main → test
+    needs: e2e
+    # The default GITHUB_TOKEN can push to main unless branch protection
+    # blocks it. If branch protection requires PR review, swap this for a
+    # `peter-evans/create-pull-request` step or a PAT with bypass.
+    if: ${{ success() && github.ref == 'refs/heads/test' && github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          # Use a token that's allowed to push to a protected branch if you
+          # have branch protection on main. The default GITHUB_TOKEN works
+          # when main is unprotected.
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch test branch
+        run: git fetch origin test:refs/remotes/origin/test --no-tags
+
+      - name: Fast-forward main → test, fall back to merge commit
+        # `--ff-only` keeps main's history linear when test is strictly
+        # ahead. If main has diverged (a hot-fix merged elsewhere), we
+        # generate a merge commit instead so the workflow doesn't get
+        # stuck — and the commit message explains why.
+        run: |
+          set -euo pipefail
+          if git merge --ff-only origin/test; then
+            echo "✓ Fast-forwarded main to test"
+          else
+            echo "main has diverged from test — creating a merge commit"
+            git merge --no-ff origin/test -m "ci(e2e): merge test → main after green E2E run
+
+            Triggered by ${{ github.event.head_commit.id }}.
+            All E2E specs passed: ${{ needs.e2e.outputs.pass_count }} passed,
+            ${{ needs.e2e.outputs.flaky_count }} flaky, ${{ needs.e2e.outputs.fail_count }} failed."
+          fi
+
+      - name: Push main
+        run: git push origin main
+
+      - name: Summarise merge
+        if: always()
+        run: |
+          {
+            echo "## Auto-merge"
+            echo ""
+            echo "- Source: \`test\` @ \`${{ github.sha }}\`"
+            echo "- Target: \`main\`"
+            echo "- E2E: ${{ needs.e2e.outputs.pass_count }} passed, ${{ needs.e2e.outputs.fail_count }} failed, ${{ needs.e2e.outputs.flaky_count }} flaky"
+          } >> "$GITHUB_STEP_SUMMARY"

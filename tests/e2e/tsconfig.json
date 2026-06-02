@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "types": ["node", "@playwright/test"],
+    "noEmit": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "isolatedModules": false
+  },
+  "include": [
+    "**/*.ts",
+    "../../types/**/*.ts"
+  ]
+}
