@@ -1,0 +1,80 @@
+name: Vercel production
+
+# Production deployment when main moves. Same prebuilt flow as the preview
+# workflow — the only difference is `--environment=production` on `pull`
+# and `--prod` on `deploy`.
+#
+# Required GitHub Action secrets (same as preview):
+#   - VERCEL_TOKEN
+#   - VERCEL_ORG_ID
+#   - VERCEL_PROJECT_ID
+#
+# Skips cleanly when VERCEL_TOKEN is empty.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  # Serialise production deploys — no point letting two run for back-to-back
+  # main commits when the later one wins anyway.
+  group: vercel-production
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Check Vercel secrets
+    runs-on: ubuntu-latest
+    outputs:
+      has-token: ${{ steps.check.outputs.has-token }}
+    steps:
+      - id: check
+        env:
+          TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [[ -n "${TOKEN}" ]]; then
+            echo "has-token=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-token=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Vercel production deploy skipped::VERCEL_TOKEN is not set. Configure Vercel secrets under Settings → Secrets and variables → Actions."
+          fi
+
+  deploy:
+    name: Deploy production
+    needs: preflight
+    if: needs.preflight.outputs.has-token == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # GitHub environments give you a manual approval gate + URL + audit log.
+    # Configure the "production" environment in repo settings to require
+    # reviewers if you want a click-to-ship workflow.
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-project
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel production env
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build with Vercel
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy prebuilt artifact
+        id: deploy
+        run: |
+          url=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Production: $url" >> "$GITHUB_STEP_SUMMARY"

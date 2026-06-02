@@ -1,0 +1,38 @@
+version: 2
+
+# Weekly check-ins keep the dep tree fresh without drowning the queue.
+# Group minor + patch into one PR per ecosystem; majors get their own PR so
+# the breaking change can be reviewed in isolation.
+updates:
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:30'
+    open-pull-requests-limit: 5
+    labels: [dependencies, npm]
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # Expo + RN versions are pinned by `expo install` semantics — let
+      # `npx expo install --check` handle them, not Dependabot.
+      - dependency-name: expo
+      - dependency-name: 'expo-*'
+      - dependency-name: react-native
+      - dependency-name: 'react-native-*'
+      - dependency-name: react
+      - dependency-name: react-dom
+
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:30'
+    open-pull-requests-limit: 3
+    labels: [dependencies, github-actions]
+    groups:
+      actions:
+        patterns: ['*']

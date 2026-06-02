@@ -1,0 +1,19 @@
+# CODEOWNERS — automatic reviewer assignment on PRs.
+# Syntax: <pattern> <owner1> <owner2> …
+# Last matching line wins, so list general rules first, specifics last.
+
+# Default owner for everything not matched below.
+*                       @Ahmad1765
+
+# Infra / CI — extra eyes recommended on anything that can break the deploy.
+/.github/               @Ahmad1765
+/app.config.js          @Ahmad1765
+/tsconfig.json          @Ahmad1765
+
+# Database — schema and policy changes need DB review.
+/supabase/              @Ahmad1765
+
+# Auth / payment surfaces — security-sensitive.
+/lib/auth.tsx           @Ahmad1765
+/lib/supabase.ts        @Ahmad1765
+/app/payment/           @Ahmad1765

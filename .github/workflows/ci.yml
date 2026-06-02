@@ -1,0 +1,122 @@
+name: CI
+
+# Runs on every PR against main + every push to main / Backend. Adding new
+# long-lived branches? Add them to the push.branches list below.
+on:
+  push:
+    branches: [main, Backend]
+  pull_request:
+    branches: [main, Backend]
+  workflow_dispatch:
+
+# Newer pushes on the same ref cancel the in-flight run. Saves minutes and
+# stops a stale build from racing a fresh one to the GH Status API.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least-privilege default. Individual jobs request more if they post a
+# comment / annotation.
+permissions:
+  contents: read
+
+jobs:
+  typecheck:
+    name: Typecheck (tsc --noEmit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-project
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+  web-build:
+    name: Web build (expo export)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Build runs in parallel with typecheck — they don't depend on each other.
+    # A typecheck failure shouldn't gate a build sanity check (and vice
+    # versa); we want to see both signals on the PR at once.
+    env:
+      # EXPO_PUBLIC_* are inlined into the web bundle. The Supabase client
+      # warns instead of throwing in non-__DEV__ builds when these are empty
+      # (see lib/supabase.ts), so the build still passes even if the secrets
+      # aren't configured — useful for forks and first-time CI runs.
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+      EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-project
+
+      - name: Warn on missing Supabase env
+        if: env.EXPO_PUBLIC_SUPABASE_URL == '' || env.EXPO_PUBLIC_SUPABASE_ANON_KEY == ''
+        run: |
+          echo "::warning title=Missing Supabase secrets::EXPO_PUBLIC_SUPABASE_URL and/or EXPO_PUBLIC_SUPABASE_ANON_KEY are not configured. The build will succeed but the resulting bundle won't talk to Supabase. Set them under Settings → Secrets and variables → Actions to fix."
+
+      - name: Build web bundle
+        run: npm run build
+
+      - name: Report bundle size
+        run: |
+          echo "## Web bundle" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| File | Size |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|------|-----:|" >> "$GITHUB_STEP_SUMMARY"
+          find dist -type f \( -name '*.js' -o -name '*.css' -o -name '*.html' \) -printf '%P\t%s\n' \
+            | sort -k2 -rn \
+            | head -20 \
+            | awk -F'\t' '{
+                size=$2; unit="B";
+                if (size>=1024*1024) { size=size/1024/1024; unit="MB" }
+                else if (size>=1024) { size=size/1024; unit="kB" }
+                printf "| %s | %.1f %s |\n", $1, size, unit
+              }' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload web bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-bundle-${{ github.sha }}
+          path: dist
+          retention-days: 7
+          if-no-files-found: error
+
+  audit:
+    name: npm audit (informational)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Non-blocking on purpose. We want visibility on advisories without
+    # failing CI for transient ones we haven't triaged yet.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-project
+        with:
+          install: 'false'
+      - name: npm audit
+        run: |
+          set +e
+          npm audit --omit=dev --audit-level=high > audit.txt
+          status=$?
+          echo "## npm audit (--omit=dev --audit-level=high)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat audit.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          exit $status
+
+  required-checks:
+    name: Required checks
+    runs-on: ubuntu-latest
+    needs: [typecheck, web-build]
+    if: always()
+    steps:
+      - name: Verify required jobs succeeded
+        run: |
+          echo "typecheck: ${{ needs.typecheck.result }}"
+          echo "web-build: ${{ needs.web-build.result }}"
+          if [[ "${{ needs.typecheck.result }}" != "success" ]] || \
+             [[ "${{ needs.web-build.result }}" != "success" ]]; then
+            echo "::error::One or more required checks failed."
+            exit 1
+          fi

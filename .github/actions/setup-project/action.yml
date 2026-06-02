@@ -1,0 +1,29 @@
+name: Setup project
+description: >-
+  Shared setup for all Ceranix CI jobs. Checks out the repo, installs Node 22
+  with npm cache, and runs `npm ci`. Centralised here so a Node-version bump
+  only happens in one place.
+
+inputs:
+  node-version:
+    description: Node.js version to install
+    required: false
+    default: '22'
+  install:
+    description: Run `npm ci` after setup (set "false" for jobs that only need the source tree)
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: npm
+
+    - name: Install dependencies
+      if: inputs.install == 'true'
+      shell: bash
+      run: npm ci --no-audit --no-fund

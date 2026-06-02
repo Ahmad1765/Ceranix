@@ -64,19 +64,19 @@ export default function UserProfileScreen() {
     Promise.all([
       supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
       fetchUserListings(userId),
-      fetchFollowState(authUser?.id ?? null, userId).catch(() => ({
-        followersCount: 0,
-        followingCount: 0,
-        isFollowing: false,
-      })),
+      // fetchFollowState now returns null on RPC failure — preserve last-known
+      // state (or default to "not following") instead of clobbering with false.
+      fetchFollowState(authUser?.id ?? null, userId).catch(() => null),
     ])
       .then(([p, l, f]) => {
         if (cancelled) return;
         setProfile((p.data as Profile | null) ?? null);
         setListings(l);
-        setFollowed(f.isFollowing);
-        setFollowersCount(f.followersCount);
-        setFollowingCount(f.followingCount);
+        if (f) {
+          setFollowed(f.isFollowing);
+          setFollowersCount(f.followersCount);
+          setFollowingCount(f.followingCount);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

@@ -19,7 +19,8 @@ import { router, useFocusEffect } from 'expo-router';
 import { ListingCard } from '@/components/ListingCard';
 import { SkeletonCard } from '@/components/SkeletonCard';
 import { AnonCards } from '@/components/AnonCards';
-import { fetchListings, type FeedTab } from '@/lib/listings';
+import { fetchListingsResult, type FeedTab } from '@/lib/listings';
+import { getFeedSnapshot, putFeedSnapshot } from '@/lib/listingCache';
 import { onListingCreated } from '@/lib/listingEvents';
 import { getOptimizedImageUrl } from '@/lib/images';
 import type { Listing } from '@/types';
@@ -119,30 +120,53 @@ const TAB_TO_FEED: Record<Exclude<TabName, 'Following'>, FeedTab> = {
 export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState<TabName>('For you');
   const [refreshing, setRefreshing] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [listings, setListings] = useState<Listing[]>([]);
-  const hasLoadedRef = useRef(false);
+  // Seed from the last-rendered snapshot for this tab so a re-mount (or a
+  // tab swap that races a wedged Supabase client) never blanks the screen.
+  // null tab maps to an empty snapshot — Following has no snapshot anyway.
+  const initialTab: TabName = 'For you';
+  const initialSnapshot = getFeedSnapshot(initialTab) ?? [];
+  const [listings, setListings] = useState<Listing[]>(initialSnapshot);
+  const [loading, setLoading] = useState(initialSnapshot.length === 0);
+  const hasLoadedRef = useRef(initialSnapshot.length > 0);
 
   // Single commit: flips loading off in the SAME setter call that installs
   // the rows, so the FlatList never sees the intermediate
   // `loading=true, listings=rows` state that previously left skeletons stuck
   // until a manual reload.
-  const load = useCallback(async (tab: TabName): Promise<Listing[]> => {
-    if (tab === 'Following') return [];
-    const rows = await fetchListings({ tab: TAB_TO_FEED[tab as Exclude<TabName, 'Following'>] });
-    const firstUrls = rows
-      .slice(0, 12)
-      .map((l) => l.images?.[0])
-      .filter(Boolean)
-      .map((u) => getOptimizedImageUrl(u as string, { width: 400 }));
-    if (firstUrls.length) Image.prefetch(firstUrls, { cachePolicy: 'memory-disk' });
-    return rows;
-  }, []);
+  // Returns the discriminated result so callers can tell "feed is genuinely
+  // empty" from "fetch wedged" and decide whether to commit or preserve.
+  const load = useCallback(
+    async (tab: TabName): Promise<{ ok: true; rows: Listing[] } | { ok: false }> => {
+      if (tab === 'Following') return { ok: true, rows: [] };
+      const result = await fetchListingsResult({
+        tab: TAB_TO_FEED[tab as Exclude<TabName, 'Following'>],
+      });
+      if (!result.ok) return result;
+      const firstUrls = result.rows
+        .slice(0, 12)
+        .map((l) => l.images?.[0])
+        .filter(Boolean)
+        .map((u) => getOptimizedImageUrl(u as string, { width: 400 }));
+      if (firstUrls.length) Image.prefetch(firstUrls, { cachePolicy: 'memory-disk' });
+      return result;
+    },
+    [],
+  );
 
-  // Initial + tab-change load: show skeletons.
+  // Initial + tab-change load: show skeletons (only if we don't already have
+  // a snapshot for this tab to render against).
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    const snapshot = getFeedSnapshot(activeTab);
+    if (snapshot && snapshot.length > 0) {
+      // Render the snapshot immediately so the user never sees a skeleton
+      // when we already know what to show. The fetch below refreshes it.
+      setListings(snapshot);
+      setLoading(false);
+      hasLoadedRef.current = true;
+    } else {
+      setLoading(true);
+    }
     // Hard ceiling — if load() never resolves/rejects (a wedged fetch that
     // somehow slips past every other safety net), clear the skeleton anyway
     // so the user sees the empty state and can pull-to-refresh instead of
@@ -155,32 +179,49 @@ export default function HomeScreen() {
       // Fire-and-forget retry: a wedge that hit the ceiling is almost always
       // transient on the next attempt. Don't await — the ceiling already
       // unblocked the UI; if this retry happens to return rows we just
-      // prepend them silently.
+      // prepend them silently. Only commit on ok:true so a second wedge
+      // doesn't blank a screen that may have prior content.
       load(activeTab)
-        .then((rows) => {
-          if (!cancelled && rows.length > 0) setListings(rows);
+        .then((result) => {
+          if (cancelled || !result.ok) return;
+          if (result.rows.length > 0) {
+            setListings(result.rows);
+            putFeedSnapshot(activeTab, result.rows);
+          }
         })
         .catch(() => {});
     }, 12_000);
     load(activeTab)
-      .then((rows) => {
+      .then((result) => {
         if (cancelled) return;
         clearTimeout(wedgeKiller);
         // Commit listings + loading=false together so React renders once with
         // the final state. Without this, the FlatList briefly sees
         // listings=rows while loading=true and the data memo zeroes them out.
-        setListings(rows);
+        // On ok:false, leave listings alone — we either have a snapshot
+        // already showing or nothing yet, but committing [] would mis-signal
+        // "feed is empty" to the user.
+        if (result.ok) {
+          setListings(result.rows);
+          putFeedSnapshot(activeTab, result.rows);
+        }
         setLoading(false);
         hasLoadedRef.current = true;
         // If the first load came back empty (likely a transient wedge that
-        // hit a timeout rather than a genuinely empty feed), silently retry
-        // once after a short delay so the user doesn't have to refresh.
-        if (rows.length === 0 && activeTab !== 'Following') {
+        // hit a timeout rather than a genuinely empty feed) OR explicitly
+        // failed, silently retry once after a short delay so the user
+        // doesn't have to refresh.
+        const needsRetry = !result.ok || (result.ok && result.rows.length === 0);
+        if (needsRetry && activeTab !== 'Following') {
           setTimeout(() => {
             if (cancelled) return;
             load(activeTab)
-              .then((retryRows) => {
-                if (!cancelled && retryRows.length > 0) setListings(retryRows);
+              .then((retry) => {
+                if (cancelled || !retry.ok) return;
+                if (retry.rows.length > 0) {
+                  setListings(retry.rows);
+                  putFeedSnapshot(activeTab, retry.rows);
+                }
               })
               .catch(() => {});
           }, 1500);
@@ -208,16 +249,14 @@ export default function HomeScreen() {
       if (activeTab === 'Following') return;
       let cancelled = false;
       load(activeTab)
-        .then((rows) => {
-          if (cancelled) return;
-          // Silent refetch only commits when it actually returned content.
-          // If the underlying fetch was aborted (the supabase web wedge) or
-          // errored, fetchListings returns []; without this guard the user's
-          // real feed would be wiped on every tab focus and only a hard
-          // browser refresh would bring it back. Genuine "feed is empty"
-          // states are still observable via pull-to-refresh below, which
-          // always commits.
-          if (rows.length > 0) setListings(rows);
+        .then((result) => {
+          if (cancelled || !result.ok) return;
+          // Silent refetch only commits when the fetch succeeded. On
+          // ok:false the supabase client wedged — keep the user's current
+          // feed on screen rather than wipe it. Genuine "feed is empty"
+          // (ok:true, rows=[]) does commit.
+          setListings(result.rows);
+          putFeedSnapshot(activeTab, result.rows);
         })
         .catch(() => {});
       return () => {
@@ -234,15 +273,22 @@ export default function HomeScreen() {
     return onListingCreated((listing) => {
       setListings((prev) => {
         if (prev.some((l) => l.id === listing.id)) return prev;
-        return [listing, ...prev];
+        const next = [listing, ...prev];
+        putFeedSnapshot(activeTab, next);
+        return next;
       });
     });
-  }, []);
+  }, [activeTab]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    const rows = await load(activeTab);
-    setListings(rows);
+    const result = await load(activeTab);
+    if (result.ok) {
+      setListings(result.rows);
+      putFeedSnapshot(activeTab, result.rows);
+    }
+    // On ok:false, preserve the current feed — pull-to-refresh against a
+    // wedged client used to wipe the screen.
     setRefreshing(false);
   }, [activeTab, load]);
 

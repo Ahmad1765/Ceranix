@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { safeBack } from '@/lib/nav';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -21,18 +21,16 @@ import * as Haptics from 'expo-haptics';
 import { StatusBar } from 'expo-status-bar';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   useAnimatedScrollHandler,
   useAnimatedReaction,
   runOnJS,
-  withSpring,
   withTiming,
   withRepeat,
   withSequence,
-  Easing,
+  type SharedValue,
 } from 'react-native-reanimated';
 import type { Listing } from '@/types';
 import {
@@ -43,7 +41,7 @@ import {
   toggleLike,
 } from '@/lib/listings';
 import { getCachedListing } from '@/lib/listingCache';
-import { fetchFollowState, toggleFollow } from '@/lib/follows';
+import { fetchFollowState, getCachedFollowState, toggleFollow } from '@/lib/follows';
 import { withTimeout } from '@/lib/async';
 import { getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
 import { useAuth } from '@/lib/auth';
@@ -214,194 +212,120 @@ const CARD_OUTER_PAD = 12;
 const CARD_WIDTH = Math.floor((width - CARD_OUTER_PAD * 2 - CARD_GAP) / 2);
 const CARD_IMAGE_HEIGHT = Math.round(CARD_WIDTH * 1.25);
 
-/**
- * Pinch-to-zoom + pan + double-tap zoom for hero carousel images.
- * Reports zoom state up so parent can lock the horizontal pager.
- */
-function ZoomableImage({
-  uri,
-  imgWidth,
-  imgHeight,
-  sharedTag,
-  onZoomChange,
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+function FullscreenImageViewer({
+  visible,
+  images,
+  initialIndex,
+  onClose,
 }: {
-  uri: string;
-  imgWidth: number;
-  imgHeight: number;
-  sharedTag?: string;
-  onZoomChange?: (zoomed: boolean) => void;
+  visible: boolean;
+  images: string[];
+  initialIndex: number;
+  onClose: () => void;
 }) {
-  const MIN_SCALE = 1;
-  const MAX_SCALE = 4;
-  const DOUBLE_TAP_SCALE = 2.4;
-
-  const scale = useSharedValue(1);
-  const savedScale = useSharedValue(1);
-  const tx = useSharedValue(0);
-  const ty = useSharedValue(0);
-  const savedTx = useSharedValue(0);
-  const savedTy = useSharedValue(0);
-
-  // Pinch focal-point (relative to the View center, in screen pixels).
-  // We translate so the pinch origin maps to the same point post-scale.
-  const focalX = useSharedValue(0);
-  const focalY = useSharedValue(0);
-  const startTx = useSharedValue(0);
-  const startTy = useSharedValue(0);
-  const startScale = useSharedValue(1);
-
-  // Notify parent whenever zoom-state crosses the 1.04 threshold.
-  useAnimatedReaction(
-    () => scale.value > 1.04,
-    (zoomed, prev) => {
-      if (zoomed !== prev && onZoomChange) runOnJS(onZoomChange)(zoomed);
+  const scrollRef = useRef<ScrollView>(null);
+  const offsetX = useSharedValue(initialIndex * width);
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (e) => {
+      offsetX.value = e.contentOffset.x;
     },
-    [onZoomChange]
-  );
+  });
 
-  // Maximum offset we can pan to without revealing edges.
-  // At scale s, content size is imgWidth*s; viewport is imgWidth.
-  // Allowed translate range is ±(imgWidth*s - imgWidth)/2.
-  function clampX(value: number, s: number) {
-    'worklet';
-    const limit = Math.max(0, (imgWidth * s - imgWidth) / 2);
-    return Math.min(limit, Math.max(-limit, value));
-  }
-  function clampY(value: number, s: number) {
-    'worklet';
-    const limit = Math.max(0, (imgHeight * s - imgHeight) / 2);
-    return Math.min(limit, Math.max(-limit, value));
-  }
-
-  const resetZoom = () => {
-    'worklet';
-    scale.value = withTiming(1, { duration: 220, easing: Easing.out(Easing.cubic) });
-    savedScale.value = 1;
-    tx.value = withTiming(0, { duration: 220, easing: Easing.out(Easing.cubic) });
-    ty.value = withTiming(0, { duration: 220, easing: Easing.out(Easing.cubic) });
-    savedTx.value = 0;
-    savedTy.value = 0;
-  };
-
-  const pinch = Gesture.Pinch()
-    .onStart((e) => {
-      // Convert focal point from view-local coords to "offset from center"
-      focalX.value = e.focalX - imgWidth / 2;
-      focalY.value = e.focalY - imgHeight / 2;
-      startTx.value = tx.value;
-      startTy.value = ty.value;
-      startScale.value = scale.value;
-    })
-    .onUpdate((e) => {
-      const next = Math.max(MIN_SCALE, Math.min(savedScale.value * e.scale, MAX_SCALE));
-      // Keep focal point pinned: shift translation by (1 - next/start) * (focal - startT)
-      const k = 1 - next / startScale.value;
-      const proposedTx = startTx.value + (focalX.value - startTx.value) * k;
-      const proposedTy = startTy.value + (focalY.value - startTy.value) * k;
-      scale.value = next;
-      tx.value = clampX(proposedTx, next);
-      ty.value = clampY(proposedTy, next);
-    })
-    .onEnd(() => {
-      if (scale.value < 1.05) {
-        resetZoom();
-      } else {
-        savedScale.value = scale.value;
-        // Snap-back into bounds with a spring, then save the rested values.
-        const targetTx = clampX(tx.value, scale.value);
-        const targetTy = clampY(ty.value, scale.value);
-        tx.value = withSpring(targetTx, { damping: 22, stiffness: 220 });
-        ty.value = withSpring(targetTy, { damping: 22, stiffness: 220 });
-        savedTx.value = targetTx;
-        savedTy.value = targetTy;
-      }
+  // Sync to the tapped image whenever the viewer (re-)opens.
+  useEffect(() => {
+    if (!visible) return;
+    offsetX.value = initialIndex * width;
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ x: initialIndex * width, y: 0, animated: false });
     });
-
-  // Single-finger pan only activates while zoomed; otherwise fails so the
-  // parent horizontal carousel keeps its swipe-to-page gesture.
-  const pan = Gesture.Pan()
-    .manualActivation(true)
-    .maxPointers(1)
-    .averageTouches(true)
-    .onTouchesMove((e, manager) => {
-      // Require zoomed AND a small movement threshold so a tap that drifts
-      // a couple of pixels never steals from the double-tap recognizer.
-      if (scale.value <= 1.04) {
-        manager.fail();
-        return;
-      }
-      const t = e.allTouches[0];
-      if (!t) return;
-      const dx = Math.abs((t.absoluteX ?? 0) - (t.x ?? 0));
-      const dy = Math.abs((t.absoluteY ?? 0) - (t.y ?? 0));
-      if (dx > 4 || dy > 4) manager.activate();
-    })
-    .onUpdate((e) => {
-      const proposedTx = savedTx.value + e.translationX;
-      const proposedTy = savedTy.value + e.translationY;
-      tx.value = clampX(proposedTx, scale.value);
-      ty.value = clampY(proposedTy, scale.value);
-    })
-    .onEnd(() => {
-      savedTx.value = tx.value;
-      savedTy.value = ty.value;
-    });
-
-  const doubleTap = Gesture.Tap()
-    .numberOfTaps(2)
-    .maxDuration(280)
-    .maxDistance(20)
-    .onEnd((e) => {
-      if (scale.value > 1.05) {
-        resetZoom();
-      } else {
-        // Zoom toward the tap location so the tapped pixel stays put.
-        const fx = e.x - imgWidth / 2;
-        const fy = e.y - imgHeight / 2;
-        const next = DOUBLE_TAP_SCALE;
-        const k = 1 - next / 1;
-        const targetTx = clampX(fx * k, next);
-        const targetTy = clampY(fy * k, next);
-        scale.value = withTiming(next, { duration: 240, easing: Easing.out(Easing.cubic) });
-        tx.value = withTiming(targetTx, { duration: 240, easing: Easing.out(Easing.cubic) });
-        ty.value = withTiming(targetTy, { duration: 240, easing: Easing.out(Easing.cubic) });
-        savedScale.value = next;
-        savedTx.value = targetTx;
-        savedTy.value = targetTy;
-      }
-    });
-
-  // Pinch + (doubleTap → pan) so doubleTap always wins a stationary 2-finger event.
-  const composed = Gesture.Simultaneous(pinch, Gesture.Exclusive(doubleTap, pan));
-
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: tx.value },
-      { translateY: ty.value },
-      { scale: scale.value },
-    ],
-  }));
+  }, [visible, initialIndex, offsetX]);
 
   return (
-    <GestureDetector gesture={composed}>
-      <Animated.View
-        collapsable={false}
-        style={{ width: imgWidth, height: imgHeight, overflow: 'hidden' }}
-      >
-        <Animated.View style={[{ width: imgWidth, height: imgHeight }, animStyle]}>
-          <AnimatedExpoImage
-            source={{ uri: getOptimizedImageUrl(uri, { width: thumbWidthFor(imgWidth), quality: 80 }) }}
-            style={{ width: imgWidth, height: imgHeight }}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-            recyclingKey={uri}
-            transition={150}
-            priority="high"
-            sharedTransitionTag={sharedTag}
-          />
-        </Animated.View>
-      </Animated.View>
-    </GestureDetector>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <StatusBar style="light" animated />
+      <View style={{ flex: 1, backgroundColor: '#000' }}>
+        <Animated.ScrollView
+          ref={scrollRef as any}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onScroll={scrollHandler}
+          scrollEventThrottle={16}
+        >
+          {images.map((uri, i) => (
+            <Pressable
+              key={i}
+              onPress={onClose}
+              style={{
+                width,
+                height: SCREEN_HEIGHT,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Image
+                source={{ uri: getOptimizedImageUrl(uri, { width: thumbWidthFor(width), quality: 80 }) }}
+                style={{ width, height: SCREEN_HEIGHT }}
+                contentFit="contain"
+                cachePolicy="memory-disk"
+                recyclingKey={uri}
+                transition={0}
+                priority={i === initialIndex ? 'high' : 'normal'}
+              />
+            </Pressable>
+          ))}
+        </Animated.ScrollView>
+
+        {/* Close button */}
+        <Pressable
+          onPress={() => { tap('selection'); onClose(); }}
+          hitSlop={12}
+          style={({ pressed }) => ({
+            position: 'absolute',
+            top: (IS_IOS ? 54 : 28),
+            right: 16,
+            width: 38,
+            height: 38,
+            borderRadius: 19,
+            backgroundColor: 'rgba(255,255,255,0.14)',
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: pressed ? 0.7 : 1,
+          })}
+        >
+          <Feather name="x" size={20} color="#fff" />
+        </Pressable>
+
+        {/* Pagination dots */}
+        {images.length > 1 && (
+          <View
+            style={{
+              position: 'absolute',
+              bottom: IS_IOS ? 44 : 28,
+              left: 0,
+              right: 0,
+              flexDirection: 'row',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: 6,
+              pointerEvents: 'none',
+            }}
+          >
+            {images.map((_, i) => (
+              <HeroPageDot key={i} index={i} offsetX={offsetX} pageWidth={width} />
+            ))}
+          </View>
+        )}
+      </View>
+    </Modal>
   );
 }
 
@@ -766,6 +690,33 @@ function ProductSkeleton({ insetsTop }: { insetsTop: number }) {
   );
 }
 
+function HeroPageDot({
+  index,
+  offsetX,
+  pageWidth,
+}: {
+  index: number;
+  offsetX: SharedValue<number>;
+  pageWidth: number;
+}) {
+  const animStyle = useAnimatedStyle(() => {
+    const progress = offsetX.value / pageWidth;
+    const dist = Math.min(1, Math.abs(progress - index));
+    const proximity = 1 - dist;
+    const w = 6 + proximity * 18;
+    const opacity = 0.5 + proximity * 0.5;
+    return {
+      width: w,
+      backgroundColor: `rgba(255,255,255,${opacity})`,
+    };
+  });
+  return (
+    <Animated.View
+      style={[{ height: 4, borderRadius: 2 }, animStyle]}
+    />
+  );
+}
+
 export default function ProductScreen() {
   const { id } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
@@ -774,21 +725,33 @@ export default function ProductScreen() {
   const productIdParam = Array.isArray(id) ? id[0] : id;
 
   const [activeImage, setActiveImage] = useState(0);
+  const heroOffsetX = useSharedValue(0);
+  const heroScrollHandler = useAnimatedScrollHandler({
+    onScroll: (e) => {
+      heroOffsetX.value = e.contentOffset.x;
+    },
+  });
   const [liked, setLiked] = useState(false);
   const [likeBusy, setLikeBusy] = useState(false);
   const [pinned, setPinned] = useState(false);
-  const [followed, setFollowed] = useState(false);
+  // Prime from cache so re-opens are instant — bypasses any wedged supabase
+  // client on web while we refetch in the background.
+  const cached = getCachedListing(productIdParam);
+  // Seed `followed` from the follow cache so a re-mount under a wedged
+  // supabase client doesn't blink the button back to "Follow" before the
+  // refetch resolves. The cache is updated on every successful fetchFollowState
+  // and toggleFollow.
+  const initialFollowed =
+    getCachedFollowState(user?.id ?? null, cached?.seller?.id)?.isFollowing ?? false;
+  const [followed, setFollowed] = useState(initialFollowed);
   const [followBusy, setFollowBusy] = useState(false);
   const [sellerItems, setSellerItems] = useState<Listing[]>([]);
   const [similarItems, setSimilarItems] = useState<Listing[]>([]);
   const [showStickyHeader, setShowStickyHeader] = useState(false);
   const [relatedTab, setRelatedTab] = useState<'members' | 'similar'>('members');
-  const [heroPagerEnabled, setHeroPagerEnabled] = useState(true);
+  const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
   const [saveListVisible, setSaveListVisible] = useState(false);
   const [savedToList, setSavedToList] = useState<string | null>(null);
-  // Prime from cache so re-opens are instant — bypasses any wedged supabase
-  // client on web while we refetch in the background.
-  const cached = getCachedListing(productIdParam);
   const [listing, setListing] = useState<Listing | null>(
     cached ? { ...cached, seller: cached.seller ?? (FALLBACK_SELLER as Listing['seller']) } : null,
   );
@@ -868,23 +831,36 @@ export default function ProductScreen() {
     };
   }, [productIdParam, user?.id]);
 
-  // Real follow state — pulls from user_follows and the profile's denormalized counts.
-  useEffect(() => {
-    let active = true;
-    const sellerId = listing?.seller?.id;
-    if (!sellerId || sellerId === user?.id) {
-      setFollowed(false);
-      return;
-    }
-    fetchFollowState(user?.id ?? null, sellerId)
-      .then((s) => {
-        if (active) setFollowed(s.isFollowing);
-      })
-      .catch((e) => console.warn('[product] fetchFollowState', e?.message ?? e));
-    return () => {
-      active = false;
-    };
-  }, [listing?.seller?.id, user?.id]);
+  // Real follow state — pulls from user_follows and the profile's denormalized
+  // counts. Re-fires on focus so a follow performed elsewhere (e.g. on the
+  // seller's user profile screen) is reflected when the user comes back to
+  // this product. On RPC failure we preserve whatever is on screen (the
+  // cached/optimistic value) instead of forcing the button back to "Follow".
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      const sellerId = listing?.seller?.id;
+      if (!sellerId || sellerId === user?.id) {
+        setFollowed(false);
+        return () => {
+          active = false;
+        };
+      }
+      // Re-seed from cache on focus in case another screen wrote a fresher
+      // state since this component last rendered.
+      const cachedState = getCachedFollowState(user?.id ?? null, sellerId);
+      if (cachedState) setFollowed(cachedState.isFollowing);
+      fetchFollowState(user?.id ?? null, sellerId)
+        .then((s) => {
+          // null = RPC failed; preserve current state rather than wipe it.
+          if (active && s) setFollowed(s.isFollowing);
+        })
+        .catch((e) => console.warn('[product] fetchFollowState', e?.message ?? e));
+      return () => {
+        active = false;
+      };
+    }, [listing?.seller?.id, user?.id]),
+  );
 
   // Other listings from this seller — ranked by likes desc, freshness tiebreak,
   // excluding the current item + sold rows server-side via RPC.
@@ -1095,6 +1071,7 @@ export default function ProductScreen() {
 
   const baseLikes = listing.likes ?? 0;
   const heartCount = Math.max(0, baseLikes + (liked ? 1 : 0));
+  const isOwnListing = !!user?.id && listing.seller_id === user.id;
 
   return (
     <View style={{ flex: 1, backgroundColor: 'white' }}>
@@ -1131,32 +1108,41 @@ export default function ProductScreen() {
         contentContainerStyle={{ paddingBottom: 120 }}
         onScroll={scrollHandler}
         scrollEventThrottle={16}
-        scrollEnabled={heroPagerEnabled}
       >
         {/* ── Image carousel (full-bleed to top, Plick style) ── */}
         <View style={{ position: 'relative' }}>
           {/* Parallax/stretch layer wraps ONLY the carousel; floating UI is unaffected */}
           <Animated.View style={heroParallaxStyle}>
-            <ScrollView
+            <Animated.ScrollView
               horizontal
               pagingEnabled
-              scrollEnabled={heroPagerEnabled}
               showsHorizontalScrollIndicator={false}
               nestedScrollEnabled
-              onScroll={(e) => setActiveImage(Math.round(e.nativeEvent.contentOffset.x / width))}
+              onScroll={heroScrollHandler}
+              onMomentumScrollEnd={(e) =>
+                setActiveImage(Math.round(e.nativeEvent.contentOffset.x / width))
+              }
               scrollEventThrottle={16}
             >
               {listing.images.map((uri, i) => (
-                <ZoomableImage
+                <Pressable
                   key={i}
-                  uri={uri}
-                  imgWidth={width}
-                  imgHeight={IMAGE_HEIGHT}
-                  sharedTag={i === 0 ? `product-image-${sharedTagId}` : undefined}
-                  onZoomChange={(zoomed) => setHeroPagerEnabled(!zoomed)}
-                />
+                  onPress={() => { tap('selection'); setFullscreenIndex(i); }}
+                  style={{ width, height: IMAGE_HEIGHT }}
+                >
+                  <AnimatedExpoImage
+                    source={{ uri: getOptimizedImageUrl(uri, { width: thumbWidthFor(width), quality: 80 }) }}
+                    style={{ width, height: IMAGE_HEIGHT }}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                    recyclingKey={uri}
+                    transition={0}
+                    priority={i === 0 ? 'high' : 'normal'}
+                    sharedTransitionTag={i === 0 ? `product-image-${sharedTagId}` : undefined}
+                  />
+                </Pressable>
               ))}
-            </ScrollView>
+            </Animated.ScrollView>
           </Animated.View>
 
           {/* Back arrow — frosted glass on iOS so it stays visible over light photos */}
@@ -1255,15 +1241,7 @@ export default function ProductScreen() {
               }}
             >
               {listing.images.map((_, i) => (
-                <View
-                  key={i}
-                  style={{
-                    width: i === activeImage ? 24 : 6,
-                    height: 4,
-                    borderRadius: 2,
-                    backgroundColor: i === activeImage ? 'white' : 'rgba(255,255,255,0.5)',
-                  }}
-                />
+                <HeroPageDot key={i} index={i} offsetX={heroOffsetX} pageWidth={width} />
               ))}
             </View>
           )}
@@ -1434,63 +1412,85 @@ export default function ProductScreen() {
               </View>
             </View>
 
-            {/* Follow + Message */}
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
-              <Pressable
-                onPress={handleFollowPress}
-                style={({ pressed }) => ({
-                  flex: 1,
+            {/* Follow + Message — hidden when viewing your own listing */}
+            {isOwnListing ? (
+              <View
+                style={{
+                  marginTop: 14,
+                  paddingVertical: 10,
                   borderRadius: 12,
-                  paddingVertical: 11,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexDirection: 'row',
-                  gap: 6,
-                  backgroundColor: followed ? 'white' : BRAND_PURPLE,
-                  borderWidth: followed ? HAIRLINE : 0,
-                  borderColor: 'rgba(15,15,15,0.08)',
-                  opacity: pressed ? 0.88 : 1,
-                  transform: [{ scale: pressed ? 0.98 : 1 }],
-                })}
-              >
-                <Feather
-                  name={followed ? 'check' : 'plus'}
-                  size={14}
-                  color={followed ? BRAND_INK : 'white'}
-                />
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: '700',
-                    color: followed ? BRAND_INK : 'white',
-                  }}
-                >
-                  {followed ? 'Following' : 'Follow'}
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => openChat('message')}
-                style={({ pressed }) => ({
-                  flex: 1,
-                  borderRadius: 12,
-                  paddingVertical: 11,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexDirection: 'row',
-                  gap: 6,
                   backgroundColor: 'white',
                   borderWidth: HAIRLINE,
                   borderColor: 'rgba(15,15,15,0.08)',
-                  opacity: pressed ? 0.7 : 1,
-                  transform: [{ scale: pressed ? 0.98 : 1 }],
-                })}
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                }}
               >
-                <Feather name="message-circle" size={14} color={BRAND_INK} />
-                <Text style={{ fontSize: 13, fontWeight: '700', color: BRAND_INK }}>
-                  Message
+                <Feather name="user-check" size={13} color="rgba(15,15,15,0.62)" />
+                <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.62)', fontWeight: '600' }}>
+                  This is your listing
                 </Text>
-              </Pressable>
-            </View>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+                <Pressable
+                  onPress={handleFollowPress}
+                  style={({ pressed }) => ({
+                    flex: 1,
+                    borderRadius: 12,
+                    paddingVertical: 11,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexDirection: 'row',
+                    gap: 6,
+                    backgroundColor: followed ? 'white' : BRAND_PURPLE,
+                    borderWidth: followed ? HAIRLINE : 0,
+                    borderColor: 'rgba(15,15,15,0.08)',
+                    opacity: pressed ? 0.88 : 1,
+                    transform: [{ scale: pressed ? 0.98 : 1 }],
+                  })}
+                >
+                  <Feather
+                    name={followed ? 'check' : 'plus'}
+                    size={14}
+                    color={followed ? BRAND_INK : 'white'}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: '700',
+                      color: followed ? BRAND_INK : 'white',
+                    }}
+                  >
+                    {followed ? 'Following' : 'Follow'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => openChat('message')}
+                  style={({ pressed }) => ({
+                    flex: 1,
+                    borderRadius: 12,
+                    paddingVertical: 11,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexDirection: 'row',
+                    gap: 6,
+                    backgroundColor: 'white',
+                    borderWidth: HAIRLINE,
+                    borderColor: 'rgba(15,15,15,0.08)',
+                    opacity: pressed ? 0.7 : 1,
+                    transform: [{ scale: pressed ? 0.98 : 1 }],
+                  })}
+                >
+                  <Feather name="message-circle" size={14} color={BRAND_INK} />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: BRAND_INK }}>
+                    Message
+                  </Text>
+                </Pressable>
+              </View>
+            )}
           </View>
         </View>
 
@@ -2009,7 +2009,8 @@ export default function ProductScreen() {
         </View>
       </Animated.ScrollView>
 
-      {/* ── Fixed bottom bar ── */}
+      {/* ── Fixed bottom bar — hidden when viewing your own listing ── */}
+      {!isOwnListing && (
       <View
         style={{
           position: 'absolute',
@@ -2098,6 +2099,7 @@ export default function ProductScreen() {
           </View>
         </Pressable>
       </View>
+      )}
 
       {/* Long-press-on-Heart save-to-list menu */}
       <SaveListSheet
@@ -2108,6 +2110,14 @@ export default function ProductScreen() {
           if (!liked) handleHeartPress();
         }}
         selectedId={savedToList}
+      />
+
+      {/* Fullscreen image viewer — opens on tap, swipe to navigate */}
+      <FullscreenImageViewer
+        visible={fullscreenIndex !== null}
+        images={listing.images}
+        initialIndex={fullscreenIndex ?? 0}
+        onClose={() => setFullscreenIndex(null)}
       />
     </View>
   );

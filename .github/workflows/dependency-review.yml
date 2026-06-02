@@ -1,0 +1,29 @@
+name: Dependency review
+
+# Surfaces vulnerable / unmaintained / license-incompatible deps in PRs.
+# Only runs on PRs because the action needs a base and head ref to diff.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    name: Review PR dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependency review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          # Comment a summary on the PR (idempotent — replaces previous run).
+          comment-summary-in-pr: on-failure
+          # Permissive licenses that match the existing dependency tree.
+          # Tighten as the project's compliance posture matures.
+          allow-licenses: >-
+            MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, CC0-1.0,
+            Unlicense, BlueOak-1.0.0, CC-BY-4.0, Python-2.0, Zlib, MPL-2.0

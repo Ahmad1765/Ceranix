@@ -1,0 +1,99 @@
+name: Supabase migrations
+
+# Validates that any SQL touched in a PR can be applied to a clean
+# Postgres before it gets merged. Catches typos, missing dependencies,
+# and policy-order mistakes before they hit production.
+#
+# Triggers only when SQL changes — keeps non-DB PRs fast.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/**/*.sql'
+  pull_request:
+    paths:
+      - 'supabase/**/*.sql'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apply-on-empty-postgres:
+    name: Apply SQL to ephemeral Postgres
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGPASSWORD: postgres
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGDATABASE: postgres
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stub Supabase auth / extension surface
+        # Supabase schemas/functions (auth.uid(), pgcrypto, etc.) aren't in
+        # vanilla Postgres. This stub lets the project's SQL parse and run
+        # so syntax + dependency-order issues surface without us needing a
+        # full Supabase stack in CI.
+        run: |
+          psql <<'SQL'
+            CREATE EXTENSION IF NOT EXISTS pgcrypto;
+            CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+            CREATE SCHEMA IF NOT EXISTS auth;
+            CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS
+              $$ SELECT '00000000-0000-0000-0000-000000000000'::uuid $$;
+            CREATE OR REPLACE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS
+              $$ SELECT 'authenticated'::text $$;
+            CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS
+              $$ SELECT '{}'::jsonb $$;
+
+            CREATE SCHEMA IF NOT EXISTS storage;
+            CREATE TABLE IF NOT EXISTS storage.objects (
+              id uuid primary key default uuid_generate_v4(),
+              bucket_id text,
+              name text,
+              owner uuid
+            );
+          SQL
+
+      - name: Apply migration SQL files in order
+        run: |
+          shopt -s nullglob
+          # Concatenate so cross-file dependencies (table → trigger → policy)
+          # resolve in lexical order. Adjust if a project-specific order
+          # emerges.
+          files=$(find supabase -maxdepth 2 -type f -name '*.sql' \
+                   -not -path 'supabase/functions/*' \
+                   -not -path 'supabase/.temp/*' \
+                   | sort)
+          if [[ -z "$files" ]]; then
+            echo "No SQL files found."
+            exit 0
+          fi
+          for f in $files; do
+            echo "::group::psql $f"
+            psql -v ON_ERROR_STOP=1 -f "$f"
+            echo "::endgroup::"
+          done

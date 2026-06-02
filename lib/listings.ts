@@ -16,7 +16,16 @@ const SELECT_FEED = `${FEED_LISTING_COLS}, seller:profiles!listings_seller_id_fk
 
 export type FeedTab = 'for_you' | 'popular';
 
-export async function fetchListings(opts: { tab?: FeedTab; limit?: number } = {}): Promise<Listing[]> {
+// Discriminated result: ok=false means the network/client wedged, the timeout
+// fired, or PostgREST returned an error — caller should preserve whatever
+// listings are already on screen rather than commit an empty array. ok=true
+// is "trust this" — a genuinely empty rows array is a real "no listings"
+// signal worth committing.
+export type FetchListingsResult = { ok: true; rows: Listing[] } | { ok: false };
+
+export async function fetchListingsResult(
+  opts: { tab?: FeedTab; limit?: number } = {},
+): Promise<FetchListingsResult> {
   const { tab = 'for_you', limit = 60 } = opts;
   let query = supabase
     .from('listings')
@@ -51,15 +60,23 @@ export async function fetchListings(opts: { tab?: FeedTab; limit?: number } = {}
     const { data, error } = result as { data: unknown; error: { message: string } | null };
     if (error) {
       console.warn('[listings] fetchListings', error.message);
-      return [];
+      return { ok: false };
     }
     const rows = (data ?? []) as unknown as Listing[];
     putCachedListings(rows);
-    return rows;
+    return { ok: true, rows };
   } catch (e: any) {
     console.warn('[listings] fetchListings threw', e?.message ?? e);
-    return [];
+    return { ok: false };
   }
+}
+
+// Back-compat thin wrapper for any caller that doesn't care about the
+// failure mode and just wants "whatever rows we got, or []". The home feed
+// uses fetchListingsResult directly so it can tell a wedge from an empty feed.
+export async function fetchListings(opts: { tab?: FeedTab; limit?: number } = {}): Promise<Listing[]> {
+  const r = await fetchListingsResult(opts);
+  return r.ok ? r.rows : [];
 }
 
 export async function fetchListingById(
