@@ -24,9 +24,9 @@ export type FeedTab = 'for_you' | 'popular';
 export type FetchListingsResult = { ok: true; rows: Listing[] } | { ok: false };
 
 export async function fetchListingsResult(
-  opts: { tab?: FeedTab; limit?: number } = {},
+  opts: { tab?: FeedTab; limit?: number; offset?: number } = {},
 ): Promise<FetchListingsResult> {
-  const { tab = 'for_you', limit = 60 } = opts;
+  const { tab = 'for_you', limit = 60, offset = 0 } = opts;
   let query = supabase
     .from('listings')
     .select(SELECT_FEED)
@@ -38,14 +38,18 @@ export async function fetchListingsResult(
   } else {
     query = query.order('created_at', { ascending: false });
   }
+  if (offset > 0) {
+    query = query.range(offset, offset + limit - 1);
+  }
 
   // Belt-and-braces: even with the global fetch ceiling in lib/supabase.ts,
   // race against an explicit timeout AND wrap the await in try/catch so this
   // function can NEVER hang or throw. The home feed depends on this resolving
   // — a hung promise means an eternal skeleton, which is the worst UX.
+  const limited = offset > 0 ? query : query.limit(limit);
   try {
     const result = await Promise.race([
-      query.limit(limit),
+      limited,
       new Promise<{ data: null; error: Error }>((resolve) =>
         setTimeout(
           () =>
@@ -77,6 +81,47 @@ export async function fetchListingsResult(
 export async function fetchListings(opts: { tab?: FeedTab; limit?: number } = {}): Promise<Listing[]> {
   const r = await fetchListingsResult(opts);
   return r.ok ? r.rows : [];
+}
+
+// Listings whose seller the current user follows. Two-step query because
+// PostgREST doesn't let us join through `user_follows` and back into
+// `listings` in one shot. Returns the same discriminated result shape as
+// `fetchListingsResult` so the home screen's wedge-vs-empty branch stays
+// uniform.
+export async function fetchFollowingListingsResult(
+  userId: string,
+  limit = 60,
+): Promise<FetchListingsResult> {
+  try {
+    const { data: rows, error: followErr } = await supabase
+      .from('user_follows')
+      .select('followee_id')
+      .eq('follower_id', userId);
+    if (followErr) {
+      console.warn('[listings] fetchFollowingListings follow', followErr.message);
+      return { ok: false };
+    }
+    const followeeIds = (rows ?? []).map((r) => (r as { followee_id: string }).followee_id);
+    if (followeeIds.length === 0) return { ok: true, rows: [] };
+
+    const { data, error } = await supabase
+      .from('listings')
+      .select(SELECT_FEED)
+      .in('seller_id', followeeIds)
+      .eq('is_sold', false)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) {
+      console.warn('[listings] fetchFollowingListings', error.message);
+      return { ok: false };
+    }
+    const out = (data ?? []) as unknown as Listing[];
+    putCachedListings(out);
+    return { ok: true, rows: out };
+  } catch (e: any) {
+    console.warn('[listings] fetchFollowingListings threw', e?.message ?? e);
+    return { ok: false };
+  }
 }
 
 export async function fetchListingById(
@@ -262,6 +307,36 @@ export async function isLiked(listingId: string, userId: string): Promise<boolea
     .maybeSingle();
   if (error) return false;
   return !!data;
+}
+
+// Owner action: flip `is_sold`. Caller is the seller; RLS enforces that.
+// Returns the new value on success, the previous value on failure (so the
+// UI's optimistic flip can roll back).
+export async function setListingSold(
+  listingId: string,
+  nextSold: boolean,
+): Promise<boolean> {
+  const { error } = await supabase
+    .from('listings')
+    .update({ is_sold: nextSold })
+    .eq('id', listingId);
+  if (error) {
+    console.warn('[listings] setListingSold', error.message);
+    return !nextSold;
+  }
+  return nextSold;
+}
+
+// Owner action: hard-delete the row. RLS only lets the seller delete their
+// own listing. We return a bool so the UI can show a toast instead of
+// throwing.
+export async function deleteListing(listingId: string): Promise<boolean> {
+  const { error } = await supabase.from('listings').delete().eq('id', listingId);
+  if (error) {
+    console.warn('[listings] deleteListing', error.message);
+    return false;
+  }
+  return true;
 }
 
 export async function toggleLike(

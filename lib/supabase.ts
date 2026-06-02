@@ -57,30 +57,79 @@ function timeoutFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Res
   );
 }
 
-// THE actual web wedge fix. supabase-js's auth client serializes session
-// reads / token refreshes through a global lock. On web that defaults to
-// `navigator.locks.request('lock-storage-key', ...)`. That lock can be
-// held indefinitely by:
-//   - another tab of the same app that crashed mid-refresh,
+// Web lock with bounded acquire + graceful fallback.
+//
+// supabase-js's auth client serializes getSession / setSession / token
+// refresh through a global lock — on web that's `navigator.locks.request`
+// keyed by storage. The lock CAN wedge:
+//   - another tab of the same app crashed mid-refresh,
 //   - a service worker still holding it after page navigation,
 //   - a browser extension that hooked storage,
 //   - or a previous in-page refresh that aborted without releasing.
 // When that happens, every subsequent supabase.from()/.rpc()/.auth call
-// queues behind the lock and never executes — no fetch, no abort, no
-// timeout, no error. The promise just sits pending. This is the
-// "skeleton until I refresh the browser" bug, exactly.
+// queues behind the lock and never executes — the "skeleton until I refresh
+// the browser" bug.
 //
-// Overriding the lock to a pass-through removes the queue. The trade-off
-// (concurrent token refresh across tabs racing) is irrelevant for this
-// app: a buyer-side marketplace where a user is in one tab at a time,
-// and the worst case of a duplicate refresh is one wasted token round
-// trip. Worth it to make the app actually usable on Chrome.
-async function passthroughLock<R>(
-  _name: string,
-  _acquireTimeout: number,
+// The previous implementation (passthroughLock) sidestepped the queue
+// entirely by NEVER holding the lock. That fixed the wedge but reintroduced
+// the underlying race the lock exists to prevent — two concurrent token
+// refreshes across tabs can hit `refresh_token_already_used` and force one
+// tab to sign out.
+//
+// This implementation does both things:
+//   1. Tries to acquire the real `navigator.locks` lock with a hard ceiling
+//      (LOCK_ACQUIRE_CEILING_MS, capped well below any UX timeout).
+//   2. If the ceiling fires, aborts the wait and runs the function
+//      unguarded. The caller still completes — at worst we burn one extra
+//      token refresh.
+//
+// On native or in environments without `navigator.locks` (legacy browsers,
+// SSR), we fall through to bare execution since there's no cross-tab race
+// to worry about there.
+const LOCK_ACQUIRE_CEILING_MS = 3_000;
+
+async function boundedLock<R>(
+  name: string,
+  acquireTimeout: number,
   fn: () => Promise<R>,
 ): Promise<R> {
-  return fn();
+  if (
+    typeof navigator === 'undefined' ||
+    typeof navigator.locks?.request !== 'function'
+  ) {
+    return fn();
+  }
+
+  const ceiling = Math.min(
+    Number.isFinite(acquireTimeout) ? acquireTimeout : LOCK_ACQUIRE_CEILING_MS,
+    LOCK_ACQUIRE_CEILING_MS,
+  );
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ceiling);
+
+  try {
+    // navigator.locks.request honours AbortSignal — when the timer fires it
+    // cancels the wait WITHOUT killing the lock holder, so the original
+    // process is free to finish whenever it does, and we just sidestep it.
+    return await navigator.locks.request(
+      name,
+      { signal: controller.signal },
+      async () => fn(),
+    );
+  } catch (err: any) {
+    const isAbort =
+      err?.name === 'AbortError' ||
+      err?.code === 20 /* DOMException.ABORT_ERR */ ||
+      String(err?.message ?? '').toLowerCase().includes('aborted');
+    if (!isAbort) throw err;
+    // Lock wedged on another tab/extension/service worker. Run unguarded
+    // — duplicate token refresh is worth it to keep the UI responsive.
+    console.warn(`[supabase] lock '${name}' wait timed out, running unguarded`);
+    return fn();
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -89,7 +138,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
-    lock: passthroughLock,
+    lock: boundedLock,
   },
   global: {
     fetch: timeoutFetch,

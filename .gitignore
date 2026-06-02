@@ -17,8 +17,15 @@ ios/
 # Environment variables
 .env
 .env.local
+.env.test
 .env.*.local
 *.env
+
+# Playwright (auth state, reports, artifacts)
+playwright/.auth/
+playwright-report/
+test-results/
+.last-run.json
 
 # Build output
 web-build/

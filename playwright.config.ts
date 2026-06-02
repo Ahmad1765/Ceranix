@@ -46,6 +46,18 @@ export default defineConfig({
   },
 
   projects: [
+    // One-shot UI sign-in that produces playwright/.auth/user.json. Every
+    // signed-in project depends on this so the storage state exists before
+    // any authenticated spec runs.
+    {
+      name: 'setup',
+      testMatch: /auth\.setup\.ts$/,
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 900 },
+        channel: 'chromium',
+      },
+    },
     {
       name: 'chromium-desktop',
       use: {
@@ -56,6 +68,22 @@ export default defineConfig({
         // version bump).
         channel: 'chromium',
       },
+      // Signed-out / read-only project. Skip the authenticated specs (those
+      // run under `signed-in-desktop` with the storage state loaded).
+      testIgnore: [/auth\.setup\.ts$/, /signed-in\//],
+    },
+    {
+      // Authenticated runs reuse the storage state captured by the setup
+      // project — so the user is already signed in when the spec loads.
+      name: 'signed-in-desktop',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 900 },
+        channel: 'chromium',
+        storageState: 'playwright/.auth/user.json',
+      },
+      testMatch: /signed-in\/.*\.spec\.ts$/,
+      dependencies: ['setup'],
     },
     {
       name: 'chromium-mobile',

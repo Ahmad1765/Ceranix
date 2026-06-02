@@ -72,12 +72,11 @@ export async function scrollFeedToBottom(page: Page) {
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-function loadEnvLocal(): Record<string, string> {
-  const envPath = path.resolve(process.cwd(), '.env.local');
-  if (!fs.existsSync(envPath)) return {};
+function parseEnvFile(file: string): Record<string, string> {
+  const full = path.resolve(process.cwd(), file);
+  if (!fs.existsSync(full)) return {};
   const out: Record<string, string> = {};
-  const raw = fs.readFileSync(envPath, 'utf8');
-  for (const line of raw.split(/\r?\n/)) {
+  for (const line of fs.readFileSync(full, 'utf8').split(/\r?\n/)) {
     const m = line.match(/^([A-Z0-9_]+)\s*=\s*(.*)$/i);
     if (!m) continue;
     out[m[1]] = m[2].replace(/^['"]|['"]$/g, '');
@@ -85,11 +84,22 @@ function loadEnvLocal(): Record<string, string> {
   return out;
 }
 
-const ENV = loadEnvLocal();
+// `.env.test` (gitignored) is the canonical source for E2E_USER_EMAIL /
+// _PASSWORD, used by auth.setup.ts to drive a one-shot UI sign-in. The
+// public Supabase URL + anon key fall back to `.env.local` so a contributor
+// without `.env.test` can still run the read-only suite.
+const LOCAL_ENV = parseEnvFile('.env.local');
+const TEST_ENV = parseEnvFile('.env.test');
+const ENV = { ...LOCAL_ENV, ...TEST_ENV };
+
 export const SUPABASE_URL =
   process.env.EXPO_PUBLIC_SUPABASE_URL || ENV.EXPO_PUBLIC_SUPABASE_URL || '';
 export const SUPABASE_ANON_KEY =
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || ENV.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+export const E2E_USER_EMAIL = process.env.E2E_USER_EMAIL || ENV.E2E_USER_EMAIL || '';
+export const E2E_USER_PASSWORD = process.env.E2E_USER_PASSWORD || ENV.E2E_USER_PASSWORD || '';
+
+export const AUTH_STORAGE_PATH = path.resolve(process.cwd(), 'playwright/.auth/user.json');
 
 // Hit the real Supabase REST endpoint to grab a sample listing for tests that
 // need a real listing id (product detail, payment, invoice). Uses the URL +

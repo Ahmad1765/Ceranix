@@ -76,6 +76,46 @@ export async function fetchFollowState(
   return state;
 }
 
+// "People to follow" suggestions. Hand-rolled with the standard query API
+// because there's no RPC for this — we order profiles by `followers_count`
+// desc and filter out (a) the caller themselves and (b) anyone they already
+// follow. Tiny limit; the suggestions strip is supplementary UX.
+export async function fetchSuggestedFollows(
+  currentUserId: string | null,
+  limit = 6,
+): Promise<
+  Array<Pick<import('@/types').User, 'id' | 'username' | 'full_name' | 'avatar_url' | 'followers_count' | 'is_verified'>>
+> {
+  // Build the exclusion list (self + already-followed) so we don't recommend
+  // someone they already follow.
+  let excluded: string[] = currentUserId ? [currentUserId] : [];
+  if (currentUserId) {
+    const { data: edges, error: followErr } = await supabase
+      .from('user_follows')
+      .select('followee_id')
+      .eq('follower_id', currentUserId);
+    if (!followErr && edges) {
+      excluded = excluded.concat(
+        edges.map((r) => (r as { followee_id: string }).followee_id),
+      );
+    }
+  }
+  let query = supabase
+    .from('profiles')
+    .select('id, username, full_name, avatar_url, followers_count, is_verified')
+    .order('followers_count', { ascending: false, nullsFirst: false })
+    .limit(limit);
+  if (excluded.length > 0) {
+    query = query.not('id', 'in', `(${excluded.map((id) => `"${id}"`).join(',')})`);
+  }
+  const { data, error } = await query;
+  if (error) {
+    console.warn('[follows] fetchSuggestedFollows', error.message);
+    return [];
+  }
+  return (data ?? []) as any;
+}
+
 // Atomic toggle: one server call decides insert-vs-delete based on the row's
 // real state and returns the new counts. The previous insert/delete pair had
 // two failure surfaces (RLS, web fetch wedge), and a transient abort on the

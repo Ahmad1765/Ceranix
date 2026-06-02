@@ -19,11 +19,18 @@ import { router, useFocusEffect } from 'expo-router';
 import { ListingCard } from '@/components/ListingCard';
 import { SkeletonCard } from '@/components/SkeletonCard';
 import { AnonCards } from '@/components/AnonCards';
-import { fetchListingsResult, type FeedTab } from '@/lib/listings';
+import {
+  fetchFollowingListingsResult,
+  fetchListingsResult,
+  type FeedTab,
+} from '@/lib/listings';
+import { fetchSuggestedFollows, toggleFollow } from '@/lib/follows';
 import { getFeedSnapshot, putFeedSnapshot } from '@/lib/listingCache';
 import { onListingCreated } from '@/lib/listingEvents';
 import { getOptimizedImageUrl } from '@/lib/images';
-import type { Listing } from '@/types';
+import { useAuth } from '@/lib/auth';
+import { useToast } from '@/lib/toast';
+import type { Listing, User as Profile } from '@/types';
 
 type TabName = 'For you' | 'Popular' | 'Following';
 
@@ -102,14 +109,6 @@ function AnimatedTabPill({
   );
 }
 
-const SUGGESTED_USERS = [
-  { id: 'u1', display_name: 'dafneee', username: '@dafneee', avatar: 'https://picsum.photos/seed/dafne/80/80' },
-  { id: 'u2', display_name: 'T.Fashion', username: '@t.fashion', avatar: 'https://picsum.photos/seed/tfash/80/80' },
-  { id: 'u3', display_name: 'Thea settergren', username: '@theasettergren', avatar: 'https://picsum.photos/seed/thea/80/80' },
-  { id: 'u4', display_name: 'Leah Ferm', username: '@leah.ferm', avatar: 'https://picsum.photos/seed/leah/80/80' },
-  { id: 'u5', display_name: 'Edita Kondrat Art', username: '@editakondratjewelry', avatar: 'https://picsum.photos/seed/edita/80/80' },
-];
-
 const TABS: TabName[] = ['For you', 'Popular', 'Following'];
 
 const TAB_TO_FEED: Record<Exclude<TabName, 'Following'>, FeedTab> = {
@@ -118,8 +117,17 @@ const TAB_TO_FEED: Record<Exclude<TabName, 'Following'>, FeedTab> = {
 };
 
 export default function HomeScreen() {
+  const { user } = useAuth();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<TabName>('For you');
   const [refreshing, setRefreshing] = useState(false);
+  // Suggested people for an empty Following tab. Live data ranked by
+  // followers; updated whenever the auth user changes so the exclusion list
+  // (self + already-followed) stays accurate.
+  const [suggestions, setSuggestions] = useState<
+    Array<Pick<Profile, 'id' | 'username' | 'full_name' | 'avatar_url' | 'followers_count' | 'is_verified'>>
+  >([]);
+  const [followingState, setFollowingState] = useState<Record<string, boolean>>({});
   // Seed from the last-rendered snapshot for this tab so a re-mount (or a
   // tab swap that races a wedged Supabase client) never blanks the screen.
   // null tab maps to an empty snapshot — Following has no snapshot anyway.
@@ -127,7 +135,10 @@ export default function HomeScreen() {
   const initialSnapshot = getFeedSnapshot(initialTab) ?? [];
   const [listings, setListings] = useState<Listing[]>(initialSnapshot);
   const [loading, setLoading] = useState(initialSnapshot.length === 0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [reachedEnd, setReachedEnd] = useState(false);
   const hasLoadedRef = useRef(initialSnapshot.length > 0);
+  const PAGE_SIZE = 60;
 
   // Single commit: flips loading off in the SAME setter call that installs
   // the rows, so the FlatList never sees the intermediate
@@ -137,10 +148,15 @@ export default function HomeScreen() {
   // empty" from "fetch wedged" and decide whether to commit or preserve.
   const load = useCallback(
     async (tab: TabName): Promise<{ ok: true; rows: Listing[] } | { ok: false }> => {
-      if (tab === 'Following') return { ok: true, rows: [] };
-      const result = await fetchListingsResult({
-        tab: TAB_TO_FEED[tab as Exclude<TabName, 'Following'>],
-      });
+      let result: { ok: true; rows: Listing[] } | { ok: false };
+      if (tab === 'Following') {
+        if (!user?.id) return { ok: true, rows: [] };
+        result = await fetchFollowingListingsResult(user.id);
+      } else {
+        result = await fetchListingsResult({
+          tab: TAB_TO_FEED[tab as Exclude<TabName, 'Following'>],
+        });
+      }
       if (!result.ok) return result;
       const firstUrls = result.rows
         .slice(0, 12)
@@ -150,7 +166,89 @@ export default function HomeScreen() {
       if (firstUrls.length) Image.prefetch(firstUrls, { cachePolicy: 'memory-disk' });
       return result;
     },
-    [],
+    [user?.id],
+  );
+
+  // Pull a fresh batch of "people to follow" whenever the auth user changes.
+  // We don't poll — the strip is a static-ish recommendation, not a feed.
+  useEffect(() => {
+    let cancelled = false;
+    fetchSuggestedFollows(user?.id ?? null).then((rows) => {
+      if (cancelled) return;
+      setSuggestions(rows);
+      setFollowingState({});
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  // Infinite scroll: pull the next page when the FlatList reports it's near
+  // the bottom. Following gates on listings.length === 0 with no pagination
+  // because the followed-seller list is generally small.
+  const loadMore = useCallback(async () => {
+    if (loading || loadingMore || reachedEnd) return;
+    if (activeTab === 'Following') return;
+    if (listings.length === 0) return;
+    setLoadingMore(true);
+    const result = await fetchListingsResult({
+      tab: TAB_TO_FEED[activeTab as Exclude<TabName, 'Following'>],
+      limit: PAGE_SIZE,
+      offset: listings.length,
+    });
+    if (result.ok) {
+      if (result.rows.length === 0) {
+        setReachedEnd(true);
+      } else {
+        setListings((prev) => {
+          // De-dupe by id in case a freshly-published row already lives at the
+          // top of `prev` from onListingCreated.
+          const seen = new Set(prev.map((l) => l.id));
+          const next = prev.concat(result.rows.filter((l) => !seen.has(l.id)));
+          putFeedSnapshot(activeTab, next);
+          return next;
+        });
+      }
+    }
+    setLoadingMore(false);
+  }, [activeTab, listings.length, loading, loadingMore, reachedEnd]);
+
+  // Reset pagination when the tab flips (each tab has its own ordering).
+  useEffect(() => {
+    setReachedEnd(false);
+    setLoadingMore(false);
+  }, [activeTab]);
+
+  const handleFollowSuggestion = useCallback(
+    async (suggestedId: string, username: string) => {
+      if (!user?.id) {
+        toast.show('Sign in to follow', { variant: 'info', icon: 'log-in' });
+        router.push('/auth/login');
+        return;
+      }
+      // Optimistic flip; rollback on failure.
+      const already = followingState[suggestedId] === true;
+      setFollowingState((prev) => ({ ...prev, [suggestedId]: !already }));
+      try {
+        const next = await toggleFollow(user.id, suggestedId, already);
+        setFollowingState((prev) => ({ ...prev, [suggestedId]: next.isFollowing }));
+        if (next.isFollowing) {
+          toast.show(`Following @${username}`, { variant: 'info', icon: 'user-check' });
+          // Pull the Following feed in the background so the next swipe to
+          // that tab already has data.
+          load('Following').then((r) => {
+            if (r.ok) putFeedSnapshot('Following' as TabName, r.rows);
+          });
+        }
+      } catch (e: any) {
+        setFollowingState((prev) => ({ ...prev, [suggestedId]: already }));
+        toast.show(e?.message ?? 'Could not follow', {
+          variant: 'default',
+          icon: 'alert-triangle',
+        });
+      }
+    },
+    [followingState, user?.id, toast, load],
   );
 
   // Initial + tab-change load: show skeletons (only if we don't already have
@@ -361,36 +459,128 @@ export default function HomeScreen() {
         ))}
       </ScrollView>
 
-      {/* Following view — always mounted, hidden when inactive */}
-      <ScrollView
+      {/* Following view — listing grid if the user follows people, otherwise
+          a live "people to follow" strip with real profiles. */}
+      <FlatList
+        key="following-3"
         style={{ flex: 1, display: activeTab === 'Following' ? 'flex' : 'none' }}
+        data={activeTab === 'Following' ? data : []}
+        keyExtractor={keyExtractor}
+        numColumns={FEED_COLUMNS}
+        columnWrapperStyle={{ gap: 6, paddingHorizontal: 12 }}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 32 }}
-      >
-        <Text className="text-center text-[15px] text-ink leading-[22px] px-8 pt-6 pb-5">
-          {'You are not following anyone yet.\nFollow other members to see their listings here.'}
-        </Text>
-        {SUGGESTED_USERS.map((user) => (
-          <View key={user.id} className="flex-row items-center px-4 py-3">
-            <Image
-              source={{ uri: getOptimizedImageUrl(user.avatar, { width: 120 }) }}
-              style={{ width: 52, height: 52, borderRadius: 26 }}
-              className="bg-ink-panel"
-              contentFit="cover"
-              cachePolicy="memory-disk"
-              transition={150}
-            />
-            <View className="flex-1 ml-3">
-              <Text className="text-[15px] font-bold text-ink">{user.display_name}</Text>
-              <Text className="text-[13px] text-ink-mute mt-0.5">{user.username}</Text>
+        initialNumToRender={12}
+        maxToRenderPerBatch={9}
+        updateCellsBatchingPeriod={50}
+        windowSize={8}
+        removeClippedSubviews={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6C47FF" />
+        }
+        ListEmptyComponent={
+          loading ? (
+            <View>
+              {renderSkeleton()}
+              {renderSkeleton()}
+              {renderSkeleton()}
             </View>
-            <Pressable className="bg-primary rounded-[10px] px-5 py-2 flex-row items-center">
-              <Feather name="plus" size={13} color="#fff" style={{ marginRight: 4 }} />
-              <Text className="text-white text-[13px] font-semibold">Follow</Text>
-            </Pressable>
-          </View>
-        ))}
-      </ScrollView>
+          ) : (
+            <View>
+              <Text className="text-center text-[15px] text-ink leading-[22px] px-8 pt-6 pb-5">
+                {user
+                  ? "You're not following anyone yet.\nFollow members to see their listings here."
+                  : 'Sign in and follow members to see their listings here.'}
+              </Text>
+              {suggestions.length === 0 ? (
+                <View style={{ alignItems: 'center', paddingVertical: 24 }}>
+                  <Text style={{ fontSize: 13, color: '#0F0F0F88' }}>
+                    No suggestions right now.
+                  </Text>
+                </View>
+              ) : (
+                suggestions.map((s) => {
+                  const isFollowing = followingState[s.id] === true;
+                  const display = s.full_name || s.username;
+                  const handle = `@${s.username}`;
+                  return (
+                    <View key={s.id} className="flex-row items-center px-4 py-3">
+                      <Pressable
+                        onPress={() => router.push(`/user/${s.id}` as any)}
+                        style={{ width: 52, height: 52, borderRadius: 26, overflow: 'hidden' }}
+                      >
+                        {s.avatar_url ? (
+                          <Image
+                            source={{ uri: getOptimizedImageUrl(s.avatar_url, { width: 120 }) }}
+                            style={{ width: 52, height: 52, borderRadius: 26 }}
+                            className="bg-ink-panel"
+                            contentFit="cover"
+                            cachePolicy="memory-disk"
+                            transition={150}
+                          />
+                        ) : (
+                          <View
+                            style={{
+                              width: 52,
+                              height: 52,
+                              borderRadius: 26,
+                              backgroundColor: 'rgba(108,71,255,0.12)',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <Text style={{ fontSize: 18, fontWeight: '900', color: '#6C47FF' }}>
+                              {(display.trim().charAt(0) || 'U').toUpperCase()}
+                            </Text>
+                          </View>
+                        )}
+                      </Pressable>
+                      <Pressable
+                        onPress={() => router.push(`/user/${s.id}` as any)}
+                        className="flex-1 ml-3"
+                      >
+                        <View className="flex-row items-center">
+                          <Text className="text-[15px] font-bold text-ink" numberOfLines={1}>
+                            {display}
+                          </Text>
+                          {s.is_verified && (
+                            <Feather
+                              name="check-circle"
+                              size={12}
+                              color="#6C47FF"
+                              style={{ marginLeft: 4 }}
+                            />
+                          )}
+                        </View>
+                        <Text className="text-[13px] text-ink-mute mt-0.5" numberOfLines={1}>
+                          {handle}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => handleFollowSuggestion(s.id, s.username)}
+                        className={`rounded-[10px] px-5 py-2 flex-row items-center ${isFollowing ? 'bg-white border border-ink-hair' : 'bg-primary'}`}
+                      >
+                        <Feather
+                          name={isFollowing ? 'check' : 'plus'}
+                          size={13}
+                          color={isFollowing ? '#0F0F0F' : '#fff'}
+                          style={{ marginRight: 4 }}
+                        />
+                        <Text
+                          className={`text-[13px] font-semibold ${isFollowing ? 'text-ink' : 'text-white'}`}
+                        >
+                          {isFollowing ? 'Following' : 'Follow'}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  );
+                })
+              )}
+            </View>
+          )
+        }
+        renderItem={renderItem}
+        contentContainerStyle={{ paddingBottom: 24 }}
+      />
 
       {/* Product grid — always mounted, hidden when Following is active */}
       <FlatList
@@ -406,6 +596,19 @@ export default function HomeScreen() {
         updateCellsBatchingPeriod={50}
         windowSize={8}
         removeClippedSubviews={false}
+        onEndReachedThreshold={0.5}
+        onEndReached={loadMore}
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={{ paddingVertical: 16 }}>{renderSkeleton()}</View>
+          ) : reachedEnd && listings.length > 0 ? (
+            <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+              <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.45)' }}>
+                You've reached the end.
+              </Text>
+            </View>
+          ) : null
+        }
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6C47FF" />
         }

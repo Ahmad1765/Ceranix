@@ -34,12 +34,15 @@ import Animated, {
 } from 'react-native-reanimated';
 import type { Listing } from '@/types';
 import {
+  deleteListing,
   fetchListingById,
   fetchSellerOtherListings,
   fetchSimilarListings,
   isLiked,
+  setListingSold,
   toggleLike,
 } from '@/lib/listings';
+import { confirm } from '@/lib/confirm';
 import { getCachedListing } from '@/lib/listingCache';
 import { fetchFollowState, getCachedFollowState, toggleFollow } from '@/lib/follows';
 import { withTimeout } from '@/lib/async';
@@ -130,11 +133,11 @@ const TAG_BG = 'rgba(15,15,15,0.04)';
 const TAG_BORDER = 'rgba(15,15,15,0.08)';
 const LINK_PURPLE = BRAND_PURPLE;
 
-const REVIEWS_COUNT = 7;
-const TRANSACTIONS_COUNT = 12;
-const ITEMS_FOR_SALE = 9;
-const LISTING_ID = '91740406';
-const PIN_COUNT = 2;
+// Dead "review" / "transaction" / "items listed" / "pin" constants were
+// previously hardcoded here as fake static numbers. They masqueraded as real
+// data on the seller card; they're gone now. Where the UI still needs a
+// value we either derive it from the actual listing/seller row or hide the
+// chip when the field is unknown. The fallback `0` paths below are explicit.
 
 // Fallback shape used while the real listing is loading; render is gated on
 // `listing` being non-null below, so this is never visible in the UI.
@@ -922,6 +925,55 @@ export default function ProductScreen() {
     setLikeBusy(false);
   };
 
+  // Owner-only actions. Both update local state optimistically so the UI
+  // doesn't lag behind the supabase round-trip, and roll back on failure.
+  const [ownerBusy, setOwnerBusy] = useState<'sold' | 'delete' | null>(null);
+
+  const handleToggleSold = async () => {
+    if (!listing || ownerBusy) return;
+    const next = !listing.is_sold;
+    setOwnerBusy('sold');
+    setListing((prev) => (prev ? { ...prev, is_sold: next } : prev));
+    const committed = await setListingSold(listing.id, next);
+    if (committed !== next) {
+      // Rollback.
+      setListing((prev) => (prev ? { ...prev, is_sold: !next } : prev));
+      toast.show("Couldn't update the listing", {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
+    } else {
+      toast.show(next ? 'Marked as sold' : 'Marked as available', {
+        variant: 'success',
+        icon: 'check',
+      });
+    }
+    setOwnerBusy(null);
+  };
+
+  const handleDelete = async () => {
+    if (!listing || ownerBusy) return;
+    const ok = await confirm({
+      title: 'Delete listing?',
+      message: 'This permanently removes the listing. This cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
+    setOwnerBusy('delete');
+    const success = await deleteListing(listing.id);
+    if (!success) {
+      toast.show("Couldn't delete the listing", {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
+      setOwnerBusy(null);
+      return;
+    }
+    toast.show('Listing deleted', { variant: 'success', icon: 'check' });
+    safeBack();
+  };
+
   const handleFollowPress = async () => {
     tap('selection');
     if (!user) {
@@ -1200,7 +1252,7 @@ export default function ProductScreen() {
             >
               <PinIcon size={20} color={BRAND_INK} filled={pinned} />
               <Text style={{ fontSize: 11, fontWeight: '700', color: BRAND_INK, marginTop: 2 }}>
-                {PIN_COUNT + (pinned ? 1 : 0)}
+                {pinned ? 1 : 0}
               </Text>
             </Pressable>
             <View style={{ height: HAIRLINE, marginHorizontal: 10, backgroundColor: 'rgba(10,10,10,0.12)' }} />
@@ -1403,35 +1455,76 @@ export default function ProductScreen() {
                     {listing.seller.rating?.toFixed?.(1) ?? '—'}
                   </Text>
                   <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.62)' }}>
-                    ({REVIEWS_COUNT})
+                    ({Math.round(listing.seller.rating ? Number(listing.seller.total_sales ?? 0) : 0)})
                   </Text>
                 </View>
                 <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.62)', marginTop: 3 }}>
-                  {TRANSACTIONS_COUNT} sales · {ITEMS_FOR_SALE} listed
+                  {Number(listing.seller.total_sales ?? 0)} sales · {sellerItems.length + 1} listed
                 </Text>
               </View>
             </View>
 
             {/* Follow + Message — hidden when viewing your own listing */}
             {isOwnListing ? (
-              <View
-                style={{
-                  marginTop: 14,
-                  paddingVertical: 10,
-                  borderRadius: 12,
-                  backgroundColor: 'white',
-                  borderWidth: HAIRLINE,
-                  borderColor: 'rgba(15,15,15,0.08)',
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                }}
-              >
-                <Feather name="user-check" size={13} color="rgba(15,15,15,0.62)" />
-                <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.62)', fontWeight: '600' }}>
-                  This is your listing
-                </Text>
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+                <Pressable
+                  onPress={handleToggleSold}
+                  disabled={ownerBusy !== null}
+                  testID="owner-toggle-sold"
+                  style={({ pressed }) => ({
+                    flex: 1,
+                    borderRadius: 12,
+                    paddingVertical: 11,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexDirection: 'row',
+                    gap: 6,
+                    backgroundColor: listing.is_sold ? 'white' : BRAND_INK,
+                    borderWidth: listing.is_sold ? HAIRLINE : 0,
+                    borderColor: 'rgba(15,15,15,0.08)',
+                    opacity: ownerBusy === 'sold' ? 0.5 : pressed ? 0.88 : 1,
+                    transform: [{ scale: pressed ? 0.98 : 1 }],
+                  })}
+                >
+                  <Feather
+                    name={listing.is_sold ? 'rotate-ccw' : 'check'}
+                    size={14}
+                    color={listing.is_sold ? BRAND_INK : 'white'}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: '700',
+                      color: listing.is_sold ? BRAND_INK : 'white',
+                    }}
+                  >
+                    {listing.is_sold ? 'Mark available' : 'Mark as sold'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={handleDelete}
+                  disabled={ownerBusy !== null}
+                  testID="owner-delete"
+                  style={({ pressed }) => ({
+                    flex: 1,
+                    borderRadius: 12,
+                    paddingVertical: 11,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexDirection: 'row',
+                    gap: 6,
+                    backgroundColor: 'white',
+                    borderWidth: HAIRLINE,
+                    borderColor: 'rgba(15,15,15,0.08)',
+                    opacity: ownerBusy === 'delete' ? 0.5 : pressed ? 0.7 : 1,
+                    transform: [{ scale: pressed ? 0.98 : 1 }],
+                  })}
+                >
+                  <Feather name="trash-2" size={14} color={BRAND_INK} />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: BRAND_INK }}>
+                    Delete
+                  </Text>
+                </Pressable>
               </View>
             ) : (
               <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
@@ -1735,7 +1828,7 @@ export default function ProductScreen() {
                   fontFamily: 'Inter_500Medium',
                 }}
               >
-                ID · {LISTING_ID}
+                ID · {listing.id.slice(0, 8)}
               </Text>
             </View>
           </View>

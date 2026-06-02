@@ -1,6 +1,12 @@
 import '../global.css';
 import { useEffect, useState } from 'react';
 import { Platform, TextInput } from 'react-native';
+import { installAlertShim } from '@/lib/alertShim';
+
+// React-native-web ships Alert.alert as a no-op, so every validation /
+// confirm path that calls Alert.alert silently dies on web. The shim swaps
+// in a window-backed implementation that honours the standard RN signature.
+installAlertShim();
 
 // Strip Android's default black TextInput underline and align selection
 // handles with the brand purple so focus/select never paints black.

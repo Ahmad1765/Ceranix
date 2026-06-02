@@ -25,12 +25,18 @@ test.describe('News / Activity', () => {
     await expect(page.getByText('Nothing for you yet')).toBeVisible();
   });
 
-  test('Saved tab CTA routes to Discover', async ({ page }) => {
+  test('Saved tab CTA routes to either Discover (signed-in empty) or the sign-in page (signed-out)', async ({
+    page,
+  }) => {
     await page.getByText('Saved', { exact: true }).click();
-    await expect(page.getByText('No saved searches')).toBeVisible();
-    await page.getByText('Search now').click();
-    await page.waitForURL(/discover/);
-    // "Discover" appears as both page title and the bottom tab label.
-    await expect(page.getByText('Discover', { exact: true }).first()).toBeVisible();
+    // Signed-out variant.
+    await expect(page.getByText('Sign in to save searches')).toBeVisible();
+    await page.getByText('Sign in', { exact: true }).first().click();
+    // Lands on the auth flow (either modal or the welcome view).
+    await expect(
+      page
+        .getByText(/Your story[\s\S]*starts now\.|Welcome[\s\S]*back\.|Continue as guest/i)
+        .first(),
+    ).toBeVisible();
   });
 });

@@ -6,13 +6,17 @@ import {
   Pressable,
   ScrollView,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import { ListingCard } from '@/components/ListingCard';
 import { fetchListings } from '@/lib/listings';
+import { createSavedSearch, touchSavedSearchSeen } from '@/lib/savedSearches';
+import { useAuth } from '@/lib/auth';
+import { useToast } from '@/lib/toast';
 import { colors, radii } from '@/lib/theme';
 import { useGridDimensions, HIT_SLOP_8 } from '@/lib/responsive';
 import { useFadeIn, useStaggeredEntrance } from '@/lib/motion';
@@ -40,11 +44,30 @@ const HORIZONTAL_PAD = 12;
 const GRID_GAP = 8;
 
 export default function DiscoverScreen() {
-  const [query, setQuery] = useState('');
+  // Query params from /news Saved tab (and external links). When set, the
+  // screen boots with the search pre-applied so the user lands on results.
+  const params = useLocalSearchParams<{ q?: string; category?: string; savedId?: string }>();
+  const initialQuery = typeof params.q === 'string' ? params.q : '';
+  const initialCat = typeof params.category === 'string' ? (params.category as CatTile['id']) : null;
+  const savedId = typeof params.savedId === 'string' ? params.savedId : null;
+
+  const { user } = useAuth();
+  const toast = useToast();
+  const [query, setQuery] = useState(initialQuery);
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeCat, setActiveCat] = useState<CatTile['id'] | null>(null);
+  const [activeCat, setActiveCat] = useState<CatTile['id'] | null>(initialCat);
+  const [savingSearch, setSavingSearch] = useState(false);
+  // We disable the Save CTA once the current query has been saved this
+  // session to avoid spam — the underlying unique index would reject anyway.
+  const [savedKey, setSavedKey] = useState<string | null>(null);
+
+  // When the screen mounts with a savedId param, mark that search seen so
+  // the "N new" badge clears once the user actually opens it.
+  useEffect(() => {
+    if (savedId) touchSavedSearchSeen(savedId).catch(() => {});
+  }, [savedId]);
 
   const fade = useFadeIn(0, 320);
 
@@ -93,6 +116,40 @@ export default function DiscoverScreen() {
     setListings(rows);
     setRefreshing(false);
   }, []);
+
+  // Compose a normalised key for "have we already saved this in this session".
+  // Lower-cased query + category so case differences don't allow dupes.
+  const currentSaveKey = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const cat = activeCat && activeCat !== 'trending' ? activeCat : '';
+    if (!q && !cat) return null;
+    return `${q}|${cat}`;
+  }, [query, activeCat]);
+
+  const handleSaveSearch = useCallback(async () => {
+    if (!user) {
+      toast.show('Sign in to save searches', { variant: 'info', icon: 'log-in' });
+      router.push('/auth/login');
+      return;
+    }
+    if (!currentSaveKey || savingSearch) return;
+    setSavingSearch(true);
+    const row = await createSavedSearch({
+      userId: user.id,
+      query: query.trim() || null,
+      category: activeCat && activeCat !== 'trending' ? (activeCat as Category) : null,
+      gender: null,
+    });
+    setSavingSearch(false);
+    if (!row) {
+      toast.show("Couldn't save the search", { variant: 'default', icon: 'alert-triangle' });
+      return;
+    }
+    setSavedKey(currentSaveKey);
+    toast.show('Search saved', { variant: 'success', icon: 'bookmark' });
+  }, [user, currentSaveKey, savingSearch, query, activeCat, toast]);
+
+  const canSaveSearch = !!currentSaveKey && currentSaveKey !== savedKey;
 
   const filtered = useMemo(() => {
     let rows = listings;
@@ -255,6 +312,52 @@ export default function DiscoverScreen() {
             })}
           </ScrollView>
         </View>
+
+        {/* Save-search CTA — only shown when the current query + category
+            represent a real filter the user could meaningfully come back to. */}
+        {currentSaveKey ? (
+          <View style={{ paddingHorizontal: 16, marginTop: 18 }}>
+            <Pressable
+              onPress={handleSaveSearch}
+              disabled={!canSaveSearch || savingSearch}
+              testID="discover-save-search"
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingHorizontal: 14,
+                paddingVertical: 11,
+                borderRadius: radii.pill,
+                backgroundColor: canSaveSearch ? colors.purpleSoft : colors.panel,
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
+              {savingSearch ? (
+                <ActivityIndicator size="small" color={colors.purple} />
+              ) : (
+                <Feather
+                  name={canSaveSearch ? 'bookmark' : 'check'}
+                  size={14}
+                  color={colors.purple}
+                />
+              )}
+              <Text
+                style={{
+                  marginLeft: 8,
+                  fontSize: 13,
+                  fontWeight: '700',
+                  color: colors.purple,
+                }}
+              >
+                {savingSearch
+                  ? 'Saving…'
+                  : canSaveSearch
+                    ? 'Save this search'
+                    : 'Saved — find it under Activity'}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         {/* Results */}
         <View style={{ marginTop: 22 }}>
