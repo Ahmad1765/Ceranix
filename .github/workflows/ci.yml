@@ -86,24 +86,53 @@ jobs:
     name: npm audit (informational)
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # Non-blocking on purpose. We want visibility on advisories without
-    # failing CI for transient ones we haven't triaged yet.
-    continue-on-error: true
+    # Purely informational — we want visibility on advisories without
+    # failing CI for transient ones we haven't triaged yet. The step always
+    # exits 0; findings (if any) land in the job summary and can be
+    # triaged at leisure. Promote to a gating check by changing the final
+    # `exit 0` to `exit $status` once the noisy advisories are resolved.
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-project
         with:
           install: 'false'
       - name: npm audit
+        shell: bash
         run: |
           set +e
-          npm audit --omit=dev --audit-level=high > audit.txt
+          npm audit --omit=dev --json > audit.json
           status=$?
-          echo "## npm audit (--omit=dev --audit-level=high)" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          cat audit.txt >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          exit $status
+
+          {
+            echo "## npm audit"
+            echo ""
+            if [[ $status -eq 0 ]]; then
+              echo "_No advisories at any severity._"
+            else
+              counts=$(node -e "
+                try {
+                  const a = JSON.parse(require('fs').readFileSync('audit.json','utf8'));
+                  const v = (a && a.metadata && a.metadata.vulnerabilities) || {};
+                  const parts = ['info','low','moderate','high','critical']
+                    .map(k => k + ': ' + (v[k] ?? 0));
+                  console.log(parts.join(' | '));
+                } catch (e) { console.log('audit.json unparseable: ' + e.message); }
+              ")
+              echo "**Severity counts:** $counts"
+              echo ""
+              echo '<details><summary>Raw advisories</summary>'
+              echo ''
+              echo '```json'
+              cat audit.json
+              echo '```'
+              echo ''
+              echo '</details>'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Never fail the job — this check is informational. Findings are
+          # visible in the summary and via Dependabot security alerts.
+          exit 0
 
   required-checks:
     name: Required checks
