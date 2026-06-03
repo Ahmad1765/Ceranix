@@ -197,3 +197,128 @@ export async function fetchNewFromFollowed(
     return { ok: false };
   }
 }
+
+// "Picked for you" — calls the existing find_similar_listings RPC against the
+// user's 5 most-recently-liked listings, merges, de-duplicates, excludes
+// liked + own + sold items. `limit` is the target visible count after
+// dedupe; we ask the RPC for roughly 2× that per seed since duplicates and
+// excluded rows trim the set.
+export async function fetchSimilarToLiked(
+  userId: string,
+  limit = 30,
+): Promise<MyFeedResult<Listing>> {
+  try {
+    // Step A — top 5 most-recent likes (the "seeds" for similarity).
+    const likedRes = await withTimeout(
+      supabase
+        .from('listing_likes')
+        .select('listing_id')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(5),
+      'similar:likes',
+    );
+    if ('__wedge' in likedRes) return { ok: false };
+    const { data: likedRows, error: likedErr } = likedRes as {
+      data: { listing_id: string }[] | null;
+      error: { message: string } | null;
+    };
+    if (likedErr) {
+      console.warn('[myFeed] fetchSimilarToLiked likes', likedErr.message);
+      return { ok: false };
+    }
+    const seedIds = (likedRows ?? []).map((r) => r.listing_id);
+    // No likes → caller falls back to popular. We DON'T fall back here so
+    // the screen can render a different section header ("Popular right now"
+    // vs "Picked for you") based on which branch ran.
+    if (seedIds.length === 0) return { ok: true, rows: [] };
+
+    // Step B — also pull the full liked set so we can exclude them from
+    // the recommendations (you don't want to be told "you might like X" when
+    // X is already in your liked list).
+    const allLikedRes = await withTimeout(
+      supabase
+        .from('listing_likes')
+        .select('listing_id')
+        .eq('user_id', userId)
+        .limit(1000),
+      'similar:exclude',
+    );
+    if ('__wedge' in allLikedRes) return { ok: false };
+    const { data: allLikedRows } = allLikedRes as {
+      data: { listing_id: string }[] | null;
+      error: { message: string } | null;
+    };
+    const likedSet = new Set((allLikedRows ?? []).map((r) => r.listing_id));
+
+    // Step C — call find_similar_listings per seed, in parallel.
+    const perSeed = Math.max(6, Math.ceil((limit * 2) / seedIds.length));
+    const responses = await Promise.all(
+      seedIds.map(async (id) => {
+        const res = await withTimeout(
+          supabase.rpc('find_similar_listings', {
+            p_listing_id: id,
+            p_limit: perSeed,
+          }),
+          `similar:rpc:${id}`,
+        );
+        if ('__wedge' in res) return [];
+        const { data, error } = res as {
+          data: Listing[] | null;
+          error: { message: string } | null;
+        };
+        if (error) {
+          console.warn('[myFeed] fetchSimilarToLiked rpc', error.message);
+          return [];
+        }
+        return (data ?? []) as Listing[];
+      }),
+    );
+
+    // Merge + dedupe by id, exclude liked, exclude own listings, exclude sold.
+    const seen = new Set<string>();
+    const merged: Listing[] = [];
+    for (const batch of responses) {
+      for (const row of batch) {
+        if (seen.has(row.id)) continue;
+        if (likedSet.has(row.id)) continue;
+        if (row.seller_id === userId) continue;
+        if (row.is_sold) continue;
+        seen.add(row.id);
+        merged.push(row);
+        if (merged.length >= limit) break;
+      }
+      if (merged.length >= limit) break;
+    }
+    if (merged.length === 0) return { ok: true, rows: [] };
+
+    // Hydrate sellers in one round-trip (RPC returns bare rows).
+    const sellerIds = Array.from(new Set(merged.map((r) => r.seller_id).filter(Boolean)));
+    const sellersRes = await withTimeout(
+      supabase.from('profiles').select(SELLER_COLS).in('id', sellerIds),
+      'similar:sellers',
+    );
+    if ('__wedge' in sellersRes) return { ok: false };
+    const { data: sellers, error: sellersErr } = sellersRes as {
+      data: Listing['seller'][] | null;
+      error: { message: string } | null;
+    };
+    if (sellersErr) {
+      console.warn('[myFeed] fetchSimilarToLiked sellers', sellersErr.message);
+      return { ok: true, rows: merged };
+    }
+    const byId = new Map<string, Listing['seller']>(
+      ((sellers ?? []) as Listing['seller'][]).map((s) => [s.id, s]),
+    );
+    const rows = merged.map((r) => ({
+      ...r,
+      seller: byId.get(r.seller_id) ?? r.seller,
+    })) as Listing[];
+    putCachedListings(rows);
+    return { ok: true, rows };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn('[myFeed] fetchSimilarToLiked threw', msg);
+    return { ok: false };
+  }
+}
