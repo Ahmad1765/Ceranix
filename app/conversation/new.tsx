@@ -63,11 +63,20 @@ export default function NewConversationScreen() {
       return;
     }
     setLoading(true);
-    fetchListingById(listingId).then((row) => {
-      if (cancelled) return;
-      setListing(row);
-      setLoading(false);
-    });
+    fetchListingById(listingId)
+      .then((row) => {
+        if (cancelled) return;
+        setListing(row);
+      })
+      .catch((err) => {
+        console.error('Failed to fetch listing for new conversation:', err);
+        if (cancelled) return;
+        setListing(null);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setLoading(false);
+      });
     return () => {
       cancelled = true;
     };

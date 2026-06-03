@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   ScrollView,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -275,8 +276,24 @@ export default function UserProfileScreen() {
 
             <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-around', marginLeft: 16 }}>
               <Stat value={formatCount(listings.length)} label="Posts" />
-              <Stat value={formatCount(followersCount)} label="Followers" />
-              <Stat value={formatCount(followingCount)} label="Following" />
+              <Stat
+                value={formatCount(followersCount)}
+                label="Followers"
+                onPress={() =>
+                  router.push(
+                    `/profile/followers?user=${userId}&username=${encodeURIComponent(profile?.username ?? '')}` as any,
+                  )
+                }
+              />
+              <Stat
+                value={formatCount(followingCount)}
+                label="Following"
+                onPress={() =>
+                  router.push(
+                    `/profile/following?user=${userId}&username=${encodeURIComponent(profile?.username ?? '')}` as any,
+                  )
+                }
+              />
             </View>
           </View>
 
@@ -317,7 +334,13 @@ export default function UserProfileScreen() {
                   icon="message-circle"
                   variant="ghost"
                   full
-                  onPress={() => router.push('/conversation/new' as any)}
+                  onPress={() => {
+                    if (listings.length > 0) {
+                      router.push(`/conversation/new?listing=${listings[0].id}`);
+                    } else {
+                      Alert.alert('No listings', 'This user has no active listings to inquire about.');
+                    }
+                  }}
                 />
               </View>
             </View>
@@ -350,14 +373,20 @@ function formatCount(n: number): string {
   return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
 }
 
-function Stat({ value, label }: { value: string; label: string }) {
-  return (
+function Stat({ value, label, onPress }: { value: string; label: string; onPress?: () => void }) {
+  const body = (
     <View style={{ alignItems: 'center' }}>
       <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink, letterSpacing: -0.2 }}>
         {value}
       </Text>
       <Text style={{ fontSize: 12, color: colors.mute, marginTop: 2 }}>{label}</Text>
     </View>
+  );
+  if (!onPress) return body;
+  return (
+    <Pressable onPress={onPress} hitSlop={HIT_SLOP_8} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+      {body}
+    </Pressable>
   );
 }
 

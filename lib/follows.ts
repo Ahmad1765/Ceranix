@@ -116,6 +116,79 @@ export async function fetchSuggestedFollows(
   return ((data ?? []) as any[]).slice(0, limit) as any;
 }
 
+// Edge rows joined to the profile on each side. Two queries because PostgREST
+// embedded selects on the same FK pair are fiddly; the second roundtrip is
+// cheap for the page sizes a follow list realistically renders.
+type FollowListRow = Pick<
+  import('@/types').User,
+  'id' | 'username' | 'full_name' | 'avatar_url' | 'is_verified' | 'followers_count'
+>;
+
+async function fetchProfilesByIds(ids: string[]): Promise<FollowListRow[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, username, full_name, avatar_url, is_verified, followers_count')
+    .in('id', ids);
+  if (error) {
+    console.warn('[follows] fetchProfilesByIds', error.message);
+    return [];
+  }
+  // Preserve the input order (which carries the most-recent-first sort from
+  // user_follows.created_at).
+  const byId = new Map<string, FollowListRow>();
+  for (const row of (data ?? []) as any[]) byId.set(row.id, row as FollowListRow);
+  return ids.map((id) => byId.get(id)).filter(Boolean) as FollowListRow[];
+}
+
+// Profiles that `userId` follows (i.e. their "Following" list).
+export async function fetchFollowing(userId: string): Promise<FollowListRow[]> {
+  const { data, error } = await supabase
+    .from('user_follows')
+    .select('followee_id, created_at')
+    .eq('follower_id', userId)
+    .order('created_at', { ascending: false });
+  if (error) {
+    console.warn('[follows] fetchFollowing', error.message);
+    return [];
+  }
+  return fetchProfilesByIds((data ?? []).map((r: any) => r.followee_id));
+}
+
+// Profiles that follow `userId` (i.e. their "Followers" list).
+export async function fetchFollowers(userId: string): Promise<FollowListRow[]> {
+  const { data, error } = await supabase
+    .from('user_follows')
+    .select('follower_id, created_at')
+    .eq('followee_id', userId)
+    .order('created_at', { ascending: false });
+  if (error) {
+    console.warn('[follows] fetchFollowers', error.message);
+    return [];
+  }
+  return fetchProfilesByIds((data ?? []).map((r: any) => r.follower_id));
+}
+
+// Given a list of target profile ids, return the subset the current viewer
+// already follows. Used to render correct "Follow"/"Following" state on each
+// row of a follow list.
+export async function fetchFollowingMask(
+  viewerId: string | null,
+  targetIds: string[],
+): Promise<Set<string>> {
+  if (!viewerId || targetIds.length === 0) return new Set();
+  const { data, error } = await supabase
+    .from('user_follows')
+    .select('followee_id')
+    .eq('follower_id', viewerId)
+    .in('followee_id', targetIds);
+  if (error) {
+    console.warn('[follows] fetchFollowingMask', error.message);
+    return new Set();
+  }
+  return new Set((data ?? []).map((r: any) => r.followee_id as string));
+}
+
 // Atomic toggle: one server call decides insert-vs-delete based on the row's
 // real state and returns the new counts. The previous insert/delete pair had
 // two failure surfaces (RLS, web fetch wedge), and a transient abort on the

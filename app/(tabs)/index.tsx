@@ -24,7 +24,7 @@ import {
   fetchListingsResult,
   type FeedTab,
 } from '@/lib/listings';
-import { fetchSuggestedFollows, toggleFollow } from '@/lib/follows';
+import { fetchFollowing, fetchSuggestedFollows, toggleFollow } from '@/lib/follows';
 import { getFeedSnapshot, putFeedSnapshot } from '@/lib/listingCache';
 import { onListingCreated } from '@/lib/listingEvents';
 import { getOptimizedImageUrl } from '@/lib/images';
@@ -128,6 +128,12 @@ export default function HomeScreen() {
     Array<Pick<Profile, 'id' | 'username' | 'full_name' | 'avatar_url' | 'followers_count' | 'is_verified'>>
   >([]);
   const [followingState, setFollowingState] = useState<Record<string, boolean>>({});
+  // Profiles the current user follows. Surfaced as a horizontal strip at the
+  // top of the Following tab so the user can see the people themselves, not
+  // just their listings (which can be empty even when follows exist).
+  const [followedProfiles, setFollowedProfiles] = useState<
+    Array<Pick<Profile, 'id' | 'username' | 'full_name' | 'avatar_url' | 'is_verified'>>
+  >([]);
   // Seed from the last-rendered snapshot for this tab so a re-mount (or a
   // tab swap that races a wedged Supabase client) never blanks the screen.
   // null tab maps to an empty snapshot — Following has no snapshot anyway.
@@ -182,6 +188,26 @@ export default function HomeScreen() {
       cancelled = true;
     };
   }, [user?.id]);
+
+  // Followed profiles for the Following-tab strip. Refetched on user change
+  // and whenever the home tab regains focus, so a follow toggled elsewhere
+  // shows up here without a manual reload.
+  const loadFollowed = useCallback(async () => {
+    if (!user?.id) {
+      setFollowedProfiles([]);
+      return;
+    }
+    const rows = await fetchFollowing(user.id);
+    setFollowedProfiles(rows);
+  }, [user?.id]);
+  useEffect(() => {
+    loadFollowed();
+  }, [loadFollowed]);
+  useFocusEffect(
+    useCallback(() => {
+      loadFollowed();
+    }, [loadFollowed]),
+  );
 
   // Infinite scroll: pull the next page when the FlatList reports it's near
   // the bottom. Following gates on listings.length === 0 with no pagination
@@ -477,6 +503,14 @@ export default function HomeScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6C47FF" />
         }
+        ListHeaderComponent={
+          followedProfiles.length > 0 ? (
+            <FollowedProfilesStrip
+              profiles={followedProfiles}
+              onSeeAll={() => router.push('/profile/following' as any)}
+            />
+          ) : null
+        }
         ListEmptyComponent={
           loading ? (
             <View>
@@ -487,9 +521,11 @@ export default function HomeScreen() {
           ) : (
             <View>
               <Text className="text-center text-[15px] text-ink leading-[22px] px-8 pt-6 pb-5">
-                {user
-                  ? "You're not following anyone yet.\nFollow members to see their listings here."
-                  : 'Sign in and follow members to see their listings here.'}
+                {!user
+                  ? 'Sign in and follow members to see their listings here.'
+                  : followedProfiles.length > 0
+                    ? "The people you follow haven't posted anything yet.\nCheck back later or follow more sellers below."
+                    : "You're not following anyone yet.\nFollow members to see their listings here."}
               </Text>
               {suggestions.length === 0 ? (
                 <View style={{ alignItems: 'center', paddingVertical: 24 }}>
@@ -657,5 +693,93 @@ export default function HomeScreen() {
         contentContainerStyle={{ paddingBottom: 24 }}
       />
     </SafeAreaView>
+  );
+}
+
+// Horizontal "people you follow" strip rendered above the Following feed.
+// Tapping an avatar opens that profile; "See all" routes to /profile/following
+// for the full list (with Follow/Unfollow per row).
+function FollowedProfilesStrip({
+  profiles,
+  onSeeAll,
+}: {
+  profiles: Array<Pick<Profile, 'id' | 'username' | 'full_name' | 'avatar_url' | 'is_verified'>>;
+  onSeeAll: () => void;
+}) {
+  return (
+    <View style={{ paddingTop: 8, paddingBottom: 12 }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: 16,
+          marginBottom: 10,
+        }}
+      >
+        <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F0F0F', letterSpacing: -0.1 }}>
+          People you follow
+        </Text>
+        <Pressable onPress={onSeeAll} hitSlop={8}>
+          <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#6C47FF' }}>See all</Text>
+        </Pressable>
+      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 12, gap: 14 }}
+      >
+        {profiles.map((p) => {
+          const display = p.full_name || p.username || 'U';
+          const initial = display.trim().charAt(0).toUpperCase();
+          return (
+            <Pressable
+              key={p.id}
+              onPress={() => router.push(`/user/${p.id}` as any)}
+              style={{ alignItems: 'center', width: 64 }}
+            >
+              <View
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  borderWidth: 2,
+                  borderColor: '#6C47FF',
+                  padding: 2,
+                }}
+              >
+                <View
+                  style={{
+                    flex: 1,
+                    borderRadius: 24,
+                    overflow: 'hidden',
+                    backgroundColor: 'rgba(108,71,255,0.10)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {p.avatar_url ? (
+                    <Image
+                      source={{ uri: getOptimizedImageUrl(p.avatar_url, { width: 120 }) }}
+                      style={{ width: '100%', height: '100%' }}
+                      contentFit="cover"
+                      cachePolicy="memory-disk"
+                    />
+                  ) : (
+                    <Text style={{ fontSize: 18, fontWeight: '900', color: '#6C47FF' }}>{initial}</Text>
+                  )}
+                </View>
+              </View>
+              <Text
+                style={{ fontSize: 11.5, fontWeight: '600', color: '#0F0F0F', marginTop: 6, maxWidth: 64 }}
+                numberOfLines={1}
+              >
+                @{p.username}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    </View>
   );
 }

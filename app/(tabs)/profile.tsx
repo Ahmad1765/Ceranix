@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, Href } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import Animated from 'react-native-reanimated';
 import { ListingCard } from '@/components/ListingCard';
@@ -51,7 +51,7 @@ const GRID_GAP = 8;
 const AVATAR_SIZE = 88;
 
 function ProfileScreenInner() {
-  const { profile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
   const [activeTab, setActiveTab] = useState<ProfileTab>('selling');
   const [selling, setSelling] = useState<Listing[]>([]);
   const [liked, setLiked] = useState<Listing[]>([]);
@@ -105,13 +105,16 @@ function ProfileScreenInner() {
     };
   }, [profile?.id]);
 
-  // Re-fetch silently when tab regains focus (after a new upload, etc.)
+  // Re-fetch silently when tab regains focus (after a new upload, etc.).
+  // refreshProfile() pulls fresh followers_count/following_count so toggling
+  // a follow on /user/[id] is reflected here without a manual reload.
   useFocusEffect(
     useCallback(() => {
       if (!profile?.id) return;
       loadSelling({ silent: true }).catch(() => {});
       loadLiked({ silent: true }).catch(() => {});
-    }, [profile?.id, loadSelling, loadLiked]),
+      refreshProfile().catch(() => {});
+    }, [profile?.id, loadSelling, loadLiked, refreshProfile]),
   );
 
   const onRefresh = useCallback(async () => {
@@ -245,8 +248,16 @@ function ProfileScreenInner() {
               }}
             >
               <Stat value={String(sellingCount)} label="Posts" />
-              <Stat value={String(profile.followers_count ?? 0)} label="Followers" />
-              <Stat value={String(profile.following_count ?? 0)} label="Following" />
+              <Stat
+                value={String(profile.followers_count ?? 0)}
+                label="Followers"
+                onPress={() => router.push('/profile/followers' as Href)}
+              />
+              <Stat
+                value={String(profile.following_count ?? 0)}
+                label="Following"
+                onPress={() => router.push('/profile/following' as Href)}
+              />
             </View>
           </View>
 
@@ -393,8 +404,8 @@ function ProfileScreenInner() {
   );
 }
 
-function Stat({ value, label }: { value: string; label: string }) {
-  return (
+function Stat({ value, label, onPress }: { value: string; label: string; onPress?: () => void }) {
+  const body = (
     <View style={{ alignItems: 'center' }}>
       <Text
         style={{ fontSize: 18, fontWeight: '800', color: colors.ink, letterSpacing: -0.2 }}
@@ -403,6 +414,12 @@ function Stat({ value, label }: { value: string; label: string }) {
       </Text>
       <Text style={{ fontSize: 12, color: colors.mute, marginTop: 2 }}>{label}</Text>
     </View>
+  );
+  if (!onPress) return body;
+  return (
+    <Pressable onPress={onPress} hitSlop={HIT_SLOP_8} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+      {body}
+    </Pressable>
   );
 }
 

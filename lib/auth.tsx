@@ -61,14 +61,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
 
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (!active) return;
-      setSession(data.session ?? null);
-      if (data.session?.user?.id) {
-        await fetchProfileWithRetry(data.session.user.id);
-      }
-      if (active) setLoading(false);
-    });
+    supabase.auth.getSession()
+      .then(async ({ data }) => {
+        if (!active) return;
+        setSession(data.session ?? null);
+        if (data.session?.user?.id) {
+          await fetchProfileWithRetry(data.session.user.id);
+        }
+      })
+      .catch((err) => {
+        console.warn('[auth] getSession failed', err);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
       if (!mounted.current) return;
