@@ -141,3 +141,59 @@ export async function fetchPriceDrops(userId: string): Promise<MyFeedResult<Pric
     return { ok: false };
   }
 }
+
+// Listings posted in the last `sinceDays` days by sellers the user follows.
+// Bounded to 8 rows for the horizontal strip. Two-step query so we can use
+// the existing user_follows table (PostgREST can't join through it inline).
+export async function fetchNewFromFollowed(
+  userId: string,
+  sinceDays = 14,
+): Promise<MyFeedResult<Listing>> {
+  try {
+    const followsRes = await withTimeout(
+      supabase.from('user_follows').select('followee_id').eq('follower_id', userId),
+      'followed:follows',
+    );
+    if ('__wedge' in followsRes) return { ok: false };
+    const { data: followRows, error: followErr } = followsRes as {
+      data: { followee_id: string }[] | null;
+      error: { message: string } | null;
+    };
+    if (followErr) {
+      console.warn('[myFeed] fetchNewFromFollowed follows', followErr.message);
+      return { ok: false };
+    }
+    const followeeIds = (followRows ?? []).map((r) => r.followee_id);
+    if (followeeIds.length === 0) return { ok: true, rows: [] };
+
+    const sinceIso = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000).toISOString();
+    const listingsRes = await withTimeout(
+      supabase
+        .from('listings')
+        .select(`${LISTING_COLS}, seller:profiles!listings_seller_id_fkey!inner(${SELLER_COLS})`)
+        .in('seller_id', followeeIds)
+        .eq('is_sold', false)
+        .eq('seller.vacation_mode', false)
+        .gt('created_at', sinceIso)
+        .order('created_at', { ascending: false })
+        .limit(8),
+      'followed:listings',
+    );
+    if ('__wedge' in listingsRes) return { ok: false };
+    const { data: listings, error: listingsErr } = listingsRes as {
+      data: Listing[] | null;
+      error: { message: string } | null;
+    };
+    if (listingsErr) {
+      console.warn('[myFeed] fetchNewFromFollowed listings', listingsErr.message);
+      return { ok: false };
+    }
+    const rows = (listings ?? []) as Listing[];
+    putCachedListings(rows);
+    return { ok: true, rows };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn('[myFeed] fetchNewFromFollowed threw', msg);
+    return { ok: false };
+  }
+}
