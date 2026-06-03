@@ -1,152 +1,415 @@
-import { View, Text, Pressable, ScrollView, Platform } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  Pressable,
+  ScrollView,
+  RefreshControl,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
+import { router, useFocusEffect } from 'expo-router';
+import { useAuth } from '@/lib/auth';
+import { colors, radii } from '@/lib/theme';
+import {
+  fetchPriceDrops,
+  fetchNewFromFollowed,
+  fetchSimilarToLiked,
+  type PriceDropListing,
+} from '@/lib/myFeed';
+import { fetchListings } from '@/lib/listings';
+import { ListingCard } from '@/components/ListingCard';
+import { PriceDropCard } from '@/components/PriceDropCard';
+import { useGridDimensions } from '@/lib/responsive';
+import type { Listing } from '@/types';
 
-export default function FeedScreen() {
+const HORIZONTAL_PAD = 12;
+const GRID_GAP = 8;
+const STRIP_CARD_WIDTH = 130;
+
+export default function MyFeedScreen() {
+  const { user } = useAuth();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const [priceDrops, setPriceDrops] = useState<PriceDropListing[]>([]);
+  const [followedNew, setFollowedNew] = useState<Listing[]>([]);
+  const [picked, setPicked] = useState<Listing[]>([]);
+  const [pickedIsFallback, setPickedIsFallback] = useState(false);
+
+  const [loadingDrops, setLoadingDrops] = useState(true);
+  const [loadingFollowed, setLoadingFollowed] = useState(true);
+  const [loadingPicked, setLoadingPicked] = useState(true);
+
+  const { columns, cardWidth } = useGridDimensions({
+    min: 2,
+    max: 4,
+    thresholds: [560, 900, 1200],
+    horizontalPadding: HORIZONTAL_PAD,
+    gap: GRID_GAP,
+  });
+
+  const loadAll = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      const silent = opts?.silent === true;
+      if (!silent) {
+        setLoadingDrops(true);
+        setLoadingFollowed(true);
+        setLoadingPicked(true);
+      }
+
+      // Run all three sections in parallel — each section commits its own
+      // state independently so a slow loader doesn't block the others.
+      const dropsP = user?.id
+        ? fetchPriceDrops(user.id).then((r) => {
+            if (r.ok) setPriceDrops(r.rows);
+            setLoadingDrops(false);
+          })
+        : Promise.resolve(setLoadingDrops(false));
+
+      const followedP = user?.id
+        ? fetchNewFromFollowed(user.id).then((r) => {
+            if (r.ok) setFollowedNew(r.rows);
+            setLoadingFollowed(false);
+          })
+        : Promise.resolve(setLoadingFollowed(false));
+
+      const pickedP = user?.id
+        ? fetchSimilarToLiked(user.id).then(async (r) => {
+            if (r.ok && r.rows.length > 0) {
+              setPicked(r.rows);
+              setPickedIsFallback(false);
+            } else {
+              const fallback = await fetchListings({ tab: 'popular', limit: 30 });
+              setPicked(fallback);
+              setPickedIsFallback(true);
+            }
+            setLoadingPicked(false);
+          })
+        : fetchListings({ tab: 'popular', limit: 30 }).then((rows) => {
+            setPicked(rows);
+            setPickedIsFallback(true);
+            setLoadingPicked(false);
+          });
+
+      await Promise.all([dropsP, followedP, pickedP]);
+    },
+    [user?.id],
+  );
+
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadAll({ silent: true });
+    }, [loadAll]),
+  );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadAll({ silent: true });
+    setRefreshing(false);
+  }, [loadAll]);
+
+  const showColdStartBanner = !user;
+  const showFollowCta =
+    !!user && followedNew.length === 0 && priceDrops.length === 0 && pickedIsFallback;
+
   return (
-    <SafeAreaView edges={['top']} className="flex-1 bg-white">
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
-        
-        {/* Header & Hero Section */}
-        <LinearGradient
-          colors={['#6C47FF', '#6C47FF', '#6C47FF']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          className="w-full pt-16 rounded-b-[40px] items-center justify-start relative mb-8"
-          style={{ minHeight: 460, overflow: 'hidden' }}
-        >
-          {/* Subtle noise overlay simulation (optional depending on platform, using simple transparent gradient for now) */}
-          <View className="absolute inset-0 bg-white/10" style={Platform.OS === 'web' ? { mixBlendMode: 'overlay' as any } : undefined} />
-
-          <Text className="text-white text-[14px] mb-2 z-10">
-            Say hi to <Text className="italic font-serif">Nybegagnat</Text>
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />
+        }
+        contentContainerStyle={{ paddingBottom: 80 }}
+      >
+        {/* Title */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 6, paddingBottom: 4 }}>
+          <Text style={{ fontSize: 24, fontWeight: '800', color: colors.ink, letterSpacing: -0.5 }}>
+            My Feed
           </Text>
-
-          <Text className="text-white font-black text-[36px] text-center leading-[40px] tracking-[-0.7px] mb-4 px-4 z-10" style={{letterSpacing: -0.7}}>
-            Cheaper than new,{'\n'}better than used.
+          <Text
+            style={{
+              fontSize: 13,
+              color: colors.muteSoft,
+              marginTop: 2,
+              letterSpacing: -0.1,
+            }}
+          >
+            Curated from what you like
           </Text>
-
-          <Text className="text-white font-medium text-center text-[16px] mb-8 leading-relaxed px-8 z-10" style={{ opacity: 0.85 }}>
-            As new. Perfected by professionals. Warranty included.
-          </Text>
-
-          {/* iPhones */}
-          <View className="flex-row items-end justify-center w-full absolute bottom-[-5] z-0">
-             {/* Lavender iPhone Back */}
-             <View className="bg-white/30 rounded-[24px] border border-white/40 absolute" style={{ width: 85, height: 180, left: '12%', bottom: -10, transform: [{rotate: '-12deg'}], elevation: 2, boxShadow: '0px 10px 15px rgba(0,0,0,0.1)' }} />
-             {/* Pink iPhone Back */}
-             <View className="bg-white/50 rounded-[24px] border border-white/60 absolute" style={{ width: 90, height: 190, left: '26%', bottom: -5, zIndex: 3, transform: [{rotate: '-6deg'}], elevation: 3, boxShadow: '0px 10px 15px rgba(0,0,0,0.1)' }} />
-             {/* Silver/White iPhone Back */}
-             <View className="bg-white/70 rounded-[24px] border border-white/80 absolute" style={{ width: 90, height: 200, right: '23%', bottom: -15, zIndex: 4, transform: [{rotate: '8deg'}], elevation: 4, boxShadow: '0px 10px 15px rgba(0,0,0,0.1)' }} />
-
-             {/* Front-most iPhone showing screen with Dynamic Island */}
-             <View className="bg-white rounded-[26px] border-[6px] border-[#0F0F0F] items-center justify-center absolute overflow-hidden" style={{ width: 110, height: 220, right: '35%', bottom: -20, zIndex: 10, transform: [{rotate: '2deg'}], elevation: 10, boxShadow: '0px 25px 50px rgba(0,0,0,0.25)' }}>
-                {/* Dynamic island */}
-                <View className="w-16 h-4 bg-[#0F0F0F] rounded-full absolute top-1 z-20" />
-
-                {/* Screen content */}
-                <View className="absolute inset-0 z-0" style={{ backgroundColor: 'rgba(108,71,255,0.10)' }} />
-                <Text className="font-extrabold text-[24px] absolute z-10 bottom-14 italic tracking-tighter" style={{ color: '#6C47FF' }}>Carrinex</Text>
-             </View>
-          </View>
-        </LinearGradient>
-
-        {/* Feature / USP Section Grid (2x2) */}
-        <View className="px-5">
-          <View className="flex-row flex-wrap justify-between" style={{ gap: 10 }}>
-             {/* Certified */}
-             <View className="bg-primary-soft py-3 px-3 rounded-[10px] flex-row items-center flex-1 min-w-[45%]" style={{ boxShadow: '0px 2px 3px rgba(108,71,255,0.08)', elevation: 2 }}>
-               <MaterialCommunityIcons name="check-decagram" size={24} color="#6C47FF" className="mr-2" />
-               <Text className="text-primary font-semibold text-[13px] flex-1 leading-tight">Certified by experts</Text>
-             </View>
-             {/* Warranty */}
-             <View className="bg-primary-soft py-3 px-3 rounded-[10px] flex-row items-center flex-1 min-w-[45%]" style={{ boxShadow: '0px 2px 3px rgba(108,71,255,0.08)', elevation: 2 }}>
-               <MaterialCommunityIcons name="shield" size={24} color="#6C47FF" className="mr-2" />
-               <Text className="text-primary font-semibold text-[13px] flex-1 leading-tight">Minimum 1 year warranty</Text>
-             </View>
-             {/* Return policy */}
-             <View className="bg-primary-soft py-3 px-3 rounded-[10px] flex-row items-center flex-1 min-w-[45%]" style={{ boxShadow: '0px 2px 3px rgba(108,71,255,0.08)', elevation: 2 }}>
-               <View className="mr-2 flex-row items-center relative">
-                 <View className="absolute left-[-4] z-10" style={{gap: 2}}>
-                    <View className="w-2.5 h-[1.5px] bg-primary-soft rounded-full absolute top-[1px]" />
-                    <View className="w-3.5 h-[1.5px] bg-primary-soft rounded-full absolute top-[5px]" />
-                    <View className="w-2 h-[1.5px] bg-primary-soft rounded-full absolute top-[9px]" />
-
-                    <View className="w-2 h-[1.5px] bg-[#6C47FF] rounded-full" style={{transform:[{translateX: -1}]}} />
-                    <View className="w-3.5 h-[1.5px] bg-[#6C47FF] rounded-full" style={{transform:[{translateX: -2}]}} />
-                    <View className="w-2 h-[1.5px] bg-[#6C47FF] rounded-full" style={{transform:[{translateX: 0}]}} />
-                 </View>
-                 <MaterialCommunityIcons name="shopping" size={22} color="#6C47FF" />
-               </View>
-               <Text className="text-primary font-semibold text-[13px] flex-1 leading-tight">30 days return policy</Text>
-             </View>
-             {/* Delivery */}
-             <View className="bg-primary-soft py-3 px-3 rounded-[10px] flex-row items-center flex-1 min-w-[45%]" style={{ boxShadow: '0px 2px 3px rgba(108,71,255,0.08)', elevation: 2 }}>
-               <MaterialCommunityIcons name="truck-fast" size={24} color="#6C47FF" className="mr-2" />
-               <Text className="text-primary font-semibold text-[13px] flex-1 leading-tight">Express delivery</Text>
-             </View>
-          </View>
         </View>
 
-        {/* Category Selector (Pills) */}
-        <View className="pt-8 mb-6">
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
-            <Pressable className="bg-primary px-4 py-2 rounded-full">
-              <Text className="font-semibold text-white text-[14px]">iPhones</Text>
-            </Pressable>
-            <Pressable className="bg-ink-panel px-4 py-2 rounded-full border border-ink-hair">
-              <Text className="text-black text-[14px]">Samsung mobiler</Text>
-            </Pressable>
-            <Pressable className="bg-ink-panel px-4 py-2 rounded-full border border-ink-hair">
-              <Text className="text-black text-[14px]">Smartklockor</Text>
-            </Pressable>
-          </ScrollView>
-        </View>
+        {showColdStartBanner ? (
+          <Pressable
+            onPress={() => router.push('/auth/login')}
+            style={{
+              marginHorizontal: 16,
+              marginTop: 14,
+              padding: 14,
+              borderRadius: radii.md,
+              backgroundColor: colors.purpleSoft,
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}
+          >
+            <Feather name="user-plus" size={16} color={colors.purple} style={{ marginRight: 10 }} />
+            <Text style={{ flex: 1, color: colors.purple, fontSize: 13, fontWeight: '600' }}>
+              Sign in and like a few items to see this feed personalize itself.
+            </Text>
+          </Pressable>
+        ) : null}
 
-        {/* Product Grid */}
-        <View className="px-4">
-          <View className="flex-row justify-between" style={{ gap: 16 }}>
-            {/* Card 1: iPhone 11 */}
-            <Pressable className="flex-1 bg-white rounded-[16px] pb-3" style={{ boxShadow: '0px 4px 6px rgba(0,0,0,0.1)', elevation: 3 }}>
-              {/* Image Box */}
-              <View className="bg-ink-panel rounded-[12px] aspect-[4/5] items-center justify-center relative mb-3 overflow-hidden">
-                 <Image source={{ uri: 'https://images.unsplash.com/photo-1591337676887-a4b1fbe40c56?w=400&q=80' }} className="w-[85%] h-[85%]" contentFit="contain" />
-                 
-                 {/* Condition Badge (Bottom-left) */}
-                 <View className="absolute bottom-2 left-2 bg-white/90 px-2 py-1 rounded-[6px]">
-                   <Text className="text-black text-[10px] font-bold">Great condition</Text>
-                 </View>
-              </View>
-              {/* Product Text */}
-              <View className="px-2">
-                <Text className="text-[14px] font-medium text-black mb-1">iPhone 11</Text>
-                <Text className="text-[16px] font-bold text-black">From $1399</Text>
-              </View>
-            </Pressable>
+        {showFollowCta ? (
+          <Pressable
+            onPress={() => router.push('/(tabs)/discover')}
+            style={{
+              marginHorizontal: 16,
+              marginTop: 14,
+              padding: 14,
+              borderRadius: radii.md,
+              backgroundColor: colors.purpleSoft,
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}
+          >
+            <Feather name="compass" size={16} color={colors.purple} style={{ marginRight: 10 }} />
+            <Text style={{ flex: 1, color: colors.purple, fontSize: 13, fontWeight: '600' }}>
+              Follow some sellers or like a few items to start personalizing your feed.
+            </Text>
+          </Pressable>
+        ) : null}
 
-            {/* Card 2: iPhone 11 Pro */}
-            <Pressable className="flex-1 bg-white rounded-[16px] pb-3" style={{ boxShadow: '0px 4px 6px rgba(0,0,0,0.1)', elevation: 3 }}>
-              {/* Image Box */}
-              <View className="bg-ink-panel rounded-[12px] aspect-[4/5] items-center justify-center relative mb-3 overflow-hidden">
-                 <Image source={{ uri: 'https://images.unsplash.com/photo-1603921326210-6edd2d60ca68?w=400&q=80' }} className="w-[85%] h-[85%]" contentFit="contain" />
-                 
-                 {/* Condition Badge (Bottom-left) */}
-                 <View className="absolute bottom-2 left-2 bg-white/90 px-2 py-1 rounded-[6px]">
-                   <Text className="text-black text-[10px] font-bold">Like new</Text>
-                 </View>
-              </View>
-              {/* Product Text */}
-              <View className="px-2">
-                <Text className="text-[14px] font-medium text-black mb-1">iPhone 11 Pro</Text>
-                <Text className="text-[16px] font-bold text-black">From $1890</Text>
-              </View>
-            </Pressable>
-          </View>
-        </View>
-
+        <PriceDropsSection rows={priceDrops} loading={loadingDrops} />
+        <FollowedSection rows={followedNew} loading={loadingFollowed} />
+        <PickedSection
+          rows={picked}
+          loading={loadingPicked}
+          isFallback={pickedIsFallback}
+          columns={columns}
+          cardWidth={cardWidth}
+        />
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function SectionHeader({
+  label,
+  caption,
+  rightAction,
+}: {
+  label: string;
+  caption?: string;
+  rightAction?: { text: string; onPress: () => void };
+}) {
+  return (
+    <View style={{ paddingHorizontal: 16, paddingTop: 22, paddingBottom: 8 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: 3,
+              backgroundColor: colors.purple,
+              marginRight: 8,
+            }}
+          />
+          <Text
+            style={{
+              fontSize: 11,
+              fontWeight: '800',
+              color: colors.ink,
+              letterSpacing: 1.4,
+              textTransform: 'uppercase',
+            }}
+          >
+            {label}
+          </Text>
+        </View>
+        {rightAction ? (
+          <Pressable hitSlop={8} onPress={rightAction.onPress}>
+            <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.purple }}>
+              {rightAction.text}
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
+      {caption ? (
+        <Text style={{ fontSize: 13, color: colors.muteSoft, marginTop: 4 }}>{caption}</Text>
+      ) : null}
+    </View>
+  );
+}
+
+function HorizontalSkeleton({ width = STRIP_CARD_WIDTH }: { width?: number }) {
+  return (
+    <View style={{ flexDirection: 'row', paddingHorizontal: 12, gap: 12 }}>
+      {[0, 1, 2, 3].map((i) => (
+        <View key={i} style={{ width }}>
+          <View
+            style={{
+              width,
+              aspectRatio: 1,
+              borderRadius: 12,
+              backgroundColor: 'rgba(15,15,15,0.06)',
+            }}
+          />
+          <View
+            style={{
+              marginTop: 6,
+              height: 10,
+              width: width * 0.7,
+              backgroundColor: 'rgba(15,15,15,0.06)',
+              borderRadius: 4,
+            }}
+          />
+          <View
+            style={{
+              marginTop: 4,
+              height: 10,
+              width: width * 0.4,
+              backgroundColor: 'rgba(15,15,15,0.06)',
+              borderRadius: 4,
+            }}
+          />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function PriceDropsSection({
+  rows,
+  loading,
+}: {
+  rows: PriceDropListing[];
+  loading: boolean;
+}) {
+  if (loading) {
+    return (
+      <>
+        <SectionHeader label="Price drops" />
+        <HorizontalSkeleton />
+      </>
+    );
+  }
+  if (rows.length === 0) return null;
+  return (
+    <>
+      <SectionHeader
+        label="Price drops"
+        caption={`${rows.length} ${rows.length === 1 ? 'item' : 'items'} you liked got cheaper`}
+      />
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 12, gap: 12 }}
+      >
+        {rows.map((l) => (
+          <PriceDropCard key={l.id} listing={l} />
+        ))}
+      </ScrollView>
+    </>
+  );
+}
+
+function FollowedSection({
+  rows,
+  loading,
+}: {
+  rows: Listing[];
+  loading: boolean;
+}) {
+  if (loading) {
+    return (
+      <>
+        <SectionHeader label="New from sellers you follow" />
+        <HorizontalSkeleton />
+      </>
+    );
+  }
+  if (rows.length === 0) return null;
+  return (
+    <>
+      <SectionHeader
+        label="New from sellers you follow"
+        rightAction={{ text: 'See all', onPress: () => router.push('/' as any) }}
+      />
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 12, gap: 12 }}
+      >
+        {rows.map((l) => (
+          <View key={l.id} style={{ width: STRIP_CARD_WIDTH }}>
+            <ListingCard listing={l} />
+          </View>
+        ))}
+      </ScrollView>
+    </>
+  );
+}
+
+function PickedSection({
+  rows,
+  loading,
+  isFallback,
+  columns,
+  cardWidth,
+}: {
+  rows: Listing[];
+  loading: boolean;
+  isFallback: boolean;
+  columns: number;
+  cardWidth: number;
+}) {
+  if (loading) {
+    return (
+      <>
+        <SectionHeader label="Picked for you" />
+        <View style={{ paddingHorizontal: HORIZONTAL_PAD, flexDirection: 'row', gap: GRID_GAP }}>
+          {Array.from({ length: columns }).map((_, i) => (
+            <View
+              key={i}
+              style={{
+                width: cardWidth,
+                aspectRatio: 1,
+                borderRadius: 12,
+                backgroundColor: 'rgba(15,15,15,0.06)',
+              }}
+            />
+          ))}
+        </View>
+      </>
+    );
+  }
+  if (rows.length === 0) return null;
+  const label = isFallback ? 'Popular right now' : 'Picked for you';
+  const caption = isFallback ? undefined : "Based on what you've liked";
+  const grid: Listing[][] = [];
+  for (let i = 0; i < rows.length; i += columns) grid.push(rows.slice(i, i + columns));
+  return (
+    <>
+      <SectionHeader label={label} caption={caption} />
+      <View style={{ paddingHorizontal: HORIZONTAL_PAD, gap: GRID_GAP }}>
+        {grid.map((row, ri) => (
+          <View key={ri} style={{ flexDirection: 'row', gap: GRID_GAP }}>
+            {row.map((listing) => (
+              <View key={listing.id} style={{ width: cardWidth }}>
+                <ListingCard listing={listing} />
+              </View>
+            ))}
+            {row.length < columns &&
+              Array.from({ length: columns - row.length }).map((_, i) => (
+                <View key={`pad-${i}`} style={{ width: cardWidth }} />
+              ))}
+          </View>
+        ))}
+      </View>
+    </>
   );
 }
