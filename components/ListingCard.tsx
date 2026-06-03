@@ -1,6 +1,14 @@
 import { memo, useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
+import {
+  View,
+  Text,
+  Pressable,
+  ScrollView,
+  type NativeSyntheticEvent,
+  type NativeScrollEvent,
+} from 'react-native';
 import { Image } from 'expo-image';
+import { Feather } from '@expo/vector-icons';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -11,6 +19,9 @@ import Animated, {
 import { router } from 'expo-router';
 import { PressableScale } from '@/components/PressableScale';
 import { getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
+import { useAuth } from '@/lib/auth';
+import { useToast } from '@/lib/toast';
+import { isLiked as fetchIsLiked, toggleLike } from '@/lib/listings';
 import type { Listing } from '@/types';
 
 const AnimatedExpoImage = Animated.createAnimatedComponent(Image);
@@ -20,14 +31,65 @@ interface Props {
 }
 
 export const ListingCard = memo(function ListingCard({ listing }: Props) {
+  const { user } = useAuth();
+  const toast = useToast();
   const [activeIndex, setActiveIndex] = useState(0);
   const [cardWidth, setCardWidth] = useState(0);
   // Sibling carousel images only mount after the user actually engages with
   // the card. This shaves ~2/3 of image requests on multi-image listings in
   // the home grid since most users never swipe individual cards.
   const [carouselArmed, setCarouselArmed] = useState(false);
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(listing.likes ?? 0);
+  const [likeBusy, setLikeBusy] = useState(false);
   const images = listing.images.length > 0 ? listing.images : [''];
   const hasMultiple = images.length > 1;
+
+  // Hydrate the liked state for the current user. Cards are recycled in the
+  // feed grid so we re-run this whenever the listing id or user changes.
+  useEffect(() => {
+    if (!user?.id) {
+      setLiked(false);
+      return;
+    }
+    let cancelled = false;
+    fetchIsLiked(listing.id, user.id).then((v) => {
+      if (!cancelled) setLiked(v);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [listing.id, user?.id]);
+
+  // Keep the visible count in sync when the parent re-fetches and `likes`
+  // changes from the server (e.g. someone else liked the listing).
+  useEffect(() => {
+    setLikeCount(listing.likes ?? 0);
+  }, [listing.likes]);
+
+  const handleToggleLike = useCallback(async () => {
+    if (!user?.id) {
+      toast.show('Sign in to like', { variant: 'info', icon: 'log-in' });
+      router.push('/auth/login');
+      return;
+    }
+    if (likeBusy) return;
+    const prev = liked;
+    const next = !prev;
+    // Optimistic flip — rollback below if the server disagrees.
+    setLiked(next);
+    setLikeCount((c) => Math.max(0, c + (next ? 1 : -1)));
+    setLikeBusy(true);
+    try {
+      const result = await toggleLike(listing.id, user.id, prev);
+      if (result !== next) {
+        setLiked(prev);
+        setLikeCount((c) => Math.max(0, c + (next ? -1 : 1)));
+      }
+    } finally {
+      setLikeBusy(false);
+    }
+  }, [liked, likeBusy, listing.id, toast, user?.id]);
 
   // Subtle staggered entrance: fade + slight rise on mount.
   const enterY = useSharedValue(8);
@@ -149,6 +211,34 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
             ))}
           </View>
         )}
+
+        {/* Like badge — heart + count, top-right. Tap toggles like with
+            optimistic UI. Nested Pressable wins the touch responder so the
+            card's onPress doesn't fire when the badge is tapped. */}
+        <Pressable
+          onPress={handleToggleLike}
+          hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel={liked ? 'Unlike listing' : 'Like listing'}
+          style={({ pressed }) => ({
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            backgroundColor: 'rgba(255,255,255,0.94)',
+            borderRadius: 999,
+            paddingVertical: 4,
+            paddingHorizontal: 9,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+            opacity: pressed ? 0.85 : 1,
+          })}
+        >
+          <Feather name="heart" size={11} color={liked ? '#6C47FF' : '#0F0F0F'} />
+          <Text style={{ fontSize: 11, fontWeight: '700', color: '#0F0F0F' }}>
+            {likeCount}
+          </Text>
+        </Pressable>
 
         {listing.is_sold && (
           <View className="absolute inset-0 bg-black/40 items-center justify-center">
