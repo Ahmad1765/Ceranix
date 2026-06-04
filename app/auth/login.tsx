@@ -716,13 +716,13 @@ function Field({
           borderRadius: 18,
           backgroundColor: colors.white,
           borderWidth: 1,
-          borderColor: colors.hairline,
+          borderColor: focused ? colors.purple : colors.hairline,
         }}
       >
         <Feather
           name={icon}
           size={18}
-          color={focused ? colors.primary : colors.mute}
+          color={focused ? colors.purple : colors.mute}
         />
         <View style={{ flex: 1, marginLeft: 12 }}>{children}</View>
       </View>

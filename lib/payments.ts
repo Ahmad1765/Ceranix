@@ -10,11 +10,22 @@ type SessionResponse = { url: string; sessionId: string };
 const PK = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
 export const STRIPE_ENABLED = PK.startsWith('pk_test_') || PK.startsWith('pk_live_');
 
-export async function createCheckoutSession(listingId: string): Promise<SessionResponse> {
+export async function createCheckoutSession(
+  listingId: string,
+  opts: { offerAmount?: number } = {},
+): Promise<SessionResponse> {
   const returnUrl = buildReturnUrl(listingId);
+  // offer_amount is forwarded to the edge function so an accepted offer can
+  // override the listing price. The server is responsible for verifying the
+  // amount matches a real accepted offer for (buyer, listing) — never trust
+  // the client value alone.
+  const body: Record<string, unknown> = { listing_id: listingId, return_url: returnUrl };
+  if (opts.offerAmount && opts.offerAmount > 0) {
+    body.offer_amount = Math.round(opts.offerAmount);
+  }
   const { data, error } = await supabase.functions.invoke<SessionResponse>(
     'create-checkout-session',
-    { body: { listing_id: listingId, return_url: returnUrl } },
+    { body },
   );
   if (error) throw new Error(error.message);
   if (!data?.url) throw new Error('No checkout URL returned');

@@ -48,13 +48,21 @@ function formatShortDate(d: Date) {
 }
 
 export default function PaymentScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, offer } = useLocalSearchParams<{ id: string; offer?: string }>();
   const { user } = useAuth();
   const toast = useToast();
   const cached = getCachedListing(id ? String(id) : null);
   const [listing, setListing] = useState<Listing | null>(cached);
   const [loading, setLoading] = useState(!cached);
   const [paying, setPaying] = useState(false);
+
+  // When the buyer arrives from an accepted offer, the chat passes ?offer=<amt>
+  // so the displayed total reflects the agreed price. The Stripe edge function
+  // is responsible for validating this against the accepted-offer record.
+  const offerAmount = (() => {
+    const n = Number(offer);
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+  })();
 
   useEffect(() => {
     let active = true;
@@ -134,7 +142,7 @@ export default function PaymentScreen() {
     );
   }
 
-  const total = Number(listing.price ?? 0);
+  const total = offerAmount ?? Number(listing.price ?? 0);
   const fee = 0;
   const sellerName =
     listing.seller?.full_name || listing.seller?.username || 'Seller';
@@ -160,7 +168,9 @@ export default function PaymentScreen() {
     }
 
     try {
-      const { url } = await createCheckoutSession(String(id));
+      const { url } = await createCheckoutSession(String(id), {
+        offerAmount: offerAmount ?? undefined,
+      });
       await openCheckout(url);
       if (Platform.OS !== 'web') {
         let verified = false;

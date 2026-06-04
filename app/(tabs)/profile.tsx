@@ -6,6 +6,7 @@ import {
   ScrollView,
   ActivityIndicator,
   RefreshControl,
+  Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -127,6 +128,17 @@ function ProfileScreenInner() {
       setRefreshing(false);
     }
   }, [loadSelling, loadLiked]);
+
+  const handleShareProfile = useCallback(async () => {
+    if (!profile?.id) return;
+    const handle = profile.username ?? 'this seller';
+    const url = `https://ceranix.vercel.app/user/${profile.id}`;
+    try {
+      await Share.share({ message: `Check out @${handle} on Ceranix\n${url}`, url });
+    } catch {
+      // User dismissed the share sheet — no-op.
+    }
+  }, [profile?.id, profile?.username]);
 
   if (!profile) {
     return (
@@ -293,7 +305,7 @@ function ProfileScreenInner() {
               />
             </View>
             <View style={{ flex: 1 }}>
-              <Button label="Share profile" variant="ghost" full onPress={() => {}} />
+              <Button label="Share profile" variant="ghost" full onPress={handleShareProfile} />
             </View>
             <Pressable
               onPress={() => router.push('/settings')}

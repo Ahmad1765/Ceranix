@@ -65,6 +65,7 @@ export async function createSavedSearch(args: {
   category: Category | null;
   gender: Gender | null;
   label?: string | null;
+  notify?: boolean;
 }): Promise<SavedSearch | null> {
   const normalisedQuery = normaliseQuery(args.query);
   const payload = {
@@ -79,6 +80,9 @@ export async function createSavedSearch(args: {
         category: args.category,
         gender: args.gender && args.gender !== 'all' ? args.gender : null,
       }),
+    // DB default is true; pass through only when caller is explicit so the
+    // chip's "Notify me" toggle round-trips end-to-end.
+    ...(args.notify === undefined ? {} : { notify: args.notify }),
   };
   // Insert; on unique violation we resolve the existing row so the caller
   // can show "already saved" instead of an error.

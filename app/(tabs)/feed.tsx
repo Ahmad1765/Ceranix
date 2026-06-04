@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -11,34 +11,31 @@ import { Feather } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/lib/auth';
 import { colors, radii } from '@/lib/theme';
-import {
-  fetchPriceDrops,
-  fetchNewFromFollowed,
-  fetchSimilarToLiked,
-  type PriceDropListing,
-} from '@/lib/myFeed';
+import { fetchSimilarToLiked } from '@/lib/myFeed';
 import { fetchListings } from '@/lib/listings';
+import { listSavedSearches, type SavedSearch } from '@/lib/savedSearches';
 import { ListingCard } from '@/components/ListingCard';
-import { PriceDropCard } from '@/components/PriceDropCard';
+import { DropAlertSheet } from '@/components/DropAlertSheet';
+import { useToast } from '@/lib/toast';
 import { useGridDimensions } from '@/lib/responsive';
-import type { Listing } from '@/types';
+import type { Category, Listing } from '@/types';
 
 const HORIZONTAL_PAD = 12;
 const GRID_GAP = 8;
-const STRIP_CARD_WIDTH = 130;
+const FOR_YOU: 'for-you' = 'for-you';
 
 export default function MyFeedScreen() {
   const { user } = useAuth();
+  const toast = useToast();
   const [refreshing, setRefreshing] = useState(false);
 
-  const [priceDrops, setPriceDrops] = useState<PriceDropListing[]>([]);
-  const [followedNew, setFollowedNew] = useState<Listing[]>([]);
-  const [picked, setPicked] = useState<Listing[]>([]);
-  const [pickedIsFallback, setPickedIsFallback] = useState(false);
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [isFallback, setIsFallback] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const [loadingDrops, setLoadingDrops] = useState(true);
-  const [loadingFollowed, setLoadingFollowed] = useState(true);
-  const [loadingPicked, setLoadingPicked] = useState(true);
+  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
+  const [activeChip, setActiveChip] = useState<string>(FOR_YOU);
+  const [alertSheetOpen, setAlertSheetOpen] = useState(false);
 
   const { columns, cardWidth } = useGridDimensions({
     min: 2,
@@ -48,73 +45,85 @@ export default function MyFeedScreen() {
     gap: GRID_GAP,
   });
 
-  const loadAll = useCallback(
+  const loadListings = useCallback(
     async (opts?: { silent?: boolean }) => {
       const silent = opts?.silent === true;
-      if (!silent) {
-        setLoadingDrops(true);
-        setLoadingFollowed(true);
-        setLoadingPicked(true);
+      if (!silent) setLoading(true);
+      if (user?.id) {
+        const r = await fetchSimilarToLiked(user.id);
+        if (r.ok && r.rows.length > 0) {
+          setListings(r.rows);
+          setIsFallback(false);
+        } else {
+          const fallback = await fetchListings({ tab: 'popular', limit: 60 });
+          setListings(fallback);
+          setIsFallback(true);
+        }
+      } else {
+        const fallback = await fetchListings({ tab: 'popular', limit: 60 });
+        setListings(fallback);
+        setIsFallback(true);
       }
-
-      // Run all three sections in parallel — each section commits its own
-      // state independently so a slow loader doesn't block the others.
-      const dropsP = user?.id
-        ? fetchPriceDrops(user.id).then((r) => {
-            if (r.ok) setPriceDrops(r.rows);
-            setLoadingDrops(false);
-          })
-        : Promise.resolve(setLoadingDrops(false));
-
-      const followedP = user?.id
-        ? fetchNewFromFollowed(user.id).then((r) => {
-            if (r.ok) setFollowedNew(r.rows);
-            setLoadingFollowed(false);
-          })
-        : Promise.resolve(setLoadingFollowed(false));
-
-      const pickedP = user?.id
-        ? fetchSimilarToLiked(user.id).then(async (r) => {
-            if (r.ok && r.rows.length > 0) {
-              setPicked(r.rows);
-              setPickedIsFallback(false);
-            } else {
-              const fallback = await fetchListings({ tab: 'popular', limit: 30 });
-              setPicked(fallback);
-              setPickedIsFallback(true);
-            }
-            setLoadingPicked(false);
-          })
-        : fetchListings({ tab: 'popular', limit: 30 }).then((rows) => {
-            setPicked(rows);
-            setPickedIsFallback(true);
-            setLoadingPicked(false);
-          });
-
-      await Promise.all([dropsP, followedP, pickedP]);
+      setLoading(false);
     },
     [user?.id],
   );
 
+  const loadSavedSearches = useCallback(async () => {
+    if (!user?.id) {
+      setSavedSearches([]);
+      return;
+    }
+    const rows = await listSavedSearches(user.id);
+    setSavedSearches(rows);
+  }, [user?.id]);
+
   useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+    loadListings();
+    loadSavedSearches();
+  }, [loadListings, loadSavedSearches]);
 
   useFocusEffect(
     useCallback(() => {
-      loadAll({ silent: true });
-    }, [loadAll]),
+      loadListings({ silent: true });
+      loadSavedSearches();
+    }, [loadListings, loadSavedSearches]),
   );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadAll({ silent: true });
+    await Promise.all([loadListings({ silent: true }), loadSavedSearches()]);
     setRefreshing(false);
-  }, [loadAll]);
+  }, [loadListings, loadSavedSearches]);
+
+  const activeSavedSearch = useMemo(
+    () => savedSearches.find((s) => s.id === activeChip) ?? null,
+    [savedSearches, activeChip],
+  );
+
+  // Client-side filter when a saved search chip is selected. Mirrors the
+  // discover screen's filter logic so the chip's params actually narrow the
+  // grid in-place rather than navigating away.
+  const visibleListings = useMemo(() => {
+    if (!activeSavedSearch) return listings;
+    let rows = listings;
+    if (activeSavedSearch.category) {
+      rows = rows.filter((l) => l.category === (activeSavedSearch.category as Category));
+    }
+    const q = activeSavedSearch.query?.trim().toLowerCase() ?? '';
+    if (q.length > 0) {
+      rows = rows.filter(
+        (l) =>
+          l.title.toLowerCase().includes(q) ||
+          (l.brand?.toLowerCase().includes(q) ?? false),
+      );
+    }
+    return rows;
+  }, [listings, activeSavedSearch]);
 
   const showColdStartBanner = !user;
   const showFollowCta =
-    !!user && followedNew.length === 0 && priceDrops.length === 0 && pickedIsFallback;
+    !!user && savedSearches.length === 0 && isFallback;
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
@@ -182,234 +191,190 @@ export default function MyFeedScreen() {
           </Pressable>
         ) : null}
 
-        <PriceDropsSection rows={priceDrops} loading={loadingDrops} />
-        <FollowedSection rows={followedNew} loading={loadingFollowed} />
-        <PickedSection
-          rows={picked}
-          loading={loadingPicked}
-          isFallback={pickedIsFallback}
+        {/* Chip row: For you + saved searches + add */}
+        <ChipRow
+          savedSearches={savedSearches}
+          activeChip={activeChip}
+          onSelectChip={setActiveChip}
+          onAdd={() => {
+            if (!user?.id) {
+              toast.show('Sign in to create drop alerts', { variant: 'info', icon: 'log-in' });
+              router.push('/auth/login');
+              return;
+            }
+            setAlertSheetOpen(true);
+          }}
+        />
+
+        <Grid
+          rows={visibleListings}
+          loading={loading}
           columns={columns}
           cardWidth={cardWidth}
         />
       </ScrollView>
+
+      {user?.id ? (
+        <DropAlertSheet
+          visible={alertSheetOpen}
+          userId={user.id}
+          onClose={() => setAlertSheetOpen(false)}
+          onCreated={loadSavedSearches}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
 
-function SectionHeader({
+function ChipRow({
+  savedSearches,
+  activeChip,
+  onSelectChip,
+  onAdd,
+}: {
+  savedSearches: SavedSearch[];
+  activeChip: string;
+  onSelectChip: (id: string) => void;
+  onAdd: () => void;
+}) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingTop: 14, paddingBottom: 10 }}
+    >
+      <Chip
+        label="For you"
+        active={activeChip === FOR_YOU}
+        onPress={() => onSelectChip(FOR_YOU)}
+      />
+      <AddChip onPress={onAdd} />
+      {savedSearches.map((s) => (
+        <Chip
+          key={s.id}
+          label={s.label ?? 'Saved'}
+          active={activeChip === s.id}
+          onPress={() => onSelectChip(s.id)}
+        />
+      ))}
+    </ScrollView>
+  );
+}
+
+function Chip({
   label,
-  caption,
-  rightAction,
+  active,
+  onPress,
 }: {
   label: string;
-  caption?: string;
-  rightAction?: { text: string; onPress: () => void };
+  active: boolean;
+  onPress: () => void;
 }) {
   return (
-    <View style={{ paddingHorizontal: 16, paddingTop: 22, paddingBottom: 8 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: 3,
-              backgroundColor: colors.purple,
-              marginRight: 8,
-            }}
-          />
-          <Text
-            style={{
-              fontSize: 11,
-              fontWeight: '800',
-              color: colors.ink,
-              letterSpacing: 1.4,
-              textTransform: 'uppercase',
-            }}
-          >
-            {label}
-          </Text>
-        </View>
-        {rightAction ? (
-          <Pressable hitSlop={8} onPress={rightAction.onPress}>
-            <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.purple }}>
-              {rightAction.text}
-            </Text>
-          </Pressable>
-        ) : null}
-      </View>
-      {caption ? (
-        <Text style={{ fontSize: 13, color: colors.muteSoft, marginTop: 4 }}>{caption}</Text>
-      ) : null}
-    </View>
-  );
-}
-
-function HorizontalSkeleton({ width = STRIP_CARD_WIDTH }: { width?: number }) {
-  return (
-    <View style={{ flexDirection: 'row', paddingHorizontal: 12, gap: 12 }}>
-      {[0, 1, 2, 3].map((i) => (
-        <View key={i} style={{ width }}>
-          <View
-            style={{
-              width,
-              aspectRatio: 1,
-              borderRadius: 12,
-              backgroundColor: 'rgba(15,15,15,0.06)',
-            }}
-          />
-          <View
-            style={{
-              marginTop: 6,
-              height: 10,
-              width: width * 0.7,
-              backgroundColor: 'rgba(15,15,15,0.06)',
-              borderRadius: 4,
-            }}
-          />
-          <View
-            style={{
-              marginTop: 4,
-              height: 10,
-              width: width * 0.4,
-              backgroundColor: 'rgba(15,15,15,0.06)',
-              borderRadius: 4,
-            }}
-          />
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function PriceDropsSection({
-  rows,
-  loading,
-}: {
-  rows: PriceDropListing[];
-  loading: boolean;
-}) {
-  if (loading) {
-    return (
-      <>
-        <SectionHeader label="Price drops" />
-        <HorizontalSkeleton />
-      </>
-    );
-  }
-  if (rows.length === 0) return null;
-  return (
-    <>
-      <SectionHeader
-        label="Price drops"
-        caption={`${rows.length} ${rows.length === 1 ? 'item' : 'items'} you liked got cheaper`}
-      />
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 12, gap: 12 }}
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: radii.pill,
+        borderWidth: 1,
+        borderColor: active ? colors.ink : colors.hairline,
+        backgroundColor: active ? colors.panel : colors.white,
+        opacity: pressed ? 0.7 : 1,
+      })}
+    >
+      <Text
+        style={{
+          fontSize: 13,
+          fontWeight: active ? '700' : '600',
+          color: colors.ink,
+          letterSpacing: -0.1,
+        }}
+        numberOfLines={1}
       >
-        {rows.map((l) => (
-          <PriceDropCard key={l.id} listing={l} />
-        ))}
-      </ScrollView>
-    </>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
-function FollowedSection({
-  rows,
-  loading,
-}: {
-  rows: Listing[];
-  loading: boolean;
-}) {
-  if (loading) {
-    return (
-      <>
-        <SectionHeader label="New from sellers you follow" />
-        <HorizontalSkeleton />
-      </>
-    );
-  }
-  if (rows.length === 0) return null;
+function AddChip({ onPress }: { onPress: () => void }) {
   return (
-    <>
-      <SectionHeader
-        label="New from sellers you follow"
-        rightAction={{ text: 'See all', onPress: () => router.push('/' as any) }}
-      />
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 12, gap: 12 }}
-      >
-        {rows.map((l) => (
-          <View key={l.id} style={{ width: STRIP_CARD_WIDTH }}>
-            <ListingCard listing={l} />
-          </View>
-        ))}
-      </ScrollView>
-    </>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel="Add a new feed"
+      style={({ pressed }) => ({
+        width: 36,
+        height: 36,
+        borderRadius: radii.pill,
+        borderWidth: 1,
+        borderColor: colors.hairline,
+        backgroundColor: colors.white,
+        alignItems: 'center',
+        justifyContent: 'center',
+        opacity: pressed ? 0.7 : 1,
+      })}
+    >
+      <Feather name="plus" size={16} color={colors.ink} />
+    </Pressable>
   );
 }
 
-function PickedSection({
+function Grid({
   rows,
   loading,
-  isFallback,
   columns,
   cardWidth,
 }: {
   rows: Listing[];
   loading: boolean;
-  isFallback: boolean;
   columns: number;
   cardWidth: number;
 }) {
   if (loading) {
     return (
-      <>
-        <SectionHeader label="Picked for you" />
-        <View style={{ paddingHorizontal: HORIZONTAL_PAD, flexDirection: 'row', gap: GRID_GAP }}>
-          {Array.from({ length: columns }).map((_, i) => (
-            <View
-              key={i}
-              style={{
-                width: cardWidth,
-                aspectRatio: 1,
-                borderRadius: 12,
-                backgroundColor: 'rgba(15,15,15,0.06)',
-              }}
-            />
-          ))}
-        </View>
-      </>
+      <View style={{ paddingHorizontal: HORIZONTAL_PAD, flexDirection: 'row', gap: GRID_GAP }}>
+        {Array.from({ length: columns }).map((_, i) => (
+          <View
+            key={i}
+            style={{
+              width: cardWidth,
+              aspectRatio: 1,
+              borderRadius: 12,
+              backgroundColor: 'rgba(15,15,15,0.06)',
+            }}
+          />
+        ))}
+      </View>
     );
   }
-  if (rows.length === 0) return null;
-  const label = isFallback ? 'Popular right now' : 'Picked for you';
-  const caption = isFallback ? undefined : "Based on what you've liked";
+  if (rows.length === 0) {
+    return (
+      <View style={{ paddingHorizontal: 16, paddingTop: 40, alignItems: 'center' }}>
+        <Text style={{ fontSize: 13, color: colors.muteSoft }}>
+          Nothing matches this feed yet.
+        </Text>
+      </View>
+    );
+  }
   const grid: Listing[][] = [];
   for (let i = 0; i < rows.length; i += columns) grid.push(rows.slice(i, i + columns));
   return (
-    <>
-      <SectionHeader label={label} caption={caption} />
-      <View style={{ paddingHorizontal: HORIZONTAL_PAD, gap: GRID_GAP }}>
-        {grid.map((row, ri) => (
-          <View key={ri} style={{ flexDirection: 'row', gap: GRID_GAP }}>
-            {row.map((listing) => (
-              <View key={listing.id} style={{ width: cardWidth }}>
-                <ListingCard listing={listing} />
-              </View>
+    <View style={{ paddingHorizontal: HORIZONTAL_PAD, gap: GRID_GAP }}>
+      {grid.map((row, ri) => (
+        <View key={ri} style={{ flexDirection: 'row', gap: GRID_GAP }}>
+          {row.map((listing) => (
+            <View key={listing.id} style={{ width: cardWidth }}>
+              <ListingCard listing={listing} />
+            </View>
+          ))}
+          {row.length < columns &&
+            Array.from({ length: columns - row.length }).map((_, i) => (
+              <View key={`pad-${i}`} style={{ width: cardWidth }} />
             ))}
-            {row.length < columns &&
-              Array.from({ length: columns - row.length }).map((_, i) => (
-                <View key={`pad-${i}`} style={{ width: cardWidth }} />
-              ))}
-          </View>
-        ))}
-      </View>
-    </>
+        </View>
+      ))}
+    </View>
   );
 }

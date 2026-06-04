@@ -34,6 +34,7 @@ import { colors, radii } from '@/lib/theme';
 import { Button, EmptyState } from '@/components/ui';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { withTimeout } from '@/lib/async';
+import { useInputFocus } from '@/lib/useInputFocus';
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -43,12 +44,16 @@ function MessageBubble({
   msg,
   mine,
   isSeller,
+  listingId,
+  listingSold,
   onAccept,
   onDecline,
 }: {
   msg: ChatMessage;
   mine: boolean;
   isSeller: boolean;
+  listingId: string | null;
+  listingSold: boolean;
   onAccept: () => void;
   onDecline: () => void;
 }) {
@@ -56,6 +61,10 @@ function MessageBubble({
     const amount = msg.metadata?.amount ?? 0;
     const status = msg.offer_status ?? 'pending';
     const canRespond = !mine && isSeller && status === 'pending';
+    // Buyer sees a Pay CTA on their own accepted offer until the listing is
+    // marked sold. Seller sees a passive "Awaiting payment" status.
+    const canPay = mine && !isSeller && status === 'accepted' && !!listingId && !listingSold;
+    const awaitingPayment = !mine && isSeller && status === 'accepted' && !listingSold;
 
     return (
       <View style={{ paddingHorizontal: 14, marginBottom: 12, alignItems: mine ? 'flex-end' : 'flex-start' }}>
@@ -186,6 +195,70 @@ function MessageBubble({
                 <Feather name="check" size={14} color="white" />
                 <Text style={{ fontSize: 13, fontWeight: '800', color: 'white' }}>Accept</Text>
               </Pressable>
+            </View>
+          )}
+
+          {canPay && (
+            <Pressable
+              onPress={() =>
+                router.push(`/payment/${listingId}?offer=${amount}` as any)
+              }
+              style={({ pressed }) => ({
+                marginTop: 12,
+                height: 40,
+                borderRadius: 999,
+                backgroundColor: colors.purple,
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'row',
+                gap: 6,
+                opacity: pressed ? 0.85 : 1,
+              })}
+            >
+              <Feather name="credit-card" size={14} color="white" />
+              <Text style={{ fontSize: 13.5, fontWeight: '800', color: 'white' }}>
+                Pay ${amount}
+              </Text>
+            </Pressable>
+          )}
+
+          {awaitingPayment && (
+            <View
+              style={{
+                marginTop: 10,
+                paddingHorizontal: 10,
+                paddingVertical: 6,
+                borderRadius: 8,
+                backgroundColor: 'rgba(15,15,15,0.05)',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <Feather name="clock" size={11} color={colors.muteSoft} />
+              <Text style={{ fontSize: 11.5, fontWeight: '600', color: colors.muteSoft }}>
+                Awaiting buyer payment
+              </Text>
+            </View>
+          )}
+
+          {status === 'accepted' && listingSold && (
+            <View
+              style={{
+                marginTop: 10,
+                paddingHorizontal: 10,
+                paddingVertical: 6,
+                borderRadius: 8,
+                backgroundColor: 'rgba(108,71,255,0.12)',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <Feather name="check-circle" size={11} color={colors.purple} />
+              <Text style={{ fontSize: 11.5, fontWeight: '700', color: colors.purple }}>
+                Paid · sold
+              </Text>
             </View>
           )}
 
@@ -427,6 +500,7 @@ export default function ConversationScreen() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [offerVisible, setOfferVisible] = useState(false);
+  const composerFocus = useInputFocus();
 
   useEffect(() => {
     if (!conversationId) return;
@@ -558,11 +632,13 @@ export default function ConversationScreen() {
         msg={item}
         mine={!!user && item.sender_id === user.id}
         isSeller={isSeller}
+        listingId={conv?.listing_id ?? null}
+        listingSold={conv?.listing?.is_sold ?? false}
         onAccept={() => handleOfferResponse(item, 'accepted')}
         onDecline={() => handleOfferResponse(item, 'declined')}
       />
     ),
-    [user, isSeller, handleOfferResponse],
+    [user, isSeller, conv?.listing_id, conv?.listing?.is_sold, handleOfferResponse],
   );
 
   if (loading) {
@@ -776,6 +852,7 @@ export default function ConversationScreen() {
               paddingHorizontal: 14,
               paddingVertical: 8,
               justifyContent: 'center',
+              ...composerFocus.borderProps('transparent'),
             }}
           >
             <TextInput
@@ -783,6 +860,8 @@ export default function ConversationScreen() {
               placeholderTextColor={colors.muteSoft}
               value={input}
               onChangeText={setInput}
+              onFocus={composerFocus.onFocus}
+              onBlur={composerFocus.onBlur}
               multiline
               style={{ fontSize: 15, color: colors.ink, padding: 0, maxHeight: 100 }}
             />
