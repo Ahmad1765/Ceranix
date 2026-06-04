@@ -77,10 +77,6 @@ export default function NewsScreen() {
     }, [activeTab, refreshSearches]),
   );
 
-  useEffect(() => {
-    if (activeTab === 'searches') refreshSearches();
-  }, [activeTab, refreshSearches]);
-
   const applySearch = useCallback((s: SavedSearch) => {
     const params = new URLSearchParams();
     if (s.query) params.set('q', s.query);

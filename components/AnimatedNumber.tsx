@@ -37,7 +37,7 @@ export function AnimatedNumber({ value, style, height = 18 }: Props) {
       -height,
       { duration: 360, easing: Easing.out(Easing.cubic) },
       (finished) => {
-        if (finished) {
+        if (finished && lastValue.current === value) {
           // Snap: current becomes next, reset translateY without animation.
           // Drive the React state update from the animation callback so
           // they are synchronised — avoids the flash a setTimeout would cause.

@@ -363,12 +363,6 @@ export default function SettingsScreen() {
         phone: form.phone.trim() || null,
         is_default: true,
       };
-      // Clear existing defaults first.
-      await supabase
-        .from('shipping_addresses')
-        .update({ is_default: false })
-        .eq('user_id', user.id);
-
       const { data, error } = address?.id
         ? await supabase
             .from('shipping_addresses')
@@ -379,6 +373,25 @@ export default function SettingsScreen() {
         : await supabase.from('shipping_addresses').insert(payload).select('*').single();
       if (error) {
         toast.show(error.message ?? 'Could not save address', {
+          variant: 'default',
+          icon: 'alert-triangle',
+        });
+        return false;
+      }
+
+      const { error: updateErr } = await supabase
+        .from('shipping_addresses')
+        .update({ is_default: false })
+        .eq('user_id', user.id)
+        .neq('id', data.id);
+      
+      if (updateErr) {
+        if (!address?.id) {
+           await supabase.from('shipping_addresses').delete().eq('id', data.id);
+        } else {
+           await supabase.from('shipping_addresses').update({ is_default: false }).eq('id', data.id);
+        }
+        toast.show('Could not save default status', {
           variant: 'default',
           icon: 'alert-triangle',
         });
@@ -415,20 +428,10 @@ export default function SettingsScreen() {
         account_last4: form.account_last4.trim(),
         is_default: true,
       };
-      // Clear existing defaults first.
-      await supabase
-        .from('payout_methods')
-        .update({ is_default: false })
-        .eq('user_id', user.id);
+      const { data, error } = await supabase.rpc('set_default_payout', {
+        p_payload: payout?.id ? { ...payload, id: payout.id } : payload,
+      });
 
-      const { data, error } = payout?.id
-        ? await supabase
-            .from('payout_methods')
-            .update(payload)
-            .eq('id', payout.id)
-            .select('*')
-            .single()
-        : await supabase.from('payout_methods').insert(payload).select('*').single();
       if (error) {
         toast.show(error.message ?? 'Could not save payout', {
           variant: 'default',

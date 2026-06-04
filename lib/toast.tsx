@@ -152,8 +152,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               paddingRight: 6,
               paddingVertical: 6,
               ...Platform.select({
-                ios: { boxShadow: '0px 8px 16px rgba(0,0,0,0.25)' },
-                android: { boxShadow: '0px 8px 16px rgba(0,0,0,0.25)', elevation: 6 },
+                ios: {
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 8 },
+                  shadowOpacity: 0.25,
+                  shadowRadius: 16,
+                },
+                android: { elevation: 6 },
                 default: { boxShadow: '0px 8px 16px rgba(0,0,0,0.25)' },
               }),
             }}

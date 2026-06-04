@@ -163,7 +163,7 @@ export function LiveActivityTicker() {
 
   if (items.length === 0) return null;
 
-  const current = items[index];
+  const current = items[index] ?? items[0];
   const label = current.brand || current.title;
 
   const dotStyle = {

@@ -6,11 +6,11 @@ import { colors } from '@/lib/theme';
 type Props = {
   uri?: string | null;
   size?: number;
-  ring?: 'gradient' | 'none' | 'pink';
+  ring?: 'purple' | 'none' | 'pink';
   initial?: string;
 };
 
-export function StoryAvatar({ uri, size = 56, ring = 'gradient', initial }: Props) {
+export function StoryAvatar({ uri, size = 56, ring = 'purple', initial }: Props) {
   const innerSize = ring === 'none' ? size : size - 6;
   const inner = (
     <View

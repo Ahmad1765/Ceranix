@@ -23,7 +23,7 @@ export function CategoryRow() {
       {CATEGORIES.map((cat) => (
         <Pressable
           key={cat.value}
-          onPress={() => router.push({ pathname: '/(tabs)/discover', params: { category: cat.value } } as any)}
+          onPress={() => router.push({ pathname: '/(tabs)/discover', params: { category: cat.value } })}
           style={({ pressed }) => ({
             alignItems: 'center',
             opacity: pressed ? 0.7 : 1,

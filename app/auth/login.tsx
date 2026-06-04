@@ -95,7 +95,12 @@ export default function LoginScreen() {
     }).start();
   }, [mode, switchAnim]);
 
-  const panelHeight = step === 'welcome' ? Math.min(height * 0.5, 460) : Math.min(height * 0.28, 240);
+  const welcomeHeight = Math.min(height * 0.5, 460);
+  const formHeight = Math.min(height * 0.28, 240);
+  const panelHeight = stepAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [welcomeHeight, formHeight],
+  });
 
   const validate = (): string | null => {
     if (!email) return 'Email is required';

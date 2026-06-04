@@ -803,12 +803,16 @@ export default function ProductScreen() {
       setLiked(false);
       return;
     }
-    isLiked(productIdParam, user.id).then((v) => {
-      if (active) {
-        setLiked(v);
-        setLikeConfirmedFromServer(v);
-      }
-    });
+    isLiked(productIdParam, user.id)
+      .then((v) => {
+        if (active) {
+          setLiked(v);
+          setLikeConfirmedFromServer(v);
+        }
+      })
+      .catch((e) => {
+        console.warn('[product] isLiked failed', e);
+      });
     return () => {
       active = false;
     };
@@ -1121,9 +1125,11 @@ export default function ProductScreen() {
   }
 
   const baseLikes = listing.likes ?? 0;
-  const heartCount = likeConfirmedFromServer
-    ? Math.max(0, baseLikes)
-    : Math.max(0, baseLikes + (liked ? 1 : 0));
+  const userLikedOnServer = listing.user_has_liked ?? false;
+  const heartDelta = likeConfirmedFromServer 
+    ? 0 
+    : (liked && !userLikedOnServer ? 1 : (!liked && userLikedOnServer ? -1 : 0));
+  const heartCount = Math.max(0, baseLikes + heartDelta);
   const isOwnListing = !!user?.id && listing.seller_id === user.id;
 
   return (

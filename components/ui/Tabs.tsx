@@ -32,6 +32,9 @@ export function Tabs<T extends string>({ tabs, value, onChange, variant = 'pill'
             <Pressable
               key={t.value}
               onPress={() => onChange(t.value)}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={`${t.label}${typeof t.count === 'number' && t.count > 0 ? ', ' + t.count + ' items' : ''}`}
               style={{
                 flex: 1,
                 alignItems: 'center',
@@ -99,6 +102,9 @@ export function Tabs<T extends string>({ tabs, value, onChange, variant = 'pill'
           <Pressable
             key={t.value}
             onPress={() => onChange(t.value)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: active }}
+            accessibilityLabel={`${t.label}${typeof t.count === 'number' && t.count > 0 ? ', ' + t.count + ' items' : ''}`}
             style={({ pressed }) => ({
               paddingHorizontal: 14,
               paddingVertical: 9,

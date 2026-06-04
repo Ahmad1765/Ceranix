@@ -12,20 +12,28 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+const envOrigins = Deno.env.get('ALLOWED_ORIGINS');
+const ALLOWED_ORIGINS = envOrigins ? envOrigins.split(',').map((o) => o.trim()).filter(Boolean) : [];
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get('Origin');
+  const safeOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0] || '*';
+  return {
+    'Access-Control-Allow-Origin': safeOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  };
 }
 
 Deno.serve(async (req: Request) => {
+  const corsHeaders = getCorsHeaders(req);
+  function json(body: unknown, status = 200): Response {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -68,15 +76,14 @@ Deno.serve(async (req: Request) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    // Log the deletion request (best-effort)
-    try {
-      await admin.from('account_deletion_requests').insert({
-        user_id: user.id,
-        email: user.email ?? null,
-        reason,
-      });
-    } catch (insertErr) {
+    // Log the deletion request (required success)
+    const { error: insertErr } = await admin.from('account_deletion_requests').insert({
+      user_uuid: user.id, // Write to a non-FK column to avoid cascade delete issues
+      reason,
+    });
+    if (insertErr) {
       console.warn('[delete-account] Failed to log deletion request:', insertErr);
+      return json({ error: 'Failed to process deletion request audit log' }, 500);
     }
 
     // Perform deletion

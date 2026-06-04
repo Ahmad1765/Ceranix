@@ -92,6 +92,7 @@ export interface Listing {
   // Seller-defined free-form tags. Stored as text[] in Postgres with a GIN
   // index so discover can do `tags && '{x,y}'` lookups cheaply.
   tags?: string[];
+  user_has_liked?: boolean;
   created_at: string;
 }
 

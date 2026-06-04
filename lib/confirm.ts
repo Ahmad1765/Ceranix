@@ -14,7 +14,7 @@ type Opts = {
 export function confirm(opts: Opts): Promise<boolean> {
   if (Platform.OS === 'web') {
     if (typeof window === 'undefined' || typeof window.confirm !== 'function') {
-      return Promise.reject(new Error('[confirm] Confirmation dialog unavailable in this environment.'));
+      return Promise.resolve(false);
     }
     const body = opts.message ? `${opts.title}\n\n${opts.message}` : opts.title;
     return Promise.resolve(window.confirm(body));

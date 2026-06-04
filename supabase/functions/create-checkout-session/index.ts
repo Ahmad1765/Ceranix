@@ -18,12 +18,18 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
-const ALLOWED_ORIGINS = ['https://yourdomain.com', 'https://staging.yourdomain.com'];
+const envOrigins = Deno.env.get('ALLOWED_ORIGINS');
+if (!envOrigins) {
+  throw new Error('Missing ALLOWED_ORIGINS environment variable. Set it via supabase secrets set ALLOWED_ORIGINS=...');
+}
+const ALLOWED_ORIGINS = envOrigins.split(',').map((o) => o.trim()).filter(Boolean);
 
-function corsHeaders(origin: string | null) {
-  const safeOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+function corsHeaders(origin: string | null): Record<string, string> {
+  if (!origin || !ALLOWED_ORIGINS.includes(origin)) {
+    return {};
+  }
   return {
-    'Access-Control-Allow-Origin': safeOrigin,
+    'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
   };
@@ -78,9 +84,17 @@ Deno.serve(async (req: Request) => {
       return json({ error: 'Invalid listing price' }, 400, origin);
     }
 
-    const successUrlObj = new URL(returnUrl);
+    let successUrlObj: URL;
+    let cancelUrlObj: URL;
+    try {
+      successUrlObj = new URL(returnUrl);
+      if (!successUrlObj.protocol.startsWith('http')) throw new Error('Invalid protocol');
+      cancelUrlObj = new URL(returnUrl);
+    } catch {
+      return json({ error: 'Invalid return_url' }, 400, origin);
+    }
+
     successUrlObj.searchParams.set('paid', '1');
-    const cancelUrlObj = new URL(returnUrl);
     cancelUrlObj.searchParams.set('paid', '0');
 
     // Build Stripe Checkout Session via the REST API (no SDK needed in Deno).

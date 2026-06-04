@@ -24,8 +24,9 @@ export async function createCheckoutSession(
     listing_id: listingId,
     return_url: returnUrl,
   };
+  // offerAmount is expected to be in dollars. If cents are passed, format to 2 decimals.
   if (opts.offerAmount && opts.offerAmount > 0) {
-    body.offer_amount = Math.round(opts.offerAmount);
+    body.offer_amount = Number(opts.offerAmount.toFixed(2));
   }
   const { data, error } = await supabase.functions.invoke<SessionResponse>(
     "create-checkout-session",

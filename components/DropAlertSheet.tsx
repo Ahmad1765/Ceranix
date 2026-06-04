@@ -78,6 +78,9 @@ export function DropAlertSheet({ visible, userId, onClose, onCreated }: Props) {
       reset();
       onCreated();
       onClose();
+    } catch (e: any) {
+      console.error('[drop-alert]', e);
+      toast.show("Couldn't create the alert", { variant: 'default', icon: 'alert-triangle' });
     } finally {
       setSaving(false);
     }

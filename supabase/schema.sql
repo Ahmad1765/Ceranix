@@ -11,7 +11,14 @@ create table public.profiles (
   location text,
   rating numeric(3,2) default 0,
   total_sales integer default 0,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  vacation_mode boolean default false,
+  bundle_discount_pct integer check (bundle_discount_pct >= 0 and bundle_discount_pct <= 100),
+  is_verified boolean default false,
+  is_pro boolean default false,
+  expo_push_token text,
+  followers_count integer default 0,
+  following_count integer default 0
 );
 
 alter table public.profiles enable row level security;
@@ -129,6 +136,20 @@ alter table public.listing_likes enable row level security;
 
 create policy "Users can manage own likes" on public.listing_likes
   for all using (auth.uid() = user_id);
+
+-- Account Deletion Requests
+create table public.account_deletion_requests (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid not null,
+  email text,
+  reason text,
+  deleted_at timestamptz default now()
+);
+
+alter table public.account_deletion_requests enable row level security;
+
+create policy "Allow select for admins" on public.account_deletion_requests
+  for select using (auth.role() = 'service_role');
 
 -- Storage buckets
 -- Run in Supabase dashboard > Storage

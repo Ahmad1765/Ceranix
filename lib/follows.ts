@@ -71,7 +71,8 @@ export async function fetchFollowState(
     console.warn('[follows] fetchFollowState', error.message);
     return null;
   }
-  const state = fromRpc(data as RpcShape | null);
+  const raw = Array.isArray(data) ? data[0] : data;
+  const state = fromRpc(raw as RpcShape | null);
   putCachedFollowState(followerId, followeeId, state);
   return state;
 }
@@ -106,7 +107,7 @@ export async function fetchSuggestedFollows(
     .order('followers_count', { ascending: false, nullsFirst: false })
     .limit(limit + excluded.length);
   if (excluded.length > 0) {
-    query = query.not('id', 'in', `(${excluded.map((id) => `"${id}"`).join(',')})`);
+    query = query.not('id', 'in', excluded);
   }
   const { data, error } = await query;
   if (error) {
@@ -207,7 +208,8 @@ export async function toggleFollow(
     console.warn('[follows] toggleFollow', error.code, error.message);
     throw new Error(error.message);
   }
-  const state = fromRpc(data as RpcShape | null);
+  const raw = Array.isArray(data) ? data[0] : data;
+  const state = fromRpc(raw as RpcShape | null);
   putCachedFollowState(followerId, followeeId, state);
   return state;
 }

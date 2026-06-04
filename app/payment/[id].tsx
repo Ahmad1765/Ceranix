@@ -59,7 +59,7 @@ export default function PaymentScreen() {
   const [listing, setListing] = useState<Listing | null>(cached);
   const [loading, setLoading] = useState(!cached);
   const [paying, setPaying] = useState(false);
-  const demoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const demoTimerRef = useRef<any>(null);
   const mounted = useRef(true);
 
   useEffect(() => {

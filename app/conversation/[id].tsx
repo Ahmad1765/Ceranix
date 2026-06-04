@@ -351,8 +351,11 @@ function OfferSheet({
   const handleSubmit = async () => {
     if (!valid) return;
     setSending(true);
-    await onSubmit(parsed, note);
-    setSending(false);
+    try {
+      await onSubmit(parsed, note);
+    } finally {
+      setSending(false);
+    }
   };
 
   return (

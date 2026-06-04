@@ -51,7 +51,13 @@ function timeoutFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Res
     if (externalSignal.aborted) controller.abort();
     else externalSignal.addEventListener('abort', () => controller.abort(), { once: true });
   }
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as any).url || '';
+  const isStorageUpload = urlStr.includes('/storage/v1/object');
+
+  const timeoutMs = isStorageUpload ? 600000 : REQUEST_TIMEOUT_MS; // 10 minutes for storage uploads
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
   return fetch(input as any, { ...init, signal: controller.signal }).finally(() =>
     clearTimeout(timer),
   );

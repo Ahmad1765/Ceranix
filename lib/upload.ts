@@ -18,8 +18,9 @@ async function downscaleAvatarOnWeb(image: LocalImage): Promise<LocalImage> {
   if (Platform.OS !== 'web') return image;
   if (typeof window === 'undefined' || typeof document === 'undefined') return image;
   try {
+    const ct = image.uri ? inferContentType(image.uri) : 'image/jpeg';
     const src = image.base64
-      ? `data:image/jpeg;base64,${image.base64}`
+      ? `data:${ct};base64,${image.base64}`
       : image.uri;
     const bitmap = await new Promise<HTMLImageElement>((resolve, reject) => {
       const img = new window.Image();
@@ -94,7 +95,9 @@ async function uploadOne(
 ): Promise<string> {
   const ab = await imageToArrayBuffer(image);
   const ext = inferExt(image.uri);
-  const path = `${pathPrefix}/${Date.now()}-${index}.${ext}`;
+  const uniqueId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36);
+  const safePrefix = pathPrefix.replace(/\.\./g, '').replace(/^\/+|\/+$/g, '').replace(/\/+/g, '/');
+  const path = `${safePrefix ? safePrefix + '/' : ''}${uniqueId}.${ext}`;
   const { error } = await supabase.storage
     .from(bucket)
     .upload(path, ab, {

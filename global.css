@@ -2,10 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Web only: kill every focus outline browsers draw around TextInputs and
-   any focusable Pressable. No replacement ring — zero borders, ever.
-   :focus-visible rule removed because clicking text inputs trips it in
-   Chromium and drew a purple rectangle the user didn't want. */
+/* Web only: kill focus outline on mouse click (:focus), but preserve
+   keyboard accessibility by rendering a clear ring on :focus-visible. */
 @layer base {
   input,
   textarea,
@@ -16,20 +14,25 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  input:focus,
-  textarea:focus,
-  select:focus,
-  button:focus,
-  [role="button"]:focus,
-  [tabindex]:focus,
+  /* Only suppress focus rings on mouse/touch clicks. Let keyboard nav use the native or custom focus-visible style. */
+  input:focus:not(:focus-visible),
+  textarea:focus:not(:focus-visible),
+  select:focus:not(:focus-visible),
+  button:focus:not(:focus-visible),
+  [role="button"]:focus:not(:focus-visible),
+  [tabindex]:focus:not(:focus-visible) {
+    outline: none;
+    box-shadow: none;
+  }
+
   input:focus-visible,
   textarea:focus-visible,
   select:focus-visible,
   button:focus-visible,
   [role="button"]:focus-visible,
   [tabindex]:focus-visible {
-    outline: none !important;
-    box-shadow: none !important;
+    outline: 2px solid #6C47FF;
+    outline-offset: 2px;
   }
 
   *::selection {
