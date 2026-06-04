@@ -64,8 +64,16 @@ function tap(style: 'light' | 'medium' | 'selection' = 'selection') {
 }
 
 const iosShadow = IS_IOS
-  ? { boxShadow: '0px 4px 10px rgba(0,0,0,0.18)' }
-  : { boxShadow: '0px 4px 10px rgba(0,0,0,0.18)', elevation: 3 };
+  ? {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.18,
+      shadowRadius: 10,
+    }
+  : {
+      shadowColor: '#000',
+      elevation: 3,
+    };
 
 const { width } = Dimensions.get('window');
 const IMAGE_HEIGHT = width * 1.45;
@@ -443,11 +451,15 @@ function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress: () => 
           </ScrollView>
         ) : (
           <Image
-            source={{ uri: getOptimizedImageUrl(item.images[0], { width: srcWidth }) }}
+            source={{
+              uri: item.images && item.images.length > 0
+                ? getOptimizedImageUrl(item.images[0], { width: srcWidth })
+                : 'https://placehold.co/400x400/eeeeee/cccccc.png?text=No+Image',
+            }}
             style={{ width: CARD_WIDTH, height: CARD_IMAGE_HEIGHT }}
             contentFit="cover"
             cachePolicy="memory-disk"
-            recyclingKey={item.images[0]}
+            recyclingKey={item.images && item.images.length > 0 ? item.images[0] : 'empty-placeholder'}
             transition={180}
           />
         )}
@@ -700,6 +712,7 @@ export default function ProductScreen() {
     },
   });
   const [liked, setLiked] = useState(false);
+  const [likeConfirmedFromServer, setLikeConfirmedFromServer] = useState(false);
   const [likeBusy, setLikeBusy] = useState(false);
   // Prime from cache so re-opens are instant — bypasses any wedged supabase
   // client on web while we refetch in the background.
@@ -791,7 +804,10 @@ export default function ProductScreen() {
       return;
     }
     isLiked(productIdParam, user.id).then((v) => {
-      if (active) setLiked(v);
+      if (active) {
+        setLiked(v);
+        setLikeConfirmedFromServer(v);
+      }
     });
     return () => {
       active = false;
@@ -881,15 +897,17 @@ export default function ProductScreen() {
     }
     if (!productIdParam || likeBusy) return;
     setLikeBusy(true);
+    const originalLiked = liked;
     // Optimistic flip — animation runs immediately, even before the round-trip.
-    setLiked((prev) => !prev);
+    setLiked(!originalLiked);
+    setLikeConfirmedFromServer(false);
     try {
-      const next = await toggleLike(productIdParam, user.id, liked);
+      const next = await toggleLike(productIdParam, user.id, originalLiked);
       setLiked(next);
       if (next) toast.show('Added to your favorites', { variant: 'success', icon: 'heart' });
     } catch {
       // Revert optimistic flip.
-      setLiked((prev) => !prev);
+      setLiked(originalLiked);
       toast.show('Could not update like', { variant: 'default', icon: 'alert-triangle' });
     } finally {
       setLikeBusy(false);
@@ -905,21 +923,31 @@ export default function ProductScreen() {
     const next = !listing.is_sold;
     setOwnerBusy('sold');
     setListing((prev) => (prev ? { ...prev, is_sold: next } : prev));
-    const committed = await setListingSold(listing.id, next);
-    if (committed !== next) {
+    try {
+      const committed = await setListingSold(listing.id, next);
+      if (committed !== next) {
+        // Rollback.
+        setListing((prev) => (prev ? { ...prev, is_sold: !next } : prev));
+        toast.show("Couldn't update the listing", {
+          variant: 'default',
+          icon: 'alert-triangle',
+        });
+      } else {
+        toast.show(next ? 'Marked as sold' : 'Marked as available', {
+          variant: 'success',
+          icon: 'check',
+        });
+      }
+    } catch {
       // Rollback.
       setListing((prev) => (prev ? { ...prev, is_sold: !next } : prev));
       toast.show("Couldn't update the listing", {
         variant: 'default',
         icon: 'alert-triangle',
       });
-    } else {
-      toast.show(next ? 'Marked as sold' : 'Marked as available', {
-        variant: 'success',
-        icon: 'check',
-      });
+    } finally {
+      setOwnerBusy(null);
     }
-    setOwnerBusy(null);
   };
 
   const handleDelete = async () => {
@@ -1093,7 +1121,9 @@ export default function ProductScreen() {
   }
 
   const baseLikes = listing.likes ?? 0;
-  const heartCount = Math.max(0, baseLikes + (liked ? 1 : 0));
+  const heartCount = likeConfirmedFromServer
+    ? Math.max(0, baseLikes)
+    : Math.max(0, baseLikes + (liked ? 1 : 0));
   const isOwnListing = !!user?.id && listing.seller_id === user.id;
 
   return (

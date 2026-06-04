@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -22,6 +22,10 @@ export default function NewsScreen() {
   const { user } = useAuth();
   const [searches, setSearches] = useState<SavedSearch[]>([]);
   const [matchCounts, setMatchCounts] = useState<Record<string, number>>({});
+  const matchCountsRef = useRef<Record<string, number>>(matchCounts);
+  useEffect(() => {
+    matchCountsRef.current = matchCounts;
+  }, [matchCounts]);
   // Distinguish "we haven't fetched yet" from "we fetched and found nothing".
   // Without this, the moment the user taps Saved we'd flash the empty state
   // before the request even fires, because activeTab flips before useEffect
@@ -53,7 +57,7 @@ export default function NewsScreen() {
             return [s.id, await fetchNewMatchesCount(s.id)] as const;
           } catch {
             // Keep the previous count (or 0) for this search on failure.
-            return [s.id, matchCounts[s.id] ?? 0] as const;
+            return [s.id, matchCountsRef.current[s.id] ?? 0] as const;
           }
         }),
       );
@@ -140,13 +144,17 @@ export default function NewsScreen() {
         </Pressable>
         <Text style={{ fontSize: 16, fontWeight: '800', color: colors.ink }}>Activity</Text>
         <Pressable
+          disabled={true}
+          accessibilityRole="button"
+          accessibilityLabel="Mark all activity as read"
+          accessibilityState={{ disabled: true }}
           hitSlop={HIT_SLOP_8}
-          style={({ pressed }) => ({
+          style={() => ({
             width: 38,
             height: 38,
             alignItems: 'center',
             justifyContent: 'center',
-            opacity: pressed ? 0.6 : 1,
+            opacity: 0.25, // Disabled appearance
           })}
         >
           <Feather name="check-square" size={18} color={colors.ink} />

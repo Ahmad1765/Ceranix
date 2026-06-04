@@ -51,7 +51,7 @@ export default function TabsLayout() {
           tabBarIcon: ({ focused, color, size }) => (
             <View className="items-center justify-center relative">
               {focused && (
-                <View className="absolute bg-[#6C47FF] rounded-full w-10 h-10 blur-xl opacity-30" style={{ boxShadow: '0px 0px 15px rgba(108,71,255,1)', elevation: 10 }} />
+                <View className="absolute bg-[#6C47FF] rounded-full w-10 h-10 opacity-30" style={{ shadowColor: '#6C47FF', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 15, elevation: 10 }} />
               )}
               <Feather name="home" size={24} color={focused ? "#0F0F0F" : "rgba(15,15,15,0.45)"} style={{fontWeight: focused ? 'bold' : 'normal'}} />
             </View>
@@ -65,7 +65,7 @@ export default function TabsLayout() {
           tabBarIcon: ({ focused, color, size }) => (
             <View className="items-center justify-center relative">
               {focused && (
-                <View className="absolute bg-[#6C47FF] rounded-full w-10 h-10 blur-xl opacity-30" style={{ boxShadow: '0px 0px 15px rgba(108,71,255,1)', elevation: 10 }} />
+                <View className="absolute bg-[#6C47FF] rounded-full w-10 h-10 opacity-30" style={{ shadowColor: '#6C47FF', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 15, elevation: 10 }} />
               )}
               <MyFeedIcon size={22} color={focused ? "#0F0F0F" : "rgba(15,15,15,0.45)"} />
             </View>
@@ -79,7 +79,7 @@ export default function TabsLayout() {
           tabBarIcon: ({ focused, color, size }) => (
             <View className="items-center justify-center relative">
               {focused && (
-                <View className="absolute bg-[#6C47FF] rounded-full w-10 h-10 blur-xl opacity-30" style={{ boxShadow: '0px 0px 15px rgba(108,71,255,1)', elevation: 10 }} />
+                <View className="absolute bg-[#6C47FF] rounded-full w-10 h-10 opacity-30" style={{ shadowColor: '#6C47FF', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 15, elevation: 10 }} />
               )}
               <Feather name="search" size={24} color={focused ? "#0F0F0F" : "rgba(15,15,15,0.45)"} strokeWidth={focused ? 3 : 2} />
             </View>
@@ -93,7 +93,7 @@ export default function TabsLayout() {
           tabBarIcon: ({ focused, color, size }) => (
             <View className="items-center justify-center relative">
               {focused && (
-                <View className="absolute bg-[#6C47FF] rounded-full w-10 h-10 blur-xl opacity-30" style={{ boxShadow: '0px 0px 15px rgba(108,71,255,1)', elevation: 10 }} />
+                <View className="absolute bg-[#6C47FF] rounded-full w-10 h-10 opacity-30" style={{ shadowColor: '#6C47FF', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 15, elevation: 10 }} />
               )}
               <Feather name="plus-circle" size={24} color={focused ? "#0F0F0F" : "rgba(15,15,15,0.45)"} strokeWidth={focused ? 2 : 1.5} />
             </View>
@@ -115,7 +115,7 @@ export default function TabsLayout() {
           tabBarIcon: ({ focused, color, size }) => (
             <View className="items-center justify-center relative">
               {focused && (
-                <View className="absolute bg-[#6C47FF] rounded-full w-10 h-10 blur-xl opacity-30" style={{ boxShadow: '0px 0px 15px rgba(108,71,255,1)', elevation: 10 }} />
+                <View className="absolute bg-[#6C47FF] rounded-full w-10 h-10 opacity-30" style={{ shadowColor: '#6C47FF', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 15, elevation: 10 }} />
               )}
               <Feather name="smile" size={24} color={focused ? "#0F0F0F" : "rgba(15,15,15,0.45)"} strokeWidth={focused ? 2.5 : 2} />
             </View>

@@ -21,6 +21,7 @@ import { colors, radii } from '@/lib/theme';
 import { useGridDimensions, HIT_SLOP_8 } from '@/lib/responsive';
 import { useStaggeredEntrance, useFadeIn } from '@/lib/motion';
 import type { Listing } from '@/types';
+import { useToast } from '@/lib/toast';
 import { Button, Card, ListRow, EmptyState, Tabs } from '@/components/ui';
 
 const APP_URL = 'https://ceranix.app';
@@ -41,6 +42,7 @@ const AVATAR_SIZE = 88;
 
 function ProfileScreenInner() {
   const { profile, refreshProfile } = useAuth();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<ProfileTab>('selling');
   const [selling, setSelling] = useState<Listing[]>([]);
   const [liked, setLiked] = useState<Listing[]>([]);
@@ -124,11 +126,21 @@ const handleShareProfile = useCallback(async () => {
   const handle = profile.username ?? 'this seller';
   const url = `${APP_URL}/user/${profile.id}`;
   try {
-    await Share.share({ message: `Check out @${handle} on Ceranix\n${url}`, url });
-  } catch {
-    // User dismissed the share sheet — no-op.
+    const result = await Share.share({ message: `Check out @${handle} on Ceranix\n${url}`, url });
+    if (result.action === Share.sharedAction) {
+      if (result.activityType) {
+        // shared with activity type of result.activityType
+      } else {
+        // shared
+      }
+      toast.show('Profile shared successfully!', { variant: 'success', icon: 'check-circle' });
+    } else if (result.action === Share.dismissedAction) {
+      // dismissed
+    }
+  } catch (error: any) {
+    toast.show(error.message || 'Could not share profile', { variant: 'default', icon: 'alert-triangle' });
   }
-}, [profile?.id, profile?.username]);
+}, [profile?.id, profile?.username, toast]);
 
   if (!profile) {
     return (
@@ -352,8 +364,8 @@ const handleShareProfile = useCallback(async () => {
             <View style={{ paddingHorizontal: 16 }}>
               <Card pad={0} variant="paper">
                 {(() => {
-                  const bundlePct = (profile as any).bundle_discount_pct ?? 0;
-                  const vacationOn = !!(profile as any).vacation_mode;
+                  const bundlePct = profile.bundle_discount_pct ?? 0;
+                  const vacationOn = !!profile.vacation_mode;
                   const items: ShopItem[] = [
                     {
                       icon: 'shopping-bag',

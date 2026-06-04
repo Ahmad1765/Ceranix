@@ -121,8 +121,8 @@ function SellScreenInner() {
       Alert.alert('Missing info', 'Please add a title.');
       return;
     }
-    const priceNum = parseInt(price, 10);
-    if (!priceNum || priceNum <= 0) {
+    const priceNum = parseFloat(price);
+    if (!Number.isFinite(priceNum) || priceNum <= 0) {
       Alert.alert('Missing info', 'Enter a valid price.');
       return;
     }

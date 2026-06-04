@@ -38,7 +38,7 @@ const INK = '#0F0F0F';
 const MUTE = 'rgba(15,15,15,0.62)';
 const SOFT = '#FFFFFF';
 const HAIR = 'rgba(15,15,15,0.08)';
-const RED = '#0F0F0F';
+const RED = '#EF4444';
 
 const SUPPORT_EMAIL = 'support@carrinex.app';
 const TERMS_URL = 'https://carrinex.vercel.app/terms';
@@ -363,6 +363,12 @@ export default function SettingsScreen() {
         phone: form.phone.trim() || null,
         is_default: true,
       };
+      // Clear existing defaults first.
+      await supabase
+        .from('shipping_addresses')
+        .update({ is_default: false })
+        .eq('user_id', user.id);
+
       const { data, error } = address?.id
         ? await supabase
             .from('shipping_addresses')
@@ -409,6 +415,12 @@ export default function SettingsScreen() {
         account_last4: form.account_last4.trim(),
         is_default: true,
       };
+      // Clear existing defaults first.
+      await supabase
+        .from('payout_methods')
+        .update({ is_default: false })
+        .eq('user_id', user.id);
+
       const { data, error } = payout?.id
         ? await supabase
             .from('payout_methods')

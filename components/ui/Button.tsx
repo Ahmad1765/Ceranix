@@ -98,6 +98,8 @@ function stylesFor(v: Variant, disabled?: boolean) {
       return { bg: colors.white, fg: colors.ink, bw: 1, bc: colors.hairline };
     case 'text':
       return { bg: 'transparent', fg: colors.purple, bw: 0, bc: 'transparent' };
+    default:
+      return { bg: colors.panel, fg: colors.muteSoft, bw: 0, bc: 'transparent' };
   }
 }
 

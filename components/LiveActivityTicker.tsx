@@ -18,7 +18,7 @@ type Activity = {
 
 const CYCLE_MS = 5200;
 const INK = '#0F0F0F';
-const LIME = '#6C47FF';
+const PURPLE = '#6C47FF';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // Sized like the iPhone Dynamic Island: centered, capsule, sits just below the
 // status bar with breathing room on both sides.
@@ -53,12 +53,16 @@ export function LiveActivityTicker() {
 
   // Pulse the live dot continuously
   useEffect(() => {
-    Animated.loop(
+    const pulseAnim = Animated.loop(
       Animated.sequence([
         Animated.timing(dotPulse, { toValue: 1, duration: 800, useNativeDriver: USE_NATIVE_DRIVER }),
         Animated.timing(dotPulse, { toValue: 0, duration: 800, useNativeDriver: USE_NATIVE_DRIVER }),
       ]),
-    ).start();
+    );
+    pulseAnim.start();
+    return () => {
+      pulseAnim.stop();
+    };
   }, [dotPulse]);
 
   // Fetch recent listings (one-shot; cheap and good enough).
@@ -229,7 +233,7 @@ export function LiveActivityTicker() {
                 width: 7,
                 height: 7,
                 borderRadius: 3.5,
-                backgroundColor: LIME,
+                backgroundColor: PURPLE,
                 marginLeft: 2,
                 marginRight: 8,
               },
@@ -240,7 +244,7 @@ export function LiveActivityTicker() {
             style={{
               fontSize: 9,
               fontWeight: '900',
-              color: LIME,
+              color: PURPLE,
               letterSpacing: 1.2,
               marginRight: 10,
             }}

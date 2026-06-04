@@ -4,7 +4,6 @@ import { Feather } from '@expo/vector-icons';
 import {
   Gesture,
   GestureDetector,
-  GestureHandlerRootView,
 } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
@@ -112,7 +111,6 @@ export function SlideToConfirm({
   }));
 
   return (
-    <GestureHandlerRootView>
       <View
         onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
         style={{
@@ -164,7 +162,7 @@ export function SlideToConfirm({
               letterSpacing: 0.4,
             }}
           >
-            {loading ? loadingLabel : label}
+            {loading ? loadingLabel : (confirmedRef.current ? doneLabel : label)}
           </Text>
         </Animated.View>
 
@@ -208,6 +206,5 @@ export function SlideToConfirm({
           </Animated.View>
         </GestureDetector>
       </View>
-    </GestureHandlerRootView>
   );
 }

@@ -1,12 +1,25 @@
 import { View, Text, Pressable } from 'react-native';
 import { colors } from '@/lib/theme';
 
-type Props = {
-  title: string;
-  count?: number;
-  action?: { label: string; onPress: () => void };
-  rightText?: string;
-};
+type Props =
+  | {
+      title: string;
+      count?: number;
+      action: { label: string; onPress: () => void; accessibilityLabel?: string; accessibilityHint?: string };
+      rightText?: never;
+    }
+  | {
+      title: string;
+      count?: number;
+      rightText: string;
+      action?: never;
+    }
+  | {
+      title: string;
+      count?: number;
+      action?: never;
+      rightText?: never;
+    };
 
 export function SectionHeader({ title, count, action, rightText }: Props) {
   return (
@@ -37,7 +50,13 @@ export function SectionHeader({ title, count, action, rightText }: Props) {
         )}
       </View>
       {action ? (
-        <Pressable onPress={action.onPress}>
+        <Pressable
+          onPress={action.onPress}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel={action.accessibilityLabel ?? action.label}
+          accessibilityHint={action.accessibilityHint}
+        >
           <Text style={{ fontSize: 13, fontWeight: '700', color: colors.pinkDeep }}>
             {action.label}
           </Text>

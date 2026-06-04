@@ -8,12 +8,16 @@ export function SkeletonCard() {
   const opacity = useRef(new Animated.Value(0.4)).current;
 
   useEffect(() => {
-    Animated.loop(
+    const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: USE_NATIVE_DRIVER }),
         Animated.timing(opacity, { toValue: 0.4, duration: 700, useNativeDriver: USE_NATIVE_DRIVER }),
       ])
-    ).start();
+    );
+    animation.start();
+    return () => {
+      animation.stop();
+    };
   }, []);
 
   return (

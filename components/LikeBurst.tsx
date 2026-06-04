@@ -159,7 +159,16 @@ export function LikeBurst({
   if (!onPress) return <View style={style}>{visual}</View>;
 
   return (
-    <Pressable onPress={onPress} hitSlop={8} style={style}>
+    <Pressable
+      onPress={onPress}
+      hitSlop={8}
+      style={style}
+      accessible={true}
+      accessibilityRole="button"
+      accessibilityLabel="Like"
+      accessibilityHint="Toggles like"
+      accessibilityState={{ selected: liked }}
+    >
       {visual}
     </Pressable>
   );

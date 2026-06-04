@@ -339,7 +339,10 @@ export default function NewConversationScreen() {
                     opacity: pressed ? 0.8 : 1,
                     ...(active
                       ? {
-                          boxShadow: '0px 1px 3px rgba(0,0,0,0.06)',
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 1 },
+                          shadowOpacity: 0.06,
+                          shadowRadius: 3,
                           ...(Platform.OS === 'android' ? { elevation: 1 } : {}),
                         }
                       : {}),

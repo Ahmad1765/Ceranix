@@ -221,7 +221,7 @@ export default function ProfileEditScreen() {
 
   const initialSnapshot = useMemo(
     () => ({
-      username: profile?.username ?? '',
+      username: (profile?.username ?? '').trim().toLowerCase(),
       fullName: profile?.full_name ?? '',
       bio: profile?.bio ?? '',
       location: profile?.location ?? '',
@@ -258,6 +258,7 @@ export default function ProfileEditScreen() {
 
   // Debounced uniqueness check
   useEffect(() => {
+    let active = true;
     if (checkTimer.current) clearTimeout(checkTimer.current);
     const candidate = username.trim().toLowerCase();
     const err = validateUsername(candidate);
@@ -273,13 +274,14 @@ export default function ProfileEditScreen() {
     if (!user) return;
     setUsernameStatus('checking');
     checkTimer.current = setTimeout(async () => {
+      const requestCandidate = candidate;
       const { data, error } = await supabase
         .from('profiles')
         .select('id')
-        .eq('username', candidate)
+        .eq('username', requestCandidate)
         .neq('id', user.id)
         .maybeSingle();
-      if (!mounted.current) return;
+      if (!mounted.current || !active || requestCandidate !== username.trim().toLowerCase() || !user || !profile) return;
       if (error) {
         setUsernameStatus('idle');
         return;
@@ -292,6 +294,9 @@ export default function ProfileEditScreen() {
         setUsernameError(null);
       }
     }, 450);
+    return () => {
+      active = false;
+    };
   }, [username, profile?.username, user, validateUsername]);
 
   const ensurePermission = useCallback(async (): Promise<boolean> => {
@@ -360,7 +365,8 @@ export default function ProfileEditScreen() {
     useCallback(() => {
       const onBack = () => {
         if (isOnboarding) return true; // block back during onboarding
-        if (!isDirty || saving) return false; // allow normal back
+        if (saving) return true; // block back while saving
+        if (!isDirty) return false; // allow normal back
         confirmDiscard();
         return true;
       };

@@ -31,13 +31,19 @@ export function StoryAvatar({ uri, size = 56, ring = 'gradient', initial }: Prop
           contentFit="cover"
           cachePolicy="memory-disk"
           transition={120}
+          accessible={true}
+          accessibilityLabel="Profile picture"
         />
-      ) : initial ? (
-        <Text style={{ fontSize: innerSize * 0.4, fontWeight: '800', color: colors.purple }}>
-          {initial.toUpperCase()}
-        </Text>
       ) : (
-        <Feather name="user" size={innerSize * 0.42} color={colors.muteSoft} />
+        <View accessible={true} accessibilityLabel="Profile picture" style={{ alignItems: 'center', justifyContent: 'center' }}>
+          {initial ? (
+            <Text style={{ fontSize: innerSize * 0.4, fontWeight: '800', color: colors.purple }}>
+              {initial.toUpperCase()}
+            </Text>
+          ) : (
+            <Feather name="user" size={innerSize * 0.42} color={colors.muteSoft} />
+          )}
+        </View>
       )}
     </View>
   );

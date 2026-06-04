@@ -43,6 +43,9 @@ export function ScreenHeader({
             <Pressable
               onPress={onBack ?? (() => safeBack())}
               hitSlop={HIT_SLOP_8}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Back"
               style={({ pressed }) => ({
                 width: 38,
                 height: 38,

@@ -8,7 +8,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams, router, Redirect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { colors } from '@/lib/theme';
@@ -50,15 +50,22 @@ function formatShortDate(d: Date) {
 export default function PaymentScreen() {
   const { id, offer } = useLocalSearchParams<{ id: string; offer?: string }>();
   const { user } = useAuth();
+
+  if (!user) {
+    return <Redirect href="/auth/login" />;
+  }
   const toast = useToast();
   const cached = getCachedListing(id ? String(id) : null);
   const [listing, setListing] = useState<Listing | null>(cached);
   const [loading, setLoading] = useState(!cached);
   const [paying, setPaying] = useState(false);
   const demoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mounted = useRef(true);
 
   useEffect(() => {
+    mounted.current = true;
     return () => {
+      mounted.current = false;
       if (demoTimerRef.current) clearTimeout(demoTimerRef.current);
     };
   }, []);
@@ -165,13 +172,14 @@ export default function PaymentScreen() {
 
     try {
       if (!STRIPE_ENABLED) {
-        demoTimerRef.current = setTimeout(() => {
-          toast.show('Demo payment — Stripe not configured', {
-            variant: 'info',
-            icon: 'info',
-          });
-          router.replace(`/invoice/${id}?paid=1` as any);
-        }, 900);
+        await new Promise((resolve) => {
+          demoTimerRef.current = setTimeout(resolve, 900);
+        });
+        toast.show('Demo payment — Stripe not configured', {
+          variant: 'info',
+          icon: 'info',
+        });
+        router.replace(`/invoice/${id}?paid=1` as any);
         return;
       }
 
@@ -182,9 +190,12 @@ export default function PaymentScreen() {
       if (Platform.OS !== 'web') {
         let verified = false;
         for (let i = 0; i < 15; i++) {
+          if (!mounted.current) return;
           await new Promise((r) => setTimeout(r, 2000));
+          if (!mounted.current) return;
           try {
             const updated = await fetchListingById(String(id));
+            if (!mounted.current) return;
             if (updated?.is_sold) {
               verified = true;
               break;
@@ -193,6 +204,7 @@ export default function PaymentScreen() {
             // ignore polling errors
           }
         }
+        if (!mounted.current) return;
         if (verified) {
           router.replace(`/invoice/${id}?paid=1` as any);
         } else {

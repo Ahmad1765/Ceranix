@@ -160,8 +160,8 @@ const PORTRAIT_CARDS: CategoryTileData[] = [
 
 
 
-function go() {
-  router.push('/(tabs)/discover');
+function go(categoryKey: string) {
+  router.push(`/(tabs)/discover?category=${encodeURIComponent(categoryKey)}` as any);
 }
 
 function SectionEyebrow({ children }: { children: string }) {
@@ -205,7 +205,7 @@ function CategoryTile({
 }) {
   return (
     <Pressable
-      onPress={go}
+      onPress={() => go(data.key)}
       style={({ pressed }) => ({
         width,
         opacity: pressed ? 0.92 : 1,
@@ -322,8 +322,10 @@ function CategoryTile({
               letterSpacing: -0.6,
               lineHeight: titleSize * 1.05,
               fontFamily: 'Fraunces_700Bold',
-              textShadow: '0px 1px 6px rgba(0,0,0,0.35)',
-            } as any}
+              textShadowColor: 'rgba(0,0,0,0.35)',
+              textShadowOffset: { width: 0, height: 1 },
+              textShadowRadius: 6,
+            }}
           >
             {data.title}
           </Text>

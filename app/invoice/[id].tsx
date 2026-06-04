@@ -65,7 +65,11 @@ function deriveInvoiceNumber(id: string): string {
 // Supabase auto-generates handles like "user70c33" with random suffixes.
 // Trim trailing hex noise so the invoice doesn't show raw machine output.
 function stripHexSuffix(s: string): string {
-  const cleaned = s.replace(/[0-9a-f]{4,}$/i, '');
+  if (/^(user|profile)[0-9a-f]{4,}$/i.test(s)) {
+    const cleaned = s.replace(/[0-9a-f]+$/i, '');
+    if (cleaned.length >= 3) return cleaned;
+  }
+  const cleaned = s.replace(/[0-9a-f]{6,}$/i, '');
   return cleaned.length >= 3 ? cleaned : s;
 }
 
@@ -531,7 +535,10 @@ export default function InvoiceScreen() {
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0px 8px 16px rgba(0,0,0,0.14)',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.14,
+              shadowRadius: 16,
               elevation: 5,
               transform: [{ scale: pressed ? 0.985 : 1 }],
             })}
@@ -559,7 +566,10 @@ export default function InvoiceScreen() {
               flexDirection: 'row',
               alignItems: 'center',
               paddingHorizontal: 8,
-              boxShadow: '0px 10px 18px rgba(0,0,0,0.16)',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 10 },
+              shadowOpacity: 0.16,
+              shadowRadius: 18,
               elevation: 6,
               transform: [{ scale: pressed ? 0.985 : 1 }],
             })}

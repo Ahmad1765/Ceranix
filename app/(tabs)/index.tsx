@@ -395,6 +395,7 @@ export default function HomeScreen() {
   // raced/failed).
   useEffect(() => {
     return onListingCreated((listing) => {
+      if (activeTab !== 'For you') return;
       setListings((prev) => {
         if (prev.some((l) => l.id === listing.id)) return prev;
         const next = [listing, ...prev];

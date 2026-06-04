@@ -84,10 +84,10 @@ export function ListRow({
 
 function Badge({ label, tone }: { label: string; tone: NonNullable<Props['badgeTone']> }) {
   const map = {
-    pink: { bg: colors.primarySoft, fg: colors.primaryDeep },
+    pink: { bg: colors.pinkSoft, fg: colors.pinkDeep },
     mute: { bg: colors.panel, fg: colors.smoke },
     green: { bg: colors.greenSoft, fg: colors.green },
-    amber: { bg: colors.pinkSoft, fg: colors.amber },
+    amber: { bg: colors.panel, fg: colors.amber },
   } as const;
   const t = map[tone];
   return (
