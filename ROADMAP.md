@@ -1,4 +1,4 @@
-# Ceranix Production Roadmap
+# Carrinex Production Roadmap
 
 Target: support **2,000–3,000 peak concurrent users**, take the platform from prototype (mock data) to production-ready marketplace.
 
@@ -204,15 +204,15 @@ reports       (id, reporter_id, target_type, target_id, reason, created_at)
 
 ## Suggested Order if Solo
 
-| Week  | Focus                                |
-| ----- | ------------------------------------ |
-| 1–2   | Phase 0–1 (foundations + schema)     |
-| 3–5   | Phase 2 (replace all mocks)          |
-| 6     | Phase 3 (images)                     |
-| 7     | Phase 4 (chat)                       |
-| 8–9   | Phase 5 (payments)                   |
-| 10    | Phase 6–7 (search + observability)   |
-| 11–12 | Phase 8 (launch prep + beta)         |
+| Week  | Focus                              |
+| ----- | ---------------------------------- |
+| 1–2   | Phase 0–1 (foundations + schema)   |
+| 3–5   | Phase 2 (replace all mocks)        |
+| 6     | Phase 3 (images)                   |
+| 7     | Phase 4 (chat)                     |
+| 8–9   | Phase 5 (payments)                 |
+| 10    | Phase 6–7 (search + observability) |
+| 11–12 | Phase 8 (launch prep + beta)       |
 
 **Total time-to-launch: ~12 weeks of solo full-time work.**
 
@@ -220,18 +220,18 @@ reports       (id, reporter_id, target_type, target_id, reason, created_at)
 
 ## Tech Stack Summary
 
-| Layer          | Choice                                                 |
-| -------------- | ------------------------------------------------------ |
-| Mobile         | Expo SDK + Expo Router (current)                       |
-| State / cache  | TanStack Query                                         |
-| Backend        | Supabase (Postgres, Auth, Storage, Realtime, Edge Fns) |
-| Payments       | Stripe Connect Express                                 |
-| Push           | Expo Notifications                                     |
-| Errors         | Sentry                                                 |
-| Analytics      | PostHog                                                |
-| Uptime         | BetterStack                                            |
-| CI/CD          | GitHub Actions + EAS Build                             |
-| Image hosting  | Supabase Storage (Cloudflare CDN)                      |
+| Layer         | Choice                                                 |
+| ------------- | ------------------------------------------------------ |
+| Mobile        | Expo SDK + Expo Router (current)                       |
+| State / cache | TanStack Query                                         |
+| Backend       | Supabase (Postgres, Auth, Storage, Realtime, Edge Fns) |
+| Payments      | Stripe Connect Express                                 |
+| Push          | Expo Notifications                                     |
+| Errors        | Sentry                                                 |
+| Analytics     | PostHog                                                |
+| Uptime        | BetterStack                                            |
+| CI/CD         | GitHub Actions + EAS Build                             |
+| Image hosting | Supabase Storage (Cloudflare CDN)                      |
 
 ---
 

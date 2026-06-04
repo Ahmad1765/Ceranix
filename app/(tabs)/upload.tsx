@@ -67,6 +67,8 @@ function SellScreenInner() {
   const [condition, setCondition] = useState<Condition>('good');
   const [category, setCategory] = useState<Category>('clothing');
   const [gender, setGender] = useState<Gender>('women');
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagDraft, setTagDraft] = useState('');
 
   const pickImages = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -98,6 +100,8 @@ function SellScreenInner() {
     setCondition('good');
     setCategory('clothing');
     setGender('women');
+    setTags([]);
+    setTagDraft('');
   };
 
   const handleContinue = () => {
@@ -145,6 +149,7 @@ function SellScreenInner() {
           condition,
           images: urls,
           is_sold: false,
+          tags,
         })
         .select('id')
         .single();
@@ -189,6 +194,7 @@ function SellScreenInner() {
         is_sold: false,
         views: 0,
         likes: 0,
+        tags,
         created_at: new Date().toISOString(),
       };
       putCachedListing(newListing);
@@ -448,6 +454,77 @@ function SellScreenInner() {
           textAlignVertical="top"
           style={{ minHeight: 100 }}
         />
+
+        {/* Tags — buyers find your listing through these */}
+        <Text className="text-sm font-medium text-ink-mute mb-1">Tags</Text>
+        <View
+          className="border border-ink-hair rounded-xl px-3 py-2 mb-2"
+          style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center', minHeight: 48 }}
+        >
+          {tags.map((t) => (
+            <Pressable
+              key={t}
+              onPress={() => setTags((prev) => prev.filter((x) => x !== t))}
+              style={{
+                backgroundColor: '#6C47FF',
+                borderRadius: 999,
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+              }}
+            >
+              <Text style={{ fontSize: 12, fontWeight: '700', color: 'white' }}>#{t}</Text>
+              <Feather name="x" size={11} color="white" />
+            </Pressable>
+          ))}
+          <TextInput
+            value={tagDraft}
+            onChangeText={(text) => {
+              // Commit on space or comma — feels native for hashtags.
+              if (/[ ,]$/.test(text)) {
+                const raw = text.trim().replace(/[,#]/g, '').toLowerCase();
+                if (raw && !tags.includes(raw) && tags.length < 10) {
+                  setTags((prev) => [...prev, raw]);
+                }
+                setTagDraft('');
+              } else {
+                setTagDraft(text);
+              }
+            }}
+            onSubmitEditing={() => {
+              const raw = tagDraft.trim().replace(/[,#]/g, '').toLowerCase();
+              if (raw && !tags.includes(raw) && tags.length < 10) {
+                setTags((prev) => [...prev, raw]);
+              }
+              setTagDraft('');
+            }}
+            onKeyPress={(e) => {
+              // Backspace on empty input removes the last chip — standard
+              // hashtag-input affordance buyers expect.
+              if (e.nativeEvent.key === 'Backspace' && tagDraft.length === 0 && tags.length > 0) {
+                setTags((prev) => prev.slice(0, -1));
+              }
+            }}
+            placeholder={tags.length === 0 ? 'e.g. arcteryx jacket hiking' : 'add tag…'}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="done"
+            style={{
+              flexGrow: 1,
+              minWidth: 80,
+              fontSize: 14,
+              color: '#0F0F0F',
+              padding: 0,
+              outlineStyle: 'none',
+              outlineWidth: 0,
+            } as any}
+          />
+        </View>
+        <Text className="text-xs text-ink-mute mb-6">
+          Up to 10 tags. Press space, comma, or return to add.
+        </Text>
 
         <Pressable
           onPress={handlePublish}

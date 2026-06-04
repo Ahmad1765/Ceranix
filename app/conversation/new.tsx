@@ -108,45 +108,50 @@ export default function NewConversationScreen() {
     }
     setSending(true);
 
-    const conv = await getOrCreateConversation({
-      buyerId: user.id,
-      sellerId: listing.seller_id,
-      listingId: listing.id,
-    });
-    if (!conv) {
+    try {
+      const conv = await getOrCreateConversation({
+        buyerId: user.id,
+        sellerId: listing.seller_id,
+        listingId: listing.id,
+      });
+      if (!conv) {
+        Alert.alert('Could not start chat', 'Please try again.');
+        return;
+      }
+
+      let ok = false;
+      if (mode === 'offer') {
+        const saved = await sendOffer({
+          conversationId: conv.id,
+          senderId: user.id,
+          amount: amountNum,
+          note: note.trim() || undefined,
+        });
+        ok = !!saved;
+      } else {
+        const saved = await sendMessage({
+          conversationId: conv.id,
+          senderId: user.id,
+          content: message,
+        });
+        ok = !!saved;
+      }
+
+      if (!ok) {
+        Alert.alert('Could not send', 'Please try again.');
+        return;
+      }
+      toast.show(mode === 'offer' ? 'Offer sent' : 'Message sent', {
+        variant: 'success',
+        icon: 'check',
+      });
+      router.replace(`/conversation/${conv.id}` as any);
+    } catch (err) {
+      console.error('Failed to send:', err);
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+    } finally {
       setSending(false);
-      Alert.alert('Could not start chat', 'Please try again.');
-      return;
     }
-
-    let ok = false;
-    if (mode === 'offer') {
-      const saved = await sendOffer({
-        conversationId: conv.id,
-        senderId: user.id,
-        amount: amountNum,
-        note: note.trim() || undefined,
-      });
-      ok = !!saved;
-    } else {
-      const saved = await sendMessage({
-        conversationId: conv.id,
-        senderId: user.id,
-        content: message,
-      });
-      ok = !!saved;
-    }
-
-    setSending(false);
-    if (!ok) {
-      Alert.alert('Could not send', 'Please try again.');
-      return;
-    }
-    toast.show(mode === 'offer' ? 'Offer sent' : 'Message sent', {
-      variant: 'success',
-      icon: 'check',
-    });
-    router.replace(`/conversation/${conv.id}` as any);
   };
 
   if (loading) {
@@ -524,7 +529,7 @@ export default function NewConversationScreen() {
           )}
 
           <Text style={{ fontSize: 11, color: colors.muteSoft, marginTop: 22, lineHeight: 16 }}>
-            Be kind and respectful. Use Ceranix's payment flow for a safe transaction.
+            Be kind and respectful. Use Carrinex's payment flow for a safe transaction.
           </Text>
         </ScrollView>
 

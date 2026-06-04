@@ -222,7 +222,7 @@ export default function LoginScreen() {
                     letterSpacing: -0.6,
                   }}
                 >
-                  Ceranix
+                  Carrinex
                 </Text>
                 <Text
                   style={{
@@ -327,7 +327,7 @@ export default function LoginScreen() {
                     textTransform: 'uppercase',
                   }}
                 >
-                  Ceranix
+                  Carrinex
                 </Text>
               </View>
 
@@ -640,7 +640,10 @@ function ModeSwitch({
             backgroundColor: colors.ink,
             borderRadius: 999,
             transform: [{ translateX }],
-            boxShadow: '0px 4px 10px rgba(0,0,0,0.12)',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.12,
+            shadowRadius: 10,
             elevation: 3,
             pointerEvents: 'none',
           }}
@@ -716,13 +719,13 @@ function Field({
           borderRadius: 18,
           backgroundColor: colors.white,
           borderWidth: 1,
-          borderColor: focused ? colors.purple : colors.hairline,
+          borderColor: colors.hairline,
         }}
       >
         <Feather
           name={icon}
           size={18}
-          color={focused ? colors.purple : colors.mute}
+          color={focused ? colors.primary : colors.mute}
         />
         <View style={{ flex: 1, marginLeft: 12 }}>{children}</View>
       </View>

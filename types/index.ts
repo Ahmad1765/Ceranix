@@ -89,6 +89,9 @@ export interface Listing {
   is_sold: boolean;
   views: number;
   likes: number;
+  // Seller-defined free-form tags. Stored as text[] in Postgres with a GIN
+  // index so discover can do `tags && '{x,y}'` lookups cheaply.
+  tags?: string[];
   created_at: string;
 }
 

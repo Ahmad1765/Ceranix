@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
@@ -40,10 +40,10 @@ const SOFT = '#FFFFFF';
 const HAIR = 'rgba(15,15,15,0.08)';
 const RED = '#0F0F0F';
 
-const SUPPORT_EMAIL = 'support@ceranix.app';
-const TERMS_URL = 'https://ceranix.vercel.app/terms';
-const PRIVACY_URL = 'https://ceranix.vercel.app/privacy';
-const APP_URL_BASE = 'https://ceranix.vercel.app';
+const SUPPORT_EMAIL = 'support@carrinex.app';
+const TERMS_URL = 'https://carrinex.vercel.app/terms';
+const PRIVACY_URL = 'https://carrinex.vercel.app/privacy';
+const APP_URL_BASE = 'https://carrinex.vercel.app';
 const BUNDLE_DEFAULT_PCT = 10;
 
 type Section = 'shop' | 'verify' | 'enhance' | 'account' | 'help';
@@ -61,6 +61,10 @@ function tap(style: 'light' | 'medium' = 'light') {
 export default function SettingsScreen() {
   const { profile, user, session, signOut, refreshProfile } = useAuth();
   const toast = useToast();
+  // Deep-link param: profile shop list passes `?open=bundle` so tapping the
+  // Bundle row jumps straight into the modal instead of forcing the user to
+  // scroll the settings page to find it.
+  const params = useLocalSearchParams<{ open?: string }>();
 
   const [open, setOpen] = useState<Section | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
@@ -135,6 +139,19 @@ export default function SettingsScreen() {
   const [showPayout, setShowPayout] = useState(false);
   const [showVerify, setShowVerify] = useState(false);
   const [showBundle, setShowBundle] = useState(false);
+
+  // Open modal from a deep-link param. Guard so the effect fires exactly
+  // once per arrival — if the user closes the modal we don't want a stale
+  // `?open=bundle` in the URL to reopen it.
+  const handledDeepLink = useRef(false);
+  useEffect(() => {
+    if (handledDeepLink.current) return;
+    if (params.open === 'bundle') {
+      setShowBundle(true);
+      setOpen('shop');
+      handledDeepLink.current = true;
+    }
+  }, [params.open]);
 
   // ---------- Section toggle ----------
   const toggleSection = useCallback((s: Section) => {
@@ -223,7 +240,7 @@ export default function SettingsScreen() {
     try {
       tap('light');
       await Share.share({
-        message: `Check out @${profile.username ?? 'this seller'} on Ceranix`,
+        message: `Check out @${profile.username ?? 'this seller'} on Carrinex`,
         url: `${APP_URL_BASE}/user/${profile.id}`,
       });
     } catch {
@@ -537,7 +554,7 @@ export default function SettingsScreen() {
             }}
           />
           <Text style={{ fontSize: 14, color: MUTE, lineHeight: 20, flex: 1 }}>
-            Manage your shop, account and how you appear on Ceranix.
+            Manage your shop, account and how you appear on Carrinex.
           </Text>
         </View>
 

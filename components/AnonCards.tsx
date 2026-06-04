@@ -1,10 +1,9 @@
-import { View, Text, Pressable, ScrollView, Dimensions } from 'react-native';
+import { View, Text, Pressable, ScrollView, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SCREEN_PAD = 16;
 const ROW_GAP = 12;
 const TILE_RADIUS = 18;
@@ -159,17 +158,7 @@ const PORTRAIT_CARDS: CategoryTileData[] = [
   },
 ];
 
-const HERO_W = Math.round(SCREEN_WIDTH * 0.74);
-const HERO_H = Math.round(HERO_W * 0.82);
 
-const GRID_TILE_W = Math.floor((SCREEN_WIDTH - SCREEN_PAD * 2 - 12) / 2);
-const GRID_TILE_H = GRID_TILE_W;
-
-const MID_W = Math.round(SCREEN_WIDTH * 0.58);
-const MID_H = Math.round(MID_W * 1.18);
-
-const PORTRAIT_W = Math.round(SCREEN_WIDTH * 0.44);
-const PORTRAIT_H = Math.round(PORTRAIT_W * 1.6);
 
 function go() {
   router.push('/(tabs)/discover');
@@ -356,6 +345,20 @@ function CategoryTile({
 }
 
 export function AnonCards() {
+  const { width: SCREEN_WIDTH } = useWindowDimensions();
+
+  const HERO_W = Math.round(SCREEN_WIDTH * 0.74);
+  const HERO_H = Math.round(HERO_W * 0.82);
+
+  const GRID_TILE_W = Math.floor((SCREEN_WIDTH - SCREEN_PAD * 2 - 12) / 2);
+  const GRID_TILE_H = GRID_TILE_W;
+
+  const MID_W = Math.round(SCREEN_WIDTH * 0.58);
+  const MID_H = Math.round(MID_W * 1.18);
+
+  const PORTRAIT_W = Math.round(SCREEN_WIDTH * 0.44);
+  const PORTRAIT_H = Math.round(PORTRAIT_W * 1.6);
+
   return (
     <View style={{ paddingTop: 8, paddingBottom: 8 }}>
       {/* Editorial heading */}

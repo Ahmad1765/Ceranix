@@ -1,4 +1,4 @@
--- Ceranix Database Schema
+-- Carrinex Database Schema
 -- Run this in your Supabase SQL editor
 
 -- Users (extends Supabase auth.users)

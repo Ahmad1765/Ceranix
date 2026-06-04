@@ -11,7 +11,7 @@ interface Props {
 }
 
 export function SearchBar({
-  placeholder = 'Search Ceranix...',
+  placeholder = 'Search Carrinex...',
   onPress,
   editable = false,
   value,

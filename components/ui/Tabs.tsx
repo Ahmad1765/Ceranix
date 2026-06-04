@@ -124,7 +124,7 @@ export function Tabs<T extends string>({ tabs, value, onChange, variant = 'pill'
             >
               {t.label}
             </Text>
-            {typeof t.count === 'number' && (
+            {typeof t.count === 'number' && t.count > 0 && (
               <View
                 style={{
                   paddingHorizontal: 6,

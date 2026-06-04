@@ -34,7 +34,6 @@ import { colors, radii } from '@/lib/theme';
 import { Button, EmptyState } from '@/components/ui';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { withTimeout } from '@/lib/async';
-import { useInputFocus } from '@/lib/useInputFocus';
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -500,7 +499,6 @@ export default function ConversationScreen() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [offerVisible, setOfferVisible] = useState(false);
-  const composerFocus = useInputFocus();
 
   useEffect(() => {
     if (!conversationId) return;
@@ -852,7 +850,6 @@ export default function ConversationScreen() {
               paddingHorizontal: 14,
               paddingVertical: 8,
               justifyContent: 'center',
-              ...composerFocus.borderProps('transparent'),
             }}
           >
             <TextInput
@@ -860,10 +857,16 @@ export default function ConversationScreen() {
               placeholderTextColor={colors.muteSoft}
               value={input}
               onChangeText={setInput}
-              onFocus={composerFocus.onFocus}
-              onBlur={composerFocus.onBlur}
               multiline
-              style={{ fontSize: 15, color: colors.ink, padding: 0, maxHeight: 100 }}
+              style={{
+                fontSize: 15,
+                color: colors.ink,
+                padding: 0,
+                maxHeight: 100,
+                // RN-Web: kill the browser's default input focus ring.
+                outlineStyle: 'none',
+                outlineWidth: 0,
+              } as any}
             />
           </View>
           <Pressable

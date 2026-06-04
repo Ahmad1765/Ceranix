@@ -1,4 +1,4 @@
--- Ceranix — listing price history.
+-- Carrinex — listing price history.
 -- Captures every price change on `listings` so we can surface
 -- "items you liked got cheaper" on the My Feed tab.
 -- Idempotent: safe to re-run.

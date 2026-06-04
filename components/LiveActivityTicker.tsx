@@ -178,8 +178,13 @@ export function LiveActivityTicker() {
           opacity: islandOpacity,
           transform: [{ scale: Animated.multiply(islandScale, pressScale) }],
           ...Platform.select({
-            ios: { boxShadow: '0px 6px 14px rgba(0,0,0,0.28)' },
-            android: { boxShadow: '0px 6px 14px rgba(0,0,0,0.28)', elevation: 6 },
+            ios: {
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: 0.28,
+              shadowRadius: 14,
+            },
+            android: { elevation: 6 },
             default: { boxShadow: '0px 6px 14px rgba(0,0,0,0.28)' },
           }),
         }}

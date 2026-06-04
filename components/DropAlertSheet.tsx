@@ -12,7 +12,6 @@ import { Feather } from '@expo/vector-icons';
 import { colors, radii } from '@/lib/theme';
 import { createSavedSearch } from '@/lib/savedSearches';
 import { useToast } from '@/lib/toast';
-import { useInputFocus } from '@/lib/useInputFocus';
 import type { Category, Gender } from '@/types';
 
 const CATEGORIES: { id: Category; label: string }[] = [
@@ -39,7 +38,6 @@ export function DropAlertSheet({ visible, userId, onClose, onCreated }: Props) {
   const [gender, setGender] = useState<Gender>('all');
   const [notify, setNotify] = useState(true);
   const [saving, setSaving] = useState(false);
-  const queryFocus = useInputFocus();
 
   const reset = useCallback(() => {
     setQuery('');
@@ -156,15 +154,12 @@ export function DropAlertSheet({ visible, userId, onClose, onCreated }: Props) {
               paddingVertical: 12,
               flexDirection: 'row',
               alignItems: 'center',
-              ...queryFocus.borderProps('transparent'),
             }}
           >
             <Feather name="search" size={16} color={colors.muteSoft} />
             <TextInput
               value={query}
               onChangeText={setQuery}
-              onFocus={queryFocus.onFocus}
-              onBlur={queryFocus.onBlur}
               placeholder="e.g. Nike, vintage tee"
               placeholderTextColor={colors.muteSoft}
               autoCapitalize="none"
@@ -176,7 +171,10 @@ export function DropAlertSheet({ visible, userId, onClose, onCreated }: Props) {
                 fontSize: 14,
                 color: colors.ink,
                 padding: 0,
-              }}
+                // RN-Web: kill the browser's default input focus ring.
+                outlineStyle: 'none',
+                outlineWidth: 0,
+              } as any}
             />
           </View>
 

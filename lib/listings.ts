@@ -10,7 +10,7 @@ const SELECT_WITH_SELLER = '*, seller:profiles!listings_seller_id_fkey(*)';
 // the DB query itself runs in <1ms (verified). Inner join so vacation_mode
 // filter applies; every listing has a seller so no rows are lost.
 const FEED_LISTING_COLS =
-  'id, seller_id, title, brand, size, price, category, gender, condition, images, is_sold, likes, created_at';
+  'id, seller_id, title, brand, size, price, category, gender, condition, images, is_sold, likes, tags, created_at';
 const FEED_SELLER_COLS = 'id, username, full_name, avatar_url, is_verified, vacation_mode';
 const SELECT_FEED = `${FEED_LISTING_COLS}, seller:profiles!listings_seller_id_fkey!inner(${FEED_SELLER_COLS})`;
 

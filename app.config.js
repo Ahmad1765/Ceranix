@@ -6,12 +6,12 @@
 module.exports = ({ config }) => ({
   ...config,
   expo: {
-    name: 'Ceranix',
-    slug: 'ceranix',
+    name: 'Carrinex',
+    slug: 'carrinex',
     version: '1.0.0',
     orientation: 'portrait',
     icon: './assets/images/icon.png',
-    scheme: 'ceranix',
+    scheme: 'carrinex',
     userInterfaceStyle: 'light',
     splash: {
       image: './assets/images/splash.png',
@@ -20,14 +20,14 @@ module.exports = ({ config }) => ({
     },
     ios: {
       supportsTablet: false,
-      bundleIdentifier: 'com.ceranix.app',
+      bundleIdentifier: 'com.carrinex.app',
     },
     android: {
       adaptiveIcon: {
         foregroundImage: './assets/images/adaptive-icon.png',
         backgroundColor: '#ffffff',
       },
-      package: 'com.ceranix.app',
+      package: 'com.carrinex.app',
     },
     assetBundlePatterns: [
       'assets/**',
@@ -39,7 +39,7 @@ module.exports = ({ config }) => ({
       [
         'expo-image-picker',
         {
-          photosPermission: 'Ceranix needs access to your photos to upload listings.',
+          photosPermission: 'Carrinex needs access to your photos to upload listings.',
         },
       ],
       'expo-asset',

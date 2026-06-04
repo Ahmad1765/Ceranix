@@ -69,11 +69,15 @@ Deno.serve(async (req: Request) => {
     });
 
     // Log the deletion request (best-effort)
-    await admin.from('account_deletion_requests').insert({
-      user_id: user.id,
-      email: user.email ?? null,
-      reason,
-    });
+    try {
+      await admin.from('account_deletion_requests').insert({
+        user_id: user.id,
+        email: user.email ?? null,
+        reason,
+      });
+    } catch (insertErr) {
+      console.warn('[delete-account] Failed to log deletion request:', insertErr);
+    }
 
     // Perform deletion
     const { error: delErr } = await admin.auth.admin.deleteUser(user.id);

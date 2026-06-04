@@ -1,4 +1,4 @@
--- Ceranix — one-shot Supabase setup. Idempotent: safe to re-run.
+-- Carrinex — one-shot Supabase setup. Idempotent: safe to re-run.
 -- Run this in the Supabase SQL editor (Project → SQL → New query → paste → Run).
 --
 -- After running, in Supabase Storage:

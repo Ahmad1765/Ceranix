@@ -94,14 +94,16 @@ export async function createSavedSearch(args: {
   if (!error) return data as SavedSearch;
   if (error.code === '23505') {
     // Already exists — fetch it.
-    const { data: existing } = await supabase
+    let q = supabase
       .from('saved_searches')
       .select('*')
-      .eq('user_id', args.userId)
-      .eq('query', payload.query as any)
-      .eq('category', payload.category as any)
-      .eq('gender', payload.gender as any)
-      .maybeSingle();
+      .eq('user_id', args.userId);
+
+    q = payload.query === null ? q.is('query', null) : q.eq('query', payload.query as any);
+    q = payload.category === null ? q.is('category', null) : q.eq('category', payload.category as any);
+    q = payload.gender === null ? q.is('gender', null) : q.eq('gender', payload.gender as any);
+
+    const { data: existing } = await q.maybeSingle();
     return (existing as SavedSearch | null) ?? null;
   }
   console.warn('[saved-searches] create', error.message);

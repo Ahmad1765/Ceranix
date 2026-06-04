@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -55,6 +55,13 @@ export default function PaymentScreen() {
   const [listing, setListing] = useState<Listing | null>(cached);
   const [loading, setLoading] = useState(!cached);
   const [paying, setPaying] = useState(false);
+  const demoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (demoTimerRef.current) clearTimeout(demoTimerRef.current);
+    };
+  }, []);
 
   // When the buyer arrives from an accepted offer, the chat passes ?offer=<amt>
   // so the displayed total reflects the agreed price. The Stripe edge function
@@ -156,18 +163,18 @@ export default function PaymentScreen() {
     tap('medium');
     setPaying(true);
 
-    if (!STRIPE_ENABLED) {
-      setTimeout(() => {
-        toast.show('Demo payment — Stripe not configured', {
-          variant: 'info',
-          icon: 'info',
-        });
-        router.replace(`/invoice/${id}?paid=1` as any);
-      }, 900);
-      return;
-    }
-
     try {
+      if (!STRIPE_ENABLED) {
+        demoTimerRef.current = setTimeout(() => {
+          toast.show('Demo payment — Stripe not configured', {
+            variant: 'info',
+            icon: 'info',
+          });
+          router.replace(`/invoice/${id}?paid=1` as any);
+        }, 900);
+        return;
+      }
+
       const { url } = await createCheckoutSession(String(id), {
         offerAmount: offerAmount ?? undefined,
       });

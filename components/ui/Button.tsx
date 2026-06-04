@@ -106,8 +106,13 @@ function shadowFor(v: Variant) {
   const rgb = v === 'primary' || v === 'gradient' ? '108,71,255' : '0,0,0';
   const box = `0px 4px 10px rgba(${rgb},0.16)`;
   return Platform.select({
-    ios: { boxShadow: box },
-    android: { boxShadow: box, elevation: 2 },
+    ios: {
+      shadowColor: `rgb(${rgb})`,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.16,
+      shadowRadius: 10,
+    },
+    android: { elevation: 2 },
     default: { boxShadow: box },
   });
 }

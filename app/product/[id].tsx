@@ -19,7 +19,6 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { StatusBar } from 'expo-status-bar';
-import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue,
@@ -71,29 +70,6 @@ const iosShadow = IS_IOS
 const { width } = Dimensions.get('window');
 const IMAGE_HEIGHT = width * 1.45;
 
-function PinIcon({
-  size = 22,
-  color = '#0F0F0F',
-  filled = false,
-}: { size?: number; color?: string; filled?: boolean }) {
-  return (
-    <Svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill={filled ? color : 'none'}
-      stroke={color}
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      style={{ transform: [{ rotate: '45deg' }] }}
-    >
-      <Path d="M12 17v5" />
-      <Path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
-    </Svg>
-  );
-}
-
 const CONDITION_LABELS: Record<string, string> = {
   new_with_tags: 'New with tags',
   like_new: 'Like new',
@@ -112,17 +88,6 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 const ITEM_COLOR = { name: 'Carrinex purple', hex: '#6C47FF' };
-
-const ITEM_TAGS = [
-  'arcteryx',
-  'jacket',
-  'gorpcore',
-  'midlayer',
-  'hiking',
-  'skiing',
-  'lightweight',
-  'breathable',
-];
 
 // Unified brand palette (matches home tabs + PromoBanner + LiveActivityTicker)
 const BRAND_PURPLE = '#6C47FF';
@@ -736,7 +701,6 @@ export default function ProductScreen() {
   });
   const [liked, setLiked] = useState(false);
   const [likeBusy, setLikeBusy] = useState(false);
-  const [pinned, setPinned] = useState(false);
   // Prime from cache so re-opens are instant — bypasses any wedged supabase
   // client on web while we refetch in the background.
   const cached = getCachedListing(productIdParam);
@@ -1247,29 +1211,12 @@ export default function ProductScreen() {
               <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255,255,255,0.94)' }]} />
             )}
             <Pressable
-              onPress={() => { tap('light'); setPinned(!pinned); }}
-              style={({ pressed }) => ({
-                width: 50,
-                paddingTop: 12,
-                paddingBottom: 8,
-                alignItems: 'center',
-                justifyContent: 'center',
-                transform: [{ scale: pressed ? 0.94 : 1 }],
-              })}
-            >
-              <PinIcon size={20} color={BRAND_INK} filled={pinned} />
-              <Text style={{ fontSize: 11, fontWeight: '700', color: BRAND_INK, marginTop: 2 }}>
-                {pinned ? 1 : 0}
-              </Text>
-            </Pressable>
-            <View style={{ height: HAIRLINE, marginHorizontal: 10, backgroundColor: 'rgba(10,10,10,0.12)' }} />
-            <Pressable
               onPress={handleHeartPress}
               onLongPress={() => { tap('medium'); setSaveListVisible(true); }}
               delayLongPress={350}
               style={({ pressed }) => ({
                 width: 50,
-                paddingTop: 8,
+                paddingTop: 12,
                 paddingBottom: 12,
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -1745,33 +1692,37 @@ export default function ProductScreen() {
             })}
           </View>
 
-          {/* Tags — subtle outline chips */}
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 16, gap: 8, paddingHorizontal: 4 }}>
-            {ITEM_TAGS.map((tag) => (
-              <View
-                key={tag}
-                style={{
-                  backgroundColor: TAG_BG,
-                  borderWidth: HAIRLINE,
-                  borderColor: TAG_BORDER,
-                  borderRadius: 999,
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 12,
-                    color: 'rgba(15,15,15,0.62)',
-                    fontFamily: 'Inter_500Medium',
-                    letterSpacing: 0.1,
-                  }}
+          {/* Tags — tap to search by tag */}
+          {listing.tags && listing.tags.length > 0 && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 16, gap: 8, paddingHorizontal: 4 }}>
+              {listing.tags.map((tag) => (
+                <Pressable
+                  key={tag}
+                  onPress={() => router.push(`/(tabs)/discover?q=${encodeURIComponent(tag)}` as any)}
+                  style={({ pressed }) => ({
+                    backgroundColor: TAG_BG,
+                    borderWidth: HAIRLINE,
+                    borderColor: TAG_BORDER,
+                    borderRadius: 999,
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    opacity: pressed ? 0.6 : 1,
+                  })}
                 >
-                  #{tag}
-                </Text>
-              </View>
-            ))}
-          </View>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: 'rgba(15,15,15,0.62)',
+                      fontFamily: 'Inter_500Medium',
+                      letterSpacing: 0.1,
+                    }}
+                  >
+                    #{tag}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
 
           {/* Share / Report row */}
           <View

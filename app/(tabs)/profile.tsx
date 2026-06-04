@@ -23,29 +23,17 @@ import { useStaggeredEntrance, useFadeIn } from '@/lib/motion';
 import type { Listing } from '@/types';
 import { Button, Card, ListRow, EmptyState, Tabs } from '@/components/ui';
 
+const APP_URL = 'https://ceranix.app';
+
 type ProfileTab = 'selling' | 'liked' | 'shop' | 'collections';
 
-const SHOP_ITEMS: {
+type ShopItem = {
   icon: any;
   title: string;
   subtitle: string;
   badge?: string;
-}[] = [
-  { icon: 'shopping-bag', title: 'My shop', subtitle: 'Purchases, sales & payouts' },
-  {
-    icon: 'percent',
-    title: 'Bundle discount',
-    subtitle: 'Reward buyers who shop multiple items',
-    badge: 'Off',
-  },
-  {
-    icon: 'pause-circle',
-    title: 'Vacation mode',
-    subtitle: 'Pause listings while away',
-    badge: 'Off',
-  },
-  { icon: 'share-2', title: 'Share your profile', subtitle: 'Send a link to your shop' },
-];
+  action: 'shop' | 'bundle' | 'vacation' | 'share';
+};
 
 const HORIZONTAL_PAD = 12;
 const GRID_GAP = 8;
@@ -129,16 +117,18 @@ function ProfileScreenInner() {
     }
   }, [loadSelling, loadLiked]);
 
-  const handleShareProfile = useCallback(async () => {
-    if (!profile?.id) return;
-    const handle = profile.username ?? 'this seller';
-    const url = `https://ceranix.vercel.app/user/${profile.id}`;
-    try {
-      await Share.share({ message: `Check out @${handle} on Ceranix\n${url}`, url });
-    } catch {
-      // User dismissed the share sheet — no-op.
-    }
-  }, [profile?.id, profile?.username]);
+
+
+const handleShareProfile = useCallback(async () => {
+  if (!profile?.id) return;
+  const handle = profile.username ?? 'this seller';
+  const url = `${APP_URL}/user/${profile.id}`;
+  try {
+    await Share.share({ message: `Check out @${handle} on Ceranix\n${url}`, url });
+  } catch {
+    // User dismissed the share sheet — no-op.
+  }
+}, [profile?.id, profile?.username]);
 
   if (!profile) {
     return (
@@ -307,22 +297,6 @@ function ProfileScreenInner() {
             <View style={{ flex: 1 }}>
               <Button label="Share profile" variant="ghost" full onPress={handleShareProfile} />
             </View>
-            <Pressable
-              onPress={() => router.push('/settings')}
-              hitSlop={HIT_SLOP_8}
-              style={({ pressed }) => ({
-                width: 44,
-                height: 44,
-                borderRadius: 999,
-                borderWidth: 1,
-                borderColor: colors.hairline,
-                alignItems: 'center',
-                justifyContent: 'center',
-                opacity: pressed ? 0.7 : 1,
-              })}
-            >
-              <Feather name="user-plus" size={16} color={colors.ink} />
-            </Pressable>
           </View>
         </Animated.View>
 
@@ -377,29 +351,69 @@ function ProfileScreenInner() {
           {activeTab === 'shop' && (
             <View style={{ paddingHorizontal: 16 }}>
               <Card pad={0} variant="paper">
-                {SHOP_ITEMS.map((item, i) => (
-                  <View key={item.title}>
-                    <ListRow
-                      icon={item.icon}
-                      iconBg={colors.purpleSoft}
-                      iconColor={colors.purple}
-                      title={item.title}
-                      subtitle={item.subtitle}
-                      badge={item.badge}
-                      badgeTone="mute"
-                      onPress={() => router.push('/settings' as any)}
-                    />
-                    {i < SHOP_ITEMS.length - 1 && (
-                      <View
-                        style={{
-                          height: 1,
-                          backgroundColor: colors.hairline,
-                          marginLeft: 68,
+                {(() => {
+                  const bundlePct = (profile as any).bundle_discount_pct ?? 0;
+                  const vacationOn = !!(profile as any).vacation_mode;
+                  const items: ShopItem[] = [
+                    {
+                      icon: 'shopping-bag',
+                      title: 'My shop',
+                      subtitle: 'Purchases, sales & payouts',
+                      action: 'shop',
+                    },
+                    {
+                      icon: 'percent',
+                      title: 'Bundle discount',
+                      subtitle: 'Reward buyers who shop multiple items',
+                      badge: bundlePct > 0 ? `${bundlePct}%` : 'Off',
+                      action: 'bundle',
+                    },
+                    {
+                      icon: 'pause-circle',
+                      title: 'Vacation mode',
+                      subtitle: 'Pause listings while away',
+                      badge: vacationOn ? 'On' : 'Off',
+                      action: 'vacation',
+                    },
+                    {
+                      icon: 'share-2',
+                      title: 'Share your profile',
+                      subtitle: 'Send a link to your shop',
+                      action: 'share',
+                    },
+                  ];
+                  return items.map((item, i) => (
+                    <View key={item.title}>
+                      <ListRow
+                        icon={item.icon}
+                        iconBg={colors.purpleSoft}
+                        iconColor={colors.purple}
+                        title={item.title}
+                        subtitle={item.subtitle}
+                        badge={item.badge}
+                        badgeTone="mute"
+                        onPress={() => {
+                          if (item.action === 'bundle') {
+                            router.push('/settings?open=bundle' as any);
+                          } else if (item.action === 'share') {
+                            handleShareProfile();
+                          } else {
+                            router.push('/settings' as any);
+                          }
                         }}
                       />
-                    )}
-                  </View>
-                ))}
+                      {i < items.length - 1 && (
+                        <View
+                          style={{
+                            height: 1,
+                            backgroundColor: colors.hairline,
+                            marginLeft: 68,
+                          }}
+                        />
+                      )}
+                    </View>
+                  ));
+                })()}
               </Card>
             </View>
           )}

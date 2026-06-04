@@ -1,18 +1,18 @@
-# Ceranix CI/CD
+# Carrinex CI/CD
 
 Operational runbook for everything under `.github/`. If you're wiring CI for the first time, work top-to-bottom.
 
 ## Pipeline at a glance
 
-| Workflow | Trigger | Purpose | Required secrets |
-|---|---|---|---|
-| `ci.yml` | PR + push to `main`/`Backend`, `workflow_dispatch` | Typecheck, web build, npm audit, artifact upload | _none required_ (Supabase secrets optional) |
-| `codeql.yml` | PR + push to `main`, weekly cron | TypeScript security analysis (CodeQL) | _none_ |
-| `secrets-scan.yml` | PR + push to `main`, weekly cron | gitleaks scan for committed secrets | _none_ (optional `GITLEAKS_LICENSE` for orgs) |
-| `dependency-review.yml` | PR | Block PRs that introduce high-severity / disallowed-license deps | _none_ |
-| `supabase-check.yml` | PR/push touching `supabase/*.sql` | Apply migrations to ephemeral Postgres to catch syntax/order issues | _none_ |
-| `vercel-preview.yml` | PR | Build + deploy a Vercel preview, comment URL on the PR | `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` |
-| `vercel-production.yml` | Push to `main`, `workflow_dispatch` | Production deploy via Vercel CLI (`--prebuilt`) | same as preview |
+| Workflow                | Trigger                                            | Purpose                                                             | Required secrets                                     |
+| ----------------------- | -------------------------------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------- |
+| `ci.yml`                | PR + push to `main`/`Backend`, `workflow_dispatch` | Typecheck, web build, npm audit, artifact upload                    | _none required_ (Supabase secrets optional)          |
+| `codeql.yml`            | PR + push to `main`, weekly cron                   | TypeScript security analysis (CodeQL)                               | _none_                                               |
+| `secrets-scan.yml`      | PR + push to `main`, weekly cron                   | gitleaks scan for committed secrets                                 | _none_ (optional `GITLEAKS_LICENSE` for orgs)        |
+| `dependency-review.yml` | PR                                                 | Block PRs that introduce high-severity / disallowed-license deps    | _none_                                               |
+| `supabase-check.yml`    | PR/push touching `supabase/*.sql`                  | Apply migrations to ephemeral Postgres to catch syntax/order issues | _none_                                               |
+| `vercel-preview.yml`    | PR                                                 | Build + deploy a Vercel preview, comment URL on the PR              | `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` |
+| `vercel-production.yml` | Push to `main`, `workflow_dispatch`                | Production deploy via Vercel CLI (`--prebuilt`)                     | same as preview                                      |
 
 All Vercel jobs skip cleanly when `VERCEL_TOKEN` is empty — no red Xs on PRs before the project is linked.
 
@@ -22,20 +22,20 @@ Set under **Settings → Secrets and variables → Actions**.
 
 ### Optional (CI passes without them)
 
-| Secret | Used by | What it controls |
-|---|---|---|
-| `EXPO_PUBLIC_SUPABASE_URL` | `ci.yml` (web build) | Inlined into the bundle. When empty, the build still succeeds but the bundle warns and can't talk to Supabase. |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | `ci.yml` (web build) | Same as above. |
-| `EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY` | `ci.yml` (web build) | Frontend Stripe key. Has a placeholder default. |
-| `GITLEAKS_LICENSE` | `secrets-scan.yml` | Only required for organisations. Personal repos work without it. |
+| Secret                               | Used by              | What it controls                                                                                               |
+| ------------------------------------ | -------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `EXPO_PUBLIC_SUPABASE_URL`           | `ci.yml` (web build) | Inlined into the bundle. When empty, the build still succeeds but the bundle warns and can't talk to Supabase. |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY`      | `ci.yml` (web build) | Same as above.                                                                                                 |
+| `EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY` | `ci.yml` (web build) | Frontend Stripe key. Has a placeholder default.                                                                |
+| `GITLEAKS_LICENSE`                   | `secrets-scan.yml`   | Only required for organisations. Personal repos work without it.                                               |
 
 ### Required to enable Vercel deploys
 
-| Secret | How to get it |
-|---|---|
-| `VERCEL_TOKEN` | https://vercel.com/account/tokens — create a token scoped to this project |
-| `VERCEL_ORG_ID` | `vercel link` locally, then read `.vercel/project.json` |
-| `VERCEL_PROJECT_ID` | Same file as above |
+| Secret              | How to get it                                                             |
+| ------------------- | ------------------------------------------------------------------------- |
+| `VERCEL_TOKEN`      | https://vercel.com/account/tokens — create a token scoped to this project |
+| `VERCEL_ORG_ID`     | `vercel link` locally, then read `.vercel/project.json`                   |
+| `VERCEL_PROJECT_ID` | Same file as above                                                        |
 
 ### Recommended GitHub Environments
 
@@ -81,8 +81,8 @@ gitleaks detect --no-banner --redact
 - uses: actions/checkout@v4
 - uses: ./.github/actions/setup-project
   with:
-    node-version: '22'   # optional, defaults to 22
-    install: 'true'      # optional, set "false" to skip npm ci
+    node-version: "22" # optional, defaults to 22
+    install: "true" # optional, set "false" to skip npm ci
 ```
 
 ## Dependabot policy

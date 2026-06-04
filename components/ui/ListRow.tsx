@@ -86,8 +86,8 @@ function Badge({ label, tone }: { label: string; tone: NonNullable<Props['badgeT
   const map = {
     pink: { bg: colors.primarySoft, fg: colors.primaryDeep },
     mute: { bg: colors.panel, fg: colors.smoke },
-    green: { bg: colors.primarySoft, fg: colors.primaryDeep },
-    amber: { bg: colors.primarySoft, fg: colors.primaryDeep },
+    green: { bg: colors.greenSoft, fg: colors.green },
+    amber: { bg: colors.pinkSoft, fg: colors.amber },
   } as const;
   const t = map[tone];
   return (

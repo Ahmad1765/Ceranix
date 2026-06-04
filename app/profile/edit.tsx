@@ -24,12 +24,12 @@ import { uploadAvatar, type LocalImage } from '@/lib/upload';
 import { useToast } from '@/lib/toast';
 
 const PURPLE = '#6C47FF';
-const LIME = '#6C47FF';
+const LIME = '#84CC16';  // or another lime/green shade
 const INK = '#0F0F0F';
 const MUTE = 'rgba(15,15,15,0.62)';
 const SOFT = '#FFFFFF';
 const HAIR = 'rgba(15,15,15,0.08)';
-const RED = '#0F0F0F';
+const RED = '#EF4444';  // or another red shade (e.g., #DC2626, #F87171)
 
 const LIMITS = {
   username: 20,

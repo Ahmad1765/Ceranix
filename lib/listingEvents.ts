@@ -19,7 +19,8 @@ export function onListingCreated(fn: Listener): () => void {
 }
 
 export function emitListingCreated(listing: Listing): void {
-  for (const fn of createdListeners) {
+  const snapshot = Array.from(createdListeners);
+  for (const fn of snapshot) {
     try {
       fn(listing);
     } catch (e) {

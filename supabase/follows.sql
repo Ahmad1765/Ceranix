@@ -1,4 +1,4 @@
--- Ceranix Follows (real social media follow graph)
+-- Carrinex Follows (real social media follow graph)
 -- Run once in the Supabase SQL editor.
 
 create table if not exists public.user_follows (

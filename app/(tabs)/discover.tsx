@@ -19,7 +19,6 @@ import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { colors, radii } from '@/lib/theme';
 import { useGridDimensions, HIT_SLOP_8 } from '@/lib/responsive';
-import { useInputFocus } from '@/lib/useInputFocus';
 import { useFadeIn, useStaggeredEntrance } from '@/lib/motion';
 import type { Category, Listing } from '@/types';
 import { EmptyState, SectionHeader } from '@/components/ui';
@@ -47,7 +46,7 @@ const GRID_GAP = 8;
 export default function DiscoverScreen() {
   // Query params from /news Saved tab (and external links). When set, the
   // screen boots with the search pre-applied so the user lands on results.
-  const params = useLocalSearchParams<{ q?: string; category?: string; savedId?: string }>();
+  const params = useLocalSearchParams<{ q?: string; category?: Category; savedId?: string }>();
   const initialQuery = typeof params.q === 'string' ? params.q : '';
   const initialCat = typeof params.category === 'string' ? (params.category as CatTile['id']) : null;
   const savedId = typeof params.savedId === 'string' ? params.savedId : null;
@@ -60,7 +59,6 @@ export default function DiscoverScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeCat, setActiveCat] = useState<CatTile['id'] | null>(initialCat);
   const [savingSearch, setSavingSearch] = useState(false);
-  const searchFocus = useInputFocus();
   // We disable the Save CTA once the current query has been saved this
   // session to avoid spam — the underlying unique index would reject anyway.
   const [savedKey, setSavedKey] = useState<string | null>(null);
@@ -233,7 +231,6 @@ export default function DiscoverScreen() {
               paddingHorizontal: 16,
               paddingVertical: 6,
               height: 46,
-              ...searchFocus.borderProps('transparent'),
             },
             fade,
           ]}
@@ -242,11 +239,18 @@ export default function DiscoverScreen() {
           <TextInput
             value={query}
             onChangeText={setQuery}
-            onFocus={searchFocus.onFocus}
-            onBlur={searchFocus.onBlur}
             placeholder="Search items, brands, sellers"
             placeholderTextColor={colors.muteSoft}
-            style={{ flex: 1, marginLeft: 10, fontSize: 14.5, color: colors.ink, padding: 0 }}
+            style={{
+              flex: 1,
+              marginLeft: 10,
+              fontSize: 14.5,
+              color: colors.ink,
+              padding: 0,
+              // RN-Web only: kill the browser's default input focus ring.
+              outlineStyle: 'none',
+              outlineWidth: 0,
+            } as any}
             returnKeyType="search"
             autoCorrect={false}
             autoCapitalize="none"

@@ -6,7 +6,7 @@
 
 ## Problem
 
-The `(tabs)/feed.tsx` screen ("My Feed") currently renders a static, hard-coded mockup of an unrelated refurbished-phone marketplace ("Carrinex" / "Nybegagnat"). It uses a purple gradient hero, fake iPhone product photos, and Swedish copy. None of it touches Supabase, none of it reflects the user's account, and none of it has anything to do with Ceranix (a peer-to-peer second-hand marketplace for clothing, shoes, bags, accessories, electronics, and beauty).
+The `(tabs)/feed.tsx` screen ("My Feed") currently renders a static, hard-coded mockup of an unrelated refurbished-phone marketplace ("Carrinex" / "Nybegagnat"). It uses a purple gradient hero, fake iPhone product photos, and Swedish copy. None of it touches Supabase, none of it reflects the user's account, and none of it has anything to do with Carrinex (a peer-to-peer second-hand marketplace for clothing, shoes, bags, accessories, electronics, and beauty).
 
 The tab is labeled "My Feed" with a dashboard-style icon, and currently has no purpose in the app's information architecture.
 
@@ -14,13 +14,13 @@ The tab is labeled "My Feed" with a dashboard-style icon, and currently has no p
 
 Rebuild `(tabs)/feed.tsx` into a personalized buyer-side surface that complements the existing tabs without duplicating them:
 
-| Tab | Purpose |
-|---|---|
-| Home (`index`) | Global discovery — For You / Popular / Following lists of all listings |
-| Discover | Active search + category browsing |
-| **My Feed (new)** | **Personalized "your corner" — items relevant to *you* based on signals** |
-| Upload | Post a new listing |
-| Profile | Your own shop + liked items + settings |
+| Tab               | Purpose                                                                   |
+| ----------------- | ------------------------------------------------------------------------- |
+| Home (`index`)    | Global discovery — For You / Popular / Following lists of all listings    |
+| Discover          | Active search + category browsing                                         |
+| **My Feed (new)** | **Personalized "your corner" — items relevant to _you_ based on signals** |
+| Upload            | Post a new listing                                                        |
+| Profile           | Your own shop + liked items + settings                                    |
 
 `/news` (bell icon, not a tab) already handles notifications and saved-search match counts and is not affected by this work.
 
@@ -52,11 +52,11 @@ If the user has zero likes, fall back to `fetchListings({ tab: 'popular' })` and
 
 ## Empty / cold-start handling
 
-There is no whole-screen empty state. Each section either renders content or hides itself. The screen always has *something* to show because Section 3 falls back to global popular listings.
+There is no whole-screen empty state. Each section either renders content or hides itself. The screen always has _something_ to show because Section 3 falls back to global popular listings.
 
-If the user is signed out, a soft banner at the top reads: *"Sign in and like a few items to see this feed personalize itself."* Tapping it routes to `/auth/login`.
+If the user is signed out, a soft banner at the top reads: _"Sign in and like a few items to see this feed personalize itself."_ Tapping it routes to `/auth/login`.
 
-If the user is signed in but has zero follows AND zero likes, an inline CTA card sits above Section 3: *"Follow some sellers or like a few items to start personalizing your feed."* Tapping it routes to Discover.
+If the user is signed in but has zero follows AND zero likes, an inline CTA card sits above Section 3: _"Follow some sellers or like a few items to start personalizing your feed."_ Tapping it routes to Discover.
 
 ## Data layer — `lib/myFeed.ts` (new)
 
@@ -215,11 +215,11 @@ Mirrors the existing real-Supabase integration helpers already used in the e2e s
 
 ## File summary
 
-| Action | Path |
-|---|---|
-| Rewrite | `app/(tabs)/feed.tsx` |
-| Create | `lib/myFeed.ts` |
-| Create | `components/PriceDropCard.tsx` |
-| Create | `supabase/migrations/<timestamp>_listing_price_history.sql` |
-| Create | `tests/e2e/feed-personalized.spec.ts` |
-| Delete | `tests/e2e/feed-static.spec.ts` |
+| Action  | Path                                                        |
+| ------- | ----------------------------------------------------------- |
+| Rewrite | `app/(tabs)/feed.tsx`                                       |
+| Create  | `lib/myFeed.ts`                                             |
+| Create  | `components/PriceDropCard.tsx`                              |
+| Create  | `supabase/migrations/<timestamp>_listing_price_history.sql` |
+| Create  | `tests/e2e/feed-personalized.spec.ts`                       |
+| Delete  | `tests/e2e/feed-static.spec.ts`                             |

@@ -25,7 +25,7 @@ test.describe('News / Activity', () => {
     await expect(page.getByText('Nothing for you yet')).toBeVisible();
   });
 
-  test('Saved tab CTA routes to either Discover (signed-in empty) or the sign-in page (signed-out)', async ({
+  test('Saved tab CTA routes to the sign-in page (signed-out)', async ({
     page,
   }) => {
     await page.getByText('Saved', { exact: true }).click();
