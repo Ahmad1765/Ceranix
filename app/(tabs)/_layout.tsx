@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import { View, Text } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { TabOrb } from '../../components/TabOrb';
 
 // Pure-View icon — no font load, no SVG. Mirrors MCI `view-dashboard`
 // (asymmetric 2×2 of rounded squares: large/small/small/large).
@@ -50,9 +51,7 @@ export default function TabsLayout() {
           title: 'Home',
           tabBarIcon: ({ focused, color, size }) => (
             <View className="items-center justify-center relative">
-              {focused && (
-                <View className="absolute bg-[#6C47FF] rounded-full w-10 h-10 opacity-30" style={{ shadowColor: '#6C47FF', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 15, elevation: 10 }} />
-              )}
+              {focused && <TabOrb />}
               <Feather name="home" size={24} color={focused ? "#0F0F0F" : "rgba(15,15,15,0.45)"} style={{fontWeight: focused ? 'bold' : 'normal'}} />
             </View>
           ),
@@ -64,9 +63,7 @@ export default function TabsLayout() {
           title: 'My Feed',
           tabBarIcon: ({ focused, color, size }) => (
             <View className="items-center justify-center relative">
-              {focused && (
-                <View className="absolute bg-[#6C47FF] rounded-full w-10 h-10 opacity-30" style={{ shadowColor: '#6C47FF', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 15, elevation: 10 }} />
-              )}
+              {focused && <TabOrb />}
               <MyFeedIcon size={22} color={focused ? "#0F0F0F" : "rgba(15,15,15,0.45)"} />
             </View>
           ),
@@ -78,9 +75,7 @@ export default function TabsLayout() {
           title: 'Discover',
           tabBarIcon: ({ focused, color, size }) => (
             <View className="items-center justify-center relative">
-              {focused && (
-                <View className="absolute bg-[#6C47FF] rounded-full w-10 h-10 opacity-30" style={{ shadowColor: '#6C47FF', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 15, elevation: 10 }} />
-              )}
+              {focused && <TabOrb />}
               <Feather name="search" size={24} color={focused ? "#0F0F0F" : "rgba(15,15,15,0.45)"} strokeWidth={focused ? 3 : 2} />
             </View>
           ),
@@ -92,9 +87,7 @@ export default function TabsLayout() {
           title: 'Upload ad',
           tabBarIcon: ({ focused, color, size }) => (
             <View className="items-center justify-center relative">
-              {focused && (
-                <View className="absolute bg-[#6C47FF] rounded-full w-10 h-10 opacity-30" style={{ shadowColor: '#6C47FF', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 15, elevation: 10 }} />
-              )}
+              {focused && <TabOrb />}
               <Feather name="plus-circle" size={24} color={focused ? "#0F0F0F" : "rgba(15,15,15,0.45)"} strokeWidth={focused ? 2 : 1.5} />
             </View>
           ),
@@ -114,9 +107,7 @@ export default function TabsLayout() {
           title: 'My profile',
           tabBarIcon: ({ focused, color, size }) => (
             <View className="items-center justify-center relative">
-              {focused && (
-                <View className="absolute bg-[#6C47FF] rounded-full w-10 h-10 opacity-30" style={{ shadowColor: '#6C47FF', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 15, elevation: 10 }} />
-              )}
+              {focused && <TabOrb />}
               <Feather name="smile" size={24} color={focused ? "#0F0F0F" : "rgba(15,15,15,0.45)"} strokeWidth={focused ? 2.5 : 2} />
             </View>
           ),
