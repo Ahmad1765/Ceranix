@@ -69,6 +69,10 @@ jobs:
             CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS
               $$ SELECT '{}'::jsonb $$;
 
+            CREATE TABLE IF NOT EXISTS auth.users (
+              id uuid primary key default uuid_generate_v4()
+            );
+
             CREATE SCHEMA IF NOT EXISTS storage;
             CREATE TABLE IF NOT EXISTS storage.objects (
               id uuid primary key default uuid_generate_v4(),
@@ -87,11 +91,21 @@ jobs:
           files=$(find supabase -maxdepth 2 -type f -name '*.sql' \
                    -not -path 'supabase/functions/*' \
                    -not -path 'supabase/.temp/*' \
-                   | sort)
+                   | sort -V)
           if [[ -z "$files" ]]; then
             echo "No SQL files found."
             exit 0
           fi
+          
+          # Ensure setup.sql runs first if it exists
+          setup_file=$(echo "$files" | grep -m1 'setup\.sql$' || true)
+          if [[ -n "$setup_file" ]]; then
+            echo "::group::psql $setup_file"
+            psql -v ON_ERROR_STOP=1 -f "$setup_file"
+            echo "::endgroup::"
+            files=$(echo "$files" | grep -v 'setup\.sql$') || true
+          fi
+
           for f in $files; do
             echo "::group::psql $f"
             psql -v ON_ERROR_STOP=1 -f "$f"

@@ -11,7 +11,7 @@ test.describe('Profile tab (signed in)', () => {
     await waitForAppReady(page);
   });
 
-  test('renders @handle, the three stat columns, and the four tabs', async ({ page }) => {
+  test('renders @handle, the three stat columns (Posts, Followers, Following), and the four tabs (Selling, Liked, Shop, Saved)', async ({ page }) => {
     // The @handle prefix is unique enough — there's always at least one.
     await expect(page.locator('text=/^@[\\w.]+$/').first()).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText('Posts', { exact: true })).toBeVisible();

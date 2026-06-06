@@ -24,7 +24,7 @@ permissions:
 
 concurrency:
   # One preview per PR ref. New pushes cancel the in-flight deploy.
-  group: vercel-preview-${{ github.event.pull_request.number || github.ref }}
+  group: vercel-preview-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || '' }}
   cancel-in-progress: true
 
 jobs:
@@ -37,12 +37,14 @@ jobs:
       - id: check
         env:
           TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
-          if [[ -n "${TOKEN}" ]]; then
+          if [[ -n "${TOKEN}" ]] && [[ -n "${ORG_ID}" ]] && [[ -n "${PROJECT_ID}" ]]; then
             echo "has-token=true" >> "$GITHUB_OUTPUT"
           else
             echo "has-token=false" >> "$GITHUB_OUTPUT"
-            echo "::notice title=Vercel deploy skipped::VERCEL_TOKEN is not set. Add it under Settings → Secrets and variables → Actions to enable preview deploys."
+            echo "::notice title=Vercel deploy skipped::VERCEL_TOKEN, VERCEL_ORG_ID, and/or VERCEL_PROJECT_ID are not set. Add them under Settings → Secrets and variables → Actions to enable preview deploys."
           fi
 
   deploy:
@@ -62,15 +64,21 @@ jobs:
         run: npm install --global vercel@latest
 
       - name: Pull Vercel preview env
-        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel pull --yes --environment=preview
 
       - name: Build with Vercel
-        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel build
 
       - name: Deploy prebuilt artifact
         id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
-          url=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
+          url=$(vercel deploy --prebuilt)
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "Preview: $url" >> "$GITHUB_STEP_SUMMARY"
 

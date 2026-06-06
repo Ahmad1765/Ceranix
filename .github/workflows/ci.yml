@@ -64,7 +64,10 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "| File | Size |" >> "$GITHUB_STEP_SUMMARY"
           echo "|------|-----:|" >> "$GITHUB_STEP_SUMMARY"
-          find dist -type f \( -name '*.js' -o -name '*.css' -o -name '*.html' \) -printf '%P\t%s\n' \
+          find dist -type f \( -name '*.js' -o -name '*.css' -o -name '*.html' \) | while read -r f; do
+            size=$(wc -c < "$f")
+            printf "%s\t%s\n" "${f#dist/}" "$size"
+          done \
             | sort -k2 -rn \
             | head -20 \
             | awk -F'\t' '{
