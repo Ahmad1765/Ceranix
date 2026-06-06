@@ -1,5 +1,5 @@
--- Profile feature backend
--- Run after schema.sql. Idempotent: safe to re-run.
+-- Ceranix — profile feature backend (mirrors live).
+-- Run after setup.sql. Idempotent: safe to re-run.
 
 -- 1) Extra columns on profiles ------------------------------------------------
 alter table public.profiles
@@ -10,7 +10,7 @@ alter table public.profiles
   add column if not exists is_pro boolean default false not null,
   add column if not exists expo_push_token text;
 
--- Case-insensitive unique username (optional, hardens edit flow)
+-- Case-insensitive unique username (hardens edit flow).
 create unique index if not exists profiles_username_lower_idx
   on public.profiles (lower(username));
 

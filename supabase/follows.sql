@@ -1,5 +1,5 @@
--- Carrinex Follows (real social media follow graph)
--- Run once in the Supabase SQL editor.
+-- Ceranix — follow graph + atomic RPCs (mirrors live).
+-- Run after setup.sql. Idempotent: safe to re-run.
 
 create table if not exists public.user_follows (
   follower_id uuid references public.profiles(id) on delete cascade not null,
@@ -23,17 +23,20 @@ create policy "Follows are viewable by everyone"
 
 drop policy if exists "Users can follow others" on public.user_follows;
 create policy "Users can follow others"
-  on public.user_follows for insert with check (auth.uid() = follower_id);
+  on public.user_follows for insert with check ((select auth.uid()) = follower_id);
 
 drop policy if exists "Users can unfollow" on public.user_follows;
 create policy "Users can unfollow"
-  on public.user_follows for delete using (auth.uid() = follower_id);
+  on public.user_follows for delete using ((select auth.uid()) = follower_id);
 
 -- Denormalized counts on the profile for cheap reads.
 alter table public.profiles
   add column if not exists followers_count integer not null default 0,
   add column if not exists following_count integer not null default 0;
 
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Counter trigger
+-- ─────────────────────────────────────────────────────────────────────────────
 create or replace function public.handle_follow_change()
 returns trigger
 language plpgsql
@@ -58,3 +61,75 @@ drop trigger if exists on_follow_change on public.user_follows;
 create trigger on_follow_change
   after insert or delete on public.user_follows
   for each row execute procedure public.handle_follow_change();
+
+revoke execute on function public.handle_follow_change() from public, anon, authenticated;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- RPC: get_follow_state — { is_following, followers_count, following_count }
+-- ─────────────────────────────────────────────────────────────────────────────
+create or replace function public.get_follow_state(p_followee uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select jsonb_build_object(
+    'is_following', exists (
+      select 1 from public.user_follows
+      where follower_id = auth.uid() and followee_id = p_followee
+    ),
+    'followers_count', coalesce((select followers_count from public.profiles where id = p_followee), 0),
+    'following_count', coalesce((select following_count from public.profiles where id = p_followee), 0)
+  );
+$$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- RPC: toggle_follow — atomic follow/unfollow, returns new state
+-- ─────────────────────────────────────────────────────────────────────────────
+create or replace function public.toggle_follow(p_followee uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_follower uuid := auth.uid();
+  v_exists boolean;
+  v_is_following boolean;
+  v_followers int;
+  v_following int;
+begin
+  if v_follower is null then
+    raise exception 'not_authenticated' using errcode = '42501';
+  end if;
+  if v_follower = p_followee then
+    raise exception 'cannot_follow_self' using errcode = '22023';
+  end if;
+
+  select exists (
+    select 1 from public.user_follows
+    where follower_id = v_follower and followee_id = p_followee
+  ) into v_exists;
+
+  if v_exists then
+    delete from public.user_follows
+    where follower_id = v_follower and followee_id = p_followee;
+    v_is_following := false;
+  else
+    insert into public.user_follows (follower_id, followee_id)
+    values (v_follower, p_followee);
+    v_is_following := true;
+  end if;
+
+  select followers_count, following_count
+    into v_followers, v_following
+  from public.profiles where id = p_followee;
+
+  return jsonb_build_object(
+    'is_following', v_is_following,
+    'followers_count', coalesce(v_followers, 0),
+    'following_count', coalesce(v_following, 0)
+  );
+end;
+$$;

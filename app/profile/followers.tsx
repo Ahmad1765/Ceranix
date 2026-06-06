@@ -46,18 +46,16 @@ export default function FollowersScreen() {
       setRows(list);
       const mask = await fetchFollowingMask(authUser?.id ?? null, list.map((r) => r.id));
       setFollowingSet(mask);
-      if (!headerName) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('username')
-          .eq('id', targetId)
-          .maybeSingle();
-        if (data?.username) setHeaderName(data.username);
-      }
+      const { data } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', targetId)
+        .maybeSingle();
+      if (data?.username) setHeaderName(prev => prev || data.username!);
     } finally {
       setLoading(false);
     }
-  }, [targetId, authUser?.id, headerName]);
+  }, [targetId, authUser?.id]);
 
   useEffect(() => {
     load();

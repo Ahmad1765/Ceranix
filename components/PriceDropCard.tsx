@@ -22,7 +22,7 @@ export const PriceDropCard = memo(function PriceDropCard({ listing, width = 130 
       onPress={() => router.push(`/product/${listing.id}`)}
       style={{ width }}
       accessibilityRole="button"
-      accessibilityLabel={`${listing.title}, price dropped to $${listing.new_price}`}
+      accessibilityLabel={`${listing.title}, price dropped to $${Number(listing.new_price).toFixed(2)}`}
     >
       <View
         style={{

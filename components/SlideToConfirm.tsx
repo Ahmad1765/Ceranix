@@ -46,14 +46,14 @@ export function SlideToConfirm({
 }: Props) {
   const [trackWidth, setTrackWidth] = useState(0);
   const translateX = useSharedValue(0);
-  const confirmedRef = useRef(false);
+  const [confirmed, setConfirmed] = useState(false);
 
   const maxTravel = Math.max(0, trackWidth - THUMB_SIZE - PADDING * 2);
   const threshold = maxTravel * 0.85;
 
   const fireConfirm = () => {
-    if (confirmedRef.current) return;
-    confirmedRef.current = true;
+    if (confirmed) return;
+    setConfirmed(true);
     tapMedium();
     onConfirm();
   };
@@ -61,14 +61,14 @@ export function SlideToConfirm({
   // External reset: if the parent flips `loading` back to false without
   // unmounting (e.g. a thrown error), slide the thumb back and re-arm.
   useEffect(() => {
-    if (!loading && confirmedRef.current) {
+    if (!loading && confirmed) {
       translateX.value = withTiming(0, {
         duration: 300,
         easing: Easing.out(Easing.exp),
       });
-      confirmedRef.current = false;
+      setConfirmed(false);
     }
-  }, [loading]);
+  }, [loading, confirmed]);
 
   const pan = Gesture.Pan()
     .enabled(!loading)
@@ -166,7 +166,7 @@ export function SlideToConfirm({
               letterSpacing: 0.4,
             }}
           >
-            {loading ? loadingLabel : (confirmedRef.current ? doneLabel : label)}
+            {loading ? loadingLabel : (confirmed ? doneLabel : label)}
           </Text>
         </Animated.View>
 

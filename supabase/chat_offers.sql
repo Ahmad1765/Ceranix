@@ -1,12 +1,8 @@
--- Chat + Offers backend.
+-- Ceranix — chat + offers backend (mirrors live).
 -- Run after setup.sql. Idempotent: safe to re-run.
---
--- Adds the columns + triggers needed by the in-app messaging and
--- "make an offer" flows. Conversations and messages already exist
--- in setup.sql; this migration only layers the bits the UI now uses.
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- conversations: keep updated_at fresh, allow upsert by (listing_id, buyer_id)
+-- conversations: track last sender, allow buyers to start + participants to update
 -- ─────────────────────────────────────────────────────────────────────────────
 alter table public.conversations
   add column if not exists last_sender_id uuid references public.profiles(id) on delete set null;
@@ -18,11 +14,9 @@ create index if not exists conversations_seller_idx
 create index if not exists conversations_last_sender_idx
   on public.conversations(last_sender_id);
 
--- Allow buyers to start a conversation. The "Participants can view" policy
--- already exists; we also need INSERT and UPDATE policies so the client can
--- create and bump conversations from the app.
--- auth.uid() is wrapped in (select ...) so it's evaluated once per query
--- instead of once per row.
+-- The "Participants can view" policy already exists in setup.sql; INSERT/UPDATE
+-- are added here so the client can create and bump conversations from the app.
+-- auth.uid() is wrapped in (select ...) so it's evaluated once per query.
 drop policy if exists "Buyers can create conversations" on public.conversations;
 create policy "Buyers can create conversations" on public.conversations
   for insert with check ((select auth.uid()) = buyer_id);
@@ -45,11 +39,12 @@ alter table public.messages
 
 create index if not exists messages_conversation_created_idx
   on public.messages(conversation_id, created_at);
+create index if not exists messages_sender_idx
+  on public.messages(sender_id);
 
 -- Allow participants to update offer_status on offer messages (accept / decline).
 -- The policy is just an authorization gate; the BEFORE UPDATE trigger below
--- enforces who can change what (counterparty accepts/declines, sender withdraws)
--- and that no other columns are mutated.
+-- enforces who can change what and that no other columns are mutated.
 drop policy if exists "Participants can update offer status" on public.messages;
 create policy "Participants can update offer status" on public.messages
   for update using (
@@ -69,8 +64,9 @@ create policy "Participants can update offer status" on public.messages
   );
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Validate offer_status updates: only counterparty can accept/decline,
--- only sender can withdraw, no other columns may be mutated, valid transitions only.
+-- Validate offer_status updates: only counterparty accepts/declines, only
+-- sender withdraws, only service_role can mark expired, no other columns may
+-- be mutated, valid transitions only.
 -- ─────────────────────────────────────────────────────────────────────────────
 create or replace function public.validate_offer_status_update()
 returns trigger
@@ -98,7 +94,7 @@ begin
     raise exception 'offer messages: only offer_status may be updated';
   end if;
 
-  -- Short-circuit if status itself didn't change (e.g. metadata-only no-op).
+  -- Short-circuit on metadata-only no-op.
   if new.offer_status is not distinct from old.offer_status then
     return new;
   end if;
@@ -127,18 +123,20 @@ begin
   counterparty := case when old.sender_id = buyer then seller else buyer end;
 
   if new.offer_status = 'withdrawn' then
-    -- Only the original sender can withdraw their offer.
     if caller is distinct from old.sender_id then
       raise exception 'only the offer sender may withdraw';
     end if;
   elsif new.offer_status in ('accepted','declined') then
-    -- Only the counterparty can accept or decline.
     if caller is distinct from counterparty then
       raise exception 'only the counterparty may accept or decline this offer';
     end if;
+  elsif new.offer_status = 'expired' then
+    -- Reserved for service / scheduled jobs (auth.uid() is null). Authenticated
+    -- callers must use withdrawn/declined instead.
+    if caller is not null then
+      raise exception 'only service role may mark offers expired';
+    end if;
   end if;
-  -- 'expired' is reserved for system / scheduled jobs running as service role
-  -- (auth.uid() is null), which bypasses the caller checks above.
 
   return new;
 end;
@@ -182,7 +180,6 @@ create trigger on_message_insert_bump_conversation
   after insert on public.messages
   for each row execute procedure public.bump_conversation_on_message();
 
--- Trigger function only — not callable via PostgREST RPC.
 revoke execute on function public.bump_conversation_on_message() from public, anon, authenticated;
 
 -- ─────────────────────────────────────────────────────────────────────────────

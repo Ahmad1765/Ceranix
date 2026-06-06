@@ -63,6 +63,18 @@ export default function DiscoverScreen() {
   // session to avoid spam — the underlying unique index would reject anyway.
   const [savedKey, setSavedKey] = useState<string | null>(null);
 
+  useEffect(() => {
+    const nextQ = typeof params.q === 'string' ? params.q : '';
+    setQuery(nextQ);
+    
+    if (typeof params.category === 'string') {
+      const isValid = CATEGORY_TILES.some(t => t.id === params.category);
+      setActiveCat(isValid ? (params.category as CatTile['id']) : null);
+    } else {
+      setActiveCat(null);
+    }
+  }, [params.q, params.category]);
+
   // When the screen mounts with a savedId param, mark that search seen so
   // the "N new" badge clears once the user actually opens it.
   useEffect(() => {

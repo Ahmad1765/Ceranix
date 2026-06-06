@@ -11,9 +11,13 @@ import * as path from 'node:path';
 function readUserIdFromStorage(): string | null {
   const storagePath = path.resolve(process.cwd(), 'playwright/.auth/user.json');
   if (!fs.existsSync(storagePath)) return null;
-  const raw = JSON.parse(fs.readFileSync(storagePath, 'utf8')) as {
-    origins?: Array<{ origin: string; localStorage?: Array<{ name: string; value: string }> }>;
-  };
+  let raw: any;
+  try {
+    raw = JSON.parse(fs.readFileSync(storagePath, 'utf8'));
+  } catch (err) {
+    console.warn(`[readUserIdFromStorage] Failed to parse auth storage at ${storagePath}`, err);
+    return null;
+  }
   for (const origin of raw.origins ?? []) {
     for (const kv of origin.localStorage ?? []) {
       if (!kv.name.startsWith('sb-') || !kv.name.endsWith('-auth-token')) continue;

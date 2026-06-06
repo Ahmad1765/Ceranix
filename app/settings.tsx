@@ -145,12 +145,14 @@ export default function SettingsScreen() {
   // `?open=bundle` in the URL to reopen it.
   const handledDeepLink = useRef(false);
   useEffect(() => {
-    if (handledDeepLink.current) return;
-    if (params.open === 'bundle') {
-      setShowBundle(true);
-      setOpen('shop');
-      handledDeepLink.current = true;
+    if (params.open !== 'bundle') {
+      handledDeepLink.current = false;
+      return;
     }
+    if (handledDeepLink.current) return;
+    setShowBundle(true);
+    setOpen('shop');
+    handledDeepLink.current = true;
   }, [params.open]);
 
   // ---------- Section toggle ----------
@@ -363,14 +365,10 @@ export default function SettingsScreen() {
         phone: form.phone.trim() || null,
         is_default: true,
       };
-      const { data, error } = address?.id
-        ? await supabase
-            .from('shipping_addresses')
-            .update(payload)
-            .eq('id', address.id)
-            .select('*')
-            .single()
-        : await supabase.from('shipping_addresses').insert(payload).select('*').single();
+      const { data, error } = await supabase.rpc('upsert_shipping_address_with_default', {
+        p_payload: address?.id ? { ...payload, id: address.id } : payload,
+      });
+
       if (error) {
         toast.show(error.message ?? 'Could not save address', {
           variant: 'default',
@@ -379,24 +377,6 @@ export default function SettingsScreen() {
         return false;
       }
 
-      const { error: updateErr } = await supabase
-        .from('shipping_addresses')
-        .update({ is_default: false })
-        .eq('user_id', user.id)
-        .neq('id', data.id);
-      
-      if (updateErr) {
-        if (!address?.id) {
-           await supabase.from('shipping_addresses').delete().eq('id', data.id);
-        } else {
-           await supabase.from('shipping_addresses').update({ is_default: false }).eq('id', data.id);
-        }
-        toast.show('Could not save default status', {
-          variant: 'default',
-          icon: 'alert-triangle',
-        });
-        return false;
-      }
       if (mounted.current) setAddress(data as ShippingAddress);
       toast.show('Address saved', { variant: 'success', icon: 'check' });
       return true;

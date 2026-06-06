@@ -68,6 +68,7 @@ export function cardWidth(args: {
   gap?: number;
 }): number {
   const { rowWidth, columns, horizontalPadding = 0, gap = 0 } = args;
+  if (columns <= 0) return 0;
   const usable = rowWidth - horizontalPadding * 2;
   const totalGap = gap * (columns - 1);
   return Math.max(0, Math.floor((usable - totalGap) / columns));

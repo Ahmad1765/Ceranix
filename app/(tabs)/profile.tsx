@@ -36,7 +36,7 @@ import type { Listing } from '@/types';
 import { useToast } from '@/lib/toast';
 import { Button, Card, ListRow, EmptyState, Tabs } from '@/components/ui';
 
-const APP_URL = 'https://ceranix.app';
+const APP_URL = 'https://carrinex.vercel.app';
 
 type ProfileTab = 'selling' | 'liked' | 'shop' | 'collections';
 

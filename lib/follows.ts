@@ -105,7 +105,8 @@ export async function fetchSuggestedFollows(
     .from('profiles')
     .select('id, username, full_name, avatar_url, followers_count, is_verified')
     .order('followers_count', { ascending: false, nullsFirst: false })
-    .limit(limit + excluded.length);
+    // Buffer limit to ensure we hit the target limit after exclusion
+    .limit(limit + Math.max(20, excluded.length * 3));
   if (excluded.length > 0) {
     query = query.not('id', 'in', excluded);
   }

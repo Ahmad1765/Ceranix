@@ -94,9 +94,12 @@ export function LiveActivityTicker() {
     };
   }, []);
 
+  const latestItemsRef = useRef(items);
+  latestItemsRef.current = items;
+
   // Cycle through items
   useEffect(() => {
-    let t: NodeJS.Timeout | undefined;
+    let t: ReturnType<typeof setInterval> | undefined;
     if (items.length === 0) return;
     // Dynamic Island expand-in: blob → pill
     islandScale.setValue(0.2);
@@ -141,7 +144,7 @@ export function LiveActivityTicker() {
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
         ]).start(() => {
-          setIndex((i) => (i + 1) % items.length);
+          setIndex((i) => (i + 1) % latestItemsRef.current.length);
           slide.setValue(16);
           opacity.setValue(0);
           Animated.parallel([

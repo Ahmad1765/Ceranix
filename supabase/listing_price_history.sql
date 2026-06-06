@@ -1,7 +1,7 @@
--- Carrinex — listing price history.
+-- Ceranix — listing price history (mirrors live).
 -- Captures every price change on `listings` so we can surface
 -- "items you liked got cheaper" on the My Feed tab.
--- Idempotent: safe to re-run.
+-- Run after setup.sql. Idempotent: safe to re-run.
 
 create table if not exists public.listing_price_history (
   id uuid primary key default gen_random_uuid(),

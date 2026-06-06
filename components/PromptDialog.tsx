@@ -122,7 +122,7 @@ function PromptModal({
             value={value}
             onChangeText={setValue}
             placeholder={options.placeholder}
-            placeholderTextColor="rgba(15,15,15,0.45)"
+            placeholderTextColor={colors.muteSoft}
             autoFocus
             returnKeyType="done"
             onSubmitEditing={submit}

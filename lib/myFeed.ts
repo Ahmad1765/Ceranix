@@ -151,7 +151,7 @@ export async function fetchNewFromFollowed(
 ): Promise<MyFeedResult<Listing>> {
   try {
     const followsRes = await withTimeout(
-      supabase.from('user_follows').select('followee_id').eq('follower_id', userId),
+      supabase.from('user_follows').select('followee_id').eq('follower_id', userId).order('created_at', { ascending: false }).limit(200),
       'followed:follows',
     );
     if ('__wedge' in followsRes) return { ok: false };
@@ -245,10 +245,14 @@ export async function fetchSimilarToLiked(
       'similar:exclude',
     );
     if ('__wedge' in allLikedRes) return { ok: false };
-    const { data: allLikedRows } = allLikedRes as {
+    const { data: allLikedRows, error: allLikedErr } = allLikedRes as {
       data: { listing_id: string }[] | null;
       error: { message: string } | null;
     };
+    if (allLikedErr) {
+      console.warn('[myFeed] fetchSimilarToLiked exclude', allLikedErr.message);
+      return { ok: false };
+    }
     const likedSet = new Set((allLikedRows ?? []).map((r) => r.listing_id));
 
     // Step C — call find_similar_listings per seed, in parallel.

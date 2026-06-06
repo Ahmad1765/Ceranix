@@ -89,7 +89,7 @@ function displayName(
 }
 
 export default function InvoiceScreen() {
-  const { id, paid } = useLocalSearchParams<{ id: string; paid?: string }>();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const { profile } = useAuth();
   const toast = useToast();
   const cached = getCachedListing(id ? String(id) : null);
@@ -105,7 +105,7 @@ export default function InvoiceScreen() {
     const haveCached = !!getCachedListing(String(id));
     setLoading(!haveCached);
     (async () => {
-      let timeoutId: NodeJS.Timeout;
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
       try {
         const res = await Promise.race([
           fetchListingById(String(id)),
@@ -205,7 +205,7 @@ export default function InvoiceScreen() {
   const sellerHandle = displayHandle(seller?.username);
   const buyerName = displayName(profile?.full_name, profile?.username);
   const buyerHandle = displayHandle(profile?.username);
-  const status: 'paid' | 'pending' = listing.is_sold || paid === '1' ? 'paid' : 'pending';
+  const status: 'paid' | 'pending' = listing.is_sold ? 'paid' : 'pending';
   const heroImage = listing.images?.[0];
 
   const onShare = async () => {

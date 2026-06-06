@@ -1,4 +1,4 @@
-import { memo, useEffect, useState, useCallback } from 'react';
+import { memo, useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -50,6 +50,9 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
   const images = listing.images.length > 0 ? listing.images : [''];
   const hasMultiple = images.length > 1;
 
+  const likedInteractedRef = useRef(false);
+  const savedInteractedRef = useRef(false);
+
   // Hydrate the liked state for the current user. Cards are recycled in the
   // feed grid so we re-run this whenever the listing id or user changes.
   useEffect(() => {
@@ -58,8 +61,9 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
       return;
     }
     let cancelled = false;
+    likedInteractedRef.current = false;
     fetchIsLiked(listing.id, user.id).then((v) => {
-      if (!cancelled) setLiked(v);
+      if (!cancelled && !likedInteractedRef.current) setLiked(v);
     });
     return () => {
       cancelled = true;
@@ -73,8 +77,9 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
       return;
     }
     let cancelled = false;
+    savedInteractedRef.current = false;
     fetchIsSaved(listing.id, user.id).then((v) => {
-      if (!cancelled) setSaved(v);
+      if (!cancelled && !savedInteractedRef.current) setSaved(v);
     });
     return () => {
       cancelled = true;
@@ -94,6 +99,7 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
       return;
     }
     if (likeBusy) return;
+    likedInteractedRef.current = true;
     const prev = liked;
     const next = !prev;
     // Optimistic flip — rollback below if the server disagrees.
@@ -106,18 +112,26 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
         setLiked(prev);
         setLikeCount((c) => Math.max(0, c + (next ? -1 : 1)));
       }
+    } catch (error) {
+      setLiked(prev);
+      setLikeCount((c) => Math.max(0, c + (next ? -1 : 1)));
+      throw error;
     } finally {
       setLikeBusy(false);
     }
   }, [liked, likeBusy, listing.id, toast, user?.id]);
 
+  const longPressHandled = useRef(false);
+
   const handleToggleSave = useCallback(async () => {
+    if (longPressHandled.current) return;
     if (!user?.id) {
       toast.show('Sign in to save', { variant: 'info', icon: 'log-in' });
       router.push('/auth/login');
       return;
     }
     if (saveBusy) return;
+    savedInteractedRef.current = true;
     const prev = saved;
     const next = !prev;
     setSaved(next);
@@ -129,6 +143,9 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
       } else if (next) {
         toast.show('Saved', { variant: 'success', icon: 'bookmark' });
       }
+    } catch (error) {
+      setSaved(prev);
+      throw error;
     } finally {
       setSaveBusy(false);
     }
@@ -137,12 +154,15 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
   // Long-press opens the SaveListSheet so the user can pick a specific
   // collection (or create a new one) instead of dumping into the default.
   const handleOpenSheet = useCallback(() => {
+    longPressHandled.current = true;
     if (!user?.id) {
       toast.show('Sign in to save', { variant: 'info', icon: 'log-in' });
       router.push('/auth/login');
+      setTimeout(() => { longPressHandled.current = false; }, 300);
       return;
     }
     setSheetOpen(true);
+    setTimeout(() => { longPressHandled.current = false; }, 300);
   }, [toast, user?.id]);
 
   // Subtle staggered entrance: fade + slight rise on mount.

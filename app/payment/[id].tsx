@@ -51,9 +51,6 @@ export default function PaymentScreen() {
   const { id, offer } = useLocalSearchParams<{ id: string; offer?: string }>();
   const { user } = useAuth();
 
-  if (!user) {
-    return <Redirect href="/auth/login" />;
-  }
   const toast = useToast();
   const cached = getCachedListing(id ? String(id) : null);
   const [listing, setListing] = useState<Listing | null>(cached);
@@ -107,6 +104,10 @@ export default function PaymentScreen() {
       active = false;
     };
   }, [id]);
+
+  if (!user) {
+    return <Redirect href="/auth/login" />;
+  }
 
   if (loading) {
     return (

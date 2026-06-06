@@ -47,9 +47,14 @@ const REQUEST_TIMEOUT_MS = 12_000;
 function timeoutFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const controller = new AbortController();
   const externalSignal = init?.signal;
+  let onExternalAbort: (() => void) | undefined;
   if (externalSignal) {
-    if (externalSignal.aborted) controller.abort();
-    else externalSignal.addEventListener('abort', () => controller.abort(), { once: true });
+    if (externalSignal.aborted) {
+      controller.abort();
+    } else {
+      onExternalAbort = () => controller.abort();
+      externalSignal.addEventListener('abort', onExternalAbort, { once: true });
+    }
   }
 
   const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as any).url || '';
@@ -58,9 +63,12 @@ function timeoutFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Res
   const timeoutMs = isStorageUpload ? 600000 : REQUEST_TIMEOUT_MS; // 10 minutes for storage uploads
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-  return fetch(input as any, { ...init, signal: controller.signal }).finally(() =>
-    clearTimeout(timer),
-  );
+  return fetch(input as any, { ...init, signal: controller.signal }).finally(() => {
+    clearTimeout(timer);
+    if (externalSignal && onExternalAbort) {
+      externalSignal.removeEventListener('abort', onExternalAbort);
+    }
+  });
 }
 
 // Web lock with bounded acquire + graceful fallback.

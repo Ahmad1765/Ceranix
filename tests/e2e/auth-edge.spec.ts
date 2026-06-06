@@ -40,7 +40,8 @@ test.describe('Auth edges', () => {
       'EXPO_PUBLIC_SUPABASE_URL not configured — cannot stub auth endpoint',
     );
     // Pre-seed a junk token so supabase-js attempts to hydrate the user.
-    await page.addInitScript(() => {
+    await page.addInitScript((url: string | undefined) => {
+      const projectId = url ? new URL(url).hostname.split('.')[0] : 'test';
       const fake = {
         access_token: 'expired-fake-token',
         refresh_token: 'expired-fake-refresh',
@@ -51,11 +52,11 @@ test.describe('Auth edges', () => {
         // supabase-js stores its session under a project-scoped key. We don't
         // know the exact prefix here, so we just plant a generic auth marker
         // that the bundle's recovery path will see.
-        localStorage.setItem('sb-test-auth-token', JSON.stringify(fake));
+        localStorage.setItem(`sb-${projectId}-auth-token`, JSON.stringify(fake));
       } catch {
         /* private mode — ignore */
       }
-    });
+    }, SUPABASE_URL);
     // Any call to /auth/v1/user returns 401, the same as an expired token.
     await page.route(AUTH_USER_RE, async (route) => {
       return route.fulfill({

@@ -170,6 +170,11 @@ const DISPLAY_TO_CATEGORY: Record<string, string> = {
   women: 'clothing',
   men: 'clothing',
   kids: 'clothing',
+  vintage: 'clothing',
+  editors: 'trending',
+  app: 'other',
+  home: 'other',
+  lifestyle: 'other',
 };
 
 function go(categoryKey: string) {

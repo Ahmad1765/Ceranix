@@ -20,7 +20,7 @@ import { safeBack } from '@/lib/nav';
 import { RequireAuth } from '@/components/RequireAuth';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
-import { uploadListingImages, type LocalImage } from '@/lib/upload';
+import { uploadListingImages, deleteListingImages, type LocalImage } from '@/lib/upload';
 import { useToast } from '@/lib/toast';
 import { putCachedListing } from '@/lib/listingCache';
 import { emitListingCreated } from '@/lib/listingEvents';
@@ -91,7 +91,6 @@ function SellScreenInner() {
   const { width } = useWindowDimensions();
   const [step, setStep] = useState<Step>('photos');
   const [images, setImages] = useState<LocalImage[]>([]);
-  const [aiPrefill, setAiPrefill] = useState(true);
   const [publishing, setPublishing] = useState(false);
 
   // Details
@@ -177,8 +176,9 @@ function SellScreenInner() {
     }
 
     setPublishing(true);
+    let urls: string[] = [];
     try {
-      const urls = await uploadListingImages(images, user.id);
+      urls = await uploadListingImages(images, user.id);
 
       const { data, error } = await supabase
         .from('listings')
@@ -199,7 +199,10 @@ function SellScreenInner() {
         .select('id')
         .single();
 
-      if (error) throw error;
+      if (error) {
+        await deleteListingImages(urls);
+        throw error;
+      }
 
       const newId = data!.id as string;
 
@@ -392,69 +395,6 @@ function SellScreenInner() {
                 )}
               </View>
             </View>
-
-            {/* AI Prefill */}
-            <Pressable
-              onPress={() => setAiPrefill(!aiPrefill)}
-              className="border border-ink-hair"
-              style={{
-                marginTop: 28,
-                borderRadius: 18,
-                padding: 16,
-                flexDirection: 'row',
-                alignItems: 'center',
-                backgroundColor: aiPrefill ? 'rgba(108,71,255,0.06)' : '#FFFFFF',
-                borderColor: aiPrefill ? 'rgba(108,71,255,0.18)' : 'rgba(15,15,15,0.08)',
-              }}
-            >
-              <View
-                className="bg-primary"
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 12,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: 12,
-                }}
-              >
-                <Ionicons name="sparkles" size={18} color="#FFFFFF" />
-              </View>
-              <View style={{ flex: 1, marginRight: 12 }}>
-                <Text className="text-ink" style={{ fontSize: 15, fontWeight: '700' }}>
-                  Auto-fill from photo
-                </Text>
-                <Text
-                  className="text-ink-mute"
-                  style={{ fontSize: 13, lineHeight: 18, marginTop: 2 }}
-                >
-                  We'll suggest title, brand, and category.
-                </Text>
-              </View>
-              <View
-                style={{
-                  width: 46,
-                  height: 28,
-                  borderRadius: 999,
-                  padding: 3,
-                  backgroundColor: aiPrefill ? '#6C47FF' : 'rgba(15,15,15,0.12)',
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: aiPrefill ? 'flex-end' : 'flex-start',
-                }}
-              >
-                <View
-                  style={{
-                    width: 22,
-                    height: 22,
-                    borderRadius: 999,
-                    backgroundColor: '#FFFFFF',
-                    boxShadow: '0px 1px 2px rgba(0,0,0,0.2)',
-                    elevation: 2,
-                  }}
-                />
-              </View>
-            </Pressable>
 
             {/* Quick tips */}
             <View style={{ marginTop: 24 }}>

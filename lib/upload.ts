@@ -1,5 +1,6 @@
 import { decode } from 'base64-arraybuffer';
 import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system';
 import { supabase } from '@/lib/supabase';
 
 export type LocalImage = { uri: string; base64?: string | null };
@@ -52,6 +53,9 @@ async function downscaleAvatarOnWeb(image: LocalImage): Promise<LocalImage> {
 }
 
 async function readBase64FromUri(uri: string): Promise<string> {
+  if (Platform.OS !== 'web') {
+    return FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+  }
   const res = await fetch(uri);
   const blob = await res.blob();
   return new Promise<string>((resolve, reject) => {
@@ -126,4 +130,15 @@ export async function uploadListingImages(
 export async function uploadAvatar(image: LocalImage, userId: string): Promise<string> {
   const downscaled = await downscaleAvatarOnWeb(image);
   return uploadOne('avatars', downscaled, userId, 0);
+}
+
+export async function deleteListingImages(urls: string[]): Promise<void> {
+  const paths = urls.map((url) => {
+    const parts = url.split('/listing-images/');
+    return parts.length > 1 ? parts[1] : null;
+  }).filter(Boolean) as string[];
+  
+  if (paths.length > 0) {
+    await supabase.storage.from('listing-images').remove(paths);
+  }
 }

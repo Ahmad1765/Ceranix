@@ -38,7 +38,7 @@ export function StoryAvatar({ uri, size = 56, ring = 'purple', initial }: Props)
         <View accessible={true} accessibilityLabel="Profile picture" style={{ alignItems: 'center', justifyContent: 'center' }}>
           {initial ? (
             <Text style={{ fontSize: innerSize * 0.4, fontWeight: '800', color: colors.purple }}>
-              {initial.toUpperCase()}
+              {initial.charAt(0).toUpperCase()}
             </Text>
           ) : (
             <Feather name="user" size={innerSize * 0.42} color={colors.muteSoft} />

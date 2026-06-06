@@ -55,9 +55,10 @@ export default function NewsScreen() {
         rows.map(async (s) => {
           try {
             return [s.id, await fetchNewMatchesCount(s.id)] as const;
-          } catch {
-            // Keep the previous count (or 0) for this search on failure.
-            return [s.id, matchCountsRef.current[s.id] ?? 0] as const;
+          } catch (err) {
+            console.warn('[news] fetchNewMatchesCount failed for', s.id, err);
+            // Clear the count on failure instead of preserving a stale badge
+            return [s.id, 0] as const;
           }
         }),
       );

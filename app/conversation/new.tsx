@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -22,9 +22,6 @@ import { getOrCreateConversation, sendMessage, sendOffer } from '@/lib/chat';
 import { getOptimizedImageUrl } from '@/lib/images';
 import { useToast } from '@/lib/toast';
 import type { Listing } from '@/types';
-import { colors, radii } from '@/lib/theme';
-import { Button } from '@/components/ui';
-import { HIT_SLOP_8 } from '@/lib/responsive';
 
 type Mode = 'message' | 'offer';
 
@@ -32,7 +29,25 @@ const QUICK_REPLIES = [
   'Hi! Is this still available?',
   'Could you send more photos?',
   'Would you bundle this with another item?',
+  'Is the price negotiable?',
 ];
+
+function Eyebrow({ children }: { children: React.ReactNode }) {
+  return (
+    <Text
+      className="text-ink-mute"
+      style={{
+        fontSize: 11,
+        fontWeight: '700',
+        letterSpacing: 1.2,
+        textTransform: 'uppercase',
+        marginBottom: 10,
+      }}
+    >
+      {children}
+    </Text>
+  );
+}
 
 export default function NewConversationScreen() {
   const params = useLocalSearchParams<{ listing?: string; mode?: string; amount?: string }>();
@@ -45,7 +60,6 @@ export default function NewConversationScreen() {
   const insets = useSafeAreaInsets();
   const { width: winWidth, height: winHeight } = useWindowDimensions();
   const compact = winHeight < 700 || winWidth < 360;
-  const amountFontSize = compact ? 28 : 32;
 
   const [listing, setListing] = useState<Listing | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,6 +69,27 @@ export default function NewConversationScreen() {
   const [note, setNote] = useState('');
   const [sending, setSending] = useState(false);
   const [hasToggled, setHasToggled] = useState(false);
+
+  const messageRef = useRef<TextInput>(null);
+  const amountRef = useRef<TextInput>(null);
+
+  // Focus the active field on first mount without triggering the
+  // browser's scrollIntoView (which on react-native-web shifts the
+  // page horizontally and clips the hero on the left edge).
+  useEffect(() => {
+    if (hasToggled) return;
+    const target = initialMode === 'offer' ? amountRef.current : messageRef.current;
+    if (!target) return;
+    const id = requestAnimationFrame(() => {
+      try {
+        (target as any).focus({ preventScroll: true });
+      } catch {
+        target.focus();
+      }
+    });
+    return () => cancelAnimationFrame(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -85,10 +120,10 @@ export default function NewConversationScreen() {
   const offerSuggestions = useMemo(() => {
     if (!listing) return [];
     return [
-      Math.round(listing.price * 0.7),
-      Math.round(listing.price * 0.8),
-      Math.round(listing.price * 0.9),
-    ].filter((v) => v > 0);
+      { label: '-30%', value: Math.round(listing.price * 0.7) },
+      { label: '-20%', value: Math.round(listing.price * 0.8) },
+      { label: '-10%', value: Math.round(listing.price * 0.9) },
+    ].filter((v) => v.value > 0);
   }, [listing]);
 
   const amountNum = parseInt(amount, 10);
@@ -160,23 +195,41 @@ export default function NewConversationScreen() {
         edges={['top']}
         style={{ flex: 1, backgroundColor: 'white', alignItems: 'center', justifyContent: 'center' }}
       >
-        <ActivityIndicator color={colors.purple} />
+        <ActivityIndicator color="#6C47FF" />
       </SafeAreaView>
     );
   }
 
   if (!listing) {
     return (
-      <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: 'white' }}>
-        <View style={{ padding: 14, flexDirection: 'row', alignItems: 'center' }}>
-          <Pressable onPress={() => safeBack()}>
-            <Feather name="x" size={24} color={colors.ink} />
+      <SafeAreaView edges={['top']} className="flex-1 bg-white">
+        <View className="flex-row items-center px-4 pt-3 pb-3">
+          <Pressable onPress={() => safeBack()} hitSlop={12}>
+            <Feather name="x" size={24} color="#0F0F0F" />
           </Pressable>
         </View>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30 }}>
-          <Text style={{ fontSize: 17, fontWeight: '700', color: colors.ink }}>Listing unavailable</Text>
-          <Text style={{ fontSize: 13, color: colors.mute, marginTop: 6, textAlign: 'center' }}>
-            This item may have been removed.
+        <View className="flex-1 items-center justify-center px-8">
+          <View
+            className="bg-ink-panel"
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 999,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 16,
+            }}
+          >
+            <Feather name="alert-circle" size={24} color="rgba(15,15,15,0.62)" />
+          </View>
+          <Text className="text-ink" style={{ fontSize: 18, fontWeight: '700' }}>
+            Listing unavailable
+          </Text>
+          <Text
+            className="text-ink-mute"
+            style={{ fontSize: 14, marginTop: 6, textAlign: 'center', lineHeight: 20 }}
+          >
+            This item may have been removed or is no longer for sale.
           </Text>
         </View>
       </SafeAreaView>
@@ -190,35 +243,39 @@ export default function NewConversationScreen() {
   const thumb = listing.images?.[0] ? getOptimizedImageUrl(listing.images[0], { width: 240 }) : null;
   const sellerInitial = sellerName.trim().charAt(0).toUpperCase();
 
-  const CTA_HEIGHT = 52;
-  const CTA_VPAD = 14;
-  const ctaTotalHeight = CTA_HEIGHT + CTA_VPAD * 2 + Math.max(insets.bottom, 8);
+  const ctaBottomPad = Math.max(insets.bottom, 12) + 12;
+  const ctaTotalHeight = 58 + 12 + ctaBottomPad;
+
+  const heroTitle = mode === 'offer' ? 'Make an offer' : 'Send a message';
+  const heroSub =
+    mode === 'offer'
+      ? 'Sellers respond faster to fair, friendly offers.'
+      : 'Ask a quick question — sellers usually reply within a day.';
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
+    <SafeAreaView
+      edges={['top']}
+      className="flex-1 bg-white"
+      style={{ overflow: 'hidden' }}
+    >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
       >
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingHorizontal: 14,
-            paddingVertical: 12,
-            borderBottomWidth: 1,
-            borderBottomColor: colors.hairline,
-          }}
-        >
-          <Pressable onPress={() => safeBack()} hitSlop={HIT_SLOP_8} style={{ padding: 4 }}>
-            <Feather name="x" size={22} color={colors.ink} />
+        {/* Header */}
+        <View className="flex-row items-center justify-between px-4 pt-3 pb-3">
+          <Pressable
+            onPress={() => safeBack()}
+            hitSlop={12}
+            style={({ pressed }) => ({ opacity: pressed ? 0.55 : 1 })}
+          >
+            <Feather name="x" size={24} color="#0F0F0F" />
           </Pressable>
-          <Text style={{ fontSize: 16, fontWeight: '800', color: colors.ink }} numberOfLines={1}>
-            {mode === 'offer' ? 'Make an offer' : 'New message'}
+          <Text className="text-ink" style={{ fontSize: 14, fontWeight: '700' }}>
+            {mode === 'offer' ? 'Offer' : 'Message'}
           </Text>
-          <View style={{ width: 30 }} />
+          <View style={{ width: 24 }} />
         </View>
 
         <ScrollView
@@ -226,333 +283,460 @@ export default function NewConversationScreen() {
           keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
-            paddingTop: 14,
-            paddingHorizontal: 14,
-            paddingBottom: ctaTotalHeight + 16,
+            paddingHorizontal: 20,
+            paddingBottom: ctaTotalHeight + 24,
           }}
         >
-          {/* Recipient */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-            <Text style={{ fontSize: 13, color: colors.mute, marginRight: 8 }}>To</Text>
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                backgroundColor: colors.panel,
-                borderRadius: 999,
-                paddingLeft: 4,
-                paddingRight: 12,
-                paddingVertical: 4,
-                maxWidth: '100%',
-              }}
-            >
+          {/* Hero */}
+          <Text
+            className="text-ink"
+            style={{ fontSize: 30, fontWeight: '800', letterSpacing: -0.6, lineHeight: 36, marginTop: 6 }}
+          >
+            {heroTitle}
+          </Text>
+          <Text
+            className="text-ink-mute"
+            style={{ fontSize: 15, lineHeight: 22, marginTop: 8, maxWidth: 320 }}
+          >
+            {heroSub}
+          </Text>
+
+          {/* Listing + seller card */}
+          <View
+            className="border border-ink-hair"
+            style={{ borderRadius: 18, padding: 14, marginTop: 22 }}
+          >
+            <View className="flex-row items-center">
               <View
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: 14,
+                  overflow: 'hidden',
+                  marginRight: 12,
+                }}
+                className="bg-ink-panel"
+              >
+                {thumb && (
+                  <Image
+                    source={{ uri: thumb }}
+                    style={{ width: '100%', height: '100%' }}
+                    contentFit="cover"
+                  />
+                )}
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text
+                  className="text-ink"
+                  style={{ fontSize: 15, fontWeight: '700' }}
+                  numberOfLines={1}
+                >
+                  {listing.title}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 4 }}>
+                  <Text className="text-ink" style={{ fontSize: 18, fontWeight: '800' }}>
+                    ${listing.price}
+                  </Text>
+                  {listing.size ? (
+                    <Text
+                      className="text-ink-mute"
+                      style={{ fontSize: 12, fontWeight: '600', marginLeft: 8 }}
+                    >
+                      Size {listing.size}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+            </View>
+
+            <View
+              className="border-t border-ink-hair"
+              style={{ marginTop: 14, paddingTop: 12, flexDirection: 'row', alignItems: 'center' }}
+            >
+              <Text className="text-ink-mute" style={{ fontSize: 12, fontWeight: '600', marginRight: 10 }}>
+                To
+              </Text>
+              <View
+                className="bg-primary-soft"
                 style={{
                   width: 24,
                   height: 24,
-                  borderRadius: 12,
-                  backgroundColor: colors.purpleSoft,
+                  borderRadius: 999,
                   overflow: 'hidden',
-                  marginRight: 8,
                   alignItems: 'center',
                   justifyContent: 'center',
+                  marginRight: 8,
                 }}
               >
                 {sellerAvatar ? (
-                  <Image source={{ uri: sellerAvatar }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+                  <Image
+                    source={{ uri: sellerAvatar }}
+                    style={{ width: '100%', height: '100%' }}
+                    contentFit="cover"
+                  />
                 ) : (
-                  <Text style={{ fontSize: 11, fontWeight: '800', color: colors.purple }}>{sellerInitial}</Text>
+                  <Text className="text-primary" style={{ fontSize: 11, fontWeight: '800' }}>
+                    {sellerInitial}
+                  </Text>
                 )}
               </View>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.ink, flexShrink: 1 }} numberOfLines={1}>
+              <Text
+                className="text-ink"
+                style={{ fontSize: 13, fontWeight: '700', flex: 1 }}
+                numberOfLines={1}
+              >
                 {sellerName}
               </Text>
             </View>
           </View>
 
-          {/* Listing card */}
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              backgroundColor: colors.panel,
-              borderRadius: 16,
-              padding: 12,
-              marginBottom: 18,
-            }}
-          >
+          {/* Mode segmented */}
+          <View style={{ marginTop: 26 }}>
+            <Eyebrow>What would you like to send?</Eyebrow>
             <View
-              style={{
-                width: 60,
-                height: 60,
-                borderRadius: 12,
-                overflow: 'hidden',
-                backgroundColor: colors.divider,
-                marginRight: 12,
-              }}
+              className="bg-ink-panel"
+              style={{ padding: 4, borderRadius: 14, flexDirection: 'row' }}
             >
-              {thumb && <Image source={{ uri: thumb }} style={{ width: '100%', height: '100%' }} contentFit="cover" />}
-            </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.ink }} numberOfLines={1}>
-                {listing.title}
-              </Text>
-              <Text style={{ fontSize: 15, fontWeight: '800', color: colors.purple, marginTop: 2 }}>
-                ${listing.price}
-                {listing.size ? (
-                  <Text style={{ fontSize: 12, color: colors.mute, fontWeight: '600' }}>
-                    {'  '}· Size {listing.size}
-                  </Text>
-                ) : null}
-              </Text>
-            </View>
-          </View>
-
-          {/* Mode toggle */}
-          <View
-            style={{
-              flexDirection: 'row',
-              backgroundColor: colors.panel,
-              padding: 4,
-              borderRadius: 12,
-              marginBottom: 18,
-            }}
-          >
-            {(['message', 'offer'] as Mode[]).map((m) => {
-              const active = mode === m;
-              return (
-                <Pressable
-                  key={m}
-                  onPress={() => {
-                    setMode(m);
-                    setHasToggled(true);
-                  }}
-                  style={({ pressed }) => ({
-                    flex: 1,
-                    paddingVertical: 9,
-                    borderRadius: 9,
-                    backgroundColor: active ? 'white' : 'transparent',
-                    alignItems: 'center',
-                    flexDirection: 'row',
-                    justifyContent: 'center',
-                    gap: 6,
-                    opacity: pressed ? 0.8 : 1,
-                    ...(active
-                      ? {
-                          shadowColor: '#000',
-                          shadowOffset: { width: 0, height: 1 },
-                          shadowOpacity: 0.06,
-                          shadowRadius: 3,
-                          ...(Platform.OS === 'android' ? { elevation: 1 } : {}),
-                        }
-                      : {}),
-                  })}
-                >
-                  <Feather
-                    name={m === 'message' ? 'message-circle' : 'tag'}
-                    size={14}
-                    color={active ? colors.ink : colors.mute}
-                  />
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: active ? colors.ink : colors.mute }}>
-                    {m === 'message' ? 'Message' : 'Offer'}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          {mode === 'message' ? (
-            <View>
-              <Text style={{ fontSize: 11, fontWeight: '800', color: colors.mute, marginBottom: 8, letterSpacing: 0.6 }}>
-                YOUR MESSAGE
-              </Text>
-              <View
-                style={{
-                  backgroundColor: colors.panel,
-                  borderRadius: 14,
-                  padding: 14,
-                  minHeight: compact ? 110 : 140,
-                }}
-              >
-                <TextInput
-                  placeholder="Hi! I have a question about this item..."
-                  value={message}
-                  onChangeText={setMessage}
-                  multiline
-                  autoFocus={!hasToggled && initialMode === 'message'}
-                  textAlignVertical="top"
-                  placeholderTextColor={colors.muteSoft}
-                  style={{ fontSize: 15, color: colors.ink, padding: 0, minHeight: compact ? 90 : 120 }}
-                />
-              </View>
-
-              <Text
-                style={{
-                  fontSize: 11,
-                  fontWeight: '800',
-                  color: colors.mute,
-                  marginTop: 18,
-                  marginBottom: 8,
-                  letterSpacing: 0.6,
-                }}
-              >
-                QUICK REPLIES
-              </Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {QUICK_REPLIES.map((q) => (
+              {(['message', 'offer'] as Mode[]).map((m) => {
+                const active = mode === m;
+                return (
                   <Pressable
-                    key={q}
-                    onPress={() => setMessage(q)}
+                    key={m}
+                    onPress={() => {
+                      setMode(m);
+                      setHasToggled(true);
+                    }}
                     style={({ pressed }) => ({
-                      paddingHorizontal: 12,
-                      paddingVertical: 8,
-                      borderRadius: 999,
-                      borderWidth: 1,
-                      borderColor: colors.hairline,
-                      backgroundColor: 'white',
-                      opacity: pressed ? 0.7 : 1,
-                      flexShrink: 1,
+                      flex: 1,
+                      paddingVertical: 11,
+                      borderRadius: 10,
+                      backgroundColor: active ? '#FFFFFF' : 'transparent',
+                      boxShadow: active ? '0px 1px 2px rgba(0,0,0,0.06)' : undefined,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      transform: [{ scale: pressed ? 0.98 : 1 }],
                     })}
                   >
-                    <Text style={{ fontSize: 12.5, color: colors.ink, fontWeight: '600' }} numberOfLines={1}>
-                      {q}
+                    <Feather
+                      name={m === 'message' ? 'message-circle' : 'tag'}
+                      size={14}
+                      color={active ? '#0F0F0F' : 'rgba(15,15,15,0.62)'}
+                    />
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: active ? '700' : '500',
+                        color: active ? '#0F0F0F' : 'rgba(15,15,15,0.62)',
+                      }}
+                    >
+                      {m === 'message' ? 'Message' : 'Offer'}
                     </Text>
                   </Pressable>
-                ))}
-              </View>
+                );
+              })}
             </View>
-          ) : (
-            <View>
-              <Text style={{ fontSize: 11, fontWeight: '800', color: colors.mute, marginBottom: 8, letterSpacing: 0.6 }}>
-                YOUR OFFER
-              </Text>
-              <View
-                style={{
-                  paddingHorizontal: 16,
-                  paddingVertical: compact ? 12 : 14,
-                  backgroundColor: colors.purpleSoft,
-                  borderRadius: 16,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                }}
-              >
-                <Text
+          </View>
+
+          {/* Mode-specific content */}
+          {mode === 'message' ? (
+            <>
+              {/* Message field */}
+              <View style={{ marginTop: 28 }}>
+                <Eyebrow>Your message</Eyebrow>
+                <View
+                  className="border border-ink-hair"
                   style={{
-                    fontSize: amountFontSize,
-                    fontWeight: '900',
-                    color: colors.purple,
-                    marginRight: 6,
-                    lineHeight: amountFontSize * 1.15,
+                    borderRadius: 14,
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    minHeight: compact ? 120 : 150,
                   }}
                 >
-                  $
-                </Text>
-                <TextInput
-                  placeholder="0"
-                  value={amount}
-                  onChangeText={(t) => setAmount(t.replace(/[^0-9]/g, ''))}
-                  keyboardType="number-pad"
-                  style={{
-                    fontSize: amountFontSize,
-                    fontWeight: '900',
-                    color: colors.ink,
-                    flex: 1,
-                    padding: 0,
-                    lineHeight: amountFontSize * 1.15,
-                  }}
-                  placeholderTextColor="rgba(15,15,15,0.45)"
-                  autoFocus={!hasToggled && initialMode === 'offer'}
-                  maxLength={7}
-                />
+                  <TextInput
+                    ref={messageRef}
+                    placeholder="Hi! I have a question about this item…"
+                    value={message}
+                    onChangeText={setMessage}
+                    multiline
+                    textAlignVertical="top"
+                    placeholderTextColor="rgba(15,15,15,0.35)"
+                    style={{
+                      fontSize: 15,
+                      color: '#0F0F0F',
+                      padding: 0,
+                      minHeight: compact ? 100 : 130,
+                      outlineStyle: 'none',
+                      outlineWidth: 0,
+                      borderWidth: 0,
+                    } as any}
+                  />
+                </View>
               </View>
 
-              {offerSuggestions.length > 0 && (
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-                  {offerSuggestions.map((v) => {
-                    const selected = amountNum === v;
+              {/* Quick replies */}
+              <View style={{ marginTop: 26 }}>
+                <Eyebrow>Quick replies</Eyebrow>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {QUICK_REPLIES.map((q) => {
+                    const active = message === q;
                     return (
                       <Pressable
-                        key={v}
-                        onPress={() => setAmount(String(v))}
+                        key={q}
+                        onPress={() => setMessage(q)}
                         style={({ pressed }) => ({
-                          flexGrow: 1,
-                          flexBasis: 0,
-                          minWidth: 80,
-                          paddingVertical: 10,
-                          paddingHorizontal: 6,
+                          paddingHorizontal: 12,
+                          paddingVertical: 9,
                           borderRadius: 999,
-                          backgroundColor: selected ? colors.ink : colors.panel,
-                          alignItems: 'center',
-                          opacity: pressed ? 0.75 : 1,
+                          borderWidth: 1,
+                          borderColor: active ? '#0F0F0F' : 'rgba(15,15,15,0.08)',
+                          backgroundColor: active ? '#0F0F0F' : '#FFFFFF',
+                          transform: [{ scale: pressed ? 0.97 : 1 }],
                         })}
                       >
                         <Text
-                          style={{ fontSize: 13, fontWeight: '700', color: selected ? 'white' : colors.ink }}
+                          style={{
+                            fontSize: 13,
+                            fontWeight: '600',
+                            color: active ? '#FFFFFF' : '#0F0F0F',
+                          }}
                           numberOfLines={1}
-                          adjustsFontSizeToFit
                         >
-                          ${v}
+                          {q}
                         </Text>
                       </Pressable>
                     );
                   })}
                 </View>
-              )}
+              </View>
+            </>
+          ) : (
+            <>
+              {/* Hero amount input */}
+              <View style={{ marginTop: 28 }}>
+                <Eyebrow>Your offer</Eyebrow>
+                <View
+                  className="border border-ink-hair"
+                  style={{
+                    borderRadius: 14,
+                    paddingHorizontal: 16,
+                    paddingVertical: 16,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                      <Text
+                        className="text-primary"
+                        style={{ fontSize: 32, fontWeight: '800', marginRight: 4 }}
+                      >
+                        $
+                      </Text>
+                      <TextInput
+                        ref={amountRef}
+                        placeholder="0"
+                        value={amount}
+                        onChangeText={(t) => setAmount(t.replace(/[^0-9]/g, ''))}
+                        keyboardType="number-pad"
+                        maxLength={7}
+                        placeholderTextColor="rgba(15,15,15,0.25)"
+                        style={{
+                          fontSize: 32,
+                          fontWeight: '800',
+                          color: '#0F0F0F',
+                          flex: 1,
+                          padding: 0,
+                          outlineStyle: 'none',
+                          outlineWidth: 0,
+                          borderWidth: 0,
+                        } as any}
+                      />
+                    </View>
+                    {offerValid && amountNum < listing.price ? (
+                      <Text className="text-ink-mute" style={{ fontSize: 12, marginTop: 4 }}>
+                        {Math.round(((listing.price - amountNum) / listing.price) * 100)}% off the
+                        listed price
+                      </Text>
+                    ) : null}
+                  </View>
+                  <Text
+                    className="text-ink-mute"
+                    style={{ fontSize: 12, fontWeight: '600' }}
+                  >
+                    USD
+                  </Text>
+                </View>
 
-              <Text
-                style={{
-                  fontSize: 11,
-                  fontWeight: '800',
-                  color: colors.mute,
-                  marginTop: 18,
-                  marginBottom: 8,
-                  letterSpacing: 0.6,
-                }}
-              >
-                NOTE (OPTIONAL)
-              </Text>
-              <TextInput
-                placeholder="Add a quick note to the seller"
-                value={note}
-                onChangeText={setNote}
-                multiline
-                placeholderTextColor={colors.muteSoft}
-                style={{
-                  fontSize: 14,
-                  color: colors.ink,
-                  backgroundColor: colors.panel,
-                  borderRadius: 14,
-                  paddingHorizontal: 14,
-                  paddingVertical: 12,
-                  minHeight: compact ? 50 : 60,
-                  textAlignVertical: 'top',
-                }}
-              />
-            </View>
+                {/* Suggestions */}
+                {offerSuggestions.length > 0 && (
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                    {offerSuggestions.map((s) => {
+                      const selected = amountNum === s.value;
+                      return (
+                        <Pressable
+                          key={s.value}
+                          onPress={() => setAmount(String(s.value))}
+                          style={({ pressed }) => ({
+                            flex: 1,
+                            paddingVertical: 12,
+                            borderRadius: 12,
+                            borderWidth: 1,
+                            borderColor: selected ? '#0F0F0F' : 'rgba(15,15,15,0.08)',
+                            backgroundColor: selected ? '#0F0F0F' : '#FFFFFF',
+                            alignItems: 'center',
+                            transform: [{ scale: pressed ? 0.97 : 1 }],
+                          })}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 10,
+                              fontWeight: '700',
+                              letterSpacing: 0.4,
+                              color: selected ? 'rgba(255,255,255,0.7)' : 'rgba(15,15,15,0.45)',
+                            }}
+                          >
+                            {s.label}
+                          </Text>
+                          <Text
+                            style={{
+                              fontSize: 14,
+                              fontWeight: '800',
+                              color: selected ? '#FFFFFF' : '#0F0F0F',
+                              marginTop: 2,
+                            }}
+                            numberOfLines={1}
+                          >
+                            ${s.value}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+
+              {/* Note */}
+              <View style={{ marginTop: 26 }}>
+                <Eyebrow>Add a note (optional)</Eyebrow>
+                <View
+                  className="border border-ink-hair"
+                  style={{
+                    borderRadius: 14,
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    minHeight: compact ? 70 : 90,
+                  }}
+                >
+                  <TextInput
+                    placeholder="Why does this offer make sense? Keep it friendly."
+                    value={note}
+                    onChangeText={setNote}
+                    multiline
+                    textAlignVertical="top"
+                    placeholderTextColor="rgba(15,15,15,0.35)"
+                    style={{
+                      fontSize: 14,
+                      color: '#0F0F0F',
+                      padding: 0,
+                      minHeight: compact ? 50 : 70,
+                      outlineStyle: 'none',
+                      outlineWidth: 0,
+                      borderWidth: 0,
+                    } as any}
+                  />
+                </View>
+              </View>
+            </>
           )}
 
-          <Text style={{ fontSize: 11, color: colors.muteSoft, marginTop: 22, lineHeight: 16 }}>
-            Be kind and respectful. Use Carrinex's payment flow for a safe transaction.
-          </Text>
+          {/* Footer hint */}
+          <View
+            className="bg-primary-soft"
+            style={{
+              marginTop: 28,
+              padding: 14,
+              borderRadius: 14,
+              flexDirection: 'row',
+              alignItems: 'flex-start',
+            }}
+          >
+            <Feather
+              name="shield"
+              size={14}
+              color="#6C47FF"
+              style={{ marginTop: 2, marginRight: 10 }}
+            />
+            <Text
+              className="text-ink"
+              style={{ fontSize: 12, lineHeight: 18, flex: 1, fontWeight: '500' }}
+            >
+              Keep payments inside Ceranix — off-platform deals aren't protected.
+            </Text>
+          </View>
         </ScrollView>
 
+        {/* Sticky CTA */}
         <View
+          className="bg-white border-t border-ink-hair"
           style={{
             position: 'absolute',
             left: 0,
             right: 0,
             bottom: 0,
-            paddingHorizontal: 14,
-            paddingTop: CTA_VPAD,
-            paddingBottom: Math.max(insets.bottom, 8) + 6,
-            borderTopWidth: 1,
-            borderTopColor: colors.hairline,
-            backgroundColor: 'white',
+            paddingHorizontal: 20,
+            paddingTop: 12,
+            paddingBottom: ctaBottomPad,
           }}
         >
-          <Button
-            label={
-              sending
+          <Pressable
+            onPress={handleSend}
+            disabled={!canSend}
+            style={({ pressed }) => ({
+              height: 58,
+              borderRadius: 16,
+              backgroundColor: canSend ? '#0F0F0F' : 'rgba(15,15,15,0.12)',
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: sending ? 0.7 : 1,
+              transform: [{ scale: pressed && canSend ? 0.985 : 1 }],
+              overflow: 'hidden',
+            })}
+          >
+            <View
+              style={{
+                position: 'absolute',
+                right: 0,
+                top: 0,
+                bottom: 0,
+                width: 58,
+                backgroundColor: canSend ? '#6C47FF' : 'rgba(15,15,15,0.18)',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {sending ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Feather
+                  name={mode === 'offer' ? 'tag' : 'send'}
+                  size={18}
+                  color="#FFFFFF"
+                />
+              )}
+            </View>
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: '800',
+                color: canSend ? '#FFFFFF' : 'rgba(15,15,15,0.45)',
+                letterSpacing: 0.2,
+                marginRight: 58,
+              }}
+            >
+              {sending
                 ? 'Sending…'
                 : mode === 'offer'
                   ? offerValid
@@ -560,16 +744,9 @@ export default function NewConversationScreen() {
                     : 'Enter an amount'
                   : msgValid
                     ? 'Send message'
-                    : 'Type a message'
-            }
-            variant="primary"
-            size="lg"
-            icon={mode === 'offer' ? 'tag' : 'send'}
-            full
-            loading={sending}
-            disabled={!canSend}
-            onPress={handleSend}
-          />
+                    : 'Type a message'}
+            </Text>
+          </Pressable>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>

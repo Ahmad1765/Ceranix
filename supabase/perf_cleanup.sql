@@ -1,10 +1,20 @@
--- Performance cleanup. Idempotent — safe to re-run.
--- No behavior changes. This migration:
---   1. Wraps auth.uid() in (select ...) on legacy policies so it's evaluated
+-- Ceranix — performance cleanup (mirrors live).
+-- Idempotent: safe to re-run.
+--
+-- Two purposes:
+--   1) Wrap auth.uid() in (select ...) on legacy policies so it's evaluated
 --      once per query instead of once per row (Postgres initplan optimization).
---   2. Splits the listing_likes "ALL" policy into explicit INSERT/UPDATE/DELETE
---      so the public SELECT policy isn't shadowed by an overlapping one.
---   3. Covers the messages.sender_id foreign key with an index.
+--   2) Add partial indexes that target the common "active feed" / "active
+--      sellers" queries so they don't have to scan over sold listings or
+--      vacation-mode profiles.
+--
+-- The base setup.sql already creates the new-style policies; this file is
+-- still safe to run because the DROP IF EXISTS / CREATE pair is a no-op when
+-- the policy is already in its target shape.
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Policy rewrites (auth.uid() → (select auth.uid()))
+-- ─────────────────────────────────────────────────────────────────────────────
 
 -- profiles
 drop policy if exists "Users can update own profile" on public.profiles;
@@ -66,6 +76,35 @@ create policy "Users can update own likes" on public.listing_likes
 create policy "Users can delete own likes" on public.listing_likes
   for delete using ((select auth.uid()) = user_id);
 
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Partial indexes for the "active feed" hot paths
+-- ─────────────────────────────────────────────────────────────────────────────
+
 -- Cover the messages.sender_id FK.
 create index if not exists messages_sender_idx
   on public.messages(sender_id);
+
+-- For-you feed: newest active listings.
+create index if not exists listings_active_created_idx
+  on public.listings (created_at desc)
+  where is_sold = false;
+
+-- Popular feed: highest-liked active listings.
+create index if not exists listings_active_likes_idx
+  on public.listings (likes desc, created_at desc)
+  where is_sold = false;
+
+-- Category browse on active listings.
+create index if not exists listings_active_category_idx
+  on public.listings (category, created_at desc)
+  where is_sold = false;
+
+-- Seller storefront: a profile's active listings newest-first.
+create index if not exists listings_active_seller_idx
+  on public.listings (seller_id, created_at desc)
+  where is_sold = false;
+
+-- Skip vacation-mode profiles in similarity / surface queries.
+create index if not exists profiles_active_idx
+  on public.profiles (id)
+  where vacation_mode = false;

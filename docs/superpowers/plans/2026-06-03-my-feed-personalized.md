@@ -171,7 +171,7 @@ async function withTimeout<T>(
   p: PromiseLike<T>,
   label: string,
 ): Promise<T | { __wedge: true }> {
-  let timer: ReturnType<typeof setTimeout>;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return (await Promise.race([
       p,
@@ -180,7 +180,9 @@ async function withTimeout<T>(
       }),
     ])) as T | { __wedge: true };
   } finally {
-    clearTimeout(timer!);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
   }
 }
 
