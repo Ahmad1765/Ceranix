@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   View,
   Text,
   Pressable,
@@ -13,7 +14,12 @@ import { useAuth } from '@/lib/auth';
 import { colors, radii } from '@/lib/theme';
 import { fetchSimilarToLiked } from '@/lib/myFeed';
 import { fetchListings } from '@/lib/listings';
-import { listSavedSearches, type SavedSearch } from '@/lib/savedSearches';
+import { fetchSavedListings } from '@/lib/saves';
+import {
+  deleteSavedSearch,
+  listSavedSearches,
+  type SavedSearch,
+} from '@/lib/savedSearches';
 import { ListingCard } from '@/components/ListingCard';
 import { DropAlertSheet } from '@/components/DropAlertSheet';
 import { useToast } from '@/lib/toast';
@@ -23,6 +29,7 @@ import type { Category, Listing } from '@/types';
 const HORIZONTAL_PAD = 12;
 const GRID_GAP = 8;
 const FOR_YOU: 'for-you' = 'for-you';
+const SAVED: 'saved' = 'saved';
 
 export default function MyFeedScreen() {
   const { user } = useAuth();
@@ -32,6 +39,9 @@ export default function MyFeedScreen() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [isFallback, setIsFallback] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const [savedListings, setSavedListings] = useState<Listing[]>([]);
+  const [loadingSaved, setLoadingSaved] = useState(false);
 
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
   const [activeChip, setActiveChip] = useState<string>(FOR_YOU);
@@ -78,33 +88,86 @@ export default function MyFeedScreen() {
     setSavedSearches(rows);
   }, [user?.id]);
 
+  const loadSavedListings = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!user?.id) {
+        setSavedListings([]);
+        return;
+      }
+      if (!opts?.silent) setLoadingSaved(true);
+      const rows = await fetchSavedListings(user.id);
+      setSavedListings(rows);
+      if (!opts?.silent) setLoadingSaved(false);
+    },
+    [user?.id],
+  );
+
   useEffect(() => {
     loadListings();
     loadSavedSearches();
-  }, [loadListings, loadSavedSearches]);
+    loadSavedListings();
+  }, [loadListings, loadSavedSearches, loadSavedListings]);
 
   useFocusEffect(
     useCallback(() => {
       loadListings({ silent: true });
       loadSavedSearches();
-    }, [loadListings, loadSavedSearches]),
+      loadSavedListings({ silent: true });
+    }, [loadListings, loadSavedSearches, loadSavedListings]),
   );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([loadListings({ silent: true }), loadSavedSearches()]);
+    await Promise.all([
+      loadListings({ silent: true }),
+      loadSavedSearches(),
+      loadSavedListings({ silent: true }),
+    ]);
     setRefreshing(false);
-  }, [loadListings, loadSavedSearches]);
+  }, [loadListings, loadSavedSearches, loadSavedListings]);
+
+  const onDeleteChip = useCallback(
+    (search: SavedSearch) => {
+      const label = search.label ?? 'Saved';
+      Alert.alert(
+        `Remove "${label}"?`,
+        'This feed will be removed from your list.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Remove',
+            style: 'destructive',
+            onPress: async () => {
+              // Optimistic: drop locally before round-trip so the chip
+              // disappears immediately on press.
+              setSavedSearches((prev) => prev.filter((s) => s.id !== search.id));
+              if (activeChip === search.id) setActiveChip(FOR_YOU);
+              const ok = await deleteSavedSearch(search.id);
+              if (!ok) {
+                toast.show('Could not remove that feed', { variant: 'info', icon: 'alert-circle' });
+                loadSavedSearches();
+              }
+            },
+          },
+        ],
+      );
+    },
+    [activeChip, loadSavedSearches, toast],
+  );
 
   const activeSavedSearch = useMemo(
     () => savedSearches.find((s) => s.id === activeChip) ?? null,
     [savedSearches, activeChip],
   );
 
+  const showingSaved = activeChip === SAVED;
+
   // Client-side filter when a saved search chip is selected. Mirrors the
   // discover screen's filter logic so the chip's params actually narrow the
-  // grid in-place rather than navigating away.
+  // grid in-place rather than navigating away. When the "Saved" chip is
+  // active we swap the dataset entirely to the user's bookmarks.
   const visibleListings = useMemo(() => {
+    if (showingSaved) return savedListings;
     if (!activeSavedSearch) return listings;
     let rows = listings;
     if (activeSavedSearch.category) {
@@ -119,7 +182,7 @@ export default function MyFeedScreen() {
       );
     }
     return rows;
-  }, [listings, activeSavedSearch]);
+  }, [listings, savedListings, activeSavedSearch, showingSaved]);
 
   const showColdStartBanner = !user;
   const showFollowCta =
@@ -191,11 +254,12 @@ export default function MyFeedScreen() {
           </Pressable>
         ) : null}
 
-        {/* Chip row: For you + saved searches + add */}
+        {/* Chip row: For you + Saved + saved searches + add */}
         <ChipRow
           savedSearches={savedSearches}
           activeChip={activeChip}
           onSelectChip={setActiveChip}
+          onDeleteChip={onDeleteChip}
           onAdd={() => {
             if (!user?.id) {
               toast.show('Sign in to create drop alerts', { variant: 'info', icon: 'log-in' });
@@ -208,9 +272,14 @@ export default function MyFeedScreen() {
 
         <Grid
           rows={visibleListings}
-          loading={loading}
+          loading={showingSaved ? loadingSaved : loading}
           columns={columns}
           cardWidth={cardWidth}
+          emptyText={
+            showingSaved
+              ? 'No saved items yet. Tap the bookmark on any listing to save it.'
+              : 'Nothing matches this feed yet.'
+          }
         />
       </ScrollView>
 
@@ -230,11 +299,13 @@ function ChipRow({
   savedSearches,
   activeChip,
   onSelectChip,
+  onDeleteChip,
   onAdd,
 }: {
   savedSearches: SavedSearch[];
   activeChip: string;
   onSelectChip: (id: string) => void;
+  onDeleteChip: (search: SavedSearch) => void;
   onAdd: () => void;
 }) {
   return (
@@ -248,6 +319,11 @@ function ChipRow({
         active={activeChip === FOR_YOU}
         onPress={() => onSelectChip(FOR_YOU)}
       />
+      <Chip
+        label="Saved"
+        active={activeChip === SAVED}
+        onPress={() => onSelectChip(SAVED)}
+      />
       <AddChip onPress={onAdd} />
       {savedSearches.map((s) => (
         <Chip
@@ -255,6 +331,7 @@ function ChipRow({
           label={s.label ?? 'Saved'}
           active={activeChip === s.id}
           onPress={() => onSelectChip(s.id)}
+          onLongPress={() => onDeleteChip(s)}
         />
       ))}
     </ScrollView>
@@ -265,21 +342,27 @@ function Chip({
   label,
   active,
   onPress,
+  onLongPress,
 }: {
   label: string;
   active: boolean;
   onPress: () => void;
+  onLongPress?: () => void;
 }) {
+  // Selected state: solid grey fill, no border (Instagram-style). Unselected
+  // keeps the hairline border on a white surface.
   return (
     <Pressable
       onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={350}
       style={({ pressed }) => ({
         paddingHorizontal: 14,
         paddingVertical: 8,
         borderRadius: radii.pill,
         borderWidth: 1,
-        borderColor: active ? colors.ink : colors.hairline,
-        backgroundColor: active ? colors.panel : colors.white,
+        borderColor: active ? 'transparent' : colors.hairline,
+        backgroundColor: active ? 'rgba(15,15,15,0.08)' : colors.white,
         opacity: pressed ? 0.7 : 1,
       })}
     >
@@ -326,11 +409,13 @@ function Grid({
   loading,
   columns,
   cardWidth,
+  emptyText,
 }: {
   rows: Listing[];
   loading: boolean;
   columns: number;
   cardWidth: number;
+  emptyText?: string;
 }) {
   if (loading) {
     return (
@@ -352,8 +437,8 @@ function Grid({
   if (rows.length === 0) {
     return (
       <View style={{ paddingHorizontal: 16, paddingTop: 40, alignItems: 'center' }}>
-        <Text style={{ fontSize: 13, color: colors.muteSoft }}>
-          Nothing matches this feed yet.
+        <Text style={{ fontSize: 13, color: colors.muteSoft, textAlign: 'center' }}>
+          {emptyText ?? 'Nothing matches this feed yet.'}
         </Text>
       </View>
     );

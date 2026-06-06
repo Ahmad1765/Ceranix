@@ -22,6 +22,8 @@ import { getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { isLiked as fetchIsLiked, toggleLike } from '@/lib/listings';
+import { isSaved as fetchIsSaved, toggleSave } from '@/lib/saves';
+import { SaveListSheet } from '@/components/SaveListSheet';
 import type { Listing } from '@/types';
 
 const AnimatedExpoImage = Animated.createAnimatedComponent(Image);
@@ -42,6 +44,9 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(listing.likes ?? 0);
   const [likeBusy, setLikeBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [saveBusy, setSaveBusy] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const images = listing.images.length > 0 ? listing.images : [''];
   const hasMultiple = images.length > 1;
 
@@ -55,6 +60,21 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
     let cancelled = false;
     fetchIsLiked(listing.id, user.id).then((v) => {
       if (!cancelled) setLiked(v);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [listing.id, user?.id]);
+
+  // Hydrate the saved/bookmarked state in parallel with liked.
+  useEffect(() => {
+    if (!user?.id) {
+      setSaved(false);
+      return;
+    }
+    let cancelled = false;
+    fetchIsSaved(listing.id, user.id).then((v) => {
+      if (!cancelled) setSaved(v);
     });
     return () => {
       cancelled = true;
@@ -90,6 +110,40 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
       setLikeBusy(false);
     }
   }, [liked, likeBusy, listing.id, toast, user?.id]);
+
+  const handleToggleSave = useCallback(async () => {
+    if (!user?.id) {
+      toast.show('Sign in to save', { variant: 'info', icon: 'log-in' });
+      router.push('/auth/login');
+      return;
+    }
+    if (saveBusy) return;
+    const prev = saved;
+    const next = !prev;
+    setSaved(next);
+    setSaveBusy(true);
+    try {
+      const result = await toggleSave(listing.id, user.id, prev);
+      if (result !== next) {
+        setSaved(prev);
+      } else if (next) {
+        toast.show('Saved', { variant: 'success', icon: 'bookmark' });
+      }
+    } finally {
+      setSaveBusy(false);
+    }
+  }, [saveBusy, saved, listing.id, toast, user?.id]);
+
+  // Long-press opens the SaveListSheet so the user can pick a specific
+  // collection (or create a new one) instead of dumping into the default.
+  const handleOpenSheet = useCallback(() => {
+    if (!user?.id) {
+      toast.show('Sign in to save', { variant: 'info', icon: 'log-in' });
+      router.push('/auth/login');
+      return;
+    }
+    setSheetOpen(true);
+  }, [toast, user?.id]);
 
   // Subtle staggered entrance: fade + slight rise on mount.
   const enterY = useSharedValue(8);
@@ -240,6 +294,33 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
           </Text>
         </Pressable>
 
+        {/* Save / bookmark badge — bottom-right. Same pill treatment as the
+            like badge so they read as a pair. Tap toggles the bookmark with
+            optimistic UI; nested Pressable wins the touch responder so the
+            card's onPress doesn't fire. */}
+        <Pressable
+          onPress={handleToggleSave}
+          onLongPress={handleOpenSheet}
+          delayLongPress={300}
+          hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel={saved ? 'Remove from saved (long-press for lists)' : 'Save listing (long-press for lists)'}
+          style={({ pressed }) => ({
+            position: 'absolute',
+            bottom: 8,
+            right: 8,
+            backgroundColor: 'rgba(255,255,255,0.94)',
+            borderRadius: 999,
+            paddingVertical: 5,
+            paddingHorizontal: 7,
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: pressed ? 0.85 : 1,
+          })}
+        >
+          <Feather name="bookmark" size={12} color={saved ? '#6C47FF' : '#0F0F0F'} />
+        </Pressable>
+
         {listing.is_sold && (
           <View className="absolute inset-0 bg-black/40 items-center justify-center">
             <Text className="text-white font-bold text-sm">SOLD</Text>
@@ -261,6 +342,15 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
         </Text>
       </View>
     </PressableScale>
+    {user?.id ? (
+      <SaveListSheet
+        visible={sheetOpen}
+        userId={user.id}
+        listingId={listing.id}
+        onClose={() => setSheetOpen(false)}
+        onChanged={(savedSomewhere) => setSaved(savedSomewhere)}
+      />
+    ) : null}
     </Animated.View>
   );
 });

@@ -50,6 +50,8 @@ import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { LikeBurst } from '@/components/LikeBurst';
 import { AnimatedNumber } from '@/components/AnimatedNumber';
+import { SaveListSheet } from '@/components/SaveListSheet';
+import { isSaved as fetchIsSaved } from '@/lib/saves';
 
 const AnimatedExpoImage = Animated.createAnimatedComponent(Image);
 
@@ -163,14 +165,6 @@ function listingToRelated(row: Listing): RelatedItem {
     likes: Number(row.likes ?? 0),
   };
 }
-
-type SaveList = { id: string; name: string; emoji: string; count: number };
-const SAVE_LISTS: SaveList[] = [
-  { id: 'liked', name: 'Liked items', emoji: '❤️', count: 47 },
-  { id: 'wishlist', name: 'Wishlist', emoji: '⭐', count: 12 },
-  { id: 'gifts', name: 'Gift ideas', emoji: '🎁', count: 5 },
-  { id: 'later', name: 'Saved for later', emoji: '🔖', count: 23 },
-];
 
 const BUNDLE_MILESTONES = [
   { items: '1 item', discount: '0% off', active: false },
@@ -301,98 +295,6 @@ function FullscreenImageViewer({
           </View>
         )}
       </View>
-    </Modal>
-  );
-}
-
-function SaveListSheet({
-  visible,
-  onClose,
-  onSelect,
-  selectedId,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  onSelect: (id: string) => void;
-  selectedId: string | null;
-}) {
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-      <Pressable onPress={onClose} style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        {IS_IOS ? (
-          <BlurView intensity={28} tint="dark" style={StyleSheet.absoluteFill} />
-        ) : (
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)' }]} />
-        )}
-        <Pressable
-          onPress={() => {}}
-          style={{
-            width: width - 56,
-            maxWidth: 360,
-            backgroundColor: IS_IOS ? 'rgba(255,255,255,0.96)' : 'white',
-            borderRadius: 18,
-            paddingVertical: 6,
-            ...iosShadow,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 13,
-              fontWeight: '600',
-              color: 'rgba(15,15,15,0.62)',
-              textAlign: 'center',
-              paddingTop: 14,
-              paddingBottom: 10,
-              letterSpacing: 0.2,
-            }}
-          >
-            Save to list
-          </Text>
-          <View style={{ height: HAIRLINE, backgroundColor: 'rgba(15,15,15,0.08)', marginHorizontal: 12 }} />
-          {SAVE_LISTS.map((list, i) => {
-            const isLast = i === SAVE_LISTS.length - 1;
-            const isSelected = list.id === selectedId;
-            return (
-              <Pressable
-                key={list.id}
-                onPress={() => { tap('selection'); onSelect(list.id); onClose(); }}
-                style={({ pressed }) => ({
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingVertical: 14,
-                  paddingHorizontal: 18,
-                  borderBottomWidth: isLast ? 0 : HAIRLINE,
-                  borderBottomColor: 'rgba(15,15,15,0.08)',
-                  opacity: pressed ? 0.55 : 1,
-                })}
-              >
-                <Text style={{ fontSize: 22, marginRight: 12 }}>{list.emoji}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 16, fontWeight: '600', color: '#0F0F0F' }}>{list.name}</Text>
-                  <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.62)', marginTop: 2 }}>{list.count} items</Text>
-                </View>
-                {isSelected && <Ionicons name="checkmark-circle" size={22} color={BRAND_PURPLE} />}
-              </Pressable>
-            );
-          })}
-          <View style={{ height: HAIRLINE, backgroundColor: 'rgba(15,15,15,0.08)', marginHorizontal: 12 }} />
-          <Pressable
-            onPress={() => { tap('selection'); Alert.alert('New list', 'Create list flow…'); onClose(); }}
-            style={({ pressed }) => ({
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              paddingVertical: 14,
-              opacity: pressed ? 0.55 : 1,
-            })}
-          >
-            <Feather name="plus" size={18} color={BRAND_PURPLE} />
-            <Text style={{ fontSize: 15, fontWeight: '700', color: BRAND_PURPLE, marginLeft: 6 }}>
-              Create new list
-            </Text>
-          </Pressable>
-        </Pressable>
-      </Pressable>
     </Modal>
   );
 }
@@ -731,7 +633,7 @@ export default function ProductScreen() {
   const [relatedTab, setRelatedTab] = useState<'members' | 'similar'>('members');
   const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
   const [saveListVisible, setSaveListVisible] = useState(false);
-  const [savedToList, setSavedToList] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
   const [listing, setListing] = useState<Listing | null>(
     cached ? { ...cached, seller: cached.seller ?? (FALLBACK_SELLER as Listing['seller']) } : null,
   );
@@ -813,6 +715,22 @@ export default function ProductScreen() {
       .catch((e) => {
         console.warn('[product] isLiked failed', e);
       });
+    return () => {
+      active = false;
+    };
+  }, [productIdParam, user?.id]);
+
+  // Hydrate the saved/bookmarked state for the bookmark pill. Returns true
+  // when the listing is in at least one of the user's save lists.
+  useEffect(() => {
+    let active = true;
+    if (!productIdParam || !user?.id) {
+      setSaved(false);
+      return;
+    }
+    fetchIsSaved(productIdParam, user.id).then((v) => {
+      if (active) setSaved(v);
+    });
     return () => {
       active = false;
     };
@@ -1264,6 +1182,42 @@ export default function ProductScreen() {
                 value={heartCount}
                 height={14}
                 style={{ fontSize: 11, fontWeight: '700', color: BRAND_INK, marginTop: 2 }}
+              />
+            </Pressable>
+            {/* Divider between heart and bookmark */}
+            <View
+              style={{
+                height: HAIRLINE,
+                width: 32,
+                alignSelf: 'center',
+                backgroundColor: 'rgba(15,15,15,0.12)',
+              }}
+            />
+            <Pressable
+              onPress={() => {
+                if (!user?.id) {
+                  toast.show('Sign in to save', { variant: 'info', icon: 'log-in' });
+                  router.push('/auth/login');
+                  return;
+                }
+                tap('medium');
+                setSaveListVisible(true);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={saved ? 'Edit save lists' : 'Save to list'}
+              style={({ pressed }) => ({
+                width: 50,
+                paddingTop: 12,
+                paddingBottom: 12,
+                alignItems: 'center',
+                justifyContent: 'center',
+                transform: [{ scale: pressed ? 0.94 : 1 }],
+              })}
+            >
+              <Feather
+                name="bookmark"
+                size={20}
+                color={saved ? BRAND_PURPLE : BRAND_INK}
               />
             </Pressable>
           </View>
@@ -2189,16 +2143,18 @@ export default function ProductScreen() {
       </View>
       )}
 
-      {/* Long-press-on-Heart save-to-list menu */}
-      <SaveListSheet
-        visible={saveListVisible}
-        onClose={() => setSaveListVisible(false)}
-        onSelect={(listId) => {
-          setSavedToList(listId);
-          if (!liked) handleHeartPress();
-        }}
-        selectedId={savedToList}
-      />
+      {/* Save-to-list sheet — opens from the bookmark pill or by long-pressing
+          the heart. The listing is "saved" if it lives in any of the user's
+          lists; the sheet handles list creation + per-list toggling. */}
+      {user?.id ? (
+        <SaveListSheet
+          visible={saveListVisible}
+          userId={user.id}
+          listingId={listing.id}
+          onClose={() => setSaveListVisible(false)}
+          onChanged={setSaved}
+        />
+      ) : null}
 
       {/* Fullscreen image viewer — opens on tap, swipe to navigate */}
       <FullscreenImageViewer

@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   View,
   Text,
   Pressable,
@@ -15,8 +16,19 @@ import { Feather } from '@expo/vector-icons';
 import Animated from 'react-native-reanimated';
 import { ListingCard } from '@/components/ListingCard';
 import { RequireAuth } from '@/components/RequireAuth';
+import { usePrompt } from '@/components/PromptDialog';
 import { useAuth } from '@/lib/auth';
 import { fetchUserListings, fetchLikedListings } from '@/lib/listings';
+import {
+  createSaveList,
+  deleteSaveList,
+  ensureSaveLists,
+  fetchListingsInList,
+  fetchSavedListings,
+  listSaveLists,
+  renameSaveList,
+  type SaveList,
+} from '@/lib/saves';
 import { colors, radii } from '@/lib/theme';
 import { useGridDimensions, HIT_SLOP_8 } from '@/lib/responsive';
 import { useStaggeredEntrance, useFadeIn } from '@/lib/motion';
@@ -43,11 +55,20 @@ const AVATAR_SIZE = 88;
 function ProfileScreenInner() {
   const { profile, refreshProfile } = useAuth();
   const toast = useToast();
+  const { prompt, element: promptElement } = usePrompt();
   const [activeTab, setActiveTab] = useState<ProfileTab>('selling');
   const [selling, setSelling] = useState<Listing[]>([]);
   const [liked, setLiked] = useState<Listing[]>([]);
+  const [savedItems, setSavedItems] = useState<Listing[]>([]);
+  const [saveLists, setSaveLists] = useState<SaveList[]>([]);
+  // null = "All" — flat union of every list. A specific list id narrows
+  // the grid to that bucket's items only.
+  const [activeListId, setActiveListId] = useState<string | null>(null);
+  const [listListings, setListListings] = useState<Listing[]>([]);
+  const [loadingListListings, setLoadingListListings] = useState(false);
   const [loadingSelling, setLoadingSelling] = useState(true);
   const [loadingLiked, setLoadingLiked] = useState(true);
+  const [loadingSaved, setLoadingSaved] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const heroFade = useFadeIn(0, 320);
@@ -76,20 +97,126 @@ function ProfileScreenInner() {
     if (!opts?.silent) setLoadingLiked(false);
   }, [profile?.id]);
 
+  const loadSaved = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!profile?.id) return;
+    if (!opts?.silent) setLoadingSaved(true);
+    // Seed starter lists on first visit, then load the flat union of all
+    // saved listings + the lists strip in parallel.
+    await ensureSaveLists(profile.id);
+    const [rows, lists] = await Promise.all([
+      fetchSavedListings(profile.id),
+      listSaveLists(profile.id),
+    ]);
+    setSavedItems(rows);
+    setSaveLists(lists);
+    if (!opts?.silent) setLoadingSaved(false);
+  }, [profile?.id]);
+
+  // When a specific list is active, pull just that list's items.
+  useEffect(() => {
+    if (!activeListId) {
+      setListListings([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingListListings(true);
+    fetchListingsInList(activeListId).then((rows) => {
+      if (cancelled) return;
+      setListListings(rows);
+      setLoadingListListings(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeListId]);
+
+  const visibleSavedListings = useMemo(
+    () => (activeListId ? listListings : savedItems),
+    [activeListId, listListings, savedItems],
+  );
+
+  const handleCreateList = useCallback(async () => {
+    if (!profile?.id) return;
+    const name = await prompt({
+      title: 'New list',
+      message: 'Name your save list',
+      placeholder: 'e.g. Summer outfits',
+      submitLabel: 'Create',
+    });
+    if (!name) return;
+    const created = await createSaveList(profile.id, name);
+    if (created) {
+      setSaveLists((prev) => [...prev, { ...created, item_count: 0 }]);
+      setActiveListId(created.id);
+    } else {
+      toast.show("Couldn't create list", { variant: 'info', icon: 'alert-circle' });
+    }
+  }, [profile?.id, prompt, toast]);
+
+  const handleManageList = useCallback(
+    (list: SaveList) => {
+      if (list.is_default) {
+        // Default is protected from rename/delete to keep tap-to-save
+        // pointing at a stable destination.
+        toast.show('Default list can\'t be edited', { variant: 'info', icon: 'info' });
+        return;
+      }
+      Alert.alert(list.name, undefined, [
+        {
+          text: 'Rename',
+          onPress: async () => {
+            const next = await prompt({
+              title: 'Rename list',
+              defaultValue: list.name,
+              submitLabel: 'Save',
+            });
+            if (!next) return;
+            const ok = await renameSaveList(list.id, next);
+            if (ok) {
+              setSaveLists((prev) =>
+                prev.map((l) => (l.id === list.id ? { ...l, name: next } : l)),
+              );
+            }
+          },
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const ok = await deleteSaveList(list.id);
+            if (!ok) {
+              toast.show("Couldn't delete list", { variant: 'info', icon: 'alert-circle' });
+              return;
+            }
+            setSaveLists((prev) => prev.filter((l) => l.id !== list.id));
+            if (activeListId === list.id) setActiveListId(null);
+            // Re-pull the flat union since this list's items are gone.
+            if (profile?.id) loadSaved({ silent: true });
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    },
+    [activeListId, loadSaved, profile?.id, prompt, toast],
+  );
+
   // Initial load — explicitly tied to profile.id arrival.
   useEffect(() => {
     if (!profile?.id) return;
     let cancelled = false;
     (async () => {
-      const [s, l] = await Promise.all([
+      const [s, l, sv] = await Promise.all([
         fetchUserListings(profile.id),
         fetchLikedListings(profile.id),
+        fetchSavedListings(profile.id),
       ]);
       if (cancelled) return;
       setSelling(s);
       setLiked(l);
+      setSavedItems(sv);
       setLoadingSelling(false);
       setLoadingLiked(false);
+      setLoadingSaved(false);
     })();
     return () => {
       cancelled = true;
@@ -104,20 +231,25 @@ function ProfileScreenInner() {
       if (!profile?.id) return;
       loadSelling({ silent: true }).catch(() => {});
       loadLiked({ silent: true }).catch(() => {});
+      loadSaved({ silent: true }).catch(() => {});
       refreshProfile().catch(() => {});
-    }, [profile?.id, loadSelling, loadLiked, refreshProfile]),
+    }, [profile?.id, loadSelling, loadLiked, loadSaved, refreshProfile]),
   );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await Promise.all([loadSelling({ silent: true }), loadLiked({ silent: true })]);
+      await Promise.all([
+        loadSelling({ silent: true }),
+        loadLiked({ silent: true }),
+        loadSaved({ silent: true }),
+      ]);
     } catch {
       // swallow — RefreshControl feedback is sufficient
     } finally {
       setRefreshing(false);
     }
-  }, [loadSelling, loadLiked]);
+  }, [loadSelling, loadLiked, loadSaved]);
 
 
 
@@ -155,6 +287,7 @@ const handleShareProfile = useCallback(async () => {
 
   const sellingCount = selling.length;
   const likedCount = liked.length;
+  const savedCount = savedItems.length;
   const initial = (profile.full_name || profile.username || 'U').trim().charAt(0).toUpperCase();
   const rating = Number(profile.rating ?? 0);
 
@@ -321,8 +454,8 @@ const handleShareProfile = useCallback(async () => {
             tabs={[
               { value: 'selling', label: 'Selling', icon: 'grid', count: sellingCount },
               { value: 'liked', label: 'Liked', icon: 'heart', count: likedCount },
+              { value: 'collections', label: 'Saved', icon: 'bookmark', count: savedCount },
               { value: 'shop', label: 'Shop', icon: 'shopping-bag' },
-              { value: 'collections', label: 'Saved', icon: 'bookmark' },
             ]}
           />
         </View>
@@ -430,15 +563,167 @@ const handleShareProfile = useCallback(async () => {
             </View>
           )}
           {activeTab === 'collections' && (
-            <EmptyState
-              icon="bookmark"
-              title="No saved boards yet"
-              description="Group your favorite items into themed boards. Coming soon."
-            />
+            <View>
+              <SavedListsStrip
+                lists={saveLists}
+                activeListId={activeListId}
+                onSelect={setActiveListId}
+                onLongPress={handleManageList}
+                onCreate={handleCreateList}
+                totalCount={savedItems.length}
+              />
+              <ListingsGrid
+                listings={visibleSavedListings}
+                loading={activeListId ? loadingListListings : loadingSaved}
+                columns={columns}
+                cardW={cardW}
+                empty={{
+                  icon: 'bookmark',
+                  title: activeListId ? 'This list is empty' : 'No saved items yet',
+                  description: activeListId
+                    ? 'Long-press the bookmark on any listing to add it here.'
+                    : 'Tap the bookmark on any listing to save it.',
+                  cta: activeListId
+                    ? undefined
+                    : {
+                        label: 'Browse',
+                        icon: 'compass',
+                        onPress: () => router.push('/(tabs)/discover'),
+                      },
+                }}
+              />
+            </View>
           )}
         </View>
       </ScrollView>
+      {promptElement}
     </SafeAreaView>
+  );
+}
+
+function SavedListsStrip({
+  lists,
+  activeListId,
+  totalCount,
+  onSelect,
+  onLongPress,
+  onCreate,
+}: {
+  lists: SaveList[];
+  activeListId: string | null;
+  totalCount: number;
+  onSelect: (id: string | null) => void;
+  onLongPress: (list: SaveList) => void;
+  onCreate: () => void;
+}) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{
+        paddingHorizontal: 16,
+        paddingTop: 4,
+        paddingBottom: 12,
+        gap: 8,
+      }}
+    >
+      <SavedListChip
+        emoji=""
+        label="All"
+        count={totalCount}
+        active={activeListId === null}
+        onPress={() => onSelect(null)}
+      />
+      {lists.map((list) => (
+        <SavedListChip
+          key={list.id}
+          emoji={list.emoji}
+          label={list.name}
+          count={list.item_count ?? 0}
+          active={activeListId === list.id}
+          onPress={() => onSelect(list.id)}
+          onLongPress={() => onLongPress(list)}
+        />
+      ))}
+      <Pressable
+        onPress={onCreate}
+        accessibilityRole="button"
+        accessibilityLabel="Create new list"
+        style={({ pressed }) => ({
+          width: 36,
+          height: 36,
+          borderRadius: 999,
+          borderWidth: 1,
+          borderColor: colors.hairline,
+          backgroundColor: colors.white,
+          alignItems: 'center',
+          justifyContent: 'center',
+          opacity: pressed ? 0.7 : 1,
+        })}
+      >
+        <Feather name="plus" size={16} color={colors.ink} />
+      </Pressable>
+    </ScrollView>
+  );
+}
+
+function SavedListChip({
+  emoji,
+  label,
+  count,
+  active,
+  onPress,
+  onLongPress,
+}: {
+  emoji?: string;
+  label: string;
+  count: number;
+  active: boolean;
+  onPress: () => void;
+  onLongPress?: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={350}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 999,
+        borderWidth: 1,
+        borderColor: active ? 'transparent' : colors.hairline,
+        backgroundColor: active ? 'rgba(15,15,15,0.08)' : colors.white,
+        opacity: pressed ? 0.7 : 1,
+      })}
+    >
+      {emoji ? (
+        <Text style={{ fontSize: 13, marginRight: 6 }}>{emoji}</Text>
+      ) : null}
+      <Text
+        style={{
+          fontSize: 13,
+          fontWeight: active ? '700' : '600',
+          color: colors.ink,
+          letterSpacing: -0.1,
+        }}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
+      <Text
+        style={{
+          fontSize: 12,
+          fontWeight: '600',
+          color: colors.muteSoft,
+          marginLeft: 6,
+        }}
+      >
+        {count}
+      </Text>
+    </Pressable>
   );
 }
 
