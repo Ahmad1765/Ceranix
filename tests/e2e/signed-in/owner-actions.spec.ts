@@ -1,10 +1,10 @@
 // Owner-only actions on /product/<id> — "Mark as sold" / "Mark available" +
-// "Delete". We need to hit an own-listing page; we ask Supabase REST for one
-// scoped to the signed-in user's id, derived from the saved storage state.
-// If the account has no listings the test skips.
+// "Delete". We use a hardcoded mocked listing fixture so the test runs deterministically
+// in CI and doesn't rely on live Supabase endpoint configuration.
+// If the account has no valid session the test skips.
 
 import { test, expect } from '@playwright/test';
-import { waitForAppReady, SUPABASE_URL, SUPABASE_ANON_KEY } from '../helpers/page';
+import { waitForAppReady } from '../helpers/page';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -20,45 +20,56 @@ function readUserIdFromStorage(): string | null {
       try {
         const parsed = JSON.parse(kv.value) as { user?: { id?: string } };
         if (parsed.user?.id) return parsed.user.id;
-      } catch {}
+      } catch (error) {
+        console.warn(`[readUserIdFromStorage] Failed to parse JSON for key "${kv.name}" in ${storagePath}:`, error);
+      }
     }
   }
   return null;
 }
 
-async function fetchAnyOwnedListing(
-  userId: string,
-): Promise<{ id: string; is_sold: boolean } | null> {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return null;
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/listings?select=id,is_sold&seller_id=eq.${userId}&order=created_at.desc&limit=1`,
-    {
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-    },
-  );
-  if (!res.ok) return null;
-  const rows = (await res.json()) as Array<{ id: string; is_sold: boolean }>;
-  return rows[0] ?? null;
-}
+const MOCK_LISTING_ID = 'mock-listing-123';
 
 test.describe('Product owner actions (signed in)', () => {
   test('owner sees the Mark-as-sold and Delete CTAs (no destructive click)', async ({ page }) => {
     const userId = readUserIdFromStorage();
     test.skip(!userId, 'no user id in storage state — auth setup did not save a session');
-    const listing = await fetchAnyOwnedListing(userId!);
-    test.skip(!listing, 'signed-in user has no listings on this account');
 
-    await page.goto(`/product/${listing!.id}`);
+    const fixtureListing = {
+      id: MOCK_LISTING_ID,
+      seller_id: userId,
+      is_sold: false,
+      title: 'Mock Owned Listing',
+      price: 123,
+      created_at: new Date().toISOString(),
+      images: ['https://placehold.co/400x400/eeeeee/cccccc.png?text=Mock+Image'],
+      size: 'M',
+      category: 'clothing',
+      condition: 'new_with_tags',
+      likes: 0,
+      seller: {
+        id: userId,
+        username: 'mockowner',
+      }
+    };
+
+    await page.route('**/rest/v1/listings*', async (route) => {
+      const url = route.request().url();
+      if (url.includes(`id=eq.${MOCK_LISTING_ID}`)) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([fixtureListing]),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
+    await page.goto(`/product/${MOCK_LISTING_ID}`);
     await waitForAppReady(page);
-    // The button copy depends on the current sold status.
-    if (listing!.is_sold) {
-      await expect(page.getByText('Mark available')).toBeVisible({ timeout: 20_000 });
-    } else {
-      await expect(page.getByText('Mark as sold')).toBeVisible({ timeout: 20_000 });
-    }
+
+    await expect(page.getByText('Mark as sold')).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText('Delete', { exact: true })).toBeVisible();
     // Confirm the legacy "Follow / Message" CTAs are NOT shown for the owner.
     await expect(page.getByText('Message', { exact: true })).toHaveCount(0);

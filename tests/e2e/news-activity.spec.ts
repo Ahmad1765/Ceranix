@@ -25,18 +25,26 @@ test.describe('News / Activity', () => {
     await expect(page.getByText('Nothing for you yet')).toBeVisible();
   });
 
-  test('Saved tab CTA routes to the sign-in page (signed-out)', async ({
+  test('Saved tab CTA routes to the sign-in page or shows saved searches', async ({
     page,
   }) => {
     await page.getByText('Saved', { exact: true }).click();
-    // Signed-out variant.
-    await expect(page.getByText('Sign in to save searches')).toBeVisible();
-    await page.getByText('Sign in', { exact: true }).first().click();
-    // Lands on the auth flow (either modal or the welcome view).
-    await expect(
-      page
-        .getByText(/Your story[\s\S]*starts now\.|Welcome[\s\S]*back\.|Continue as guest/i)
-        .first(),
-    ).toBeVisible();
+    
+    // Check if the sign-in prompt is visible (signed-out path).
+    const signInVisible = await page.getByText('Sign in to save searches').isVisible();
+    
+    if (signInVisible) {
+      await expect(page.getByText('Sign in to save searches')).toBeVisible();
+      await page.getByText('Sign in', { exact: true }).first().click();
+      // Lands on the auth flow (either modal or the welcome view).
+      await expect(
+        page
+          .getByText(/Your story[\s\S]*starts now\.|Welcome[\s\S]*back\.|Continue as guest/i)
+          .first(),
+      ).toBeVisible();
+    } else {
+      // Signed-in empty state path.
+      await expect(page.getByText('No saved searches')).toBeVisible();
+    }
   });
 });

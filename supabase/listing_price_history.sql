@@ -6,8 +6,8 @@
 create table if not exists public.listing_price_history (
   id uuid primary key default gen_random_uuid(),
   listing_id uuid not null references public.listings(id) on delete cascade,
-  old_price numeric not null,
-  new_price numeric not null,
+  old_price numeric(10,2) not null,
+  new_price numeric(10,2) not null,
   changed_at timestamptz not null default now()
 );
 
@@ -15,7 +15,9 @@ create index if not exists listing_price_history_listing_changed_idx
   on public.listing_price_history (listing_id, changed_at desc);
 
 create or replace function public.log_listing_price_change()
-returns trigger language plpgsql security definer as $$
+returns trigger language plpgsql security definer
+set search_path = public, pg_temp
+as $$
 begin
   if new.price is distinct from old.price then
     insert into public.listing_price_history (listing_id, old_price, new_price)
@@ -28,6 +30,8 @@ drop trigger if exists listings_price_change_trg on public.listings;
 create trigger listings_price_change_trg
   after update on public.listings
   for each row execute function public.log_listing_price_change();
+
+revoke execute on function public.log_listing_price_change() from public, anon, authenticated;
 
 alter table public.listing_price_history enable row level security;
 

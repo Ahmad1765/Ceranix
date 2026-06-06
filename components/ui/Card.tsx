@@ -37,7 +37,7 @@ export function Card({
                   shadowRadius: 7,
                 },
                 android: { elevation: 2 },
-                default: { boxShadow: '0px 4px 14px rgba(0,0,0,0.06)' },
+                default: ({ boxShadow: '0px 4px 14px rgba(0,0,0,0.06)' } as any),
               })
             : {}),
         },

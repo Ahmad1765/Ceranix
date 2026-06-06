@@ -14,8 +14,8 @@ test.describe('Payment', () => {
     await page.goto(`/payment/${listing!.id}`);
     await waitForAppReady(page);
     await expect(page.getByText('Pay in full')).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByText('To', { exact: true })).toBeVisible();
-    await expect(page.getByText('From', { exact: true })).toBeVisible();
+    await expect(page.getByText('To', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('From', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Pay on')).toBeVisible();
     await expect(page.getByText('Fee (0%)')).toBeVisible();
     await expect(page.getByText('Total', { exact: true })).toBeVisible();

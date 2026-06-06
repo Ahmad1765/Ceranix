@@ -79,31 +79,19 @@ export default function DiscoverScreen() {
     gap: GRID_GAP,
   });
 
-  // Initial load — clear effect, doesn't rely on focus.
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    fetchListings({ tab: 'popular', limit: 60 })
-      .then((rows) => {
-        if (cancelled) return;
-        setListings(rows);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   // Silent re-fetch on focus.
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
-      fetchListings({ tab: 'popular', limit: 60 }).then((rows) => {
-        if (cancelled) return;
-        setListings(rows);
-      });
+      setLoading(true);
+      fetchListings({ tab: 'popular', limit: 60 })
+        .then((rows) => {
+          if (cancelled) return;
+          setListings(rows);
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
       return () => {
         cancelled = true;
       };

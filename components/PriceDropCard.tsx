@@ -71,10 +71,10 @@ export const PriceDropCard = memo(function PriceDropCard({ listing, width = 130 
             textDecorationLine: 'line-through',
           }}
         >
-          ${listing.old_price}
+          ${Number(listing.old_price).toFixed(2)}
         </Text>
         <Text style={{ fontSize: 13, fontWeight: '800', color: '#6C47FF' }}>
-          ${listing.new_price}
+          ${Number(listing.new_price).toFixed(2)}
         </Text>
       </View>
     </Pressable>

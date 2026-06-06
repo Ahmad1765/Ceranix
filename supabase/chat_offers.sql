@@ -47,6 +47,9 @@ create index if not exists messages_conversation_created_idx
   on public.messages(conversation_id, created_at);
 
 -- Allow participants to update offer_status on offer messages (accept / decline).
+-- The policy is just an authorization gate; the BEFORE UPDATE trigger below
+-- enforces who can change what (counterparty accepts/declines, sender withdraws)
+-- and that no other columns are mutated.
 drop policy if exists "Participants can update offer status" on public.messages;
 create policy "Participants can update offer status" on public.messages
   for update using (
@@ -64,6 +67,89 @@ create policy "Participants can update offer status" on public.messages
       and ((select auth.uid()) = c.buyer_id or (select auth.uid()) = c.seller_id)
     )
   );
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Validate offer_status updates: only counterparty can accept/decline,
+-- only sender can withdraw, no other columns may be mutated, valid transitions only.
+-- ─────────────────────────────────────────────────────────────────────────────
+create or replace function public.validate_offer_status_update()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  caller uuid := auth.uid();
+  buyer  uuid;
+  seller uuid;
+  counterparty uuid;
+begin
+  if old.kind <> 'offer' then
+    return new;
+  end if;
+
+  -- Block mutation of any column other than offer_status / updated_at.
+  if new.conversation_id is distinct from old.conversation_id
+     or new.sender_id      is distinct from old.sender_id
+     or new.content        is distinct from old.content
+     or new.kind           is distinct from old.kind
+     or new.metadata       is distinct from old.metadata
+     or new.created_at     is distinct from old.created_at then
+    raise exception 'offer messages: only offer_status may be updated';
+  end if;
+
+  -- Short-circuit if status itself didn't change (e.g. metadata-only no-op).
+  if new.offer_status is not distinct from old.offer_status then
+    return new;
+  end if;
+
+  -- Only pending offers may transition.
+  if old.offer_status is distinct from 'pending' then
+    raise exception 'offer is no longer pending (current: %)', old.offer_status;
+  end if;
+
+  -- Valid target states.
+  if new.offer_status not in ('accepted','declined','expired','withdrawn') then
+    raise exception 'invalid offer_status transition: % -> %',
+      old.offer_status, new.offer_status;
+  end if;
+
+  select c.buyer_id, c.seller_id
+    into buyer, seller
+    from public.conversations c
+    where c.id = old.conversation_id;
+
+  if buyer is null then
+    raise exception 'conversation not found for message';
+  end if;
+
+  -- Counterparty = whichever participant did NOT send the offer.
+  counterparty := case when old.sender_id = buyer then seller else buyer end;
+
+  if new.offer_status = 'withdrawn' then
+    -- Only the original sender can withdraw their offer.
+    if caller is distinct from old.sender_id then
+      raise exception 'only the offer sender may withdraw';
+    end if;
+  elsif new.offer_status in ('accepted','declined') then
+    -- Only the counterparty can accept or decline.
+    if caller is distinct from counterparty then
+      raise exception 'only the counterparty may accept or decline this offer';
+    end if;
+  end if;
+  -- 'expired' is reserved for system / scheduled jobs running as service role
+  -- (auth.uid() is null), which bypasses the caller checks above.
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_validate_offer_status_update on public.messages;
+create trigger trg_validate_offer_status_update
+  before update on public.messages
+  for each row execute procedure public.validate_offer_status_update();
+
+revoke execute on function public.validate_offer_status_update() from public, anon, authenticated;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Bump conversation.last_message + updated_at when a new message lands

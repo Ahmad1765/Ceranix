@@ -16,8 +16,9 @@ const envOrigins = Deno.env.get('ALLOWED_ORIGINS');
 const ALLOWED_ORIGINS = envOrigins ? envOrigins.split(',').map((o) => o.trim()).filter(Boolean) : [];
 
 function getCorsHeaders(req: Request) {
+  if (ALLOWED_ORIGINS.length === 0) return null;
   const origin = req.headers.get('Origin');
-  const safeOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0] || '*';
+  const safeOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
   return {
     'Access-Control-Allow-Origin': safeOrigin,
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -27,6 +28,10 @@ function getCorsHeaders(req: Request) {
 
 Deno.serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
+  if (!corsHeaders) {
+    return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+  }
+
   function json(body: unknown, status = 200): Response {
     return new Response(JSON.stringify(body), {
       status,

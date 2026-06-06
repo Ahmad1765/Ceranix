@@ -30,9 +30,9 @@ test.describe('Discover', () => {
   });
 
   test('selecting a category surfaces the Clear chip', async ({ page }) => {
-    await page.getByText('Bags', { exact: true }).click();
-    await expect(page.getByText('Clear', { exact: true })).toBeVisible();
-    await page.getByText('Clear', { exact: true }).click();
+    await page.getByText('Bags', { exact: true }).first().click();
+    await expect(page.getByText('Clear', { exact: true }).first()).toBeVisible();
+    await page.getByText('Clear', { exact: true }).first().click();
     // After clearing, the Trending section header is back.
     await expect(page.getByText(/Trending|Results/i).first()).toBeVisible();
   });

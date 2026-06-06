@@ -105,12 +105,13 @@ export default function InvoiceScreen() {
     const haveCached = !!getCachedListing(String(id));
     setLoading(!haveCached);
     (async () => {
+      let timeoutId: NodeJS.Timeout;
       try {
         const res = await Promise.race([
           fetchListingById(String(id)),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('Request timed out')), 25_000),
-          ),
+          new Promise<never>((_, reject) => {
+            timeoutId = setTimeout(() => reject(new Error('Request timed out')), 25_000);
+          }),
         ]);
         if (active && res) setListing(res);
         else if (active && !haveCached) setListing(null);
@@ -119,6 +120,7 @@ export default function InvoiceScreen() {
         if (active && !haveCached) setListing(null);
       } finally {
         if (active) setLoading(false);
+        if (timeoutId) clearTimeout(timeoutId);
       }
     })();
     return () => {

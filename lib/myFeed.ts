@@ -298,7 +298,7 @@ export async function fetchSimilarToLiked(
       supabase.from('profiles').select(SELLER_COLS).in('id', sellerIds),
       'similar:sellers',
     );
-    if ('__wedge' in sellersRes) return { ok: false };
+    if ('__wedge' in sellersRes) return { ok: true, rows: merged };
     const { data: sellers, error: sellersErr } = sellersRes as {
       data: Listing['seller'][] | null;
       error: { message: string } | null;

@@ -39,13 +39,25 @@ create table if not exists public.saved_searches (
   -- UI can toggle it without another migration.
   notify boolean not null default true,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  -- Soft uniqueness: one saved search per (user, normalised query+filters)
-  -- combination. NULL filters compare equal via coalesce so a duplicate
-  -- "shirt + clothing" never appears twice.
-  constraint saved_searches_user_query_unique
-    unique (user_id, query, category, gender)
+  updated_at timestamptz not null default now()
 );
+
+-- Drop the legacy plain-UNIQUE constraint if a prior migration installed it.
+-- The plain unique() treated NULLs as distinct, so duplicate all-NULL saves
+-- (e.g. category-only with no query/gender) slipped through.
+alter table public.saved_searches
+  drop constraint if exists saved_searches_user_query_unique;
+
+-- Soft uniqueness: one saved search per (user, normalised query+filters)
+-- combination. NULL filters compare equal via coalesce so a duplicate
+-- "shirt + clothing" never appears twice.
+create unique index if not exists saved_searches_user_query_unique_idx
+  on public.saved_searches (
+    user_id,
+    coalesce(query, ''),
+    coalesce(category, ''),
+    coalesce(gender, '')
+  );
 
 alter table public.saved_searches enable row level security;
 
@@ -96,11 +108,20 @@ as $$
 declare
   s public.saved_searches%rowtype;
   c integer;
+  escaped_query text;
 begin
   select * into s from public.saved_searches where id = p_search_id;
   if not found or s.user_id <> auth.uid() then
     return 0;
   end if;
+
+  -- Escape LIKE metacharacters so a saved query containing '%' or '_'
+  -- matches them literally instead of acting as wildcards.
+  escaped_query := replace(replace(replace(coalesce(s.query, ''),
+                                           '\', '\\'),
+                                   '%', '\%'),
+                           '_', '\_');
+
   select count(*) into c
     from public.listings l
     where l.is_sold = false
@@ -108,8 +129,8 @@ begin
       and (s.gender is null or l.gender = s.gender)
       and (
         s.query is null or s.query = ''
-        or l.title ilike '%' || s.query || '%'
-        or coalesce(l.brand, '') ilike '%' || s.query || '%'
+        or l.title ilike '%' || escaped_query || '%' escape '\'
+        or coalesce(l.brand, '') ilike '%' || escaped_query || '%' escape '\'
       )
       and l.created_at > coalesce(s.last_seen_at, '1970-01-01'::timestamptz);
   return coalesce(c, 0);

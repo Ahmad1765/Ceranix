@@ -35,7 +35,11 @@ alter table public.profiles
   add column if not exists following_count integer not null default 0;
 
 create or replace function public.handle_follow_change()
-returns trigger as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 begin
   if (tg_op = 'INSERT') then
     update public.profiles set followers_count = followers_count + 1 where id = new.followee_id;
@@ -48,7 +52,7 @@ begin
   end if;
   return null;
 end;
-$$ language plpgsql security definer;
+$$;
 
 drop trigger if exists on_follow_change on public.user_follows;
 create trigger on_follow_change

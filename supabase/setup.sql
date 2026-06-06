@@ -37,27 +37,42 @@ create policy "Users can update own profile" on public.profiles
 -- a short uniqueness suffix to avoid collisions; the user changes it on
 -- the onboarding screen.
 create or replace function public.handle_new_user()
-returns trigger as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public, extensions, pg_temp
+as $$
 declare
   base_username text;
   candidate text;
+  attempts int := 0;
 begin
   base_username := lower(regexp_replace(split_part(new.email, '@', 1), '[^a-z0-9_]', '', 'g'));
   if base_username is null or length(base_username) = 0 then
     base_username := 'user';
   end if;
-  candidate := base_username || substr(replace(gen_random_uuid()::text, '-', ''), 1, 5);
 
-  insert into public.profiles (id, username, full_name)
-  values (
-    new.id,
-    candidate,
-    coalesce(new.raw_user_meta_data->>'full_name', base_username)
-  )
-  on conflict (id) do nothing;
-  return new;
+  -- Retry on username collisions (unique index on lower(username)) up to 5 times.
+  loop
+    candidate := base_username || substr(replace(gen_random_uuid()::text, '-', ''), 1, 8);
+    begin
+      insert into public.profiles (id, username, full_name)
+      values (
+        new.id,
+        candidate,
+        coalesce(new.raw_user_meta_data->>'full_name', base_username)
+      )
+      on conflict (id) do nothing;
+      return new;
+    exception when unique_violation then
+      attempts := attempts + 1;
+      if attempts >= 5 then
+        raise;
+      end if;
+    end;
+  end loop;
 end;
-$$ language plpgsql security definer;
+$$;
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created

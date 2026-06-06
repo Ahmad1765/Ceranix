@@ -26,11 +26,14 @@ create table if not exists public.shipping_addresses (
   postal_code text not null,
   country text not null,
   phone text,
-  is_default boolean default true not null,
+  is_default boolean default false not null,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
 create index if not exists shipping_addresses_user_idx on public.shipping_addresses(user_id);
+-- At most one default address per user.
+create unique index if not exists shipping_addresses_one_default_idx
+  on public.shipping_addresses(user_id) where is_default = true;
 
 alter table public.shipping_addresses enable row level security;
 
@@ -55,10 +58,13 @@ create table if not exists public.payout_methods (
   kind text not null check (kind in ('bank','wallet')),
   label text not null,
   account_last4 text not null check (account_last4 ~ '^[0-9]{4}$'),
-  is_default boolean default true not null,
+  is_default boolean default false not null,
   created_at timestamptz default now()
 );
 create index if not exists payout_methods_user_idx on public.payout_methods(user_id);
+-- At most one default payout per user.
+create unique index if not exists payout_methods_one_default_idx
+  on public.payout_methods(user_id) where is_default = true;
 
 alter table public.payout_methods enable row level security;
 
@@ -116,6 +122,68 @@ alter table public.account_deletion_requests enable row level security;
 drop policy if exists "deletion_insert_own" on public.account_deletion_requests;
 create policy "deletion_insert_own" on public.account_deletion_requests
   for insert with check ((select auth.uid()) = user_id);
+
+-- 5b) Block users from forging trust/status fields ---------------------------
+-- Owner-RLS policies on profiles & verifications allow owner UPDATEs at the
+-- row level. These triggers add column-level guards so owners can't promote
+-- themselves to verified/pro or mark their own verification approved. The
+-- service_role bypass lets edge functions / admin RPCs still mutate.
+create or replace function public.guard_profile_trust_fields()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if coalesce(auth.role(), '') = 'service_role' then
+    return new;
+  end if;
+  if new.is_verified is distinct from old.is_verified
+     or new.is_pro      is distinct from old.is_pro
+     or new.rating      is distinct from old.rating
+     or new.total_sales is distinct from old.total_sales then
+    raise exception 'profile trust fields (is_verified, is_pro, rating, total_sales) are read-only';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_guard_profile_trust on public.profiles;
+create trigger trg_guard_profile_trust
+  before update on public.profiles
+  for each row execute procedure public.guard_profile_trust_fields();
+
+revoke execute on function public.guard_profile_trust_fields() from public, anon, authenticated;
+
+create or replace function public.guard_verification_status()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if coalesce(auth.role(), '') = 'service_role' then
+    return new;
+  end if;
+  if tg_op = 'INSERT' then
+    if new.status is distinct from 'submitted' then
+      raise exception 'new verifications must start as submitted';
+    end if;
+  elsif tg_op = 'UPDATE' then
+    if new.status is distinct from old.status then
+      raise exception 'verification status may only be changed by reviewers';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_guard_verification_status on public.verifications;
+create trigger trg_guard_verification_status
+  before insert or update on public.verifications
+  for each row execute procedure public.guard_verification_status();
+
+revoke execute on function public.guard_verification_status() from public, anon, authenticated;
 
 -- 6) Auto-update updated_at on shipping_addresses ----------------------------
 create or replace function public.touch_updated_at()

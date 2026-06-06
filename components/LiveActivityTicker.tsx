@@ -76,9 +76,9 @@ export function LiveActivityTicker() {
         .order('created_at', { ascending: false })
         .limit(8);
       if (!active) return;
-      if (error || !data) return;
-      const mapped: Activity[] = (data as unknown as (Listing & { seller: { username: string } })[])
-        .filter((row) => row?.seller?.username)
+      if (error || !Array.isArray(data)) return;
+      const mapped: Activity[] = (data as any[])
+        .filter((row) => row && row.seller && row.seller.username)
         .map((row) => ({
           id: row.id,
           username: row.seller.username,
@@ -86,6 +86,7 @@ export function LiveActivityTicker() {
           title: row.title,
           created_at: row.created_at,
         }));
+      if (!active) return;
       setItems(mapped);
     })();
     return () => {
@@ -95,6 +96,7 @@ export function LiveActivityTicker() {
 
   // Cycle through items
   useEffect(() => {
+    let t: NodeJS.Timeout | undefined;
     if (items.length === 0) return;
     // Dynamic Island expand-in: blob → pill
     islandScale.setValue(0.2);
@@ -122,44 +124,47 @@ export function LiveActivityTicker() {
       easing: Easing.out(Easing.quad),
       useNativeDriver: USE_NATIVE_DRIVER,
     }).start();
-    if (items.length === 1) return;
 
-    const t = setInterval(() => {
-      // Slide current up + fade, then swap and slide new in from below.
-      Animated.parallel([
-        Animated.timing(slide, {
-          toValue: -16,
-          duration: 220,
-          easing: Easing.in(Easing.cubic),
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
-        Animated.timing(opacity, {
-          toValue: 0,
-          duration: 220,
-          useNativeDriver: USE_NATIVE_DRIVER,
-        }),
-      ]).start(() => {
-        setIndex((i) => (i + 1) % items.length);
-        slide.setValue(16);
-        opacity.setValue(0);
+    if (items.length > 1) {
+      t = setInterval(() => {
+        // Slide current up + fade, then swap and slide new in from below.
         Animated.parallel([
-          Animated.spring(slide, {
-            toValue: 0,
+          Animated.timing(slide, {
+            toValue: -16,
+            duration: 220,
+            easing: Easing.in(Easing.cubic),
             useNativeDriver: USE_NATIVE_DRIVER,
-            damping: 18,
-            stiffness: 220,
-            mass: 0.7,
           }),
           Animated.timing(opacity, {
-            toValue: 1,
+            toValue: 0,
             duration: 220,
             useNativeDriver: USE_NATIVE_DRIVER,
           }),
-        ]).start();
-      });
-    }, CYCLE_MS);
-    return () => clearInterval(t);
-  }, [items.length, slide, opacity]);
+        ]).start(() => {
+          setIndex((i) => (i + 1) % items.length);
+          slide.setValue(16);
+          opacity.setValue(0);
+          Animated.parallel([
+            Animated.spring(slide, {
+              toValue: 0,
+              useNativeDriver: USE_NATIVE_DRIVER,
+              damping: 18,
+              stiffness: 220,
+              mass: 0.7,
+            }),
+            Animated.timing(opacity, {
+              toValue: 1,
+              duration: 220,
+              useNativeDriver: USE_NATIVE_DRIVER,
+            }),
+          ]).start();
+        });
+      }, CYCLE_MS);
+    }
+    return () => {
+      if (t) clearInterval(t);
+    };
+  }, [items.length, slide, opacity, islandScale, islandOpacity]);
 
   if (items.length === 0) return null;
 

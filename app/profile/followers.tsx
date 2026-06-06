@@ -66,6 +66,7 @@ export default function FollowersScreen() {
   const handleToggle = async (row: Row) => {
     if (!authUser) {
       toast.show('Sign in to follow', { variant: 'info', icon: 'log-in' });
+      // deliberate temporary exception: route not yet declared in expo-router type map
       router.push('/auth/login' as any);
       return;
     }

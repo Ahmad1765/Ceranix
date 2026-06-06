@@ -126,6 +126,8 @@ export async function fetchAnyLiveListing(
 ): Promise<{ id: string; title: string; price: number; brand: string | null; seller_id: string | null } | null> {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return null;
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10_000);
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/listings?select=id,title,price,brand,seller_id&is_sold=eq.false&order=created_at.desc&limit=1`,
       {
@@ -133,9 +135,10 @@ export async function fetchAnyLiveListing(
           apikey: SUPABASE_ANON_KEY,
           Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
         },
-        signal: AbortSignal.timeout(10_000),
+        signal: controller.signal,
       },
     );
+    clearTimeout(timeoutId);
     if (!res.ok) return null;
     const rows = (await res.json()) as Array<{
       id: string;

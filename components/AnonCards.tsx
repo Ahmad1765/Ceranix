@@ -160,8 +160,21 @@ const PORTRAIT_CARDS: CategoryTileData[] = [
 
 
 
+const DISPLAY_TO_CATEGORY: Record<string, string> = {
+  sneakers: 'shoes',
+  handbags: 'bags',
+  electronics: 'electronics',
+  beauty: 'beauty',
+  activewear: 'clothing',
+  streetwear: 'clothing',
+  women: 'clothing',
+  men: 'clothing',
+  kids: 'clothing',
+};
+
 function go(categoryKey: string) {
-  router.push(`/(tabs)/discover?category=${encodeURIComponent(categoryKey)}` as any);
+  const mappedCategory = DISPLAY_TO_CATEGORY[categoryKey] || 'other';
+  router.push(`/(tabs)/discover?category=${encodeURIComponent(mappedCategory)}` as any);
 }
 
 function SectionEyebrow({ children }: { children: string }) {

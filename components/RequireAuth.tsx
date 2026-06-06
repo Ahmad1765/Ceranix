@@ -9,7 +9,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   if (loading) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'white' }}>
-        <ActivityIndicator color="#6C47FF" />
+        <ActivityIndicator color="#6C47FF" accessibilityLabel="Loading, authenticating" accessibilityRole="progressbar" />
       </View>
     );
   }

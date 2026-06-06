@@ -5,7 +5,8 @@ import { defineConfig, devices } from '@playwright/test';
 // edge functions, realtime, Stripe) is intercepted in tests/e2e/helpers/
 // supabase-mock.ts — no live backend is touched.
 
-const PORT = Number(process.env.PLAYWRIGHT_PORT ?? 4173);
+const envPort = Number(process.env.PLAYWRIGHT_PORT);
+const PORT = Number.isFinite(envPort) && envPort > 0 ? envPort : 4173;
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${PORT}`;
 
 export default defineConfig({

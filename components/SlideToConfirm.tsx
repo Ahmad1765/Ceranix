@@ -123,6 +123,10 @@ export function SlideToConfirm({
           overflow: 'hidden',
           boxShadow: '0px 10px 18px rgba(0,0,0,0.16)',
           elevation: 6,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 10 },
+          shadowOpacity: 0.16,
+          shadowRadius: 18,
         }}
       >
         {/* Fill — gives a satisfying "filling up" feedback as you drag */}
@@ -194,6 +198,10 @@ export function SlideToConfirm({
                 justifyContent: 'center',
                 boxShadow: '0px 4px 8px rgba(0,0,0,0.18)',
                 elevation: 4,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.18,
+                shadowRadius: 8,
               },
               thumbStyle,
             ]}

@@ -160,15 +160,15 @@ export async function sendOffer(args: {
   note?: string;
 }): Promise<ChatMessage | null> {
   if (!Number.isFinite(args.amount) || args.amount <= 0) return null;
-  const amountInCents = Math.round(args.amount * 100);
+  const amountInDollars = Number(args.amount.toFixed(2));
   const { data, error } = await supabase
     .from('messages')
     .insert({
       conversation_id: args.conversationId,
       sender_id: args.senderId,
-      content: args.note?.trim() || `Offer: $${(amountInCents / 100).toFixed(2)}`,
+      content: args.note?.trim() || `Offer: $${amountInDollars.toFixed(2)}`,
       kind: 'offer',
-      metadata: { amount: amountInCents, currency: 'USD', note: args.note?.trim() || null },
+      metadata: { amount: amountInDollars, currency: 'USD', note: args.note?.trim() || null },
       offer_status: 'pending',
     })
     .select('id, conversation_id, sender_id, content, kind, metadata, offer_status, created_at, updated_at')
