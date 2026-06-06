@@ -26,29 +26,35 @@ That's it. The Playwright config (`playwright.config.ts`) auto-boots
 ```
 tests/e2e/
 ├── helpers/
-│   ├── fixtures.ts        # Deterministic users, listings, conversations, messages
-│   ├── supabase-mock.ts   # Route interception for Supabase REST/RPC/auth/edge funcs
-│   ├── auth.ts            # localStorage session injection (signInAs, signOut)
-│   └── page.ts            # Custom test() fixture: fresh state + waitForAppReady
+│   ├── fixtures.ts               # Deterministic users, listings, conversations, messages
+│   ├── supabase-mock.ts          # Route interception for Supabase REST/RPC/auth/edge funcs
+│   ├── auth.ts                   # localStorage session injection (signInAs, signOut)
+│   └── page.ts                   # Custom test() fixture: fresh state + waitForAppReady
+├── signed-in/
+│   ├── chat-inbox.spec.ts        # Signed-out empty, list, All/Buying/Selling filters
+│   ├── following-feed.spec.ts
+│   ├── owner-actions.spec.ts
+│   ├── profile-edit.spec.ts      # Username validation, debounce, save PATCH, onboarding
+│   ├── profile-tab.spec.ts       # Own profile tabs, stats, edit CTA
+│   ├── ratings.spec.ts           # Score card, achievements, zero-sales callout
+│   ├── saved-searches.spec.ts
+│   ├── settings.spec.ts          # Sections, modals, vacation, bundle, logout, delete
+│   └── upload-listing.spec.ts    # RequireAuth gate + photos step UI + alerts
+├── auth-edge.spec.ts
 ├── auth-flow.spec.ts             # Welcome → signin / signup, validation, errors
-├── home-feed.spec.ts             # For you / Popular / Following, empty state, navigation
+├── auth.setup.ts
+├── boundary-data.spec.ts
 ├── discover.spec.ts              # Search + category filters + clear
-├── feed-static.spec.ts           # The static promo /feed screen
-├── product-detail.spec.ts        # Hero, like, follow, message, sold-out, not-found
-├── upload-listing.spec.ts        # RequireAuth gate + photos step UI + alerts
-├── profile-screen.spec.ts        # Own profile tabs, stats, edit CTA
-├── chat-inbox.spec.ts            # Signed-out empty, list, All/Buying/Selling filters
-├── conversation-thread.spec.ts   # Send text, send offer, accept / decline
-├── new-conversation.spec.ts      # Mode toggle, quick replies, offer suggestions
-├── settings-account.spec.ts      # Sections, modals, vacation, bundle, logout, delete
-├── profile-edit.spec.ts          # Username validation, debounce, save PATCH, onboarding
-├── payment-flow.spec.ts          # Slide-to-pay (demo), redirect to invoice
+├── feed-personalized.spec.ts
+├── home-feed.spec.ts             # For you / Popular / Following, empty state, navigation
 ├── invoice-detail.spec.ts        # Pending / paid status, Pay → /payment redirect
+├── network-failure.spec.ts
 ├── news-activity.spec.ts         # Following / For you / Saved empty states
-├── ratings-screen.spec.ts        # Score card, achievements, zero-sales callout
+├── payment-flow.spec.ts          # Slide-to-pay (demo), redirect to invoice
+├── product-detail.spec.ts        # Hero, like, follow, message, sold-out, not-found
+├── responsive.spec.ts
 ├── tab-navigation.spec.ts        # All five tabs reach the right route
-├── user-profile.spec.ts          # Other user follow / unfollow, counts, missing user
-└── api-validation.spec.ts        # Direct contract checks against the mocked endpoints
+└── user-profile.spec.ts          # Other user follow / unfollow, counts, missing user
 ```
 
 ## How a test stays isolated
