@@ -118,12 +118,26 @@ export default function NewConversationScreen() {
   }, [listingId]);
 
   const offerSuggestions = useMemo(() => {
-    if (!listing) return [];
-    return [
-      { label: '-30%', value: Math.round(listing.price * 0.7) },
-      { label: '-20%', value: Math.round(listing.price * 0.8) },
-      { label: '-10%', value: Math.round(listing.price * 0.9) },
-    ].filter((v) => v.value > 0);
+    if (!listing || listing.price <= 0) return [];
+    // Money snap: round suggestions down to a tier that reads naturally for
+    // the price band. Avoids ugly $13.30 / $55.30 numbers and prevents
+    // -10% on a $5 item from rounding back up to the list price.
+    const step =
+      listing.price <= 20 ? 1 :
+      listing.price <= 100 ? 5 :
+      listing.price <= 500 ? 10 :
+      25;
+    const snap = (n: number) => Math.max(step, Math.floor(n / step) * step);
+
+    const snapped = [0.3, 0.2, 0.1]
+      .map((off) => snap(listing.price * (1 - off)))
+      .filter((v) => v > 0 && v < listing.price);
+    const unique = Array.from(new Set(snapped));
+
+    return unique.map((value) => ({
+      value,
+      label: `-${Math.round(((listing.price - value) / listing.price) * 100)}%`,
+    }));
   }, [listing]);
 
   const amountNum = parseInt(amount, 10);

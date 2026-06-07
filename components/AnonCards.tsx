@@ -160,26 +160,45 @@ const PORTRAIT_CARDS: CategoryTileData[] = [
 
 
 
-const DISPLAY_TO_CATEGORY: Record<string, string> = {
-  sneakers: 'shoes',
-  handbags: 'bags',
-  electronics: 'electronics',
-  beauty: 'beauty',
-  activewear: 'clothing',
-  streetwear: 'clothing',
-  women: 'clothing',
-  men: 'clothing',
-  kids: 'clothing',
-  vintage: 'clothing',
-  editors: 'trending',
-  app: 'other',
-  home: 'other',
-  lifestyle: 'other',
+// Each tile maps to a discover route. Cards whose value is a real category
+// pass `category=`; niche themes (vintage, streetwear, departments) pass a
+// `q=` keyword because the discover screen text-matches title/brand/desc,
+// which is far broader than the 7 fixed categories. The "Get the app" card
+// has no product meaning, so it lands on unfiltered discover.
+type DiscoverRoute = { q?: string; category?: string };
+
+const DISPLAY_TO_ROUTE: Record<string, DiscoverRoute> = {
+  // Hero
+  vintage: { q: 'vintage' },
+  sneakers: { category: 'shoes' },
+  editors: { category: 'trending' },
+
+  // Grid
+  electronics: { category: 'electronics' },
+  beauty: { category: 'beauty' },
+  home: { q: 'home' },
+  handbags: { category: 'bags' },
+
+  // Mid
+  app: {},
+  activewear: { q: 'activewear' },
+  streetwear: { q: 'streetwear' },
+
+  // Departments — discover has no gender filter, so query text is the only
+  // signal that meaningfully narrows the feed.
+  women: { q: 'women' },
+  men: { q: 'men' },
+  kids: { q: 'kids' },
+  lifestyle: { q: 'lifestyle' },
 };
 
-function go(categoryKey: string) {
-  const mappedCategory = DISPLAY_TO_CATEGORY[categoryKey] || 'other';
-  router.push(`/(tabs)/discover?category=${encodeURIComponent(mappedCategory)}` as any);
+function go(displayKey: string) {
+  const route = DISPLAY_TO_ROUTE[displayKey] ?? {};
+  const params = new URLSearchParams();
+  if (route.q) params.set('q', route.q);
+  if (route.category) params.set('category', route.category);
+  const qs = params.toString();
+  router.push(`/(tabs)/discover${qs ? `?${qs}` : ''}` as any);
 }
 
 function SectionEyebrow({ children }: { children: string }) {
