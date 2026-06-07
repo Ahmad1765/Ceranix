@@ -255,10 +255,10 @@ function ProfileScreenInner() {
 
 const handleShareProfile = useCallback(async () => {
   if (!profile?.id) return;
-  const handle = profile.username ?? 'this seller';
+  const displayName = profile.username ? `@${profile.username}` : 'this seller';
   const url = `${APP_URL}/user/${profile.id}`;
   try {
-    const result = await Share.share({ message: `Check out @${handle} on Carrinix\n${url}`, url });
+    const result = await Share.share({ message: `Check out ${displayName} on Carrinix\n${url}`, url });
     if (result.action === Share.sharedAction) {
       if (result.activityType) {
         // shared with activity type of result.activityType

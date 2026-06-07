@@ -723,8 +723,8 @@ function Field({
           height: 56,
           borderRadius: 18,
           backgroundColor: colors.white,
-          borderWidth: 1,
-          borderColor: colors.hairline,
+          borderWidth: focused ? 2 : 1,
+          borderColor: focused ? colors.primary : colors.hairline,
         }}
       >
         <Feather

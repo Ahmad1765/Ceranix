@@ -110,9 +110,22 @@ export function SlideToConfirm({
     width: translateX.value + THUMB_SIZE + PADDING,
   }));
 
+  const a11yLabel = loading ? loadingLabel : confirmed ? doneLabel : label;
+
   return (
       <View
         onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel={a11yLabel}
+        accessibilityHint="Slide right to confirm, or double-tap to activate"
+        accessibilityState={{ disabled: loading, busy: loading }}
+        accessibilityActions={[{ name: 'activate' }]}
+        onAccessibilityAction={(e) => {
+          if (e.nativeEvent.actionName === 'activate' && !loading && !confirmed) {
+            fireConfirm();
+          }
+        }}
         style={{
           height: TRACK_HEIGHT,
           borderRadius: 999,

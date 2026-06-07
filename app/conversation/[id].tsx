@@ -353,6 +353,10 @@ function OfferSheet({
     setSending(true);
     try {
       await onSubmit(parsed, note);
+    } catch (e) {
+      // The parent already surfaces toast/Alert on failure. Swallow here so
+      // the rejection doesn't bubble as an unhandled promise.
+      console.warn('[OfferSheet] submit failed', e);
     } finally {
       setSending(false);
     }
@@ -598,13 +602,19 @@ export default function ConversationScreen() {
   const handleSendOffer = useCallback(
     async (amount: number, note: string) => {
       if (!user || !conversationId) return;
-      const saved = await sendOffer({ conversationId, senderId: user.id, amount, note });
-      if (saved) {
-        setMessages((prev) => (prev.some((m) => m.id === saved.id) ? prev : [...prev, saved]));
-        setOfferVisible(false);
-        toast.show('Offer sent', { variant: 'success', icon: 'check' });
-      } else {
-        Alert.alert('Could not send offer', 'Please try again.');
+      try {
+        const saved = await sendOffer({ conversationId, senderId: user.id, amount, note });
+        if (saved) {
+          setMessages((prev) => (prev.some((m) => m.id === saved.id) ? prev : [...prev, saved]));
+          setOfferVisible(false);
+          toast.show('Offer sent', { variant: 'success', icon: 'check' });
+        } else {
+          // Sheet stays open so the user can retry without retyping.
+          Alert.alert('Could not send offer', 'Please try again.');
+        }
+      } catch (e: any) {
+        console.warn('[conversation] sendOffer threw', e?.message ?? e);
+        toast.show("Couldn't send offer", { variant: 'default', icon: 'alert-triangle' });
       }
     },
     [conversationId, user, toast],
