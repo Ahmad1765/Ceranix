@@ -18,9 +18,13 @@ const ALLOWED_ORIGINS = envOrigins ? envOrigins.split(',').map((o) => o.trim()).
 function getCorsHeaders(req: Request) {
   if (ALLOWED_ORIGINS.length === 0) return null;
   const origin = req.headers.get('Origin');
-  const safeOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  // Only echo back the caller's Origin if it's explicitly on the allow-list.
+  // Falling back to ALLOWED_ORIGINS[0] would leak a valid CORS response to
+  // disallowed origins (the browser still blocks the actual cross-origin
+  // request, but exposing the allowed origin in error logs is unnecessary).
+  if (!origin || !ALLOWED_ORIGINS.includes(origin)) return null;
   return {
-    'Access-Control-Allow-Origin': safeOrigin,
+    'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
   };

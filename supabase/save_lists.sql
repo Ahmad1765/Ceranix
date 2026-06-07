@@ -78,6 +78,15 @@ security definer
 set search_path = public
 as $$
 begin
+  -- SECURITY DEFINER bypasses RLS, so a misbehaving client could pass any
+  -- p_user_id and seed lists on another user's behalf. Pin the caller and
+  -- service_role to be the only writers; everyone else must operate on
+  -- their own user_id. service_role is exempt so admin scripts can backfill.
+  if coalesce(auth.role(), '') <> 'service_role'
+     and (auth.uid() is null or auth.uid() <> p_user_id) then
+    raise exception 'ensure_save_lists may only seed the caller''s own user_id';
+  end if;
+
   -- Default "Saved" list — protected, always exists.
   insert into public.save_lists (user_id, name, emoji, is_default)
   select p_user_id, 'Saved', '🔖', true

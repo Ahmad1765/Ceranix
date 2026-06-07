@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import Animated, {
+  cancelAnimation,
   Easing,
   useAnimatedStyle,
   useSharedValue,
@@ -19,6 +20,10 @@ export function TabOrb() {
       -1,
       false,
     );
+    return () => {
+      cancelAnimation(t);
+      t.value = 0;
+    };
   }, [t]);
 
   // Outer halo — slow soft breath

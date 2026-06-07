@@ -113,9 +113,13 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
         setLikeCount((c) => Math.max(0, c + (next ? -1 : 1)));
       }
     } catch (error) {
+      // Roll back the optimistic flip and surface a toast. We intentionally
+      // do NOT re-throw — the onPress caller doesn't await this, so a throw
+      // would become an unhandled promise rejection.
       setLiked(prev);
       setLikeCount((c) => Math.max(0, c + (next ? -1 : 1)));
-      throw error;
+      console.warn('[ListingCard] toggleLike failed:', error);
+      toast.show("Couldn't update like", { variant: 'default', icon: 'alert-triangle' });
     } finally {
       setLikeBusy(false);
     }
@@ -144,8 +148,10 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
         toast.show('Saved', { variant: 'success', icon: 'bookmark' });
       }
     } catch (error) {
+      // Roll back and toast; do NOT re-throw — see handleToggleLike.
       setSaved(prev);
-      throw error;
+      console.warn('[ListingCard] toggleSave failed:', error);
+      toast.show("Couldn't update save", { variant: 'default', icon: 'alert-triangle' });
     } finally {
       setSaveBusy(false);
     }

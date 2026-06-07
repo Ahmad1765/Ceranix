@@ -8,6 +8,12 @@
 // signature (title, message, buttons[]). Import this file once at the top of
 // the root layout — installAlertShim() is idempotent.
 //
+// LIMITATION — 2-button max on web. The shim backs onto `window.confirm`,
+// which only has OK/Cancel. With 3+ buttons we map the first non-cancel to
+// OK and the cancel-styled one to Cancel; any other buttons are unreachable.
+// A console.warn fires at runtime to flag this so call sites don't silently
+// drop options. Use a custom modal instead when you need >2 actions on web.
+//
 // Native (iOS / Android) is left untouched.
 
 import { Alert, Platform } from 'react-native';
@@ -48,6 +54,12 @@ export function installAlertShim(): void {
 
     // Multi-button → confirm. OK runs the first non-cancel button's onPress
     // (typically the action); Cancel runs the cancel button's onPress.
+    if (buttons.length > 2) {
+      console.warn(
+        '[alertShim] window.confirm only supports 2 buttons; extras are unreachable. Buttons:',
+        buttons.map((b) => b.text ?? '(unnamed)'),
+      );
+    }
     const confirmed = window.confirm(body);
     if (confirmed) {
       const action = buttons.find((b) => b.style !== 'cancel') ?? buttons[0];

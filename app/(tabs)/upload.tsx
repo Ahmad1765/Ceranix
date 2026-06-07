@@ -208,20 +208,25 @@ function SellScreenInner() {
 
       // Seed cache + broadcast before navigating so the product page
       // and home feed reflect the new listing without a fetch race.
+      // Build seller explicitly so the cached listing always conforms to
+      // Listing['seller'] even if `profile` is sparse (e.g. a brand-new
+      // signup that hasn't filled in rating/total_sales yet).
+      const sellerSeed: Listing['seller'] = {
+        id: user.id,
+        username: profile?.username ?? '',
+        avatar_url: profile?.avatar_url ?? null,
+        full_name: profile?.full_name ?? '',
+        bio: profile?.bio ?? null,
+        location: profile?.location ?? null,
+        rating: profile?.rating ?? 0,
+        total_sales: profile?.total_sales ?? 0,
+        created_at: profile?.created_at ?? new Date().toISOString(),
+      };
+
       const newListing: Listing = {
         id: newId,
         seller_id: user.id,
-        seller: (profile as Listing['seller']) ?? ({
-          id: user.id,
-          username: '',
-          avatar_url: null,
-          full_name: '',
-          bio: null,
-          location: null,
-          rating: 0,
-          total_sales: 0,
-          created_at: new Date().toISOString(),
-        } as Listing['seller']),
+        seller: sellerSeed,
         title: title.trim(),
         description: description.trim(),
         price: priceNum,

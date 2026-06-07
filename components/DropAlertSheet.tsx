@@ -14,15 +14,18 @@ import { createSavedSearch } from '@/lib/savedSearches';
 import { useToast } from '@/lib/toast';
 import type { Category, Gender } from '@/types';
 
-const CATEGORIES: { id: Category; label: string }[] = [
-  { id: 'clothing', label: 'Clothing' },
-  { id: 'shoes', label: 'Shoes' },
-  { id: 'bags', label: 'Bags' },
-  { id: 'accessories', label: 'Accessories' },
-  { id: 'electronics', label: 'Tech' },
-  { id: 'beauty', label: 'Beauty' },
-  { id: 'other', label: 'Other' },
+const CATEGORIES: { id: Category; label: string; emoji: string }[] = [
+  { id: 'clothing', label: 'Clothing', emoji: '👕' },
+  { id: 'shoes', label: 'Shoes', emoji: '👟' },
+  { id: 'bags', label: 'Bags', emoji: '👜' },
+  { id: 'accessories', label: 'Accessories', emoji: '🕶️' },
+  { id: 'electronics', label: 'Tech', emoji: '📱' },
+  { id: 'beauty', label: 'Beauty', emoji: '💄' },
+  { id: 'other', label: 'Other', emoji: '✨' },
 ];
+
+const CARD_W = 116;
+const CARD_H = 132;
 
 interface Props {
   visible: boolean;
@@ -188,7 +191,11 @@ export function DropAlertSheet({ visible, userId, onClose, onCreated }: Props) {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 8, paddingRight: 8 }}
+            decelerationRate="fast"
+            snapToInterval={CARD_W + 10}
+            snapToAlignment="start"
+            contentContainerStyle={{ gap: 10, paddingRight: 20 }}
+            style={{ marginHorizontal: -20, paddingHorizontal: 20 }}
           >
             {CATEGORIES.map((c) => {
               const active = category === c.id;
@@ -197,16 +204,39 @@ export function DropAlertSheet({ visible, userId, onClose, onCreated }: Props) {
                   key={c.id}
                   onPress={() => setCategory(active ? null : c.id)}
                   style={({ pressed }) => ({
-                    paddingHorizontal: 14,
-                    paddingVertical: 9,
-                    borderRadius: radii.pill,
+                    width: CARD_W,
+                    height: CARD_H,
+                    borderRadius: radii.xl,
                     borderWidth: 1,
-                    borderColor: active ? colors.ink : colors.hairline,
-                    backgroundColor: active ? colors.panel : colors.white,
-                    opacity: pressed ? 0.7 : 1,
+                    borderColor: active ? colors.purple : colors.hairline,
+                    backgroundColor: active ? colors.purple : colors.white,
+                    padding: 10,
+                    justifyContent: 'space-between',
+                    opacity: pressed ? 0.85 : 1,
                   })}
                 >
-                  <Text style={{ fontSize: 13, fontWeight: active ? '700' : '600', color: colors.ink }}>
+                  <View
+                    style={{
+                      flex: 1,
+                      borderRadius: radii.lg,
+                      backgroundColor: active ? 'rgba(255,255,255,0.16)' : colors.primarySoft,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: 8,
+                    }}
+                  >
+                    <Text style={{ fontSize: 40, lineHeight: 48 }}>{c.emoji}</Text>
+                  </View>
+                  <Text
+                    style={{
+                      fontSize: 13.5,
+                      fontWeight: '700',
+                      color: active ? colors.white : colors.ink,
+                      letterSpacing: -0.1,
+                      paddingLeft: 4,
+                    }}
+                    numberOfLines={1}
+                  >
                     {c.label}
                   </Text>
                 </Pressable>

@@ -137,8 +137,14 @@ export async function deleteListingImages(urls: string[]): Promise<void> {
     const parts = url.split('/listing-images/');
     return parts.length > 1 ? parts[1] : null;
   }).filter(Boolean) as string[];
-  
-  if (paths.length > 0) {
-    await supabase.storage.from('listing-images').remove(paths);
+
+  if (paths.length === 0) return;
+
+  const { error } = await supabase.storage.from('listing-images').remove(paths);
+  if (error) {
+    // Log but don't throw — this runs on the publish failure path as a
+    // best-effort cleanup. Letting it throw would mask the original DB error
+    // shown to the user with a less actionable storage error.
+    console.warn('[upload] deleteListingImages failed:', error.message, 'paths:', paths);
   }
 }

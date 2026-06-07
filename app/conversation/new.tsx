@@ -672,7 +672,7 @@ export default function NewConversationScreen() {
               className="text-ink"
               style={{ fontSize: 12, lineHeight: 18, flex: 1, fontWeight: '500' }}
             >
-              Keep payments inside Ceranix — off-platform deals aren't protected.
+              Keep payments inside Carranix — off-platform deals aren't protected.
             </Text>
           </View>
         </ScrollView>

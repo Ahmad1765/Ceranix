@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import { View, Text } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TabOrb } from '../../components/TabOrb';
 
 // Pure-View icon — no font load, no SVG. Mirrors MCI `view-dashboard`
@@ -19,7 +20,6 @@ function MyFeedIcon({ size, color }: { size: number; color: string }) {
     </View>
   );
 }
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();

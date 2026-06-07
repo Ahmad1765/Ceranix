@@ -117,8 +117,13 @@ begin
     where follower_id = v_follower and followee_id = p_followee;
     v_is_following := false;
   else
+    -- ON CONFLICT DO NOTHING absorbs the race where two concurrent toggle
+    -- calls both saw v_exists = false. Whichever insert lost the race
+    -- becomes a no-op; the row exists either way, so the post-state is
+    -- "is_following = true" for both callers.
     insert into public.user_follows (follower_id, followee_id)
-    values (v_follower, p_followee);
+    values (v_follower, p_followee)
+    on conflict do nothing;
     v_is_following := true;
   end if;
 

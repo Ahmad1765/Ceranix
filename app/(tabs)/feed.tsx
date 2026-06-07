@@ -31,6 +31,17 @@ const GRID_GAP = 8;
 const FOR_YOU: 'for-you' = 'for-you';
 const SAVED: 'saved' = 'saved';
 
+// Mirrors the CHECK constraint on listings.category in setup.sql. Saved
+// searches may hold arbitrary strings (the UI also stores pseudo-categories
+// like "trending"), so any value not in this set is silently ignored when
+// filtering the visible grid.
+const VALID_CATEGORIES: ReadonlySet<Category> = new Set<Category>([
+  'clothing', 'shoes', 'bags', 'accessories', 'electronics', 'beauty', 'other',
+]);
+function isValidCategory(v: unknown): v is Category {
+  return typeof v === 'string' && VALID_CATEGORIES.has(v as Category);
+}
+
 export default function MyFeedScreen() {
   const { user } = useAuth();
   const toast = useToast();
@@ -170,8 +181,9 @@ export default function MyFeedScreen() {
     if (showingSaved) return savedListings;
     if (!activeSavedSearch) return listings;
     let rows = listings;
-    if (activeSavedSearch.category) {
-      rows = rows.filter((l) => l.category === (activeSavedSearch.category as Category));
+    if (isValidCategory(activeSavedSearch.category)) {
+      const cat = activeSavedSearch.category;
+      rows = rows.filter((l) => l.category === cat);
     }
     const q = activeSavedSearch.query?.trim().toLowerCase() ?? '';
     if (q.length > 0) {

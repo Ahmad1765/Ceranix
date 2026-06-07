@@ -10,19 +10,30 @@ interface Props {
   width?: number;
 }
 
+function formatPrice(value: unknown): string {
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? `$${n.toFixed(2)}` : 'N/A';
+}
+
 export const PriceDropCard = memo(function PriceDropCard({ listing, width = 130 }: Props) {
-  const firstImage = listing.images[0] ?? '';
+  const firstImage = Array.isArray(listing.images) ? (listing.images[0] ?? '') : '';
   const src = getOptimizedImageUrl(firstImage, { width: thumbWidthFor(width) });
+  // Clamp negative pct to 0: if new_price > old_price (price went up) the
+  // render guard `pct > 0` will hide the discount badge anyway, but the
+  // clamp keeps the math honest for any future consumers of `pct`.
   const pct =
     listing.old_price > 0
-      ? Math.round(((listing.old_price - listing.new_price) / listing.old_price) * 100)
+      ? Math.max(
+          0,
+          Math.round(((listing.old_price - listing.new_price) / listing.old_price) * 100),
+        )
       : 0;
   return (
     <Pressable
       onPress={() => router.push(`/product/${listing.id}`)}
       style={{ width }}
       accessibilityRole="button"
-      accessibilityLabel={`${listing.title}, price dropped to $${Number(listing.new_price).toFixed(2)}`}
+      accessibilityLabel={`${listing.title}, price dropped to ${formatPrice(listing.new_price)}`}
     >
       <View
         style={{
@@ -71,10 +82,10 @@ export const PriceDropCard = memo(function PriceDropCard({ listing, width = 130 
             textDecorationLine: 'line-through',
           }}
         >
-          ${Number(listing.old_price).toFixed(2)}
+          {formatPrice(listing.old_price)}
         </Text>
         <Text style={{ fontSize: 13, fontWeight: '800', color: '#6C47FF' }}>
-          ${Number(listing.new_price).toFixed(2)}
+          {formatPrice(listing.new_price)}
         </Text>
       </View>
     </Pressable>
