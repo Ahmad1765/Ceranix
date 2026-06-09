@@ -166,13 +166,18 @@ function listingToRelated(row: Listing): RelatedItem {
   };
 }
 
-const BUNDLE_MILESTONES = [
-  { items: '1 item', discount: '0% off', active: false },
-  { items: '2 items', discount: '5% off', active: true },
-  { items: '3 items', discount: '10% off', active: true },
-  { items: '4 items', discount: '15% off', active: true },
-  { items: '5+ items', discount: '20% off', active: true },
-];
+// Marketplace-wide bundle tiers. The buyer's bundle item count maps to the
+// highest tier whose `count` threshold has been reached. Tier `pct` is the
+// applied discount. Keeping this a const array (not seller-configurable) so
+// the milestone progress bar always shows the same rungs across the app.
+const BUNDLE_TIERS = [
+  { count: 1, pct: 0, label: '1 item' },
+  { count: 2, pct: 5, label: '2 items' },
+  { count: 3, pct: 10, label: '3 items' },
+  { count: 4, pct: 15, label: '4 items' },
+  { count: 5, pct: 20, label: '5+ items' },
+] as const;
+const BUNDLE_MIN_ITEMS = 2;
 
 const CARD_GAP = 8;
 const CARD_OUTER_PAD = 12;
@@ -429,6 +434,488 @@ function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress: () => 
   );
 }
 
+function BundleSection({
+  listing,
+  sellerItems,
+  selectedIds,
+  onToggle,
+  onSendBundleOffer,
+}: {
+  listing: Listing;
+  sellerItems: Listing[];
+  selectedIds: Set<string>;
+  onToggle: (id: string) => void;
+  onSendBundleOffer: (totalAfterDiscount: number) => void;
+}) {
+  const username = listing.seller.username;
+  const selectedItems = sellerItems.filter((s) => selectedIds.has(s.id));
+  const bundleItemCount = 1 + selectedItems.length;
+  const subtotal = listing.price + selectedItems.reduce((acc, s) => acc + Number(s.price ?? 0), 0);
+  // Highest tier the user currently qualifies for. We walk the tiers
+  // backwards so the first match is the largest discount.
+  const activeTier =
+    [...BUNDLE_TIERS].reverse().find((t) => bundleItemCount >= t.count) ?? BUNDLE_TIERS[0];
+  const bundlePct = activeTier.pct;
+  const qualifies = bundleItemCount >= BUNDLE_MIN_ITEMS && bundlePct > 0;
+  const savings = qualifies ? Math.round((subtotal * bundlePct) / 100 * 100) / 100 : 0;
+  const total = Math.max(0, subtotal - savings);
+  // Progress fill: 0% at 1 item, 100% at 5+ items. Clamped so over-selection
+  // doesn't push the thumb past the right edge.
+  const progressFraction = Math.max(
+    0,
+    Math.min(1, (bundleItemCount - 1) / (BUNDLE_TIERS.length - 1)),
+  );
+
+  const brands = Array.from(
+    new Set(
+      [listing, ...sellerItems]
+        .map((l) => (l.brand ?? '').trim())
+        .filter((b) => b.length > 0),
+    ),
+  );
+  const brandLabel =
+    brands.length === 0
+      ? `${sellerItems.length + 1} items`
+      : brands.length <= 3
+        ? brands.join(' · ').toUpperCase()
+        : `${brands.slice(0, 3).join(' · ').toUpperCase()} + MORE`;
+
+  const collageImages = [listing, ...sellerItems]
+    .map((l) => l.images?.[0])
+    .filter((u): u is string => typeof u === 'string' && u.length > 0)
+    .slice(0, 5);
+  const extraCount = Math.max(0, 1 + sellerItems.length - collageImages.length);
+
+  return (
+    <View style={{ paddingTop: 18 }}>
+      {/* Composition header card — GRAILED-style */}
+      <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
+        <Text
+          style={{
+            fontSize: 11,
+            fontWeight: '700',
+            letterSpacing: 1.4,
+            color: 'rgba(15,15,15,0.62)',
+            marginBottom: 6,
+          }}
+          numberOfLines={1}
+        >
+          {brandLabel}
+        </Text>
+        <Text
+          style={{
+            fontSize: 26,
+            fontWeight: '900',
+            color: BRAND_INK,
+            letterSpacing: -0.8,
+            marginBottom: 14,
+          }}
+        >
+          Bundle from @{username}
+        </Text>
+        <BundleCollage images={collageImages} extraCount={extraCount} />
+        <Text
+          style={{
+            fontSize: 13,
+            color: 'rgba(15,15,15,0.62)',
+            lineHeight: 19,
+            marginTop: 14,
+          }}
+        >
+          Add items from @{username} to unlock progressive discounts plus shipping savings.
+        </Text>
+      </View>
+
+      {/* Milestone progress bar — fills with live selection count, every
+          tier becomes "active" once its threshold has been reached. */}
+      <View
+        style={{
+          marginHorizontal: 16,
+          marginBottom: 22,
+          backgroundColor: BRAND_PURPLE_SOFT,
+          borderRadius: 18,
+          padding: 18,
+        }}
+      >
+        <View style={{ height: 8, marginBottom: 18, position: 'relative' }}>
+          <View
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(108,71,255,0.2)',
+              borderRadius: 99,
+            }}
+          />
+          <View
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: `${progressFraction * 100}%`,
+            }}
+          >
+            <LinearGradient
+              colors={[BRAND_PURPLE, BRAND_PURPLE]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{ flex: 1, borderRadius: 99 }}
+            />
+            <View
+              style={{
+                position: 'absolute',
+                right: -8,
+                top: -4,
+                width: 16,
+                height: 16,
+                borderRadius: 8,
+                backgroundColor: 'white',
+                borderWidth: 3,
+                borderColor: BRAND_PURPLE,
+                ...(IS_IOS && {
+                  boxShadow: '0px 2px 4px rgba(0,0,0,0.15)',
+                }),
+              }}
+            />
+          </View>
+        </View>
+
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+          {BUNDLE_TIERS.map((tier, i) => {
+            const reached = bundleItemCount >= tier.count;
+            return (
+              <View key={i} style={{ alignItems: 'center', flex: 1 }}>
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: '700',
+                    color: reached ? BRAND_PURPLE : 'rgba(15,15,15,0.45)',
+                    textAlign: 'center',
+                  }}
+                >
+                  {tier.pct}% off
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 10,
+                    color: 'rgba(15,15,15,0.62)',
+                    textAlign: 'center',
+                    marginTop: 2,
+                  }}
+                >
+                  {tier.label}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* Selectable seller items grid */}
+      {sellerItems.length === 0 ? (
+        <View style={{ paddingHorizontal: 20, paddingVertical: 14 }}>
+          <Text style={{ fontSize: 13, color: 'rgba(15,15,15,0.62)' }}>
+            @{username} has no other listings right now.
+          </Text>
+        </View>
+      ) : (
+        <View
+          style={{
+            width: '100%',
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            paddingHorizontal: CARD_OUTER_PAD,
+            columnGap: CARD_GAP,
+          }}
+        >
+          {sellerItems.map((row) => {
+            const item = listingToRelated(row);
+            const isSelected = selectedIds.has(row.id);
+            return (
+              <BundleSelectCard
+                key={item.id}
+                item={item}
+                selected={isSelected}
+                onToggle={() => onToggle(row.id)}
+                onOpen={() => router.push(`/product/${item.id}`)}
+              />
+            );
+          })}
+        </View>
+      )}
+
+      {/* Live bundle summary + offer CTA */}
+      <View
+        style={{
+          marginHorizontal: 16,
+          marginTop: 18,
+          backgroundColor: BRAND_PURPLE_SOFT,
+          borderRadius: 18,
+          padding: 18,
+        }}
+      >
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+            <Ionicons name="pricetags" size={16} color={BRAND_PURPLE} />
+            <Text
+              style={{
+                fontSize: 12,
+                fontWeight: '800',
+                color: BRAND_PURPLE,
+                letterSpacing: 1.2,
+                textTransform: 'uppercase',
+                marginLeft: 6,
+              }}
+            >
+              {qualifies
+                ? `Bundle unlocked · ${bundlePct}% off`
+                : `Add ${BUNDLE_MIN_ITEMS - bundleItemCount} more to unlock`}
+            </Text>
+          </View>
+
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+            <Text style={{ fontSize: 13, color: 'rgba(15,15,15,0.62)' }}>
+              {bundleItemCount} item{bundleItemCount === 1 ? '' : 's'} · subtotal
+            </Text>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: BRAND_INK }}>
+              ${subtotal.toFixed(2)}
+            </Text>
+          </View>
+          {qualifies && (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+              <Text style={{ fontSize: 13, color: 'rgba(15,15,15,0.62)' }}>
+                Bundle discount ({bundlePct}%)
+              </Text>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: BRAND_PURPLE }}>
+                −${savings.toFixed(2)}
+              </Text>
+            </View>
+          )}
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              paddingTop: 10,
+              borderTopWidth: HAIRLINE,
+              borderTopColor: 'rgba(15,15,15,0.08)',
+              marginBottom: 14,
+            }}
+          >
+            <Text style={{ fontSize: 14, fontWeight: '800', color: BRAND_INK }}>Total</Text>
+            <Text style={{ fontSize: 18, fontWeight: '900', color: BRAND_INK, letterSpacing: -0.4 }}>
+              ${total.toFixed(2)}
+            </Text>
+          </View>
+
+          <Pressable
+            disabled={!qualifies}
+            onPress={() => onSendBundleOffer(total)}
+            style={({ pressed }) => ({
+              backgroundColor: qualifies ? BRAND_INK : 'rgba(15,15,15,0.18)',
+              borderRadius: 14,
+              paddingVertical: 14,
+              alignItems: 'center',
+              flexDirection: 'row',
+              justifyContent: 'center',
+              gap: 6,
+              opacity: pressed ? 0.85 : 1,
+              transform: [{ scale: pressed ? 0.98 : 1 }],
+            })}
+          >
+            <Feather name="send" size={14} color="white" />
+            <Text style={{ fontSize: 14, fontWeight: '800', color: 'white' }}>
+              {qualifies ? `Send bundle offer · $${total.toFixed(2)}` : 'Select items to bundle'}
+            </Text>
+          </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function BundleCollage({ images, extraCount }: { images: string[]; extraCount: number }) {
+  if (images.length === 0) {
+    return (
+      <View
+        style={{
+          height: 200,
+          borderRadius: 16,
+          backgroundColor: 'rgba(15,15,15,0.04)',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.45)' }}>No items yet</Text>
+      </View>
+    );
+  }
+
+  const top = images.slice(0, 2);
+  const bottom = images.slice(2, 5);
+  const LARGE_H = 220;
+  const SMALL_H = 120;
+
+  return (
+    <View style={{ gap: 6 }}>
+      <View style={{ flexDirection: 'row', gap: 6 }}>
+        {top.map((u, i) => (
+          <View
+            key={i}
+            style={{
+              flex: 1,
+              height: LARGE_H,
+              borderRadius: 14,
+              overflow: 'hidden',
+              backgroundColor: 'rgba(15,15,15,0.04)',
+            }}
+          >
+            <Image
+              source={{ uri: getOptimizedImageUrl(u, { width: 600 }) }}
+              style={{ width: '100%', height: '100%' }}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+            />
+          </View>
+        ))}
+      </View>
+      {bottom.length > 0 && (
+        <View style={{ flexDirection: 'row', gap: 6 }}>
+          {bottom.map((u, i) => {
+            const isLast = i === bottom.length - 1 && extraCount > 0;
+            return (
+              <View
+                key={i}
+                style={{
+                  flex: 1,
+                  height: SMALL_H,
+                  borderRadius: 14,
+                  overflow: 'hidden',
+                  backgroundColor: 'rgba(15,15,15,0.04)',
+                }}
+              >
+                <Image
+                  source={{ uri: getOptimizedImageUrl(u, { width: 400 }) }}
+                  style={{ width: '100%', height: '100%' }}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                />
+                {isLast && (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      backgroundColor: 'rgba(15,15,15,0.55)',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: '800',
+                        color: 'white',
+                        letterSpacing: 1.2,
+                      }}
+                    >
+                      + {extraCount} more
+                    </Text>
+                  </View>
+                )}
+              </View>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function BundleSelectCard({
+  item,
+  selected,
+  onToggle,
+  onOpen,
+}: {
+  item: ReturnType<typeof listingToRelated>;
+  selected: boolean;
+  onToggle: () => void;
+  onOpen: () => void;
+}) {
+  return (
+    <View style={{ width: CARD_WIDTH, marginBottom: 14 }}>
+      <Pressable
+        onPress={onOpen}
+        style={({ pressed }) => ({
+          width: CARD_WIDTH,
+          height: CARD_IMAGE_HEIGHT,
+          borderRadius: 12,
+          overflow: 'hidden',
+          backgroundColor: 'rgba(15,15,15,0.04)',
+          opacity: pressed ? 0.92 : 1,
+        })}
+      >
+        {item.images[0] && (
+          <Image
+            source={{ uri: getOptimizedImageUrl(item.images[0], { width: 500 }) }}
+            style={{ width: '100%', height: '100%' }}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+          />
+        )}
+        <Pressable
+          onPress={onToggle}
+          hitSlop={10}
+          style={({ pressed }) => ({
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            width: 30,
+            height: 30,
+            borderRadius: 15,
+            backgroundColor: selected ? BRAND_PURPLE : 'rgba(255,255,255,0.92)',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transform: [{ scale: pressed ? 0.92 : 1 }],
+          })}
+        >
+          <Feather
+            name={selected ? 'check' : 'plus'}
+            size={16}
+            color={selected ? 'white' : BRAND_INK}
+          />
+        </Pressable>
+        {selected && (
+          <View
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: 0,
+              bottom: 0,
+              borderRadius: 12,
+              borderWidth: 2,
+              borderColor: BRAND_PURPLE,
+            }}
+          />
+        )}
+      </Pressable>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+        <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: BRAND_INK }} numberOfLines={1}>
+          {item.brand}
+        </Text>
+        <Text style={{ fontSize: 13, fontWeight: '800', color: BRAND_INK }}>
+          ${item.price.toFixed(0)}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 function SectionEyebrow({ label, color = BRAND_INK }: { label: string; color?: string }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
@@ -629,6 +1116,7 @@ export default function ProductScreen() {
   const [followBusy, setFollowBusy] = useState(false);
   const [sellerItems, setSellerItems] = useState<Listing[]>([]);
   const [similarItems, setSimilarItems] = useState<Listing[]>([]);
+  const [selectedBundleIds, setSelectedBundleIds] = useState<Set<string>>(new Set());
   const [showStickyHeader, setShowStickyHeader] = useState(false);
   const [relatedTab, setRelatedTab] = useState<'members' | 'similar'>('members');
   const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
@@ -766,6 +1254,12 @@ export default function ProductScreen() {
       };
     }, [listing?.seller?.id, user?.id]),
   );
+
+  // Reset bundle selection whenever the viewed listing changes — selected
+  // IDs from a previous seller's items must not bleed into a new product page.
+  useEffect(() => {
+    setSelectedBundleIds(new Set());
+  }, [listing?.id]);
 
   // Other listings from this seller — ranked by likes desc, freshness tiebreak,
   // excluding the current item + sold rows server-side via RPC.
@@ -1907,115 +2401,40 @@ export default function ProductScreen() {
           {/* TODO: replace MEMBER_ITEMS / SIMILAR_ITEMS with real Supabase queries
               (seller_id eq for member items; brand+category match for similar). */}
           {relatedTab === 'members' ? (
-            <View style={{ paddingTop: 18 }}>
-              {/* Bundle discounts header */}
-              <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>
-                <SectionEyebrow label={`Bundle from @${listing.seller.username}`} />
-                <Text style={{ fontSize: 13, color: 'rgba(15,15,15,0.62)', lineHeight: 19 }}>
-                  Add items from this seller to unlock progressive discounts plus shipping savings.
-                </Text>
-              </View>
-
-              {/* Bundle discount banner */}
-              <View
-                style={{
-                  marginHorizontal: 16,
-                  marginBottom: 22,
-                  backgroundColor: BRAND_PURPLE_SOFT,
-                  borderRadius: 18,
-                  padding: 18,
-                }}
-              >
-                {/* Progress track */}
-                <View style={{ height: 8, marginBottom: 18, position: 'relative' }}>
-                  <View
-                    style={{
-                      position: 'absolute',
-                      left: 0,
-                      right: 0,
-                      top: 0,
-                      bottom: 0,
-                      backgroundColor: 'rgba(108,71,255,0.2)',
-                      borderRadius: 99,
-                    }}
-                  />
-                  <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '25%' }}>
-                    <LinearGradient
-                      colors={[BRAND_PURPLE, BRAND_PURPLE]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={{ flex: 1, borderRadius: 99 }}
-                    />
-                    {/* Thumb */}
-                    <View
-                      style={{
-                        position: 'absolute',
-                        right: -8,
-                        top: -4,
-                        width: 16,
-                        height: 16,
-                        borderRadius: 8,
-                        backgroundColor: 'white',
-                        borderWidth: 3,
-                        borderColor: BRAND_PURPLE,
-                        ...(IS_IOS && {
-                          boxShadow: '0px 2px 4px rgba(0,0,0,0.15)',
-                        }),
-                      }}
-                    />
-                  </View>
-                </View>
-
-                {/* Milestones */}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  {BUNDLE_MILESTONES.map((m, i) => (
-                    <View key={i} style={{ alignItems: 'center', flex: 1 }}>
-                      <Text
-                        style={{
-                          fontSize: 11,
-                          fontWeight: '700',
-                          color: m.active ? BRAND_PURPLE : 'rgba(15,15,15,0.45)',
-                          textAlign: 'center',
-                        }}
-                      >
-                        {m.discount}
-                      </Text>
-                      <Text style={{ fontSize: 10, color: 'rgba(15,15,15,0.62)', textAlign: 'center', marginTop: 2 }}>
-                        {m.items}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-              {sellerItems.length === 0 ? (
-                <View style={{ paddingHorizontal: 20, paddingVertical: 14 }}>
-                  <Text style={{ fontSize: 13, color: 'rgba(15,15,15,0.62)' }}>
-                    @{listing.seller.username} has no other listings right now.
-                  </Text>
-                </View>
-              ) : (
-                <View
-                  style={{
-                    width: '100%',
-                    flexDirection: 'row',
-                    flexWrap: 'wrap',
-                    paddingHorizontal: CARD_OUTER_PAD,
-                    columnGap: CARD_GAP,
-                  }}
-                >
-                  {sellerItems.map((row) => {
-                    const item = listingToRelated(row);
-                    return (
-                      <RelatedItemCard
-                        key={item.id}
-                        item={item}
-                        onPress={() => router.push(`/product/${item.id}`)}
-                      />
-                    );
-                  })}
-                </View>
-              )}
-            </View>
+            <BundleSection
+              listing={listing}
+              sellerItems={sellerItems}
+              selectedIds={selectedBundleIds}
+              onToggle={(id) => {
+                tap('selection');
+                setSelectedBundleIds((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(id)) next.delete(id);
+                  else next.add(id);
+                  return next;
+                });
+              }}
+              onSendBundleOffer={(amount) => {
+                tap('medium');
+                if (!user) {
+                  toast.show('Sign in to message sellers', { variant: 'info', icon: 'log-in' });
+                  router.push('/auth/login');
+                  return;
+                }
+                if (listing.seller_id === user.id) {
+                  toast.show("That's your own listing", { variant: 'default', icon: 'info' });
+                  return;
+                }
+                router.push({
+                  pathname: '/conversation/new',
+                  params: {
+                    listing: listing.id,
+                    mode: 'offer',
+                    amount: amount.toFixed(2),
+                  },
+                } as any);
+              }}
+            />
           ) : (
             <View style={{ paddingTop: 18 }}>
               {similarItems.length === 0 ? (

@@ -201,34 +201,6 @@ function go(displayKey: string) {
   router.push(`/(tabs)/discover${qs ? `?${qs}` : ''}` as any);
 }
 
-function SectionEyebrow({ children }: { children: string }) {
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: SCREEN_PAD,
-        marginBottom: 12,
-      }}
-    >
-      <View
-        style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#6C47FF', marginRight: 8 }}
-      />
-      <Text
-        style={{
-          fontSize: 11,
-          color: '#0F0F0F',
-          letterSpacing: 1.6,
-          textTransform: 'uppercase',
-          fontFamily: 'Inter_700Bold',
-        }}
-      >
-        {children}
-      </Text>
-    </View>
-  );
-}
-
 function CategoryTile({
   data,
   width,
@@ -280,8 +252,8 @@ function CategoryTile({
         <View
           style={{
             position: 'absolute',
-            top: 14,
-            left: 14,
+            top: 16,
+            left: 16,
             width: 34,
             height: 34,
             borderRadius: 17,
@@ -299,8 +271,8 @@ function CategoryTile({
         <View
           style={{
             position: 'absolute',
-            top: 14,
-            right: 14,
+            top: 16,
+            right: 16,
             flexDirection: 'row',
             alignItems: 'center',
             gap: 5,
@@ -337,7 +309,7 @@ function CategoryTile({
             position: 'absolute',
             left: 16,
             right: 16,
-            bottom: 14,
+            bottom: 16,
           }}
         >
           <Text
@@ -432,7 +404,6 @@ export function AnonCards() {
 
       {/* Row 1 — hero carousel */}
       <View style={{ marginTop: 24 }}>
-        <SectionEyebrow>This week's spotlight</SectionEyebrow>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -449,7 +420,6 @@ export function AnonCards() {
 
       {/* Row 2 — 2x2 grid */}
       <View style={{ marginTop: 28 }}>
-        <SectionEyebrow>Shop by aisle</SectionEyebrow>
         <View
           style={{
             paddingHorizontal: SCREEN_PAD,
@@ -473,7 +443,6 @@ export function AnonCards() {
 
       {/* Row 3 — mid carousel */}
       <View style={{ marginTop: 28 }}>
-        <SectionEyebrow>Worth a scroll</SectionEyebrow>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -490,7 +459,6 @@ export function AnonCards() {
 
       {/* Row 4 — portrait carousel (departments) */}
       <View style={{ marginTop: 28, marginBottom: 8 }}>
-        <SectionEyebrow>Shop by department</SectionEyebrow>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
