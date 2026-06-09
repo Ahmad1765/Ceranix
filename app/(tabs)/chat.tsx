@@ -399,8 +399,27 @@ export default function InboxScreen() {
 
   const pagerRef = useRef<FlatList<{ value: InboxTab; label: string }>>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
+  const activeTabRef = useRef<InboxTab>(activeTab);
+  activeTabRef.current = activeTab;
   const userIdRef = useRef<string | null>(null);
   userIdRef.current = user?.id ?? null;
+
+  // Update activeTab live during a swipe so the bold/dark text tracks the
+  // gesture instead of only flipping at momentum end. Native-driver friendly:
+  // we don't disable useNativeDriver on the Animated.event, we just attach a
+  // JS listener that fires on every committed value.
+  useEffect(() => {
+    if (pageWidth <= 0) return;
+    const id = scrollX.addListener(({ value }) => {
+      const index = Math.round(value / pageWidth);
+      const next = INBOX_TABS[index]?.value;
+      if (next && next !== activeTabRef.current) {
+        activeTabRef.current = next;
+        setActiveTab(next);
+      }
+    });
+    return () => scrollX.removeListener(id);
+  }, [scrollX, pageWidth]);
 
   const fetchInbox = useCallback(async (uid: string) => {
     return listConversations(uid);
