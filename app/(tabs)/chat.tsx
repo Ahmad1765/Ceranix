@@ -401,18 +401,24 @@ export default function InboxScreen() {
   const scrollX = useRef(new Animated.Value(0)).current;
   const activeTabRef = useRef<InboxTab>(activeTab);
   activeTabRef.current = activeTab;
+  // Timestamp until which the scroll listener should ignore updates because
+  // a tap kicked off a programmatic animated scroll. This window covers the
+  // ~300ms animation. Platform-agnostic: doesn't rely on begin/end-drag
+  // events (which react-native-web doesn't fire for native scrollers).
+  const ignoreListenerUntilRef = useRef(0);
   const userIdRef = useRef<string | null>(null);
   userIdRef.current = user?.id ?? null;
 
-  // Update activeTab live during a swipe so the bold/dark text tracks the
-  // gesture instead of only flipping at momentum end. Native-driver friendly:
-  // we don't disable useNativeDriver on the Animated.event, we just attach a
-  // JS listener that fires on every committed value.
+  // Drive activeTab from scrollX so the bold text tracks the indicator
+  // under your finger during a swipe. After a tap, the listener is briefly
+  // muted so the animation flying through intermediate pages doesn't make
+  // the bold flicker — see goToTab.
   useEffect(() => {
     if (pageWidth <= 0) return;
     const id = scrollX.addListener(({ value }) => {
-      const index = Math.round(value / pageWidth);
-      const next = INBOX_TABS[index]?.value;
+      if (Date.now() < ignoreListenerUntilRef.current) return;
+      const nextIndex = Math.round(value / pageWidth);
+      const next = INBOX_TABS[nextIndex]?.value;
       if (next && next !== activeTabRef.current) {
         activeTabRef.current = next;
         setActiveTab(next);
@@ -491,22 +497,36 @@ export default function InboxScreen() {
 
   const goToTab = useCallback(
     (tab: InboxTab) => {
-      const index = INBOX_TABS.findIndex((t) => t.value === tab);
-      if (index < 0) return;
+      const to = INBOX_TABS.findIndex((t) => t.value === tab);
+      if (to < 0 || pageWidth <= 0) return;
+      if (tab === activeTabRef.current) return;
+      // Snap state to destination immediately so the bold flips once, cleanly,
+      // while the pager slides underneath. Mute the listener for the duration
+      // of the animation so it doesn't briefly bold each tab the scroll flies
+      // through.
+      activeTabRef.current = tab;
       setActiveTab(tab);
-      pagerRef.current?.scrollToOffset({ offset: index * pageWidth, animated: true });
+      ignoreListenerUntilRef.current = Date.now() + 450;
+      pagerRef.current?.scrollToOffset({ offset: to * pageWidth, animated: true });
     },
     [pageWidth],
   );
 
   const onMomentumScrollEnd = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      // Force-reconcile to whatever page we actually settled on. Cheap safety
+      // net — covers the case where the listener was muted and the final
+      // resting page differs from activeTab (shouldn't happen, but free).
+      ignoreListenerUntilRef.current = 0;
       if (pageWidth <= 0) return;
       const index = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
       const next = INBOX_TABS[index]?.value;
-      if (next && next !== activeTab) setActiveTab(next);
+      if (next && next !== activeTabRef.current) {
+        activeTabRef.current = next;
+        setActiveTab(next);
+      }
     },
-    [activeTab, pageWidth],
+    [pageWidth],
   );
 
   // Keep pager aligned with activeTab if window width changes (e.g. rotation).
