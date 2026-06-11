@@ -392,21 +392,27 @@ const handleShareProfile = useCallback(async () => {
               )}
             </View>
 
-            {/* Stats inline */}
+            {/* Stats — a contained panel strip with dividers instead of
+                Instagram's floating numbers. */}
             <View
               style={{
                 flex: 1,
                 flexDirection: 'row',
-                justifyContent: 'space-around',
+                alignItems: 'center',
                 marginLeft: 16,
+                backgroundColor: colors.panel,
+                borderRadius: radii.md,
+                paddingVertical: 10,
               }}
             >
               <Stat value={String(sellingCount)} label="Items" />
+              <View style={{ width: 1, alignSelf: 'stretch', backgroundColor: colors.hairline }} />
               <Stat
                 value={String(profile.followers_count ?? 0)}
                 label="Followers"
                 onPress={() => router.push('/profile/followers' as Href)}
               />
+              <View style={{ width: 1, alignSelf: 'stretch', backgroundColor: colors.hairline }} />
               <Stat
                 value={String(profile.following_count ?? 0)}
                 label="Following"
@@ -464,7 +470,8 @@ const handleShareProfile = useCallback(async () => {
             </View>
           </View>
 
-          {/* CTA row */}
+          {/* CTA row — sharing your shop is the action that grows it, so it
+              carries the accent; editing stays quiet. */}
           <View style={{ flexDirection: 'row', marginTop: 14, gap: 8 }}>
             <View style={{ flex: 1 }}>
               <Button
@@ -475,7 +482,7 @@ const handleShareProfile = useCallback(async () => {
               />
             </View>
             <View style={{ flex: 1 }}>
-              <Button label="Share profile" variant="ghost" full onPress={handleShareProfile} />
+              <Button label="Share profile" variant="primary" full onPress={handleShareProfile} />
             </View>
           </View>
         </Animated.View>
@@ -747,8 +754,8 @@ function SavedListChip({
         paddingVertical: 8,
         borderRadius: 999,
         borderWidth: 1,
-        borderColor: active ? 'transparent' : colors.hairline,
-        backgroundColor: active ? 'rgba(15,15,15,0.08)' : colors.white,
+        borderColor: active ? colors.purple : colors.hairline,
+        backgroundColor: active ? colors.purple : colors.white,
         opacity: pressed ? 0.7 : 1,
       })}
     >
@@ -759,7 +766,7 @@ function SavedListChip({
         style={{
           fontSize: 13,
           fontWeight: active ? '700' : '600',
-          color: colors.ink,
+          color: active ? 'white' : colors.ink,
           letterSpacing: -0.1,
         }}
         numberOfLines={1}
@@ -770,7 +777,7 @@ function SavedListChip({
         style={{
           fontSize: 12,
           fontWeight: '600',
-          color: colors.muteSoft,
+          color: active ? 'rgba(255,255,255,0.8)' : colors.muteSoft,
           marginLeft: 6,
         }}
       >
@@ -830,9 +837,13 @@ function Stat({ value, label, onPress }: { value: string; label: string; onPress
       <Text style={{ fontSize: 12, color: colors.mute, marginTop: 2 }}>{label}</Text>
     </View>
   );
-  if (!onPress) return body;
+  if (!onPress) return <View style={{ flex: 1 }}>{body}</View>;
   return (
-    <Pressable onPress={onPress} hitSlop={HIT_SLOP_8} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+    <Pressable
+      onPress={onPress}
+      hitSlop={HIT_SLOP_8}
+      style={({ pressed }) => ({ flex: 1, opacity: pressed ? 0.6 : 1 })}
+    >
       {body}
     </Pressable>
   );

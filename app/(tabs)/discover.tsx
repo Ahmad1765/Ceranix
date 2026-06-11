@@ -105,32 +105,40 @@ export default function DiscoverScreen() {
 
   const browseCat = activeCat && activeCat !== 'trending' ? activeCat : null;
 
+  // True once any grid data has landed — re-focuses then refresh silently
+  // instead of flashing skeletons over content the user can already see.
+  const hasDataRef = useRef(false);
+
   const loadAll = useCallback(
     async (opts: { silent?: boolean } = {}) => {
       if (!opts.silent) setLoading(true);
       try {
-        // Grid + rails in parallel. Category browsing is server-filtered so
-        // results aren't limited to whatever made the trending top 60.
-        const [gridRows, recRows, viewedRows] = await Promise.all([
-          fetchListings({ tab: 'popular', limit: 60, category: browseCat }),
-          user ? fetchRecommendations(12) : Promise.resolve([]),
-          user ? fetchRecentlyViewed(10) : Promise.resolve([]),
-        ]);
+        // The grid gates the skeleton; rails fill in whenever they resolve.
+        // Tying them together made every focus wait on the recommendation
+        // pipeline (3 sequential round-trips) before showing anything.
+        const gridP = fetchListings({ tab: 'popular', limit: 60, category: browseCat });
+        if (user?.id) {
+          fetchRecommendations(12).then(setRecommended).catch(() => {});
+          fetchRecentlyViewed(10).then(setRecentlyViewed).catch(() => {});
+        } else {
+          setRecommended([]);
+          setRecentlyViewed([]);
+        }
+        const gridRows = await gridP;
         setListings(gridRows);
-        setRecommended(recRows);
-        setRecentlyViewed(viewedRows);
+        hasDataRef.current = true;
       } finally {
         setLoading(false);
       }
     },
-    [user, browseCat],
+    [user?.id, browseCat],
   );
 
-  // Silent re-fetch on focus.
+  // Re-fetch on focus — silently once we have something on screen.
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
-      loadAll().catch((e) => {
+      loadAll({ silent: hasDataRef.current }).catch((e) => {
         if (!cancelled) console.warn('[Discover] load failed', e);
       });
       return () => {

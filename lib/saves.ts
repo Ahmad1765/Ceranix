@@ -12,6 +12,11 @@
 
 import { supabase } from '@/lib/supabase';
 import type { Listing } from '@/types';
+import {
+  getSavedIds,
+  invalidateSavedCache,
+  updateSavedCache,
+} from '@/lib/engagementCache';
 
 const LISTING_COLUMNS =
   'id, seller_id, title, brand, size, price, category, gender, condition, images, is_sold, likes, tags, created_at';
@@ -28,10 +33,17 @@ export type SaveList = {
 };
 
 // Idempotent — seeds the four starter lists on first call, no-op after.
-// Safe to call on every screen mount.
+// Memoized per user per session: the RPC is cheap but it's still a network
+// round-trip on every profile focus otherwise.
+const ensuredFor = new Set<string>();
 export async function ensureSaveLists(userId: string): Promise<void> {
+  if (ensuredFor.has(userId)) return;
   const { error } = await supabase.rpc('ensure_save_lists', { p_user_id: userId });
-  if (error) console.warn('[saves] ensureSaveLists', error.message);
+  if (error) {
+    console.warn('[saves] ensureSaveLists', error.message);
+    return; // don't memoize failures
+  }
+  ensuredFor.add(userId);
 }
 
 export async function listSaveLists(userId: string): Promise<SaveList[]> {
@@ -145,6 +157,9 @@ export async function addToList(listId: string, listingId: string): Promise<bool
     console.warn('[saves] addToList', error.message);
     return false;
   }
+  // Multi-list membership makes the net "saved anywhere" state ambiguous
+  // here — invalidate instead of guessing.
+  invalidateSavedCache();
   return true;
 }
 
@@ -158,21 +173,16 @@ export async function removeFromList(listId: string, listingId: string): Promise
     console.warn('[saves] removeFromList', error.message);
     return false;
   }
+  invalidateSavedCache();
   return true;
 }
 
 // "Is this listing saved by the user in *any* list?" — drives the
-// bookmark icon's filled/empty state on cards.
+// bookmark icon's filled/empty state on cards. Answered from the batched
+// engagement cache (one query per user per 30s, not one per card).
 export async function isSaved(listingId: string, userId: string): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('save_list_items')
-    .select('listing_id, save_lists!inner(user_id)')
-    .eq('listing_id', listingId)
-    .eq('save_lists.user_id', userId)
-    .limit(1)
-    .maybeSingle();
-  if (error) return false;
-  return !!data;
+  const ids = await getSavedIds(userId);
+  return ids.has(listingId);
 }
 
 // Returns or lazily creates the user's default list ID. The DB seed
@@ -216,11 +226,13 @@ export async function toggleSave(
       console.warn('[saves] toggleSave remove', error.message);
       return currentlySaved;
     }
+    updateSavedCache(userId, listingId, false);
     return false;
   }
   const listId = await getOrCreateDefaultList(userId);
   if (!listId) return currentlySaved;
   const ok = await addToList(listId, listingId);
+  if (ok) updateSavedCache(userId, listingId, true);
   return ok ? true : currentlySaved;
 }
 

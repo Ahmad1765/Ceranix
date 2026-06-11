@@ -49,7 +49,7 @@ function isValidCategory(v: unknown): v is Category {
 }
 
 export default function MyFeedScreen() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const toast = useToast();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -255,10 +255,16 @@ export default function MyFeedScreen() {
         }
         contentContainerStyle={{ paddingBottom: 80 }}
       >
-        {/* Title */}
+        {/* Title — greets the signed-in user by name; the feed is THEIRS,
+            not a generic surface. */}
         <View style={{ paddingHorizontal: 16, paddingTop: 6, paddingBottom: 4 }}>
           <Text style={{ fontSize: 24, fontWeight: '800', color: colors.ink, letterSpacing: -0.5 }}>
-            My Feed
+            {(() => {
+              const first = (profile?.full_name || profile?.username || '')
+                .trim()
+                .split(/\s+/)[0];
+              return first ? `Hey ${first}` : 'My Feed';
+            })()}
           </Text>
           <Text
             style={{
@@ -474,8 +480,9 @@ function Chip({
   onPress: () => void;
   onLongPress?: () => void;
 }) {
-  // Selected state: solid grey fill, no border (Instagram-style). Unselected
-  // keeps the hairline border on a white surface.
+  // Selected state: solid purple fill with white label — Ceranix identity,
+  // replacing the old Instagram-grey selection. Unselected keeps the
+  // hairline border on a white surface.
   return (
     <Pressable
       onPress={onPress}
@@ -486,8 +493,8 @@ function Chip({
         paddingVertical: 8,
         borderRadius: radii.pill,
         borderWidth: 1,
-        borderColor: active ? 'transparent' : colors.hairline,
-        backgroundColor: active ? 'rgba(15,15,15,0.08)' : colors.white,
+        borderColor: active ? colors.purple : colors.hairline,
+        backgroundColor: active ? colors.purple : colors.white,
         opacity: pressed ? 0.7 : 1,
       })}
     >
@@ -495,7 +502,7 @@ function Chip({
         style={{
           fontSize: 13,
           fontWeight: active ? '700' : '600',
-          color: colors.ink,
+          color: active ? 'white' : colors.ink,
           letterSpacing: -0.1,
         }}
         numberOfLines={1}

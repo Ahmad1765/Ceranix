@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import type { Listing } from '@/types';
 import { putCachedListing, putCachedListings } from '@/lib/listingCache';
+import { getLikedIds, updateLikedCache } from '@/lib/engagementCache';
 
 const SELECT_WITH_SELLER = '*, seller:profiles!listings_seller_id_fkey(*)';
 
@@ -346,15 +347,12 @@ export async function fetchLikedListings(userId: string): Promise<Listing[]> {
     .filter((l): l is Listing => l != null);
 }
 
+// Answered from the batched engagement cache: one query per user per 30s
+// instead of one query per card mount (the heart icons on a 60-card grid
+// used to cost 60 round-trips).
 export async function isLiked(listingId: string, userId: string): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('listing_likes')
-    .select('listing_id')
-    .eq('listing_id', listingId)
-    .eq('user_id', userId)
-    .maybeSingle();
-  if (error) return false;
-  return !!data;
+  const ids = await getLikedIds(userId);
+  return ids.has(listingId);
 }
 
 // Owner action: flip `is_sold`. Caller is the seller; RLS enforces that.
@@ -402,6 +400,7 @@ export async function toggleLike(
       console.warn('[listings] unlike', error.message);
       return currentlyLiked;
     }
+    updateLikedCache(userId, listingId, false);
     return false;
   }
   const { error } = await supabase
@@ -411,5 +410,6 @@ export async function toggleLike(
     console.warn('[listings] like', error.message);
     return currentlyLiked;
   }
+  updateLikedCache(userId, listingId, true);
   return true;
 }
