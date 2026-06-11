@@ -24,14 +24,15 @@ export type FeedTab = 'for_you' | 'popular';
 export type FetchListingsResult = { ok: true; rows: Listing[] } | { ok: false };
 
 export async function fetchListingsResult(
-  opts: { tab?: FeedTab; limit?: number; offset?: number } = {},
+  opts: { tab?: FeedTab; limit?: number; offset?: number; category?: string | null } = {},
 ): Promise<FetchListingsResult> {
-  const { tab = 'for_you', limit = 60, offset = 0 } = opts;
+  const { tab = 'for_you', limit = 60, offset = 0, category = null } = opts;
   let query = supabase
     .from('listings')
     .select(SELECT_FEED)
     .eq('is_sold', false)
     .eq('seller.vacation_mode', false);
+  if (category) query = query.eq('category', category);
 
   if (tab === 'popular') {
     query = query.order('likes', { ascending: false }).order('created_at', { ascending: false });
@@ -81,7 +82,9 @@ export async function fetchListingsResult(
 // Back-compat thin wrapper for any caller that doesn't care about the
 // failure mode and just wants "whatever rows we got, or []". The home feed
 // uses fetchListingsResult directly so it can tell a wedge from an empty feed.
-export async function fetchListings(opts: { tab?: FeedTab; limit?: number } = {}): Promise<Listing[]> {
+export async function fetchListings(
+  opts: { tab?: FeedTab; limit?: number; category?: string | null } = {},
+): Promise<Listing[]> {
   const r = await fetchListingsResult(opts);
   return r.ok ? r.rows : [];
 }
@@ -123,6 +126,48 @@ export async function fetchFollowingListingsResult(
     return { ok: true, rows: out };
   } catch (e: any) {
     console.warn('[listings] fetchFollowingListings threw', e?.message ?? e);
+    return { ok: false };
+  }
+}
+
+// Server-side search across the WHOLE catalog (title, brand, description,
+// tags). The Discover screen previously filtered its 60 cached "popular" rows
+// client-side, which silently missed anything outside that window. Escapes
+// PostgREST `or()` metacharacters and ilike wildcards so user input can't
+// break the filter expression.
+export async function searchListings(opts: {
+  query: string;
+  category?: string | null;
+  limit?: number;
+}): Promise<FetchListingsResult> {
+  const { query, category = null, limit = 60 } = opts;
+  const raw = query.trim();
+  if (!raw) return { ok: true, rows: [] };
+  // Strip PostgREST or() syntax chars, escape LIKE wildcards.
+  const safe = raw.replace(/[(),]/g, ' ').replace(/[%_]/g, '\\$&').trim();
+  if (!safe) return { ok: true, rows: [] };
+
+  try {
+    let q = supabase
+      .from('listings')
+      .select(SELECT_FEED)
+      .eq('is_sold', false)
+      .eq('seller.vacation_mode', false)
+      .or(`title.ilike.%${safe}%,brand.ilike.%${safe}%,description.ilike.%${safe}%,tags.cs.{${safe}}`);
+    if (category) q = q.eq('category', category);
+    const { data, error } = await q
+      .order('likes', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) {
+      console.warn('[listings] searchListings', error.message);
+      return { ok: false };
+    }
+    const rows = (data ?? []) as unknown as Listing[];
+    putCachedListings(rows);
+    return { ok: true, rows };
+  } catch (e: any) {
+    console.warn('[listings] searchListings threw', e?.message ?? e);
     return { ok: false };
   }
 }

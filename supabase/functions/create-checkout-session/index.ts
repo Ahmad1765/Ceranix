@@ -2,25 +2,36 @@
 // Deploy: supabase functions deploy create-checkout-session
 // Required secrets:
 //   supabase secrets set STRIPE_SECRET_KEY=sk_test_...
+//   supabase secrets set ALLOWED_ORIGINS=https://yourapp.com,http://localhost:8081
 // Inherits: SUPABASE_URL, SUPABASE_ANON_KEY (already set by Supabase)
 //
 // Client invokes via:
 //   supabase.functions.invoke('create-checkout-session', {
-//     body: { listing_id, return_url },
+//     body: { listing_id, return_url, offer_amount? },
 //   })
 //
 // Returns:
 //   { url: string, sessionId: string }
 //
-// Stripe is in test mode by default — pass sk_test_... so PaymentIntents
-// are created in the test account. Use real keys in production env later.
+// Security model:
+//   - Caller must be an authenticated user (JWT forwarded by supabase-js).
+//   - Buying your own listing or a sold listing is rejected.
+//   - offer_amount is only a HINT: when present, the server looks up the
+//     latest ACCEPTED offer for (listing, caller-as-buyer) via RLS-scoped
+//     queries and charges that amount. The client value is cross-checked but
+//     never trusted as the price.
+//   - The session carries listing/buyer metadata; the stripe-webhook function
+//     records the order and marks the listing sold after payment completes.
 
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
-const envOrigins = Deno.env.get('ALLOWED_ORIGINS');
+// CORS allowlist for WEB callers. Native apps send no Origin header and are
+// unaffected. If unset, browser calls get no CORS headers (and fail preflight)
+// but the function still boots — a missing secret shouldn't crash-loop it.
+const envOrigins = Deno.env.get('ALLOWED_ORIGINS') ?? '';
 if (!envOrigins) {
-  throw new Error('Missing ALLOWED_ORIGINS environment variable. Set it via supabase secrets set ALLOWED_ORIGINS=...');
+  console.warn('ALLOWED_ORIGINS not set — web (browser) checkout will fail CORS until you run: supabase secrets set ALLOWED_ORIGINS=...');
 }
 const ALLOWED_ORIGINS = envOrigins.split(',').map((o) => o.trim()).filter(Boolean);
 
@@ -44,7 +55,7 @@ function json(body: unknown, status = 200, origin: string | null = null): Respon
 
 Deno.serve(async (req: Request) => {
   const origin = req.headers.get('origin');
-  
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders(origin) });
   }
@@ -60,26 +71,73 @@ Deno.serve(async (req: Request) => {
     if (!stripeSecret) return json({ error: 'STRIPE_SECRET_KEY not set' }, 500, origin);
 
     const auth = req.headers.get('Authorization');
+    if (!auth) return json({ error: 'Authentication required' }, 401, origin);
+
     const body = await req.json().catch(() => ({}));
     const listingId = String(body?.listing_id ?? '').trim();
     const returnUrl = String(body?.return_url ?? '').trim();
+    const offerAmountHint = Number(body?.offer_amount);
+    const wantsOfferPrice =
+      Number.isFinite(offerAmountHint) && offerAmountHint > 0;
     if (!listingId) return json({ error: 'listing_id required' }, 400, origin);
     if (!returnUrl) return json({ error: 'return_url required' }, 400, origin);
 
-    // Fetch the listing — anon key is fine since listings are public-readable.
+    // User-scoped client: every query below runs under the caller's RLS.
     const sb = createClient(supabaseUrl, anonKey, {
-      global: auth ? { headers: { Authorization: auth } } : undefined,
+      global: { headers: { Authorization: auth } },
       auth: { persistSession: false, autoRefreshToken: false },
     });
+
+    const { data: userData, error: uErr } = await sb.auth.getUser();
+    if (uErr || !userData?.user) {
+      return json({ error: 'Authentication required' }, 401, origin);
+    }
+    const buyerId = userData.user.id;
+
     const { data: listing, error: lErr } = await sb
       .from('listings')
-      .select('id, title, price, images')
+      .select('id, title, price, images, seller_id, is_sold')
       .eq('id', listingId)
       .maybeSingle();
     if (lErr) return json({ error: lErr.message }, 500, origin);
     if (!listing) return json({ error: 'Listing not found' }, 404, origin);
+    if (listing.is_sold) return json({ error: 'Listing already sold' }, 409, origin);
+    if (listing.seller_id === buyerId) {
+      return json({ error: 'You cannot buy your own listing' }, 400, origin);
+    }
 
-    const priceCents = Math.round(Number(listing.price) * 100);
+    // Resolve the charge amount server-side. Default: listing price.
+    // With offer_amount: require a matching ACCEPTED offer in a conversation
+    // where the caller is the buyer. RLS already restricts the query to
+    // conversations the caller participates in.
+    let chargeDollars = Number(listing.price);
+    let offerMessageId: string | null = null;
+    if (wantsOfferPrice) {
+      const { data: offers, error: oErr } = await sb
+        .from('messages')
+        .select('id, metadata, conversations!inner(listing_id, buyer_id)')
+        .eq('kind', 'offer')
+        .eq('offer_status', 'accepted')
+        .eq('conversations.listing_id', listingId)
+        .eq('conversations.buyer_id', buyerId)
+        .order('updated_at', { ascending: false })
+        .limit(1);
+      if (oErr) return json({ error: oErr.message }, 500, origin);
+      const offer = offers?.[0];
+      const offerDollars = Number(offer?.metadata?.amount);
+      if (!offer || !Number.isFinite(offerDollars) || offerDollars <= 0) {
+        return json({ error: 'No accepted offer found for this listing' }, 403, origin);
+      }
+      // The client hint must match the real accepted offer; otherwise the UI
+      // is showing the buyer one price and charging another.
+      if (Math.abs(offerDollars - offerAmountHint) > 0.005) {
+        return json({ error: 'Offer amount mismatch' }, 409, origin);
+      }
+      chargeDollars = offerDollars;
+      offerMessageId = offer.id;
+    }
+
+    const priceCents = Math.round(chargeDollars * 100);
     if (!Number.isFinite(priceCents) || priceCents < 50) {
       return json({ error: 'Invalid listing price' }, 400, origin);
     }
@@ -88,7 +146,9 @@ Deno.serve(async (req: Request) => {
     let cancelUrlObj: URL;
     try {
       successUrlObj = new URL(returnUrl);
-      if (!successUrlObj.protocol.startsWith('http')) throw new Error('Invalid protocol');
+      if (!successUrlObj.protocol.startsWith('http') && !successUrlObj.protocol.startsWith('carrinex')) {
+        throw new Error('Invalid protocol');
+      }
       cancelUrlObj = new URL(returnUrl);
     } catch {
       return json({ error: 'Invalid return_url' }, 400, origin);
@@ -102,6 +162,7 @@ Deno.serve(async (req: Request) => {
     params.append('mode', 'payment');
     params.append('success_url', successUrlObj.toString());
     params.append('cancel_url', cancelUrlObj.toString());
+    params.append('client_reference_id', buyerId);
     params.append('line_items[0][quantity]', '1');
     params.append('line_items[0][price_data][currency]', 'usd');
     params.append('line_items[0][price_data][unit_amount]', String(priceCents));
@@ -109,7 +170,11 @@ Deno.serve(async (req: Request) => {
     if (Array.isArray(listing.images) && listing.images[0]) {
       params.append('line_items[0][price_data][product_data][images][0]', listing.images[0]);
     }
+    // stripe-webhook reads these to record the order after payment.
     params.append('metadata[listing_id]', listing.id);
+    params.append('metadata[buyer_id]', buyerId);
+    params.append('metadata[seller_id]', listing.seller_id);
+    if (offerMessageId) params.append('metadata[offer_message_id]', offerMessageId);
     params.append('payment_method_types[0]', 'card');
 
     const res = await fetch('https://api.stripe.com/v1/checkout/sessions', {

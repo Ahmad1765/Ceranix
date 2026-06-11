@@ -290,6 +290,13 @@ const handleShareProfile = useCallback(async () => {
   const savedCount = savedItems.length;
   const initial = (profile.full_name || profile.username || 'U').trim().charAt(0).toUpperCase();
   const rating = Number(profile.rating ?? 0);
+  const totalSales = Number(profile.total_sales ?? 0);
+  const memberSince = profile.created_at ? new Date(profile.created_at).getFullYear() : null;
+
+  // Shop snapshot, derived from rows already loaded for the Selling tab.
+  const activeCount = selling.filter((l) => !l.is_sold).length;
+  const soldCount = selling.length - activeCount;
+  const shopLikes = selling.reduce((sum, l) => sum + (l.likes ?? 0), 0);
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
@@ -394,7 +401,7 @@ const handleShareProfile = useCallback(async () => {
                 marginLeft: 16,
               }}
             >
-              <Stat value={String(sellingCount)} label="Posts" />
+              <Stat value={String(sellingCount)} label="Items" />
               <Stat
                 value={String(profile.followers_count ?? 0)}
                 label="Followers"
@@ -427,6 +434,34 @@ const handleShareProfile = useCallback(async () => {
                 <Text style={{ fontSize: 12, color: colors.mute }}>{profile.location}</Text>
               </View>
             )}
+
+            {/* Seller identity — the part Instagram has no answer to. Only
+                segments backed by real data render; new accounts just show
+                their member-since year. */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                marginTop: 10,
+                gap: 6,
+              }}
+            >
+              {rating > 0 ? (
+                <TrustBadge icon="star" label={`${rating.toFixed(1)} rating`} />
+              ) : null}
+              {totalSales > 0 ? (
+                <TrustBadge icon="check-circle" label={`${totalSales} ${totalSales === 1 ? 'sale' : 'sales'}`} />
+              ) : null}
+              {memberSince ? (
+                <TrustBadge icon="clock" label={`Joined ${memberSince}`} />
+              ) : null}
+              {profile.vacation_mode ? (
+                <Pressable onPress={() => router.push('/settings' as any)}>
+                  <TrustBadge icon="pause-circle" label="On vacation" emphasized />
+                </Pressable>
+              ) : null}
+            </View>
           </View>
 
           {/* CTA row */}
@@ -463,22 +498,40 @@ const handleShareProfile = useCallback(async () => {
         {/* Tab content */}
         <View style={{ marginTop: 12 }}>
           {activeTab === 'selling' && (
-            <ListingsGrid
-              listings={selling}
-              loading={loadingSelling}
-              columns={columns}
-              cardW={cardW}
-              empty={{
-                icon: 'shopping-bag',
-                title: 'Your shop is empty',
-                description: 'Post your first item — takes less than a minute.',
-                cta: {
-                  label: 'Post an item',
-                  icon: 'plus',
-                  onPress: () => router.push('/(tabs)/upload'),
-                },
-              }}
-            />
+            <View>
+              {/* Shop snapshot: one quiet line, only when there's a shop to
+                  summarize. Derived locally — no extra fetch. */}
+              {!loadingSelling && selling.length > 0 ? (
+                <Text
+                  style={{
+                    paddingHorizontal: 16,
+                    marginBottom: 10,
+                    fontSize: 12.5,
+                    color: colors.mute,
+                    fontWeight: '600',
+                  }}
+                >
+                  {activeCount} active · {soldCount} sold · {shopLikes}{' '}
+                  {shopLikes === 1 ? 'like' : 'likes'} on your items
+                </Text>
+              ) : null}
+              <ListingsGrid
+                listings={selling}
+                loading={loadingSelling}
+                columns={columns}
+                cardW={cardW}
+                empty={{
+                  icon: 'shopping-bag',
+                  title: 'Your shop is empty',
+                  description: 'Post your first item — takes less than a minute.',
+                  cta: {
+                    label: 'Post an item',
+                    icon: 'plus',
+                    onPress: () => router.push('/(tabs)/upload'),
+                  },
+                }}
+              />
+            </View>
           )}
           {activeTab === 'liked' && (
             <ListingsGrid
@@ -724,6 +777,45 @@ function SavedListChip({
         {count}
       </Text>
     </Pressable>
+  );
+}
+
+// Small pill stating a seller-trust fact (rating, sales, tenure). Quiet by
+// default; `emphasized` switches to the purple-soft fill for states that
+// deserve attention (vacation mode).
+function TrustBadge({
+  icon,
+  label,
+  emphasized = false,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  emphasized?: boolean;
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: radii.pill,
+        backgroundColor: emphasized ? colors.purpleSoft : colors.panel,
+      }}
+    >
+      <Feather name={icon} size={11} color={emphasized ? colors.purple : colors.mute} />
+      <Text
+        style={{
+          fontSize: 12,
+          fontWeight: '700',
+          color: emphasized ? colors.purple : colors.ink,
+          letterSpacing: -0.1,
+        }}
+      >
+        {label}
+      </Text>
+    </View>
   );
 }
 

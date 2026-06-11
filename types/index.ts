@@ -26,7 +26,6 @@ export interface User {
   bundle_discount_pct?: number;
   is_verified?: boolean;
   is_pro?: boolean;
-  expo_push_token?: string | null;
   followers_count?: number;
   following_count?: number;
 }
@@ -45,6 +44,24 @@ export interface ShippingAddress {
   is_default: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export type OrderStatus = 'pending' | 'paid' | 'refunded' | 'canceled';
+
+// Written exclusively by the stripe-webhook edge function after a verified
+// checkout.session.completed event; clients can only read their own rows.
+export interface Order {
+  id: string;
+  listing_id: string;
+  buyer_id: string;
+  seller_id: string;
+  amount_cents: number;
+  currency: string;
+  stripe_session_id: string;
+  stripe_payment_intent: string | null;
+  offer_message_id: string | null;
+  status: OrderStatus;
+  created_at: string;
 }
 
 export type PayoutKind = 'bank' | 'wallet';

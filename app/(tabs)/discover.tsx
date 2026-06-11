@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,8 @@ import { Feather } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import { ListingCard } from '@/components/ListingCard';
-import { fetchListings } from '@/lib/listings';
+import { fetchListings, searchListings } from '@/lib/listings';
+import { fetchRecommendations, fetchRecentlyViewed } from '@/lib/recommendations';
 import { createSavedSearch, touchSavedSearchSeen } from '@/lib/savedSearches';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
@@ -42,6 +43,8 @@ const CATEGORY_TILES: CatTile[] = [
 
 const HORIZONTAL_PAD = 12;
 const GRID_GAP = 8;
+const RAIL_CARD_WIDTH = 160;
+const SEARCH_DEBOUNCE_MS = 300;
 
 export default function DiscoverScreen() {
   // Query params from /news Saved tab (and external links). When set, the
@@ -55,6 +58,8 @@ export default function DiscoverScreen() {
   const toast = useToast();
   const [query, setQuery] = useState(initialQuery);
   const [listings, setListings] = useState<Listing[]>([]);
+  const [recommended, setRecommended] = useState<Listing[]>([]);
+  const [recentlyViewed, setRecentlyViewed] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeCat, setActiveCat] = useState<CatTile['id'] | null>(initialCat);
@@ -63,10 +68,17 @@ export default function DiscoverScreen() {
   // session to avoid spam — the underlying unique index would reject anyway.
   const [savedKey, setSavedKey] = useState<string | null>(null);
 
+  // Server search: null = not searching (no query), array = authoritative
+  // results for the current query. While a search is in flight we keep
+  // showing the instant client-side filter so typing feels immediate.
+  const [serverResults, setServerResults] = useState<Listing[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const searchSeq = useRef(0);
+
   useEffect(() => {
     const nextQ = typeof params.q === 'string' ? params.q : '';
     setQuery(nextQ);
-    
+
     if (typeof params.category === 'string') {
       const isValid = CATEGORY_TILES.some(t => t.id === params.category);
       setActiveCat(isValid ? (params.category as CatTile['id']) : null);
@@ -91,45 +103,81 @@ export default function DiscoverScreen() {
     gap: GRID_GAP,
   });
 
+  const browseCat = activeCat && activeCat !== 'trending' ? activeCat : null;
+
+  const loadAll = useCallback(
+    async (opts: { silent?: boolean } = {}) => {
+      if (!opts.silent) setLoading(true);
+      try {
+        // Grid + rails in parallel. Category browsing is server-filtered so
+        // results aren't limited to whatever made the trending top 60.
+        const [gridRows, recRows, viewedRows] = await Promise.all([
+          fetchListings({ tab: 'popular', limit: 60, category: browseCat }),
+          user ? fetchRecommendations(12) : Promise.resolve([]),
+          user ? fetchRecentlyViewed(10) : Promise.resolve([]),
+        ]);
+        setListings(gridRows);
+        setRecommended(recRows);
+        setRecentlyViewed(viewedRows);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [user, browseCat],
+  );
+
   // Silent re-fetch on focus.
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
-      setLoading(true);
-      fetchListings({ tab: 'popular', limit: 60 })
-        .then((rows) => {
-          if (cancelled) return;
-          setListings(rows);
-        })
-        .finally(() => {
-          if (!cancelled) setLoading(false);
-        });
+      loadAll().catch((e) => {
+        if (!cancelled) console.warn('[Discover] load failed', e);
+      });
       return () => {
         cancelled = true;
       };
-    }, []),
+    }, [loadAll]),
   );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const rows = await fetchListings({ tab: 'popular', limit: 60 });
-      setListings(rows);
+      await loadAll({ silent: true });
     } catch (e) {
       console.warn('[Discover] refresh failed', e);
     } finally {
       setRefreshing(false);
     }
-  }, []);
+  }, [loadAll]);
+
+  // Debounced server-side search across the whole catalog. Client filtering
+  // below gives instant feedback; this replaces it with authoritative rows.
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length === 0) {
+      setServerResults(null);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    const seq = ++searchSeq.current;
+    const timer = setTimeout(async () => {
+      const res = await searchListings({ query: q, category: browseCat, limit: 60 });
+      if (seq !== searchSeq.current) return; // a newer keystroke superseded us
+      if (res.ok) setServerResults(res.rows);
+      setSearching(false);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [query, browseCat]);
 
   // Compose a normalised key for "have we already saved this in this session".
   // Lower-cased query + category so case differences don't allow dupes.
   const currentSaveKey = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const cat = activeCat && activeCat !== 'trending' ? activeCat : '';
+    const cat = browseCat ?? '';
     if (!q && !cat) return null;
     return `${q}|${cat}`;
-  }, [query, activeCat]);
+  }, [query, browseCat]);
 
   const handleSaveSearch = useCallback(async () => {
     if (!user) {
@@ -143,7 +191,7 @@ export default function DiscoverScreen() {
       const row = await createSavedSearch({
         userId: user.id,
         query: query.trim() || null,
-        category: activeCat && activeCat !== 'trending' ? (activeCat as Category) : null,
+        category: browseCat as Category | null,
         gender: null,
       });
       if (!row) {
@@ -157,15 +205,16 @@ export default function DiscoverScreen() {
     } finally {
       setSavingSearch(false);
     }
-  }, [user, currentSaveKey, savingSearch, query, activeCat, toast]);
+  }, [user, currentSaveKey, savingSearch, query, browseCat, toast]);
 
   const canSaveSearch = !!currentSaveKey && currentSaveKey !== savedKey;
 
-  const filtered = useMemo(() => {
+  const hasQuery = query.trim().length > 0;
+
+  // Instant local filter over loaded rows; superseded by serverResults when
+  // the debounced search lands.
+  const clientFiltered = useMemo(() => {
     let rows = listings;
-    if (activeCat && activeCat !== 'trending') {
-      rows = rows.filter((l) => l.category === activeCat);
-    }
     const q = query.trim().toLowerCase();
     if (q.length > 0) {
       rows = rows.filter(
@@ -176,7 +225,12 @@ export default function DiscoverScreen() {
       );
     }
     return rows;
-  }, [listings, query, activeCat]);
+  }, [listings, query]);
+
+  const results = hasQuery && serverResults !== null ? serverResults : clientFiltered;
+  // Idle = browsing, not searching: rails are shown only here so search
+  // results stay focused on the query.
+  const idle = !hasQuery && !browseCat;
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
@@ -255,6 +309,9 @@ export default function DiscoverScreen() {
             autoCorrect={false}
             autoCapitalize="none"
           />
+          {searching ? (
+            <ActivityIndicator size="small" color={colors.purple} style={{ marginRight: 4 }} />
+          ) : null}
           {query.length > 0 && (
             <Pressable hitSlop={HIT_SLOP_8} onPress={() => setQuery('')}>
               <Feather name="x" size={16} color={colors.muteSoft} />
@@ -378,38 +435,102 @@ export default function DiscoverScreen() {
           </View>
         ) : null}
 
+        {/* For you — personalized rail (hybrid recommender). Idle browse only. */}
+        {idle && user && (loading || recommended.length > 0) ? (
+          <View style={{ marginTop: 22 }}>
+            <SectionHeader title="For you" />
+            {loading ? (
+              <RailSkeleton />
+            ) : (
+              <Rail listings={recommended} testID="discover-for-you" />
+            )}
+          </View>
+        ) : null}
+
+        {/* Recently viewed — pick up where you left off. Hidden when empty. */}
+        {idle && user && recentlyViewed.length > 0 && !loading ? (
+          <View style={{ marginTop: 22 }}>
+            <SectionHeader title="Recently viewed" />
+            <Rail listings={recentlyViewed} testID="discover-recently-viewed" />
+          </View>
+        ) : null}
+
         {/* Results */}
         <View style={{ marginTop: 22 }}>
           <SectionHeader
             title={
-              query.trim().length > 0
+              hasQuery
                 ? 'Results'
-                : activeCat && activeCat !== 'trending'
-                  ? `In ${CATEGORY_TILES.find((c) => c.id === activeCat)?.label}`
+                : browseCat
+                  ? `In ${CATEGORY_TILES.find((c) => c.id === browseCat)?.label}`
                   : 'Trending'
             }
-            count={filtered.length}
-            rightText={filtered.length === 1 ? 'item' : 'items'}
+            count={results.length}
+            rightText={results.length === 1 ? 'item' : 'items'}
           />
 
           {loading ? (
-            <View style={{ paddingHorizontal: HORIZONTAL_PAD, flexDirection: 'row', gap: GRID_GAP }}>
-              {Array.from({ length: columns }).map((_, i) => (
-                <SkeletonTile key={i} width={cardW} />
-              ))}
-            </View>
-          ) : filtered.length === 0 ? (
-            <EmptyState
-              icon="search"
-              title="Nothing matched"
-              description="Try a different word, brand, or category."
-            />
+            <GridSkeleton columns={columns} cardW={cardW} />
+          ) : results.length === 0 ? (
+            searching ? (
+              <GridSkeleton columns={columns} cardW={cardW} />
+            ) : (
+              <EmptyState
+                icon="search"
+                title="Nothing matched"
+                description="Try a different word, brand, or category."
+              />
+            )
           ) : (
-            <GridSection listings={filtered} columns={columns} cardW={cardW} />
+            <GridSection listings={results} columns={columns} cardW={cardW} />
           )}
         </View>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+// Horizontal listing rail used by "For you" and "Recently viewed".
+function Rail({ listings, testID }: { listings: Listing[]; testID?: string }) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ paddingHorizontal: HORIZONTAL_PAD, gap: GRID_GAP }}
+      testID={testID}
+    >
+      {listings.map((listing) => (
+        <View key={listing.id} style={{ width: RAIL_CARD_WIDTH }}>
+          <ListingCard listing={listing} />
+        </View>
+      ))}
+    </ScrollView>
+  );
+}
+
+function RailSkeleton() {
+  return (
+    <View style={{ flexDirection: 'row', gap: GRID_GAP, paddingHorizontal: HORIZONTAL_PAD }}>
+      {Array.from({ length: 3 }).map((_, i) => (
+        <SkeletonTile key={i} width={RAIL_CARD_WIDTH} />
+      ))}
+    </View>
+  );
+}
+
+// Two skeleton rows instead of one: matches the density of the real grid so
+// the loaded state doesn't cause a layout jump.
+function GridSkeleton({ columns, cardW }: { columns: number; cardW: number }) {
+  return (
+    <View style={{ paddingHorizontal: HORIZONTAL_PAD, gap: GRID_GAP }}>
+      {Array.from({ length: 2 }).map((_, r) => (
+        <View key={r} style={{ flexDirection: 'row', gap: GRID_GAP }}>
+          {Array.from({ length: columns }).map((_, i) => (
+            <SkeletonTile key={i} width={cardW} />
+          ))}
+        </View>
+      ))}
+    </View>
   );
 }
 

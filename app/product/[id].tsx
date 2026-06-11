@@ -42,6 +42,7 @@ import {
   toggleLike,
 } from '@/lib/listings';
 import { confirm } from '@/lib/confirm';
+import { logListingView } from '@/lib/recommendations';
 import { getCachedListing } from '@/lib/listingCache';
 import { fetchFollowState, getCachedFollowState, toggleFollow } from '@/lib/follows';
 import { withTimeout } from '@/lib/async';
@@ -1186,6 +1187,12 @@ export default function ProductScreen() {
       controller.abort();
     };
   }, [productIdParam, retryToken]);
+
+  // Feed the recommender: record that this user opened this listing. The RPC
+  // dedupes within 30 minutes and skips own listings, so no guards needed.
+  useEffect(() => {
+    if (productIdParam && user?.id) logListingView(productIdParam);
+  }, [productIdParam, user?.id]);
 
   useEffect(() => {
     let active = true;

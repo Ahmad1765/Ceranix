@@ -15,14 +15,17 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 const envOrigins = Deno.env.get('ALLOWED_ORIGINS');
 const ALLOWED_ORIGINS = envOrigins ? envOrigins.split(',').map((o) => o.trim()).filter(Boolean) : [];
 
-function getCorsHeaders(req: Request) {
-  if (ALLOWED_ORIGINS.length === 0) return null;
+// CORS is a browser concern: native apps (iOS/Android) send no Origin header
+// and must NOT be rejected — the JWT check below is the real auth gate.
+// Browser callers with an Origin outside the allow-list are refused.
+function getCorsHeaders(req: Request): Record<string, string> | null {
   const origin = req.headers.get('Origin');
+  if (!origin) return {}; // non-browser caller: no CORS headers needed
   // Only echo back the caller's Origin if it's explicitly on the allow-list.
   // Falling back to ALLOWED_ORIGINS[0] would leak a valid CORS response to
   // disallowed origins (the browser still blocks the actual cross-origin
   // request, but exposing the allowed origin in error logs is unnecessary).
-  if (!origin || !ALLOWED_ORIGINS.includes(origin)) return null;
+  if (!ALLOWED_ORIGINS.includes(origin)) return null;
   return {
     'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -32,7 +35,7 @@ function getCorsHeaders(req: Request) {
 
 Deno.serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
-  if (!corsHeaders) {
+  if (corsHeaders === null) {
     return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
   }
 
@@ -85,9 +88,11 @@ Deno.serve(async (req: Request) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    // Log the deletion request (required success)
+    // Log the deletion request (required success). user_id is a plain uuid
+    // column (no FK), so the audit row survives the auth user deletion below.
     const { error: insertErr } = await admin.from('account_deletion_requests').insert({
-      user_uuid: user.id, // Write to a non-FK column to avoid cascade delete issues
+      user_id: user.id,
+      email: user.email ?? null,
       reason,
     });
     if (insertErr) {

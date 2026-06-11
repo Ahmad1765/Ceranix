@@ -12,9 +12,15 @@ import { Feather } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/lib/auth';
 import { colors, radii } from '@/lib/theme';
-import { fetchSimilarToLiked } from '@/lib/myFeed';
+import {
+  fetchNewFromFollowed,
+  fetchPriceDrops,
+  type PriceDropListing,
+} from '@/lib/myFeed';
+import { fetchRecommendations, type RecommendedListing } from '@/lib/recommendations';
 import { fetchListings } from '@/lib/listings';
 import { fetchSavedListings } from '@/lib/saves';
+import { PriceDropCard } from '@/components/PriceDropCard';
 import {
   deleteSavedSearch,
   listSavedSearches,
@@ -47,9 +53,15 @@ export default function MyFeedScreen() {
   const toast = useToast();
   const [refreshing, setRefreshing] = useState(false);
 
-  const [listings, setListings] = useState<Listing[]>([]);
+  const [listings, setListings] = useState<RecommendedListing[]>([]);
   const [isFallback, setIsFallback] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // Personal rails — the things a marketplace feed can do that a social
+  // feed can't: price drops on items you liked, fresh stock from sellers
+  // you follow. Both hide entirely when empty.
+  const [priceDrops, setPriceDrops] = useState<PriceDropListing[]>([]);
+  const [fromFollowed, setFromFollowed] = useState<Listing[]>([]);
 
   const [savedListings, setSavedListings] = useState<Listing[]>([]);
   const [loadingSaved, setLoadingSaved] = useState(false);
@@ -71,15 +83,12 @@ export default function MyFeedScreen() {
       const silent = opts?.silent === true;
       if (!silent) setLoading(true);
       if (user?.id) {
-        const r = await fetchSimilarToLiked(user.id);
-        if (r.ok && r.rows.length > 0) {
-          setListings(r.rows);
-          setIsFallback(false);
-        } else {
-          const fallback = await fetchListings({ tab: 'popular', limit: 60 });
-          setListings(fallback);
-          setIsFallback(true);
-        }
+        // Hybrid recommender (taste + collaborative + social + intent).
+        // It backfills with trending internally, so "fallback" here means
+        // nothing ranked for personal reasons — the user has no signals yet.
+        const rows = await fetchRecommendations(48);
+        setListings(rows);
+        setIsFallback(rows.every((r) => !r.rec_reason || r.rec_reason === 'trending'));
       } else {
         const fallback = await fetchListings({ tab: 'popular', limit: 60 });
         setListings(fallback);
@@ -89,6 +98,20 @@ export default function MyFeedScreen() {
     },
     [user?.id],
   );
+
+  const loadRails = useCallback(async () => {
+    if (!user?.id) {
+      setPriceDrops([]);
+      setFromFollowed([]);
+      return;
+    }
+    const [drops, followed] = await Promise.all([
+      fetchPriceDrops(user.id),
+      fetchNewFromFollowed(user.id),
+    ]);
+    if (drops.ok) setPriceDrops(drops.rows);
+    if (followed.ok) setFromFollowed(followed.rows);
+  }, [user?.id]);
 
   const loadSavedSearches = useCallback(async () => {
     if (!user?.id) {
@@ -117,14 +140,16 @@ export default function MyFeedScreen() {
     loadListings();
     loadSavedSearches();
     loadSavedListings();
-  }, [loadListings, loadSavedSearches, loadSavedListings]);
+    loadRails();
+  }, [loadListings, loadSavedSearches, loadSavedListings, loadRails]);
 
   useFocusEffect(
     useCallback(() => {
       loadListings({ silent: true });
       loadSavedSearches();
       loadSavedListings({ silent: true });
-    }, [loadListings, loadSavedSearches, loadSavedListings]),
+      loadRails();
+    }, [loadListings, loadSavedSearches, loadSavedListings, loadRails]),
   );
 
   const onRefresh = useCallback(async () => {
@@ -133,9 +158,10 @@ export default function MyFeedScreen() {
       loadListings({ silent: true }),
       loadSavedSearches(),
       loadSavedListings({ silent: true }),
+      loadRails(),
     ]);
     setRefreshing(false);
-  }, [loadListings, loadSavedSearches, loadSavedListings]);
+  }, [loadListings, loadSavedSearches, loadSavedListings, loadRails]);
 
   const onDeleteChip = useCallback(
     (search: SavedSearch) => {
@@ -200,6 +226,26 @@ export default function MyFeedScreen() {
   const showFollowCta =
     !!user && savedSearches.length === 0 && isFallback;
 
+  // Personal subtitle: name the dominant category in today's picks instead
+  // of a static tagline, so the feed tells the user WHY it looks like this.
+  const subtitle = useMemo(() => {
+    if (!user || isFallback || listings.length === 0) return 'Curated from what you like';
+    const counts = new Map<string, number>();
+    for (const l of listings.slice(0, 24)) {
+      if (l.category) counts.set(l.category, (counts.get(l.category) ?? 0) + 1);
+    }
+    let top: string | null = null;
+    let max = 0;
+    for (const [cat, n] of counts) {
+      if (n > max) { top = cat; max = n; }
+    }
+    return top
+      ? `Heavy on ${top} today, from your likes, saves & sellers you follow`
+      : 'From your likes, saves & sellers you follow';
+  }, [user, isFallback, listings]);
+
+  const showRails = activeChip === FOR_YOU && !showingSaved;
+
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
       <ScrollView
@@ -222,7 +268,7 @@ export default function MyFeedScreen() {
               letterSpacing: -0.1,
             }}
           >
-            Curated from what you like
+            {subtitle}
           </Text>
         </View>
 
@@ -282,6 +328,41 @@ export default function MyFeedScreen() {
           }}
         />
 
+        {/* Price drops on items the user liked — a marketplace-only signal.
+            Strip renders only when there's at least one real drop. */}
+        {showRails && priceDrops.length > 0 ? (
+          <View style={{ marginBottom: 14 }}>
+            <RailHeader icon="trending-down" title="Price drops on your likes" />
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: HORIZONTAL_PAD, gap: GRID_GAP }}
+            >
+              {priceDrops.map((drop) => (
+                <PriceDropCard key={drop.id} listing={drop} width={130} />
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
+
+        {/* Fresh stock from sellers the user follows. */}
+        {showRails && fromFollowed.length > 0 ? (
+          <View style={{ marginBottom: 14 }}>
+            <RailHeader icon="user-check" title="New from sellers you follow" />
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: HORIZONTAL_PAD, gap: GRID_GAP }}
+            >
+              {fromFollowed.map((listing) => (
+                <View key={listing.id} style={{ width: 160 }}>
+                  <ListingCard listing={listing} />
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
+
         <Grid
           rows={visibleListings}
           loading={showingSaved ? loadingSaved : loading}
@@ -304,6 +385,38 @@ export default function MyFeedScreen() {
         />
       ) : null}
     </SafeAreaView>
+  );
+}
+
+// Compact section header for the personal rails: icon chip + label, quieter
+// than the page title so the grid below stays the focal point.
+function RailHeader({ icon, title }: { icon: keyof typeof Feather.glyphMap; title: string }) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 16,
+        marginBottom: 10,
+      }}
+    >
+      <View
+        style={{
+          width: 24,
+          height: 24,
+          borderRadius: 12,
+          backgroundColor: colors.purpleSoft,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Feather name={icon} size={12} color={colors.purple} />
+      </View>
+      <Text style={{ fontSize: 14, fontWeight: '800', color: colors.ink, letterSpacing: -0.2 }}>
+        {title}
+      </Text>
+    </View>
   );
 }
 

@@ -1,6 +1,8 @@
 import { decode } from 'base64-arraybuffer';
 import { Platform } from 'react-native';
-import * as FileSystem from 'expo-file-system';
+// SDK 54 moved readAsStringAsync/EncodingType to the legacy entry point; the
+// new expo-file-system API no longer exports them from the package root.
+import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from '@/lib/supabase';
 
 export type LocalImage = { uri: string; base64?: string | null };
