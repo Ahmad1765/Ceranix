@@ -30,11 +30,16 @@ import { onListingCreated } from '@/lib/listingEvents';
 import { getOptimizedImageUrl } from '@/lib/images';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
+import { colors } from '@/lib/theme';
+import { useResponsiveColumns } from '@/lib/responsive';
 import type { Listing, User as Profile } from '@/types';
 
 type TabName = 'For you' | 'Popular' | 'Following';
 
-const FEED_COLUMNS = 3;
+// Same column ramp as discover so listings render at identical sizes on
+// every screen of the app: 2-up on phones, 3 on big phones, 4 on tablets.
+const GRID_THRESHOLDS = [560, 900, 1200];
+const GRID_GAP = 8;
 type FeedItem = Listing | { __placeholder: true; id: string };
 
 function isPlaceholder(item: FeedItem): item is { __placeholder: true; id: string } {
@@ -119,6 +124,7 @@ const TAB_TO_FEED: Record<Exclude<TabName, 'Following'>, FeedTab> = {
 export default function HomeScreen() {
   const { user } = useAuth();
   const toast = useToast();
+  const columns = useResponsiveColumns({ min: 2, max: 4, thresholds: GRID_THRESHOLDS });
   const [activeTab, setActiveTab] = useState<TabName>('For you');
   const [refreshing, setRefreshing] = useState(false);
   // Suggested people for an empty Following tab. Live data ranked by
@@ -417,21 +423,21 @@ export default function HomeScreen() {
     setRefreshing(false);
   }, [activeTab, load]);
 
-  // Pad to a multiple of FEED_COLUMNS so trailing rows don't stretch their
-  // cards across the full width when listings.length isn't divisible by 3.
+  // Pad to a multiple of the column count so trailing rows don't stretch
+  // their cards across the full width when listings.length isn't divisible.
   // Note: we DON'T gate this on `loading` — listings render the moment they
   // arrive. The skeleton ListEmptyComponent below keys off `loading` instead.
   const data = useMemo<FeedItem[]>(() => {
     if (listings.length === 0) return [];
-    const remainder = listings.length % FEED_COLUMNS;
+    const remainder = listings.length % columns;
     if (remainder === 0) return listings;
-    const padCount = FEED_COLUMNS - remainder;
+    const padCount = columns - remainder;
     const pads: FeedItem[] = Array.from({ length: padCount }, (_, i) => ({
       __placeholder: true as const,
       id: `__pad-${i}`,
     }));
     return [...listings, ...pads];
-  }, [listings]);
+  }, [listings, columns]);
 
   const keyExtractor = useCallback((item: FeedItem) => item.id, []);
 
@@ -443,11 +449,11 @@ export default function HomeScreen() {
 
   const renderSkeleton = useCallback(
     () => (
-      <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 12, marginBottom: 6 }}>
-        {[0, 1, 2].map((i) => <SkeletonCard key={i} />)}
+      <View style={{ flexDirection: 'row', gap: GRID_GAP, paddingHorizontal: 12, marginBottom: 6 }}>
+        {Array.from({ length: columns }, (_, i) => <SkeletonCard key={i} />)}
       </View>
     ),
-    [],
+    [columns],
   );
 
   return (
@@ -467,9 +473,11 @@ export default function HomeScreen() {
         </Pressable>
         <Pressable
           onPress={() => router.push('/(tabs)/chat' as any)}
-          className="w-[42px] h-[42px] border border-ink-hair rounded-[10px] items-center justify-center bg-surface"
+          accessibilityRole="button"
+          accessibilityLabel="Open chats"
+          className="w-[42px] h-[42px] border border-ink-hair rounded-full items-center justify-center bg-surface"
         >
-          <Feather name="message-circle" size={18} color="#0F0F0F" />
+          <Feather name="message-circle" size={18} color={colors.ink} />
         </Pressable>
       </View>
 
@@ -494,12 +502,12 @@ export default function HomeScreen() {
       {/* Following view — listing grid if the user follows people, otherwise
           a live "people to follow" strip with real profiles. */}
       <FlatList
-        key="following-3"
+        key={`following-${columns}`}
         style={{ flex: 1, display: activeTab === 'Following' ? 'flex' : 'none' }}
         data={activeTab === 'Following' ? data : []}
         keyExtractor={keyExtractor}
-        numColumns={FEED_COLUMNS}
-        columnWrapperStyle={{ gap: 6, paddingHorizontal: 12 }}
+        numColumns={columns}
+        columnWrapperStyle={{ gap: GRID_GAP, paddingHorizontal: 12 }}
         showsVerticalScrollIndicator={false}
         initialNumToRender={12}
         maxToRenderPerBatch={9}
@@ -507,7 +515,7 @@ export default function HomeScreen() {
         windowSize={8}
         removeClippedSubviews={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6C47FF" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
         ListHeaderComponent={
           followedProfiles.length > 0 ? (
@@ -626,12 +634,12 @@ export default function HomeScreen() {
 
       {/* Product grid — always mounted, hidden when Following is active */}
       <FlatList
-        key="feed-3"
+        key={`feed-${columns}`}
         style={{ flex: 1, display: activeTab !== 'Following' ? 'flex' : 'none' }}
         data={data}
         keyExtractor={keyExtractor}
-        numColumns={FEED_COLUMNS}
-        columnWrapperStyle={{ gap: 6, paddingHorizontal: 12 }}
+        numColumns={columns}
+        columnWrapperStyle={{ gap: GRID_GAP, paddingHorizontal: 12 }}
         showsVerticalScrollIndicator={false}
         initialNumToRender={12}
         maxToRenderPerBatch={9}
@@ -644,15 +652,33 @@ export default function HomeScreen() {
           loadingMore ? (
             <View style={{ paddingVertical: 16 }}>{renderSkeleton()}</View>
           ) : reachedEnd && listings.length > 0 ? (
-            <View style={{ paddingVertical: 24, alignItems: 'center' }}>
-              <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.45)' }}>
-                You've reached the end.
+            <View
+              style={{
+                paddingVertical: 28,
+                paddingHorizontal: 40,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 14,
+              }}
+            >
+              <View style={{ flex: 1, height: 1, backgroundColor: colors.hairline }} />
+              <Text
+                style={{
+                  fontSize: 10,
+                  fontFamily: 'Inter_600SemiBold',
+                  color: colors.muteSoft,
+                  letterSpacing: 1.6,
+                  textTransform: 'uppercase',
+                }}
+              >
+                All caught up
               </Text>
+              <View style={{ flex: 1, height: 1, backgroundColor: colors.hairline }} />
             </View>
           ) : null
         }
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6C47FF" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
         ListHeaderComponent={
           activeTab === 'For you' ? (
@@ -673,24 +699,32 @@ export default function HomeScreen() {
           ) : (
             <View style={{ paddingHorizontal: 24, paddingVertical: 56, alignItems: 'flex-start' }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 18 }}>
-                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#6C47FF', marginRight: 10 }} />
-                <Text style={{ fontSize: 11, fontWeight: '800', color: '#0F0F0F', letterSpacing: 1.4, textTransform: 'uppercase' }}>
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary, marginRight: 10 }} />
+                <Text style={{ fontSize: 11, fontWeight: '800', color: colors.ink, letterSpacing: 1.4, textTransform: 'uppercase' }}>
                   Empty rack
                 </Text>
               </View>
               <Text
                 style={{
-                  fontSize: 38,
-                  fontWeight: '900',
-                  color: '#0F0F0F',
+                  fontSize: 36,
+                  color: colors.ink,
                   lineHeight: 40,
-                  letterSpacing: -1.4,
+                  letterSpacing: -1,
+                  fontFamily: 'Fraunces_600SemiBold',
                 }}
               >
                 Nothing here{'\n'}yet.
               </Text>
-              <Text style={{ fontSize: 14, color: 'rgba(15,15,15,0.62)', marginTop: 10, lineHeight: 20 }}>
-                Pull down to refresh, or be the first to post — the upload tab is one tap away.
+              <Text
+                style={{
+                  fontSize: 14,
+                  color: colors.mute,
+                  marginTop: 10,
+                  lineHeight: 20,
+                  fontFamily: 'Inter_400Regular',
+                }}
+              >
+                Pull down to refresh, or be the first to post. The upload tab is one tap away.
               </Text>
             </View>
           )

@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { CategorySticker, type StickerSpec } from './CategorySticker';
 
 const SCREEN_PAD = 16;
 const ROW_GAP = 12;
@@ -89,76 +90,21 @@ const GRID_CARDS: CategoryTileData[] = [
   },
 ];
 
-const MID_CARDS: CategoryTileData[] = [
-  {
-    key: 'app',
-    eyebrow: 'Get the app',
-    title: 'Carrinex,\nin your pocket.',
-    tagline: 'Faster checkout · push deals',
-    accent: '#6C47FF',
-    icon: 'phone-portrait-outline',
-    src: require('../assets/images/categories/app.jpg'),
-  },
-  {
-    key: 'activewear',
-    eyebrow: 'Move',
-    title: 'Activewear.',
-    tagline: 'Train · run · stretch',
-    accent: '#6C47FF',
-    icon: 'pulse-outline',
-    src: require('../assets/images/categories/activewear.jpg'),
-  },
-  {
-    key: 'streetwear',
-    eyebrow: 'Drops',
-    title: 'Streetwear.',
-    tagline: 'Hype tees · hoodies · caps',
-    accent: '#6C47FF',
-    icon: 'flame-outline',
-    src: require('../assets/images/categories/streetwear.jpg'),
-  },
+// Quick category shortcuts — the horizontal icon row under the headline.
+// Same routing table as the tiles (keys resolve through DISPLAY_TO_ROUTE).
+// Each entry carries a sticker spec: vivid fills deliberately outside the
+// 3-color palette (explicit product call — gen-z sticker-sheet vibe, like
+// the foodora reference) while labels and layout stay on-system.
+// Capped at 6: one comfortable screenful with the 7th edge peeking as a
+// scroll affordance. More belongs on the discover tab, not the home page.
+const QUICK_CATS: Array<{ key: string; label: string; sticker: StickerSpec }> = [
+  { key: 'deals', label: 'Deals', sticker: { icon: 'pricetag', color: '#FF4D8D', deep: '#8E1247' } },
+  { key: 'sneakers', label: 'Sneakers', sticker: { icon: 'flash', color: '#FFB03A', deep: '#8A4D00' } },
+  { key: 'streetwear', label: 'Streetwear', sticker: { icon: 'flame', color: '#FF5757', deep: '#7E1010' } },
+  { key: 'electronics', label: 'Tech', sticker: { icon: 'hardware-chip', color: '#36C5F0', deep: '#0B5570' } },
+  { key: 'beauty', label: 'Beauty', sticker: { icon: 'flower', color: '#F45BC0', deep: '#771254' } },
+  { key: 'vintage', label: 'Vintage', sticker: { icon: 'leaf', color: '#33D6A6', deep: '#0A5C44' } },
 ];
-
-const PORTRAIT_CARDS: CategoryTileData[] = [
-  {
-    key: 'women',
-    eyebrow: 'Department',
-    title: 'Women',
-    tagline: 'Dresses · denim · knits',
-    accent: '#6C47FF',
-    icon: 'heart-outline',
-    src: require('../assets/images/categories/women.jpg'),
-  },
-  {
-    key: 'men',
-    eyebrow: 'Department',
-    title: 'Men',
-    tagline: 'Tailoring · tees · sneakers',
-    accent: '#6C47FF',
-    icon: 'shirt-outline',
-    src: require('../assets/images/categories/men.jpg'),
-  },
-  {
-    key: 'kids',
-    eyebrow: 'Department',
-    title: 'Kids',
-    tagline: 'Tiny outfits · toys · books',
-    accent: '#6C47FF',
-    icon: 'happy-outline',
-    src: require('../assets/images/categories/kids.jpg'),
-  },
-  {
-    key: 'lifestyle',
-    eyebrow: 'Department',
-    title: 'Lifestyle',
-    tagline: 'Bikes · plants · books',
-    accent: '#6C47FF',
-    icon: 'bicycle-outline',
-    src: require('../assets/images/categories/lifestyle.jpg'),
-  },
-];
-
-
 
 // Each tile maps to a discover route. Cards whose value is a real category
 // pass `category=`; niche themes (vintage, streetwear, departments) pass a
@@ -168,6 +114,10 @@ const PORTRAIT_CARDS: CategoryTileData[] = [
 type DiscoverRoute = { q?: string; category?: string };
 
 const DISPLAY_TO_ROUTE: Record<string, DiscoverRoute> = {
+  // Quick row
+  deals: { category: 'trending' },
+  streetwear: { q: 'streetwear' },
+
   // Hero
   vintage: { q: 'vintage' },
   sneakers: { category: 'shoes' },
@@ -178,18 +128,6 @@ const DISPLAY_TO_ROUTE: Record<string, DiscoverRoute> = {
   beauty: { category: 'beauty' },
   home: { q: 'home' },
   handbags: { category: 'bags' },
-
-  // Mid
-  app: {},
-  activewear: { q: 'activewear' },
-  streetwear: { q: 'streetwear' },
-
-  // Departments — discover has no gender filter, so query text is the only
-  // signal that meaningfully narrows the feed.
-  women: { q: 'women' },
-  men: { q: 'men' },
-  kids: { q: 'kids' },
-  lifestyle: { q: 'lifestyle' },
 };
 
 function go(displayKey: string) {
@@ -355,6 +293,48 @@ function CategoryTile({
   );
 }
 
+// Horizontal shortcut row: tilted die-cut sticker icons with a two-line-max
+// label, scrolling edge to edge under the headline.
+function QuickCategoryRow() {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ paddingHorizontal: SCREEN_PAD, gap: 16, paddingVertical: 4 }}
+    >
+      {QUICK_CATS.map((c, i) => (
+        <Pressable
+          key={c.key}
+          onPress={() => go(c.key)}
+          accessibilityRole="button"
+          accessibilityLabel={c.label}
+          style={({ pressed }) => ({
+            alignItems: 'center',
+            width: 74,
+            opacity: pressed ? 0.85 : 1,
+            transform: [{ scale: pressed ? 0.95 : 1 }],
+          })}
+        >
+          <CategorySticker spec={c.sticker} index={i} size={64} />
+          <Text
+            style={{
+              fontSize: 12,
+              lineHeight: 15,
+              color: '#0F0F0F',
+              marginTop: 8,
+              textAlign: 'center',
+              fontFamily: 'Inter_600SemiBold',
+            }}
+            numberOfLines={2}
+          >
+            {c.label}
+          </Text>
+        </Pressable>
+      ))}
+    </ScrollView>
+  );
+}
+
 export function AnonCards() {
   const { width: SCREEN_WIDTH } = useWindowDimensions();
 
@@ -363,12 +343,6 @@ export function AnonCards() {
 
   const GRID_TILE_W = Math.floor((SCREEN_WIDTH - SCREEN_PAD * 2 - 12) / 2);
   const GRID_TILE_H = GRID_TILE_W;
-
-  const MID_W = Math.round(SCREEN_WIDTH * 0.58);
-  const MID_H = Math.round(MID_W * 1.18);
-
-  const PORTRAIT_W = Math.round(SCREEN_WIDTH * 0.44);
-  const PORTRAIT_H = Math.round(PORTRAIT_W * 1.6);
 
   return (
     <View style={{ paddingTop: 8, paddingBottom: 8 }}>
@@ -401,6 +375,12 @@ export function AnonCards() {
           Curated finds across every corner of the marketplace.
         </Text>
       </View>
+
+      {/* Quick category shortcuts + section break into the editorial tiles */}
+      <View style={{ marginTop: 20 }}>
+        <QuickCategoryRow />
+      </View>
+      <View style={{ height: 1, backgroundColor: 'rgba(15,15,15,0.08)', marginTop: 20 }} />
 
       {/* Row 1 — hero carousel */}
       <View style={{ marginTop: 24 }}>
@@ -441,58 +421,32 @@ export function AnonCards() {
         </View>
       </View>
 
-      {/* Row 3 — mid carousel */}
-      <View style={{ marginTop: 28 }}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          decelerationRate="fast"
-          snapToInterval={MID_W + ROW_GAP}
-          snapToAlignment="start"
-          contentContainerStyle={{ paddingHorizontal: SCREEN_PAD, gap: ROW_GAP }}
-        >
-          {MID_CARDS.map((c) => (
-            <CategoryTile key={c.key} data={c} width={MID_W} height={MID_H} titleSize={26} />
-          ))}
-        </ScrollView>
-      </View>
-
-      {/* Row 4 — portrait carousel (departments) */}
-      <View style={{ marginTop: 28, marginBottom: 8 }}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          decelerationRate="fast"
-          snapToInterval={PORTRAIT_W + ROW_GAP}
-          snapToAlignment="start"
-          contentContainerStyle={{ paddingHorizontal: SCREEN_PAD, gap: ROW_GAP }}
-        >
-          {PORTRAIT_CARDS.map((c) => (
-            <CategoryTile
-              key={c.key}
-              data={c}
-              width={PORTRAIT_W}
-              height={PORTRAIT_H}
-              titleSize={24}
-            />
-          ))}
-        </ScrollView>
-      </View>
-
       {/* Editorial divider into product feed below */}
       <View style={{ paddingHorizontal: SCREEN_PAD, marginTop: 30, marginBottom: 4 }}>
         <View style={{ height: 1, backgroundColor: 'rgba(15,15,15,0.08)', marginBottom: 18 }} />
-        <Text
-          style={{
-            fontSize: 22,
-            color: '#0F0F0F',
-            letterSpacing: -0.4,
-            lineHeight: 26,
-            fontFamily: 'Fraunces_600SemiBold',
-          }}
-        >
-          Picked for you
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+          <Text
+            style={{
+              fontSize: 22,
+              color: '#0F0F0F',
+              letterSpacing: -0.4,
+              lineHeight: 26,
+              fontFamily: 'Fraunces_600SemiBold',
+            }}
+          >
+            Picked for you
+          </Text>
+          <Pressable
+            onPress={() => router.push('/(tabs)/discover' as any)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="See all listings on discover"
+          >
+            <Text style={{ fontSize: 13, fontFamily: 'Inter_700Bold', color: '#6C47FF' }}>
+              See all
+            </Text>
+          </Pressable>
+        </View>
         <Text
           style={{
             fontSize: 13,
