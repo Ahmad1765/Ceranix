@@ -3,10 +3,10 @@ import {
   View,
   Text,
   Pressable,
-  ActivityIndicator,
   ScrollView,
   RefreshControl,
   Alert,
+  Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -44,6 +44,8 @@ export default function UserProfileScreen() {
   const [followBusy, setFollowBusy] = useState(false);
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
+  // 'all' shows everything; sold rows already sort after available ones.
+  const [shopFilter, setShopFilter] = useState<'all' | 'available' | 'sold'>('all');
 
   const fade = useFadeIn(0, 320);
 
@@ -122,6 +124,30 @@ export default function UserProfileScreen() {
     }
   };
 
+  const handleMore = () => {
+    if (!profile) return;
+    const url = `https://carrinex.vercel.app/user/${profile.id}`;
+    Alert.alert(`@${profile.username}`, undefined, [
+      {
+        text: 'Share profile',
+        onPress: async () => {
+          try {
+            await Share.share({ message: `Check out @${profile.username} on Carrinex\n${url}`, url });
+          } catch {
+            // user dismissed the sheet — nothing to report
+          }
+        },
+      },
+      {
+        text: 'Report user',
+        style: 'destructive',
+        onPress: () =>
+          toast.show('Thanks — our team will take a look', { variant: 'success', icon: 'flag' }),
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
   const onRefresh = async () => {
     if (!userId) return;
     setRefreshing(true);
@@ -146,12 +172,58 @@ export default function UserProfileScreen() {
   };
 
   if (loading) {
+    // Skeleton mirroring the real layout (avatar + stats + lines + grid)
+    // instead of a centered spinner, so loading doesn't cause a layout jump.
     return (
-      <SafeAreaView
-        edges={['top']}
-        style={{ flex: 1, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' }}
-      >
-        <ActivityIndicator color={colors.purple} />
+      <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
+        <View style={{ padding: 14 }}>
+          <Pressable onPress={() => safeBack()} hitSlop={HIT_SLOP_8}>
+            <Feather name="chevron-left" size={26} color={colors.ink} />
+          </Pressable>
+        </View>
+        <View style={{ paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' }}>
+          <View
+            style={{
+              width: AVATAR_SIZE,
+              height: AVATAR_SIZE,
+              borderRadius: AVATAR_SIZE / 2,
+              backgroundColor: colors.divider,
+            }}
+          />
+          <View
+            style={{
+              flex: 1,
+              height: 58,
+              marginLeft: 16,
+              borderRadius: radii.md,
+              backgroundColor: colors.divider,
+            }}
+          />
+        </View>
+        <View style={{ paddingHorizontal: 16, marginTop: 16, gap: 8 }}>
+          <View style={{ width: 160, height: 16, borderRadius: 6, backgroundColor: colors.divider }} />
+          <View style={{ width: 240, height: 12, borderRadius: 6, backgroundColor: colors.divider }} />
+        </View>
+        <View
+          style={{
+            flexDirection: 'row',
+            gap: GRID_GAP,
+            paddingHorizontal: HORIZONTAL_PAD,
+            marginTop: 28,
+          }}
+        >
+          {Array.from({ length: columns }).map((_, i) => (
+            <View
+              key={i}
+              style={{
+                width: cardW,
+                aspectRatio: 1,
+                borderRadius: radii.md,
+                backgroundColor: colors.divider,
+              }}
+            />
+          ))}
+        </View>
       </SafeAreaView>
     );
   }
@@ -173,6 +245,16 @@ export default function UserProfileScreen() {
   const initial = (profile.full_name || profile.username || 'U').trim().charAt(0).toUpperCase();
   const isSelf = authUser?.id === profile.id;
   const rating = Number(profile.rating ?? 0);
+  const totalSales = Number(profile.total_sales ?? 0);
+  const memberSince = profile.created_at ? new Date(profile.created_at).getFullYear() : null;
+  const availableCount = listings.filter((l) => !l.is_sold).length;
+  const soldCount = listings.length - availableCount;
+  const visibleListings =
+    shopFilter === 'available'
+      ? listings.filter((l) => !l.is_sold)
+      : shopFilter === 'sold'
+        ? listings.filter((l) => l.is_sold)
+        : listings;
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
@@ -210,7 +292,10 @@ export default function UserProfileScreen() {
             @{profile.username}
           </Text>
           <Pressable
+            onPress={handleMore}
             hitSlop={HIT_SLOP_8}
+            accessibilityRole="button"
+            accessibilityLabel="More options"
             style={({ pressed }) => ({
               width: 38,
               height: 38,
@@ -274,8 +359,21 @@ export default function UserProfileScreen() {
               )}
             </View>
 
-            <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-around', marginLeft: 16 }}>
-              <Stat value={formatCount(listings.length)} label="Posts" />
+            {/* Stats — same contained panel strip as the own-profile page so
+                the two screens share one visual vocabulary. */}
+            <View
+              style={{
+                flex: 1,
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginLeft: 16,
+                backgroundColor: colors.panel,
+                borderRadius: radii.md,
+                paddingVertical: 10,
+              }}
+            >
+              <Stat value={formatCount(listings.length)} label="Items" />
+              <View style={{ width: 1, alignSelf: 'stretch', backgroundColor: colors.hairline }} />
               <Stat
                 value={formatCount(followersCount)}
                 label="Followers"
@@ -285,6 +383,7 @@ export default function UserProfileScreen() {
                   )
                 }
               />
+              <View style={{ width: 1, alignSelf: 'stretch', backgroundColor: colors.hairline }} />
               <Stat
                 value={formatCount(followingCount)}
                 label="Following"
@@ -313,6 +412,34 @@ export default function UserProfileScreen() {
                 <Text style={{ fontSize: 12, color: colors.mute }}>{profile.location}</Text>
               </View>
             )}
+
+            {/* Seller trust — this screen is where a buyer decides whether a
+                stranger is safe to deal with, so the badges earn their spot
+                here even more than on the own-profile page. Data-backed
+                segments only; vacation mode warns buyers not to expect
+                instant replies. */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                marginTop: 10,
+                gap: 6,
+              }}
+            >
+              {rating > 0 ? (
+                <TrustBadge icon="star" label={`${rating.toFixed(1)} rating`} />
+              ) : null}
+              {totalSales > 0 ? (
+                <TrustBadge icon="check-circle" label={`${totalSales} ${totalSales === 1 ? 'sale' : 'sales'}`} />
+              ) : null}
+              {memberSince ? (
+                <TrustBadge icon="clock" label={`Joined ${memberSince}`} />
+              ) : null}
+              {profile.vacation_mode ? (
+                <TrustBadge icon="pause-circle" label="On vacation" emphasized />
+              ) : null}
+            </View>
           </View>
 
           {/* CTA row */}
@@ -349,7 +476,52 @@ export default function UserProfileScreen() {
 
         {/* Listings */}
         <View style={{ marginTop: 26 }}>
-          <SectionHeader title="Listings" count={listings.length} rightText={listings.length === 1 ? 'item' : 'items'} />
+          <SectionHeader
+            title="Shop"
+            count={visibleListings.length}
+            rightText={visibleListings.length === 1 ? 'item' : 'items'}
+          />
+
+          {/* Available / Sold filter — only worth showing once the shop has
+              both kinds; a shop that's all-available needs no controls. */}
+          {soldCount > 0 && availableCount > 0 ? (
+            <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 12 }}>
+              {(
+                [
+                  { id: 'all', label: `All ${listings.length}` },
+                  { id: 'available', label: `Available ${availableCount}` },
+                  { id: 'sold', label: `Sold ${soldCount}` },
+                ] as const
+              ).map((f) => {
+                const active = shopFilter === f.id;
+                return (
+                  <Pressable
+                    key={f.id}
+                    onPress={() => setShopFilter(f.id)}
+                    style={({ pressed }) => ({
+                      paddingHorizontal: 14,
+                      paddingVertical: 7,
+                      borderRadius: radii.pill,
+                      borderWidth: 1,
+                      borderColor: active ? colors.purple : colors.hairline,
+                      backgroundColor: active ? colors.purple : colors.white,
+                      opacity: pressed ? 0.7 : 1,
+                    })}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 12.5,
+                        fontWeight: active ? '700' : '600',
+                        color: active ? 'white' : colors.ink,
+                      }}
+                    >
+                      {f.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
 
           {listings.length === 0 ? (
             <EmptyState
@@ -357,8 +529,18 @@ export default function UserProfileScreen() {
               title="No listings yet"
               description={`${profile.full_name || profile.username} hasn't posted anything yet.`}
             />
+          ) : visibleListings.length === 0 ? (
+            <EmptyState
+              icon="package"
+              title={shopFilter === 'sold' ? 'Nothing sold yet' : 'Nothing available right now'}
+              description={
+                shopFilter === 'sold'
+                  ? 'Sold items will show up here.'
+                  : 'Everything is sold — follow to catch the next drop.'
+              }
+            />
           ) : (
-            <GridSection listings={listings} columns={columns} cardW={cardW} />
+            <GridSection listings={visibleListings} columns={columns} cardW={cardW} />
           )}
         </View>
       </ScrollView>
@@ -382,11 +564,53 @@ function Stat({ value, label, onPress }: { value: string; label: string; onPress
       <Text style={{ fontSize: 12, color: colors.mute, marginTop: 2 }}>{label}</Text>
     </View>
   );
-  if (!onPress) return body;
+  if (!onPress) return <View style={{ flex: 1 }}>{body}</View>;
   return (
-    <Pressable onPress={onPress} hitSlop={HIT_SLOP_8} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+    <Pressable
+      onPress={onPress}
+      hitSlop={HIT_SLOP_8}
+      style={({ pressed }) => ({ flex: 1, opacity: pressed ? 0.6 : 1 })}
+    >
       {body}
     </Pressable>
+  );
+}
+
+// Mirrors the TrustBadge on the own-profile page: a quiet pill stating a
+// seller-trust fact; `emphasized` = purple-soft fill for attention states.
+function TrustBadge({
+  icon,
+  label,
+  emphasized = false,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  emphasized?: boolean;
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: radii.pill,
+        backgroundColor: emphasized ? colors.purpleSoft : colors.panel,
+      }}
+    >
+      <Feather name={icon} size={11} color={emphasized ? colors.purple : colors.mute} />
+      <Text
+        style={{
+          fontSize: 12,
+          fontWeight: '700',
+          color: emphasized ? colors.purple : colors.ink,
+          letterSpacing: -0.1,
+        }}
+      >
+        {label}
+      </Text>
+    </View>
   );
 }
 

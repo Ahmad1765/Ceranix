@@ -16,7 +16,6 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { safeBack } from '@/lib/nav';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -466,6 +465,15 @@ function BundleSection({
     0,
     Math.min(1, (bundleItemCount - 1) / (BUNDLE_TIERS.length - 1)),
   );
+  // Next rung above the current count — drives the single guidance line.
+  const nextTier = BUNDLE_TIERS.find((t) => t.count > bundleItemCount);
+  const guidance = qualifies
+    ? nextTier
+      ? `${bundlePct}% off unlocked · add ${nextTier.count - bundleItemCount} more for ${nextTier.pct}%`
+      : `${bundlePct}% off unlocked · max discount`
+    : nextTier
+      ? `Add ${nextTier.count - bundleItemCount} more ${nextTier.count - bundleItemCount === 1 ? 'item' : 'items'} to save ${nextTier.pct}%`
+      : '';
 
   const brands = Array.from(
     new Set(
@@ -489,7 +497,9 @@ function BundleSection({
 
   return (
     <View style={{ paddingTop: 18 }}>
-      {/* Composition header card — GRAILED-style */}
+      {/* Composition header — GRAILED-style collage. The editorial moment of
+          the section; the decluttering lives below it (slim progress strip,
+          summary only after selection). */}
       <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
         <Text
           style={{
@@ -515,30 +525,12 @@ function BundleSection({
           Bundle from @{username}
         </Text>
         <BundleCollage images={collageImages} extraCount={extraCount} />
-        <Text
-          style={{
-            fontSize: 13,
-            color: 'rgba(15,15,15,0.62)',
-            lineHeight: 19,
-            marginTop: 14,
-          }}
-        >
-          Add items from @{username} to unlock progressive discounts plus shipping savings.
-        </Text>
       </View>
 
-      {/* Milestone progress bar — fills with live selection count, every
-          tier becomes "active" once its threshold has been reached. */}
-      <View
-        style={{
-          marginHorizontal: 16,
-          marginBottom: 22,
-          backgroundColor: BRAND_PURPLE_SOFT,
-          borderRadius: 18,
-          padding: 18,
-        }}
-      >
-        <View style={{ height: 8, marginBottom: 18, position: 'relative' }}>
+      {/* Slim progress strip: the bar carries the tier ladder via pips; one
+          dynamic line replaces the old five-column tier table. */}
+      <View style={{ marginHorizontal: 16, marginBottom: 18 }}>
+        <View style={{ height: 8, position: 'relative' }}>
           <View
             style={{
               position: 'absolute',
@@ -546,10 +538,30 @@ function BundleSection({
               right: 0,
               top: 0,
               bottom: 0,
-              backgroundColor: 'rgba(108,71,255,0.2)',
+              backgroundColor: 'rgba(108,71,255,0.16)',
               borderRadius: 99,
             }}
           />
+          {BUNDLE_TIERS.map((tier, i) => {
+            if (i === 0 || i === BUNDLE_TIERS.length - 1) return null;
+            const reached = bundleItemCount >= tier.count;
+            return (
+              <View
+                key={i}
+                style={{
+                  position: 'absolute',
+                  left: `${(i / (BUNDLE_TIERS.length - 1)) * 100}%`,
+                  top: 1,
+                  width: 6,
+                  height: 6,
+                  marginLeft: -3,
+                  borderRadius: 3,
+                  backgroundColor: reached ? 'rgba(255,255,255,0.85)' : 'rgba(108,71,255,0.4)',
+                  zIndex: 2,
+                }}
+              />
+            );
+          })}
           <View
             style={{
               position: 'absolute',
@@ -557,69 +569,39 @@ function BundleSection({
               top: 0,
               bottom: 0,
               width: `${progressFraction * 100}%`,
+              backgroundColor: BRAND_PURPLE,
+              borderRadius: 99,
+            }}
+          />
+        </View>
+        {guidance ? (
+          <Text
+            style={{
+              fontSize: 12.5,
+              fontWeight: qualifies ? '700' : '600',
+              color: qualifies ? BRAND_PURPLE : 'rgba(15,15,15,0.62)',
+              marginTop: 8,
             }}
           >
-            <LinearGradient
-              colors={[BRAND_PURPLE, BRAND_PURPLE]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={{ flex: 1, borderRadius: 99 }}
-            />
-            <View
-              style={{
-                position: 'absolute',
-                right: -8,
-                top: -4,
-                width: 16,
-                height: 16,
-                borderRadius: 8,
-                backgroundColor: 'white',
-                borderWidth: 3,
-                borderColor: BRAND_PURPLE,
-                ...(IS_IOS && {
-                  boxShadow: '0px 2px 4px rgba(0,0,0,0.15)',
-                }),
-              }}
-            />
-          </View>
-        </View>
-
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-          {BUNDLE_TIERS.map((tier, i) => {
-            const reached = bundleItemCount >= tier.count;
-            return (
-              <View key={i} style={{ alignItems: 'center', flex: 1 }}>
-                <Text
-                  style={{
-                    fontSize: 11,
-                    fontWeight: '700',
-                    color: reached ? BRAND_PURPLE : 'rgba(15,15,15,0.45)',
-                    textAlign: 'center',
-                  }}
-                >
-                  {tier.pct}% off
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 10,
-                    color: 'rgba(15,15,15,0.62)',
-                    textAlign: 'center',
-                    marginTop: 2,
-                  }}
-                >
-                  {tier.label}
-                </Text>
-              </View>
-            );
-          })}
-        </View>
+            {guidance}
+          </Text>
+        ) : null}
       </View>
 
       {/* Selectable seller items grid */}
       {sellerItems.length === 0 ? (
-        <View style={{ paddingHorizontal: 20, paddingVertical: 14 }}>
-          <Text style={{ fontSize: 13, color: 'rgba(15,15,15,0.62)' }}>
-            @{username} has no other listings right now.
+        <View style={{ paddingHorizontal: 20, paddingVertical: 20, alignItems: 'center' }}>
+          <Feather name="package" size={22} color="rgba(15,15,15,0.3)" />
+          <Text
+            style={{
+              fontSize: 13,
+              color: 'rgba(15,15,15,0.62)',
+              marginTop: 8,
+              textAlign: 'center',
+              lineHeight: 19,
+            }}
+          >
+            @{username} has nothing else listed right now.{'\n'}Follow them to catch their next drop.
           </Text>
         </View>
       ) : (
@@ -648,65 +630,46 @@ function BundleSection({
         </View>
       )}
 
-      {/* Live bundle summary + offer CTA */}
-      <View
-        style={{
-          marginHorizontal: 16,
-          marginTop: 18,
-          backgroundColor: BRAND_PURPLE_SOFT,
-          borderRadius: 18,
-          padding: 18,
-        }}
-      >
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-            <Ionicons name="pricetags" size={16} color={BRAND_PURPLE} />
-            <Text
-              style={{
-                fontSize: 12,
-                fontWeight: '800',
-                color: BRAND_PURPLE,
-                letterSpacing: 1.2,
-                textTransform: 'uppercase',
-                marginLeft: 6,
-              }}
-            >
-              {qualifies
-                ? `Bundle unlocked · ${bundlePct}% off`
-                : `Add ${BUNDLE_MIN_ITEMS - bundleItemCount} more to unlock`}
-            </Text>
-          </View>
-
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-            <Text style={{ fontSize: 13, color: 'rgba(15,15,15,0.62)' }}>
-              {bundleItemCount} item{bundleItemCount === 1 ? '' : 's'} · subtotal
-            </Text>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: BRAND_INK }}>
-              ${subtotal.toFixed(2)}
-            </Text>
-          </View>
-          {qualifies && (
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-              <Text style={{ fontSize: 13, color: 'rgba(15,15,15,0.62)' }}>
-                Bundle discount ({bundlePct}%)
-              </Text>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: BRAND_PURPLE }}>
-                −${savings.toFixed(2)}
-              </Text>
-            </View>
-          )}
+      {/* Summary + CTA — only once the buyer has actually selected something.
+          With nothing selected the guidance line above is the whole story;
+          an empty checkout card is just noise. */}
+      {selectedItems.length > 0 ? (
+        <View
+          style={{
+            marginHorizontal: 16,
+            marginTop: 18,
+            backgroundColor: BRAND_PURPLE_SOFT,
+            borderRadius: 18,
+            padding: 16,
+          }}
+        >
           <View
             style={{
               flexDirection: 'row',
               justifyContent: 'space-between',
               alignItems: 'center',
-              paddingTop: 10,
-              borderTopWidth: HAIRLINE,
-              borderTopColor: 'rgba(15,15,15,0.08)',
-              marginBottom: 14,
+              marginBottom: 12,
             }}
           >
-            <Text style={{ fontSize: 14, fontWeight: '800', color: BRAND_INK }}>Total</Text>
-            <Text style={{ fontSize: 18, fontWeight: '900', color: BRAND_INK, letterSpacing: -0.4 }}>
+            <View>
+              <Text style={{ fontSize: 13, color: 'rgba(15,15,15,0.62)' }}>
+                {bundleItemCount} items
+                {qualifies ? ` · you save $${savings.toFixed(2)}` : ''}
+              </Text>
+              {qualifies ? (
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: 'rgba(15,15,15,0.45)',
+                    textDecorationLine: 'line-through',
+                    marginTop: 2,
+                  }}
+                >
+                  ${subtotal.toFixed(2)}
+                </Text>
+              ) : null}
+            </View>
+            <Text style={{ fontSize: 20, fontWeight: '900', color: BRAND_INK, letterSpacing: -0.4 }}>
               ${total.toFixed(2)}
             </Text>
           </View>
@@ -715,7 +678,7 @@ function BundleSection({
             disabled={!qualifies}
             onPress={() => onSendBundleOffer(total)}
             style={({ pressed }) => ({
-              backgroundColor: qualifies ? BRAND_INK : 'rgba(15,15,15,0.18)',
+              backgroundColor: qualifies ? BRAND_PURPLE : 'rgba(15,15,15,0.18)',
               borderRadius: 14,
               paddingVertical: 14,
               alignItems: 'center',
@@ -728,10 +691,13 @@ function BundleSection({
           >
             <Feather name="send" size={14} color="white" />
             <Text style={{ fontSize: 14, fontWeight: '800', color: 'white' }}>
-              {qualifies ? `Send bundle offer · $${total.toFixed(2)}` : 'Select items to bundle'}
+              {qualifies
+                ? `Send bundle offer · $${total.toFixed(2)}`
+                : `Add ${BUNDLE_MIN_ITEMS - bundleItemCount} more to unlock`}
             </Text>
           </Pressable>
-      </View>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -913,6 +879,16 @@ function BundleSelectCard({
           ${item.price.toFixed(0)}
         </Text>
       </View>
+      {/* Size · condition — buyers shouldn't have to open each item to know
+          whether it even fits before adding it to a bundle. */}
+      {item.meta ? (
+        <Text
+          style={{ fontSize: 11.5, color: 'rgba(15,15,15,0.55)', marginTop: 2 }}
+          numberOfLines={1}
+        >
+          {item.meta}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -1130,6 +1106,10 @@ export default function ProductScreen() {
   const [notFound, setNotFound] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retryToken, setRetryToken] = useState(0);
+
+  // The bundle section lives at the bottom of the page (inside the
+  // "Seller's items" tab); the teaser pill under the price jumps there.
+  const mainScrollRef = useRef<any>(null);
 
   const retry = () => setRetryToken((n) => n + 1);
 
@@ -1582,6 +1562,7 @@ export default function ProductScreen() {
       )}
 
       <Animated.ScrollView
+        ref={mainScrollRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}
         onScroll={scrollHandler}
@@ -1774,7 +1755,7 @@ export default function ProductScreen() {
               >
                 {listing.title}
               </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: 8, gap: 8 }}>
                 <View
                   style={{
                     backgroundColor: 'rgba(15,15,15,0.04)',
@@ -1787,6 +1768,22 @@ export default function ProductScreen() {
                     Size {listing.size}
                   </Text>
                 </View>
+                {/* Condition is a primary purchase factor — surface it next to
+                    size instead of burying it in the details rows below. */}
+                {conditionLabel(listing.condition) ? (
+                  <View
+                    style={{
+                      backgroundColor: BRAND_PURPLE_SOFT,
+                      borderRadius: 999,
+                      paddingHorizontal: 10,
+                      paddingVertical: 4,
+                    }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: BRAND_PURPLE }}>
+                      {conditionLabel(listing.condition)}
+                    </Text>
+                  </View>
+                ) : null}
                 {listing.seller?.location ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <Feather name="map-pin" size={11} color="rgba(15,15,15,0.62)" />
@@ -1814,32 +1811,51 @@ export default function ProductScreen() {
 
         </View>
 
-        {/* ── Bundle teaser pill — commented out ── */}
-        {/* <Pressable
-          onPress={() => { tap('selection'); setRelatedTab('members'); }}
-          style={({ pressed }) => ({
-            marginHorizontal: 16,
-            marginBottom: 4,
-            backgroundColor: BRAND_INK,
-            borderRadius: 18,
-            paddingLeft: 16,
-            paddingRight: 8,
-            paddingVertical: 12,
-            flexDirection: 'row',
-            alignItems: 'center',
-            opacity: pressed ? 0.9 : 1,
-            transform: [{ scale: pressed ? 0.98 : 1 }],
-          })}
-        >
-          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: BRAND_LIME, marginRight: 10 }} />
-          <Text style={{ fontSize: 10, fontWeight: '900', color: BRAND_LIME, letterSpacing: 1.4, marginRight: 12 }}>BUNDLE</Text>
-          <Text style={{ flex: 1, color: 'white', fontSize: 13, fontWeight: '600' }} numberOfLines={1}>
-            Add 1 more — <Text style={{ fontWeight: '800' }}>save 10%</Text><Text style={{ color: 'rgba(255,255,255,0.55)' }}> · view items</Text>
-          </Text>
-          <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center', marginLeft: 8 }}>
-            <Feather name="arrow-up-right" size={14} color="white" />
-          </View>
-        </Pressable> */}
+        {/* ── Bundle teaser — the bundle builder lives at the bottom of the
+            page, so without this it's invisible until a buyer happens to
+            scroll past everything. Shown only when there's actually
+            something to bundle. ── */}
+        {!isOwnListing && sellerItems.length > 0 ? (
+          <Pressable
+            onPress={() => {
+              tap('selection');
+              setRelatedTab('members');
+              // Let the tab content mount, then jump to it.
+              requestAnimationFrame(() => mainScrollRef.current?.scrollToEnd({ animated: true }));
+            }}
+            style={({ pressed }) => ({
+              marginHorizontal: 16,
+              marginBottom: 4,
+              backgroundColor: BRAND_PURPLE_SOFT,
+              borderRadius: 16,
+              paddingLeft: 14,
+              paddingRight: 10,
+              paddingVertical: 12,
+              flexDirection: 'row',
+              alignItems: 'center',
+              opacity: pressed ? 0.8 : 1,
+            })}
+          >
+            <View
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: 15,
+                backgroundColor: 'white',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginRight: 10,
+              }}
+            >
+              <Ionicons name="pricetags" size={14} color={BRAND_PURPLE} />
+            </View>
+            <Text style={{ flex: 1, color: BRAND_INK, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>
+              <Text style={{ fontWeight: '800' }}>Bundle & save up to 20%</Text>
+              {' '}· {sellerItems.length} more from @{listing.seller.username}
+            </Text>
+            <Feather name="chevron-down" size={16} color={BRAND_PURPLE} />
+          </Pressable>
+        ) : null}
 
         {/* ── Seller card ── */}
         <View style={{ paddingHorizontal: 16, paddingTop: 18, paddingBottom: 16 }}>
@@ -2296,15 +2312,16 @@ export default function ProductScreen() {
               overflow: 'hidden',
             }}
           >
-            <Pressable
-              onPress={() => {}}
-              style={({ pressed }) => ({
+            {/* Plain info rows — these had pressed states and chevrons wired
+                to no-op handlers, which promises navigation that never
+                happens. Static until there's a real destination to open. */}
+            <View
+              style={{
                 flexDirection: 'row',
                 alignItems: 'flex-start',
                 padding: 16,
                 gap: 12,
-                opacity: pressed ? 0.7 : 1,
-              })}
+              }}
             >
               <View
                 style={{
@@ -2326,20 +2343,17 @@ export default function ProductScreen() {
                   Authenticated by our in-house team or a trusted partner.
                 </Text>
               </View>
-              <Feather name="chevron-right" size={18} color={BRAND_PURPLE} />
-            </Pressable>
+            </View>
 
             <View style={{ height: HAIRLINE, marginHorizontal: 16, backgroundColor: 'rgba(108,71,255,0.18)' }} />
 
-            <Pressable
-              onPress={() => {}}
-              style={({ pressed }) => ({
+            <View
+              style={{
                 flexDirection: 'row',
                 alignItems: 'flex-start',
                 padding: 16,
                 gap: 12,
-                opacity: pressed ? 0.7 : 1,
-              })}
+              }}
             >
               <View
                 style={{
@@ -2361,8 +2375,7 @@ export default function ProductScreen() {
                   Qualifying orders covered if something goes wrong.
                 </Text>
               </View>
-              <Feather name="chevron-right" size={18} color={BRAND_PURPLE} />
-            </Pressable>
+            </View>
           </View>
         </View>
 
