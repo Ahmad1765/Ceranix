@@ -28,6 +28,7 @@ import {
 import { fetchFollowing, fetchSuggestedFollows, toggleFollow } from '@/lib/follows';
 import { getFeedSnapshot, putFeedSnapshot } from '@/lib/listingCache';
 import { onListingCreated } from '@/lib/listingEvents';
+import { isFresh } from '@/lib/freshness';
 import { getOptimizedImageUrl } from '@/lib/images';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
@@ -378,6 +379,9 @@ export default function HomeScreen() {
     useCallback(() => {
       if (!hasLoadedRef.current) return;
       if (activeTab === 'Following') return;
+      // Reuse recently-loaded rows instead of refetching the whole feed every
+      // time this tab regains focus. Pull-to-refresh bypasses this.
+      if (isFresh(`feed:${activeTab}`)) return;
       let cancelled = false;
       load(activeTab)
         .then((result) => {

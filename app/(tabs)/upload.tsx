@@ -24,6 +24,7 @@ import { uploadListingImages, deleteListingImages, type LocalImage } from '@/lib
 import { useToast } from '@/lib/toast';
 import { putCachedListing } from '@/lib/listingCache';
 import { emitListingCreated } from '@/lib/listingEvents';
+import { invalidateFresh } from '@/lib/freshness';
 import type { Category, Condition, Gender, Listing } from '@/types';
 
 type Step = 'photos' | 'details';
@@ -244,6 +245,9 @@ function SellScreenInner() {
       };
       putCachedListing(newListing);
       emitListingCreated(newListing);
+      // Force every cached feed to refetch on next focus so the new listing
+      // shows up across Discover / My Feed, not just the home feed.
+      invalidateFresh();
 
       resetForm();
       toast.show('Listing is live', { variant: 'success', icon: 'check' });

@@ -1,4 +1,5 @@
 import type { Listing } from '@/types';
+import { markFresh } from '@/lib/freshness';
 
 // Module-level cache that survives across screen mounts within one app
 // session. The Supabase web client occasionally wedges (stuck token
@@ -38,4 +39,7 @@ export function getFeedSnapshot(tab: string): Listing[] | null {
 
 export function putFeedSnapshot(tab: string, rows: Listing[]): void {
   feedSnapshots.set(tab, rows);
+  // Stamp freshness so the home feed's focus refetch can reuse these rows
+  // instead of re-hitting the network on every tab switch.
+  markFresh(`feed:${tab}`);
 }

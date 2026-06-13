@@ -29,6 +29,7 @@ import {
 import { ListingCard } from '@/components/ListingCard';
 import { DropAlertSheet } from '@/components/DropAlertSheet';
 import { useWebPullToRefresh, WebPullIndicator } from '@/components/WebRefresh';
+import { isFresh, markFresh } from '@/lib/freshness';
 import { useToast } from '@/lib/toast';
 import { useGridDimensions } from '@/lib/responsive';
 import type { Category, Listing } from '@/types';
@@ -146,6 +147,11 @@ export default function MyFeedScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      // Reuse the last load when returning to this tab within the freshness
+      // window — this screen fans out to 4 fetches, so refetching on every
+      // focus was the heaviest offender. Pull-to-refresh bypasses this.
+      if (isFresh('myfeed')) return;
+      markFresh('myfeed');
       loadListings({ silent: true });
       loadSavedSearches();
       loadSavedListings({ silent: true });

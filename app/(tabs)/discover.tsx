@@ -24,6 +24,7 @@ import { useFadeIn, useStaggeredEntrance } from '@/lib/motion';
 import type { Category, Listing } from '@/types';
 import { EmptyState, SectionHeader } from '@/components/ui';
 import { useWebPullToRefresh, WebPullIndicator } from '@/components/WebRefresh';
+import { isFresh, markFresh } from '@/lib/freshness';
 
 type CatTile = {
   id: Category | 'trending';
@@ -128,6 +129,7 @@ export default function DiscoverScreen() {
         const gridRows = await gridP;
         setListings(gridRows);
         hasDataRef.current = true;
+        markFresh(`discover:${browseCat ?? 'all'}`);
       } finally {
         setLoading(false);
       }
@@ -135,9 +137,11 @@ export default function DiscoverScreen() {
     [user?.id, browseCat],
   );
 
-  // Re-fetch on focus — silently once we have something on screen.
+  // Re-fetch on focus — silently once we have something on screen, and only
+  // when the current category's data has gone stale (reuse it otherwise).
   useFocusEffect(
     useCallback(() => {
+      if (isFresh(`discover:${browseCat ?? 'all'}`)) return;
       let cancelled = false;
       loadAll({ silent: hasDataRef.current }).catch((e) => {
         if (!cancelled) console.warn('[Discover] load failed', e);
@@ -145,7 +149,7 @@ export default function DiscoverScreen() {
       return () => {
         cancelled = true;
       };
-    }, [loadAll]),
+    }, [loadAll, browseCat]),
   );
 
   const onRefresh = useCallback(async () => {

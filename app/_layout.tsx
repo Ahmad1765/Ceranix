@@ -36,6 +36,7 @@ import {
 } from '@expo-google-fonts/inter';
 import { AuthProvider } from '@/lib/auth';
 import { ToastProvider } from '@/lib/toast';
+import { Preloader } from '@/components/Preloader';
 
 const AESTHETIC_FONTS = {
   Fraunces_400Regular,
@@ -117,7 +118,7 @@ export default function RootLayout() {
       });
   }, []);
 
-  if (!ready) return null;
+  if (!ready) return <Preloader />;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
