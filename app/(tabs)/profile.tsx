@@ -35,6 +35,14 @@ import { useStaggeredEntrance, useFadeIn } from '@/lib/motion';
 import type { Listing } from '@/types';
 import { useToast } from '@/lib/toast';
 import { Button, Card, ListRow, EmptyState, Tabs } from '@/components/ui';
+import {
+  LEVELS,
+  computeLevel,
+  profileCompletion,
+  computeBadges,
+  type Badge,
+  type ProfileCompletion,
+} from '@/lib/levels';
 
 const APP_URL = 'https://carrinex.vercel.app';
 
@@ -298,6 +306,32 @@ const handleShareProfile = useCallback(async () => {
   const soldCount = selling.length - activeCount;
   const shopLikes = selling.reduce((sum, l) => sum + (l.likes ?? 0), 0);
 
+  // ── Status & progression (Phase 1, computed from existing data) ──
+  const sellerStats = {
+    totalSales,
+    rating,
+    listingsCount: sellingCount,
+    totalLikes: shopLikes,
+    followers: profile.followers_count ?? 0,
+  };
+  const levelProgress = computeLevel(sellerStats);
+  const completion = profileCompletion(profile, sellingCount);
+  const badges = computeBadges(sellerStats, profile, completion.isComplete);
+  const earnedBadges = badges.filter((b) => b.earned);
+  const handleCompletionCta = () => {
+    // Route to the highest-leverage next step. Listing-related steps go to the
+    // upload flow; identity steps go to profile edit / settings.
+    const next = completion.steps.find((s) => !s.done);
+    if (!next) return;
+    if (next.key === 'first_listing' || next.key === 'three_listings') {
+      router.push('/(tabs)/upload');
+    } else if (next.key === 'verify') {
+      router.push('/settings' as any);
+    } else {
+      router.push('/profile/edit');
+    }
+  };
+
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
       <ScrollView
@@ -421,6 +455,45 @@ const handleShareProfile = useCallback(async () => {
             </View>
           </View>
 
+          {/* Seller level — the progression spine. Level name + a thin
+              progress bar + the single next-step requirement. Computed from
+              existing data; no network. */}
+          <View style={{ marginTop: 16 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 8,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Feather name="award" size={13} color={colors.purple} />
+                <Text
+                  style={{ fontSize: 13.5, fontWeight: '800', color: colors.ink, letterSpacing: -0.2 }}
+                >
+                  {levelProgress.current.name}
+                </Text>
+              </View>
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontWeight: '800',
+                  color: levelProgress.next ? colors.muteSoft : colors.purple,
+                  letterSpacing: 0.4,
+                }}
+              >
+                {levelProgress.next ? `LEVEL ${levelProgress.current.id} / ${LEVELS.length}` : 'MAX LEVEL'}
+              </Text>
+            </View>
+            <ProgressBar fraction={levelProgress.progress} />
+            {levelProgress.nextRequirement ? (
+              <Text style={{ fontSize: 12.5, color: colors.mute, fontWeight: '600', marginTop: 8 }}>
+                {levelProgress.nextRequirement}
+              </Text>
+            ) : null}
+          </View>
+
           {/* Name + bio */}
           <View style={{ marginTop: 14 }}>
             <Text
@@ -468,6 +541,10 @@ const handleShareProfile = useCallback(async () => {
                 </Pressable>
               ) : null}
             </View>
+
+            {/* Earned achievements — purple-accent pills, set apart from the
+                neutral trust facts above. Only earned badges render. */}
+            <AchievementsStrip badges={earnedBadges} />
           </View>
 
           {/* CTA row — sharing your shop is the action that grows it, so it
@@ -485,6 +562,11 @@ const handleShareProfile = useCallback(async () => {
               <Button label="Share profile" variant="primary" full onPress={handleShareProfile} />
             </View>
           </View>
+
+          {/* Activation meter — only while the shop is incomplete, so it
+              vanishes once set up (no permanent clutter). Tapping routes to the
+              next missing step. */}
+          <CompletionMeter completion={completion} onPressNext={handleCompletionCta} />
         </Animated.View>
 
         {/* Tabs */}
@@ -783,6 +865,137 @@ function SavedListChip({
       >
         {count}
       </Text>
+    </Pressable>
+  );
+}
+
+// Thin progress bar — purple fill on a purple-soft track. Shared by the level
+// block and the completion meter so progress reads identically everywhere.
+function ProgressBar({ fraction }: { fraction: number }) {
+  const pct = Math.max(0, Math.min(1, fraction)) * 100;
+  return (
+    <View
+      style={{
+        height: 8,
+        borderRadius: 99,
+        backgroundColor: colors.purpleSoft,
+        overflow: 'hidden',
+      }}
+    >
+      <View
+        style={{ width: `${pct}%`, height: '100%', borderRadius: 99, backgroundColor: colors.purple }}
+      />
+    </View>
+  );
+}
+
+// Earned-achievement pills. Caps at 4 visible + a "+N" overflow chip so the
+// hero never turns into a wall of badges.
+function AchievementsStrip({ badges }: { badges: Badge[] }) {
+  if (badges.length === 0) return null;
+  const shown = badges.slice(0, 4);
+  const extra = badges.length - shown.length;
+  return (
+    <View
+      accessibilityRole="text"
+      accessibilityLabel={`${badges.length} ${badges.length === 1 ? 'achievement' : 'achievements'} earned`}
+      style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 10 }}
+    >
+      {shown.map((b) => (
+        <View
+          key={b.key}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 5,
+            paddingHorizontal: 10,
+            paddingVertical: 5,
+            borderRadius: radii.pill,
+            backgroundColor: colors.purpleSoft,
+          }}
+        >
+          <Feather name={b.icon as keyof typeof Feather.glyphMap} size={11} color={colors.purple} />
+          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.purple, letterSpacing: -0.1 }}>
+            {b.label}
+          </Text>
+        </View>
+      ))}
+      {extra > 0 ? (
+        <View
+          style={{
+            paddingHorizontal: 10,
+            paddingVertical: 5,
+            borderRadius: radii.pill,
+            backgroundColor: colors.panel,
+          }}
+        >
+          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.mute }}>+{extra}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+// Profile-completion meter. Renders only while incomplete; tapping advances the
+// user to the next missing step.
+function CompletionMeter({
+  completion,
+  onPressNext,
+}: {
+  completion: ProfileCompletion;
+  onPressNext: () => void;
+}) {
+  if (completion.isComplete) return null;
+  return (
+    <Pressable
+      onPress={onPressNext}
+      accessibilityRole="button"
+      accessibilityLabel={`Complete your shop, ${completion.pct} percent done. Next step: ${completion.nextLabel}`}
+      accessibilityHint="Opens the next setup step"
+      style={({ pressed }) => ({
+        marginTop: 14,
+        padding: 14,
+        borderRadius: radii.lg,
+        backgroundColor: colors.panel,
+        opacity: pressed ? 0.85 : 1,
+      })}
+    >
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 8,
+        }}
+      >
+        <Text style={{ fontSize: 13.5, fontWeight: '800', color: colors.ink, letterSpacing: -0.2 }}>
+          Complete your shop
+        </Text>
+        <Text style={{ fontSize: 13, fontWeight: '800', color: colors.purple }}>
+          {completion.pct}%
+        </Text>
+      </View>
+      <ProgressBar fraction={completion.pct / 100} />
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginTop: 10,
+          gap: 12,
+        }}
+      >
+        <Text
+          style={{ fontSize: 12.5, color: colors.mute, fontWeight: '600', flex: 1 }}
+          numberOfLines={1}
+        >
+          Next: {completion.nextLabel}
+        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Text style={{ fontSize: 12.5, fontWeight: '800', color: colors.purple }}>Continue</Text>
+          <Feather name="arrow-right" size={13} color={colors.purple} />
+        </View>
+      </View>
     </Pressable>
   );
 }

@@ -22,6 +22,7 @@ import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { ListingCard } from '@/components/ListingCard';
 import { colors, radii } from '@/lib/theme';
+import { computeLevel } from '@/lib/levels';
 import { useGridDimensions, HIT_SLOP_8 } from '@/lib/responsive';
 import { useFadeIn, useStaggeredEntrance } from '@/lib/motion';
 import type { User as Profile, Listing } from '@/types';
@@ -247,6 +248,15 @@ export default function UserProfileScreen() {
   const rating = Number(profile.rating ?? 0);
   const totalSales = Number(profile.total_sales ?? 0);
   const memberSince = profile.created_at ? new Date(profile.created_at).getFullYear() : null;
+  // Read-only seller level for social proof. Hidden for Newcomers (id 1) so a
+  // brand-new account isn't labelled — status should be earned to be shown.
+  const sellerLevel = computeLevel({
+    totalSales,
+    rating,
+    listingsCount: listings.length,
+    totalLikes: listings.reduce((sum, l) => sum + (l.likes ?? 0), 0),
+    followers: profile.followers_count ?? 0,
+  }).current;
   const availableCount = listings.filter((l) => !l.is_sold).length;
   const soldCount = listings.length - availableCount;
   const visibleListings =
@@ -398,9 +408,34 @@ export default function UserProfileScreen() {
 
           {/* Name + bio */}
           <View style={{ marginTop: 14 }}>
-            <Text style={{ fontSize: 16, fontWeight: '800', color: colors.ink, letterSpacing: -0.2 }} numberOfLines={1}>
-              {profile.full_name || profile.username}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text
+                style={{ fontSize: 16, fontWeight: '800', color: colors.ink, letterSpacing: -0.2, flexShrink: 1 }}
+                numberOfLines={1}
+              >
+                {profile.full_name || profile.username}
+              </Text>
+              {sellerLevel.id >= 2 ? (
+                <View
+                  accessibilityRole="text"
+                  accessibilityLabel={`Seller level: ${sellerLevel.name}`}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4,
+                    paddingHorizontal: 8,
+                    paddingVertical: 3,
+                    borderRadius: radii.pill,
+                    backgroundColor: colors.purpleSoft,
+                  }}
+                >
+                  <Feather name="award" size={10} color={colors.purple} />
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: colors.purple, letterSpacing: -0.1 }}>
+                    {sellerLevel.name}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
             {profile.bio && (
               <Text style={{ fontSize: 14, color: colors.ink, marginTop: 4, lineHeight: 19 }}>
                 {profile.bio}
