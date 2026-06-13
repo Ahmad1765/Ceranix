@@ -28,6 +28,7 @@ import {
 } from '@/lib/savedSearches';
 import { ListingCard } from '@/components/ListingCard';
 import { DropAlertSheet } from '@/components/DropAlertSheet';
+import { useWebPullToRefresh, WebPullIndicator } from '@/components/WebRefresh';
 import { useToast } from '@/lib/toast';
 import { useGridDimensions } from '@/lib/responsive';
 import type { Category, Listing } from '@/types';
@@ -246,9 +247,13 @@ export default function MyFeedScreen() {
 
   const showRails = activeChip === FOR_YOU && !showingSaved;
 
+  // Web pull-to-refresh — RefreshControl is inert on react-native-web.
+  const { scrollRef, pull, nodeTop, threshold } = useWebPullToRefresh({ refreshing, onRefresh });
+
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
       <ScrollView
+        ref={scrollRef}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />
@@ -390,6 +395,7 @@ export default function MyFeedScreen() {
           onCreated={loadSavedSearches}
         />
       ) : null}
+      <WebPullIndicator pull={pull} refreshing={refreshing} nodeTop={nodeTop} threshold={threshold} />
     </SafeAreaView>
   );
 }

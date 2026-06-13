@@ -23,6 +23,7 @@ import { useGridDimensions, HIT_SLOP_8 } from '@/lib/responsive';
 import { useFadeIn, useStaggeredEntrance } from '@/lib/motion';
 import type { Category, Listing } from '@/types';
 import { EmptyState, SectionHeader } from '@/components/ui';
+import { useWebPullToRefresh, WebPullIndicator } from '@/components/WebRefresh';
 
 type CatTile = {
   id: Category | 'trending';
@@ -158,6 +159,9 @@ export default function DiscoverScreen() {
     }
   }, [loadAll]);
 
+  // Web pull-to-refresh — RefreshControl is inert on react-native-web.
+  const { scrollRef, pull, nodeTop, threshold } = useWebPullToRefresh({ refreshing, onRefresh });
+
   // Debounced server-side search across the whole catalog. Client filtering
   // below gives instant feedback; this replaces it with authoritative rows.
   useEffect(() => {
@@ -243,6 +247,7 @@ export default function DiscoverScreen() {
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
       <ScrollView
+        ref={scrollRef}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
@@ -494,6 +499,7 @@ export default function DiscoverScreen() {
           )}
         </View>
       </ScrollView>
+      <WebPullIndicator pull={pull} refreshing={refreshing} nodeTop={nodeTop} threshold={threshold} />
     </SafeAreaView>
   );
 }

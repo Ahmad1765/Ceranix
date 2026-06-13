@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { colors, radii } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { safeBack } from '@/lib/nav';
+import { useWebPullToRefresh, WebPullIndicator } from '@/components/WebRefresh';
 
 export default function RatingsScreen() {
   const { profile, refreshProfile } = useAuth();
@@ -21,6 +22,9 @@ export default function RatingsScreen() {
       setRefreshing(false);
     }
   }, [refreshProfile]);
+
+  // Web pull-to-refresh — RefreshControl is inert on react-native-web.
+  const { scrollRef, pull, nodeTop, threshold } = useWebPullToRefresh({ refreshing, onRefresh });
   const rating = Number(profile?.rating ?? 0);
   const sales = profile?.total_sales ?? 0;
   const showStars = Math.max(0, Math.min(5, Math.round(rating)));
@@ -58,6 +62,7 @@ export default function RatingsScreen() {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32 }}
         refreshControl={
@@ -211,6 +216,7 @@ export default function RatingsScreen() {
           </View>
         )}
       </ScrollView>
+      <WebPullIndicator pull={pull} refreshing={refreshing} nodeTop={nodeTop} threshold={threshold} />
     </SafeAreaView>
   );
 }

@@ -35,6 +35,7 @@ import { useStaggeredEntrance, useFadeIn } from '@/lib/motion';
 import type { Listing } from '@/types';
 import { useToast } from '@/lib/toast';
 import { Button, Card, ListRow, EmptyState, Tabs } from '@/components/ui';
+import { useWebPullToRefresh, WebPullIndicator } from '@/components/WebRefresh';
 import {
   LEVELS,
   computeLevel,
@@ -259,7 +260,8 @@ function ProfileScreenInner() {
     }
   }, [loadSelling, loadLiked, loadSaved]);
 
-
+  // Web pull-to-refresh — RefreshControl is inert on react-native-web.
+  const { scrollRef, pull, nodeTop, threshold } = useWebPullToRefresh({ refreshing, onRefresh });
 
 const handleShareProfile = useCallback(async () => {
   if (!profile?.id) return;
@@ -335,6 +337,7 @@ const handleShareProfile = useCallback(async () => {
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
       <ScrollView
+        ref={scrollRef}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />
@@ -738,6 +741,7 @@ const handleShareProfile = useCallback(async () => {
           )}
         </View>
       </ScrollView>
+      <WebPullIndicator pull={pull} refreshing={refreshing} nodeTop={nodeTop} threshold={threshold} />
       {promptElement}
     </SafeAreaView>
   );

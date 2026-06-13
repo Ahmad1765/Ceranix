@@ -19,6 +19,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { ListingCard } from '@/components/ListingCard';
 import { SkeletonCard } from '@/components/SkeletonCard';
 import { AnonCards } from '@/components/AnonCards';
+import { useWebPullToRefresh, WebPullIndicator } from '@/components/WebRefresh';
 import {
   fetchFollowingListingsResult,
   fetchListingsResult,
@@ -423,6 +424,10 @@ export default function HomeScreen() {
     setRefreshing(false);
   }, [activeTab, load]);
 
+  // Web pull-to-refresh — RefreshControl is inert on react-native-web, so we
+  // drive the scroll-down gesture ourselves. No-op on native.
+  const { scrollRef, pull, nodeTop, threshold } = useWebPullToRefresh({ refreshing, onRefresh });
+
   // Pad to a multiple of the column count so trailing rows don't stretch
   // their cards across the full width when listings.length isn't divisible.
   // Note: we DON'T gate this on `loading` — listings render the moment they
@@ -731,7 +736,9 @@ export default function HomeScreen() {
         }
         renderItem={renderItem}
         contentContainerStyle={{ paddingBottom: 24 }}
+        ref={scrollRef}
       />
+      <WebPullIndicator pull={pull} refreshing={refreshing} nodeTop={nodeTop} threshold={threshold} />
     </SafeAreaView>
   );
 }

@@ -17,6 +17,7 @@ import {
   fetchFollowingMask,
   toggleFollow,
 } from '@/lib/follows';
+import { useWebPullToRefresh, WebPullIndicator } from '@/components/WebRefresh';
 
 type Row = Awaited<ReturnType<typeof fetchFollowers>>[number];
 
@@ -72,6 +73,9 @@ export default function FollowersScreen() {
       setRefreshing(false);
     }
   }, [load]);
+
+  // Web pull-to-refresh — RefreshControl is inert on react-native-web.
+  const { scrollRef, pull, nodeTop, threshold } = useWebPullToRefresh({ refreshing, onRefresh });
 
   const handleToggle = async (row: Row) => {
     if (!authUser) {
@@ -153,6 +157,7 @@ export default function FollowersScreen() {
         />
       ) : (
         <FlatList
+          ref={scrollRef}
           data={rows}
           keyExtractor={(r) => r.id}
           contentContainerStyle={{ paddingVertical: 4, paddingBottom: 80 }}
@@ -170,6 +175,7 @@ export default function FollowersScreen() {
           )}
         />
       )}
+      <WebPullIndicator pull={pull} refreshing={refreshing} nodeTop={nodeTop} threshold={threshold} />
     </SafeAreaView>
   );
 }
