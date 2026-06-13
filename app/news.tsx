@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -32,6 +32,7 @@ export default function NewsScreen() {
   // runs and `loadingSearches` is still false.
   const [searchesFetched, setSearchesFetched] = useState(false);
   const [loadingSearches, setLoadingSearches] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Pull saved searches whenever the user lands on the Saved tab and is
   // signed in. We hydrate the "new matches" counts in parallel — the badge
@@ -77,6 +78,17 @@ export default function NewsScreen() {
       refreshSearches();
     }, [activeTab, refreshSearches]),
   );
+
+  // Pull-to-refresh. Saved searches is the only data-backed tab, so that's what
+  // we re-pull; the spinner gives feedback on the other tabs regardless.
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refreshSearches();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshSearches]);
 
   const applySearch = useCallback((s: SavedSearch) => {
     const params = new URLSearchParams();
@@ -173,7 +185,13 @@ export default function NewsScreen() {
       </View>
 
       {/* Content */}
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 24 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />
+        }
+      >
         {activeTab === 'following' && (
           <EmptyState
             icon="users"

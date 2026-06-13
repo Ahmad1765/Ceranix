@@ -1,4 +1,5 @@
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { useCallback, useState } from 'react';
+import { View, Text, Pressable, ScrollView, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@/lib/auth';
@@ -7,7 +8,19 @@ import { HIT_SLOP_8 } from '@/lib/responsive';
 import { safeBack } from '@/lib/nav';
 
 export default function RatingsScreen() {
-  const { profile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Rating + sales come from the profile row; pull-to-refresh re-pulls it so a
+  // freshly completed sale is reflected without leaving the screen.
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refreshProfile();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshProfile]);
   const rating = Number(profile?.rating ?? 0);
   const sales = profile?.total_sales ?? 0;
   const showStars = Math.max(0, Math.min(5, Math.round(rating)));
@@ -44,7 +57,13 @@ export default function RatingsScreen() {
         <View style={{ width: 38 }} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32 }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />
+        }
+      >
         {/* Score card */}
         <View
           style={{

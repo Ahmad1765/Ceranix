@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { View, Text, Pressable, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -31,16 +31,19 @@ export default function FollowersScreen() {
   const [followingSet, setFollowingSet] = useState<Set<string>>(new Set());
   const [busyId, setBusyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [headerName, setHeaderName] = useState<string>(
     (typeof params.username === 'string' && params.username) || authProfile?.username || '',
   );
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!targetId) {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    // Silent refresh keeps the list mounted (and the pull-to-refresh spinner
+    // visible) instead of swapping in the full-screen loader.
+    if (!opts?.silent) setLoading(true);
     try {
       const list = await fetchFollowers(targetId);
       setRows(list);
@@ -53,12 +56,21 @@ export default function FollowersScreen() {
         .maybeSingle();
       if (data?.username) setHeaderName(prev => prev || data.username!);
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   }, [targetId, authUser?.id]);
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await load({ silent: true });
+    } finally {
+      setRefreshing(false);
+    }
   }, [load]);
 
   const handleToggle = async (row: Row) => {
@@ -144,6 +156,9 @@ export default function FollowersScreen() {
           data={rows}
           keyExtractor={(r) => r.id}
           contentContainerStyle={{ paddingVertical: 4, paddingBottom: 80 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />
+          }
           renderItem={({ item }) => (
             <UserRow
               row={item}
