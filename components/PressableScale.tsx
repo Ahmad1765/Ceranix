@@ -16,7 +16,7 @@ type Props = PressableProps & {
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export const PressableScale = forwardRef<View, Props>(function PressableScale(
-  { scaleTo = 0.97, onPressIn, onPressOut, children, style, ...rest },
+  { scaleTo = 0.97, accessibilityRole = 'button', onPressIn, onPressOut, children, style, ...rest },
   ref,
 ) {
   const scale = useSharedValue(1);
@@ -28,6 +28,7 @@ export const PressableScale = forwardRef<View, Props>(function PressableScale(
   return (
     <AnimatedPressable
       ref={ref as any}
+      accessibilityRole={accessibilityRole}
       {...rest}
       onPressIn={(e) => {
         scale.value = withTiming(scaleTo, { duration: 90, easing: Easing.out(Easing.cubic) });

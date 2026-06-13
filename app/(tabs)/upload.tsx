@@ -987,6 +987,10 @@ function SellScreenInner() {
         <Pressable
           onPress={handlePublish}
           disabled={publishing || !canPublish}
+          accessibilityRole="button"
+          accessibilityLabel={publishing ? 'Publishing listing' : 'Publish listing'}
+          accessibilityHint={canPublish ? 'Posts your item to the marketplace' : 'Add a title, price, and at least one photo to continue'}
+          accessibilityState={{ disabled: publishing || !canPublish, busy: publishing }}
           style={({ pressed }) => ({
             height: 58,
             borderRadius: 16,

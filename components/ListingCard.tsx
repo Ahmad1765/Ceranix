@@ -199,6 +199,9 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
     <Animated.View style={[{ flex: 1, marginBottom: 16 }, enterStyle]}>
     <PressableScale
       onPress={() => router.push(`/product/${listing.id}`)}
+      accessibilityRole="button"
+      accessibilityLabel={`${listing.brand || listing.title}${listing.size ? `, size ${listing.size}` : ''}, $${listing.price}`}
+      accessibilityHint="Opens listing details"
       style={{ flex: 1 }}
     >
       <View
@@ -300,6 +303,7 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
           hitSlop={6}
           accessibilityRole="button"
           accessibilityLabel={liked ? 'Unlike listing' : 'Like listing'}
+          accessibilityState={{ selected: liked }}
           style={({ pressed }) => ({
             position: 'absolute',
             top: 8,
@@ -331,6 +335,7 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
           hitSlop={6}
           accessibilityRole="button"
           accessibilityLabel={saved ? 'Remove from saved (long-press for lists)' : 'Save listing (long-press for lists)'}
+          accessibilityState={{ selected: saved }}
           style={({ pressed }) => ({
             position: 'absolute',
             bottom: 8,

@@ -40,9 +40,13 @@ export function Button({
     <Pressable
       onPress={onPress}
       disabled={disabled || loading}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!(disabled || loading), busy: !!loading }}
+      hitSlop={8}
       style={({ pressed }) => ({
-        opacity: pressed ? 0.88 : 1,
-        transform: [{ scale: pressed ? 0.985 : 1 }],
+        opacity: pressed ? 0.9 : 1,
+        transform: [{ scale: pressed ? 0.97 : 1 }],
         alignSelf: full ? 'stretch' : 'flex-start',
       })}
     >

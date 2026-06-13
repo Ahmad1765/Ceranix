@@ -43,7 +43,7 @@ test.describe('Responsive layout', () => {
     // The tab labels are visible Text nodes in the bottom navigator. On very
     // narrow viewports the labels may wrap or shrink, but they remain in the
     // DOM and queryable by name.
-    for (const label of ['Home', 'My Feed', 'Discover', 'Upload ad', 'My profile']) {
+    for (const label of ['Home', 'My Feed', 'Discover', 'Sell', 'My profile']) {
       await expect(page.getByText(label, { exact: true }).first()).toBeVisible();
     }
   });

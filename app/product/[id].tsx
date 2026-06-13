@@ -2502,83 +2502,106 @@ export default function ProductScreen() {
           borderTopWidth: HAIRLINE,
           borderTopColor: 'rgba(15,15,15,0.08)',
           paddingHorizontal: 16,
-          paddingTop: 12,
+          paddingTop: 10,
           paddingBottom: insets.bottom || 16,
-          flexDirection: 'row',
-          gap: 10,
-          alignItems: 'center',
           ...(IS_IOS && {
             boxShadow: '0px -3px 12px rgba(0,0,0,0.06)',
           }),
         }}
       >
-        <Pressable
-          onPress={() => openChat('offer')}
-          style={({ pressed }) => ({
-            paddingHorizontal: 18,
-            height: 50,
-            borderRadius: 14,
-            borderWidth: HAIRLINE,
-            borderColor: 'rgba(15,15,15,0.08)',
+        {/* Reassurance at the point of decision — answers "is this safe?"
+            right where the buyer commits, reinforcing the value proposition. */}
+        <View
+          accessibilityRole="text"
+          style={{
+            flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'center',
-            flexDirection: 'row',
             gap: 6,
-            backgroundColor: 'white',
-            opacity: pressed ? 0.7 : 1,
-            transform: [{ scale: pressed ? 0.98 : 1 }],
-          })}
-        >
-          <Feather name="tag" size={15} color={BRAND_INK} />
-          <Text style={{ fontSize: 13, fontWeight: '700', color: BRAND_INK }}>
-            Offer
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => {
-            tap('medium');
-            if (!user) {
-              toast.show('Sign in to buy', { variant: 'info', icon: 'log-in' });
-              router.push('/auth/login');
-              return;
-            }
-            if (!listing?.id) return;
-            if (listing.seller_id === user.id) {
-              toast.show("That's your own listing", { variant: 'default', icon: 'info' });
-              return;
-            }
-            router.push(`/payment/${listing.id}` as any);
+            marginBottom: 10,
           }}
-          style={({ pressed }) => ({
-            flex: 1,
-            height: 50,
-            backgroundColor: BRAND_INK,
-            borderRadius: 14,
-            paddingHorizontal: 16,
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexDirection: 'row',
-            opacity: pressed ? 0.9 : 1,
-            transform: [{ scale: pressed ? 0.98 : 1 }],
-          })}
         >
-          <Text style={{ fontSize: 15, fontWeight: '800', color: 'white', letterSpacing: 0.2 }}>
-            Buy now
+          <Feather name="lock" size={11} color="rgba(15,15,15,0.45)" />
+          <Text style={{ fontSize: 11.5, fontWeight: '600', color: 'rgba(15,15,15,0.62)' }}>
+            Secure checkout · Buyer protection included
           </Text>
-          <View
-            style={{
-              marginLeft: 10,
-              backgroundColor: BRAND_LIME,
-              borderRadius: 999,
-              paddingHorizontal: 10,
-              paddingVertical: 3,
-            }}
+        </View>
+
+        <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+          <Pressable
+            onPress={() => openChat('offer')}
+            accessibilityRole="button"
+            accessibilityLabel="Make an offer"
+            accessibilityHint="Opens a chat with the seller to negotiate the price"
+            style={({ pressed }) => ({
+              paddingHorizontal: 18,
+              height: 50,
+              borderRadius: 14,
+              borderWidth: HAIRLINE,
+              borderColor: 'rgba(15,15,15,0.08)',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexDirection: 'row',
+              gap: 6,
+              backgroundColor: 'white',
+              opacity: pressed ? 0.7 : 1,
+              transform: [{ scale: pressed ? 0.98 : 1 }],
+            })}
           >
-            <Text style={{ fontSize: 13, fontWeight: '900', color: '#FFFFFF', letterSpacing: 0.2 }}>
-              ${listing.price}
+            <Feather name="tag" size={15} color={BRAND_INK} />
+            <Text style={{ fontSize: 13, fontWeight: '700', color: BRAND_INK }}>
+              Offer
             </Text>
-          </View>
-        </Pressable>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              tap('medium');
+              if (!user) {
+                toast.show('Sign in to buy', { variant: 'info', icon: 'log-in' });
+                router.push('/auth/login');
+                return;
+              }
+              if (!listing?.id) return;
+              if (listing.seller_id === user.id) {
+                toast.show("That's your own listing", { variant: 'default', icon: 'info' });
+                return;
+              }
+              router.push(`/payment/${listing.id}` as any);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`Buy now for $${listing.price}`}
+            accessibilityHint="Proceeds to secure checkout"
+            style={({ pressed }) => ({
+              flex: 1,
+              height: 50,
+              backgroundColor: BRAND_INK,
+              borderRadius: 14,
+              paddingHorizontal: 16,
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexDirection: 'row',
+              opacity: pressed ? 0.9 : 1,
+              transform: [{ scale: pressed ? 0.98 : 1 }],
+            })}
+          >
+            <Text style={{ fontSize: 15, fontWeight: '800', color: 'white', letterSpacing: 0.2 }}>
+              Buy now
+            </Text>
+            <View
+              style={{
+                marginLeft: 10,
+                backgroundColor: BRAND_LIME,
+                borderRadius: 999,
+                paddingHorizontal: 10,
+                paddingVertical: 3,
+              }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: '900', color: '#FFFFFF', letterSpacing: 0.2 }}>
+                ${listing.price}
+              </Text>
+            </View>
+          </Pressable>
+        </View>
       </View>
       )}
 

@@ -24,8 +24,8 @@ test.describe('Tab navigation', () => {
     await expect(page.getByPlaceholder('Search items, brands, sellers')).toBeVisible();
   });
 
-  test('Upload ad tab routes (gate or upload form depending on auth)', async ({ page }) => {
-    await page.getByText('Upload ad', { exact: true }).click();
+  test('Sell tab routes (gate or upload form depending on auth)', async ({ page }) => {
+    await page.getByText('Sell', { exact: true }).click();
     await expect(
       page.getByText(/Upload listing|Your story[\s\S]*starts now\.|Continue as guest/i).first(),
     ).toBeVisible();

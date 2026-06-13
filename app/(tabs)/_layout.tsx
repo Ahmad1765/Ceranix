@@ -87,7 +87,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="upload"
         options={{
-          title: 'Upload ad',
+          title: 'Sell',
           tabBarIcon: ({ focused, color, size }) => (
             <View className="items-center justify-center relative">
               {focused && <TabOrb />}
