@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { View, Text } from 'react-native';
+import { View, Text, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TabOrb } from '../../components/TabOrb';
@@ -31,15 +31,20 @@ export default function TabsLayout() {
         tabBarActiveTintColor: '#0F0F0F',
         tabBarInactiveTintColor: 'rgba(15,15,15,0.45)',
         tabBarStyle: {
+          position: 'absolute',
+          bottom: Platform.OS === 'ios' ? Math.max(insets.bottom, 16) : 24,
+          left: 16,
+          right: 16,
           backgroundColor: '#ffffff',
+          borderRadius: 40,
           borderTopWidth: 0,
-          elevation: 3,
+          elevation: 8,
           shadowColor: '#000000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.05,
-          shadowRadius: 4,
-          height: 65 + insets.bottom,
-          paddingBottom: 8 + insets.bottom,
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.1,
+          shadowRadius: 12,
+          height: 64,
+          paddingBottom: 8,
           paddingTop: 8,
         },
         tabBarLabelStyle: {
