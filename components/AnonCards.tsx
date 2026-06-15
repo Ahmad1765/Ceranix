@@ -346,8 +346,8 @@ const TOP_BRANDS = [
 
 function TopBrandsRow() {
   return (
-    <View style={{ marginTop: 32 }}>
-      <View style={{ paddingHorizontal: SCREEN_PAD, marginBottom: 16 }}>
+    <View style={{ marginTop: 20 }}>
+      <View style={{ paddingHorizontal: SCREEN_PAD, marginBottom: 12 }}>
         <Text
           style={{
             fontSize: 18,
@@ -450,13 +450,13 @@ export function AnonCards() {
       </View>
 
       {/* Quick category shortcuts + section break into the editorial tiles */}
-      <View style={{ marginTop: 20 }}>
+      <View style={{ marginTop: 12 }}>
         <QuickCategoryRow />
       </View>
-      <View style={{ height: 1, backgroundColor: 'rgba(15,15,15,0.08)', marginTop: 20 }} />
+      <View style={{ height: 1, backgroundColor: 'rgba(15,15,15,0.08)', marginTop: 12 }} />
 
       {/* Row 1 — hero carousel */}
-      <View style={{ marginTop: 24 }}>
+      <View style={{ marginTop: 16 }}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -472,7 +472,7 @@ export function AnonCards() {
       </View>
 
       {/* Row 2 — 2x2 grid */}
-      <View style={{ marginTop: 28 }}>
+      <View style={{ marginTop: 16 }}>
         <View
           style={{
             paddingHorizontal: SCREEN_PAD,
@@ -497,7 +497,7 @@ export function AnonCards() {
       <TopBrandsRow />
 
       {/* Editorial divider into product feed below */}
-      <View style={{ paddingHorizontal: SCREEN_PAD, marginTop: 30, marginBottom: 4 }}>
+      <View style={{ paddingHorizontal: SCREEN_PAD, marginTop: 20, marginBottom: 4 }}>
         <View style={{ height: 1, backgroundColor: 'rgba(15,15,15,0.08)', marginBottom: 18 }} />
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
           <Text
