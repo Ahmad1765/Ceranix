@@ -1460,7 +1460,7 @@ function VerificationModal({
           >
             <Feather name="check" size={24} color="#FFFFFF" />
           </View>
-          <Text style={{ fontSize: 16, fontWeight: '800', color: INK }}>You're verified</Text>
+          <Text style={{ fontSize: 16, fontWeight: '800', color: INK }}>You&apos;re verified</Text>
           <Text style={{ fontSize: 13, color: MUTE, marginTop: 4 }}>
             Approved on {initial.reviewed_at?.slice(0, 10) ?? '—'}
           </Text>

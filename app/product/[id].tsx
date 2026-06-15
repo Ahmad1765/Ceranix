@@ -1473,7 +1473,7 @@ export default function ProductScreen() {
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
           <Feather name="wifi-off" size={36} color="rgba(15,15,15,0.45)" />
           <Text style={{ fontSize: 17, fontWeight: '800', color: '#0F0F0F', marginTop: 14, letterSpacing: -0.3 }}>
-            Couldn't load this listing
+            Couldn&apos;t load this listing
           </Text>
           <Text style={{ fontSize: 13, color: 'rgba(15,15,15,0.62)', marginTop: 6, textAlign: 'center', lineHeight: 19 }}>
             {loadError === 'Request timed out'

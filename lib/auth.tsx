@@ -9,6 +9,7 @@ import {
 } from 'react';
 import type { Session, User as AuthUser } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { setSentryUser } from '@/lib/sentry';
 import type { User as Profile } from '@/types';
 
 type AuthState = {
@@ -47,6 +48,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       mounted.current = false;
     };
   }, []);
+
+  // Tie Sentry events to the current user (id only — no PII) so production
+  // errors are attributable. Cleared automatically on sign-out.
+  useEffect(() => {
+    setSentryUser(session?.user?.id ?? null);
+  }, [session?.user?.id]);
 
   const fetchProfileWithRetry = async (userId: string) => {
     let p = await loadProfile(userId);

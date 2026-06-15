@@ -2,6 +2,11 @@ import '../global.css';
 import { useEffect, useState } from 'react';
 import { Platform, TextInput } from 'react-native';
 import { installAlertShim } from '@/lib/alertShim';
+import { initSentry, wrapWithSentry } from '@/lib/sentry';
+
+// Initialize crash + error reporting before anything else renders so startup
+// failures are captured too. No-ops when EXPO_PUBLIC_SENTRY_DSN is unset.
+initSentry();
 
 // React-native-web ships Alert.alert as a no-op, so every validation /
 // confirm path that calls Alert.alert silently dies on web. The shim swaps
@@ -83,7 +88,7 @@ function useFocusOutOfAriaHidden() {
   }, []);
 }
 
-export default function RootLayout() {
+function RootLayout() {
   const [ready, setReady] = useState(false);
   useFocusOutOfAriaHidden();
 
@@ -177,3 +182,7 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+// Sentry.wrap adds native crash, touch-event, and performance instrumentation
+// around the root. No-ops (returns the component unchanged) without a DSN.
+export default wrapWithSentry(RootLayout);

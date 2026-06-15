@@ -43,6 +43,7 @@ module.exports = ({ config }) => ({
         },
       ],
       'expo-asset',
+      '@sentry/react-native',
     ],
     web: {
       favicon: './assets/images/favicon.png',
@@ -53,6 +54,8 @@ module.exports = ({ config }) => ({
     extra: {
       supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
       supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+      sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+      sentryDebug: process.env.EXPO_PUBLIC_SENTRY_DEBUG,
     },
   },
 });
