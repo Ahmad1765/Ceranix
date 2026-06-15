@@ -106,11 +106,12 @@ export function Tabs<T extends string>({ tabs, value, onChange, variant = 'pill'
             accessibilityState={{ selected: active }}
             accessibilityLabel={`${t.label}${typeof t.count === 'number' && t.count > 0 ? ', ' + t.count + ' items' : ''}`}
             style={({ pressed }) => ({
-              paddingHorizontal: 14,
+              paddingHorizontal: 20,
               paddingVertical: 9,
               borderRadius: radii.pill,
-              backgroundColor: active ? colors.ink2 : colors.panel,
-              borderWidth: 0,
+              backgroundColor: active ? colors.primarySoft : colors.surface,
+              borderColor: active ? colors.primary : '#E5E5E5',
+              borderWidth: 1,
               flexDirection: 'row',
               alignItems: 'center',
               gap: 6,
@@ -118,14 +119,11 @@ export function Tabs<T extends string>({ tabs, value, onChange, variant = 'pill'
               transform: [{ scale: pressed ? 0.97 : 1 }],
             })}
           >
-            {t.icon && (
-              <Feather name={t.icon} size={13} color={active ? colors.white : colors.smoke} />
-            )}
             <Text
               style={{
-                fontSize: 13,
-                fontWeight: '700',
-                color: active ? colors.white : colors.ink2,
+                fontSize: 15,
+                fontWeight: '500',
+                color: active ? colors.ink : colors.mute,
               }}
             >
               {t.label}
@@ -136,7 +134,7 @@ export function Tabs<T extends string>({ tabs, value, onChange, variant = 'pill'
                   paddingHorizontal: 6,
                   paddingVertical: 1,
                   borderRadius: 999,
-                  backgroundColor: active ? colors.pink : colors.white,
+                  backgroundColor: active ? colors.primary : colors.panel,
                   minWidth: 18,
                   alignItems: 'center',
                 }}
@@ -145,7 +143,7 @@ export function Tabs<T extends string>({ tabs, value, onChange, variant = 'pill'
                   style={{
                     fontSize: 10,
                     fontWeight: '800',
-                    color: active ? colors.white : colors.smoke,
+                    color: active ? colors.white : colors.ink,
                   }}
                 >
                   {t.count}

@@ -14,6 +14,7 @@ const IS_WEB = Platform.OS === 'web';
 const THRESHOLD = 70; // px of pull before release/accumulation triggers a refresh
 const MAX_PULL = 110; // clamp so the indicator never runs away
 const RESISTANCE = 0.5; // pull feels rubber-banded, not 1:1
+const AXIS_LOCK = 10; // px of travel before we commit to horizontal vs vertical
 
 // RN ScrollView / FlatList expose getScrollableNode(); on web it returns the
 // actual scrolling <div>. Fall back to the raw node for plain Views.
@@ -64,36 +65,56 @@ export function useWebPullToRefresh({
       const atTop = () => node.scrollTop <= 0;
       const captureTop = () => setNodeTop(node.getBoundingClientRect().top);
 
+      let startX = 0;
       let startY = 0;
-      let pulling = false;
+      // 'none' = direction undecided; 'vertical' = a pull; 'horizontal' = a
+      // nested carousel / horizontal scroller — hand it back and never touch it.
+      let axis: 'none' | 'vertical' | 'horizontal' = 'none';
+      let engaged = false;
       let current = 0;
 
       const onTouchStart = (e: TouchEvent) => {
-        if (!atTop()) {
-          pulling = false;
-          return;
-        }
-        startY = e.touches[0].clientY;
-        pulling = true;
+        const t = e.touches[0];
+        startX = t.clientX;
+        startY = t.clientY;
+        axis = 'none';
+        engaged = false;
         current = 0;
-        captureTop();
       };
       const onTouchMove = (e: TouchEvent) => {
-        if (!pulling) return;
-        const dy = e.touches[0].clientY - startY;
-        if (dy > 0 && atTop()) {
-          current = Math.min(dy * RESISTANCE, MAX_PULL);
-          setPull(current);
-          // Stop the browser's own rubber-band so our indicator owns the pull.
-          if (e.cancelable) e.preventDefault();
-        } else {
+        const t = e.touches[0];
+        const dx = t.clientX - startX;
+        const dy = t.clientY - startY;
+
+        // Lock the axis once the gesture clears a small deadzone. Until then do
+        // nothing — crucially, never preventDefault, so a carousel swipe starts
+        // unobstructed.
+        if (axis === 'none') {
+          if (Math.abs(dx) < AXIS_LOCK && Math.abs(dy) < AXIS_LOCK) return;
+          axis = Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical';
+        }
+        // Horizontal gesture belongs to a nested carousel — leave it alone.
+        if (axis !== 'vertical') return;
+        // Only a downward drag while pinned at the very top is a pull.
+        if (dy <= 0 || !atTop()) {
+          engaged = false;
           current = 0;
           setPull(0);
+          return;
         }
+        if (!engaged) {
+          engaged = true;
+          captureTop();
+        }
+        current = Math.min((dy - AXIS_LOCK) * RESISTANCE, MAX_PULL);
+        setPull(current);
+        // Now that we own a vertical pull, suppress the browser's rubber-band.
+        if (e.cancelable) e.preventDefault();
       };
       const onTouchEnd = () => {
-        if (pulling && current >= THRESHOLD && !refreshingRef.current) onRefreshRef.current();
-        pulling = false;
+        if (engaged && current >= THRESHOLD && !refreshingRef.current) onRefreshRef.current();
+        axis = 'none';
+        engaged = false;
         current = 0;
         setPull(0);
       };
@@ -110,6 +131,8 @@ export function useWebPullToRefresh({
           setPull(0);
           return;
         }
+        // Horizontal-dominant wheel = trackpad swipe on a carousel — ignore it.
+        if (Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return;
         if (e.deltaY < 0) {
           if (wheelAccum === 0) captureTop();
           wheelAccum += -e.deltaY;

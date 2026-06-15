@@ -70,15 +70,18 @@ function AnimatedTabPill({
 
   const backgroundColor = colorAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['rgba(15,15,15,0.04)', '#6C47FF'],
+    outputRange: ['#FFFFFF', 'rgba(108,71,255,0.12)'],
+  });
+
+  const borderColor = colorAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#E5E5E5', '#6C47FF'],
   });
 
   const textColor = colorAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['#0F0F0F', '#ffffff'],
+    outputRange: ['#666666', '#0F0F0F'],
   });
-
-  const iconName = tab === 'For you' ? 'sparkles' : tab === 'Popular' ? 'flame' : 'person';
 
   return (
     <Pressable
@@ -94,20 +97,16 @@ function AnimatedTabPill({
         <Animated.View
           style={{
             backgroundColor,
+            borderColor,
+            borderWidth: 1,
             flexDirection: 'row',
             alignItems: 'center',
-            paddingHorizontal: 16,
+            paddingHorizontal: 20,
             paddingVertical: 8,
             borderRadius: 999,
           }}
         >
-          <Ionicons
-            name={iconName as any}
-            size={14}
-            color={isActive ? '#ffffff' : '#0F0F0F'}
-            style={{ marginRight: 5 }}
-          />
-          <Animated.Text style={{ fontSize: 14, fontWeight: '600', color: textColor }}>
+          <Animated.Text style={{ fontSize: 15, fontWeight: '500', color: textColor }}>
             {tab}
           </Animated.Text>
         </Animated.View>

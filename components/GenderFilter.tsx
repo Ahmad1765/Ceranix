@@ -25,15 +25,15 @@ export function GenderFilter({ selected, onChange }: Props) {
         <Pressable
           key={f.value}
           onPress={() => onChange(f.value)}
-          className={`px-4 py-1.5 rounded-full border ${
+          className={`px-5 py-2 rounded-full border ${
             selected === f.value
-              ? 'bg-primary border-primary'
-              : 'bg-surface border-ink-hair'
+              ? 'bg-primary-soft border-primary'
+              : 'bg-surface border-[#E5E5E5]'
           }`}
         >
           <Text
-            className={`text-sm font-medium ${
-              selected === f.value ? 'text-white' : 'text-ink'
+            className={`text-[15px] font-medium ${
+              selected === f.value ? 'text-ink' : 'text-ink-mute'
             }`}
           >
             {f.label}

@@ -335,6 +335,79 @@ function QuickCategoryRow() {
   );
 }
 
+const TOP_BRANDS = [
+  { key: 'apple', label: 'Apple', q: 'apple', src: require('../assets/images/brand_apple.png') },
+  { key: 'sony', label: 'Sony', q: 'sony', src: require('../assets/images/brand_sony.png') },
+  { key: 'nike', label: 'Nike', q: 'nike', src: require('../assets/images/brand_nike.png') },
+  { key: 'samsung', label: 'Samsung', q: 'samsung', src: require('../assets/images/brand_samsung.png') },
+  { key: 'adidas', label: 'Adidas', q: 'adidas', src: require('../assets/images/brand_adidas.png') },
+  { key: 'nintendo', label: 'Nintendo', q: 'nintendo', src: require('../assets/images/brand_nintendo.png') },
+];
+
+function TopBrandsRow() {
+  return (
+    <View style={{ marginTop: 32 }}>
+      <View style={{ paddingHorizontal: SCREEN_PAD, marginBottom: 16 }}>
+        <Text
+          style={{
+            fontSize: 18,
+            color: '#0F0F0F',
+            fontFamily: 'Inter_700Bold',
+          }}
+        >
+          Top brands
+        </Text>
+      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: SCREEN_PAD, gap: 16 }}
+      >
+        {TOP_BRANDS.map((b) => (
+          <Pressable
+            key={b.key}
+            onPress={() => router.push(`/(tabs)/discover?q=${b.q}` as any)}
+            style={({ pressed }) => ({
+              alignItems: 'center',
+              opacity: pressed ? 0.85 : 1,
+              transform: [{ scale: pressed ? 0.95 : 1 }],
+              width: 90,
+            })}
+          >
+            <View
+              style={{
+                width: 90,
+                height: 90,
+                borderRadius: 45,
+                backgroundColor: '#F3F4F6',
+                overflow: 'hidden',
+                borderWidth: 1,
+                borderColor: 'rgba(15,15,15,0.05)',
+              }}
+            >
+              <Image
+                source={b.src}
+                style={{ width: '100%', height: '100%' }}
+                contentFit="cover"
+              />
+            </View>
+            <Text
+              style={{
+                fontSize: 14,
+                color: '#0F0F0F',
+                marginTop: 8,
+                fontFamily: 'Inter_600SemiBold',
+              }}
+            >
+              {b.label}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
 export function AnonCards() {
   const { width: SCREEN_WIDTH } = useWindowDimensions();
 
@@ -405,8 +478,7 @@ export function AnonCards() {
             paddingHorizontal: SCREEN_PAD,
             flexDirection: 'row',
             flexWrap: 'wrap',
-            justifyContent: 'space-between',
-            rowGap: 12,
+            gap: 12,
           }}
         >
           {GRID_CARDS.map((c) => (
@@ -420,6 +492,9 @@ export function AnonCards() {
           ))}
         </View>
       </View>
+
+      {/* Top brands */}
+      <TopBrandsRow />
 
       {/* Editorial divider into product feed below */}
       <View style={{ paddingHorizontal: SCREEN_PAD, marginTop: 30, marginBottom: 4 }}>

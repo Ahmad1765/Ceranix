@@ -501,20 +501,20 @@ function Chip({
       onLongPress={onLongPress}
       delayLongPress={350}
       style={({ pressed }) => ({
-        paddingHorizontal: 14,
-        paddingVertical: 8,
+        paddingHorizontal: 20,
+        paddingVertical: 9,
         borderRadius: radii.pill,
         borderWidth: 1,
-        borderColor: active ? colors.purple : colors.hairline,
-        backgroundColor: active ? colors.purple : colors.white,
+        borderColor: active ? colors.purple : '#E5E5E5',
+        backgroundColor: active ? colors.purpleSoft : colors.white,
         opacity: pressed ? 0.7 : 1,
       })}
     >
       <Text
         style={{
-          fontSize: 13,
-          fontWeight: active ? '700' : '600',
-          color: active ? 'white' : colors.ink,
+          fontSize: 15,
+          fontWeight: '500',
+          color: active ? colors.ink : colors.mute,
           letterSpacing: -0.1,
         }}
         numberOfLines={1}
@@ -532,11 +532,11 @@ function AddChip({ onPress }: { onPress: () => void }) {
       accessibilityRole="button"
       accessibilityLabel="Add a new feed"
       style={({ pressed }) => ({
-        width: 36,
-        height: 36,
+        width: 40,
+        height: 40,
         borderRadius: radii.pill,
         borderWidth: 1,
-        borderColor: colors.hairline,
+        borderColor: '#E5E5E5',
         backgroundColor: colors.white,
         alignItems: 'center',
         justifyContent: 'center',
