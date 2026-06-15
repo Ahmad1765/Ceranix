@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { View, Text, Pressable, ScrollView, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -408,7 +409,7 @@ function TopBrandsRow() {
   );
 }
 
-export function AnonCards() {
+export const AnonCards = memo(function AnonCards() {
   const { width: SCREEN_WIDTH } = useWindowDimensions();
 
   const HERO_W = Math.round(SCREEN_WIDTH * 0.74);
@@ -535,4 +536,4 @@ export function AnonCards() {
       </View>
     </View>
   );
-}
+});

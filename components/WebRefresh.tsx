@@ -97,9 +97,11 @@ export function useWebPullToRefresh({
         if (axis !== 'vertical') return;
         // Only a downward drag while pinned at the very top is a pull.
         if (dy <= 0 || !atTop()) {
-          engaged = false;
-          current = 0;
-          setPull(0);
+          if (engaged || current !== 0) {
+            engaged = false;
+            current = 0;
+            setPull(0);
+          }
           return;
         }
         if (!engaged) {

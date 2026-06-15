@@ -7,6 +7,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Animated,
+  Platform,
   useWindowDimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
@@ -630,7 +631,7 @@ export default function InboxScreen() {
           })}
           onScroll={Animated.event(
             [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-            { useNativeDriver: true },
+            { useNativeDriver: Platform.OS !== 'web' },
           )}
           scrollEventThrottle={16}
           onMomentumScrollEnd={onMomentumScrollEnd}

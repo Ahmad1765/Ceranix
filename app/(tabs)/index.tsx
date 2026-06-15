@@ -61,11 +61,13 @@ function AnimatedTabPill({
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    Animated.timing(colorAnim, {
+    const anim = Animated.timing(colorAnim, {
       toValue: isActive ? 1 : 0,
       duration: 250,
       useNativeDriver: false,
-    }).start();
+    });
+    anim.start();
+    return () => anim.stop();
   }, [isActive]);
 
   const backgroundColor = colorAnim.interpolate({
@@ -219,15 +221,21 @@ export default function HomeScreen() {
   // Infinite scroll: pull the next page when the FlatList reports it's near
   // the bottom. Following gates on listings.length === 0 with no pagination
   // because the followed-seller list is generally small.
+  // Track current length in a ref so loadMore always reads the latest offset
+  // without needing to re-create the callback (which would reset onEndReached).
+  const listingsLengthRef = useRef(listings.length);
+  listingsLengthRef.current = listings.length;
+
   const loadMore = useCallback(async () => {
     if (loading || loadingMore || reachedEnd) return;
     if (activeTab === 'Following') return;
-    if (listings.length === 0) return;
+    const currentLength = listingsLengthRef.current;
+    if (currentLength === 0) return;
     setLoadingMore(true);
     const result = await fetchListingsResult({
       tab: TAB_TO_FEED[activeTab as Exclude<TabName, 'Following'>],
       limit: PAGE_SIZE,
-      offset: listings.length,
+      offset: currentLength,
     });
     if (result.ok) {
       if (result.rows.length === 0) {
@@ -244,7 +252,7 @@ export default function HomeScreen() {
       }
     }
     setLoadingMore(false);
-  }, [activeTab, listings.length, loading, loadingMore, reachedEnd]);
+  }, [activeTab, loading, loadingMore, reachedEnd]);
 
   // Reset pagination when the tab flips (each tab has its own ordering).
   useEffect(() => {
@@ -510,6 +518,7 @@ export default function HomeScreen() {
       {/* Following view — listing grid if the user follows people, otherwise
           a live "people to follow" strip with real profiles. */}
       <FlatList
+        ref={activeTab === 'Following' ? scrollRef : undefined}
         key={`following-${columns}`}
         style={{ flex: 1, display: activeTab === 'Following' ? 'flex' : 'none' }}
         data={activeTab === 'Following' ? data : []}
@@ -521,7 +530,7 @@ export default function HomeScreen() {
         maxToRenderPerBatch={9}
         updateCellsBatchingPeriod={50}
         windowSize={8}
-        removeClippedSubviews={false}
+        removeClippedSubviews={Platform.OS !== 'web'}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
@@ -644,7 +653,7 @@ export default function HomeScreen() {
       <FlatList
         key={`feed-${columns}`}
         style={{ flex: 1, display: activeTab !== 'Following' ? 'flex' : 'none' }}
-        data={data}
+        data={activeTab !== 'Following' ? data : []}
         keyExtractor={keyExtractor}
         numColumns={columns}
         columnWrapperStyle={{ gap: GRID_GAP, paddingHorizontal: 12 }}
@@ -653,7 +662,7 @@ export default function HomeScreen() {
         maxToRenderPerBatch={9}
         updateCellsBatchingPeriod={50}
         windowSize={8}
-        removeClippedSubviews={false}
+        removeClippedSubviews={Platform.OS !== 'web'}
         onEndReachedThreshold={0.5}
         onEndReached={loadMore}
         ListFooterComponent={
@@ -739,7 +748,7 @@ export default function HomeScreen() {
         }
         renderItem={renderItem}
         contentContainerStyle={{ paddingBottom: 24 }}
-        ref={scrollRef}
+        ref={activeTab !== 'Following' ? scrollRef : undefined}
       />
       <WebPullIndicator pull={pull} refreshing={refreshing} nodeTop={nodeTop} threshold={threshold} />
     </SafeAreaView>

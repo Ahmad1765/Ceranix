@@ -31,7 +31,7 @@ import {
 } from '@/lib/saves';
 import { colors, radii } from '@/lib/theme';
 import { useGridDimensions, HIT_SLOP_8 } from '@/lib/responsive';
-import { useStaggeredEntrance, useFadeIn } from '@/lib/motion';
+import { useFadeIn } from '@/lib/motion';
 import type { Listing } from '@/types';
 import { useToast } from '@/lib/toast';
 import { Button, Card, ListRow, EmptyState, Tabs } from '@/components/ui';
@@ -1130,8 +1130,7 @@ function ListingsGrid({
 }
 
 function GridCard({ index, width, children }: { index: number; width: number; children: React.ReactNode }) {
-  const style = useStaggeredEntrance(index, { delayStep: 22, offsetY: 6 });
-  return <Animated.View style={[{ width }, style]}>{children}</Animated.View>;
+  return <View style={{ width }}>{children}</View>;
 }
 
 function SkeletonTile({ width }: { width: number }) {

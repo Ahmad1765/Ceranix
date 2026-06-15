@@ -9,13 +9,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withSpring,
-  Easing,
-} from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { PressableScale } from '@/components/PressableScale';
 import { getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
@@ -171,18 +165,6 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
     setTimeout(() => { longPressHandled.current = false; }, 300);
   }, [toast, user?.id]);
 
-  // Subtle staggered entrance: fade + slight rise on mount.
-  const enterY = useSharedValue(8);
-  const enterO = useSharedValue(0);
-  useEffect(() => {
-    enterO.value = withTiming(1, { duration: 280, easing: Easing.out(Easing.cubic) });
-    enterY.value = withSpring(0, { damping: 18, stiffness: 220, mass: 0.7 });
-  }, [enterO, enterY]);
-  const enterStyle = useAnimatedStyle(() => ({
-    opacity: enterO.value,
-    transform: [{ translateY: enterY.value }],
-  }));
-
   const handleScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (cardWidth <= 0) return;
     setActiveIndex(Math.round(e.nativeEvent.contentOffset.x / cardWidth));
@@ -196,7 +178,7 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
   const firstSrc = getOptimizedImageUrl(images[0], { width: srcWidth });
 
   return (
-    <Animated.View style={[{ flex: 1, marginBottom: 16 }, enterStyle]}>
+    <View style={{ flex: 1, marginBottom: 16 }}>
     <PressableScale
       onPress={() => router.push(`/product/${listing.id}`)}
       accessibilityRole="button"
@@ -382,6 +364,6 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
         onChanged={(savedSomewhere) => setSaved(savedSomewhere)}
       />
     ) : null}
-    </Animated.View>
+    </View>
   );
 });

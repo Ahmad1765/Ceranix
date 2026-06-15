@@ -24,7 +24,7 @@ import { ListingCard } from '@/components/ListingCard';
 import { colors, radii } from '@/lib/theme';
 import { computeLevel } from '@/lib/levels';
 import { useGridDimensions, HIT_SLOP_8 } from '@/lib/responsive';
-import { useFadeIn, useStaggeredEntrance } from '@/lib/motion';
+import { useFadeIn } from '@/lib/motion';
 import type { User as Profile, Listing } from '@/types';
 import { Button, EmptyState, SectionHeader } from '@/components/ui';
 
@@ -674,6 +674,5 @@ function GridSection({ listings, columns, cardW }: { listings: Listing[]; column
 }
 
 function GridCard({ index, width, children }: { index: number; width: number; children: React.ReactNode }) {
-  const style = useStaggeredEntrance(index, { delayStep: 22, offsetY: 6 });
-  return <Animated.View style={[{ width }, style]}>{children}</Animated.View>;
+  return <View style={{ width }}>{children}</View>;
 }
