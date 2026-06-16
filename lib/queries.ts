@@ -5,7 +5,8 @@
 // these hooks just wrap them with React Query.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { fetchUserListings } from '@/lib/listings';
+import { fetchListings, fetchUserListings, type FeedTab } from '@/lib/listings';
+import { fetchRecommendations, fetchRecentlyViewed } from '@/lib/recommendations';
 import {
   fetchFollowState,
   getCachedFollowState,
@@ -21,7 +22,43 @@ export const qk = {
   userListings: (id: string) => ['userListings', id] as const,
   followState: (viewerId: string | null, targetId: string) =>
     ['followState', viewerId, targetId] as const,
+  feedListings: (tab: FeedTab, category: string | null) =>
+    ['feedListings', tab, category] as const,
+  recommendations: (userId: string | null) => ['recommendations', userId] as const,
+  recentlyViewed: (userId: string | null) => ['recentlyViewed', userId] as const,
 };
+
+export function useFeedListingsQuery(opts: {
+  tab: FeedTab;
+  category?: string | null;
+  limit?: number;
+  enabled?: boolean;
+}) {
+  const { tab, category = null, limit = 60, enabled = true } = opts;
+  return useQuery({
+    queryKey: qk.feedListings(tab, category),
+    enabled,
+    queryFn: (): Promise<Listing[]> => fetchListings({ tab, category, limit }),
+  });
+}
+
+// Personalized recommendation rail. User-scoped via auth.uid in the RPC; we key
+// by userId so a sign-out/sign-in can't serve another user's cached rows.
+export function useRecommendationsQuery(userId: string | null, limit = 12) {
+  return useQuery({
+    queryKey: qk.recommendations(userId),
+    enabled: !!userId,
+    queryFn: () => fetchRecommendations(limit),
+  });
+}
+
+export function useRecentlyViewedQuery(userId: string | null, limit = 10) {
+  return useQuery({
+    queryKey: qk.recentlyViewed(userId),
+    enabled: !!userId,
+    queryFn: (): Promise<Listing[]> => fetchRecentlyViewed(limit),
+  });
+}
 
 export function useProfileQuery(userId: string) {
   return useQuery({

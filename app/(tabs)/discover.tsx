@@ -13,8 +13,12 @@ import { Feather } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import { ListingCard } from '@/components/ListingCard';
-import { fetchListings, searchListings } from '@/lib/listings';
-import { fetchRecommendations, fetchRecentlyViewed } from '@/lib/recommendations';
+import { searchListings } from '@/lib/listings';
+import {
+  useFeedListingsQuery,
+  useRecommendationsQuery,
+  useRecentlyViewedQuery,
+} from '@/lib/queries';
 import { createSavedSearch, touchSavedSearchSeen } from '@/lib/savedSearches';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
@@ -24,7 +28,6 @@ import { useFadeIn } from '@/lib/motion';
 import type { Category, Listing } from '@/types';
 import { EmptyState, SectionHeader } from '@/components/ui';
 import { useWebPullToRefresh, WebPullIndicator } from '@/components/WebRefresh';
-import { isFresh, markFresh } from '@/lib/freshness';
 
 type CatTile = {
   id: Category | 'trending';
@@ -47,6 +50,9 @@ const HORIZONTAL_PAD = 12;
 const GRID_GAP = 8;
 const RAIL_CARD_WIDTH = 160;
 const SEARCH_DEBOUNCE_MS = 300;
+// Stable empty reference so the grid's fallback doesn't churn useMemo deps when
+// the query has no data yet.
+const EMPTY_LISTINGS: Listing[] = [];
 
 export default function DiscoverScreen() {
   // Query params from /news Saved tab (and external links). When set, the
@@ -59,11 +65,6 @@ export default function DiscoverScreen() {
   const { user } = useAuth();
   const toast = useToast();
   const [query, setQuery] = useState(initialQuery);
-  const [listings, setListings] = useState<Listing[]>([]);
-  const [recommended, setRecommended] = useState<Listing[]>([]);
-  const [recentlyViewed, setRecentlyViewed] = useState<Listing[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [activeCat, setActiveCat] = useState<CatTile['id'] | null>(initialCat);
   const [savingSearch, setSavingSearch] = useState(false);
   // We disable the Save CTA once the current query has been saved this
@@ -107,61 +108,41 @@ export default function DiscoverScreen() {
 
   const browseCat = activeCat && activeCat !== 'trending' ? activeCat : null;
 
-  // True once any grid data has landed — re-focuses then refresh silently
-  // instead of flashing skeletons over content the user can already see.
-  const hasDataRef = useRef(false);
+  // React Query owns the grid + personalized rails. staleTime (60s) reproduces
+  // the old isFresh() gate; the three reads dedupe and cache independently so
+  // the grid skeleton no longer waits on the recommendation pipeline.
+  const gridQ = useFeedListingsQuery({ tab: 'popular', category: browseCat, limit: 60 });
+  const recQ = useRecommendationsQuery(user?.id ?? null, 12);
+  const recentQ = useRecentlyViewedQuery(user?.id ?? null, 10);
 
-  const loadAll = useCallback(
-    async (opts: { silent?: boolean } = {}) => {
-      if (!opts.silent) setLoading(true);
-      try {
-        // The grid gates the skeleton; rails fill in whenever they resolve.
-        // Tying them together made every focus wait on the recommendation
-        // pipeline (3 sequential round-trips) before showing anything.
-        const gridP = fetchListings({ tab: 'popular', limit: 60, category: browseCat });
-        if (user?.id) {
-          fetchRecommendations(12).then(setRecommended).catch(() => {});
-          fetchRecentlyViewed(10).then(setRecentlyViewed).catch(() => {});
-        } else {
-          setRecommended([]);
-          setRecentlyViewed([]);
-        }
-        const gridRows = await gridP;
-        setListings(gridRows);
-        hasDataRef.current = true;
-        markFresh(`discover:${browseCat ?? 'all'}`);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [user?.id, browseCat],
-  );
+  const listings = gridQ.data ?? EMPTY_LISTINGS;
+  const recommended = recQ.data ?? EMPTY_LISTINGS;
+  const recentlyViewed = recentQ.data ?? EMPTY_LISTINGS;
+  const loading = gridQ.isLoading;
+  const recLoading = recQ.isLoading;
+  const recentLoading = recentQ.isLoading;
+  const refreshing = gridQ.isRefetching;
 
-  // Re-fetch on focus — silently once we have something on screen, and only
-  // when the current category's data has gone stale (reuse it otherwise).
+  // Destructure the stable refetch fns + isStale snapshots so the callbacks
+  // below depend on primitives, not the per-render query objects.
+  const { isStale: gridStale, refetch: gridRefetch } = gridQ;
+  const { isStale: recStale, refetch: recRefetch } = recQ;
+  const { isStale: recentStale, refetch: recentRefetch } = recentQ;
+
+  // Revalidate on focus, but only queries that have gone stale — fresh data is
+  // reused so bouncing between tabs doesn't spam the backend (the old freshness
+  // gate, now driven by React Query's staleTime).
   useFocusEffect(
     useCallback(() => {
-      if (isFresh(`discover:${browseCat ?? 'all'}`)) return;
-      let cancelled = false;
-      loadAll({ silent: hasDataRef.current }).catch((e) => {
-        if (!cancelled) console.warn('[Discover] load failed', e);
-      });
-      return () => {
-        cancelled = true;
-      };
-    }, [loadAll, browseCat]),
+      if (gridStale) gridRefetch();
+      if (recStale) recRefetch();
+      if (recentStale) recentRefetch();
+    }, [gridStale, gridRefetch, recStale, recRefetch, recentStale, recentRefetch]),
   );
 
   const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await loadAll({ silent: true });
-    } catch (e) {
-      console.warn('[Discover] refresh failed', e);
-    } finally {
-      setRefreshing(false);
-    }
-  }, [loadAll]);
+    await Promise.all([gridRefetch(), recRefetch(), recentRefetch()]);
+  }, [gridRefetch, recRefetch, recentRefetch]);
 
   // Web pull-to-refresh — RefreshControl is inert on react-native-web.
   const { scrollRef, pull, nodeTop, threshold } = useWebPullToRefresh({ refreshing, onRefresh });
@@ -216,7 +197,7 @@ export default function DiscoverScreen() {
       }
       setSavedKey(currentSaveKey);
       toast.show('Search saved', { variant: 'success', icon: 'bookmark' });
-    } catch (e) {
+    } catch {
       toast.show("Couldn't save the search", { variant: 'default', icon: 'alert-triangle' });
     } finally {
       setSavingSearch(false);
@@ -453,10 +434,10 @@ export default function DiscoverScreen() {
         ) : null}
 
         {/* For you — personalized rail (hybrid recommender). Idle browse only. */}
-        {idle && user && (loading || recommended.length > 0) ? (
+        {idle && user && (recLoading || recommended.length > 0) ? (
           <View style={{ marginTop: 22 }}>
             <SectionHeader title="For you" />
-            {loading ? (
+            {recLoading ? (
               <RailSkeleton />
             ) : (
               <Rail listings={recommended} testID="discover-for-you" />
@@ -465,7 +446,7 @@ export default function DiscoverScreen() {
         ) : null}
 
         {/* Recently viewed — pick up where you left off. Hidden when empty. */}
-        {idle && user && recentlyViewed.length > 0 && !loading ? (
+        {idle && user && recentlyViewed.length > 0 && !recentLoading ? (
           <View style={{ marginTop: 22 }}>
             <SectionHeader title="Recently viewed" />
             <Rail listings={recentlyViewed} testID="discover-recently-viewed" />
