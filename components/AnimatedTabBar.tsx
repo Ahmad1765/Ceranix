@@ -13,6 +13,7 @@ import Animated, {
   Extrapolation,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -25,13 +26,13 @@ const INACTIVE = colors.muteSoft; // rgba(15,15,15,0.45)
 const PILL_FILL = colors.primarySofter; // purple @18%
 const PILL_BORDER = tintedPurple; // purple @45%
 
-const BAR_HEIGHT = 66;
-const PILL_INSET = 7;
+const BAR_HEIGHT = 68;
+const PILL_INSET = 8;
+const PILL_H = BAR_HEIGHT - PILL_INSET * 2;
 // Snappy, premium settle for the slide.
 const SLIDE = { damping: 16, stiffness: 260, mass: 0.9 } as const;
 // Bouncier spring for the icon morph (a little overshoot = life).
 const POP = { damping: 11, stiffness: 200, mass: 0.7 } as const;
-const HOLD_MS = 150; // press-and-hold before drag engages
 
 const ICONS: Record<
   string,
@@ -175,15 +176,21 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
     }
   };
 
+  // Drag engages as soon as the finger travels a few px (works for an
+  // immediate drag AND a hold-then-drag). A quick stationary touch falls
+  // through to the Tap gesture below and selects.
   const pan = Gesture.Pan()
-    .activateAfterLongPress(HOLD_MS)
+    .minDistance(6)
     .onBegin((e) => runOnJS(onBegin)(e.x))
     .onStart(() => runOnJS(onDragStart)())
     .onUpdate((e) => runOnJS(onDragMove)(e.x))
     .onEnd((e) => runOnJS(onDragEnd)(e.x))
     .onFinalize(() => runOnJS(onFinalize)());
 
-  const tap = Gesture.Tap().onEnd((e) => runOnJS(onTap)(e.x));
+  const tap = Gesture.Tap()
+    .maxDistance(14)
+    .onEnd((e) => runOnJS(onTap)(e.x));
+
   const gesture = Gesture.Race(pan, tap);
 
   // Pill: slides, stretches toward its direction of travel (liquid), lifts on drag.
@@ -232,34 +239,71 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
             style={{
               flexDirection: 'row',
               height: BAR_HEIGHT,
-              borderRadius: 33,
-              paddingHorizontal: 6,
-              backgroundColor: colors.white,
+              borderRadius: 34,
+              paddingHorizontal: 8,
+              backgroundColor: 'rgba(255,255,255,0.70)',
               borderWidth: 1,
-              borderColor: colors.hairline,
-              shadowColor: '#000000',
-              shadowOffset: { width: 0, height: 10 },
-              shadowOpacity: 0.12,
-              shadowRadius: 24,
-              elevation: 12,
+              borderColor: 'rgba(255,255,255,0.6)',
+              // Layered depth + a faint purple ambient = premium float.
+              boxShadow:
+                '0px 2px 6px rgba(0,0,0,0.05), 0px 12px 28px rgba(0,0,0,0.10), 0px 20px 44px rgba(108,71,255,0.12)',
+              elevation: 16,
             }}
           >
+            {/* Frosted glass fill */}
+            <BlurView
+              tint="light"
+              intensity={Platform.OS === 'android' ? 24 : 40}
+              experimentalBlurMethod="dimezisBlurView"
+              pointerEvents="none"
+              style={{ ...StyleSheet.absoluteFillObject, borderRadius: 34, overflow: 'hidden' }}
+            />
+            {/* Glass top-edge highlight */}
+            <View
+              pointerEvents="none"
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: '12%',
+                right: '12%',
+                height: 1,
+                borderRadius: 1,
+                backgroundColor: 'rgba(255,255,255,0.9)',
+              }}
+            />
+
+            {/* Sliding glossy pill */}
             <Animated.View
               pointerEvents="none"
               style={[
                 {
                   position: 'absolute',
                   top: PILL_INSET,
-                  height: BAR_HEIGHT - PILL_INSET * 2,
+                  height: PILL_H,
                   left: 0,
-                  borderRadius: (BAR_HEIGHT - PILL_INSET * 2) / 2,
+                  borderRadius: PILL_H / 2,
                   backgroundColor: PILL_FILL,
                   borderWidth: 1,
                   borderColor: PILL_BORDER,
+                  overflow: 'hidden',
+                  boxShadow: '0px 6px 16px rgba(108,71,255,0.28)',
                 },
                 pillStyle,
               ]}
-            />
+            >
+              {/* Top sheen for a glossy, raised feel */}
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 1,
+                  left: 5,
+                  right: 5,
+                  height: '46%',
+                  borderRadius: PILL_H / 2,
+                  backgroundColor: 'rgba(255,255,255,0.40)',
+                }}
+              />
+            </Animated.View>
 
             {routes.map((route, pos) => {
               const { options } = descriptors[route.key];
@@ -362,7 +406,12 @@ function TabItem({
           <Ionicons name={icon.outline} size={26} color={INACTIVE} />
         </Animated.View>
         <Animated.View style={[StyleSheet.absoluteFill, filledStyle]}>
-          <Ionicons name={icon.filled} size={26} color={ACCENT} />
+          <Ionicons
+            name={icon.filled}
+            size={26}
+            color={ACCENT}
+            style={{ textShadowColor: 'rgba(108,71,255,0.45)', textShadowRadius: 7, textShadowOffset: { width: 0, height: 1 } }}
+          />
         </Animated.View>
       </Animated.View>
       <Animated.Text
