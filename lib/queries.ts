@@ -38,6 +38,7 @@ import {
   toggleFollow,
   type FollowState,
 } from '@/lib/follows';
+import { listConversations, type ConversationRow } from '@/lib/chat';
 import type { User as Profile, Listing } from '@/types';
 
 // Centralized, typed query keys. One place to see every cache key in the app
@@ -61,7 +62,19 @@ export const qk = {
   likedListings: (userId: string | null) => ['likedListings', userId] as const,
   saveLists: (userId: string | null) => ['saveLists', userId] as const,
   listingsInList: (listId: string | null) => ['listingsInList', listId] as const,
+  inbox: (userId: string | null) => ['inbox', userId] as const,
 };
+
+// Chat inbox. The Realtime subscription (subscribeToInbox) stays in the screen
+// and simply calls refetch() on change — the simplest Realtime + React Query
+// pattern (subscription invalidates the query rather than patching the cache).
+export function useInboxQuery(userId: string | null) {
+  return useQuery({
+    queryKey: qk.inbox(userId),
+    enabled: !!userId,
+    queryFn: (): Promise<ConversationRow[]> => listConversations(userId as string),
+  });
+}
 
 export function useLikedListingsQuery(userId: string | null) {
   return useQuery({

@@ -18,17 +18,20 @@ import { router, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@/lib/auth';
 import {
-  listConversations,
   subscribeToInbox,
   otherParticipant,
   type ConversationRow,
 } from '@/lib/chat';
+import { useInboxQuery } from '@/lib/queries';
 import { getOptimizedImageUrl } from '@/lib/images';
 import { colors } from '@/lib/theme';
 import { EmptyState } from '@/components/ui';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 
 type InboxTab = 'selling' | 'buying' | 'social' | 'support';
+
+// Stable empty reference so the inbox fallback doesn't churn the pageData memo.
+const EMPTY_CONVERSATIONS: ConversationRow[] = [];
 
 const INBOX_TABS: { value: InboxTab; label: string }[] = [
   { value: 'selling', label: 'Selling' },
@@ -393,10 +396,14 @@ export default function InboxScreen() {
   const { user, loading: authLoading } = useAuth();
   const { width: pageWidth } = useWindowDimensions();
   const [activeTab, setActiveTab] = useState<InboxTab>('buying');
-  const [conversations, setConversations] = useState<ConversationRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
+
+  const userId = user?.id ?? null;
+  const inboxQ = useInboxQuery(userId);
+  const conversations = inboxQ.data ?? EMPTY_CONVERSATIONS;
+  const loading = inboxQ.isLoading;
+  const refreshing = inboxQ.isRefetching;
+  const { refetch: inboxRefetch, isStale: inboxStale } = inboxQ;
 
   const pagerRef = useRef<FlatList<{ value: InboxTab; label: string }>>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
@@ -428,45 +435,21 @@ export default function InboxScreen() {
     return () => scrollX.removeListener(id);
   }, [scrollX, pageWidth]);
 
-  const fetchInbox = useCallback(async (uid: string) => {
-    return listConversations(uid);
-  }, []);
-
-  useEffect(() => {
-    if (!user?.id) {
-      setConversations([]);
-      setLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    fetchInbox(user.id)
-      .then((rows) => {
-        if (cancelled) return;
-        setConversations(rows);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.id, fetchInbox]);
-
+  // Revalidate the inbox on focus when stale (the initial fetch is automatic).
   useFocusEffect(
     useCallback(() => {
-      if (!user?.id) return;
-      fetchInbox(user.id).then((rows) => setConversations(rows)).catch(() => {});
-    }, [user?.id, fetchInbox]),
+      if (inboxStale) inboxRefetch();
+    }, [inboxStale, inboxRefetch]),
   );
 
+  // Realtime: a new/updated conversation simply triggers a refetch.
   useEffect(() => {
-    if (!user?.id) return;
-    const unsub = subscribeToInbox(user.id, () => {
-      fetchInbox(user.id).then((rows) => setConversations(rows)).catch(() => {});
+    if (!userId) return;
+    const unsub = subscribeToInbox(userId, () => {
+      inboxRefetch();
     });
     return unsub;
-  }, [user?.id, fetchInbox]);
+  }, [userId, inboxRefetch]);
 
   // Per-tab filtered data so the pager always has all four pages ready.
   const pageData = useMemo<Record<InboxTab, ConversationRow[]>>(() => {
@@ -484,17 +467,8 @@ export default function InboxScreen() {
   }, [conversations, user?.id]);
 
   const onRefresh = useCallback(async () => {
-    if (!user?.id) return;
-    setRefreshing(true);
-    try {
-      const rows = await fetchInbox(user.id);
-      setConversations(rows);
-    } catch (e) {
-      console.warn('[Inbox] refresh failed', e);
-    } finally {
-      setRefreshing(false);
-    }
-  }, [user?.id, fetchInbox]);
+    await inboxRefetch();
+  }, [inboxRefetch]);
 
   const goToTab = useCallback(
     (tab: InboxTab) => {
