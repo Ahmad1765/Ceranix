@@ -43,7 +43,16 @@ module.exports = ({ config }) => ({
         },
       ],
       'expo-asset',
-      '@sentry/react-native',
+      [
+        '@sentry/react-native',
+        {
+          // Org + project for source map / debug symbol upload during builds.
+          // The auth token is NOT here (it's a secret) — the plugin reads it
+          // from the SENTRY_AUTH_TOKEN env var (.env.sentry-build-plugin).
+          organization: 'penta-squad',
+          project: 'ceranix-vg',
+        },
+      ],
     ],
     web: {
       favicon: './assets/images/favicon.png',

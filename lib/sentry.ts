@@ -4,6 +4,7 @@
 // swap providers later and guarantees we never crash when no DSN is configured.
 import * as Sentry from '@sentry/react-native';
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
 // DSN is resolved expoConfig.extra-first (embedded at config-load time via
 // app.config.js), falling back to the bundle-inlined env — same precedence the
@@ -40,6 +41,15 @@ export function initSentry(): void {
     return;
   }
 
+  // Session Replay records a video-like reproduction of the session that led to
+  // an error. Mobile replay is native-only — including it on web throws — so we
+  // guard by platform. Feedback works everywhere.
+  const integrations = [
+    Sentry.feedbackIntegration(),
+    // Mobile replay is native-only — including it on web throws.
+    ...(Platform.OS !== 'web' ? [Sentry.mobileReplayIntegration()] : []),
+  ];
+
   Sentry.init({
     dsn,
     environment: __DEV__ ? 'development' : 'production',
@@ -50,9 +60,17 @@ export function initSentry(): void {
     debug: debugEnabled,
     // Performance tracing: full in dev, sampled in prod to control volume/cost.
     tracesSampleRate: __DEV__ ? 1.0 : 0.2,
-    // We attach the user id explicitly via setSentryUser; never let the SDK
-    // hoover up IPs / device identifiers on its own.
+    // We attach the user id explicitly via setSentryUser; keep PII off so the
+    // SDK never hoovers up IPs / cookies / device identifiers on its own.
+    // (The wizard defaults this to true — flip if you want richer context and
+    // have the privacy policy to back it.)
     sendDefaultPii: false,
+    // Structured logs → Sentry Logs.
+    enableLogs: true,
+    // Session Replay sampling: 10% of all sessions, 100% of errored ones.
+    replaysSessionSampleRate: 0.1,
+    replaysOnErrorSampleRate: 1,
+    integrations,
     // Surface the app version so dashboard issues are grouped by release.
     release: Constants.expoConfig?.version
       ? `carrinex@${Constants.expoConfig.version}`
