@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   View,
@@ -18,14 +18,18 @@ import { ListingCard } from '@/components/ListingCard';
 import { RequireAuth } from '@/components/RequireAuth';
 import { usePrompt } from '@/components/PromptDialog';
 import { useAuth } from '@/lib/auth';
-import { fetchUserListings, fetchLikedListings } from '@/lib/listings';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  useUserListingsQuery,
+  useLikedListingsQuery,
+  useSavedListingsQuery,
+  useSaveListsQuery,
+  useListingsInListQuery,
+  qk,
+} from '@/lib/queries';
 import {
   createSaveList,
   deleteSaveList,
-  ensureSaveLists,
-  fetchListingsInList,
-  fetchSavedListings,
-  listSaveLists,
   renameSaveList,
   type SaveList,
 } from '@/lib/saves';
@@ -61,24 +65,18 @@ const HORIZONTAL_PAD = 12;
 const GRID_GAP = 8;
 const AVATAR_SIZE = 88;
 
+// Stable empty references so query fallbacks don't churn the useMemos below.
+const EMPTY_LISTINGS: Listing[] = [];
+const EMPTY_SAVE_LISTS: SaveList[] = [];
+
 function ProfileScreenInner() {
   const { profile, refreshProfile } = useAuth();
   const toast = useToast();
   const { prompt, element: promptElement } = usePrompt();
   const [activeTab, setActiveTab] = useState<ProfileTab>('selling');
-  const [selling, setSelling] = useState<Listing[]>([]);
-  const [liked, setLiked] = useState<Listing[]>([]);
-  const [savedItems, setSavedItems] = useState<Listing[]>([]);
-  const [saveLists, setSaveLists] = useState<SaveList[]>([]);
   // null = "All" — flat union of every list. A specific list id narrows
   // the grid to that bucket's items only.
   const [activeListId, setActiveListId] = useState<string | null>(null);
-  const [listListings, setListListings] = useState<Listing[]>([]);
-  const [loadingListListings, setLoadingListListings] = useState(false);
-  const [loadingSelling, setLoadingSelling] = useState(true);
-  const [loadingLiked, setLoadingLiked] = useState(true);
-  const [loadingSaved, setLoadingSaved] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
 
   const heroFade = useFadeIn(0, 320);
 
@@ -90,62 +88,41 @@ function ProfileScreenInner() {
     gap: GRID_GAP,
   });
 
-  const loadSelling = useCallback(async (opts?: { silent?: boolean }) => {
-    if (!profile?.id) return;
-    if (!opts?.silent) setLoadingSelling(true);
-    const rows = await fetchUserListings(profile.id);
-    setSelling(rows);
-    if (!opts?.silent) setLoadingSelling(false);
-  }, [profile?.id]);
+  // Reuse the shared listing hooks; only the liked + save-list reads are
+  // profile-specific. `profile` is the signed-in user (RequireAuth wraps this).
+  const userId = profile?.id ?? null;
+  const queryClient = useQueryClient();
+  const sellingQ = useUserListingsQuery(userId ?? '');
+  const likedQ = useLikedListingsQuery(userId);
+  const savedQ = useSavedListingsQuery(userId);
+  const saveListsQ = useSaveListsQuery(userId);
+  const listInListQ = useListingsInListQuery(activeListId);
 
-  const loadLiked = useCallback(async (opts?: { silent?: boolean }) => {
-    if (!profile?.id) return;
-    if (!opts?.silent) setLoadingLiked(true);
-    const rows = await fetchLikedListings(profile.id);
-    setLiked(rows);
-    if (!opts?.silent) setLoadingLiked(false);
-  }, [profile?.id]);
-
-  const loadSaved = useCallback(async (opts?: { silent?: boolean }) => {
-    if (!profile?.id) return;
-    if (!opts?.silent) setLoadingSaved(true);
-    // Seed starter lists on first visit, then load the flat union of all
-    // saved listings + the lists strip in parallel.
-    await ensureSaveLists(profile.id);
-    const [rows, lists] = await Promise.all([
-      fetchSavedListings(profile.id),
-      listSaveLists(profile.id),
-    ]);
-    setSavedItems(rows);
-    setSaveLists(lists);
-    if (!opts?.silent) setLoadingSaved(false);
-  }, [profile?.id]);
-
-  // When a specific list is active, pull just that list's items.
-  useEffect(() => {
-    if (!activeListId) {
-      setListListings([]);
-      return;
-    }
-    let cancelled = false;
-    setLoadingListListings(true);
-    fetchListingsInList(activeListId).then((rows) => {
-      if (cancelled) return;
-      setListListings(rows);
-      setLoadingListListings(false);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [activeListId]);
+  const selling = sellingQ.data ?? EMPTY_LISTINGS;
+  const liked = likedQ.data ?? EMPTY_LISTINGS;
+  const savedItems = savedQ.data ?? EMPTY_LISTINGS;
+  const saveLists = saveListsQ.data ?? EMPTY_SAVE_LISTS;
+  const listListings = listInListQ.data ?? EMPTY_LISTINGS;
+  const loadingSelling = sellingQ.isLoading;
+  const loadingLiked = likedQ.isLoading;
+  const loadingSaved = savedQ.isLoading;
+  const loadingListListings = listInListQ.isLoading;
+  const refreshing =
+    sellingQ.isRefetching || likedQ.isRefetching || savedQ.isRefetching;
 
   const visibleSavedListings = useMemo(
     () => (activeListId ? listListings : savedItems),
     [activeListId, listListings, savedItems],
   );
 
+  // Stable refetch fns + isStale snapshots for the focus gate.
+  const { isStale: sellingStale, refetch: sellingRefetch } = sellingQ;
+  const { isStale: likedStale, refetch: likedRefetch } = likedQ;
+  const { isStale: savedStale, refetch: savedRefetch } = savedQ;
+  const { refetch: saveListsRefetch } = saveListsQ;
+
   const handleCreateList = useCallback(async () => {
-    if (!profile?.id) return;
+    if (!userId) return;
     const name = await prompt({
       title: 'New list',
       message: 'Name your save list',
@@ -153,14 +130,17 @@ function ProfileScreenInner() {
       submitLabel: 'Create',
     });
     if (!name) return;
-    const created = await createSaveList(profile.id, name);
+    const created = await createSaveList(userId, name);
     if (created) {
-      setSaveLists((prev) => [...prev, { ...created, item_count: 0 }]);
+      queryClient.setQueryData<SaveList[]>(qk.saveLists(userId), (prev) => [
+        ...(prev ?? []),
+        { ...created, item_count: 0 },
+      ]);
       setActiveListId(created.id);
     } else {
       toast.show("Couldn't create list", { variant: 'info', icon: 'alert-circle' });
     }
-  }, [profile?.id, prompt, toast]);
+  }, [userId, prompt, toast, queryClient]);
 
   const handleManageList = useCallback(
     (list: SaveList) => {
@@ -182,8 +162,8 @@ function ProfileScreenInner() {
             if (!next) return;
             const ok = await renameSaveList(list.id, next);
             if (ok) {
-              setSaveLists((prev) =>
-                prev.map((l) => (l.id === list.id ? { ...l, name: next } : l)),
+              queryClient.setQueryData<SaveList[]>(qk.saveLists(userId), (prev) =>
+                (prev ?? []).map((l) => (l.id === list.id ? { ...l, name: next } : l)),
               );
             }
           },
@@ -197,68 +177,47 @@ function ProfileScreenInner() {
               toast.show("Couldn't delete list", { variant: 'info', icon: 'alert-circle' });
               return;
             }
-            setSaveLists((prev) => prev.filter((l) => l.id !== list.id));
+            queryClient.setQueryData<SaveList[]>(qk.saveLists(userId), (prev) =>
+              (prev ?? []).filter((l) => l.id !== list.id),
+            );
             if (activeListId === list.id) setActiveListId(null);
-            // Re-pull the flat union since this list's items are gone.
-            if (profile?.id) loadSaved({ silent: true });
+            // This list's items are gone — revalidate the flat saved union.
+            savedRefetch();
           },
         },
         { text: 'Cancel', style: 'cancel' },
       ]);
     },
-    [activeListId, loadSaved, profile?.id, prompt, toast],
+    [activeListId, userId, prompt, toast, queryClient, savedRefetch],
   );
 
-  // Initial load — explicitly tied to profile.id arrival.
-  useEffect(() => {
-    if (!profile?.id) return;
-    let cancelled = false;
-    (async () => {
-      const [s, l, sv] = await Promise.all([
-        fetchUserListings(profile.id),
-        fetchLikedListings(profile.id),
-        fetchSavedListings(profile.id),
-      ]);
-      if (cancelled) return;
-      setSelling(s);
-      setLiked(l);
-      setSavedItems(sv);
-      setLoadingSelling(false);
-      setLoadingLiked(false);
-      setLoadingSaved(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [profile?.id]);
-
-  // Re-fetch silently when tab regains focus (after a new upload, etc.).
-  // refreshProfile() pulls fresh followers_count/following_count so toggling
-  // a follow on /user/[id] is reflected here without a manual reload.
+  // Re-fetch silently when the tab regains focus (after a new upload, etc.),
+  // but only stale grids. refreshProfile() pulls fresh follower/following
+  // counts so a follow toggled on /user/[id] reflects here without a reload.
   useFocusEffect(
     useCallback(() => {
-      if (!profile?.id) return;
-      loadSelling({ silent: true }).catch(() => {});
-      loadLiked({ silent: true }).catch(() => {});
-      loadSaved({ silent: true }).catch(() => {});
+      if (!userId) return;
+      if (sellingStale) sellingRefetch();
+      if (likedStale) likedRefetch();
+      if (savedStale) savedRefetch();
       refreshProfile().catch(() => {});
-    }, [profile?.id, loadSelling, loadLiked, loadSaved, refreshProfile]),
+    }, [
+      userId,
+      sellingStale, sellingRefetch,
+      likedStale, likedRefetch,
+      savedStale, savedRefetch,
+      refreshProfile,
+    ]),
   );
 
   const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await Promise.all([
-        loadSelling({ silent: true }),
-        loadLiked({ silent: true }),
-        loadSaved({ silent: true }),
-      ]);
-    } catch {
-      // swallow — RefreshControl feedback is sufficient
-    } finally {
-      setRefreshing(false);
-    }
-  }, [loadSelling, loadLiked, loadSaved]);
+    await Promise.all([
+      sellingRefetch(),
+      likedRefetch(),
+      savedRefetch(),
+      saveListsRefetch(),
+    ]);
+  }, [sellingRefetch, likedRefetch, savedRefetch, saveListsRefetch]);
 
   // Web pull-to-refresh — RefreshControl is inert on react-native-web.
   const { scrollRef, pull, nodeTop, threshold } = useWebPullToRefresh({ refreshing, onRefresh });

@@ -12,6 +12,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import {
   fetchFollowingListingsResult,
+  fetchLikedListings,
   fetchListings,
   fetchListingsResult,
   fetchUserListings,
@@ -19,7 +20,13 @@ import {
 } from '@/lib/listings';
 import { fetchRecommendations, fetchRecentlyViewed } from '@/lib/recommendations';
 import { fetchNewFromFollowed, fetchPriceDrops, type PriceDropListing } from '@/lib/myFeed';
-import { fetchSavedListings } from '@/lib/saves';
+import {
+  ensureSaveLists,
+  fetchListingsInList,
+  fetchSavedListings,
+  listSaveLists,
+  type SaveList,
+} from '@/lib/saves';
 import {
   deleteSavedSearch,
   listSavedSearches,
@@ -51,7 +58,38 @@ export const qk = {
   newFromFollowed: (userId: string | null) => ['newFromFollowed', userId] as const,
   savedSearches: (userId: string | null) => ['savedSearches', userId] as const,
   savedListings: (userId: string | null) => ['savedListings', userId] as const,
+  likedListings: (userId: string | null) => ['likedListings', userId] as const,
+  saveLists: (userId: string | null) => ['saveLists', userId] as const,
+  listingsInList: (listId: string | null) => ['listingsInList', listId] as const,
 };
+
+export function useLikedListingsQuery(userId: string | null) {
+  return useQuery({
+    queryKey: qk.likedListings(userId),
+    enabled: !!userId,
+    queryFn: (): Promise<Listing[]> => fetchLikedListings(userId as string),
+  });
+}
+
+// Save-list chips. Seeds the starter lists on first visit, then returns them.
+export function useSaveListsQuery(userId: string | null) {
+  return useQuery({
+    queryKey: qk.saveLists(userId),
+    enabled: !!userId,
+    queryFn: async (): Promise<SaveList[]> => {
+      await ensureSaveLists(userId as string);
+      return listSaveLists(userId as string);
+    },
+  });
+}
+
+export function useListingsInListQuery(listId: string | null) {
+  return useQuery({
+    queryKey: qk.listingsInList(listId),
+    enabled: !!listId,
+    queryFn: (): Promise<Listing[]> => fetchListingsInList(listId as string),
+  });
+}
 
 // My Feed primary grid: personalized recommendations for a signed-in user,
 // trending as the anonymous fallback. Returns RecommendedListing[] for users
