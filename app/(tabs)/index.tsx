@@ -14,21 +14,16 @@ import {
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { ListingCard } from '@/components/ListingCard';
 import { SkeletonCard } from '@/components/SkeletonCard';
 import { AnonCards } from '@/components/AnonCards';
 import { useWebPullToRefresh, WebPullIndicator } from '@/components/WebRefresh';
-import {
-  fetchFollowingListingsResult,
-  fetchListingsResult,
-  type FeedTab,
-} from '@/lib/listings';
+import { useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { fetchFollowing, fetchSuggestedFollows, toggleFollow } from '@/lib/follows';
-import { getFeedSnapshot, putFeedSnapshot } from '@/lib/listingCache';
+import { useHomeFeedQuery, qk, type HomeFeedTab } from '@/lib/queries';
 import { onListingCreated } from '@/lib/listingEvents';
-import { isFresh } from '@/lib/freshness';
 import { getOptimizedImageUrl } from '@/lib/images';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
@@ -119,17 +114,20 @@ function AnimatedTabPill({
 
 const TABS: TabName[] = ['For you', 'Popular', 'Following'];
 
-const TAB_TO_FEED: Record<Exclude<TabName, 'Following'>, FeedTab> = {
+const TAB_KEY: Record<TabName, HomeFeedTab> = {
   'For you': 'for_you',
   Popular: 'popular',
+  Following: 'following',
 };
+
+// Stable empty reference so the flattened-listings memo fallback doesn't churn.
+const EMPTY_LISTINGS: Listing[] = [];
 
 export default function HomeScreen() {
   const { user } = useAuth();
   const toast = useToast();
   const columns = useResponsiveColumns({ min: 2, max: 4, thresholds: GRID_THRESHOLDS });
   const [activeTab, setActiveTab] = useState<TabName>('For you');
-  const [refreshing, setRefreshing] = useState(false);
   // Suggested people for an empty Following tab. Live data ranked by
   // followers; updated whenever the auth user changes so the exclusion list
   // (self + already-followed) stays accurate.
@@ -143,46 +141,49 @@ export default function HomeScreen() {
   const [followedProfiles, setFollowedProfiles] = useState<
     Array<Pick<Profile, 'id' | 'username' | 'full_name' | 'avatar_url' | 'is_verified'>>
   >([]);
-  // Seed from the last-rendered snapshot for this tab so a re-mount (or a
-  // tab swap that races a wedged Supabase client) never blanks the screen.
-  // null tab maps to an empty snapshot — Following has no snapshot anyway.
-  const initialTab: TabName = 'For you';
-  const initialSnapshot = getFeedSnapshot(initialTab) ?? [];
-  const [listings, setListings] = useState<Listing[]>(initialSnapshot);
-  const [loading, setLoading] = useState(initialSnapshot.length === 0);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [reachedEnd, setReachedEnd] = useState(false);
-  const hasLoadedRef = useRef(initialSnapshot.length > 0);
-  const PAGE_SIZE = 60;
+  // React Query owns the feed now. One infinite query per active tab; switching
+  // tabs swaps the query key, so each tab's pages are cached independently
+  // (replacing the feedSnapshots cache) and a wedged fetch throws — which makes
+  // React Query keep the last good pages instead of blanking the grid.
+  const queryClient = useQueryClient();
+  const feedTab = TAB_KEY[activeTab];
+  const feedQ = useHomeFeedQuery(feedTab, user?.id ?? null);
 
-  // Single commit: flips loading off in the SAME setter call that installs
-  // the rows, so the FlatList never sees the intermediate
-  // `loading=true, listings=rows` state that previously left skeletons stuck
-  // until a manual reload.
-  // Returns the discriminated result so callers can tell "feed is genuinely
-  // empty" from "fetch wedged" and decide whether to commit or preserve.
-  const load = useCallback(
-    async (tab: TabName): Promise<{ ok: true; rows: Listing[] } | { ok: false }> => {
-      let result: { ok: true; rows: Listing[] } | { ok: false };
-      if (tab === 'Following') {
-        if (!user?.id) return { ok: true, rows: [] };
-        result = await fetchFollowingListingsResult(user.id);
-      } else {
-        result = await fetchListingsResult({
-          tab: TAB_TO_FEED[tab as Exclude<TabName, 'Following'>],
-        });
+  // Flatten pages, de-duping by id (a row prepended via onListingCreated can
+  // also surface in a later fetched page).
+  const listings = useMemo<Listing[]>(() => {
+    const pages = feedQ.data?.pages;
+    if (!pages) return EMPTY_LISTINGS;
+    const seen = new Set<string>();
+    const out: Listing[] = [];
+    for (const page of pages) {
+      for (const l of page) {
+        if (!seen.has(l.id)) {
+          seen.add(l.id);
+          out.push(l);
+        }
       }
-      if (!result.ok) return result;
-      const firstUrls = result.rows
-        .slice(0, 12)
-        .map((l) => l.images?.[0])
-        .filter(Boolean)
-        .map((u) => getOptimizedImageUrl(u as string, { width: 400 }));
-      if (firstUrls.length) Image.prefetch(firstUrls, { cachePolicy: 'memory-disk' });
-      return result;
-    },
-    [user?.id],
-  );
+    }
+    return out;
+  }, [feedQ.data]);
+
+  const loading = feedQ.isLoading;
+  const loadingMore = feedQ.isFetchingNextPage;
+  const reachedEnd = !feedQ.hasNextPage && !feedQ.isLoading;
+  // Pull-to-refresh spinner: a refetch of existing pages, not a next-page fetch.
+  const refreshing = feedQ.isRefetching && !feedQ.isFetchingNextPage;
+
+  const { refetch: feedRefetch, fetchNextPage, isStale: feedStale } = feedQ;
+
+  // Warm the image cache for the first screenful so cards paint instantly.
+  useEffect(() => {
+    const urls = listings
+      .slice(0, 12)
+      .map((l) => l.images?.[0])
+      .filter(Boolean)
+      .map((u) => getOptimizedImageUrl(u as string, { width: 400 }));
+    if (urls.length) Image.prefetch(urls, { cachePolicy: 'memory-disk' });
+  }, [listings]);
 
   // Pull a fresh batch of "people to follow" whenever the auth user changes.
   // We don't poll — the strip is a static-ish recommendation, not a feed.
@@ -218,47 +219,14 @@ export default function HomeScreen() {
     }, [loadFollowed]),
   );
 
-  // Infinite scroll: pull the next page when the FlatList reports it's near
-  // the bottom. Following gates on listings.length === 0 with no pagination
-  // because the followed-seller list is generally small.
-  // Track current length in a ref so loadMore always reads the latest offset
-  // without needing to re-create the callback (which would reset onEndReached).
-  const listingsLengthRef = useRef(listings.length);
-  listingsLengthRef.current = listings.length;
-
-  const loadMore = useCallback(async () => {
-    if (loading || loadingMore || reachedEnd) return;
-    if (activeTab === 'Following') return;
-    const currentLength = listingsLengthRef.current;
-    if (currentLength === 0) return;
-    setLoadingMore(true);
-    const result = await fetchListingsResult({
-      tab: TAB_TO_FEED[activeTab as Exclude<TabName, 'Following'>],
-      limit: PAGE_SIZE,
-      offset: currentLength,
-    });
-    if (result.ok) {
-      if (result.rows.length === 0) {
-        setReachedEnd(true);
-      } else {
-        setListings((prev) => {
-          // De-dupe by id in case a freshly-published row already lives at the
-          // top of `prev` from onListingCreated.
-          const seen = new Set(prev.map((l) => l.id));
-          const next = prev.concat(result.rows.filter((l) => !seen.has(l.id)));
-          putFeedSnapshot(activeTab, next);
-          return next;
-        });
-      }
-    }
-    setLoadingMore(false);
-  }, [activeTab, loading, loadingMore, reachedEnd]);
-
-  // Reset pagination when the tab flips (each tab has its own ordering).
-  useEffect(() => {
-    setReachedEnd(false);
-    setLoadingMore(false);
-  }, [activeTab]);
+  // Infinite scroll: ask React Query for the next page. It no-ops when there's
+  // no next page or a fetch is already in flight; Following never paginates.
+  // (No tab-reset effect needed — switching tabs swaps the query key, so each
+  // tab's page list resets on its own.)
+  const loadMore = useCallback(() => {
+    if (feedTab === 'following') return;
+    if (feedQ.hasNextPage && !feedQ.isFetchingNextPage) fetchNextPage();
+  }, [feedTab, feedQ.hasNextPage, feedQ.isFetchingNextPage, fetchNextPage]);
 
   const handleFollowSuggestion = useCallback(
     async (suggestedId: string, username: string) => {
@@ -275,11 +243,9 @@ export default function HomeScreen() {
         setFollowingState((prev) => ({ ...prev, [suggestedId]: next.isFollowing }));
         if (next.isFollowing) {
           toast.show(`Following @${username}`, { variant: 'info', icon: 'user-check' });
-          // Pull the Following feed in the background so the next swipe to
-          // that tab already has data.
-          load('Following').then((r) => {
-            if (r.ok) putFeedSnapshot('Following' as TabName, r.rows);
-          });
+          // Invalidate the Following feed so the next visit refetches with the
+          // newly-followed seller's listings.
+          queryClient.invalidateQueries({ queryKey: qk.homeFeed('following', user.id) });
         }
       } catch (e: any) {
         setFollowingState((prev) => ({ ...prev, [suggestedId]: already }));
@@ -289,151 +255,41 @@ export default function HomeScreen() {
         });
       }
     },
-    [followingState, user?.id, toast, load],
+    [followingState, user?.id, toast, queryClient],
   );
 
-  // Initial + tab-change load: show skeletons (only if we don't already have
-  // a snapshot for this tab to render against).
-  useEffect(() => {
-    let cancelled = false;
-    const snapshot = getFeedSnapshot(activeTab);
-    if (snapshot && snapshot.length > 0) {
-      // Render the snapshot immediately so the user never sees a skeleton
-      // when we already know what to show. The fetch below refreshes it.
-      setListings(snapshot);
-      setLoading(false);
-      hasLoadedRef.current = true;
-    } else {
-      setLoading(true);
-    }
-    // Hard ceiling — if load() never resolves/rejects (a wedged fetch that
-    // somehow slips past every other safety net), clear the skeleton anyway
-    // so the user sees the empty state and can pull-to-refresh instead of
-    // staring at gray boxes forever.
-    const wedgeKiller = setTimeout(() => {
-      if (cancelled) return;
-      console.warn('[home] load() wedge ceiling fired — clearing skeleton');
-      setLoading(false);
-      hasLoadedRef.current = true;
-      // Fire-and-forget retry: a wedge that hit the ceiling is almost always
-      // transient on the next attempt. Don't await — the ceiling already
-      // unblocked the UI; if this retry happens to return rows we just
-      // prepend them silently. Only commit on ok:true so a second wedge
-      // doesn't blank a screen that may have prior content.
-      load(activeTab)
-        .then((result) => {
-          if (cancelled || !result.ok) return;
-          if (result.rows.length > 0) {
-            setListings(result.rows);
-            putFeedSnapshot(activeTab, result.rows);
-          }
-        })
-        .catch(() => {});
-    }, 12_000);
-    load(activeTab)
-      .then((result) => {
-        if (cancelled) return;
-        clearTimeout(wedgeKiller);
-        // Commit listings + loading=false together so React renders once with
-        // the final state. Without this, the FlatList briefly sees
-        // listings=rows while loading=true and the data memo zeroes them out.
-        // On ok:false, leave listings alone — we either have a snapshot
-        // already showing or nothing yet, but committing [] would mis-signal
-        // "feed is empty" to the user.
-        if (result.ok) {
-          setListings(result.rows);
-          putFeedSnapshot(activeTab, result.rows);
-        }
-        setLoading(false);
-        hasLoadedRef.current = true;
-        // If the first load came back empty (likely a transient wedge that
-        // hit a timeout rather than a genuinely empty feed) OR explicitly
-        // failed, silently retry once after a short delay so the user
-        // doesn't have to refresh.
-        const needsRetry = !result.ok || (result.ok && result.rows.length === 0);
-        if (needsRetry && activeTab !== 'Following') {
-          setTimeout(() => {
-            if (cancelled) return;
-            load(activeTab)
-              .then((retry) => {
-                if (cancelled || !retry.ok) return;
-                if (retry.rows.length > 0) {
-                  setListings(retry.rows);
-                  putFeedSnapshot(activeTab, retry.rows);
-                }
-              })
-              .catch(() => {});
-          }, 1500);
-        }
-      })
-      .catch(() => {
-        if (cancelled) return;
-        clearTimeout(wedgeKiller);
-        setLoading(false);
-        hasLoadedRef.current = true;
-      });
-    return () => {
-      cancelled = true;
-      clearTimeout(wedgeKiller);
-    };
-  }, [activeTab, load]);
-
-  // Silently refetch whenever the tab gains focus (e.g. after publishing a
-  // listing from the upload tab). Skipping the first focus avoids running
-  // back-to-back with the initial mount fetch above. Without this, freshly
-  // uploaded listings only appeared after the app was restarted.
+  // Revalidate on focus (e.g. after publishing from the upload tab), but only
+  // when the feed has gone stale — React Query's staleTime reproduces the old
+  // isFresh() gate, so a just-loaded feed is reused. Following is skipped here
+  // (its profiles strip refreshes separately via loadFollowed). The initial
+  // fetch and tab-change fetch are handled automatically by useInfiniteQuery.
   useFocusEffect(
     useCallback(() => {
-      if (!hasLoadedRef.current) return;
-      if (activeTab === 'Following') return;
-      // Reuse recently-loaded rows instead of refetching the whole feed every
-      // time this tab regains focus. Pull-to-refresh bypasses this.
-      if (isFresh(`feed:${activeTab}`)) return;
-      let cancelled = false;
-      load(activeTab)
-        .then((result) => {
-          if (cancelled || !result.ok) return;
-          // Silent refetch only commits when the fetch succeeded. On
-          // ok:false the supabase client wedged — keep the user's current
-          // feed on screen rather than wipe it. Genuine "feed is empty"
-          // (ok:true, rows=[]) does commit.
-          setListings(result.rows);
-          putFeedSnapshot(activeTab, result.rows);
-        })
-        .catch(() => {});
-      return () => {
-        cancelled = true;
-      };
-    }, [activeTab, load]),
+      if (feedTab === 'following') return;
+      if (feedStale) feedRefetch();
+    }, [feedTab, feedStale, feedRefetch]),
   );
 
-  // Listen for freshly published listings and prepend them to the feed so
-  // the user sees their upload land at the top immediately — no need to
-  // wait for the next focus refetch (or refresh the page if that refetch
-  // raced/failed).
+  // Freshly published listings: prepend to the For-you feed's first page so the
+  // user's upload lands at the top immediately, without waiting for a refetch.
   useEffect(() => {
     return onListingCreated((listing) => {
-      if (activeTab !== 'For you') return;
-      setListings((prev) => {
-        if (prev.some((l) => l.id === listing.id)) return prev;
-        const next = [listing, ...prev];
-        putFeedSnapshot(activeTab, next);
-        return next;
+      if (feedTab !== 'for_you') return;
+      const key = qk.homeFeed('for_you', user?.id ?? null);
+      queryClient.setQueryData<InfiniteData<Listing[], number>>(key, (old) => {
+        if (!old) return old;
+        if (old.pages.some((page) => page.some((l) => l.id === listing.id))) return old;
+        const [first = [], ...rest] = old.pages;
+        return { ...old, pages: [[listing, ...first], ...rest] };
       });
     });
-  }, [activeTab]);
+  }, [feedTab, user?.id, queryClient]);
 
   const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    const result = await load(activeTab);
-    if (result.ok) {
-      setListings(result.rows);
-      putFeedSnapshot(activeTab, result.rows);
-    }
-    // On ok:false, preserve the current feed — pull-to-refresh against a
-    // wedged client used to wipe the screen.
-    setRefreshing(false);
-  }, [activeTab, load]);
+    // refetch revalidates all loaded pages. On failure React Query keeps the
+    // current pages on screen, so pull-to-refresh can't blank a wedged feed.
+    await feedRefetch();
+  }, [feedRefetch]);
 
   // Web pull-to-refresh — RefreshControl is inert on react-native-web, so we
   // drive the scroll-down gesture ourselves. No-op on native.

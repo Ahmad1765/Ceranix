@@ -3,9 +3,20 @@
 // background refetch are handled in one place. The underlying fetch functions
 // in lib/listings.ts / lib/follows.ts stay the single source of data logic —
 // these hooks just wrap them with React Query.
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { fetchListings, fetchUserListings, type FeedTab } from '@/lib/listings';
+import {
+  fetchFollowingListingsResult,
+  fetchListings,
+  fetchListingsResult,
+  fetchUserListings,
+  type FeedTab,
+} from '@/lib/listings';
 import { fetchRecommendations, fetchRecentlyViewed } from '@/lib/recommendations';
 import {
   fetchFollowState,
@@ -26,7 +37,52 @@ export const qk = {
     ['feedListings', tab, category] as const,
   recommendations: (userId: string | null) => ['recommendations', userId] as const,
   recentlyViewed: (userId: string | null) => ['recentlyViewed', userId] as const,
+  homeFeed: (tab: HomeFeedTab, userId: string | null) =>
+    ['homeFeed', tab, userId] as const,
 };
+
+// The home screen's three tabs. 'following' is a non-paginated, user-scoped
+// feed; the other two paginate.
+export type HomeFeedTab = FeedTab | 'following';
+const HOME_FEED_PAGE_SIZE = 60;
+
+// Paginated home feed as an infinite query. This single hook subsumes a large
+// amount of the old hand-rolled machinery in app/(tabs)/index.tsx:
+//   - per-tab caching (keyed by tab) replaces the feedSnapshots cache
+//   - throwing on a wedge (ok:false) makes React Query keep the last good pages
+//     instead of blanking the feed — the resilience the ok:false branch gave us
+//   - the default retry/backoff replaces the manual wedge-killer + retry timers
+//   - getNextPageParam replaces the manual offset bookkeeping in loadMore
+export function useHomeFeedQuery(tab: HomeFeedTab, userId: string | null) {
+  return useInfiniteQuery({
+    queryKey: qk.homeFeed(tab, userId),
+    // Following requires a signed-in user; the other tabs are public.
+    enabled: tab !== 'following' || !!userId,
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }): Promise<Listing[]> => {
+      if (tab === 'following') {
+        if (!userId) return [];
+        const r = await fetchFollowingListingsResult(userId);
+        if (!r.ok) throw new Error('following feed unavailable');
+        return r.rows;
+      }
+      const r = await fetchListingsResult({
+        tab,
+        limit: HOME_FEED_PAGE_SIZE,
+        offset: pageParam,
+      });
+      if (!r.ok) throw new Error('feed unavailable');
+      return r.rows;
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      // Following never paginates. Otherwise, a short final page = end of feed;
+      // the next offset is the total rows loaded so far.
+      if (tab === 'following') return undefined;
+      if (lastPage.length < HOME_FEED_PAGE_SIZE) return undefined;
+      return allPages.reduce((total, page) => total + page.length, 0);
+    },
+  });
+}
 
 export function useFeedListingsQuery(opts: {
   tab: FeedTab;
