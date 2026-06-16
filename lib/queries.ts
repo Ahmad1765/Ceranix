@@ -18,6 +18,13 @@ import {
   type FeedTab,
 } from '@/lib/listings';
 import { fetchRecommendations, fetchRecentlyViewed } from '@/lib/recommendations';
+import { fetchNewFromFollowed, fetchPriceDrops, type PriceDropListing } from '@/lib/myFeed';
+import { fetchSavedListings } from '@/lib/saves';
+import {
+  deleteSavedSearch,
+  listSavedSearches,
+  type SavedSearch,
+} from '@/lib/savedSearches';
 import {
   fetchFollowState,
   getCachedFollowState,
@@ -39,7 +46,87 @@ export const qk = {
   recentlyViewed: (userId: string | null) => ['recentlyViewed', userId] as const,
   homeFeed: (tab: HomeFeedTab, userId: string | null) =>
     ['homeFeed', tab, userId] as const,
+  myFeedListings: (userId: string | null) => ['myFeedListings', userId] as const,
+  priceDrops: (userId: string | null) => ['priceDrops', userId] as const,
+  newFromFollowed: (userId: string | null) => ['newFromFollowed', userId] as const,
+  savedSearches: (userId: string | null) => ['savedSearches', userId] as const,
+  savedListings: (userId: string | null) => ['savedListings', userId] as const,
 };
+
+// My Feed primary grid: personalized recommendations for a signed-in user,
+// trending as the anonymous fallback. Returns RecommendedListing[] for users
+// (carries rec_reason, used to detect the cold-start "fallback" state).
+export function useMyFeedListingsQuery(userId: string | null) {
+  return useQuery({
+    queryKey: qk.myFeedListings(userId),
+    queryFn: () =>
+      userId ? fetchRecommendations(48) : fetchListings({ tab: 'popular', limit: 60 }),
+  });
+}
+
+// Price drops on liked items. Throws on the discriminated ok:false so React
+// Query preserves the last good rows instead of clearing the rail.
+export function usePriceDropsQuery(userId: string | null) {
+  return useQuery({
+    queryKey: qk.priceDrops(userId),
+    enabled: !!userId,
+    queryFn: async (): Promise<PriceDropListing[]> => {
+      const r = await fetchPriceDrops(userId as string);
+      if (!r.ok) throw new Error('price drops unavailable');
+      return r.rows;
+    },
+  });
+}
+
+export function useNewFromFollowedQuery(userId: string | null) {
+  return useQuery({
+    queryKey: qk.newFromFollowed(userId),
+    enabled: !!userId,
+    queryFn: async (): Promise<Listing[]> => {
+      const r = await fetchNewFromFollowed(userId as string);
+      if (!r.ok) throw new Error('new-from-followed unavailable');
+      return r.rows;
+    },
+  });
+}
+
+export function useSavedSearchesQuery(userId: string | null) {
+  return useQuery({
+    queryKey: qk.savedSearches(userId),
+    enabled: !!userId,
+    queryFn: (): Promise<SavedSearch[]> => listSavedSearches(userId as string),
+  });
+}
+
+export function useSavedListingsQuery(userId: string | null) {
+  return useQuery({
+    queryKey: qk.savedListings(userId),
+    enabled: !!userId,
+    queryFn: (): Promise<Listing[]> => fetchSavedListings(userId as string),
+  });
+}
+
+// Optimistic saved-search delete: drop the chip from cache immediately, roll
+// back if the server rejects.
+export function useDeleteSavedSearch(userId: string | null) {
+  const qc = useQueryClient();
+  const key = qk.savedSearches(userId);
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const ok = await deleteSavedSearch(id);
+      if (!ok) throw new Error('delete failed');
+    },
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: key });
+      const prev = qc.getQueryData<SavedSearch[]>(key);
+      qc.setQueryData<SavedSearch[]>(key, (old) => (old ?? []).filter((s) => s.id !== id));
+      return { prev };
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.prev) qc.setQueryData(key, ctx.prev);
+    },
+  });
+}
 
 // The home screen's three tabs. 'following' is a non-paginated, user-scoped
 // feed; the other two paginate.

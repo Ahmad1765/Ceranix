@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   View,
@@ -12,24 +12,20 @@ import { Feather } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/lib/auth';
 import { colors, radii } from '@/lib/theme';
-import {
-  fetchNewFromFollowed,
-  fetchPriceDrops,
-  type PriceDropListing,
-} from '@/lib/myFeed';
-import { fetchRecommendations, type RecommendedListing } from '@/lib/recommendations';
-import { fetchListings } from '@/lib/listings';
-import { fetchSavedListings } from '@/lib/saves';
+import type { RecommendedListing } from '@/lib/recommendations';
 import { PriceDropCard } from '@/components/PriceDropCard';
-import {
-  deleteSavedSearch,
-  listSavedSearches,
-  type SavedSearch,
-} from '@/lib/savedSearches';
+import { type SavedSearch } from '@/lib/savedSearches';
 import { ListingCard } from '@/components/ListingCard';
 import { DropAlertSheet } from '@/components/DropAlertSheet';
 import { useWebPullToRefresh, WebPullIndicator } from '@/components/WebRefresh';
-import { isFresh, markFresh } from '@/lib/freshness';
+import {
+  useMyFeedListingsQuery,
+  usePriceDropsQuery,
+  useNewFromFollowedQuery,
+  useSavedSearchesQuery,
+  useSavedListingsQuery,
+  useDeleteSavedSearch,
+} from '@/lib/queries';
 import { useToast } from '@/lib/toast';
 import { useGridDimensions } from '@/lib/responsive';
 import type { Category, Listing } from '@/types';
@@ -50,25 +46,13 @@ function isValidCategory(v: unknown): v is Category {
   return typeof v === 'string' && VALID_CATEGORIES.has(v as Category);
 }
 
+// Stable empty references so query fallbacks don't churn the useMemos below.
+const EMPTY_LISTINGS: Listing[] = [];
+const EMPTY_SAVED_SEARCHES: SavedSearch[] = [];
+
 export default function MyFeedScreen() {
   const { user, profile } = useAuth();
   const toast = useToast();
-  const [refreshing, setRefreshing] = useState(false);
-
-  const [listings, setListings] = useState<RecommendedListing[]>([]);
-  const [isFallback, setIsFallback] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  // Personal rails — the things a marketplace feed can do that a social
-  // feed can't: price drops on items you liked, fresh stock from sellers
-  // you follow. Both hide entirely when empty.
-  const [priceDrops, setPriceDrops] = useState<PriceDropListing[]>([]);
-  const [fromFollowed, setFromFollowed] = useState<Listing[]>([]);
-
-  const [savedListings, setSavedListings] = useState<Listing[]>([]);
-  const [loadingSaved, setLoadingSaved] = useState(false);
-
-  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
   const [activeChip, setActiveChip] = useState<string>(FOR_YOU);
   const [alertSheetOpen, setAlertSheetOpen] = useState(false);
 
@@ -80,95 +64,72 @@ export default function MyFeedScreen() {
     gap: GRID_GAP,
   });
 
-  const loadListings = useCallback(
-    async (opts?: { silent?: boolean }) => {
-      const silent = opts?.silent === true;
-      if (!silent) setLoading(true);
-      if (user?.id) {
-        // Hybrid recommender (taste + collaborative + social + intent).
-        // It backfills with trending internally, so "fallback" here means
-        // nothing ranked for personal reasons — the user has no signals yet.
-        const rows = await fetchRecommendations(48);
-        setListings(rows);
-        setIsFallback(rows.every((r) => !r.rec_reason || r.rec_reason === 'trending'));
-      } else {
-        const fallback = await fetchListings({ tab: 'popular', limit: 60 });
-        setListings(fallback);
-        setIsFallback(true);
-      }
-      setLoading(false);
-    },
-    [user?.id],
-  );
+  // React Query owns all four reads (primary grid, two rails, saved searches,
+  // saved listings). staleTime reproduces the single old 'myfeed' freshness
+  // gate; each query now caches and revalidates independently.
+  const userId = user?.id ?? null;
+  const feedQ = useMyFeedListingsQuery(userId);
+  const priceDropsQ = usePriceDropsQuery(userId);
+  const followedQ = useNewFromFollowedQuery(userId);
+  const savedSearchesQ = useSavedSearchesQuery(userId);
+  const savedListingsQ = useSavedListingsQuery(userId);
+  const deleteSavedSearchM = useDeleteSavedSearch(userId);
 
-  const loadRails = useCallback(async () => {
-    if (!user?.id) {
-      setPriceDrops([]);
-      setFromFollowed([]);
-      return;
-    }
-    const [drops, followed] = await Promise.all([
-      fetchPriceDrops(user.id),
-      fetchNewFromFollowed(user.id),
-    ]);
-    if (drops.ok) setPriceDrops(drops.rows);
-    if (followed.ok) setFromFollowed(followed.rows);
-  }, [user?.id]);
+  const listings = feedQ.data ?? EMPTY_LISTINGS;
+  const loading = feedQ.isLoading;
+  // "Fallback" = nothing ranked for personal reasons (cold start). Anonymous
+  // users always get the trending fallback.
+  const isFallback =
+    !user ||
+    (listings as RecommendedListing[]).every(
+      (r) => !r.rec_reason || r.rec_reason === 'trending',
+    );
+  const priceDrops = priceDropsQ.data ?? [];
+  const fromFollowed = followedQ.data ?? EMPTY_LISTINGS;
+  const savedSearches = savedSearchesQ.data ?? EMPTY_SAVED_SEARCHES;
+  const savedListings = savedListingsQ.data ?? EMPTY_LISTINGS;
+  const loadingSaved = savedListingsQ.isLoading;
+  const refreshing =
+    feedQ.isRefetching ||
+    priceDropsQ.isRefetching ||
+    followedQ.isRefetching ||
+    savedSearchesQ.isRefetching ||
+    savedListingsQ.isRefetching;
 
-  const loadSavedSearches = useCallback(async () => {
-    if (!user?.id) {
-      setSavedSearches([]);
-      return;
-    }
-    const rows = await listSavedSearches(user.id);
-    setSavedSearches(rows);
-  }, [user?.id]);
+  // Stable refetch fns + isStale snapshots for the focus gate (see discover).
+  const { isStale: feedStale, refetch: feedRefetch } = feedQ;
+  const { isStale: dropsStale, refetch: dropsRefetch } = priceDropsQ;
+  const { isStale: followedStale, refetch: followedRefetch } = followedQ;
+  const { isStale: searchesStale, refetch: searchesRefetch } = savedSearchesQ;
+  const { isStale: savedStale, refetch: savedRefetch } = savedListingsQ;
 
-  const loadSavedListings = useCallback(
-    async (opts?: { silent?: boolean }) => {
-      if (!user?.id) {
-        setSavedListings([]);
-        return;
-      }
-      if (!opts?.silent) setLoadingSaved(true);
-      const rows = await fetchSavedListings(user.id);
-      setSavedListings(rows);
-      if (!opts?.silent) setLoadingSaved(false);
-    },
-    [user?.id],
-  );
-
-  useEffect(() => {
-    loadListings();
-    loadSavedSearches();
-    loadSavedListings();
-    loadRails();
-  }, [loadListings, loadSavedSearches, loadSavedListings, loadRails]);
-
+  // Revalidate stale queries on focus — reuses fresh data so returning to this
+  // 4-fetch tab doesn't re-hit the network every time.
   useFocusEffect(
     useCallback(() => {
-      // Reuse the last load when returning to this tab within the freshness
-      // window — this screen fans out to 4 fetches, so refetching on every
-      // focus was the heaviest offender. Pull-to-refresh bypasses this.
-      if (isFresh('myfeed')) return;
-      markFresh('myfeed');
-      loadListings({ silent: true });
-      loadSavedSearches();
-      loadSavedListings({ silent: true });
-      loadRails();
-    }, [loadListings, loadSavedSearches, loadSavedListings, loadRails]),
+      if (feedStale) feedRefetch();
+      if (dropsStale) dropsRefetch();
+      if (followedStale) followedRefetch();
+      if (searchesStale) searchesRefetch();
+      if (savedStale) savedRefetch();
+    }, [
+      feedStale, feedRefetch,
+      dropsStale, dropsRefetch,
+      followedStale, followedRefetch,
+      searchesStale, searchesRefetch,
+      savedStale, savedRefetch,
+    ]),
   );
 
   const onRefresh = useCallback(async () => {
-    setRefreshing(true);
     await Promise.all([
-      loadListings({ silent: true }),
-      loadSavedSearches(),
-      loadSavedListings({ silent: true }),
-      loadRails(),
+      feedRefetch(),
+      dropsRefetch(),
+      followedRefetch(),
+      searchesRefetch(),
+      savedRefetch(),
     ]);
-    setRefreshing(false);
-  }, [loadListings, loadSavedSearches, loadSavedListings, loadRails]);
+  }, [feedRefetch, dropsRefetch, followedRefetch, searchesRefetch, savedRefetch]);
 
   const onDeleteChip = useCallback(
     (search: SavedSearch) => {
@@ -181,22 +142,23 @@ export default function MyFeedScreen() {
           {
             text: 'Remove',
             style: 'destructive',
-            onPress: async () => {
-              // Optimistic: drop locally before round-trip so the chip
-              // disappears immediately on press.
-              setSavedSearches((prev) => prev.filter((s) => s.id !== search.id));
+            onPress: () => {
+              // The mutation drops the chip from cache optimistically and rolls
+              // back on failure.
               if (activeChip === search.id) setActiveChip(FOR_YOU);
-              const ok = await deleteSavedSearch(search.id);
-              if (!ok) {
-                toast.show('Could not remove that feed', { variant: 'info', icon: 'alert-circle' });
-                loadSavedSearches();
-              }
+              deleteSavedSearchM.mutate(search.id, {
+                onError: () =>
+                  toast.show('Could not remove that feed', {
+                    variant: 'info',
+                    icon: 'alert-circle',
+                  }),
+              });
             },
           },
         ],
       );
     },
-    [activeChip, loadSavedSearches, toast],
+    [activeChip, deleteSavedSearchM, toast],
   );
 
   const activeSavedSearch = useMemo(
@@ -398,7 +360,7 @@ export default function MyFeedScreen() {
           visible={alertSheetOpen}
           userId={user.id}
           onClose={() => setAlertSheetOpen(false)}
-          onCreated={loadSavedSearches}
+          onCreated={() => searchesRefetch()}
         />
       ) : null}
       <WebPullIndicator pull={pull} refreshing={refreshing} nodeTop={nodeTop} threshold={threshold} />
