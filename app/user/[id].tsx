@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   View,
   Text,
@@ -14,9 +14,12 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { safeBack } from '@/lib/nav';
 import { Feather } from '@expo/vector-icons';
 import Animated from 'react-native-reanimated';
-import { supabase } from '@/lib/supabase';
-import { fetchUserListings } from '@/lib/listings';
-import { fetchFollowState, toggleFollow } from '@/lib/follows';
+import {
+  useProfileQuery,
+  useUserListingsQuery,
+  useFollowStateQuery,
+  useToggleFollow,
+} from '@/lib/queries';
 import { getOptimizedImageUrl } from '@/lib/images';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
@@ -25,7 +28,7 @@ import { colors, radii } from '@/lib/theme';
 import { computeLevel } from '@/lib/levels';
 import { useGridDimensions, HIT_SLOP_8 } from '@/lib/responsive';
 import { useFadeIn } from '@/lib/motion';
-import type { User as Profile, Listing } from '@/types';
+import type { Listing } from '@/types';
 import { Button, EmptyState, SectionHeader } from '@/components/ui';
 
 const HORIZONTAL_PAD = 12;
@@ -37,14 +40,6 @@ export default function UserProfileScreen() {
   const userId = typeof id === 'string' ? id : '';
   const { user: authUser } = useAuth();
   const toast = useToast();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [listings, setListings] = useState<Listing[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [followed, setFollowed] = useState(false);
-  const [followBusy, setFollowBusy] = useState(false);
-  const [followersCount, setFollowersCount] = useState(0);
-  const [followingCount, setFollowingCount] = useState(0);
   // 'all' shows everything; sold rows already sort after available ones.
   const [shopFilter, setShopFilter] = useState<'all' | 'available' | 'sold'>('all');
 
@@ -58,71 +53,42 @@ export default function UserProfileScreen() {
     gap: GRID_GAP,
   });
 
-  useEffect(() => {
-    if (!userId) {
-      setLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    Promise.all([
-      supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
-      fetchUserListings(userId),
-      // fetchFollowState now returns null on RPC failure — preserve last-known
-      // state (or default to "not following") instead of clobbering with false.
-      fetchFollowState(authUser?.id ?? null, userId).catch(() => null),
-    ])
-      .then(([p, l, f]) => {
-        if (cancelled) return;
-        setProfile((p.data as Profile | null) ?? null);
-        setListings(l);
-        if (f) {
-          setFollowed(f.isFollowing);
-          setFollowersCount(f.followersCount);
-          setFollowingCount(f.followingCount);
-        }
-      })
-      .catch((e) => {
-        if (!cancelled) console.warn('[user] load failed', e?.message ?? e);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [userId, authUser?.id]);
+  // React Query owns fetching/caching/retries now. Profile + listings + follow
+  // state are three independent queries that dedupe and refetch on their own.
+  const profileQ = useProfileQuery(userId);
+  const listingsQ = useUserListingsQuery(userId);
+  const followQ = useFollowStateQuery(authUser?.id ?? null, userId);
+  const toggleFollowM = useToggleFollow(authUser?.id ?? null, userId);
 
-  const handleFollowToggle = async () => {
+  const profile = profileQ.data ?? null;
+  const listings = listingsQ.data ?? [];
+  // First-load skeleton: only while the primary reads have no data yet.
+  const loading = profileQ.isLoading || listingsQ.isLoading;
+  // Pull-to-refresh spinner: a refetch while data is already on screen.
+  const refreshing = profileQ.isRefetching || listingsQ.isRefetching;
+  const followed = followQ.data?.isFollowing ?? false;
+  const followersCount = followQ.data?.followersCount ?? 0;
+  const followingCount = followQ.data?.followingCount ?? 0;
+  const followBusy = toggleFollowM.isPending;
+
+  const handleFollowToggle = () => {
     if (!authUser) {
       toast.show('Sign in to follow', { variant: 'info', icon: 'log-in' });
       router.push('/auth/login' as any);
       return;
     }
     if (!userId || authUser.id === userId || followBusy) return;
-    setFollowBusy(true);
-    const wasFollowing = followed;
-    // Optimistic UI flip + counts adjust.
-    setFollowed(!wasFollowing);
-    setFollowersCount((n) => Math.max(0, n + (wasFollowing ? -1 : 1)));
-    try {
-      const next = await toggleFollow(authUser.id, userId, wasFollowing);
-      // Commit the server-truth state + counts atomically so optimistic
-      // drift can't leave the button or numbers stale.
-      setFollowed(next.isFollowing);
-      setFollowersCount(next.followersCount);
-      setFollowingCount(next.followingCount);
-    } catch (e: any) {
-      // Roll back.
-      setFollowed(wasFollowing);
-      setFollowersCount((n) => Math.max(0, n + (wasFollowing ? 1 : -1)));
-      toast.show(e?.message ?? 'Could not update follow', {
-        variant: 'default',
-        icon: 'alert-triangle',
-      });
-    } finally {
-      setFollowBusy(false);
-    }
+    // The mutation handles the optimistic flip + rollback internally.
+    toggleFollowM.mutate(
+      { currentlyFollowing: followed },
+      {
+        onError: (e: any) =>
+          toast.show(e?.message ?? 'Could not update follow', {
+            variant: 'default',
+            icon: 'alert-triangle',
+          }),
+      },
+    );
   };
 
   const handleMore = () => {
@@ -149,27 +115,12 @@ export default function UserProfileScreen() {
     ]);
   };
 
-  const onRefresh = async () => {
+  const onRefresh = () => {
     if (!userId) return;
-    setRefreshing(true);
-    try {
-      const [p, l, f] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
-        fetchUserListings(userId),
-        fetchFollowState(authUser?.id ?? null, userId).catch(() => null),
-      ]);
-      setProfile((p.data as Profile | null) ?? null);
-      setListings(l);
-      if (f) {
-        setFollowed(f.isFollowing);
-        setFollowersCount(f.followersCount);
-        setFollowingCount(f.followingCount);
-      }
-    } catch (e: any) {
-      console.warn('[user] refresh failed', e?.message ?? e);
-    } finally {
-      setRefreshing(false);
-    }
+    // Force all three reads to revalidate, bypassing staleTime.
+    profileQ.refetch();
+    listingsQ.refetch();
+    followQ.refetch();
   };
 
   if (loading) {

@@ -39,6 +39,8 @@ import {
   Inter_600SemiBold,
   Inter_700Bold,
 } from '@expo-google-fonts/inter';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '@/lib/queryClient';
 import { AuthProvider } from '@/lib/auth';
 import { ToastProvider } from '@/lib/toast';
 import { Preloader } from '@/components/Preloader';
@@ -128,6 +130,7 @@ function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <StatusBar style="dark" />
+      <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <ToastProvider>
         <Stack screenOptions={{ headerShown: false }}>
@@ -179,6 +182,7 @@ function RootLayout() {
         </Stack>
         </ToastProvider>
       </AuthProvider>
+      </QueryClientProvider>
     </GestureHandlerRootView>
   );
 }
