@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import type { Listing } from '@/types';
 import { putCachedListing, putCachedListings } from '@/lib/listingCache';
 import { getLikedIds, updateLikedCache } from '@/lib/engagementCache';
+import { captureError } from '@/lib/sentry';
 
 const SELECT_WITH_SELLER = '*, seller:profiles!listings_seller_id_fkey(*)';
 
@@ -73,7 +74,7 @@ export async function fetchListingsResult(
     putCachedListings(rows);
     return { ok: true, rows };
   } catch (e: any) {
-    console.warn('[listings] fetchListings threw', e?.message ?? e);
+    captureError(e, { fn: 'fetchListings' });
     return { ok: false };
   } finally {
     clearTimeout(timer!);
@@ -126,7 +127,7 @@ export async function fetchFollowingListingsResult(
     putCachedListings(out);
     return { ok: true, rows: out };
   } catch (e: any) {
-    console.warn('[listings] fetchFollowingListings threw', e?.message ?? e);
+    captureError(e, { fn: 'fetchFollowingListings' });
     return { ok: false };
   }
 }
@@ -168,7 +169,7 @@ export async function searchListings(opts: {
     putCachedListings(rows);
     return { ok: true, rows };
   } catch (e: any) {
-    console.warn('[listings] searchListings threw', e?.message ?? e);
+    captureError(e, { fn: 'searchListings' });
     return { ok: false };
   }
 }

@@ -1,4 +1,5 @@
 import type { Listing } from '@/types';
+import { captureError } from '@/lib/sentry';
 
 // Tiny module-level event bus for "a listing just appeared/disappeared".
 // Used so the upload screen can tell the home feed about a freshly published
@@ -24,7 +25,7 @@ export function emitListingCreated(listing: Listing): void {
     try {
       fn(listing);
     } catch (e) {
-      console.warn('[listingEvents] listener threw', e);
+      captureError(e, { fn: 'listingEvents.listener' });
     }
   }
 }

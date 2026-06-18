@@ -21,6 +21,7 @@ import { fetchListingById } from '@/lib/listings';
 import { getOrCreateConversation, sendMessage, sendOffer } from '@/lib/chat';
 import { getOptimizedImageUrl } from '@/lib/images';
 import { useToast } from '@/lib/toast';
+import { captureError } from '@/lib/sentry';
 import type { Listing } from '@/types';
 
 type Mode = 'message' | 'offer';
@@ -104,7 +105,7 @@ export default function NewConversationScreen() {
         setListing(row);
       })
       .catch((err) => {
-        console.error('Failed to fetch listing for new conversation:', err);
+        captureError(err, { fn: 'conversationNew.fetchListing' });
         if (cancelled) return;
         setListing(null);
       })
@@ -196,7 +197,7 @@ export default function NewConversationScreen() {
       });
       router.replace(`/conversation/${conv.id}` as any);
     } catch (err) {
-      console.error('Failed to send:', err);
+      captureError(err, { fn: 'conversationNew.send' });
       Alert.alert('Error', 'An unexpected error occurred. Please try again.');
     } finally {
       setSending(false);

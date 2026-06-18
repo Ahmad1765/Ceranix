@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import type { Listing } from '@/types';
 import { putCachedListings } from '@/lib/listingCache';
+import { captureError } from '@/lib/sentry';
 
 // Discriminated result: ok=false means the fetch wedged or PostgREST errored.
 // Callers should preserve whatever is on screen rather than commit []. This
@@ -136,8 +137,7 @@ export async function fetchPriceDrops(userId: string): Promise<MyFeedResult<Pric
     putCachedListings(rows);
     return { ok: true, rows };
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.warn('[myFeed] fetchPriceDrops threw', msg);
+    captureError(e, { fn: 'fetchPriceDrops' });
     return { ok: false };
   }
 }
@@ -192,8 +192,7 @@ export async function fetchNewFromFollowed(
     putCachedListings(rows);
     return { ok: true, rows };
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.warn('[myFeed] fetchNewFromFollowed threw', msg);
+    captureError(e, { fn: 'fetchNewFromFollowed' });
     return { ok: false };
   }
 }
@@ -321,8 +320,7 @@ export async function fetchSimilarToLiked(
     putCachedListings(rows);
     return { ok: true, rows };
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.warn('[myFeed] fetchSimilarToLiked threw', msg);
+    captureError(e, { fn: 'fetchSimilarToLiked' });
     return { ok: false };
   }
 }

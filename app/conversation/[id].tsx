@@ -30,6 +30,7 @@ import {
 } from '@/lib/chat';
 import { getOptimizedImageUrl } from '@/lib/images';
 import { useToast } from '@/lib/toast';
+import { captureError } from '@/lib/sentry';
 import { colors, radii } from '@/lib/theme';
 import { Button, EmptyState } from '@/components/ui';
 import { HIT_SLOP_8 } from '@/lib/responsive';
@@ -613,7 +614,7 @@ export default function ConversationScreen() {
           Alert.alert('Could not send offer', 'Please try again.');
         }
       } catch (e: any) {
-        console.warn('[conversation] sendOffer threw', e?.message ?? e);
+        captureError(e, { fn: 'conversation.sendOffer' });
         toast.show("Couldn't send offer", { variant: 'default', icon: 'alert-triangle' });
       }
     },

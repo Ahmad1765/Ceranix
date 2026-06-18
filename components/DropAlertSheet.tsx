@@ -12,6 +12,7 @@ import { Feather } from '@expo/vector-icons';
 import { colors, radii } from '@/lib/theme';
 import { createSavedSearch } from '@/lib/savedSearches';
 import { useToast } from '@/lib/toast';
+import { captureError } from '@/lib/sentry';
 import type { Category, Gender } from '@/types';
 
 const CATEGORIES: { id: Category; label: string; emoji: string }[] = [
@@ -82,7 +83,7 @@ export function DropAlertSheet({ visible, userId, onClose, onCreated }: Props) {
       onCreated();
       onClose();
     } catch (e: any) {
-      console.error('[drop-alert]', e);
+      captureError(e, { fn: 'dropAlert.create' });
       toast.show("Couldn't create the alert", { variant: 'default', icon: 'alert-triangle' });
     } finally {
       setSaving(false);
