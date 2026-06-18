@@ -34,12 +34,11 @@ import type { Listing } from '@/types';
 import {
   deleteListing,
   fetchListingById,
-  fetchSellerOtherListings,
-  fetchSimilarListings,
   isLiked,
   setListingSold,
   toggleLike,
 } from '@/lib/listings';
+import { useSellerOtherListingsQuery, useSimilarListingsQuery } from '@/lib/queries';
 import { confirm } from '@/lib/confirm';
 import { logListingView } from '@/lib/recommendations';
 import { getCachedListing } from '@/lib/listingCache';
@@ -127,6 +126,10 @@ const FALLBACK_SELLER = {
   total_sales: 0,
   created_at: '',
 };
+
+// Stable empty reference for the React Query rail fallbacks (seller/similar
+// items), so downstream memos don't churn before the queries resolve.
+const EMPTY_LISTINGS: Listing[] = [];
 
 type RelatedItem = {
   id: string;
@@ -1091,8 +1094,6 @@ export default function ProductScreen() {
     getCachedFollowState(user?.id ?? null, cached?.seller?.id)?.isFollowing ?? false;
   const [followed, setFollowed] = useState(initialFollowed);
   const [followBusy, setFollowBusy] = useState(false);
-  const [sellerItems, setSellerItems] = useState<Listing[]>([]);
-  const [similarItems, setSimilarItems] = useState<Listing[]>([]);
   const [selectedBundleIds, setSelectedBundleIds] = useState<Set<string>>(new Set());
   const [showStickyHeader, setShowStickyHeader] = useState(false);
   const [relatedTab, setRelatedTab] = useState<'members' | 'similar'>('members');
@@ -1248,48 +1249,17 @@ export default function ProductScreen() {
     setSelectedBundleIds(new Set());
   }, [listing?.id]);
 
-  // Other listings from this seller — ranked by likes desc, freshness tiebreak,
-  // excluding the current item + sold rows server-side via RPC.
-  useEffect(() => {
-    let active = true;
-    const sellerId = listing?.seller_id;
-    const currentId = listing?.id ?? null;
-    if (!sellerId) {
-      setSellerItems([]);
-      return;
-    }
-    fetchSellerOtherListings(sellerId, currentId, 6)
-      .then((rows) => {
-        if (!active) return;
-        setSellerItems(rows);
-      })
-      .catch((e) => console.warn('[product] fetchSellerOtherListings', e?.message ?? e));
-    return () => {
-      active = false;
-    };
-  }, [listing?.seller_id, listing?.id]);
-
-  // "You might also like" — weighted similarity (brand, gender, size,
-  // condition, price proximity, title trigram, likes, freshness). Filtered
-  // server-side to exclude the item itself, sold rows, the same seller, and
-  // sellers on vacation.
-  useEffect(() => {
-    let active = true;
-    const currentId = listing?.id;
-    if (!currentId) {
-      setSimilarItems([]);
-      return;
-    }
-    fetchSimilarListings(currentId, 6)
-      .then((rows) => {
-        if (!active) return;
-        setSimilarItems(rows);
-      })
-      .catch((e) => console.warn('[product] fetchSimilarListings', e?.message ?? e));
-    return () => {
-      active = false;
-    };
-  }, [listing?.id]);
+  // Other listings from this seller ("more from this seller") + "you might also
+  // like" — both are pure server reads keyed on the current listing, so React
+  // Query owns fetching/caching. They refetch automatically when the viewed
+  // listing changes.
+  const sellerItemsQ = useSellerOtherListingsQuery(
+    listing?.seller_id ?? null,
+    listing?.id ?? null,
+  );
+  const similarItemsQ = useSimilarListingsQuery(listing?.id ?? null);
+  const sellerItems = sellerItemsQ.data ?? EMPTY_LISTINGS;
+  const similarItems = similarItemsQ.data ?? EMPTY_LISTINGS;
 
   const handleHeartPress = async () => {
     tap('light');

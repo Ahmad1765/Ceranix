@@ -15,6 +15,8 @@ import {
   fetchLikedListings,
   fetchListings,
   fetchListingsResult,
+  fetchSellerOtherListings,
+  fetchSimilarListings,
   fetchUserListings,
   type FeedTab,
 } from '@/lib/listings';
@@ -63,7 +65,32 @@ export const qk = {
   saveLists: (userId: string | null) => ['saveLists', userId] as const,
   listingsInList: (listId: string | null) => ['listingsInList', listId] as const,
   inbox: (userId: string | null) => ['inbox', userId] as const,
+  sellerOtherListings: (sellerId: string | null, excludeId: string | null) =>
+    ['sellerOtherListings', sellerId, excludeId] as const,
+  similarListings: (listingId: string | null) => ['similarListings', listingId] as const,
 };
+
+// Product detail rails — pure server reads keyed on the current listing.
+export function useSellerOtherListingsQuery(
+  sellerId: string | null,
+  excludeId: string | null,
+  limit = 6,
+) {
+  return useQuery({
+    queryKey: qk.sellerOtherListings(sellerId, excludeId),
+    enabled: !!sellerId,
+    queryFn: (): Promise<Listing[]> =>
+      fetchSellerOtherListings(sellerId as string, excludeId, limit),
+  });
+}
+
+export function useSimilarListingsQuery(listingId: string | null, limit = 6) {
+  return useQuery({
+    queryKey: qk.similarListings(listingId),
+    enabled: !!listingId,
+    queryFn: (): Promise<Listing[]> => fetchSimilarListings(listingId as string, limit),
+  });
+}
 
 // Chat inbox. The Realtime subscription (subscribeToInbox) stays in the screen
 // and simply calls refetch() on change — the simplest Realtime + React Query
