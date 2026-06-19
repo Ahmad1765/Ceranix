@@ -182,11 +182,16 @@ Deno.serve(async (req: Request) => {
     return new Response('Order insert failed', { status: 500 });
   }
 
-  await capturePurchase(buyerId, {
-    order_id: session.id,
-    listing_id: listingId,
-    amount_cents: amountCents,
-  });
+  // Emit the analytics event ONLY for a genuinely new order. A 23505 means this
+  // is a Stripe retry of an already-recorded purchase, so firing again would
+  // double-count revenue in PostHog (the exact metric this funnel measures).
+  if (!orderErr) {
+    await capturePurchase(buyerId, {
+      order_id: session.id,
+      listing_id: listingId,
+      amount_cents: amountCents,
+    });
+  }
 
   // 2) Mark the listing sold.
   const { error: soldErr } = await db
