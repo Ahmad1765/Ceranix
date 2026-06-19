@@ -2,21 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
-  ScrollView,
   Pressable,
-  Dimensions,
   Alert,
-  Platform,
   StyleSheet,
-  Modal,
-  ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { safeBack } from '@/lib/nav';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import * as Haptics from 'expo-haptics';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -25,10 +19,6 @@ import Animated, {
   useAnimatedScrollHandler,
   useAnimatedReaction,
   runOnJS,
-  withTiming,
-  withRepeat,
-  withSequence,
-  type SharedValue,
 } from 'react-native-reanimated';
 import type { Listing } from '@/types';
 import {
@@ -43,7 +33,6 @@ import { confirm } from '@/lib/confirm';
 import { logListingView } from '@/lib/recommendations';
 import { getCachedListing } from '@/lib/listingCache';
 import { fetchFollowState, getCachedFollowState, toggleFollow } from '@/lib/follows';
-import { withTimeout } from '@/lib/async';
 import { getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
@@ -51,391 +40,40 @@ import { LikeBurst } from '@/components/LikeBurst';
 import { AnimatedNumber } from '@/components/AnimatedNumber';
 import { SaveListSheet } from '@/components/SaveListSheet';
 import { isSaved as fetchIsSaved } from '@/lib/saves';
+import { FullscreenImageViewer } from '@/components/product/FullscreenImageViewer';
+import { RelatedItemCard } from '@/components/product/RelatedItemCard';
+import { ProductSkeleton } from '@/components/product/ProductSkeleton';
+import { HeroPageDot } from '@/components/product/HeroPageDot';
+import {
+  IS_IOS,
+  HAIRLINE,
+  tap,
+  iosShadow,
+  width,
+  IMAGE_HEIGHT,
+  CONDITION_LABELS,
+  CATEGORY_LABELS,
+  ITEM_COLOR,
+  BRAND_PURPLE,
+  BRAND_PURPLE_SOFT,
+  BRAND_LIME,
+  BRAND_INK,
+  TAG_BG,
+  TAG_BORDER,
+  LINK_PURPLE,
+  FALLBACK_SELLER,
+  EMPTY_LISTINGS,
+  conditionLabel,
+  listingToRelated,
+  BUNDLE_TIERS,
+  BUNDLE_MIN_ITEMS,
+  CARD_GAP,
+  CARD_OUTER_PAD,
+  CARD_WIDTH,
+  CARD_IMAGE_HEIGHT,
+} from '@/components/product/shared';
 
 const AnimatedExpoImage = Animated.createAnimatedComponent(Image);
-
-const IS_IOS = Platform.OS === 'ios';
-const HAIRLINE = StyleSheet.hairlineWidth;
-
-function tap(style: 'light' | 'medium' | 'selection' = 'selection') {
-  if (!IS_IOS) return;
-  if (style === 'selection') Haptics.selectionAsync();
-  else if (style === 'light') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-}
-
-const iosShadow = IS_IOS
-  ? {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.18,
-      shadowRadius: 10,
-    }
-  : {
-      shadowColor: '#000',
-      elevation: 3,
-    };
-
-const { width } = Dimensions.get('window');
-const IMAGE_HEIGHT = width * 1.45;
-
-const CONDITION_LABELS: Record<string, string> = {
-  new_with_tags: 'New with tags',
-  like_new: 'Like new',
-  good: 'Very good condition',
-  fair: 'Fair',
-};
-
-const CATEGORY_LABELS: Record<string, string> = {
-  clothing: 'Clothing',
-  shoes: 'Shoes',
-  bags: 'Bags',
-  accessories: 'Accessories',
-  electronics: 'Electronics',
-  beauty: 'Beauty',
-  other: 'Other',
-};
-
-const ITEM_COLOR = { name: 'Carrinex purple', hex: '#6C47FF' };
-
-// Unified brand palette (matches home tabs + PromoBanner + LiveActivityTicker)
-const BRAND_PURPLE = '#6C47FF';
-const BRAND_PURPLE_SOFT = 'rgba(108,71,255,0.10)';
-const BRAND_LIME = '#6C47FF';
-const BRAND_INK = '#0F0F0F';
-const TAG_BG = 'rgba(15,15,15,0.04)';
-const TAG_BORDER = 'rgba(15,15,15,0.08)';
-const LINK_PURPLE = BRAND_PURPLE;
-
-// Dead "review" / "transaction" / "items listed" / "pin" constants were
-// previously hardcoded here as fake static numbers. They masqueraded as real
-// data on the seller card; they're gone now. Where the UI still needs a
-// value we either derive it from the actual listing/seller row or hide the
-// chip when the field is unknown. The fallback `0` paths below are explicit.
-
-// Fallback shape used while the real listing is loading; render is gated on
-// `listing` being non-null below, so this is never visible in the UI.
-const FALLBACK_SELLER = {
-  id: '',
-  username: '',
-  avatar_url: null,
-  full_name: '',
-  bio: null,
-  location: null,
-  rating: 0,
-  total_sales: 0,
-  created_at: '',
-};
-
-// Stable empty reference for the React Query rail fallbacks (seller/similar
-// items), so downstream memos don't churn before the queries resolve.
-const EMPTY_LISTINGS: Listing[] = [];
-
-type RelatedItem = {
-  id: string;
-  images: string[];
-  brand: string;
-  meta: string;
-  price: number;
-  inclPrice: number;
-  likes: number;
-};
-
-function conditionLabel(c: Listing['condition']) {
-  switch (c) {
-    case 'new_with_tags':
-      return 'New with tags';
-    case 'like_new':
-      return 'Like new';
-    case 'good':
-      return 'Good';
-    case 'fair':
-      return 'Fair';
-    default:
-      return '';
-  }
-}
-
-function listingToRelated(row: Listing): RelatedItem {
-  const meta = [row.size, conditionLabel(row.condition)].filter(Boolean).join(' · ');
-  return {
-    id: row.id,
-    images: row.images && row.images.length > 0 ? row.images : [],
-    brand: row.brand || row.title,
-    meta: meta || row.category,
-    price: Number(row.price ?? 0),
-    inclPrice: Number(row.price ?? 0),
-    likes: Number(row.likes ?? 0),
-  };
-}
-
-// Marketplace-wide bundle tiers. The buyer's bundle item count maps to the
-// highest tier whose `count` threshold has been reached. Tier `pct` is the
-// applied discount. Keeping this a const array (not seller-configurable) so
-// the milestone progress bar always shows the same rungs across the app.
-const BUNDLE_TIERS = [
-  { count: 1, pct: 0, label: '1 item' },
-  { count: 2, pct: 5, label: '2 items' },
-  { count: 3, pct: 10, label: '3 items' },
-  { count: 4, pct: 15, label: '4 items' },
-  { count: 5, pct: 20, label: '5+ items' },
-] as const;
-const BUNDLE_MIN_ITEMS = 2;
-
-const CARD_GAP = 8;
-const CARD_OUTER_PAD = 12;
-// Floor so 2*CARD_WIDTH + CARD_GAP can never exceed the row width due to
-// sub-pixel rounding — otherwise the second card wraps and the grid
-// collapses into a single column on certain devices/layout passes.
-const CARD_WIDTH = Math.floor((width - CARD_OUTER_PAD * 2 - CARD_GAP) / 2);
-const CARD_IMAGE_HEIGHT = Math.round(CARD_WIDTH * 1.25);
-
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-
-function FullscreenImageViewer({
-  visible,
-  images,
-  initialIndex,
-  onClose,
-}: {
-  visible: boolean;
-  images: string[];
-  initialIndex: number;
-  onClose: () => void;
-}) {
-  const scrollRef = useRef<ScrollView>(null);
-  const offsetX = useSharedValue(initialIndex * width);
-  const scrollHandler = useAnimatedScrollHandler({
-    onScroll: (e) => {
-      offsetX.value = e.contentOffset.x;
-    },
-  });
-
-  // Sync to the tapped image whenever the viewer (re-)opens.
-  useEffect(() => {
-    if (!visible) return;
-    offsetX.value = initialIndex * width;
-    requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({ x: initialIndex * width, y: 0, animated: false });
-    });
-  }, [visible, initialIndex, offsetX]);
-
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-      statusBarTranslucent
-    >
-      <StatusBar style="light" animated />
-      <View style={{ flex: 1, backgroundColor: '#000' }}>
-        <Animated.ScrollView
-          ref={scrollRef as any}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onScroll={scrollHandler}
-          scrollEventThrottle={16}
-        >
-          {images.map((uri, i) => (
-            <Pressable
-              key={i}
-              onPress={onClose}
-              style={{
-                width,
-                height: SCREEN_HEIGHT,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Image
-                source={{ uri: getOptimizedImageUrl(uri, { width: thumbWidthFor(width), quality: 80 }) }}
-                style={{ width, height: SCREEN_HEIGHT }}
-                contentFit="contain"
-                cachePolicy="memory-disk"
-                recyclingKey={uri}
-                transition={0}
-                priority={i === initialIndex ? 'high' : 'normal'}
-              />
-            </Pressable>
-          ))}
-        </Animated.ScrollView>
-
-        {/* Close button */}
-        <Pressable
-          onPress={() => { tap('selection'); onClose(); }}
-          hitSlop={12}
-          style={({ pressed }) => ({
-            position: 'absolute',
-            top: (IS_IOS ? 54 : 28),
-            right: 16,
-            width: 38,
-            height: 38,
-            borderRadius: 19,
-            backgroundColor: 'rgba(255,255,255,0.14)',
-            alignItems: 'center',
-            justifyContent: 'center',
-            opacity: pressed ? 0.7 : 1,
-          })}
-        >
-          <Feather name="x" size={20} color="#fff" />
-        </Pressable>
-
-        {/* Pagination dots */}
-        {images.length > 1 && (
-          <View
-            style={{
-              position: 'absolute',
-              bottom: IS_IOS ? 44 : 28,
-              left: 0,
-              right: 0,
-              flexDirection: 'row',
-              justifyContent: 'center',
-              alignItems: 'center',
-              gap: 6,
-              pointerEvents: 'none',
-            }}
-          >
-            {images.map((_, i) => (
-              <HeroPageDot key={i} index={i} offsetX={offsetX} pageWidth={width} />
-            ))}
-          </View>
-        )}
-      </View>
-    </Modal>
-  );
-}
-
-function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress: () => void }) {
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [carouselArmed, setCarouselArmed] = useState(false);
-  const hasMultiple = item.images.length > 1;
-  const srcWidth = thumbWidthFor(CARD_WIDTH);
-  const armCarousel = () => {
-    if (!carouselArmed) setCarouselArmed(true);
-  };
-  return (
-    <Pressable onPress={onPress} style={{ width: CARD_WIDTH, marginBottom: 18 }}>
-      <View
-        style={{
-          position: 'relative',
-          width: CARD_WIDTH,
-          height: CARD_IMAGE_HEIGHT,
-          borderRadius: 14,
-          overflow: 'hidden',
-          backgroundColor: 'rgba(15,15,15,0.04)',
-        }}
-      >
-        {hasMultiple ? (
-          <ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            nestedScrollEnabled
-            onScroll={(e) =>
-              setActiveIndex(Math.round(e.nativeEvent.contentOffset.x / CARD_WIDTH))
-            }
-            onTouchStart={armCarousel}
-            onScrollBeginDrag={armCarousel}
-            scrollEventThrottle={16}
-            disableIntervalMomentum
-          >
-            {item.images.map((uri, i) => {
-              if (i !== 0 && !carouselArmed) {
-                return <View key={i} style={{ width: CARD_WIDTH, height: CARD_IMAGE_HEIGHT }} />;
-              }
-              return (
-                <Image
-                  key={i}
-                  source={{ uri: getOptimizedImageUrl(uri, { width: srcWidth }) }}
-                  style={{ width: CARD_WIDTH, height: CARD_IMAGE_HEIGHT }}
-                  contentFit="cover"
-                  cachePolicy="memory-disk"
-                  recyclingKey={uri}
-                  transition={180}
-                  priority={i === 0 ? 'normal' : 'low'}
-                />
-              );
-            })}
-          </ScrollView>
-        ) : (
-          <Image
-            source={{
-              uri: item.images && item.images.length > 0
-                ? getOptimizedImageUrl(item.images[0], { width: srcWidth })
-                : 'https://placehold.co/400x400/eeeeee/cccccc.png?text=No+Image',
-            }}
-            style={{ width: CARD_WIDTH, height: CARD_IMAGE_HEIGHT }}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-            recyclingKey={item.images && item.images.length > 0 ? item.images[0] : 'empty-placeholder'}
-            transition={180}
-          />
-        )}
-
-        {hasMultiple && (
-          <View
-            style={{
-              position: 'absolute',
-              bottom: 8,
-              left: 0,
-              right: 0,
-              flexDirection: 'row',
-              justifyContent: 'center',
-              alignItems: 'center',
-              gap: 4,
-              pointerEvents: 'none',
-            }}
-          >
-            {item.images.map((_, i) => (
-              <View
-                key={i}
-                style={{
-                  width: 5,
-                  height: 5,
-                  borderRadius: 3,
-                  backgroundColor: i === activeIndex ? 'white' : 'rgba(255,255,255,0.55)',
-                }}
-              />
-            ))}
-          </View>
-        )}
-
-        {/* Like chip */}
-        <View
-          style={{
-            position: 'absolute',
-            top: 8,
-            right: 8,
-            backgroundColor: 'rgba(255,255,255,0.94)',
-            borderRadius: 999,
-            paddingHorizontal: 9,
-            paddingVertical: 4,
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 4,
-          }}
-        >
-          <Feather name="heart" size={11} color={BRAND_INK} />
-          <Text style={{ fontSize: 11, fontWeight: '700', color: BRAND_INK }}>{item.likes}</Text>
-        </View>
-      </View>
-
-      <View style={{ marginTop: 10 }}>
-        <Text style={{ fontSize: 13, fontWeight: '700', color: BRAND_INK }} numberOfLines={1}>
-          {item.brand}
-        </Text>
-        <Text style={{ fontSize: 11, color: 'rgba(15,15,15,0.62)', marginTop: 2 }} numberOfLines={1}>
-          {item.meta}
-        </Text>
-        <Text style={{ fontSize: 14, fontWeight: '800', color: BRAND_INK, marginTop: 4 }}>
-          ${item.price.toFixed(0)}
-        </Text>
-      </View>
-    </Pressable>
-  );
-}
 
 function BundleSection({
   listing,
@@ -936,133 +574,6 @@ function StarRating({ rating }: { rating: number }) {
         />
       ))}
     </View>
-  );
-}
-
-function SkeletonBlock({
-  width,
-  height,
-  radius = 8,
-  style,
-}: {
-  width: number | string;
-  height: number;
-  radius?: number;
-  style?: any;
-}) {
-  const opacity = useSharedValue(0.5);
-  useEffect(() => {
-    opacity.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 700 }),
-        withTiming(0.5, { duration: 700 }),
-      ),
-      -1,
-      true,
-    );
-  }, [opacity]);
-  const animStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
-  return (
-    <Animated.View
-      style={[
-        {
-          width,
-          height,
-          borderRadius: radius,
-          backgroundColor: 'rgba(15,15,15,0.06)',
-        },
-        animStyle,
-        style,
-      ]}
-    />
-  );
-}
-
-function ProductSkeleton({ insetsTop }: { insetsTop: number }) {
-  return (
-    <View style={{ flex: 1, backgroundColor: 'white' }}>
-      {/* Header (back button area) */}
-      <View
-        style={{
-          paddingTop: insetsTop + 8,
-          paddingHorizontal: 16,
-          paddingBottom: 8,
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <SkeletonBlock width={40} height={40} radius={20} />
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <SkeletonBlock width={40} height={40} radius={20} />
-          <SkeletonBlock width={40} height={40} radius={20} />
-        </View>
-      </View>
-
-      {/* Hero image */}
-      <SkeletonBlock
-        width="100%"
-        height={420}
-        radius={0}
-        style={{ marginTop: 4 }}
-      />
-
-      {/* Content block */}
-      <View style={{ paddingHorizontal: 20, paddingTop: 22 }}>
-        <SkeletonBlock width={80} height={14} radius={4} />
-        <SkeletonBlock width="86%" height={22} radius={6} style={{ marginTop: 10 }} />
-        <SkeletonBlock width="60%" height={22} radius={6} style={{ marginTop: 8 }} />
-
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 20 }}>
-          <SkeletonBlock width={120} height={34} radius={8} />
-          <SkeletonBlock width={70} height={20} radius={4} style={{ marginLeft: 12 }} />
-        </View>
-
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            marginTop: 24,
-            paddingTop: 20,
-            borderTopWidth: 1,
-            borderTopColor: 'rgba(15,15,15,0.06)',
-          }}
-        >
-          <SkeletonBlock width={44} height={44} radius={22} />
-          <View style={{ marginLeft: 12, flex: 1 }}>
-            <SkeletonBlock width="55%" height={14} radius={4} />
-            <SkeletonBlock width="35%" height={11} radius={4} style={{ marginTop: 6 }} />
-          </View>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-function HeroPageDot({
-  index,
-  offsetX,
-  pageWidth,
-}: {
-  index: number;
-  offsetX: SharedValue<number>;
-  pageWidth: number;
-}) {
-  const animStyle = useAnimatedStyle(() => {
-    const progress = offsetX.value / pageWidth;
-    const dist = Math.min(1, Math.abs(progress - index));
-    const proximity = 1 - dist;
-    const w = 6 + proximity * 18;
-    const opacity = 0.5 + proximity * 0.5;
-    return {
-      width: w,
-      backgroundColor: `rgba(255,255,255,${opacity})`,
-    };
-  });
-  return (
-    <Animated.View
-      style={[{ height: 4, borderRadius: 2 }, animStyle]}
-    />
   );
 }
 

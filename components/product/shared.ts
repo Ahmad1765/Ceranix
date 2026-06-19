@@ -1,0 +1,140 @@
+// Cross-cutting primitives for the product detail screen and its extracted
+// sub-components. Kept in one module so the screen and the components in
+// components/product/* share a single source of truth for dimensions, the
+// brand palette, and the listing→related-card mapping.
+import { Dimensions, Platform, StyleSheet } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import type { Listing } from '@/types';
+
+export const IS_IOS = Platform.OS === 'ios';
+export const HAIRLINE = StyleSheet.hairlineWidth;
+
+const win = Dimensions.get('window');
+export const width = win.width;
+export const SCREEN_HEIGHT = win.height;
+export const IMAGE_HEIGHT = width * 1.45;
+
+/** iOS-only haptic tap. No-op on Android/web. */
+export function tap(style: 'light' | 'medium' | 'selection' = 'selection') {
+  if (!IS_IOS) return;
+  if (style === 'selection') Haptics.selectionAsync();
+  else if (style === 'light') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+}
+
+export const iosShadow = IS_IOS
+  ? {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.18,
+      shadowRadius: 10,
+    }
+  : {
+      shadowColor: '#000',
+      elevation: 3,
+    };
+
+export const CONDITION_LABELS: Record<string, string> = {
+  new_with_tags: 'New with tags',
+  like_new: 'Like new',
+  good: 'Very good condition',
+  fair: 'Fair',
+};
+
+export const CATEGORY_LABELS: Record<string, string> = {
+  clothing: 'Clothing',
+  shoes: 'Shoes',
+  bags: 'Bags',
+  accessories: 'Accessories',
+  electronics: 'Electronics',
+  beauty: 'Beauty',
+  other: 'Other',
+};
+
+export const ITEM_COLOR = { name: 'Carrinex purple', hex: '#6C47FF' };
+
+// Unified brand palette (matches home tabs + PromoBanner + LiveActivityTicker)
+export const BRAND_PURPLE = '#6C47FF';
+export const BRAND_PURPLE_SOFT = 'rgba(108,71,255,0.10)';
+export const BRAND_LIME = '#6C47FF';
+export const BRAND_INK = '#0F0F0F';
+export const TAG_BG = 'rgba(15,15,15,0.04)';
+export const TAG_BORDER = 'rgba(15,15,15,0.08)';
+export const LINK_PURPLE = BRAND_PURPLE;
+
+// Fallback shape used while the real listing is loading; render is gated on
+// `listing` being non-null, so this is never visible in the UI.
+export const FALLBACK_SELLER = {
+  id: '',
+  username: '',
+  avatar_url: null,
+  full_name: '',
+  bio: null,
+  location: null,
+  rating: 0,
+  total_sales: 0,
+  created_at: '',
+};
+
+// Stable empty reference for the React Query rail fallbacks (seller/similar
+// items), so downstream memos don't churn before the queries resolve.
+export const EMPTY_LISTINGS: Listing[] = [];
+
+export type RelatedItem = {
+  id: string;
+  images: string[];
+  brand: string;
+  meta: string;
+  price: number;
+  inclPrice: number;
+  likes: number;
+};
+
+export function conditionLabel(c: Listing['condition']) {
+  switch (c) {
+    case 'new_with_tags':
+      return 'New with tags';
+    case 'like_new':
+      return 'Like new';
+    case 'good':
+      return 'Good';
+    case 'fair':
+      return 'Fair';
+    default:
+      return '';
+  }
+}
+
+export function listingToRelated(row: Listing): RelatedItem {
+  const meta = [row.size, conditionLabel(row.condition)].filter(Boolean).join(' · ');
+  return {
+    id: row.id,
+    images: row.images && row.images.length > 0 ? row.images : [],
+    brand: row.brand || row.title,
+    meta: meta || row.category,
+    price: Number(row.price ?? 0),
+    inclPrice: Number(row.price ?? 0),
+    likes: Number(row.likes ?? 0),
+  };
+}
+
+// Marketplace-wide bundle tiers. The buyer's bundle item count maps to the
+// highest tier whose `count` threshold has been reached. Tier `pct` is the
+// applied discount. Keeping this a const array (not seller-configurable) so the
+// milestone progress bar always shows the same rungs across the app.
+export const BUNDLE_TIERS = [
+  { count: 1, pct: 0, label: '1 item' },
+  { count: 2, pct: 5, label: '2 items' },
+  { count: 3, pct: 10, label: '3 items' },
+  { count: 4, pct: 15, label: '4 items' },
+  { count: 5, pct: 20, label: '5+ items' },
+] as const;
+export const BUNDLE_MIN_ITEMS = 2;
+
+export const CARD_GAP = 8;
+export const CARD_OUTER_PAD = 12;
+// Floor so 2*CARD_WIDTH + CARD_GAP can never exceed the row width due to
+// sub-pixel rounding — otherwise the second card wraps and the grid collapses
+// into a single column on certain devices/layout passes.
+export const CARD_WIDTH = Math.floor((width - CARD_OUTER_PAD * 2 - CARD_GAP) / 2);
+export const CARD_IMAGE_HEIGHT = Math.round(CARD_WIDTH * 1.25);
