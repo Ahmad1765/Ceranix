@@ -7,6 +7,7 @@ import type { Listing } from '@/types';
 import {
   BUNDLE_TIERS,
   BUNDLE_MIN_ITEMS,
+  computeBundlePricing,
   BRAND_INK,
   BRAND_PURPLE,
   BRAND_PURPLE_SOFT,
@@ -32,24 +33,20 @@ export function BundleSection({
 }) {
   const username = listing.seller.username;
   const selectedItems = sellerItems.filter((s) => selectedIds.has(s.id));
-  const bundleItemCount = 1 + selectedItems.length;
-  const subtotal = listing.price + selectedItems.reduce((acc, s) => acc + Number(s.price ?? 0), 0);
-  // Highest tier the user currently qualifies for. We walk the tiers
-  // backwards so the first match is the largest discount.
-  const activeTier =
-    [...BUNDLE_TIERS].reverse().find((t) => bundleItemCount >= t.count) ?? BUNDLE_TIERS[0];
-  const bundlePct = activeTier.pct;
-  const qualifies = bundleItemCount >= BUNDLE_MIN_ITEMS && bundlePct > 0;
-  const savings = qualifies ? Math.round((subtotal * bundlePct) / 100 * 100) / 100 : 0;
-  const total = Math.max(0, subtotal - savings);
-  // Progress fill: 0% at 1 item, 100% at 5+ items. Clamped so over-selection
-  // doesn't push the thumb past the right edge.
-  const progressFraction = Math.max(
-    0,
-    Math.min(1, (bundleItemCount - 1) / (BUNDLE_TIERS.length - 1)),
+  // All bundle money math lives in lib/bundle.ts (pure + unit-tested).
+  const {
+    itemCount: bundleItemCount,
+    subtotal,
+    pct: bundlePct,
+    qualifies,
+    savings,
+    total,
+    progress: progressFraction,
+    nextTier,
+  } = computeBundlePricing(
+    listing.price,
+    selectedItems.map((s) => Number(s.price ?? 0)),
   );
-  // Next rung above the current count — drives the single guidance line.
-  const nextTier = BUNDLE_TIERS.find((t) => t.count > bundleItemCount);
   const guidance = qualifies
     ? nextTier
       ? `${bundlePct}% off unlocked · add ${nextTier.count - bundleItemCount} more for ${nextTier.pct}%`

@@ -118,18 +118,9 @@ export function listingToRelated(row: Listing): RelatedItem {
   };
 }
 
-// Marketplace-wide bundle tiers. The buyer's bundle item count maps to the
-// highest tier whose `count` threshold has been reached. Tier `pct` is the
-// applied discount. Keeping this a const array (not seller-configurable) so the
-// milestone progress bar always shows the same rungs across the app.
-export const BUNDLE_TIERS = [
-  { count: 1, pct: 0, label: '1 item' },
-  { count: 2, pct: 5, label: '2 items' },
-  { count: 3, pct: 10, label: '3 items' },
-  { count: 4, pct: 15, label: '4 items' },
-  { count: 5, pct: 20, label: '5+ items' },
-] as const;
-export const BUNDLE_MIN_ITEMS = 2;
+// Bundle tiers + the discount math live in lib/bundle.ts (pure + unit-tested).
+// Re-exported here so the product components keep a single import surface.
+export { BUNDLE_TIERS, BUNDLE_MIN_ITEMS, computeBundlePricing } from '@/lib/bundle';
 
 export const CARD_GAP = 8;
 export const CARD_OUTER_PAD = 12;
