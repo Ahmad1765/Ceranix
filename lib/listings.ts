@@ -3,6 +3,7 @@ import type { Listing } from '@/types';
 import { putCachedListing, putCachedListings } from '@/lib/listingCache';
 import { getLikedIds, updateLikedCache } from '@/lib/engagementCache';
 import { captureError } from '@/lib/sentry';
+import { escapeSearchQuery } from '@/lib/search';
 
 const SELECT_WITH_SELLER = '*, seller:profiles!listings_seller_id_fkey(*)';
 
@@ -145,8 +146,8 @@ export async function searchListings(opts: {
   const { query, category = null, limit = 60 } = opts;
   const raw = query.trim();
   if (!raw) return { ok: true, rows: [] };
-  // Strip PostgREST or() syntax chars, escape LIKE wildcards.
-  const safe = raw.replace(/[(),]/g, ' ').replace(/[%_]/g, '\\$&').trim();
+  // Neutralize PostgREST or() delimiters + escape LIKE wildcards (see lib/search).
+  const safe = escapeSearchQuery(raw);
   if (!safe) return { ok: true, rows: [] };
 
   try {
