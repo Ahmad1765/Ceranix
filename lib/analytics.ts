@@ -73,14 +73,11 @@ export function resetIdentity(): void {
 
 export function capture(event: string, props: Record<string, unknown> = {}): void {
   // Cast via `any` is safe: callers pass plain JSON-serialisable values; the
-  // wrapper intentionally accepts `unknown` for ergonomics (matching Sentry's
   // pattern) and bridges to PostHog's recursive JsonType internally.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   active()?.capture(event, props as any);
 }
 
 export function screen(name: string, props: Record<string, unknown> = {}): void {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   active()?.screen(name, props as any);
 }
 
