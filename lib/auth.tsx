@@ -10,6 +10,7 @@ import {
 import type { Session, User as AuthUser } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { setSentryUser } from '@/lib/sentry';
+import { identify, resetIdentity } from '@/lib/analytics';
 import type { User as Profile } from '@/types';
 
 type AuthState = {
@@ -49,11 +50,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Tie Sentry events to the current user (id only — no PII) so production
-  // errors are attributable. Cleared automatically on sign-out.
+  // Tie Sentry and analytics events to the current user (id only, plus non-PII
+  // profile fields for analytics). Cleared automatically on sign-out.
   useEffect(() => {
-    setSentryUser(session?.user?.id ?? null);
-  }, [session?.user?.id]);
+    const uid = session?.user?.id ?? null;
+    setSentryUser(uid);
+    if (uid) {
+      identify(uid, {
+        username: profile?.username,
+        is_verified: profile?.is_verified ?? false,
+      });
+    } else {
+      resetIdentity();
+    }
+  }, [session?.user?.id, profile?.username, profile?.is_verified]);
 
   const fetchProfileWithRetry = async (userId: string) => {
     let p = await loadProfile(userId);
