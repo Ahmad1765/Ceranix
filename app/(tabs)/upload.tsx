@@ -1,3 +1,4 @@
+import { capture } from '@/lib/analytics';
 import { useMemo, useState } from 'react';
 import {
   View,
@@ -252,6 +253,7 @@ function SellScreenInner() {
       // Force every cached feed to refetch on next focus so the new listing
       // shows up across Discover / My Feed, not just the home feed.
       invalidateFresh();
+      capture('listing_created', { listing_id: newListing.id, category: newListing.category, price: newListing.price });
 
       resetForm();
       toast.show('Listing is live', { variant: 'success', icon: 'check' });

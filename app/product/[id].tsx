@@ -1,3 +1,4 @@
+import { capture, buildListingViewedProps } from '@/lib/analytics';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -151,6 +152,10 @@ export default function ProductScreen() {
             ...row,
             seller: row.seller ?? (FALLBACK_SELLER as Listing['seller']),
           });
+          capture('listing_viewed', buildListingViewedProps(
+            { id: row.id, seller_id: row.seller_id, price: row.price, category: row.category },
+            'product_page',
+          ));
         }
       } catch (e: any) {
         // Silently swallow cancellations — they fire on unmount/HMR and
@@ -284,7 +289,10 @@ export default function ProductScreen() {
     try {
       const next = await toggleLike(productIdParam, user.id, originalLiked);
       setLiked(next);
-      if (next) toast.show('Added to your favorites', { variant: 'success', icon: 'heart' });
+      if (next) {
+        toast.show('Added to your favorites', { variant: 'success', icon: 'heart' });
+        capture('listing_liked', { listing_id: productIdParam });
+      }
     } catch {
       // Revert optimistic flip.
       setLiked(originalLiked);
@@ -368,6 +376,7 @@ export default function ProductScreen() {
     try {
       const next = await toggleFollow(user.id, sellerId, followed);
       setFollowed(next.isFollowing);
+      if (next.isFollowing) capture('seller_followed', { seller_id: sellerId });
       toast.show(
         next.isFollowing ? `Following @${listing?.seller?.username ?? 'seller'}` : 'Unfollowed',
         { variant: next.isFollowing ? 'info' : 'default', icon: next.isFollowing ? 'user-check' : 'user-x' },
@@ -1602,7 +1611,10 @@ export default function ProductScreen() {
           userId={user.id}
           listingId={listing.id}
           onClose={() => setSaveListVisible(false)}
-          onChanged={setSaved}
+          onChanged={(isSaved) => {
+            setSaved(isSaved);
+            if (isSaved) capture('listing_saved', { listing_id: productIdParam });
+          }}
         />
       ) : null}
 

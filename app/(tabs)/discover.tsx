@@ -1,3 +1,4 @@
+import { capture, buildSearchProps } from '@/lib/analytics';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
@@ -176,7 +177,10 @@ export default function DiscoverScreen() {
         searchUsers(q, 20),
       ]);
       if (seq !== searchSeq.current) return; // a newer keystroke superseded us
-      if (res.ok) setServerResults(res.rows);
+      if (res.ok) {
+        setServerResults(res.rows);
+        capture('search_performed', buildSearchProps(q, browseCat, res.rows.length));
+      }
       setUserResults(users);
       setSearching(false);
     }, SEARCH_DEBOUNCE_MS);

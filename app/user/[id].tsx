@@ -1,3 +1,4 @@
+import { capture } from '@/lib/analytics';
 import { useState } from 'react';
 import {
   View,
@@ -82,6 +83,9 @@ export default function UserProfileScreen() {
     toggleFollowM.mutate(
       { currentlyFollowing: followed },
       {
+        onSuccess: (next) => {
+          if (next.isFollowing) capture('seller_followed', { seller_id: userId });
+        },
         onError: (e: any) =>
           toast.show(e?.message ?? 'Could not update follow', {
             variant: 'default',

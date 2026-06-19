@@ -1,3 +1,4 @@
+import { capture } from '@/lib/analytics';
 import { useEffect, useState, useRef } from 'react';
 import {
   View,
@@ -172,6 +173,7 @@ export default function PaymentScreen() {
     setPaying(true);
 
     try {
+      capture('checkout_started', { listing_id: id, amount: total });
       if (!STRIPE_ENABLED) {
         await new Promise((resolve) => {
           demoTimerRef.current = setTimeout(resolve, 900);

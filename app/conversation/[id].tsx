@@ -1,3 +1,4 @@
+import { capture } from '@/lib/analytics';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
@@ -609,6 +610,7 @@ export default function ConversationScreen() {
           setMessages((prev) => (prev.some((m) => m.id === saved.id) ? prev : [...prev, saved]));
           setOfferVisible(false);
           toast.show('Offer sent', { variant: 'success', icon: 'check' });
+          capture('offer_made', { listing_id: conv?.listing_id ?? null, amount });
         } else {
           // Sheet stays open so the user can retry without retyping.
           Alert.alert('Could not send offer', 'Please try again.');
