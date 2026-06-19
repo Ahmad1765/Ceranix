@@ -3,10 +3,13 @@ import { useEffect, useState } from 'react';
 import { Platform, TextInput } from 'react-native';
 import { installAlertShim } from '@/lib/alertShim';
 import { initSentry, wrapWithSentry } from '@/lib/sentry';
+import { initAnalytics } from '@/lib/analytics';
 
 // Initialize crash + error reporting before anything else renders so startup
 // failures are captured too. No-ops when EXPO_PUBLIC_SENTRY_DSN is unset.
 initSentry();
+// Initialize PostHog analytics. No-ops when EXPO_PUBLIC_POSTHOG_KEY is unset.
+initAnalytics();
 
 // React-native-web ships Alert.alert as a no-op, so every validation /
 // confirm path that calls Alert.alert silently dies on web. The shim swaps

@@ -65,6 +65,8 @@ module.exports = ({ config }) => ({
       supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
       sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
       sentryDebug: process.env.EXPO_PUBLIC_SENTRY_DEBUG,
+      posthogKey: process.env.EXPO_PUBLIC_POSTHOG_KEY,
+      posthogHost: process.env.EXPO_PUBLIC_POSTHOG_HOST,
     },
   },
 });
