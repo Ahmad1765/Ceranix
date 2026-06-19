@@ -72,8 +72,8 @@ export function resetIdentity(): void {
 }
 
 export function capture(event: string, props: Record<string, unknown> = {}): void {
-  // Cast via `any` is safe: callers pass plain JSON-serialisable values; the
-  // pattern) and bridges to PostHog's recursive JsonType internally.
+  // Cast via `any`: callers pass plain JSON-serialisable values; this bridges
+  // our ergonomic Record<string, unknown> to PostHog's recursive JsonType.
   active()?.capture(event, props as any);
 }
 
