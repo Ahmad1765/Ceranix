@@ -2,12 +2,16 @@
 // and never touches the SDK directly (mirrors lib/sentry.ts). Every helper is a
 // no-op when there's no key OR the user has opted out.
 import PostHog, { useFeatureFlag as usePostHogFeatureFlag } from 'posthog-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import {
   shouldTrack,
   buildListingViewedProps,
   buildSearchProps,
 } from '@/lib/analyticsEvents';
+
+/** AsyncStorage key used to persist the user's opt-out choice across restarts. */
+const OPT_OUT_KEY = 'analytics_opted_out';
 
 export { buildListingViewedProps, buildSearchProps };
 
@@ -35,6 +39,11 @@ let optedOut = false;
 /**
  * Initialize PostHog. Safe to call unconditionally and exactly once, as early
  * in app startup as possible (before the first render). No-ops without a key.
+ *
+ * Opt-out hydration is async: on the very first frames after a cold start the
+ * in-memory `optedOut` mirror may briefly read `false` until the AsyncStorage
+ * read completes. This is acceptable — the window is tiny (<50 ms on device)
+ * and any events fired that early are low-value startup events.
  */
 export function initAnalytics(): void {
   if (!apiKey) {
@@ -56,6 +65,17 @@ export function initAnalytics(): void {
   if (optedOut) {
     client.optOut().catch(() => {});
   }
+  // Rehydrate the persisted opt-out flag. Fire-and-forget: initAnalytics stays
+  // synchronous so callers don't need to await. Once the read resolves we apply
+  // the stored preference to both the in-memory mirror and the SDK.
+  AsyncStorage.getItem(OPT_OUT_KEY).then((stored) => {
+    if (stored === '1' && !optedOut) {
+      optedOut = true;
+      client?.optOut().catch(() => {});
+    }
+  }).catch(() => {
+    // Storage read failure is non-fatal; we keep the in-memory default (false).
+  });
 }
 
 /** Returns the client only when tracking is allowed. */
@@ -87,6 +107,8 @@ export function isOptedOut(): boolean {
 
 export function setAnalyticsOptOut(next: boolean): void {
   optedOut = next;
+  // Persist the choice so it survives cold restarts. Fire-and-forget.
+  AsyncStorage.setItem(OPT_OUT_KEY, next ? '1' : '0').catch(() => {});
   if (!client) return;
   if (next) {
     client.optOut().catch(() => {});

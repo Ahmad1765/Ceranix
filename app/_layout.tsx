@@ -4,6 +4,7 @@ import { Platform, TextInput } from 'react-native';
 import { installAlertShim } from '@/lib/alertShim';
 import { initSentry, wrapWithSentry } from '@/lib/sentry';
 import { initAnalytics, screen } from '@/lib/analytics';
+import { normalizeScreenName } from '@/lib/analyticsEvents';
 
 // Initialize crash + error reporting before anything else renders so startup
 // failures are captured too. No-ops when EXPO_PUBLIC_SENTRY_DSN is unset.
@@ -98,7 +99,7 @@ function RootLayout() {
   useFocusOutOfAriaHidden();
   const pathname = usePathname();
   useEffect(() => {
-    if (pathname) screen(pathname);
+    if (pathname) screen(normalizeScreenName(pathname));
   }, [pathname]);
 
   useEffect(() => {
