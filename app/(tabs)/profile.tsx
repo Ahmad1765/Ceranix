@@ -34,7 +34,7 @@ import {
   type SaveList,
 } from '@/lib/saves';
 import { colors, radii } from '@/lib/theme';
-import { useGridDimensions, HIT_SLOP_8 } from '@/lib/responsive';
+import { useGridDimensions, useTabBarClearance, HIT_SLOP_8 } from '@/lib/responsive';
 import { useFadeIn } from '@/lib/motion';
 import type { Listing } from '@/types';
 import { useToast } from '@/lib/toast';
@@ -79,6 +79,8 @@ function ProfileScreenInner() {
   const [activeListId, setActiveListId] = useState<string | null>(null);
 
   const heroFade = useFadeIn(0, 320);
+  // Bottom padding that clears the floating tab bar overlaying the content.
+  const tabClear = useTabBarClearance();
 
   const { columns, cardWidth: cardW } = useGridDimensions({
     min: 2,
@@ -301,7 +303,7 @@ const handleShareProfile = useCallback(async () => {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />
         }
-        contentContainerStyle={{ paddingBottom: 96 }}
+        contentContainerStyle={{ paddingBottom: tabClear }}
       >
         {/* Top bar */}
         <View

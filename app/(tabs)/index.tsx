@@ -28,7 +28,7 @@ import { getOptimizedImageUrl } from '@/lib/images';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { colors } from '@/lib/theme';
-import { useResponsiveColumns } from '@/lib/responsive';
+import { useResponsiveColumns, useTabBarClearance } from '@/lib/responsive';
 import type { Listing, User as Profile } from '@/types';
 
 type TabName = 'For you' | 'Popular' | 'Following';
@@ -127,6 +127,8 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const toast = useToast();
   const columns = useResponsiveColumns({ min: 2, max: 4, thresholds: GRID_THRESHOLDS });
+  // Bottom padding that clears the floating tab bar overlaying the feed.
+  const tabClear = useTabBarClearance();
   const [activeTab, setActiveTab] = useState<TabName>('For you');
   // Suggested people for an empty Following tab. Live data ranked by
   // followers; updated whenever the auth user changes so the exclusion list
@@ -502,7 +504,7 @@ export default function HomeScreen() {
           )
         }
         renderItem={renderItem}
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingBottom: tabClear }}
       />
 
       {/* Product grid — always mounted, hidden when Following is active */}
@@ -603,7 +605,7 @@ export default function HomeScreen() {
           )
         }
         renderItem={renderItem}
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingBottom: tabClear }}
         ref={activeTab !== 'Following' ? scrollRef : undefined}
       />
       <WebPullIndicator pull={pull} refreshing={refreshing} nodeTop={nodeTop} threshold={threshold} />

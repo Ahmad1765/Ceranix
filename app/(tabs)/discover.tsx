@@ -12,8 +12,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import Animated from 'react-native-reanimated';
+import { Image } from 'expo-image';
 import { ListingCard } from '@/components/ListingCard';
 import { searchListings } from '@/lib/listings';
+import { searchUsers } from '@/lib/follows';
+import { getOptimizedImageUrl } from '@/lib/images';
 import {
   useFeedListingsQuery,
   useRecommendationsQuery,
@@ -23,7 +26,7 @@ import { createSavedSearch, touchSavedSearchSeen } from '@/lib/savedSearches';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { colors, radii } from '@/lib/theme';
-import { useGridDimensions, HIT_SLOP_8 } from '@/lib/responsive';
+import { useGridDimensions, useTabBarClearance, HIT_SLOP_8 } from '@/lib/responsive';
 import { useFadeIn } from '@/lib/motion';
 import type { Category, Listing } from '@/types';
 import { EmptyState, SectionHeader } from '@/components/ui';
@@ -54,6 +57,8 @@ const SEARCH_DEBOUNCE_MS = 300;
 // the query has no data yet.
 const EMPTY_LISTINGS: Listing[] = [];
 
+type UserResult = Awaited<ReturnType<typeof searchUsers>>[number];
+
 export default function DiscoverScreen() {
   // Query params from /news Saved tab (and external links). When set, the
   // screen boots with the search pre-applied so the user lands on results.
@@ -75,8 +80,13 @@ export default function DiscoverScreen() {
   // results for the current query. While a search is in flight we keep
   // showing the instant client-side filter so typing feels immediate.
   const [serverResults, setServerResults] = useState<Listing[] | null>(null);
+  // People matching the query (username / full name). Empty when not searching.
+  const [userResults, setUserResults] = useState<UserResult[]>([]);
   const [searching, setSearching] = useState(false);
   const searchSeq = useRef(0);
+
+  // Bottom padding that clears the floating tab bar overlaying the results.
+  const tabClear = useTabBarClearance();
 
   useEffect(() => {
     const nextQ = typeof params.q === 'string' ? params.q : '';
@@ -153,15 +163,21 @@ export default function DiscoverScreen() {
     const q = query.trim();
     if (q.length === 0) {
       setServerResults(null);
+      setUserResults([]);
       setSearching(false);
       return;
     }
     setSearching(true);
     const seq = ++searchSeq.current;
     const timer = setTimeout(async () => {
-      const res = await searchListings({ query: q, category: browseCat, limit: 60 });
+      // Items + people in parallel — one debounce window covers both.
+      const [res, users] = await Promise.all([
+        searchListings({ query: q, category: browseCat, limit: 60 }),
+        searchUsers(q, 20),
+      ]);
       if (seq !== searchSeq.current) return; // a newer keystroke superseded us
       if (res.ok) setServerResults(res.rows);
+      setUserResults(users);
       setSearching(false);
     }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
@@ -237,7 +253,7 @@ export default function DiscoverScreen() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />}
-        contentContainerStyle={{ paddingBottom: 80 }}
+        contentContainerStyle={{ paddingBottom: tabClear }}
       >
         {/* Top bar */}
         <View
@@ -453,12 +469,29 @@ export default function DiscoverScreen() {
           </View>
         ) : null}
 
+        {/* People — sellers matching the query. Shown above item results so
+            "search for a user" lands them right away. */}
+        {hasQuery && userResults.length > 0 ? (
+          <View style={{ marginTop: 22 }}>
+            <SectionHeader
+              title="People"
+              count={userResults.length}
+              rightText={userResults.length === 1 ? 'person' : 'people'}
+            />
+            <View style={{ paddingHorizontal: 8 }}>
+              {userResults.map((u) => (
+                <PeopleRow key={u.id} user={u} />
+              ))}
+            </View>
+          </View>
+        ) : null}
+
         {/* Results */}
         <View style={{ marginTop: 22 }}>
           <SectionHeader
             title={
               hasQuery
-                ? 'Results'
+                ? 'Items'
                 : browseCat
                   ? `In ${CATEGORY_TILES.find((c) => c.id === browseCat)?.label}`
                   : 'Trending'
@@ -472,6 +505,14 @@ export default function DiscoverScreen() {
           ) : results.length === 0 ? (
             searching ? (
               <GridSkeleton columns={columns} cardW={cardW} />
+            ) : hasQuery && userResults.length > 0 ? (
+              // People matched even though no items did — don't contradict that
+              // with a "nothing matched" panel.
+              <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
+                <Text style={{ fontSize: 13, color: colors.muteSoft }}>
+                  No items matched “{query.trim()}”.
+                </Text>
+              </View>
             ) : (
               <EmptyState
                 icon="search"
@@ -486,6 +527,61 @@ export default function DiscoverScreen() {
       </ScrollView>
       <WebPullIndicator pull={pull} refreshing={refreshing} nodeTop={nodeTop} threshold={threshold} />
     </SafeAreaView>
+  );
+}
+
+// A single person result. Taps through to the seller's profile, where the
+// follow / message / followers actions live.
+function PeopleRow({ user }: { user: UserResult }) {
+  const avatar = user.avatar_url ? getOptimizedImageUrl(user.avatar_url, { width: 120 }) : null;
+  const initial = (user.full_name || user.username || 'U').trim().charAt(0).toUpperCase();
+  const followers = Number(user.followers_count ?? 0);
+  return (
+    <Pressable
+      onPress={() => router.push(`/user/${user.id}` as any)}
+      accessibilityRole="button"
+      accessibilityLabel={`View @${user.username}'s profile`}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 10,
+        borderRadius: radii.md,
+        backgroundColor: pressed ? colors.panel : 'transparent',
+      })}
+    >
+      <View
+        style={{
+          width: 48,
+          height: 48,
+          borderRadius: 24,
+          overflow: 'hidden',
+          backgroundColor: colors.purpleSoft,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginRight: 12,
+        }}
+      >
+        {avatar ? (
+          <Image source={{ uri: avatar }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+        ) : (
+          <Text style={{ fontSize: 18, fontWeight: '900', color: colors.purple }}>{initial}</Text>
+        )}
+      </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Text style={{ fontSize: 14, fontWeight: '800', color: colors.ink }} numberOfLines={1}>
+            {user.full_name || user.username}
+          </Text>
+          {user.is_verified && <Feather name="check-circle" size={12} color={colors.purple} />}
+        </View>
+        <Text style={{ fontSize: 12.5, color: colors.mute, marginTop: 1 }} numberOfLines={1}>
+          @{user.username}
+          {followers > 0 ? ` · ${followers} ${followers === 1 ? 'follower' : 'followers'}` : ''}
+        </Text>
+      </View>
+      <Feather name="chevron-right" size={18} color={colors.muteSoft} />
+    </Pressable>
   );
 }
 

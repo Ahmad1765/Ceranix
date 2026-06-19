@@ -845,7 +845,17 @@ export default function ProductScreen() {
               padding: 14,
             }}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Pressable
+              onPress={() => router.push(`/user/${listing.seller.id}` as any)}
+              accessibilityRole="button"
+              accessibilityLabel={`View @${listing.seller.username}'s profile`}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 12,
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
               {/* Avatar with subtle ring */}
               <View
                 style={{
@@ -901,7 +911,8 @@ export default function ProductScreen() {
                   {Number(listing.seller.total_sales ?? 0)} sales · {sellerItems.length + 1} listed
                 </Text>
               </View>
-            </View>
+              <Feather name="chevron-right" size={18} color="rgba(15,15,15,0.30)" />
+            </Pressable>
 
             {/* Follow + Message — hidden when viewing your own listing */}
             {isOwnListing ? (

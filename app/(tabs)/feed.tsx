@@ -27,7 +27,7 @@ import {
   useDeleteSavedSearch,
 } from '@/lib/queries';
 import { useToast } from '@/lib/toast';
-import { useGridDimensions } from '@/lib/responsive';
+import { useGridDimensions, useTabBarClearance } from '@/lib/responsive';
 import type { Category, Listing } from '@/types';
 
 const HORIZONTAL_PAD = 12;
@@ -63,6 +63,8 @@ export default function MyFeedScreen() {
     horizontalPadding: HORIZONTAL_PAD,
     gap: GRID_GAP,
   });
+  // Bottom padding that clears the floating tab bar overlaying the feed.
+  const tabClear = useTabBarClearance();
 
   // React Query owns all four reads (primary grid, two rails, saved searches,
   // saved listings). staleTime reproduces the single old 'myfeed' freshness
@@ -226,7 +228,7 @@ export default function MyFeedScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />
         }
-        contentContainerStyle={{ paddingBottom: 80 }}
+        contentContainerStyle={{ paddingBottom: tabClear }}
       >
         {/* Title — greets the signed-in user by name; the feed is THEIRS,
             not a generic surface. */}

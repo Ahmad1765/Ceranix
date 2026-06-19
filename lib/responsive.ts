@@ -5,7 +5,8 @@
 // viewport, and `cardWidth` to compute exact pixel widths when you can't
 // rely on FlatList's numColumns + columnWrapperStyle.
 
-import { useWindowDimensions } from 'react-native';
+import { Platform, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export const bp = {
   xs: 320, // small Android phones, iPhone SE 1st gen
@@ -98,6 +99,19 @@ export function useGridDimensions(opts: {
 // Standard max width for content on large screens — keeps layouts readable
 // instead of stretching edge-to-edge on tablets/web.
 export const CONTENT_MAX_WIDTH = 720;
+
+// The floating tab bar (components/AnimatedTabBar) is absolutely positioned and
+// overlays screen content — it does NOT reserve layout space. Screens inside the
+// (tabs) group must pad the bottom of their scroll content (and any sticky CTA
+// bar) by this much, or the bar covers the last row / buttons beneath it.
+// Mirrors AnimatedTabBar's BAR_HEIGHT (68) + its bottom offset.
+export const TAB_BAR_HEIGHT = 68;
+export function useTabBarClearance(extra = 12): number {
+  const insets = useSafeAreaInsets();
+  // Matches AnimatedTabBar: bottom = max(insets.bottom, 16) on iOS, else 24.
+  const bottomOffset = Platform.OS === 'ios' ? Math.max(insets.bottom, 16) : 24;
+  return bottomOffset + TAB_BAR_HEIGHT + extra;
+}
 
 // Hit-slop preset for small icon buttons (improves touch target on phones).
 export const HIT_SLOP_8 = { top: 8, bottom: 8, left: 8, right: 8 } as const;

@@ -22,6 +22,7 @@ import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { uploadListingImages, deleteListingImages, type LocalImage } from '@/lib/upload';
 import { useToast } from '@/lib/toast';
+import { useTabBarClearance } from '@/lib/responsive';
 import { putCachedListing } from '@/lib/listingCache';
 import { emitListingCreated } from '@/lib/listingEvents';
 import { invalidateFresh } from '@/lib/freshness';
@@ -90,6 +91,9 @@ function SellScreenInner() {
   const { user, profile } = useAuth();
   const toast = useToast();
   const { width } = useWindowDimensions();
+  // Reserve space for the floating tab bar so the sticky Continue/Publish bar
+  // isn't covered by it (the bar is absolutely positioned and overlays content).
+  const tabClear = useTabBarClearance();
   const [step, setStep] = useState<Step>('photos');
   const [images, setImages] = useState<LocalImage[]>([]);
   const [publishing, setPublishing] = useState(false);
@@ -446,7 +450,7 @@ function SellScreenInner() {
           style={{
             paddingHorizontal: 20,
             paddingTop: 12,
-            paddingBottom: 24,
+            paddingBottom: tabClear,
             flexDirection: 'row',
             alignItems: 'center',
             gap: 12,
@@ -985,7 +989,7 @@ function SellScreenInner() {
         style={{
           paddingHorizontal: 20,
           paddingTop: 12,
-          paddingBottom: 24,
+          paddingBottom: tabClear,
         }}
       >
         <Pressable

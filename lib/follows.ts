@@ -171,6 +171,28 @@ export async function fetchFollowers(userId: string): Promise<FollowListRow[]> {
   return fetchProfilesByIds((data ?? []).map((r: any) => r.follower_id));
 }
 
+// Free-text search across profiles by username / full name. Powers the
+// "People" results on the discover screen. Leading "@" is stripped so both
+// "@carrinex" and "carrinex" match; LIKE wildcards are escaped so a user
+// typing "%" can't broaden the query.
+export async function searchUsers(query: string, limit = 20): Promise<FollowListRow[]> {
+  const raw = query.trim().replace(/^@+/, '');
+  if (!raw) return [];
+  const safe = raw.replace(/[(),]/g, ' ').replace(/[%_]/g, '\\$&').trim();
+  if (!safe) return [];
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, username, full_name, avatar_url, is_verified, followers_count')
+    .or(`username.ilike.%${safe}%,full_name.ilike.%${safe}%`)
+    .order('followers_count', { ascending: false, nullsFirst: false })
+    .limit(limit);
+  if (error) {
+    console.warn('[follows] searchUsers', error.message);
+    return [];
+  }
+  return (data ?? []) as unknown as FollowListRow[];
+}
+
 // Given a list of target profile ids, return the subset the current viewer
 // already follows. Used to render correct "Follow"/"Following" state on each
 // row of a follow list.
