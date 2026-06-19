@@ -9,6 +9,8 @@
     "web": "expo start --web",
     "build": "expo export -p web",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
@@ -60,6 +62,7 @@
     "eslint-config-expo": "~10.0.0",
     "serve": "^14.2.4",
     "tailwindcss": "3.4.17",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.9"
   }
 }
