@@ -25,6 +25,7 @@ import { useToast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
 import { confirm } from '@/lib/confirm';
 import { safeBack } from '@/lib/nav';
+import { isOptedOut, setAnalyticsOptOut } from '@/lib/analytics';
 import type {
   DocumentKind,
   PayoutKind,
@@ -68,6 +69,7 @@ export default function SettingsScreen() {
 
   const [open, setOpen] = useState<Section | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
+  const [shareUsage, setShareUsage] = useState(!isOptedOut());
   const mounted = useRef(true);
 
   useEffect(() => {
@@ -887,6 +889,16 @@ export default function SettingsScreen() {
           <Row label="Terms of service" onPress={() => openLink(TERMS_URL)} chevron />
           <Divider />
           <Row label="Privacy policy" onPress={() => openLink(PRIVACY_URL)} chevron />
+          <Divider />
+          <ToggleRow
+            label="Share usage data"
+            desc="Helps us improve the app. No personal content is collected."
+            value={shareUsage}
+            onValueChange={(v) => {
+              setShareUsage(v);
+              setAnalyticsOptOut(!v);
+            }}
+          />
         </SectionCard>
 
         {/* Log out CTA */}
