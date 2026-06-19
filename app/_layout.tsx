@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Platform, TextInput } from 'react-native';
 import { installAlertShim } from '@/lib/alertShim';
 import { initSentry, wrapWithSentry } from '@/lib/sentry';
-import { initAnalytics } from '@/lib/analytics';
+import { initAnalytics, screen } from '@/lib/analytics';
 
 // Initialize crash + error reporting before anything else renders so startup
 // failures are captured too. No-ops when EXPO_PUBLIC_SENTRY_DSN is unset.
@@ -22,7 +22,7 @@ const _TI: any = TextInput;
 _TI.defaultProps = _TI.defaultProps || {};
 _TI.defaultProps.underlineColorAndroid = 'transparent';
 _TI.defaultProps.selectionColor = '#6C47FF';
-import { Stack } from 'expo-router';
+import { Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as SplashScreen from 'expo-splash-screen';
@@ -96,6 +96,10 @@ function useFocusOutOfAriaHidden() {
 function RootLayout() {
   const [ready, setReady] = useState(false);
   useFocusOutOfAriaHidden();
+  const pathname = usePathname();
+  useEffect(() => {
+    if (pathname) screen(pathname);
+  }, [pathname]);
 
   useEffect(() => {
     // Icon fonts are tiny — always block first paint on these so glyphs never
