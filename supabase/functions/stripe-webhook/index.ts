@@ -23,6 +23,29 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const SIGNATURE_TOLERANCE_SECONDS = 300; // 5 min, same default as Stripe SDKs
 
+// Best-effort PostHog capture from the edge function. Never throws — analytics
+// must not break the webhook. distinct_id is the buyer so the event ties to the
+// same person as the client-side funnel.
+async function capturePurchase(distinctId: string, props: Record<string, unknown>) {
+  const key = Deno.env.get('POSTHOG_KEY');
+  const host = Deno.env.get('POSTHOG_HOST') ?? 'https://eu.i.posthog.com';
+  if (!key) return;
+  try {
+    await fetch(`${host}/i/v0/e/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: key,
+        event: 'purchase_completed',
+        distinct_id: distinctId,
+        properties: props,
+      }),
+    });
+  } catch (e) {
+    console.error('[stripe-webhook] posthog capture failed', e);
+  }
+}
+
 function hexToBytes(hex: string): Uint8Array {
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < bytes.length; i++) {
@@ -158,6 +181,12 @@ Deno.serve(async (req: Request) => {
     // 500 → Stripe retries with backoff; the unique constraint keeps it safe.
     return new Response('Order insert failed', { status: 500 });
   }
+
+  await capturePurchase(buyerId, {
+    order_id: session.id,
+    listing_id: listingId,
+    amount_cents: amountCents,
+  });
 
   // 2) Mark the listing sold.
   const { error: soldErr } = await db
