@@ -65,5 +65,10 @@
     "tailwindcss": "3.4.17",
     "typescript": "^5.9.3",
     "vitest": "^4.1.9"
+  },
+  "overrides": {
+    "@emnapi/core": "1.11.1",
+    "@emnapi/runtime": "1.11.1",
+    "@emnapi/wasi-threads": "1.2.2"
   }
 }
