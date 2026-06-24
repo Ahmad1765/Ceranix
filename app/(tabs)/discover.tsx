@@ -32,6 +32,20 @@ import { useFadeIn } from '@/lib/motion';
 import type { Category, Listing } from '@/types';
 import { EmptyState, SectionHeader } from '@/components/ui';
 import { useWebPullToRefresh, WebPullIndicator } from '@/components/WebRefresh';
+import {
+  WelcomeEyebrow,
+  TrendingSearches,
+  DigestRail,
+  DailyPicks,
+  RecentlyViewedList,
+  CollectionBlock,
+} from '@/components/discover/EditorialFeed';
+import {
+  buildDigest,
+  buildCollections,
+  buildTrendingSearches,
+  type DigestCard,
+} from '@/lib/discover';
 
 type CatTile = {
   id: Category | 'trending';
@@ -68,10 +82,13 @@ export default function DiscoverScreen() {
   const initialCat = typeof params.category === 'string' ? (params.category as CatTile['id']) : null;
   const savedId = typeof params.savedId === 'string' ? params.savedId : null;
 
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const toast = useToast();
   const [query, setQuery] = useState(initialQuery);
   const [activeCat, setActiveCat] = useState<CatTile['id'] | null>(initialCat);
+  // Editorial digest "theme" applied to the trending grid (e.g. Now in demand /
+  // Fresh drops). Reorders the idle grid in place; cleared via the grid header.
+  const [digestSort, setDigestSort] = useState<'demand' | 'fresh' | null>(null);
   const [savingSearch, setSavingSearch] = useState(false);
   // We disable the Save CTA once the current query has been saved this
   // session to avoid spam — the underlying unique index would reject anyway.
@@ -245,9 +262,50 @@ export default function DiscoverScreen() {
   }, [listings, query]);
 
   const results = hasQuery && serverResults !== null ? serverResults : clientFiltered;
-  // Idle = browsing, not searching: rails are shown only here so search
-  // results stay focused on the query.
+  // Idle = browsing, not searching: the editorial feed (welcome, digest, picks,
+  // collections) is shown only here so search results stay focused on the query.
   const idle = !hasQuery && !browseCat;
+
+  // Editorial blocks derived from the already-loaded trending grid — no extra
+  // fetches. Recomputed only when the listing set changes.
+  const digest = useMemo(() => buildDigest(listings), [listings]);
+  const collections = useMemo(() => buildCollections(listings), [listings]);
+  const trendingSearches = useMemo(() => buildTrendingSearches(listings), [listings]);
+  // Personalized picks rail: recommendations when we have them, otherwise the
+  // top of the trending grid so the rail is never empty (logged-out / cold).
+  const picks = recommended.length > 0 ? recommended : listings.slice(0, 10);
+
+  // Apply the active digest theme to the idle grid in place.
+  const gridResults = useMemo(() => {
+    if (!idle || !digestSort) return results;
+    const arr = [...results];
+    if (digestSort === 'demand') {
+      arr.sort((a, b) => (b.likes ?? 0) - (a.likes ?? 0));
+    } else {
+      arr.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    }
+    return arr;
+  }, [results, idle, digestSort]);
+
+  // Y offset of the grid section so a digest theme tap can scroll the user to
+  // the reordered results.
+  const gridY = useRef(0);
+  const handleDigestPress = useCallback(
+    (card: DigestCard) => {
+      if (card.target.kind === 'category') {
+        setActiveCat(card.target.category);
+        return;
+      }
+      setDigestSort(card.target.theme);
+      requestAnimationFrame(() =>
+        scrollRef.current?.scrollTo?.({ y: Math.max(0, gridY.current - 8), animated: true }),
+      );
+    },
+    [scrollRef],
+  );
+
+  const idleGridTitle =
+    digestSort === 'demand' ? 'Now in demand' : digestSort === 'fresh' ? 'Fresh drops' : 'Trending';
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
@@ -453,24 +511,54 @@ export default function DiscoverScreen() {
           </View>
         ) : null}
 
-        {/* For you — personalized rail (hybrid recommender). Idle browse only. */}
-        {idle && user && (recLoading || recommended.length > 0) ? (
-          <View style={{ marginTop: 22 }}>
-            <SectionHeader title="For you" />
-            {recLoading ? (
-              <RailSkeleton />
-            ) : (
-              <Rail listings={recommended} testID="discover-for-you" />
-            )}
-          </View>
-        ) : null}
+        {/* Editorial feed — welcome, digest, picks, recently viewed, collections.
+            Idle browse only; search / category states render results instead. */}
+        {idle ? (
+          <>
+            <WelcomeEyebrow username={profile?.username ?? null} />
 
-        {/* Recently viewed — pick up where you left off. Hidden when empty. */}
-        {idle && user && recentlyViewed.length > 0 && !recentLoading ? (
-          <View style={{ marginTop: 22 }}>
-            <SectionHeader title="Recently viewed" />
-            <Rail listings={recentlyViewed} testID="discover-recently-viewed" />
-          </View>
+            <TrendingSearches
+              terms={trendingSearches}
+              onSelect={(term) => setQuery(term)}
+              onShopAll={() => {
+                setQuery('');
+                setActiveCat(null);
+                setDigestSort(null);
+                requestAnimationFrame(() =>
+                  scrollRef.current?.scrollTo?.({ y: Math.max(0, gridY.current - 8), animated: true }),
+                );
+              }}
+            />
+
+            {loading && digest.length === 0 ? (
+              <View style={{ marginTop: 16 }}>
+                <RailSkeleton />
+              </View>
+            ) : (
+              <DigestRail cards={digest} onPress={handleDigestPress} />
+            )}
+
+            {recLoading ? (
+              <View style={{ marginTop: 26 }}>
+                <SectionHeader title="Daily picks for you" />
+                <RailSkeleton />
+              </View>
+            ) : (
+              <DailyPicks
+                listings={picks}
+                onSeeMore={() => router.push('/(tabs)' as any)}
+                testID="discover-daily-picks"
+              />
+            )}
+
+            {user && recentlyViewed.length > 0 && !recentLoading ? (
+              <RecentlyViewedList listings={recentlyViewed} testID="discover-recently-viewed" />
+            ) : null}
+
+            {collections.map((c) => (
+              <CollectionBlock key={c.id} collection={c} onPress={() => setQuery(c.brand)} />
+            ))}
+          </>
         ) : null}
 
         {/* People — sellers matching the query. Shown above item results so
@@ -490,23 +578,36 @@ export default function DiscoverScreen() {
           </View>
         ) : null}
 
-        {/* Results */}
-        <View style={{ marginTop: 22 }}>
-          <SectionHeader
-            title={
-              hasQuery
-                ? 'Items'
-                : browseCat
-                  ? `In ${CATEGORY_TILES.find((c) => c.id === browseCat)?.label}`
-                  : 'Trending'
-            }
-            count={results.length}
-            rightText={results.length === 1 ? 'item' : 'items'}
-          />
+        {/* Results — also the idle "Trending" grid (reorderable via digest). */}
+        <View
+          style={{ marginTop: 22 }}
+          onLayout={(e) => {
+            gridY.current = e.nativeEvent.layout.y;
+          }}
+        >
+          {idle && digestSort ? (
+            <SectionHeader
+              title={idleGridTitle}
+              count={gridResults.length}
+              action={{ label: 'Clear', onPress: () => setDigestSort(null) }}
+            />
+          ) : (
+            <SectionHeader
+              title={
+                hasQuery
+                  ? 'Items'
+                  : browseCat
+                    ? `In ${CATEGORY_TILES.find((c) => c.id === browseCat)?.label}`
+                    : idleGridTitle
+              }
+              count={(idle ? gridResults : results).length}
+              rightText={(idle ? gridResults : results).length === 1 ? 'item' : 'items'}
+            />
+          )}
 
           {loading ? (
             <GridSkeleton columns={columns} cardW={cardW} />
-          ) : results.length === 0 ? (
+          ) : (idle ? gridResults : results).length === 0 ? (
             searching ? (
               <GridSkeleton columns={columns} cardW={cardW} />
             ) : hasQuery && userResults.length > 0 ? (
@@ -525,7 +626,7 @@ export default function DiscoverScreen() {
               />
             )
           ) : (
-            <GridSection listings={results} columns={columns} cardW={cardW} />
+            <GridSection listings={idle ? gridResults : results} columns={columns} cardW={cardW} />
           )}
         </View>
       </ScrollView>
@@ -586,24 +687,6 @@ function PeopleRow({ user }: { user: UserResult }) {
       </View>
       <Feather name="chevron-right" size={18} color={colors.muteSoft} />
     </Pressable>
-  );
-}
-
-// Horizontal listing rail used by "For you" and "Recently viewed".
-function Rail({ listings, testID }: { listings: Listing[]; testID?: string }) {
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ paddingHorizontal: HORIZONTAL_PAD, gap: GRID_GAP }}
-      testID={testID}
-    >
-      {listings.map((listing) => (
-        <View key={listing.id} style={{ width: RAIL_CARD_WIDTH }}>
-          <ListingCard listing={listing} />
-        </View>
-      ))}
-    </ScrollView>
   );
 }
 
