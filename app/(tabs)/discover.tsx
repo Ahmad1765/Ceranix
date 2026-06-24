@@ -8,6 +8,7 @@ import {
   ScrollView,
   RefreshControl,
   ActivityIndicator,
+  Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -38,7 +39,7 @@ import {
   DigestRail,
   DailyPicks,
   RecentlyViewedList,
-  CollectionBlock,
+  ShopByBrandRail,
 } from '@/components/discover/EditorialFeed';
 import {
   buildDigest,
@@ -307,6 +308,40 @@ export default function DiscoverScreen() {
   const idleGridTitle =
     digestSort === 'demand' ? 'Now in demand' : digestSort === 'fresh' ? 'Fresh drops' : 'Trending';
 
+  // Search-as-hub: focusing the search bar opens a browse landing (categories +
+  // trending searches) instead of cluttering the idle feed with them. We toggle
+  // an explicit mode (not raw blur) so selecting a tile on web doesn't lose the
+  // tap to a blur-driven unmount. The landing shows only while empty; typing
+  // swaps to results.
+  const [searchActive, setSearchActive] = useState(false);
+  const showSearchLanding = searchActive && !hasQuery;
+
+  const selectSearchTerm = useCallback((term: string) => {
+    setQuery(term);
+    setSearchActive(false);
+    Keyboard.dismiss();
+  }, []);
+
+  const shopAll = useCallback(() => {
+    setQuery('');
+    setActiveCat(null);
+    setDigestSort(null);
+    setSearchActive(false);
+    Keyboard.dismiss();
+  }, []);
+
+  const pickCategory = useCallback((id: CatTile['id']) => {
+    setActiveCat((cur) => (cur === id ? null : id));
+    setSearchActive(false);
+    Keyboard.dismiss();
+  }, []);
+
+  const cancelSearch = useCallback(() => {
+    setQuery('');
+    setSearchActive(false);
+    Keyboard.dismiss();
+  }, []);
+
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
       <ScrollView
@@ -348,12 +383,22 @@ export default function DiscoverScreen() {
           </Pressable>
         </View>
 
-        {/* Search */}
+        {/* Search — focusing it opens the browse landing below. */}
         <Animated.View
           style={[
             {
               marginHorizontal: 16,
               marginTop: 10,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 10,
+            },
+            fade,
+          ]}
+        >
+          <View
+            style={{
+              flex: 1,
               backgroundColor: colors.panel,
               borderRadius: radii.pill,
               flexDirection: 'row',
@@ -361,41 +406,48 @@ export default function DiscoverScreen() {
               paddingHorizontal: 16,
               paddingVertical: 6,
               height: 46,
-            },
-            fade,
-          ]}
-        >
-          <Feather name="search" size={18} color={colors.muteSoft} />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search items, brands, sellers"
-            placeholderTextColor={colors.muteSoft}
-            style={{
-              flex: 1,
-              marginLeft: 10,
-              fontSize: 14.5,
-              color: colors.ink,
-              padding: 0,
-              // RN-Web only: kill the browser's default input focus ring.
-              outlineStyle: 'none',
-              outlineWidth: 0,
-            } as any}
-            returnKeyType="search"
-            autoCorrect={false}
-            autoCapitalize="none"
-          />
-          {searching ? (
-            <ActivityIndicator size="small" color={colors.purple} style={{ marginRight: 4 }} />
-          ) : null}
-          {query.length > 0 && (
-            <Pressable hitSlop={HIT_SLOP_8} onPress={() => setQuery('')}>
-              <Feather name="x" size={16} color={colors.muteSoft} />
+            }}
+          >
+            <Feather name="search" size={18} color={colors.muteSoft} />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              onFocus={() => setSearchActive(true)}
+              placeholder="Search items, brands, sellers"
+              placeholderTextColor={colors.muteSoft}
+              style={{
+                flex: 1,
+                marginLeft: 10,
+                fontSize: 14.5,
+                color: colors.ink,
+                padding: 0,
+                // RN-Web only: kill the browser's default input focus ring.
+                outlineStyle: 'none',
+                outlineWidth: 0,
+              } as any}
+              returnKeyType="search"
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+            {searching ? (
+              <ActivityIndicator size="small" color={colors.purple} style={{ marginRight: 4 }} />
+            ) : null}
+            {query.length > 0 && (
+              <Pressable hitSlop={HIT_SLOP_8} onPress={() => setQuery('')}>
+                <Feather name="x" size={16} color={colors.muteSoft} />
+              </Pressable>
+            )}
+          </View>
+          {searchActive ? (
+            <Pressable hitSlop={HIT_SLOP_8} onPress={cancelSearch} accessibilityRole="button">
+              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.purple }}>Cancel</Text>
             </Pressable>
-          )}
+          ) : null}
         </Animated.View>
 
-        {/* Categories — clean circular icons */}
+        {/* Search-focus landing — browse tools (categories + trending searches)
+            live here instead of the idle feed, so Discover stays editorial. */}
+        {showSearchLanding ? (
         <View style={{ marginTop: 20 }}>
           <View
             style={{
@@ -418,6 +470,7 @@ export default function DiscoverScreen() {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ paddingHorizontal: 16, gap: 14 }}
           >
             {CATEGORY_TILES.map((cat) => {
@@ -425,7 +478,7 @@ export default function DiscoverScreen() {
               return (
                 <Pressable
                   key={cat.id}
-                  onPress={() => setActiveCat(active ? null : cat.id)}
+                  onPress={() => pickCategory(cat.id)}
                   style={({ pressed }) => ({
                     alignItems: 'center',
                     width: 64,
@@ -463,8 +516,18 @@ export default function DiscoverScreen() {
               );
             })}
           </ScrollView>
-        </View>
 
+          <TrendingSearches
+            terms={trendingSearches}
+            onSelect={selectSearchTerm}
+            onShopAll={shopAll}
+          />
+        </View>
+        ) : null}
+
+        {/* Everything below the landing — hidden while the browse landing is open. */}
+        {!showSearchLanding ? (
+        <>
         {/* Save-search CTA — only shown when the current query + category
             represent a real filter the user could meaningfully come back to. */}
         {currentSaveKey ? (
@@ -511,24 +574,11 @@ export default function DiscoverScreen() {
           </View>
         ) : null}
 
-        {/* Editorial feed — welcome, digest, picks, recently viewed, collections.
+        {/* Editorial feed — welcome, digest, picks, recently viewed, shop by brand.
             Idle browse only; search / category states render results instead. */}
         {idle ? (
           <>
             <WelcomeEyebrow username={profile?.username ?? null} />
-
-            <TrendingSearches
-              terms={trendingSearches}
-              onSelect={(term) => setQuery(term)}
-              onShopAll={() => {
-                setQuery('');
-                setActiveCat(null);
-                setDigestSort(null);
-                requestAnimationFrame(() =>
-                  scrollRef.current?.scrollTo?.({ y: Math.max(0, gridY.current - 8), animated: true }),
-                );
-              }}
-            />
 
             {loading && digest.length === 0 ? (
               <View style={{ marginTop: 16 }}>
@@ -555,9 +605,7 @@ export default function DiscoverScreen() {
               <RecentlyViewedList listings={recentlyViewed} testID="discover-recently-viewed" />
             ) : null}
 
-            {collections.map((c) => (
-              <CollectionBlock key={c.id} collection={c} onPress={() => setQuery(c.brand)} />
-            ))}
+            <ShopByBrandRail collections={collections} onPress={(brand) => setQuery(brand)} />
           </>
         ) : null}
 
@@ -585,7 +633,15 @@ export default function DiscoverScreen() {
             gridY.current = e.nativeEvent.layout.y;
           }}
         >
-          {idle && digestSort ? (
+          {browseCat && !hasQuery ? (
+            // Category browse — give the user a way back out (the category tiles
+            // now live in the search landing, so the grid owns the Clear).
+            <SectionHeader
+              title={`In ${CATEGORY_TILES.find((c) => c.id === browseCat)?.label}`}
+              count={results.length}
+              action={{ label: 'Clear', onPress: () => setActiveCat(null) }}
+            />
+          ) : idle && digestSort ? (
             <SectionHeader
               title={idleGridTitle}
               count={gridResults.length}
@@ -593,13 +649,7 @@ export default function DiscoverScreen() {
             />
           ) : (
             <SectionHeader
-              title={
-                hasQuery
-                  ? 'Items'
-                  : browseCat
-                    ? `In ${CATEGORY_TILES.find((c) => c.id === browseCat)?.label}`
-                    : idleGridTitle
-              }
+              title={hasQuery ? 'Items' : idleGridTitle}
               count={(idle ? gridResults : results).length}
               rightText={(idle ? gridResults : results).length === 1 ? 'item' : 'items'}
             />
@@ -629,6 +679,8 @@ export default function DiscoverScreen() {
             <GridSection listings={idle ? gridResults : results} columns={columns} cardW={cardW} />
           )}
         </View>
+        </>
+        ) : null}
       </ScrollView>
       <WebPullIndicator pull={pull} refreshing={refreshing} nodeTop={nodeTop} threshold={threshold} />
     </SafeAreaView>

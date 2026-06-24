@@ -338,67 +338,83 @@ function RecentRow({ listing }: { listing: Listing }) {
   );
 }
 
-// ── Collections ──────────────────────────────────────────────────────────────
-export function CollectionBlock({
-  collection,
+// ── Shop by brand ────────────────────────────────────────────────────────────
+// One horizontal rail of brand cards (a hero thumb + brand name), replacing the
+// old stacked collage blocks so brand browsing is a single band, not three.
+export function ShopByBrandRail({
+  collections,
   onPress,
 }: {
-  collection: Collection;
-  onPress: () => void;
+  collections: Collection[];
+  onPress: (brand: string) => void;
 }) {
+  if (collections.length === 0) return null;
+  return (
+    <View style={{ marginTop: 26 }}>
+      <Text
+        style={{
+          fontFamily: SERIF_BOLD,
+          fontSize: 20,
+          color: colors.ink,
+          letterSpacing: -0.3,
+          paddingHorizontal: PAD,
+          marginBottom: 12,
+        }}
+      >
+        Shop by brand
+      </Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: PAD, gap: 12 }}
+      >
+        {collections.map((c) => (
+          <BrandCard key={c.id} collection={c} onPress={() => onPress(c.brand)} />
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+function BrandCard({ collection, onPress }: { collection: Collection; onPress: () => void }) {
+  const img = collection.images[0]
+    ? getOptimizedImageUrl(collection.images[0], { width: 300 })
+    : null;
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`Browse ${collection.brand}`}
-      style={({ pressed }) => ({ paddingHorizontal: PAD, marginTop: 26, opacity: pressed ? 0.9 : 1 })}
+      style={({ pressed }) => ({ width: 150, opacity: pressed ? 0.85 : 1 })}
     >
-      <Text style={eyebrowStyle} numberOfLines={1}>
-        {collection.eyebrow}
-      </Text>
       <View
         style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginTop: 3,
+          width: '100%',
+          aspectRatio: 1,
+          borderRadius: radii.md,
+          overflow: 'hidden',
+          backgroundColor: colors.panel,
         }}
       >
-        <Text
-          style={{ fontFamily: SERIF_BOLD, fontSize: 24, color: colors.ink, letterSpacing: -0.5, flex: 1 }}
-          numberOfLines={1}
-        >
-          {collection.brand}
-        </Text>
-        <Feather name="arrow-up-right" size={20} color={colors.ink} />
+        {img ? (
+          <Image
+            source={{ uri: img }}
+            style={{ width: '100%', height: '100%' }}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={200}
+          />
+        ) : null}
       </View>
-      <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-        {collection.images.map((img, i) => (
-          <View
-            key={i}
-            style={{
-              flex: 1,
-              aspectRatio: 1 / 1.15,
-              borderRadius: 8,
-              overflow: 'hidden',
-              backgroundColor: colors.panel,
-            }}
-          >
-            <Image
-              source={{ uri: getOptimizedImageUrl(img, { width: 300 }) }}
-              style={{ width: '100%', height: '100%' }}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-              transition={200}
-            />
-          </View>
-        ))}
-        {/* Pad to a stable 3-up rhythm when a brand has fewer images. */}
-        {collection.images.length < 3 &&
-          Array.from({ length: 3 - collection.images.length }).map((_, i) => (
-            <View key={`pad-${i}`} style={{ flex: 1 }} />
-          ))}
-      </View>
+      <Text style={[eyebrowStyle, { marginTop: 8 }]} numberOfLines={1}>
+        {collection.eyebrow}
+      </Text>
+      <Text
+        style={{ fontFamily: SERIF_BOLD, fontSize: 15, color: colors.ink, marginTop: 1 }}
+        numberOfLines={1}
+      >
+        {collection.brand}
+      </Text>
     </Pressable>
   );
 }
