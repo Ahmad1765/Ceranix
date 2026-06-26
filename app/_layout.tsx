@@ -150,7 +150,7 @@ function RootLayout() {
           />
           <Stack.Screen
             name="user/[id]"
-            options={{ headerShown: true, title: '', headerBackTitle: '' }}
+            options={{ headerShown: false }}
           />
           <Stack.Screen
             name="conversation/[id]"
