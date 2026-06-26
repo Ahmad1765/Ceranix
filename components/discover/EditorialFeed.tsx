@@ -3,7 +3,7 @@
 // "collection" collages. All presentational — data is derived upstream in
 // lib/discover.ts and passed in. Strict purple/white/black, Inter + Fraunces.
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -62,10 +62,9 @@ export function WelcomeEyebrow() {
 // delivery-app promo banner, reinterpreted strictly on-brand: a deep purple
 // card with a tonal arc for depth, a serif headline with hard weight contrast,
 // a high-contrast white CTA, and a framed product tile (no cheap bleed seam).
-// Auto-advances, with an expanding-pill page indicator. Purple/white/black,
+// Swipe-driven, with an expanding-pill page indicator. Purple/white/black,
 // no gradients.
 const PROMO_H = 184;
-const PROMO_AUTOPLAY_MS = 4800;
 
 export function PromoBanner({
   slides,
@@ -74,40 +73,25 @@ export function PromoBanner({
   slides: PromoSlide[];
   onPress: (target: PromoTarget) => void;
 }) {
-  const { width } = useWindowDimensions();
+  const { width: winW } = useWindowDimensions();
+  const [containerW, setContainerW] = useState(0);
   const [active, setActive] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
-  const activeRef = useRef(0);
 
-  // Page width: the card plus its trailing gap, so each snap lands one slide on.
-  const cardW = width - PAD * 2;
-  const page = cardW + GAP;
+  // Measure the real viewport width (the feed is narrower than the window on
+  // web), and page each slide at exactly that width so pagingEnabled snaps one
+  // full card on every swipe. snapToInterval + leading padding never lines up on
+  // react-native-web, which is why the card used to land short.
+  const w = containerW || winW;
+  const cardW = w - PAD * 2;
 
-  const setIndex = (i: number) => {
-    activeRef.current = i;
-    setActive(i);
-  };
-
-  // Track the active slide continuously. onMomentumScrollEnd is unreliable on
-  // react-native-web (it misses programmatic scrolls and some snap settles), so
-  // we derive the index from the live scroll offset instead.
+  // Derive the active slide from the live offset — onMomentumScrollEnd is
+  // unreliable on web, so we track every scroll tick instead.
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const i = Math.round(e.nativeEvent.contentOffset.x / page);
+    const i = Math.round(e.nativeEvent.contentOffset.x / w);
     const clamped = Math.max(0, Math.min(slides.length - 1, i));
-    if (clamped !== activeRef.current) setIndex(clamped);
+    if (clamped !== active) setActive(clamped);
   };
-
-  // Auto-advance. Each tick reads the live index off the ref so manual swipes
-  // (which update the ref via onMomentumEnd) don't get fought by a stale closure.
-  useEffect(() => {
-    if (slides.length < 2) return;
-    const id = setInterval(() => {
-      const next = (activeRef.current + 1) % slides.length;
-      scrollRef.current?.scrollTo({ x: next * page, animated: true });
-      setIndex(next);
-    }, PROMO_AUTOPLAY_MS);
-    return () => clearInterval(id);
-  }, [slides.length, page]);
 
   if (slides.length === 0) return null;
 
@@ -116,16 +100,16 @@ export function PromoBanner({
       <ScrollView
         ref={scrollRef}
         horizontal
+        pagingEnabled
         showsHorizontalScrollIndicator={false}
-        snapToInterval={page}
-        decelerationRate="fast"
-        disableIntervalMomentum
         onScroll={onScroll}
         scrollEventThrottle={16}
-        contentContainerStyle={{ paddingHorizontal: PAD, gap: GAP }}
+        onLayout={(e) => setContainerW(e.nativeEvent.layout.width)}
       >
         {slides.map((s) => (
-          <PromoCard key={s.id} slide={s} width={cardW} onPress={() => onPress(s.target)} />
+          <View key={s.id} style={{ width: w, paddingHorizontal: PAD }}>
+            <PromoCard slide={s} width={cardW} onPress={() => onPress(s.target)} />
+          </View>
         ))}
       </ScrollView>
 
@@ -522,8 +506,12 @@ export function DailyPicks({
 }
 
 // ── Recently viewed ──────────────────────────────────────────────────────────
-// Vertical list of the last items the user opened: square thumb + title + price.
-// A row layout reads as "pick up where you left off" better than a card rail.
+// The last items the user opened: square thumb + title + price, kept as stacked
+// vertical rows. To avoid a long scroll, the rows are paginated — each page is a
+// column of up to ROWS_PER_PAGE rows, swiped horizontally with a dotted page
+// indicator beneath.
+const ROWS_PER_PAGE = 4;
+
 export function RecentlyViewedList({
   listings,
   testID,
@@ -531,7 +519,37 @@ export function RecentlyViewedList({
   listings: Listing[];
   testID?: string;
 }) {
+  const { width: winW } = useWindowDimensions();
+  const [containerW, setContainerW] = useState(0);
+  const [page, setPage] = useState(0);
+  const scrollRef = useRef<ScrollView>(null);
   if (listings.length === 0) return null;
+
+  // Page each column at the real viewport width (measured below) so paging snaps
+  // correctly on web, where the feed is narrower than the window.
+  const w = containerW || winW;
+
+  // Chunk into pages of ROWS_PER_PAGE — each becomes one swipeable column.
+  const pages: Listing[][] = [];
+  for (let i = 0; i < listings.length; i += ROWS_PER_PAGE) {
+    pages.push(listings.slice(i, i + ROWS_PER_PAGE));
+  }
+
+  // Derive the active page from the live offset. onMomentumScrollEnd is
+  // unreliable on react-native-web, so we track it on every scroll tick.
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const i = Math.round(e.nativeEvent.contentOffset.x / w);
+    const clamped = Math.max(0, Math.min(pages.length - 1, i));
+    if (clamped !== page) setPage(clamped);
+  };
+
+  // Tapping a dot jumps to that page — the only way to navigate on web, where
+  // there's no touch swipe.
+  const goToPage = (i: number) => {
+    scrollRef.current?.scrollTo({ x: i * w, animated: true });
+    setPage(i);
+  };
+
   return (
     <View style={{ marginTop: 26 }} testID={testID}>
       <Text
@@ -546,11 +564,50 @@ export function RecentlyViewedList({
       >
         Recently viewed
       </Text>
-      <View style={{ paddingHorizontal: PAD, gap: 8 }}>
-        {listings.map((l) => (
-          <RecentRow key={l.id} listing={l} />
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        onLayout={(e) => setContainerW(e.nativeEvent.layout.width)}
+      >
+        {pages.map((group, i) => (
+          <View key={i} style={{ width: w, paddingHorizontal: PAD, gap: 8 }}>
+            {group.map((l) => (
+              <RecentRow key={l.id} listing={l} />
+            ))}
+          </View>
         ))}
-      </View>
+      </ScrollView>
+      {pages.length > 1 ? (
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: 6,
+            marginTop: 14,
+          }}
+        >
+          {pages.map((_, i) => (
+            <Pressable
+              key={i}
+              onPress={() => goToPage(i)}
+              hitSlop={HIT_SLOP_8}
+              accessibilityRole="button"
+              accessibilityLabel={`Go to page ${i + 1} of ${pages.length}`}
+              style={{
+                width: i === page ? 18 : 6,
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: i === page ? colors.purple : colors.hair,
+              }}
+            />
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }

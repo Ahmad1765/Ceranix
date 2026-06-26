@@ -72,6 +72,9 @@ const HORIZONTAL_PAD = 12;
 const GRID_GAP = 8;
 const RAIL_CARD_WIDTH = 160;
 const SEARCH_DEBOUNCE_MS = 300;
+// Feature flag: the editorial "digest" rail on the idle feed. Disabled per
+// product call; flip to re-enable the Now in demand / Fresh drops / edit cards.
+const SHOW_DIGEST_RAIL = false;
 // Stable empty reference so the grid's fallback doesn't churn useMemo deps when
 // the query has no data yet.
 const EMPTY_LISTINGS: Listing[] = [];
@@ -604,15 +607,20 @@ export default function DiscoverScreen() {
           <>
             <PromoBanner slides={promos} onPress={handlePromoPress} />
 
-            <WelcomeEyebrow />
-
-            {loading && digest.length === 0 ? (
-              <View style={{ marginTop: 16 }}>
-                <RailSkeleton />
-              </View>
-            ) : (
-              <DigestRail cards={digest} onPress={handleDigestPress} />
-            )}
+            {/* "Today's edit" heading + digest rail ("Now in demand" / "Fresh
+                drops" / edits) disabled together — the heading titles the rail. */}
+            {SHOW_DIGEST_RAIL ? (
+              <>
+                <WelcomeEyebrow />
+                {loading && digest.length === 0 ? (
+                  <View style={{ marginTop: 16 }}>
+                    <RailSkeleton />
+                  </View>
+                ) : (
+                  <DigestRail cards={digest} onPress={handleDigestPress} />
+                )}
+              </>
+            ) : null}
 
             {recLoading ? (
               <View style={{ marginTop: 26 }}>
