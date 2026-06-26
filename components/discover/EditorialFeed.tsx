@@ -22,7 +22,7 @@ import { getOptimizedImageUrl } from '@/lib/images';
 import { colors, radii, shadow, type } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import type { Listing } from '@/types';
-import type { DigestCard, Collection } from '@/lib/discover';
+import type { DigestCard, Collection, PromoSlide, PromoTarget } from '@/lib/discover';
 
 const PAD = 16;
 const GAP = 10;
@@ -67,40 +67,17 @@ export function WelcomeEyebrow() {
 const PROMO_H = 184;
 const PROMO_AUTOPLAY_MS = 4800;
 
-type PromoSlide = {
-  id: string;
-  eyebrow: string;
-  title: string;
-  image: string | null;
-};
-
-const PROMO_COPY: Omit<PromoSlide, 'id' | 'image'>[] = [
-  { eyebrow: 'Editor’s edit', title: 'Curated finds, freshly dropped' },
-  { eyebrow: 'Trending now', title: 'The pieces everyone’s after' },
-  { eyebrow: 'Just in', title: 'New sellers, new obsessions' },
-];
-
 export function PromoBanner({
-  listings,
+  slides,
   onPress,
 }: {
-  listings: Listing[];
-  onPress: () => void;
+  slides: PromoSlide[];
+  onPress: (target: PromoTarget) => void;
 }) {
   const { width } = useWindowDimensions();
   const [active, setActive] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
   const activeRef = useRef(0);
-
-  // Derive slides from the loaded grid so the banner always has real imagery
-  // without an extra fetch. Falls back to a single copy slide when grid is cold.
-  const withImage = listings.filter((l) => l.images[0]);
-  const count = Math.max(1, Math.min(PROMO_COPY.length, withImage.length || 1));
-  const slides: PromoSlide[] = PROMO_COPY.slice(0, count).map((c, i) => ({
-    ...c,
-    id: `promo-${i}`,
-    image: withImage[i]?.images[0] ?? null,
-  }));
 
   // Page width: the card plus its trailing gap, so each snap lands one slide on.
   const cardW = width - PAD * 2;
@@ -132,6 +109,8 @@ export function PromoBanner({
     return () => clearInterval(id);
   }, [slides.length, page]);
 
+  if (slides.length === 0) return null;
+
   return (
     <View style={{ marginTop: 18 }}>
       <ScrollView
@@ -146,7 +125,7 @@ export function PromoBanner({
         contentContainerStyle={{ paddingHorizontal: PAD, gap: GAP }}
       >
         {slides.map((s) => (
-          <PromoCard key={s.id} slide={s} width={cardW} onPress={onPress} />
+          <PromoCard key={s.id} slide={s} width={cardW} onPress={() => onPress(s.target)} />
         ))}
       </ScrollView>
 

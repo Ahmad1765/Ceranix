@@ -47,7 +47,6 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { AuthProvider } from '@/lib/auth';
 import { ToastProvider } from '@/lib/toast';
-import { Preloader } from '@/components/Preloader';
 
 const AESTHETIC_FONTS = {
   Fraunces_400Regular,
@@ -133,7 +132,9 @@ function RootLayout() {
       });
   }, []);
 
-  if (!ready) return <Preloader />;
+  // Preloader disabled — render nothing until boot assets are ready instead of
+  // the branded loading screen.
+  if (!ready) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

@@ -38,6 +38,21 @@ export interface DigestCard {
   target: DigestTarget;
 }
 
+export type PromoTarget =
+  | { kind: 'theme'; theme: 'demand' | 'fresh' }
+  | { kind: 'category'; category: Category }
+  | { kind: 'listing'; id: string };
+
+export interface PromoSlide {
+  id: string;
+  /** Uppercase eyebrow chip, e.g. "JUST IN". */
+  eyebrow: string;
+  /** Headline, set in serif. Short enough to wrap to ≤2 lines. */
+  title: string;
+  image: string | null;
+  target: PromoTarget;
+}
+
 export interface Collection {
   id: string;
   brand: string;
@@ -116,6 +131,81 @@ export function buildDigest(listings: Listing[]): DigestCard[] {
     }));
 
   return [...cards, ...catCards];
+}
+
+/**
+ * Promo banner slides — up to 3 dynamic hero cards derived from live stock,
+ * each carrying a real tap target the idle screen can act on (apply a theme
+ * sort, open a category, or push a product). Images are de-duped across slides
+ * so the carousel never repeats the same photo. Empty on a cold/blank catalog.
+ */
+export function buildPromos(listings: Listing[]): PromoSlide[] {
+  const live = listings.filter((l) => !l.is_sold && l.images.length > 0);
+  if (live.length === 0) return [];
+
+  const used = new Set<string>();
+  // Pick the first listing from `cands` whose image we haven't used yet.
+  const take = (cands: Listing[]): Listing | undefined => {
+    const pick = cands.find((l) => !used.has(l.id));
+    if (pick) used.add(pick.id);
+    return pick;
+  };
+
+  const slides: PromoSlide[] = [];
+
+  // Fresh drops — newest first.
+  const byNew = [...live].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
+  const fresh = take(byNew);
+  if (fresh) {
+    slides.push({
+      id: 'promo-fresh',
+      eyebrow: 'Just in',
+      title: 'Fresh drops, just landed',
+      image: firstImage(fresh),
+      target: { kind: 'theme', theme: 'fresh' },
+    });
+  }
+
+  // Now in demand — most liked.
+  const byLikes = [...live].sort((a, b) => (b.likes ?? 0) - (a.likes ?? 0));
+  const hot = take(byLikes);
+  if (hot) {
+    slides.push({
+      id: 'promo-demand',
+      eyebrow: 'Trending now',
+      title: 'The most-loved, right now',
+      image: firstImage(hot),
+      target: { kind: 'theme', theme: 'demand' },
+    });
+  }
+
+  // Strongest category — the deepest bucket that clears the threshold.
+  const byCat = new Map<Category, Listing[]>();
+  for (const l of live) {
+    const arr = byCat.get(l.category) ?? [];
+    arr.push(l);
+    byCat.set(l.category, arr);
+  }
+  const topCat = [...byCat.entries()]
+    .filter(([, arr]) => arr.length >= MIN_PER_GROUP)
+    .sort((a, b) => b[1].length - a[1].length)[0];
+  if (topCat) {
+    const [category, arr] = topCat;
+    const pick = take(arr);
+    if (pick) {
+      slides.push({
+        id: `promo-cat-${category}`,
+        eyebrow: 'Shop the edit',
+        title: `The ${CATEGORY_LABEL[category]} edit`,
+        image: firstImage(pick),
+        target: { kind: 'category', category },
+      });
+    }
+  }
+
+  return slides;
 }
 
 /**

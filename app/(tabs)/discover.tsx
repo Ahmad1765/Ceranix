@@ -46,7 +46,9 @@ import {
   buildDigest,
   buildCollections,
   buildTrendingSearches,
+  buildPromos,
   type DigestCard,
+  type PromoTarget,
 } from '@/lib/discover';
 
 type CatTile = {
@@ -273,6 +275,7 @@ export default function DiscoverScreen() {
   const digest = useMemo(() => buildDigest(listings), [listings]);
   const collections = useMemo(() => buildCollections(listings), [listings]);
   const trendingSearches = useMemo(() => buildTrendingSearches(listings), [listings]);
+  const promos = useMemo(() => buildPromos(listings), [listings]);
   // Personalized picks rail: recommendations when we have them, otherwise the
   // top of the trending grid so the rail is never empty (logged-out / cold).
   const picks = recommended.length > 0 ? recommended : listings.slice(0, 10);
@@ -299,6 +302,26 @@ export default function DiscoverScreen() {
         return;
       }
       setDigestSort(card.target.theme);
+      requestAnimationFrame(() =>
+        scrollRef.current?.scrollTo?.({ y: Math.max(0, gridY.current - 8), animated: true }),
+      );
+    },
+    [scrollRef],
+  );
+
+  // Promo banner taps: open a product, jump into a category, or apply a theme
+  // sort and scroll the user to the reordered grid (mirrors the digest cards).
+  const handlePromoPress = useCallback(
+    (target: PromoTarget) => {
+      if (target.kind === 'listing') {
+        router.push(`/product/${target.id}`);
+        return;
+      }
+      if (target.kind === 'category') {
+        setActiveCat(target.category);
+        return;
+      }
+      setDigestSort(target.theme);
       requestAnimationFrame(() =>
         scrollRef.current?.scrollTo?.({ y: Math.max(0, gridY.current - 8), animated: true }),
       );
@@ -579,7 +602,7 @@ export default function DiscoverScreen() {
             Idle browse only; search / category states render results instead. */}
         {idle ? (
           <>
-            <PromoBanner listings={listings} onPress={shopAll} />
+            <PromoBanner slides={promos} onPress={handlePromoPress} />
 
             <WelcomeEyebrow />
 
