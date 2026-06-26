@@ -35,6 +35,7 @@ import { EmptyState, SectionHeader } from '@/components/ui';
 import { useWebPullToRefresh, WebPullIndicator } from '@/components/WebRefresh';
 import {
   WelcomeEyebrow,
+  PromoBanner,
   TrendingSearches,
   DigestRail,
   DailyPicks,
@@ -83,7 +84,7 @@ export default function DiscoverScreen() {
   const initialCat = typeof params.category === 'string' ? (params.category as CatTile['id']) : null;
   const savedId = typeof params.savedId === 'string' ? params.savedId : null;
 
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const toast = useToast();
   const [query, setQuery] = useState(initialQuery);
   const [activeCat, setActiveCat] = useState<CatTile['id'] | null>(initialCat);
@@ -578,7 +579,9 @@ export default function DiscoverScreen() {
             Idle browse only; search / category states render results instead. */}
         {idle ? (
           <>
-            <WelcomeEyebrow username={profile?.username ?? null} />
+            <PromoBanner listings={listings} onPress={shopAll} />
+
+            <WelcomeEyebrow />
 
             {loading && digest.length === 0 ? (
               <View style={{ marginTop: 16 }}>

@@ -3,13 +3,23 @@
 // "collection" collages. All presentational — data is derived upstream in
 // lib/discover.ts and passed in. Strict purple/white/black, Inter + Fraunces.
 
-import { View, Text, Pressable, ScrollView, useWindowDimensions } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  type NativeSyntheticEvent,
+  type NativeScrollEvent,
+} from 'react-native';
 import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { ListingCard } from '@/components/ListingCard';
 import { getOptimizedImageUrl } from '@/lib/images';
-import { colors, radii, type } from '@/lib/theme';
+import { colors, radii, shadow, type } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import type { Listing } from '@/types';
 import type { DigestCard, Collection } from '@/lib/discover';
@@ -28,24 +38,310 @@ const eyebrowStyle = {
 };
 
 // ── Welcome ────────────────────────────────────────────────────────────────
-export function WelcomeEyebrow({ username }: { username: string | null }) {
+// Section heading for the idle feed. The personalized "Welcome @username"
+// eyebrow was removed; this now just titles the edit.
+export function WelcomeEyebrow() {
   return (
     <View style={{ paddingHorizontal: PAD, marginTop: 22 }}>
-      <Text style={eyebrowStyle} numberOfLines={1}>
-        {username ? `Welcome @${username}` : 'Welcome to Ceranix'}
-      </Text>
       <Text
         style={{
           fontFamily: SERIF_SEMI,
           fontSize: 26,
           color: colors.ink,
           letterSpacing: -0.4,
-          marginTop: 4,
         }}
       >
         Today’s edit
       </Text>
     </View>
+  );
+}
+
+// ── Promo banner ─────────────────────────────────────────────────────────────
+// Hero promotional carousel at the top of the idle feed. Same shape as a
+// delivery-app promo banner, reinterpreted strictly on-brand: a deep purple
+// card with a tonal arc for depth, a serif headline with hard weight contrast,
+// a high-contrast white CTA, and a framed product tile (no cheap bleed seam).
+// Auto-advances, with an expanding-pill page indicator. Purple/white/black,
+// no gradients.
+const PROMO_H = 184;
+const PROMO_AUTOPLAY_MS = 4800;
+
+type PromoSlide = {
+  id: string;
+  eyebrow: string;
+  title: string;
+  image: string | null;
+};
+
+const PROMO_COPY: Omit<PromoSlide, 'id' | 'image'>[] = [
+  { eyebrow: 'Editor’s edit', title: 'Curated finds, freshly dropped' },
+  { eyebrow: 'Trending now', title: 'The pieces everyone’s after' },
+  { eyebrow: 'Just in', title: 'New sellers, new obsessions' },
+];
+
+export function PromoBanner({
+  listings,
+  onPress,
+}: {
+  listings: Listing[];
+  onPress: () => void;
+}) {
+  const { width } = useWindowDimensions();
+  const [active, setActive] = useState(0);
+  const scrollRef = useRef<ScrollView>(null);
+  const activeRef = useRef(0);
+
+  // Derive slides from the loaded grid so the banner always has real imagery
+  // without an extra fetch. Falls back to a single copy slide when grid is cold.
+  const withImage = listings.filter((l) => l.images[0]);
+  const count = Math.max(1, Math.min(PROMO_COPY.length, withImage.length || 1));
+  const slides: PromoSlide[] = PROMO_COPY.slice(0, count).map((c, i) => ({
+    ...c,
+    id: `promo-${i}`,
+    image: withImage[i]?.images[0] ?? null,
+  }));
+
+  // Page width: the card plus its trailing gap, so each snap lands one slide on.
+  const cardW = width - PAD * 2;
+  const page = cardW + GAP;
+
+  const setIndex = (i: number) => {
+    activeRef.current = i;
+    setActive(i);
+  };
+
+  // Track the active slide continuously. onMomentumScrollEnd is unreliable on
+  // react-native-web (it misses programmatic scrolls and some snap settles), so
+  // we derive the index from the live scroll offset instead.
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const i = Math.round(e.nativeEvent.contentOffset.x / page);
+    const clamped = Math.max(0, Math.min(slides.length - 1, i));
+    if (clamped !== activeRef.current) setIndex(clamped);
+  };
+
+  // Auto-advance. Each tick reads the live index off the ref so manual swipes
+  // (which update the ref via onMomentumEnd) don't get fought by a stale closure.
+  useEffect(() => {
+    if (slides.length < 2) return;
+    const id = setInterval(() => {
+      const next = (activeRef.current + 1) % slides.length;
+      scrollRef.current?.scrollTo({ x: next * page, animated: true });
+      setIndex(next);
+    }, PROMO_AUTOPLAY_MS);
+    return () => clearInterval(id);
+  }, [slides.length, page]);
+
+  return (
+    <View style={{ marginTop: 18 }}>
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        snapToInterval={page}
+        decelerationRate="fast"
+        disableIntervalMomentum
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        contentContainerStyle={{ paddingHorizontal: PAD, gap: GAP }}
+      >
+        {slides.map((s) => (
+          <PromoCard key={s.id} slide={s} width={cardW} onPress={onPress} />
+        ))}
+      </ScrollView>
+
+      {/* Page indicator — a frosted pill overlaid inside the banner, bottom
+          center, so it floats on the card rather than taking feed space. */}
+      {slides.length > 1 ? (
+        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+          <View
+            style={{
+              position: 'absolute',
+              bottom: 12,
+              left: 0,
+              right: 0,
+              alignItems: 'center',
+            }}
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 5,
+                paddingHorizontal: 8,
+                paddingVertical: 6,
+                borderRadius: radii.pill,
+                backgroundColor: 'rgba(15,15,15,0.28)',
+              }}
+            >
+              {slides.map((s, i) => (
+                <View
+                  key={s.id}
+                  style={{
+                    width: i === active ? 16 : 6,
+                    height: 6,
+                    borderRadius: 3,
+                    backgroundColor:
+                      i === active ? colors.white : 'rgba(255,255,255,0.5)',
+                  }}
+                />
+              ))}
+            </View>
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function PromoCard({
+  slide,
+  width,
+  onPress,
+}: {
+  slide: PromoSlide;
+  width: number;
+  onPress: () => void;
+}) {
+  const src = slide.image ? getOptimizedImageUrl(slide.image, { width: 600 }) : null;
+  const hasImg = !!src;
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${slide.eyebrow}. ${slide.title.replace('\n', ' ')}. Shop now`}
+      style={({ pressed }) => ({
+        width,
+        transform: [{ scale: pressed ? 0.985 : 1 }],
+      })}
+    >
+      <View
+        style={{
+          width: '100%',
+          height: PROMO_H,
+          borderRadius: radii['3xl'],
+          overflow: 'hidden',
+          backgroundColor: colors.purpleDeep,
+          flexDirection: 'row',
+          ...shadow.lg,
+        }}
+      >
+        {/* Product image, full-bleed to the right edge so it meets the copy
+            panel like a real promo banner (no floating placeholder box). The
+            purple fill underneath means a slow / missing image still reads as
+            part of the card, never an empty hole. */}
+        {hasImg ? (
+          <View style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: '46%' }}>
+            <Image
+              source={{ uri: src }}
+              style={{ width: '100%', height: '100%' }}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={250}
+            />
+            {/* Brand tint — a single flat purple wash unifies any product photo
+                with the card. Not a gradient. */}
+            <View
+              pointerEvents="none"
+              style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(85,56,214,0.22)' }}
+            />
+          </View>
+        ) : null}
+
+        {/* Tonal arc — a single lighter-purple disc gives the flat fill depth
+            and anchors the headline. Sits behind the copy. */}
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: -64,
+            top: -72,
+            width: 210,
+            height: 210,
+            borderRadius: 105,
+            backgroundColor: colors.purple,
+            opacity: 0.5,
+          }}
+        />
+
+        {/* Copy column — width-capped (not flex) so the headline always wraps
+            inside the panel and never runs under the image. */}
+        <View
+          style={{
+            width: hasImg ? '58%' : '100%',
+            paddingLeft: 22,
+            paddingRight: 12,
+            paddingVertical: 20,
+            justifyContent: 'space-between',
+          }}
+        >
+          <View>
+            <View
+              style={{
+                alignSelf: 'flex-start',
+                paddingHorizontal: 11,
+                paddingVertical: 5,
+                borderRadius: radii.pill,
+                backgroundColor: 'rgba(255,255,255,0.16)',
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 10.5,
+                  fontFamily: type.family.sansBold,
+                  color: colors.white,
+                  letterSpacing: 1.3,
+                  textTransform: 'uppercase',
+                }}
+                numberOfLines={1}
+              >
+                {slide.eyebrow}
+              </Text>
+            </View>
+            <Text
+              numberOfLines={2}
+              style={{
+                fontFamily: SERIF_BOLD,
+                fontSize: 21,
+                lineHeight: 25,
+                color: colors.white,
+                letterSpacing: -0.3,
+                marginTop: 10,
+              }}
+            >
+              {slide.title}
+            </Text>
+          </View>
+
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 7,
+              alignSelf: 'flex-start',
+              backgroundColor: colors.white,
+              paddingLeft: 16,
+              paddingRight: 13,
+              paddingVertical: 9,
+              borderRadius: radii.pill,
+              ...shadow.sm,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 13,
+                fontFamily: type.family.sansBold,
+                color: colors.purpleDeep,
+                letterSpacing: 0.2,
+              }}
+            >
+              Shop now
+            </Text>
+            <Feather name="arrow-right" size={14} color={colors.purpleDeep} />
+          </View>
+        </View>
+      </View>
+    </Pressable>
   );
 }
 
