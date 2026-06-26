@@ -140,6 +140,36 @@ function go(displayKey: string) {
   router.push(`/(tabs)/discover${qs ? `?${qs}` : ''}` as any);
 }
 
+// Small uppercase section label with a leading accent dot — sits above a
+// content row to title it. Palette-safe: purple dot, ink text.
+function SectionEyebrow({ children }: { children: string }) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: SCREEN_PAD,
+        marginBottom: 12,
+      }}
+    >
+      <View
+        style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#6C47FF', marginRight: 8 }}
+      />
+      <Text
+        style={{
+          fontSize: 11,
+          color: '#0F0F0F',
+          letterSpacing: 1.6,
+          textTransform: 'uppercase',
+          fontFamily: 'Inter_700Bold',
+        }}
+      >
+        {children}
+      </Text>
+    </View>
+  );
+}
+
 function CategoryTile({
   data,
   width,
@@ -458,6 +488,7 @@ export const AnonCards = memo(function AnonCards() {
 
       {/* Row 1 — hero carousel */}
       <View style={{ marginTop: 16 }}>
+        <SectionEyebrow>This week's spotlight</SectionEyebrow>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -474,6 +505,7 @@ export const AnonCards = memo(function AnonCards() {
 
       {/* Row 2 — 2x2 grid */}
       <View style={{ marginTop: 16 }}>
+        <SectionEyebrow>Shop by aisle</SectionEyebrow>
         <View
           style={{
             paddingHorizontal: SCREEN_PAD,
