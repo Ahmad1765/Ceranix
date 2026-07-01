@@ -338,7 +338,7 @@ function SellScreenInner() {
                 {slots.map((slot, i) => (
                   <View key={slot.id} style={{ width: tile, height: tile, position: 'relative' }}>
                     <Image
-                      source={{ uri: slot.original.uri }}
+                      source={{ uri: resolveImage(slot).uri }}
                       style={{ width: '100%', height: '100%', borderRadius: 14 }}
                       className="bg-ink-panel"
                       contentFit="cover"
@@ -595,7 +595,7 @@ function SellScreenInner() {
             {slots.map((slot, i) => (
               <View key={slot.id} style={{ position: 'relative' }}>
                 <Image
-                  source={{ uri: slot.original.uri }}
+                  source={{ uri: resolveImage(slot).uri }}
                   style={{ width: 64, height: 64, borderRadius: 12 }}
                   className="bg-ink-panel"
                   contentFit="cover"
