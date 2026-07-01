@@ -3,6 +3,7 @@ import type { CleanInput, CleanResult, FaceBox, CleanOptions } from './types';
 import { getSegmenter, getFaceDetector } from './engine.web';
 import { expandFaceBox, eyeBarRect } from './geometry';
 import { resolveCleanOptions } from './options';
+import { getMatteAlpha } from './matte.web';
 
 const MAX_EDGE = 1024;        // downscale ceiling before analysis, for speed
 // Soft-matte ramp: instead of a hard on/off cutoff (which gives jagged edges),
@@ -11,7 +12,9 @@ const MAX_EDGE = 1024;        // downscale ceiling before analysis, for speed
 const MATTE_LO = 0.35;
 const MATTE_HI = 0.65;
 const BLUR_PX = 22;           // gaussian blur radius for faces
-const TIMEOUT_MS = 15000;
+// Generous ceiling: the first "remove background" run downloads the MODNet
+// matting model (cached by the browser afterwards). Subsequent runs are quick.
+const TIMEOUT_MS = 60000;
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -55,18 +58,25 @@ async function run(
   const octx = out.getContext('2d')!;
 
   if (flags.removeBackground) {
-    const segmenter = await getSegmenter();
     const segImg = bctx.getImageData(0, 0, w, h);
-    const seg = segmenter.segment(base);
-    const conf = seg.confidenceMasks?.[0]?.getAsFloat32Array();
-    seg.close(); // extract data first, then close — getAsFloat32Array returns a JS-side copy
-    if (conf) {
-      const range = MATTE_HI - MATTE_LO;
-      for (let i = 0; i < conf.length; i++) {
-        // Feathered alpha: 0 below LO, 1 above HI, linear ramp between.
-        let t = (conf[i] - MATTE_LO) / range;
-        t = t < 0 ? 0 : t > 1 ? 1 : t;
-        segImg.data[i * 4 + 3] = Math.round(segImg.data[i * 4 + 3] * t);
+    // Prefer MODNet matting (clean edges); fall back to MediaPipe selfie
+    // segmentation with a soft-matte ramp if MODNet can't load.
+    const alpha = await getMatteAlpha(src, w, h);
+    if (alpha && alpha.length >= w * h) {
+      for (let i = 0; i < w * h; i++) segImg.data[i * 4 + 3] = alpha[i];
+    } else {
+      const segmenter = await getSegmenter();
+      const seg = segmenter.segment(base);
+      const conf = seg.confidenceMasks?.[0]?.getAsFloat32Array();
+      seg.close(); // extract data first, then close — getAsFloat32Array returns a JS-side copy
+      if (conf) {
+        const range = MATTE_HI - MATTE_LO;
+        for (let i = 0; i < conf.length; i++) {
+          // Feathered alpha: 0 below LO, 1 above HI, linear ramp between.
+          let t = (conf[i] - MATTE_LO) / range;
+          t = t < 0 ? 0 : t > 1 ? 1 : t;
+          segImg.data[i * 4 + 3] = Math.round(segImg.data[i * 4 + 3] * t);
+        }
       }
     }
     octx.fillStyle = '#FFFFFF';
