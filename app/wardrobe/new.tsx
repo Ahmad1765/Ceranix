@@ -117,7 +117,7 @@ function NewWardrobeInner() {
           </Pressable>
         ) : (
           <View style={{ position: 'relative' }}>
-            <Image source={{ uri: preview.uri }} style={{ width: '100%', height: 360, borderRadius: 18 }} contentFit="cover" />
+            <Image source={{ uri: preview.uri }} style={{ width: '100%', height: 360, borderRadius: 18 }} contentFit="contain" />
             {processing && (
               <View style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.5)', borderRadius: 18 }}>
                 <ActivityIndicator color="#6C47FF" />

@@ -20,7 +20,7 @@ export function WardrobeGrid({ posts, onDelete }: { posts: WardrobePost[]; onDel
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 20 }}>
       {posts.map((p) => (
         <View key={p.id} style={{ width: tile, height: tile * 1.3, borderRadius: 14, overflow: 'hidden', backgroundColor: '#F2F2F4' }}>
-          <Image source={{ uri: p.image_url }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+          <Image source={{ uri: p.image_url }} style={{ width: '100%', height: '100%' }} contentFit="contain" />
           <View style={{ position: 'absolute', bottom: 6, left: 6, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
             <Feather name="heart" size={11} color="#fff" />
             <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>{p.likes_count}</Text>
