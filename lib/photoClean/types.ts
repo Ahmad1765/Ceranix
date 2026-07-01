@@ -9,4 +9,11 @@ export type CleanResult = {
 
 export type FaceBox = { x: number; y: number; width: number; height: number };
 
-export type CleanOptions = { blurFace?: boolean; removeBackground?: boolean };
+// faceMode picks HOW a face is hidden when blurFace is true:
+//  - 'blur' (default): gaussian-blur the whole face region (Sell listing default)
+//  - 'eyes': draw a solid black censor bar across just the eyes (Wardrobe)
+export type CleanOptions = {
+  blurFace?: boolean;
+  removeBackground?: boolean;
+  faceMode?: 'blur' | 'eyes';
+};

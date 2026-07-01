@@ -1,11 +1,15 @@
 // lib/photoClean/index.web.ts
 import type { CleanInput, CleanResult, FaceBox, CleanOptions } from './types';
 import { getSegmenter, getFaceDetector } from './engine.web';
-import { expandFaceBox } from './geometry';
+import { expandFaceBox, eyeBarRect } from './geometry';
 import { resolveCleanOptions } from './options';
 
 const MAX_EDGE = 1024;        // downscale ceiling before analysis, for speed
-const FG_THRESHOLD = 0.5;     // foreground confidence cutoff
+// Soft-matte ramp: instead of a hard on/off cutoff (which gives jagged edges),
+// map the segmenter's confidence through a ramp so the subject edge is
+// anti-aliased/feathered — a noticeably cleaner cutout from the same model.
+const MATTE_LO = 0.35;
+const MATTE_HI = 0.65;
 const BLUR_PX = 22;           // gaussian blur radius for faces
 const TIMEOUT_MS = 15000;
 
@@ -29,7 +33,7 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
 
 async function run(
   input: CleanInput,
-  flags: { blurFace: boolean; removeBackground: boolean },
+  flags: { blurFace: boolean; removeBackground: boolean; faceMode: 'blur' | 'eyes' },
 ): Promise<CleanResult> {
   const src = input.base64 ? `data:image/jpeg;base64,${input.base64}` : input.uri;
   const img = await loadImage(src);
@@ -57,8 +61,12 @@ async function run(
     const conf = seg.confidenceMasks?.[0]?.getAsFloat32Array();
     seg.close(); // extract data first, then close — getAsFloat32Array returns a JS-side copy
     if (conf) {
+      const range = MATTE_HI - MATTE_LO;
       for (let i = 0; i < conf.length; i++) {
-        if (conf[i] < FG_THRESHOLD) segImg.data[i * 4 + 3] = 0; // alpha → 0
+        // Feathered alpha: 0 below LO, 1 above HI, linear ramp between.
+        let t = (conf[i] - MATTE_LO) / range;
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        segImg.data[i * 4 + 3] = Math.round(segImg.data[i * 4 + 3] * t);
       }
     }
     octx.fillStyle = '#FFFFFF';
@@ -78,15 +86,30 @@ async function run(
   if (flags.blurFace) {
     const faceDetector = await getFaceDetector();
     const faces = faceDetector.detect(base);
-    const boxes: FaceBox[] = (faces.detections ?? []).map((d) => ({
-      x: d.boundingBox!.originX,
-      y: d.boundingBox!.originY,
-      width: d.boundingBox!.width,
-      height: d.boundingBox!.height,
-    }));
-    faceCount = boxes.length;
-    for (const raw of boxes) {
-      const b = expandFaceBox(raw, w, h);
+    const detections = faces.detections ?? [];
+    faceCount = detections.length;
+    for (const d of detections) {
+      const bb = d.boundingBox!;
+      const box: FaceBox = { x: bb.originX, y: bb.originY, width: bb.width, height: bb.height };
+
+      if (flags.faceMode === 'eyes') {
+        // Solid black censor bar over just the eyes. BlazeFace keypoints are
+        // [rightEye, leftEye, ...] in normalized coords; fall back to the face
+        // box's eye band when keypoints are unavailable.
+        const kp = d.keypoints ?? [];
+        const eyes =
+          kp.length >= 2
+            ? { right: { x: kp[0].x * w, y: kp[0].y * h }, left: { x: kp[1].x * w, y: kp[1].y * h } }
+            : null;
+        const bar = eyeBarRect(box, eyes, w, h);
+        if (bar.width > 0 && bar.height > 0) {
+          octx.fillStyle = '#000000';
+          octx.fillRect(bar.x, bar.y, bar.width, bar.height);
+        }
+        continue;
+      }
+
+      const b = expandFaceBox(box, w, h);
       if (b.width <= 0 || b.height <= 0) continue;
       octx.save();
       octx.filter = `blur(${BLUR_PX}px)`;

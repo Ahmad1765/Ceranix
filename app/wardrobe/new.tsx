@@ -57,7 +57,7 @@ function NewWardrobeInner() {
     }
     setProcessing(true);
     try {
-      const r = await cleanPhoto(original, { blurFace: nextBlur, removeBackground: nextBg });
+      const r = await cleanPhoto(original, { blurFace: nextBlur, removeBackground: nextBg, faceMode: 'eyes' });
       if (mySeq !== seqRef.current) return; // superseded by a newer toggle
       if (r.ok) {
         setPreview({ uri: r.uri, base64: r.base64 });
@@ -129,7 +129,7 @@ function NewWardrobeInner() {
         {preview && (
           <>
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
-              <ToggleChip label="Blur face" active={blurFace} onPress={toggleBlur} icon="eye-off" disabled={processing} />
+              <ToggleChip label="Hide eyes" active={blurFace} onPress={toggleBlur} icon="eye-off" disabled={processing} />
               <ToggleChip label="Remove background" active={removeBg} onPress={toggleBg} icon="image" disabled={processing} />
             </View>
             <TextInput
