@@ -15,7 +15,7 @@ test.describe('Upload auto-clean (signed in)', () => {
     // 1. Navigate to the upload tab (mirrors upload-listing.spec.ts).
     await page.goto('/upload');
     await waitForAppReady(page);
-    await expect(page.getByText('Upload listing')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('Add photos')).toBeVisible({ timeout: 20_000 });
 
     // 2. Drive the hidden <input type="file"> that the web picker renders.
     //    The input may only appear after the page is ready; wait for it first.

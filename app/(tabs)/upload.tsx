@@ -146,13 +146,13 @@ function SellScreenInner() {
           (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`),
         ),
       );
-      setSlots((prev) => [...prev, ...newSlots]);
+      setSlots((prev) => [...prev, ...newSlots].slice(0, MAX_IMAGES));
       // Concurrency 2: run in pairs so a big batch doesn't freeze the UI.
       (async () => {
         for (let i = 0; i < newSlots.length; i += 2) {
           await Promise.all(newSlots.slice(i, i + 2).map(runClean));
         }
-      })();
+      })().catch(() => {});
     }
   };
 
