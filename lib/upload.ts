@@ -209,3 +209,8 @@ export async function deleteListingImages(urls: string[]): Promise<void> {
     console.warn('[upload] deleteListingImages failed:', error.message, 'paths:', paths);
   }
 }
+
+export async function uploadWardrobeImage(image: LocalImage, userId: string): Promise<string> {
+  const compressed = await compressImage(image, LISTING_MAX_EDGE, LISTING_QUALITY);
+  return uploadOne('wardrobe-images', compressed, userId, 0);
+}
