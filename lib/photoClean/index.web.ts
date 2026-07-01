@@ -1,7 +1,8 @@
 // lib/photoClean/index.web.ts
-import type { CleanInput, CleanResult, FaceBox } from './types';
+import type { CleanInput, CleanResult, FaceBox, CleanOptions } from './types';
 import { getSegmenter, getFaceDetector } from './engine.web';
 import { expandFaceBox } from './geometry';
+import { resolveCleanOptions } from './options';
 
 const MAX_EDGE = 1024;        // downscale ceiling before analysis, for speed
 const FG_THRESHOLD = 0.5;     // foreground confidence cutoff
@@ -26,7 +27,10 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return Promise.race([p, timeout]).finally(() => clearTimeout(timer));
 }
 
-async function run(input: CleanInput): Promise<CleanResult> {
+async function run(
+  input: CleanInput,
+  flags: { blurFace: boolean; removeBackground: boolean },
+): Promise<CleanResult> {
   const src = input.base64 ? `data:image/jpeg;base64,${input.base64}` : input.uri;
   const img = await loadImage(src);
 
@@ -41,50 +45,57 @@ async function run(input: CleanInput): Promise<CleanResult> {
   const bctx = base.getContext('2d')!;
   bctx.drawImage(img, 0, 0, w, h);
 
-  const [segmenter, faceDetector] = await Promise.all([getSegmenter(), getFaceDetector()]);
-
-  // 1. Segmentation → punch out the background to transparent, composite on white.
-  const segImg = bctx.getImageData(0, 0, w, h);
-  const seg = segmenter.segment(base);
-  const conf = seg.confidenceMasks?.[0]?.getAsFloat32Array();
-  seg.close(); // extract data first, then close — getAsFloat32Array returns a JS-side copy
-  if (conf) {
-    for (let i = 0; i < conf.length; i++) {
-      if (conf[i] < FG_THRESHOLD) segImg.data[i * 4 + 3] = 0; // alpha → 0
-    }
-  }
-
   const out = document.createElement('canvas');
   out.width = w;
   out.height = h;
   const octx = out.getContext('2d')!;
-  octx.fillStyle = '#FFFFFF';
-  octx.fillRect(0, 0, w, h);
-  // Draw the masked subject over the white fill via a scratch canvas.
-  const scratch = document.createElement('canvas');
-  scratch.width = w;
-  scratch.height = h;
-  scratch.getContext('2d')!.putImageData(segImg, 0, 0);
-  octx.drawImage(scratch, 0, 0);
 
-  // 2. Faces → blur each expanded box on the composited output.
-  const faces = faceDetector.detect(base);
-  const boxes: FaceBox[] = (faces.detections ?? []).map((d) => ({
-    x: d.boundingBox!.originX,
-    y: d.boundingBox!.originY,
-    width: d.boundingBox!.width,
-    height: d.boundingBox!.height,
-  }));
-  for (const raw of boxes) {
-    const b = expandFaceBox(raw, w, h);
-    if (b.width <= 0 || b.height <= 0) continue;
-    octx.save();
-    octx.filter = `blur(${BLUR_PX}px)`;
-    octx.beginPath();
-    octx.rect(b.x, b.y, b.width, b.height);
-    octx.clip();
-    octx.drawImage(out, 0, 0); // redraw whole canvas through the blur, clipped to the face
-    octx.restore();
+  if (flags.removeBackground) {
+    const segmenter = await getSegmenter();
+    const segImg = bctx.getImageData(0, 0, w, h);
+    const seg = segmenter.segment(base);
+    const conf = seg.confidenceMasks?.[0]?.getAsFloat32Array();
+    seg.close(); // extract data first, then close — getAsFloat32Array returns a JS-side copy
+    if (conf) {
+      for (let i = 0; i < conf.length; i++) {
+        if (conf[i] < FG_THRESHOLD) segImg.data[i * 4 + 3] = 0; // alpha → 0
+      }
+    }
+    octx.fillStyle = '#FFFFFF';
+    octx.fillRect(0, 0, w, h);
+    // Draw the masked subject over the white fill via a scratch canvas.
+    const scratch = document.createElement('canvas');
+    scratch.width = w;
+    scratch.height = h;
+    scratch.getContext('2d')!.putImageData(segImg, 0, 0);
+    octx.drawImage(scratch, 0, 0);
+  } else {
+    // Keep the real photo untouched underneath any face blur.
+    octx.drawImage(base, 0, 0);
+  }
+
+  let faceCount = 0;
+  if (flags.blurFace) {
+    const faceDetector = await getFaceDetector();
+    const faces = faceDetector.detect(base);
+    const boxes: FaceBox[] = (faces.detections ?? []).map((d) => ({
+      x: d.boundingBox!.originX,
+      y: d.boundingBox!.originY,
+      width: d.boundingBox!.width,
+      height: d.boundingBox!.height,
+    }));
+    faceCount = boxes.length;
+    for (const raw of boxes) {
+      const b = expandFaceBox(raw, w, h);
+      if (b.width <= 0 || b.height <= 0) continue;
+      octx.save();
+      octx.filter = `blur(${BLUR_PX}px)`;
+      octx.beginPath();
+      octx.rect(b.x, b.y, b.width, b.height);
+      octx.clip();
+      octx.drawImage(out, 0, 0); // redraw whole canvas through the blur, clipped to the face
+      octx.restore();
+    }
   }
 
   const dataUrl = out.toDataURL('image/jpeg', 0.85);
@@ -92,14 +103,15 @@ async function run(input: CleanInput): Promise<CleanResult> {
   return {
     uri: dataUrl,
     base64: comma >= 0 ? dataUrl.slice(comma + 1) : null,
-    faceCount: boxes.length,
+    faceCount,
     ok: true,
   };
 }
 
-export async function cleanPhoto(input: CleanInput): Promise<CleanResult> {
+export async function cleanPhoto(input: CleanInput, options?: CleanOptions): Promise<CleanResult> {
+  const flags = resolveCleanOptions(options);
   try {
-    return await withTimeout(run(input), TIMEOUT_MS);
+    return await withTimeout(run(input, flags), TIMEOUT_MS);
   } catch (e) {
     console.warn('[photoClean] web clean failed; using original', e);
     return { uri: input.uri, base64: input.base64 ?? null, faceCount: 0, ok: false };

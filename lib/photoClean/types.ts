@@ -8,3 +8,5 @@ export type CleanResult = {
 };
 
 export type FaceBox = { x: number; y: number; width: number; height: number };
+
+export type CleanOptions = { blurFace?: boolean; removeBackground?: boolean };
