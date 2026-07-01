@@ -19,10 +19,11 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 }
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
-  return Promise.race([
-    p,
-    new Promise<T>((_, reject) => setTimeout(() => reject(new Error('clean timeout')), ms)),
-  ]);
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<T>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('clean timeout')), ms);
+  });
+  return Promise.race([p, timeout]).finally(() => clearTimeout(timer));
 }
 
 async function run(input: CleanInput): Promise<CleanResult> {
@@ -46,12 +47,12 @@ async function run(input: CleanInput): Promise<CleanResult> {
   const segImg = bctx.getImageData(0, 0, w, h);
   const seg = segmenter.segment(base);
   const conf = seg.confidenceMasks?.[0]?.getAsFloat32Array();
+  seg.close(); // extract data first, then close — getAsFloat32Array returns a JS-side copy
   if (conf) {
     for (let i = 0; i < conf.length; i++) {
       if (conf[i] < FG_THRESHOLD) segImg.data[i * 4 + 3] = 0; // alpha → 0
     }
   }
-  seg.close();
 
   const out = document.createElement('canvas');
   out.width = w;
