@@ -21,7 +21,11 @@ import { safeBack } from '@/lib/nav';
 import { RequireAuth } from '@/components/RequireAuth';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
-import { uploadListingImages, deleteListingImages, type LocalImage } from '@/lib/upload';
+import { uploadListingImages, deleteListingImages } from '@/lib/upload';
+import { cleanPhoto } from '@/lib/photoClean';
+import {
+  makeSlot, applyResult, toggleSlot, resolveImage, type PhotoSlot,
+} from '@/lib/photoClean/slots';
 import { useToast } from '@/lib/toast';
 import { useTabBarClearance } from '@/lib/responsive';
 import { putCachedListing } from '@/lib/listingCache';
@@ -96,7 +100,7 @@ function SellScreenInner() {
   // isn't covered by it (the bar is absolutely positioned and overlays content).
   const tabClear = useTabBarClearance();
   const [step, setStep] = useState<Step>('photos');
-  const [images, setImages] = useState<LocalImage[]>([]);
+  const [slots, setSlots] = useState<PhotoSlot[]>([]);
   const [publishing, setPublishing] = useState(false);
 
   // Details
@@ -120,6 +124,11 @@ function SellScreenInner() {
     return Math.floor((usable - gaps) / 3);
   }, [width]);
 
+  const runClean = async (slot: PhotoSlot) => {
+    const result = await cleanPhoto(slot.original);
+    setSlots((prev) => prev.map((s) => (s.id === slot.id ? applyResult(s, result) : s)));
+  };
+
   const pickImages = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -129,19 +138,27 @@ function SellScreenInner() {
       base64: true,
     });
     if (!result.canceled) {
-      setImages((prev) => {
-        const next = [
-          ...prev,
-          ...result.assets.map((a) => ({ uri: a.uri, base64: a.base64 ?? null })),
-        ];
-        return next.slice(0, MAX_IMAGES);
-      });
+      const room = MAX_IMAGES - slots.length;
+      const picked = result.assets.slice(0, room);
+      const newSlots = picked.map((a) =>
+        makeSlot(
+          { uri: a.uri, base64: a.base64 ?? null },
+          (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`),
+        ),
+      );
+      setSlots((prev) => [...prev, ...newSlots]);
+      // Concurrency 2: run in pairs so a big batch doesn't freeze the UI.
+      (async () => {
+        for (let i = 0; i < newSlots.length; i += 2) {
+          await Promise.all(newSlots.slice(i, i + 2).map(runClean));
+        }
+      })();
     }
   };
 
   const resetForm = () => {
     setStep('photos');
-    setImages([]);
+    setSlots([]);
     setTitle('');
     setPrice('');
     setBrand('');
@@ -155,7 +172,7 @@ function SellScreenInner() {
   };
 
   const handleContinue = () => {
-    if (images.length === 0) {
+    if (slots.length === 0) {
       Alert.alert('Add photos', 'Please add at least one photo of the item.');
       return;
     }
@@ -176,7 +193,7 @@ function SellScreenInner() {
       Alert.alert('Missing info', 'Enter a valid price.');
       return;
     }
-    if (images.length === 0) {
+    if (slots.length === 0) {
       Alert.alert('Missing photos', 'Add at least one photo first.');
       return;
     }
@@ -184,7 +201,8 @@ function SellScreenInner() {
     setPublishing(true);
     let urls: string[] = [];
     try {
-      urls = await uploadListingImages(images, user.id);
+      const chosen = slots.map(resolveImage);
+      urls = await uploadListingImages(chosen, user.id);
 
       const { data, error } = await supabase
         .from('listings')
@@ -267,8 +285,8 @@ function SellScreenInner() {
 
   // ── Step 1 — photos ──────────────────────────────────────────────────
   if (step === 'photos') {
-    const canContinue = images.length > 0;
-    const showAddSlot = images.length < MAX_IMAGES;
+    const canContinue = slots.length > 0;
+    const showAddSlot = slots.length < MAX_IMAGES;
 
     return (
       <SafeAreaView edges={['top']} className="flex-1 bg-white">
@@ -312,15 +330,15 @@ function SellScreenInner() {
               <View className="flex-row items-center justify-between" style={{ marginBottom: 12 }}>
                 <Eyebrow>Photos</Eyebrow>
                 <Text className="text-ink-mute" style={{ fontSize: 12, fontWeight: '600' }}>
-                  {images.length} / {MAX_IMAGES}
+                  {slots.length} / {MAX_IMAGES}
                 </Text>
               </View>
 
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-                {images.map((img, i) => (
-                  <View key={i} style={{ width: tile, height: tile, position: 'relative' }}>
+                {slots.map((slot, i) => (
+                  <View key={slot.id} style={{ width: tile, height: tile, position: 'relative' }}>
                     <Image
-                      source={{ uri: img.uri }}
+                      source={{ uri: slot.original.uri }}
                       style={{ width: '100%', height: '100%', borderRadius: 14 }}
                       className="bg-ink-panel"
                       contentFit="cover"
@@ -343,7 +361,7 @@ function SellScreenInner() {
                       </View>
                     )}
                     <Pressable
-                      onPress={() => setImages((prev) => prev.filter((_, idx) => idx !== i))}
+                      onPress={() => setSlots((prev) => prev.filter((s) => s.id !== slot.id))}
                       hitSlop={8}
                       style={({ pressed }) => ({
                         position: 'absolute',
@@ -360,6 +378,30 @@ function SellScreenInner() {
                     >
                       <Feather name="x" size={13} color="white" />
                     </Pressable>
+                    {slot.status === 'processing' && (
+                      <View style={{ position: 'absolute', bottom: 6, left: 6, right: 6, alignItems: 'center' }}>
+                        <View style={{ backgroundColor: 'rgba(15,15,15,0.72)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3, flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                          <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '700' }}>Cleaning…</Text>
+                        </View>
+                      </View>
+                    )}
+                    {slot.status === 'done' && slot.cleaned && (
+                      <Pressable
+                        onPress={() => setSlots((prev) => prev.map((s) => (s.id === slot.id ? toggleSlot(s) : s)))}
+                        hitSlop={6}
+                        style={{ position: 'absolute', bottom: 6, left: 6, backgroundColor: slot.useCleaned ? '#6C47FF' : 'rgba(15,15,15,0.72)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}
+                      >
+                        <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '800', letterSpacing: 0.3 }}>
+                          {slot.useCleaned ? 'CLEANED' : 'ORIGINAL'}
+                        </Text>
+                      </Pressable>
+                    )}
+                    {slot.status === 'failed' && (
+                      <View style={{ position: 'absolute', bottom: 6, left: 6, backgroundColor: 'rgba(15,15,15,0.72)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
+                        <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '700' }}>Original</Text>
+                      </View>
+                    )}
                   </View>
                 ))}
 
@@ -372,16 +414,16 @@ function SellScreenInner() {
                       borderRadius: 14,
                       borderWidth: 1.5,
                       borderStyle: 'dashed',
-                      borderColor: images.length === 0 ? '#6C47FF' : 'rgba(15,15,15,0.18)',
+                      borderColor: slots.length === 0 ? '#6C47FF' : 'rgba(15,15,15,0.18)',
                       backgroundColor:
-                        images.length === 0 ? 'rgba(108,71,255,0.06)' : 'rgba(15,15,15,0.02)',
+                        slots.length === 0 ? 'rgba(108,71,255,0.06)' : 'rgba(15,15,15,0.02)',
                       alignItems: 'center',
                       justifyContent: 'center',
                       transform: [{ scale: pressed ? 0.97 : 1 }],
                     })}
                   >
                     <View
-                      className={images.length === 0 ? 'bg-primary' : 'bg-ink-panel'}
+                      className={slots.length === 0 ? 'bg-primary' : 'bg-ink-panel'}
                       style={{
                         width: 36,
                         height: 36,
@@ -394,17 +436,17 @@ function SellScreenInner() {
                       <Feather
                         name="plus"
                         size={18}
-                        color={images.length === 0 ? '#FFFFFF' : '#0F0F0F'}
+                        color={slots.length === 0 ? '#FFFFFF' : '#0F0F0F'}
                       />
                     </View>
                     <Text
                       style={{
                         fontSize: 12,
                         fontWeight: '600',
-                        color: images.length === 0 ? '#6C47FF' : 'rgba(15,15,15,0.62)',
+                        color: slots.length === 0 ? '#6C47FF' : 'rgba(15,15,15,0.62)',
                       }}
                     >
-                      {images.length === 0 ? 'Add cover' : 'Add'}
+                      {slots.length === 0 ? 'Add cover' : 'Add'}
                     </Text>
                   </Pressable>
                 )}
@@ -463,9 +505,9 @@ function SellScreenInner() {
               STEP 1 OF 2
             </Text>
             <Text className="text-ink" style={{ fontSize: 14, fontWeight: '600', marginTop: 2 }}>
-              {images.length === 0
+              {slots.length === 0
                 ? 'Add at least one photo'
-                : `${images.length} photo${images.length === 1 ? '' : 's'} ready`}
+                : `${slots.length} photo${slots.length === 1 ? '' : 's'} ready`}
             </Text>
           </View>
           <Pressable
@@ -503,7 +545,7 @@ function SellScreenInner() {
   }
 
   // ── Step 2 — details ─────────────────────────────────────────────────
-  const canPublish = title.trim().length > 0 && parseFloat(price) > 0 && images.length > 0;
+  const canPublish = title.trim().length > 0 && parseFloat(price) > 0 && slots.length > 0;
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-white">
@@ -550,10 +592,10 @@ function SellScreenInner() {
             style={{ marginTop: 22, marginHorizontal: -20 }}
             contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}
           >
-            {images.map((img, i) => (
-              <View key={i} style={{ position: 'relative' }}>
+            {slots.map((slot, i) => (
+              <View key={slot.id} style={{ position: 'relative' }}>
                 <Image
-                  source={{ uri: img.uri }}
+                  source={{ uri: slot.original.uri }}
                   style={{ width: 64, height: 64, borderRadius: 12 }}
                   className="bg-ink-panel"
                   contentFit="cover"
