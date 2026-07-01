@@ -41,6 +41,7 @@ const ICONS: Record<
   index: { outline: 'home-outline', filled: 'home', ghost: 'HOME' },
   feed: { outline: 'grid-outline', filled: 'grid', ghost: 'MY FEED' },
   discover: { outline: 'search-outline', filled: 'search', ghost: 'DISCOVER' },
+  wardrobe: { outline: 'shirt-outline', filled: 'shirt', ghost: 'WARDROBE' },
   upload: { outline: 'add-circle-outline', filled: 'add-circle', ghost: 'SELL' },
   profile: { outline: 'person-outline', filled: 'person', ghost: 'PROFILE' },
 };
