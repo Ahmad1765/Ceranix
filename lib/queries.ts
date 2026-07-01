@@ -42,6 +42,16 @@ import {
 } from '@/lib/follows';
 import { listConversations, type ConversationRow } from '@/lib/chat';
 import type { User as Profile, Listing } from '@/types';
+import {
+  fetchDeck,
+  recordSwipe,
+  createWardrobePost,
+  deleteWardrobePost,
+  fetchMyWardrobe,
+  fetchLikedWardrobe,
+  type WardrobePost,
+  type SwipeDirection,
+} from '@/lib/wardrobe';
 
 // Centralized, typed query keys. One place to see every cache key in the app
 // and to invalidate consistently (e.g. qc.invalidateQueries({ queryKey: qk.profile(id) })).
@@ -68,6 +78,9 @@ export const qk = {
   sellerOtherListings: (sellerId: string | null, excludeId: string | null) =>
     ['sellerOtherListings', sellerId, excludeId] as const,
   similarListings: (listingId: string | null) => ['similarListings', listingId] as const,
+  wardrobeDeck: (userId: string | null) => ['wardrobeDeck', userId] as const,
+  myWardrobe: (userId: string | null) => ['myWardrobe', userId] as const,
+  likedWardrobe: (userId: string | null) => ['likedWardrobe', userId] as const,
 };
 
 // Product detail rails — pure server reads keyed on the current listing.
@@ -353,6 +366,75 @@ export function useToggleFollow(viewerId: string | null, targetId: string) {
     },
     onSuccess: (next) => {
       qc.setQueryData(key, next);
+    },
+  });
+}
+
+// ── Wardrobe ────────────────────────────────────────────────────────────────
+export function useWardrobeDeckQuery(userId: string | null) {
+  return useQuery({
+    queryKey: qk.wardrobeDeck(userId),
+    enabled: !!userId,
+    queryFn: (): Promise<WardrobePost[]> => fetchDeck(userId as string),
+  });
+}
+
+export function useMyWardrobeQuery(userId: string | null) {
+  return useQuery({
+    queryKey: qk.myWardrobe(userId),
+    enabled: !!userId,
+    queryFn: (): Promise<WardrobePost[]> => fetchMyWardrobe(userId as string),
+  });
+}
+
+export function useLikedWardrobeQuery(userId: string | null) {
+  return useQuery({
+    queryKey: qk.likedWardrobe(userId),
+    enabled: !!userId,
+    queryFn: (): Promise<WardrobePost[]> => fetchLikedWardrobe(userId as string),
+  });
+}
+
+// Record a swipe. The deck screen removes the card optimistically on its own;
+// this mutation just persists and, on success, refreshes the Liked list.
+export function useRecordSwipe(userId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ postId, direction }: { postId: string; direction: SwipeDirection }) =>
+      recordSwipe(postId, userId as string, direction),
+    onSuccess: (_r, { direction }) => {
+      if (direction === 'like') qc.invalidateQueries({ queryKey: qk.likedWardrobe(userId) });
+    },
+  });
+}
+
+export function useCreateWardrobePost(userId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: {
+      imageUrl: string;
+      caption: string | null;
+      tags: string[];
+      faceHidden: boolean;
+      bgRemoved: boolean;
+    }) => createWardrobePost({ userId: userId as string, ...args }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.myWardrobe(userId) }),
+  });
+}
+
+export function useDeleteWardrobePost(userId: string | null) {
+  const qc = useQueryClient();
+  const key = qk.myWardrobe(userId);
+  return useMutation({
+    mutationFn: (id: string) => deleteWardrobePost(id),
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: key });
+      const prev = qc.getQueryData<WardrobePost[]>(key);
+      qc.setQueryData<WardrobePost[]>(key, (old) => (old ?? []).filter((p) => p.id !== id));
+      return { prev };
+    },
+    onError: (_e, _id, ctx) => {
+      if (ctx?.prev) qc.setQueryData(key, ctx.prev);
     },
   });
 }
