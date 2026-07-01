@@ -1,6 +1,6 @@
 // app/wardrobe/new.tsx — post an outfit to your wardrobe, optionally hiding
 // your face and/or the background (web: real processing; native: no-op today).
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -26,6 +26,10 @@ function NewWardrobeInner() {
   const [processing, setProcessing] = useState(false);
   const [caption, setCaption] = useState('');
   const [posting, setPosting] = useState(false);
+  const seqRef = useRef(0);
+  // The flags that the CURRENT preview was actually produced with (so the DB
+  // flags reflect reality, not just toggle intent).
+  const [previewFlags, setPreviewFlags] = useState({ blurFace: false, removeBackground: false });
 
   const pick = async () => {
     const res = await ImagePicker.launchImageLibraryAsync({
@@ -39,22 +43,32 @@ function NewWardrobeInner() {
     setBlurFace(false);
     setRemoveBg(false);
     setPreview(img);
+    setPreviewFlags({ blurFace: false, removeBackground: false });
   };
 
   // Re-run cleaning whenever a toggle changes. If both are off, show the original.
   const reprocess = async (nextBlur: boolean, nextBg: boolean) => {
     if (!original) return;
+    const mySeq = ++seqRef.current; // token so a stale run's result is dropped
     if (!nextBlur && !nextBg) {
       setPreview(original);
+      setPreviewFlags({ blurFace: false, removeBackground: false });
       return;
     }
     setProcessing(true);
     try {
       const r = await cleanPhoto(original, { blurFace: nextBlur, removeBackground: nextBg });
-      setPreview(r.ok ? { uri: r.uri, base64: r.base64 } : original);
-      if (!r.ok) toast.show('Could not hide on this device; posting original', { variant: 'info' });
+      if (mySeq !== seqRef.current) return; // superseded by a newer toggle
+      if (r.ok) {
+        setPreview({ uri: r.uri, base64: r.base64 });
+        setPreviewFlags({ blurFace: nextBlur, removeBackground: nextBg });
+      } else {
+        setPreview(original);
+        setPreviewFlags({ blurFace: false, removeBackground: false });
+        toast.show('Could not hide on this device; posting original', { variant: 'info' });
+      }
     } finally {
-      setProcessing(false);
+      if (mySeq === seqRef.current) setProcessing(false);
     }
   };
 
@@ -70,8 +84,8 @@ function NewWardrobeInner() {
         imageUrl: url,
         caption: caption.trim() || null,
         tags: [],
-        faceHidden: blurFace,
-        bgRemoved: removeBg,
+        faceHidden: previewFlags.blurFace,
+        bgRemoved: previewFlags.removeBackground,
       });
       toast.show('Posted to your wardrobe', { variant: 'success', icon: 'check' });
       router.back();
@@ -115,8 +129,8 @@ function NewWardrobeInner() {
         {preview && (
           <>
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
-              <ToggleChip label="Blur face" active={blurFace} onPress={toggleBlur} icon="eye-off" />
-              <ToggleChip label="Remove background" active={removeBg} onPress={toggleBg} icon="image" />
+              <ToggleChip label="Blur face" active={blurFace} onPress={toggleBlur} icon="eye-off" disabled={processing} />
+              <ToggleChip label="Remove background" active={removeBg} onPress={toggleBg} icon="image" disabled={processing} />
             </View>
             <TextInput
               value={caption}
@@ -145,13 +159,14 @@ function NewWardrobeInner() {
   );
 }
 
-function ToggleChip({ label, active, onPress, icon }: { label: string; active: boolean; onPress: () => void; icon: keyof typeof Feather.glyphMap }) {
+function ToggleChip({ label, active, onPress, icon, disabled }: { label: string; active: boolean; onPress: () => void; icon: keyof typeof Feather.glyphMap; disabled?: boolean }) {
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
       accessibilityRole="switch"
       accessibilityState={{ checked: active }}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, borderWidth: 1, borderColor: active ? '#6C47FF' : 'rgba(15,15,15,0.12)', backgroundColor: active ? 'rgba(108,71,255,0.08)' : '#fff' }}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, borderWidth: 1, borderColor: active ? '#6C47FF' : 'rgba(15,15,15,0.12)', backgroundColor: active ? 'rgba(108,71,255,0.08)' : '#fff', opacity: disabled ? 0.5 : 1 }}
     >
       <Feather name={icon} size={14} color={active ? '#6C47FF' : 'rgba(15,15,15,0.55)'} />
       <Text style={{ fontSize: 13, fontWeight: '700', color: active ? '#6C47FF' : 'rgba(15,15,15,0.62)' }}>{label}</Text>

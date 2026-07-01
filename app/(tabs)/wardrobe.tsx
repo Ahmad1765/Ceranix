@@ -15,6 +15,7 @@ import {
   useWardrobeDeckQuery, useMyWardrobeQuery, useLikedWardrobeQuery,
   useRecordSwipe, useDeleteWardrobePost,
 } from '@/lib/queries';
+import { useToast } from '@/lib/toast';
 
 type Section = 'swipe' | 'mine' | 'liked';
 
@@ -29,6 +30,7 @@ function WardrobeInner() {
   const liked = useLikedWardrobeQuery(uid);
   const recordSwipe = useRecordSwipe(uid);
   const deletePost = useDeleteWardrobePost(uid);
+  const toast = useToast();
 
   // Cards not yet swiped in this session (deck refetch may lag the optimistic pop).
   const cards = useMemo(
@@ -38,10 +40,22 @@ function WardrobeInner() {
 
   const onSwipe = useCallback((post: WardrobePost, dir: SwipeDirection) => {
     setSwiped((prev) => new Set(prev).add(post.id));
-    recordSwipe.mutate({ postId: post.id, direction: dir });
-  }, [recordSwipe]);
+    recordSwipe.mutate(
+      { postId: post.id, direction: dir },
+      {
+        onError: () => {
+          setSwiped((prev) => {
+            const next = new Set(prev);
+            next.delete(post.id);
+            return next;
+          });
+          toast.show('Could not save your swipe', { variant: 'info' });
+        },
+      },
+    );
+  }, [recordSwipe, toast]);
 
-  const onNeedMore = useCallback(() => { deck.refetch(); }, [deck]);
+  const onNeedMore = useCallback(() => { deck.refetch(); }, [deck.refetch]);
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-white">
