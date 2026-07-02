@@ -12,9 +12,11 @@ const MAX_EDGE = 1024;        // downscale ceiling before analysis, for speed
 const MATTE_LO = 0.35;
 const MATTE_HI = 0.65;
 const BLUR_PX = 22;           // gaussian blur radius for faces
-// Generous ceiling: the first "remove background" run downloads the MODNet
-// matting model (cached by the browser afterwards). Subsequent runs are quick.
-const TIMEOUT_MS = 60000;
+// Generous ceiling: the first "remove background" run downloads a matting
+// model (BiRefNet ~114MB on WebGPU browsers, MODNet ~25MB elsewhere; cached
+// afterwards). If it still times out, the download continues in the background
+// and the next attempt succeeds; the user just sees the original meanwhile.
+const TIMEOUT_MS = 120000;
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
