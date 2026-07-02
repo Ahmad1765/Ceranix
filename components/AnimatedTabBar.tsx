@@ -237,10 +237,17 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
       >
         <GestureDetector gesture={gesture}>
           <View
+            // Web only: hook for the corner-shape: squircle rule in global.css.
+            // RN-web renders nativeID as the DOM id; ignored on native.
+            nativeID="tab-dock"
             style={{
               flexDirection: 'row',
               height: BAR_HEIGHT,
               borderRadius: 34,
+              // Apple-style continuous (superellipse) corners on iOS — the
+              // edge eases into the curve instead of a quarter-circle "kink".
+              // No-op on Android/web, which keep the normal rounded corner.
+              borderCurve: 'continuous',
               paddingHorizontal: 8,
               backgroundColor: 'rgba(255,255,255,0.70)',
               borderWidth: 1,
@@ -257,7 +264,7 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
               intensity={Platform.OS === 'android' ? 24 : 40}
               experimentalBlurMethod="dimezisBlurView"
               pointerEvents="none"
-              style={{ ...StyleSheet.absoluteFillObject, borderRadius: 34, overflow: 'hidden' }}
+              style={{ ...StyleSheet.absoluteFillObject, borderRadius: 34, borderCurve: 'continuous', overflow: 'hidden' }}
             />
             {/* Glass top-edge highlight */}
             <View

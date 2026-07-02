@@ -106,7 +106,7 @@ export default function LoginScreen() {
     if (!email) return 'Email is required';
     if (!EMAIL_RE.test(email.trim())) return 'Enter a valid email';
     if (!password) return 'Password is required';
-    if (password.length < 6) return 'Password must be at least 6 characters';
+    if (password.length < 8) return 'Password must be at least 8 characters';
     return null;
   };
 

@@ -38,4 +38,16 @@
   *::selection {
     background-color: rgba(108, 71, 255, 0.25);
   }
+
+  /* Squircle (superellipse) corners on the bottom tab dock — the edge eases
+     into the curve instead of a quarter-circle "kink". Progressive
+     enhancement: only browsers that support corner-shape get it; everyone
+     else keeps the normal rounded corner from the inline border-radius.
+     iOS gets the equivalent natively via borderCurve: 'continuous'. */
+  @supports (corner-shape: squircle) {
+    #tab-dock,
+    #tab-dock > * {
+      corner-shape: squircle;
+    }
+  }
 }

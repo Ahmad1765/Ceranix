@@ -82,7 +82,11 @@ async function verifyStripeSignature(
   const signatures = parts.get('v1') ?? [];
   if (!Number.isFinite(timestamp) || signatures.length === 0) return false;
 
-  const ageSeconds = Math.abs(Date.now() / 1000 - timestamp);
+  // Ensure timestamp is in the past (prevent future-dated forged signatures)
+  const nowSeconds = Date.now() / 1000;
+  if (timestamp > nowSeconds) return false;
+
+  const ageSeconds = Math.abs(nowSeconds - timestamp);
   if (ageSeconds > SIGNATURE_TOLERANCE_SECONDS) return false;
 
   const key = await crypto.subtle.importKey(

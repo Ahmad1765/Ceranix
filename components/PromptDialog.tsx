@@ -5,9 +5,11 @@
 // Keep this tiny — anything richer (multi-field forms, validation) belongs
 // in a dedicated sheet, not here.
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  Animated,
+  Easing,
   Modal,
   Platform,
   Pressable,
@@ -20,6 +22,11 @@ import { BlurView } from 'expo-blur';
 import { colors } from '@/lib/theme';
 
 const IS_IOS = Platform.OS === 'ios';
+// BlurView renders cheaply on iOS (native) and on web (CSS backdrop-filter).
+// On Android it's costly and inconsistent, so there we keep the solid dim only.
+const CAN_BLUR = IS_IOS || Platform.OS === 'web';
+// JS-driven on web (no RCTAnimation host); native-driven on iOS/Android.
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 type PromptOptions = {
   title: string;
@@ -82,11 +89,27 @@ function PromptModal({
 }) {
   const [value, setValue] = useState(options.defaultValue ?? '');
   const submit = () => onResolve(value.trim() || null);
+
+  // Entrance: the backdrop fades in while the card scales up from 96% and
+  // fades — the RN equivalent of CSS @starting-style. ~180ms ease-out reads
+  // as the dialog being physically placed in front of the (receding) page.
+  const enter = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(enter, {
+      toValue: 1,
+      duration: 180,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: USE_NATIVE_DRIVER,
+    }).start();
+  }, [enter]);
+
+  const cardScale = enter.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] });
+
   return (
     <Modal
       visible
       transparent
-      animationType="fade"
+      animationType="none"
       statusBarTranslucent
       onRequestClose={() => onResolve(null)}
     >
@@ -94,20 +117,35 @@ function PromptModal({
         onPress={() => onResolve(null)}
         style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
       >
-        {IS_IOS ? (
-          <BlurView intensity={28} tint="dark" style={StyleSheet.absoluteFill} />
-        ) : (
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)' }]} />
-        )}
+        {/* Backdrop: a dim tint for depth on every platform, plus a real blur
+            where it's cheap (iOS/web) so the page visibly recedes. */}
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: enter }]}>
+          {CAN_BLUR ? (
+            <BlurView intensity={24} tint="dark" style={StyleSheet.absoluteFill} />
+          ) : null}
+          <View
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: CAN_BLUR ? 'rgba(12,8,26,0.35)' : 'rgba(12,8,26,0.45)' },
+            ]}
+          />
+        </Animated.View>
+        <Animated.View
+          style={{ opacity: enter, transform: [{ scale: cardScale }] }}
+        >
         <Pressable
           onPress={() => {}}
           style={{
             width: 320,
             maxWidth: '90%',
             backgroundColor: 'white',
-            borderRadius: 16,
+            borderRadius: 18,
             padding: 18,
             elevation: 12,
+            shadowColor: '#000',
+            shadowOpacity: 0.28,
+            shadowRadius: 30,
+            shadowOffset: { width: 0, height: 18 },
           }}
         >
           <Text style={{ fontSize: 16, fontWeight: '700', color: colors.ink, marginBottom: 4 }}>
@@ -166,6 +204,7 @@ function PromptModal({
             </Pressable>
           </View>
         </Pressable>
+        </Animated.View>
       </Pressable>
     </Modal>
   );

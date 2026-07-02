@@ -146,8 +146,18 @@ Deno.serve(async (req: Request) => {
     let cancelUrlObj: URL;
     try {
       successUrlObj = new URL(returnUrl);
-      if (!successUrlObj.protocol.startsWith('http') && !successUrlObj.protocol.startsWith('carrinex')) {
+      // Validate protocol: http/https for web, carrinex:// for app deep links
+      const isWeb = successUrlObj.protocol === 'http:' || successUrlObj.protocol === 'https:';
+      const isApp = successUrlObj.protocol === 'carrinex:';
+      if (!isWeb && !isApp) {
         throw new Error('Invalid protocol');
+      }
+      // For web URLs, ensure the hostname matches allowed origins (if configured)
+      if (isWeb && ALLOWED_ORIGINS.length > 0) {
+        const urlOrigin = `${successUrlObj.protocol}//${successUrlObj.hostname}`;
+        if (!ALLOWED_ORIGINS.some(o => o.includes(successUrlObj.hostname ?? ''))) {
+          throw new Error('Redirect origin not allowed');
+        }
       }
       cancelUrlObj = new URL(returnUrl);
     } catch {
@@ -167,8 +177,19 @@ Deno.serve(async (req: Request) => {
     params.append('line_items[0][price_data][currency]', 'usd');
     params.append('line_items[0][price_data][unit_amount]', String(priceCents));
     params.append('line_items[0][price_data][product_data][name]', listing.title ?? 'Item');
+    // Validate image URL: must be HTTPS and from a trusted source (Supabase storage)
     if (Array.isArray(listing.images) && listing.images[0]) {
-      params.append('line_items[0][price_data][product_data][images][0]', listing.images[0]);
+      const imageUrl = String(listing.images[0]).trim();
+      try {
+        const imgObj = new URL(imageUrl);
+        const isTrustedSource = imgObj.hostname?.includes('supabaseusercontent.com') ||
+                               imgObj.hostname?.includes('your-cdn.com');
+        if (imgObj.protocol === 'https:' && isTrustedSource) {
+          params.append('line_items[0][price_data][product_data][images][0]', imageUrl);
+        }
+      } catch {
+        // Silently skip invalid image URL — don't break the checkout
+      }
     }
     // stripe-webhook reads these to record the order after payment.
     params.append('metadata[listing_id]', listing.id);
@@ -187,12 +208,20 @@ Deno.serve(async (req: Request) => {
     });
     const stripeBody = await res.json();
     if (!res.ok) {
-      return json({ error: stripeBody?.error?.message ?? 'Stripe error' }, 500, origin);
+      // Don't leak Stripe error details to client — log server-side, return generic message
+      console.error('[create-checkout] stripe error', stripeBody?.error);
+      return json({ error: 'Payment setup failed. Please try again.' }, 500, origin);
+    }
+
+    if (!stripeBody?.url || !stripeBody?.id) {
+      console.error('[create-checkout] missing session data', stripeBody);
+      return json({ error: 'Payment setup failed. Please try again.' }, 500, origin);
     }
 
     return json({ url: stripeBody.url, sessionId: stripeBody.id }, 200, origin);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : 'Unknown error';
-    return json({ error: msg }, 500, origin);
+    // Don't leak error details — log server-side for debugging
+    console.error('[create-checkout] exception', e instanceof Error ? e.message : String(e));
+    return json({ error: 'Payment setup failed. Please try again.' }, 500, origin);
   }
 });
