@@ -18,7 +18,7 @@ export function SkeletonCard() {
     return () => {
       animation.stop();
     };
-  }, []);
+  }, [opacity]);
 
   return (
     <Animated.View style={{ flex: 1, opacity }}>

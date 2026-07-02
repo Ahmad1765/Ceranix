@@ -620,7 +620,7 @@ export default function ConversationScreen() {
         toast.show("Couldn't send offer", { variant: 'default', icon: 'alert-triangle' });
       }
     },
-    [conversationId, user, toast],
+    [conversationId, user, toast, conv?.listing_id],
   );
 
   const handleOfferResponse = useCallback(

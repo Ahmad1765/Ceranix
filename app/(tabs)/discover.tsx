@@ -14,15 +14,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import Animated from 'react-native-reanimated';
-import { Image } from 'expo-image';
 import { ListingCard } from '@/components/ListingCard';
 import { searchListings } from '@/lib/listings';
 import { searchUsers } from '@/lib/follows';
-import { getOptimizedImageUrl } from '@/lib/images';
+import { useQueryClient } from '@tanstack/react-query';
 import {
+  qk,
   useFeedListingsQuery,
   useRecommendationsQuery,
   useRecentlyViewedQuery,
+  useBrandIndexQuery,
+  useAestheticIndexQuery,
+  useAestheticListingsQuery,
+  useSuggestedFollowsQuery,
 } from '@/lib/queries';
 import { createSavedSearch, touchSavedSearchSeen } from '@/lib/savedSearches';
 import { useAuth } from '@/lib/auth';
@@ -50,6 +54,16 @@ import {
   type DigestCard,
   type PromoTarget,
 } from '@/lib/discover';
+import {
+  DiscoverSegments,
+  AestheticsPanel,
+  BrandsPanel,
+  UsersPanel,
+  HubTitle,
+  type DiscoverTab,
+  type BrandEntry,
+} from '@/components/discover/SearchTabs';
+import { filterAesthetics, matchAestheticListings, type Aesthetic } from '@/lib/aesthetics';
 
 type CatTile = {
   id: Category | 'trending';
@@ -92,6 +106,16 @@ export default function DiscoverScreen() {
   const { user } = useAuth();
   const toast = useToast();
   const [query, setQuery] = useState(initialQuery);
+  // Search hub tab: Items keeps the classic feed + grid; Aesthetics / Brands /
+  // Users are index-style panels. Query state is shared so a typed term
+  // carries across tabs (search "zara" → flip between brand hits and sellers).
+  const [tab, setTab] = useState<DiscoverTab>('items');
+  // Search-as-hub: focusing the search bar opens a browse landing (categories +
+  // trending searches) instead of cluttering the idle feed with them. We toggle
+  // an explicit mode (not raw blur) so selecting a tile on web doesn't lose the
+  // tap to a blur-driven unmount. The landing shows only while empty; typing
+  // swaps to results.
+  const [searchActive, setSearchActive] = useState(false);
   const [activeCat, setActiveCat] = useState<CatTile['id'] | null>(initialCat);
   // Editorial digest "theme" applied to the trending grid (e.g. Now in demand /
   // Fresh drops). Reorders the idle grid in place; cleared via the grid header.
@@ -175,9 +199,15 @@ export default function DiscoverScreen() {
     }, [gridStale, gridRefetch, recStale, recRefetch, recentStale, recentRefetch]),
   );
 
+  const qc = useQueryClient();
   const onRefresh = useCallback(async () => {
+    // The search-hub indexes are invalidated (not refetched): active tabs
+    // refetch immediately, gated tabs pick up fresh data on next open.
+    qc.invalidateQueries({ queryKey: qk.brandIndex() });
+    qc.invalidateQueries({ queryKey: qk.aestheticIndex() });
+    qc.invalidateQueries({ queryKey: qk.suggestedFollows(user?.id ?? null) });
     await Promise.all([gridRefetch(), recRefetch(), recentRefetch()]);
-  }, [gridRefetch, recRefetch, recentRefetch]);
+  }, [gridRefetch, recRefetch, recentRefetch, qc, user?.id]);
 
   // Web pull-to-refresh — RefreshControl is inert on react-native-web.
   const { scrollRef, pull, nodeTop, threshold } = useWebPullToRefresh({ refreshing, onRefresh });
@@ -283,6 +313,92 @@ export default function DiscoverScreen() {
   // top of the trending grid so the rail is never empty (logged-out / cold).
   const picks = recommended.length > 0 ? recommended : listings.slice(0, 10);
 
+  // ── Search-hub indexes ── fetched from the server the first time their tab
+  // opens (enabled gate), then cached by React Query. Each panel falls back to
+  // rows derived from the already-loaded grid until the authoritative index
+  // lands, so switching tabs never shows a blank screen.
+  const aestheticIdxQ = useAestheticIndexQuery(tab === 'aesthetics');
+  const brandIdxQ = useBrandIndexQuery(tab === 'brands');
+  const suggestedQ = useSuggestedFollowsQuery(user?.id ?? null, tab === 'users' && !hasQuery);
+
+  // ── Aesthetics tab ── curated catalog filtered by the query. Counts and
+  // preview collages prefer the catalog-wide server index; grid-derived
+  // matches fill in while it loads. Ranked by live stock so the styles that
+  // are actually trending in the catalog lead (name breaks ties, which also
+  // keeps the cold catalog alphabetical).
+  const aestheticCards = useMemo(
+    () =>
+      filterAesthetics(query)
+        .map((aesthetic) => {
+          const server = aestheticIdxQ.data?.get(aesthetic.slug);
+          const local = server ? [] : matchAestheticListings(aesthetic, listings);
+          return {
+            aesthetic,
+            count: server ? server.count : local.length,
+            images: server ? server.images.slice(0, 3) : local.slice(0, 3).map((l) => l.images[0]),
+          };
+        })
+        .sort(
+          (a, b) => b.count - a.count || a.aesthetic.name.localeCompare(b.aesthetic.name),
+        ),
+    [query, listings, aestheticIdxQ.data],
+  );
+
+  // ── Brands tab ── the catalog-wide index (every live brand, ranked by stock
+  // depth), filtered client-side per keystroke so typing is zero-latency.
+  // Until the index arrives, brands seen in the loaded grid stand in.
+  const brandResults = useMemo<BrandEntry[]>(() => {
+    let rows: BrandEntry[];
+    if (brandIdxQ.data) {
+      rows = brandIdxQ.data;
+    } else {
+      const counts = new Map<string, BrandEntry>();
+      for (const l of listings) {
+        const name = l.brand?.trim();
+        if (!name || l.is_sold) continue;
+        const key = name.toLowerCase();
+        const cur = counts.get(key);
+        if (cur) cur.count += 1;
+        else counts.set(key, { name, count: 1, image: l.images[0] ?? null });
+      }
+      rows = [...counts.values()].sort(
+        (a, b) => b.count - a.count || a.name.localeCompare(b.name),
+      );
+    }
+    const q = query.trim().toLowerCase();
+    return q ? rows.filter((b) => b.name.toLowerCase().includes(q)) : rows;
+  }, [brandIdxQ.data, listings, query]);
+
+  const suggested = suggestedQ.data ?? null;
+
+  // Tapping an aesthetic opens an in-tab detail: the listings behind the
+  // card's count (same RPC semantics), so the number shown is the number
+  // delivered. Typing exits the detail back to the filtered catalog.
+  const [activeAesthetic, setActiveAesthetic] = useState<Aesthetic | null>(null);
+  const aestheticListingsQ = useAestheticListingsQuery(activeAesthetic);
+  useEffect(() => {
+    if (hasQuery) setActiveAesthetic(null);
+  }, [hasQuery]);
+
+  const openAesthetic = useCallback(
+    (a: Aesthetic) => {
+      setActiveAesthetic(a);
+      setSearchActive(false);
+      Keyboard.dismiss();
+      scrollRef.current?.scrollTo?.({ y: 0, animated: false });
+    },
+    [scrollRef],
+  );
+
+  // A brand tap converts into a regular item search so results reuse the whole
+  // existing pipeline (server search, save-search, grid).
+  const openBrand = useCallback((brand: string) => {
+    setTab('items');
+    setQuery(brand);
+    setSearchActive(false);
+    Keyboard.dismiss();
+  }, []);
+
   // Apply the active digest theme to the idle grid in place.
   const gridResults = useMemo(() => {
     if (!idle || !digestSort) return results;
@@ -335,13 +451,8 @@ export default function DiscoverScreen() {
   const idleGridTitle =
     digestSort === 'demand' ? 'Now in demand' : digestSort === 'fresh' ? 'Fresh drops' : 'Trending';
 
-  // Search-as-hub: focusing the search bar opens a browse landing (categories +
-  // trending searches) instead of cluttering the idle feed with them. We toggle
-  // an explicit mode (not raw blur) so selecting a tile on web doesn't lose the
-  // tap to a blur-driven unmount. The landing shows only while empty; typing
-  // swaps to results.
-  const [searchActive, setSearchActive] = useState(false);
-  const showSearchLanding = searchActive && !hasQuery;
+  // The browse landing only makes sense for item search, so other tabs skip it.
+  const showSearchLanding = searchActive && !hasQuery && tab === 'items';
 
   const selectSearchTerm = useCallback((term: string) => {
     setQuery(term);
@@ -440,7 +551,15 @@ export default function DiscoverScreen() {
               value={query}
               onChangeText={setQuery}
               onFocus={() => setSearchActive(true)}
-              placeholder="Search items, brands, sellers"
+              placeholder={
+                tab === 'aesthetics'
+                  ? 'Search aesthetics'
+                  : tab === 'brands'
+                    ? 'Search brands'
+                    : tab === 'users'
+                      ? 'Search people'
+                      : 'Search items, brands, sellers'
+              }
               placeholderTextColor={colors.muteSoft}
               style={{
                 flex: 1,
@@ -471,6 +590,123 @@ export default function DiscoverScreen() {
             </Pressable>
           ) : null}
         </Animated.View>
+
+        {/* Search hub tabs — Items keeps the classic feed; the rest are
+            index-style panels over the same shared query. */}
+        <DiscoverSegments tab={tab} onChange={setTab} />
+
+        {/* ── Aesthetics ── curated style index; tapping a card opens its
+            matched listings in place. */}
+        {tab === 'aesthetics' ? (
+          activeAesthetic ? (
+            <View style={{ marginTop: 16 }}>
+              <SectionHeader
+                title={activeAesthetic.name}
+                count={aestheticListingsQ.data?.length ?? undefined}
+                action={{ label: 'All aesthetics', onPress: () => setActiveAesthetic(null) }}
+              />
+              <Text
+                style={{
+                  paddingHorizontal: 16,
+                  marginBottom: 14,
+                  fontSize: 13.5,
+                  lineHeight: 20,
+                  color: colors.mute,
+                }}
+              >
+                {activeAesthetic.description}
+              </Text>
+              {aestheticListingsQ.isLoading ? (
+                <GridSkeleton columns={columns} cardW={cardW} />
+              ) : (aestheticListingsQ.data ?? []).length === 0 ? (
+                <EmptyState
+                  icon="wind"
+                  title={`No ${activeAesthetic.name} items yet`}
+                  description="Nothing in the catalog matches this style right now — check back soon."
+                />
+              ) : (
+                <GridSection
+                  listings={aestheticListingsQ.data ?? []}
+                  columns={columns}
+                  cardW={cardW}
+                />
+              )}
+            </View>
+          ) : aestheticCards.length === 0 ? (
+            <EmptyState
+              icon="search"
+              title="No aesthetic matched"
+              description="Try streetwear, y2k, gorpcore, or old money."
+            />
+          ) : (
+            <>
+              {!hasQuery ? (
+                <HubTitle eyebrow="Ranked by live stock" title="Trending aesthetics" />
+              ) : (
+                <View style={{ height: 18 }} />
+              )}
+              <AestheticsPanel cards={aestheticCards} onOpen={openAesthetic} />
+            </>
+          )
+        ) : null}
+
+        {/* ── Brands ── every brand in the live catalog, filtered by the query. */}
+        {tab === 'brands' ? (
+          (loading || brandIdxQ.isLoading) && brandResults.length === 0 ? (
+            <BrandsSkeleton />
+          ) : brandResults.length === 0 ? (
+            <EmptyState
+              icon="tag"
+              title={hasQuery ? 'No brand matched' : 'No brands yet'}
+              description={
+                hasQuery
+                  ? 'Try a different spelling or a shorter name.'
+                  : 'Brands appear here as items are listed.'
+              }
+            />
+          ) : (
+            <>
+              {!hasQuery ? (
+                <HubTitle eyebrow="Ranked by live stock" title="Trending brands" />
+              ) : (
+                <View style={{ height: 10 }} />
+              )}
+              <BrandsPanel brands={brandResults} onSelect={openBrand} />
+            </>
+          )
+        ) : null}
+
+        {/* ── Users ── seller search with inline follow; suggestions when idle. */}
+        {tab === 'users' ? (
+          hasQuery ? (
+            searching && userResults.length === 0 ? (
+              <PeopleSkeleton />
+            ) : userResults.length === 0 ? (
+              <EmptyState
+                icon="users"
+                title="No one matched"
+                description="Try a username or full name."
+              />
+            ) : (
+              <View style={{ marginTop: 10 }}>
+                <UsersPanel users={userResults} viewerId={user?.id ?? null} />
+              </View>
+            )
+          ) : suggested === null ? (
+            <PeopleSkeleton />
+          ) : suggested.length === 0 ? (
+            <EmptyState
+              icon="users"
+              title="No sellers yet"
+              description="Sellers show up here as the community grows."
+            />
+          ) : (
+            <View>
+              <HubTitle eyebrow="People to follow" title="Suggested sellers" />
+              <UsersPanel users={suggested} viewerId={user?.id ?? null} />
+            </View>
+          )
+        ) : null}
 
         {/* Search-focus landing — browse tools (categories + trending searches)
             live here instead of the idle feed, so Discover stays editorial. */}
@@ -552,8 +788,9 @@ export default function DiscoverScreen() {
         </View>
         ) : null}
 
-        {/* Everything below the landing — hidden while the browse landing is open. */}
-        {!showSearchLanding ? (
+        {/* Everything below the landing — Items tab only, hidden while the
+            browse landing is open. */}
+        {tab === 'items' && !showSearchLanding ? (
         <>
         {/* Save-search CTA — only shown when the current query + category
             represent a real filter the user could meaningfully come back to. */}
@@ -643,20 +880,34 @@ export default function DiscoverScreen() {
           </>
         ) : null}
 
-        {/* People — sellers matching the query. Shown above item results so
-            "search for a user" lands them right away. */}
+        {/* People matching the query moved to the Users tab — surface a one-tap
+            pointer so a seller search typed here still lands. */}
         {hasQuery && userResults.length > 0 ? (
-          <View style={{ marginTop: 22 }}>
-            <SectionHeader
-              title="People"
-              count={userResults.length}
-              rightText={userResults.length === 1 ? 'person' : 'people'}
-            />
-            <View style={{ paddingHorizontal: 8 }}>
-              {userResults.map((u) => (
-                <PeopleRow key={u.id} user={u} />
-              ))}
-            </View>
+          <View style={{ paddingHorizontal: 16, marginTop: 18 }}>
+            <Pressable
+              onPress={() => setTab('users')}
+              accessibilityRole="button"
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8,
+                paddingHorizontal: 14,
+                paddingVertical: 11,
+                borderRadius: radii.lg,
+                borderWidth: 1,
+                borderColor: colors.hair,
+                backgroundColor: pressed ? colors.panel : colors.white,
+              })}
+            >
+              <Feather name="users" size={14} color={colors.purple} />
+              <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: colors.ink }}>
+                {userResults.length === 1
+                  ? '1 person matches'
+                  : `${userResults.length} people match`}{' '}
+                “{query.trim()}”
+              </Text>
+              <Feather name="chevron-right" size={16} color={colors.muteSoft} />
+            </Pressable>
           </View>
         ) : null}
 
@@ -721,58 +972,37 @@ export default function DiscoverScreen() {
   );
 }
 
-// A single person result. Taps through to the seller's profile, where the
-// follow / message / followers actions live.
-function PeopleRow({ user }: { user: UserResult }) {
-  const avatar = user.avatar_url ? getOptimizedImageUrl(user.avatar_url, { width: 120 }) : null;
-  const initial = (user.full_name || user.username || 'U').trim().charAt(0).toUpperCase();
-  const followers = Number(user.followers_count ?? 0);
+// Loading rows for the Users tab — avatar disc + two text bars, matching the
+// real row's footprint so the loaded list doesn't jump.
+function PeopleSkeleton() {
   return (
-    <Pressable
-      onPress={() => router.push(`/user/${user.id}` as any)}
-      accessibilityRole="button"
-      accessibilityLabel={`View @${user.username}'s profile`}
-      style={({ pressed }) => ({
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 8,
-        paddingVertical: 10,
-        borderRadius: radii.md,
-        backgroundColor: pressed ? colors.panel : 'transparent',
-      })}
-    >
-      <View
-        style={{
-          width: 48,
-          height: 48,
-          borderRadius: 24,
-          overflow: 'hidden',
-          backgroundColor: colors.purpleSoft,
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginRight: 12,
-        }}
-      >
-        {avatar ? (
-          <Image source={{ uri: avatar }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
-        ) : (
-          <Text style={{ fontSize: 18, fontWeight: '900', color: colors.purple }}>{initial}</Text>
-        )}
-      </View>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <Text style={{ fontSize: 14, fontWeight: '800', color: colors.ink }} numberOfLines={1}>
-            {user.full_name || user.username}
-          </Text>
-          {user.is_verified && <Feather name="check-circle" size={12} color={colors.purple} />}
+    <View style={{ paddingHorizontal: 16, marginTop: 14, gap: 18 }}>
+      {Array.from({ length: 6 }).map((_, i) => (
+        <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: colors.divider }} />
+          <View style={{ flex: 1, gap: 7 }}>
+            <View style={{ width: '45%', height: 12, borderRadius: 6, backgroundColor: colors.divider }} />
+            <View style={{ width: '30%', height: 10, borderRadius: 5, backgroundColor: colors.divider }} />
+          </View>
+          <View style={{ width: 76, height: 32, borderRadius: radii.pill, backgroundColor: colors.divider }} />
         </View>
-        <Text style={{ fontSize: 12.5, color: colors.mute, marginTop: 1 }} numberOfLines={1}>
-          @{user.username}
-          {followers > 0 ? ` · ${followers} ${followers === 1 ? 'follower' : 'followers'}` : ''}
-        </Text>
-      </View>
-      <Feather name="chevron-right" size={18} color={colors.muteSoft} />
-    </Pressable>
+      ))}
+    </View>
+  );
+}
+
+// Loading pills for the Brands tab, staggered widths so the placeholder list
+// reads as chips rather than bars.
+function BrandsSkeleton() {
+  const widths = [110, 150, 96, 132, 118, 144];
+  return (
+    <View style={{ paddingHorizontal: 16, marginTop: 10 }}>
+      {widths.map((w, i) => (
+        <View key={i} style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.hair }}>
+          <View style={{ width: w, height: 38, borderRadius: radii.lg, backgroundColor: colors.divider }} />
+        </View>
+      ))}
+    </View>
   );
 }
 

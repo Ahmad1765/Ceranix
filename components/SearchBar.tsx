@@ -1,6 +1,5 @@
 import { View, TextInput, Pressable } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { router } from 'expo-router';
 
 interface Props {
   placeholder?: string;

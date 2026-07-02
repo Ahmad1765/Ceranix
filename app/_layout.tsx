@@ -5,24 +5,6 @@ import { installAlertShim } from '@/lib/alertShim';
 import { initSentry, wrapWithSentry } from '@/lib/sentry';
 import { initAnalytics, screen } from '@/lib/analytics';
 import { normalizeScreenName } from '@/lib/analyticsEvents';
-
-// Initialize crash + error reporting before anything else renders so startup
-// failures are captured too. No-ops when EXPO_PUBLIC_SENTRY_DSN is unset.
-initSentry();
-// Initialize PostHog analytics. No-ops when EXPO_PUBLIC_POSTHOG_KEY is unset.
-initAnalytics();
-
-// React-native-web ships Alert.alert as a no-op, so every validation /
-// confirm path that calls Alert.alert silently dies on web. The shim swaps
-// in a window-backed implementation that honours the standard RN signature.
-installAlertShim();
-
-// Strip Android's default black TextInput underline and align selection
-// handles with the brand purple so focus/select never paints black.
-const _TI: any = TextInput;
-_TI.defaultProps = _TI.defaultProps || {};
-_TI.defaultProps.underlineColorAndroid = 'transparent';
-_TI.defaultProps.selectionColor = '#6C47FF';
 import { Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -47,6 +29,24 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { AuthProvider } from '@/lib/auth';
 import { ToastProvider } from '@/lib/toast';
+
+// Initialize crash + error reporting before anything else renders so startup
+// failures are captured too. No-ops when EXPO_PUBLIC_SENTRY_DSN is unset.
+initSentry();
+// Initialize PostHog analytics. No-ops when EXPO_PUBLIC_POSTHOG_KEY is unset.
+initAnalytics();
+
+// React-native-web ships Alert.alert as a no-op, so every validation /
+// confirm path that calls Alert.alert silently dies on web. The shim swaps
+// in a window-backed implementation that honours the standard RN signature.
+installAlertShim();
+
+// Strip Android's default black TextInput underline and align selection
+// handles with the brand purple so focus/select never paints black.
+const _TI: any = TextInput;
+_TI.defaultProps = _TI.defaultProps || {};
+_TI.defaultProps.underlineColorAndroid = 'transparent';
+_TI.defaultProps.selectionColor = '#6C47FF';
 
 const AESTHETIC_FONTS = {
   Fraunces_400Regular,

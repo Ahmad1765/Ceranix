@@ -98,7 +98,7 @@ const GRID_CARDS: CategoryTileData[] = [
 // the foodora reference) while labels and layout stay on-system.
 // Capped at 6: one comfortable screenful with the 7th edge peeking as a
 // scroll affordance. More belongs on the discover tab, not the home page.
-const QUICK_CATS: Array<{ key: string; label: string; sticker: StickerSpec }> = [
+const QUICK_CATS: { key: string; label: string; sticker: StickerSpec }[] = [
   { key: 'deals', label: 'Deals', sticker: { icon: 'pricetag', color: '#FF4D8D', deep: '#8E1247' } },
   { key: 'sneakers', label: 'Sneakers', sticker: { icon: 'flash', color: '#FFB03A', deep: '#8A4D00' } },
   { key: 'streetwear', label: 'Streetwear', sticker: { icon: 'flame', color: '#FF5757', deep: '#7E1010' } },
@@ -488,7 +488,7 @@ export const AnonCards = memo(function AnonCards() {
 
       {/* Row 1 — hero carousel */}
       <View style={{ marginTop: 16 }}>
-        <SectionEyebrow>This week's spotlight</SectionEyebrow>
+        <SectionEyebrow>This week&apos;s spotlight</SectionEyebrow>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}

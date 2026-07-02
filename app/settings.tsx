@@ -4,7 +4,6 @@ import {
   Text,
   Pressable,
   ScrollView,
-  Alert,
   Switch,
   Platform,
   Share,
@@ -45,7 +44,6 @@ const SUPPORT_EMAIL = 'support@carrinex.app';
 const TERMS_URL = 'https://carrinex.vercel.app/terms';
 const PRIVACY_URL = 'https://carrinex.vercel.app/privacy';
 const APP_URL_BASE = 'https://carrinex.vercel.app';
-const BUNDLE_DEFAULT_PCT = 10;
 
 type Section = 'shop' | 'verify' | 'enhance' | 'account' | 'help';
 type Busy = 'logout' | 'delete' | 'password' | null;

@@ -85,7 +85,7 @@ export async function fetchSuggestedFollows(
   currentUserId: string | null,
   limit = 6,
 ): Promise<
-  Array<Pick<import('@/types').User, 'id' | 'username' | 'full_name' | 'avatar_url' | 'followers_count' | 'is_verified'>>
+  Pick<import('@/types').User, 'id' | 'username' | 'full_name' | 'avatar_url' | 'followers_count' | 'is_verified'>[]
 > {
   // Build the exclusion list (self + already-followed) so we don't recommend
   // someone they already follow.

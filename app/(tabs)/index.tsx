@@ -9,9 +9,6 @@ import {
   Animated,
   Platform,
 } from 'react-native';
-
-// JS-driven on web (no RCTAnimation), native-driven on iOS/Android.
-const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -30,6 +27,9 @@ import { useToast } from '@/lib/toast';
 import { colors } from '@/lib/theme';
 import { useResponsiveColumns, useTabBarClearance } from '@/lib/responsive';
 import type { Listing, User as Profile } from '@/types';
+
+// JS-driven on web (no RCTAnimation), native-driven on iOS/Android.
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 type TabName = 'For you' | 'Popular' | 'Following';
 
@@ -63,7 +63,7 @@ function AnimatedTabPill({
     });
     anim.start();
     return () => anim.stop();
-  }, [isActive]);
+  }, [isActive, colorAnim]);
 
   const backgroundColor = colorAnim.interpolate({
     inputRange: [0, 1],
@@ -134,14 +134,14 @@ export default function HomeScreen() {
   // followers; updated whenever the auth user changes so the exclusion list
   // (self + already-followed) stays accurate.
   const [suggestions, setSuggestions] = useState<
-    Array<Pick<Profile, 'id' | 'username' | 'full_name' | 'avatar_url' | 'followers_count' | 'is_verified'>>
+    Pick<Profile, 'id' | 'username' | 'full_name' | 'avatar_url' | 'followers_count' | 'is_verified'>[]
   >([]);
   const [followingState, setFollowingState] = useState<Record<string, boolean>>({});
   // Profiles the current user follows. Surfaced as a horizontal strip at the
   // top of the Following tab so the user can see the people themselves, not
   // just their listings (which can be empty even when follows exist).
   const [followedProfiles, setFollowedProfiles] = useState<
-    Array<Pick<Profile, 'id' | 'username' | 'full_name' | 'avatar_url' | 'is_verified'>>
+    Pick<Profile, 'id' | 'username' | 'full_name' | 'avatar_url' | 'is_verified'>[]
   >([]);
   // React Query owns the feed now. One infinite query per active tab; switching
   // tabs swaps the query key, so each tab's pages are cached independently
@@ -620,7 +620,7 @@ function FollowedProfilesStrip({
   profiles,
   onSeeAll,
 }: {
-  profiles: Array<Pick<Profile, 'id' | 'username' | 'full_name' | 'avatar_url' | 'is_verified'>>;
+  profiles: Pick<Profile, 'id' | 'username' | 'full_name' | 'avatar_url' | 'is_verified'>[];
   onSeeAll: () => void;
 }) {
   return (

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import {
@@ -68,7 +68,7 @@ export function SlideToConfirm({
       });
       setConfirmed(false);
     }
-  }, [loading, confirmed]);
+  }, [loading, confirmed, translateX]);
 
   const pan = Gesture.Pan()
     .enabled(!loading)

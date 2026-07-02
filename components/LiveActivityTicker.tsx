@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, Animated, Easing, Platform, Dimensions } from 'react-native';
-
-// JS-driven on web (no RCTAnimation), native-driven on iOS/Android.
-const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import type { Listing } from '@/types';
+
+// JS-driven on web (no RCTAnimation), native-driven on iOS/Android.
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 type Activity = {
   id: string;

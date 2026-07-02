@@ -36,10 +36,19 @@ import {
 } from '@/lib/savedSearches';
 import {
   fetchFollowState,
+  fetchSuggestedFollows,
   getCachedFollowState,
   toggleFollow,
   type FollowState,
 } from '@/lib/follows';
+import {
+  fetchAestheticIndex,
+  fetchAestheticListings,
+  fetchBrandIndex,
+  type AestheticIndexEntry,
+  type BrandIndexEntry,
+} from '@/lib/searchIndex';
+import type { Aesthetic } from '@/lib/aesthetics';
 import { listConversations, type ConversationRow } from '@/lib/chat';
 import type { User as Profile, Listing } from '@/types';
 import {
@@ -81,7 +90,53 @@ export const qk = {
   wardrobeDeck: (userId: string | null) => ['wardrobeDeck', userId] as const,
   myWardrobe: (userId: string | null) => ['myWardrobe', userId] as const,
   likedWardrobe: (userId: string | null) => ['likedWardrobe', userId] as const,
+  brandIndex: () => ['brandIndex'] as const,
+  aestheticIndex: () => ['aestheticIndex'] as const,
+  aestheticListings: (slug: string | null) => ['aestheticListings', slug] as const,
+  suggestedFollows: (userId: string | null) => ['suggestedFollows', userId] as const,
 };
+
+// ── Discover search hub ─────────────────────────────────────────────────────
+// The full live brand index (catalog-wide, ranked by stock). Fetched once per
+// staleTime and filtered client-side while typing, so keystrokes cost nothing.
+export function useBrandIndexQuery(enabled = true) {
+  return useQuery({
+    queryKey: qk.brandIndex(),
+    enabled,
+    staleTime: 5 * 60_000,
+    queryFn: (): Promise<BrandIndexEntry[]> => fetchBrandIndex(null),
+  });
+}
+
+// Catalog-wide counts + previews for the curated aesthetics, one round trip.
+export function useAestheticIndexQuery(enabled = true) {
+  return useQuery({
+    queryKey: qk.aestheticIndex(),
+    enabled,
+    staleTime: 5 * 60_000,
+    queryFn: (): Promise<Map<string, AestheticIndexEntry>> => fetchAestheticIndex(),
+  });
+}
+
+// Listings behind one aesthetic card — keyed by slug so revisiting a card is
+// instant from cache.
+export function useAestheticListingsQuery(aesthetic: Aesthetic | null) {
+  return useQuery({
+    queryKey: qk.aestheticListings(aesthetic?.slug ?? null),
+    enabled: !!aesthetic,
+    staleTime: 5 * 60_000,
+    queryFn: (): Promise<Listing[]> => fetchAestheticListings(aesthetic as Aesthetic),
+  });
+}
+
+// "Suggested for you" sellers on the Users tab idle state.
+export function useSuggestedFollowsQuery(userId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: qk.suggestedFollows(userId),
+    enabled,
+    queryFn: () => fetchSuggestedFollows(userId, 12),
+  });
+}
 
 // Product detail rails — pure server reads keyed on the current listing.
 export function useSellerOtherListingsQuery(

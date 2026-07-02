@@ -16,7 +16,6 @@ import * as Haptics from 'expo-haptics';
 import { colors } from '@/lib/theme';
 import { fetchListingById } from '@/lib/listings';
 import { getCachedListing } from '@/lib/listingCache';
-import { withTimeout } from '@/lib/async';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { safeBack } from '@/lib/nav';

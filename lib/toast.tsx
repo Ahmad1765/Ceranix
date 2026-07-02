@@ -8,12 +8,12 @@ import {
   type ReactNode,
 } from 'react';
 import { View, Text, Animated, Easing, Platform, StyleSheet } from 'react-native';
-
-// JS-driven on web (no RCTAnimation), native-driven on iOS/Android.
-const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+
+// JS-driven on web (no RCTAnimation), native-driven on iOS/Android.
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 type ToastVariant = 'default' | 'success' | 'info';
 type Toast = {

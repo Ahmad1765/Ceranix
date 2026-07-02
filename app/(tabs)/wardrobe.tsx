@@ -55,7 +55,8 @@ function WardrobeInner() {
     );
   }, [recordSwipe, toast]);
 
-  const onNeedMore = useCallback(() => { deck.refetch(); }, [deck.refetch]);
+  const refetchDeck = deck.refetch;
+  const onNeedMore = useCallback(() => { refetchDeck(); }, [refetchDeck]);
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-white">

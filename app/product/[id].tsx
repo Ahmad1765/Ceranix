@@ -81,7 +81,6 @@ export default function ProductScreen() {
   const toast = useToast();
   const productIdParam = Array.isArray(id) ? id[0] : id;
 
-  const [activeImage, setActiveImage] = useState(0);
   const heroOffsetX = useSharedValue(0);
   const heroScrollHandler = useAnimatedScrollHandler({
     onScroll: (e) => {
@@ -564,9 +563,6 @@ export default function ProductScreen() {
               showsHorizontalScrollIndicator={false}
               nestedScrollEnabled
               onScroll={heroScrollHandler}
-              onMomentumScrollEnd={(e) =>
-                setActiveImage(Math.round(e.nativeEvent.contentOffset.x / width))
-              }
               scrollEventThrottle={16}
             >
               {listing.images.map((uri, i) => (

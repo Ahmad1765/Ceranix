@@ -297,7 +297,7 @@ export default function ProfileEditScreen() {
     return () => {
       active = false;
     };
-  }, [username, profile?.username, user, validateUsername]);
+  }, [username, profile, user, validateUsername]);
 
   const ensurePermission = useCallback(async (): Promise<boolean> => {
     const { status, canAskAgain } = await ImagePicker.requestMediaLibraryPermissionsAsync();

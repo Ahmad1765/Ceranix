@@ -17,7 +17,6 @@ const PURPLE_TINT_45 = "rgba(108,71,255,0.45)";
 const WHITE = "#FFFFFF";
 
 const INK = "#0F0F0F"; // near-pure black for text
-const INK_PURE = "#000000"; // pure black, reserved for shadows
 const INK_MUTE = "rgba(15,15,15,0.62)"; // 5.62:1 on white — AA normal text
 const INK_MUTE_SOFT = "rgba(15,15,15,0.45)"; // large text / icons
 const INK_HAIRLINE = "rgba(15,15,15,0.08)"; // borders, dividers
