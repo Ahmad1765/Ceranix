@@ -10,6 +10,8 @@
 // Everything is best-effort: any failure returns null so the caller falls back
 // to the MediaPipe path, then to the original image.
 
+import { refineAlpha } from './alpha';
+
 // Transformers.js has no bundled types here; treat the module as untyped.
 type TF = any;
 
@@ -74,8 +76,21 @@ export async function getMatteAlpha(src: string, w: number, h: number): Promise<
     // resize to the working canvas size.
     const mask = await tf.RawImage.fromTensor(output[0].mul(255).to('uint8')).resize(w, h);
     const data: ArrayLike<number> = mask.data;
-    if (!data || data.length < w * h) return null;
-    return data instanceof Uint8Array ? data : Uint8Array.from(data);
+    const n = w * h;
+    if (!data || data.length < n) return null;
+    // Stride-aware read: a single-channel mask is length n; if the RawImage
+    // carries more channels, take the first channel of each pixel.
+    const stride = Math.floor(data.length / n);
+    let raw: Uint8Array;
+    if (stride === 1 && data instanceof Uint8Array) {
+      raw = data;
+    } else {
+      raw = new Uint8Array(n);
+      for (let i = 0; i < n; i++) raw[i] = data[i * stride];
+    }
+    // Clean up matting artifacts: crush faint halo residue and drop stray
+    // disconnected blobs before handing the alpha to the compositor.
+    return refineAlpha(raw, w, h);
   } catch (e) {
     console.warn('[photoClean] MODNet matte unavailable; falling back', e);
     return null;
