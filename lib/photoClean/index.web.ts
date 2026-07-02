@@ -4,6 +4,8 @@ import { getSegmenter, getFaceDetector } from './engine.web';
 import { expandFaceBox, eyeBarRect } from './geometry';
 import { resolveCleanOptions } from './options';
 import { getMatteAlpha } from './matte.web';
+import { getServerMaskDataUrl } from './serverMatte.web';
+import { refineAlpha } from './alpha';
 
 const MAX_EDGE = 1024;        // downscale ceiling before analysis, for speed
 // Soft-matte ramp: instead of a hard on/off cutoff (which gives jagged edges),
@@ -26,6 +28,30 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     img.onerror = () => reject(new Error('image load failed'));
     img.src = src;
   });
+}
+
+// Read a server-returned mask image into a refined w*h alpha. Transparent
+// cutout PNGs carry the matte in the alpha channel; grayscale mask images
+// (BiRefNet's output) are fully opaque, so fall back to the red channel.
+function maskImageToAlpha(img: HTMLImageElement, w: number, h: number): Uint8Array | null {
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext('2d');
+  if (!ctx) return null;
+  ctx.drawImage(img, 0, 0, w, h);
+  const d = ctx.getImageData(0, 0, w, h).data;
+  const n = w * h;
+  let hasTransparency = false;
+  for (let i = 0; i < n; i++) {
+    if (d[i * 4 + 3] < 250) {
+      hasTransparency = true;
+      break;
+    }
+  }
+  const out = new Uint8Array(n);
+  for (let i = 0; i < n; i++) out[i] = hasTransparency ? d[i * 4 + 3] : d[i * 4];
+  return refineAlpha(out, w, h);
 }
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
@@ -61,9 +87,20 @@ async function run(
 
   if (flags.removeBackground) {
     const segImg = bctx.getImageData(0, 0, w, h);
-    // Prefer MODNet matting (clean edges); fall back to MediaPipe selfie
-    // segmentation with a soft-matte ramp if MODNet can't load.
-    const alpha = await getMatteAlpha(src, w, h);
+    // Quality ladder: server-side BiRefNet (edge function, best on every
+    // device) → on-device matting (BiRefNet-WebGPU/MODNet) → MediaPipe ramp.
+    let alpha: Uint8Array | null = null;
+    const baseJpeg = base.toDataURL('image/jpeg', 0.92);
+    const maskUrl = await getServerMaskDataUrl(baseJpeg.slice(baseJpeg.indexOf(',') + 1));
+    if (maskUrl) {
+      try {
+        alpha = maskImageToAlpha(await loadImage(maskUrl), w, h);
+      } catch (e) {
+        console.warn('[photoClean] server mask unusable; using on-device', e);
+        alpha = null;
+      }
+    }
+    if (!alpha) alpha = await getMatteAlpha(src, w, h);
     if (alpha && alpha.length >= w * h) {
       for (let i = 0; i < w * h; i++) segImg.data[i * 4 + 3] = alpha[i];
     } else {
