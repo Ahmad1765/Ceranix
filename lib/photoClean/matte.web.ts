@@ -13,7 +13,11 @@
 // Transformers.js has no bundled types here; treat the module as untyped.
 type TF = any;
 
-const TRANSFORMERS_ESM = 'https://esm.sh/@huggingface/transformers@4.2.0';
+// jsDelivr's prebuilt browser ESM is the officially documented way to load
+// Transformers.js without a bundler (esm.sh re-bundles and can break the
+// onnxruntime WASM asset paths).
+const TRANSFORMERS_ESM =
+  'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0/dist/transformers.min.mjs';
 const MODEL_ID = 'Xenova/modnet';
 
 let tfPromise: Promise<TF> | null = null;
