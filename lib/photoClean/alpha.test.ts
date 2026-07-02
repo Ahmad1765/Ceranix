@@ -174,24 +174,26 @@ describe('refineMatte', () => {
     const w = 15;
     const h = 15;
     const raw = new Uint8Array(w * h);
-    const vals: number[] = new Array(w * h).fill(30);
     for (let y = 4; y <= 10; y++) {
-      for (let x = 4; x <= 10; x++) {
-        raw[y * w + x] = 255;
-        vals[y * w + x] = 200;
-      }
+      for (let x = 4; x <= 10; x++) raw[y * w + x] = 255;
     }
     raw[7 * w + 7] = 80; // color-confused patch inside the garment
-    const rgba = new Uint8Array(w * h * 4);
-    for (let i = 0; i < w * h; i++) {
-      rgba[i * 4] = vals[i];
-      rgba[i * 4 + 1] = vals[i];
-      rgba[i * 4 + 2] = vals[i];
-      rgba[i * 4 + 3] = 255;
-    }
-    const out = refineMatte(raw, rgba, w, h);
+    const out = refineMatte(raw, w, h);
     expect(out.length).toBe(w * h);
     expect(out[7 * w + 7]).toBeGreaterThan(180); // patch repaired
-    expect(out[0]).toBeLessThan(40); // background stays background
+    expect(out[0]).toBe(0); // background stays background
+  });
+
+  it('preserves the model soft edge band (mild crush)', () => {
+    // A single mid-alpha edge pixel next to solid subject must survive as a
+    // soft value, not be crushed to 0 or blown to 255.
+    const w = 12;
+    const h = 12;
+    const raw = new Uint8Array(w * h);
+    for (let y = 4; y <= 8; y++) for (let x = 4; x <= 7; x++) raw[y * w + x] = 255;
+    for (let y = 4; y <= 8; y++) raw[y * w + 8] = 128; // soft edge column
+    const out = refineMatte(raw, w, h);
+    expect(out[6 * w + 8]).toBeGreaterThan(60);
+    expect(out[6 * w + 8]).toBeLessThan(220);
   });
 });

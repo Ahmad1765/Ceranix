@@ -110,9 +110,8 @@ async function run(
     }
     if (alpha && alpha.length >= w * h) {
       // One repair pass for every source: residue/blob cleanup, color-confusion
-      // hole filling, edge-crack mending, and guided-filter alignment of the
-      // matte to the photo's real edges.
-      const refined = refineMatte(alpha, segImg.data, w, h);
+      // hole filling, and edge-crack mending.
+      const refined = refineMatte(alpha, w, h);
       for (let i = 0; i < w * h; i++) segImg.data[i * 4 + 3] = refined[i];
     }
     octx.fillStyle = '#FFFFFF';

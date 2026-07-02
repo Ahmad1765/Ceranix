@@ -251,9 +251,12 @@ function boxMean(src: Float64Array, w: number, h: number, r: number, out: Float6
 }
 
 // He et al.'s guided filter with the photo's luminance as the guide: locally
-// fits alpha as a linear function of the image, which snaps matte edges onto
-// real image edges (edge-aware smoothing). The standard cheap trick real
-// matting pipelines use to fix jagged/misaligned borders.
+// fits alpha as a linear function of the image (edge-aware smoothing).
+// NOT part of refineMatte: lab testing on real outfit photos showed it washes
+// out matte interiors (semi-transparent subject) and bleeds high-contrast
+// background texture back in — MODNet/BiRefNet mattes are already soft-edged
+// and need no reconstruction. Kept (tested) for a possible future narrow
+// edge-band-only variant.
 export function guidedFilterAlpha(
   alpha: Uint8Array,
   rgba: ArrayLike<number>,
@@ -302,18 +305,14 @@ export function guidedFilterAlpha(
   return out;
 }
 
-// Full repair chain for a raw model matte, in artifact order: residue/blob
-// cleanup → color-confusion hole filling → edge crack mending → edge-aware
-// alignment to the actual photo.
-export function refineMatte(
-  rawAlpha: Uint8Array,
-  rgba: ArrayLike<number>,
-  w: number,
-  h: number,
-): Uint8Array {
-  let a = refineAlpha(rawAlpha, w, h);
+// Full repair chain for a raw model matte: mild residue crush + island removal
+// → color-confusion hole filling → gentle crack mending. Parameters were tuned
+// visually against real outfit photos (Testing for wardrobe/) in an offline
+// harness; a milder crush (20/235) preserves the model's native soft edges,
+// and closing at r=1 mends nicks without rounding garment corners.
+export function refineMatte(rawAlpha: Uint8Array, w: number, h: number): Uint8Array {
+  let a = refineAlpha(rawAlpha, w, h, { lo: 20, hi: 235 });
   a = fillHoles(a, rawAlpha, w, h);
-  a = morphClose(a, w, h, 2);
-  a = guidedFilterAlpha(a, rgba, w, h, 6, 0.005);
+  a = morphClose(a, w, h, 1);
   return a;
 }
