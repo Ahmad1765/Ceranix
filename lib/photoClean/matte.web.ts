@@ -13,11 +13,12 @@
 // Transformers.js has no bundled types here; treat the module as untyped.
 type TF = any;
 
-// jsDelivr's prebuilt browser ESM is the officially documented way to load
-// Transformers.js without a bundler (esm.sh re-bundles and can break the
-// onnxruntime WASM asset paths).
+// The package's own `jsdelivr` field target — the standalone browser ESM build
+// (verified: 200, ESM, exports AutoModel/AutoProcessor/RawImage). v4 renamed
+// the dist files, so the v3-era transformers.min.mjs path 404s; and the
+// exports-map `transformers.web.js` is for bundlers, not raw browser imports.
 const TRANSFORMERS_ESM =
-  'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0/dist/transformers.min.mjs';
+  'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0/dist/transformers.min.js';
 const MODEL_ID = 'Xenova/modnet';
 
 let tfPromise: Promise<TF> | null = null;
