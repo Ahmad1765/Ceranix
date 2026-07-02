@@ -35,20 +35,22 @@ let processorPromise: Promise<any> | null = null;
 
 function getModel(tf: TF): Promise<any> {
   if (!modelPromise) {
-    modelPromise = tf.AutoModel.from_pretrained(MODEL_ID, { dtype: 'fp32' }).catch((e: unknown) => {
+    const p: Promise<any> = tf.AutoModel.from_pretrained(MODEL_ID, { dtype: 'fp32' }).catch((e: unknown) => {
       modelPromise = null;
       throw e;
     });
+    modelPromise = p;
   }
   return modelPromise;
 }
 
 function getProcessor(tf: TF): Promise<any> {
   if (!processorPromise) {
-    processorPromise = tf.AutoProcessor.from_pretrained(MODEL_ID).catch((e: unknown) => {
+    const p: Promise<any> = tf.AutoProcessor.from_pretrained(MODEL_ID).catch((e: unknown) => {
       processorPromise = null;
       throw e;
     });
+    processorPromise = p;
   }
   return processorPromise;
 }
