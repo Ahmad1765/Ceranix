@@ -5,14 +5,9 @@ import { expandFaceBox, eyeBarRect } from './geometry';
 import { resolveCleanOptions } from './options';
 import { getMatteAlpha } from './matte.web';
 import { getServerMaskDataUrl } from './serverMatte.web';
-import { refineAlpha } from './alpha';
+import { refineMatte } from './alpha';
 
 const MAX_EDGE = 1024;        // downscale ceiling before analysis, for speed
-// Soft-matte ramp: instead of a hard on/off cutoff (which gives jagged edges),
-// map the segmenter's confidence through a ramp so the subject edge is
-// anti-aliased/feathered — a noticeably cleaner cutout from the same model.
-const MATTE_LO = 0.35;
-const MATTE_HI = 0.65;
 const BLUR_PX = 22;           // gaussian blur radius for faces
 // Generous ceiling: the first "remove background" run downloads a matting
 // model (BiRefNet ~114MB on WebGPU browsers, MODNet ~25MB elsewhere; cached
@@ -30,9 +25,10 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-// Read a server-returned mask image into a refined w*h alpha. Transparent
-// cutout PNGs carry the matte in the alpha channel; grayscale mask images
-// (BiRefNet's output) are fully opaque, so fall back to the red channel.
+// Read a server-returned mask image into a RAW w*h alpha (refineMatte runs
+// later, once, for every source). Transparent cutout PNGs carry the matte in
+// the alpha channel; grayscale mask images (BiRefNet's output) are fully
+// opaque, so fall back to the red channel.
 function maskImageToAlpha(img: HTMLImageElement, w: number, h: number): Uint8Array | null {
   const c = document.createElement('canvas');
   c.width = w;
@@ -51,7 +47,7 @@ function maskImageToAlpha(img: HTMLImageElement, w: number, h: number): Uint8Arr
   }
   const out = new Uint8Array(n);
   for (let i = 0; i < n; i++) out[i] = hasTransparency ? d[i * 4 + 3] : d[i * 4];
-  return refineAlpha(out, w, h);
+  return out;
 }
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
@@ -101,22 +97,23 @@ async function run(
       }
     }
     if (!alpha) alpha = await getMatteAlpha(src, w, h);
-    if (alpha && alpha.length >= w * h) {
-      for (let i = 0; i < w * h; i++) segImg.data[i * 4 + 3] = alpha[i];
-    } else {
+    if (!alpha) {
+      // Last resort: MediaPipe selfie segmentation confidence as a raw matte.
       const segmenter = await getSegmenter();
       const seg = segmenter.segment(base);
       const conf = seg.confidenceMasks?.[0]?.getAsFloat32Array();
       seg.close(); // extract data first, then close — getAsFloat32Array returns a JS-side copy
-      if (conf) {
-        const range = MATTE_HI - MATTE_LO;
-        for (let i = 0; i < conf.length; i++) {
-          // Feathered alpha: 0 below LO, 1 above HI, linear ramp between.
-          let t = (conf[i] - MATTE_LO) / range;
-          t = t < 0 ? 0 : t > 1 ? 1 : t;
-          segImg.data[i * 4 + 3] = Math.round(segImg.data[i * 4 + 3] * t);
-        }
+      if (conf && conf.length >= w * h) {
+        alpha = new Uint8Array(w * h);
+        for (let i = 0; i < w * h; i++) alpha[i] = Math.round(conf[i] * 255);
       }
+    }
+    if (alpha && alpha.length >= w * h) {
+      // One repair pass for every source: residue/blob cleanup, color-confusion
+      // hole filling, edge-crack mending, and guided-filter alignment of the
+      // matte to the photo's real edges.
+      const refined = refineMatte(alpha, segImg.data, w, h);
+      for (let i = 0; i < w * h; i++) segImg.data[i * 4 + 3] = refined[i];
     }
     octx.fillStyle = '#FFFFFF';
     octx.fillRect(0, 0, w, h);

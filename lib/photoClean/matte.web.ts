@@ -10,7 +10,6 @@
 //
 // Like engine.web.ts, the library is loaded at RUNTIME from a CDN via a dynamic
 // import hidden from Metro's bundler (Transformers.js can't be Metro-bundled).
-import { refineAlpha } from './alpha';
 
 // Transformers.js has no bundled types here; treat the module as untyped.
 type TF = any;
@@ -105,23 +104,18 @@ function getBirefnetProcessor(tf: TF): Promise<any> {
 }
 
 // ── Shared mask handling ────────────────────────────────────────────────────
-// Convert a RawImage mask into a refined w*h alpha. Stride-aware in case the
-// RawImage carries more than one channel.
+// Convert a RawImage mask into a RAW w*h alpha (no cleanup — the caller runs
+// the full refineMatte chain once, with the photo as the guided-filter guide).
+// Stride-aware in case the RawImage carries more than one channel.
 function maskToAlpha(mask: any, w: number, h: number): Uint8Array | null {
   const data: ArrayLike<number> = mask?.data;
   const n = w * h;
   if (!data || data.length < n) return null;
   const stride = Math.floor(data.length / n);
-  let raw: Uint8Array;
-  if (stride === 1 && data instanceof Uint8Array) {
-    raw = data;
-  } else {
-    raw = new Uint8Array(n);
-    for (let i = 0; i < n; i++) raw[i] = data[i * stride];
-  }
-  // Clean up matting artifacts: crush faint halo residue and drop stray
-  // disconnected blobs before handing the alpha to the compositor.
-  return refineAlpha(raw, w, h);
+  if (stride === 1 && data instanceof Uint8Array) return data;
+  const raw = new Uint8Array(n);
+  for (let i = 0; i < n; i++) raw[i] = data[i * stride];
+  return raw;
 }
 
 async function birefnetAlpha(tf: TF, image: any, w: number, h: number): Promise<Uint8Array | null> {
