@@ -332,6 +332,10 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-white">
+      {/* Web pull-to-refresh: translate the whole page (header + feed) down with
+          the gesture so it tracks the pull. contentStyle is undefined on native,
+          so this wrapper is a no-op there — RefreshControl moves the list. */}
+      <View style={[{ flex: 1 }, contentStyle]}>
       {/* Search Header */}
       <View className="flex-row items-center px-4 pt-2 pb-3">
         <Pressable
@@ -605,9 +609,10 @@ export default function HomeScreen() {
           )
         }
         renderItem={renderItem}
-        contentContainerStyle={[{ paddingBottom: tabClear }, contentStyle]}
+        contentContainerStyle={{ paddingBottom: tabClear }}
         ref={activeTab !== 'Following' ? scrollRef : undefined}
       />
+      </View>
       <WebPullIndicator pull={pull} refreshing={refreshing} nodeTop={nodeTop} threshold={threshold} />
     </SafeAreaView>
   );
