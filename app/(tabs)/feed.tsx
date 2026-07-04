@@ -218,7 +218,7 @@ export default function MyFeedScreen() {
   const showRails = activeChip === FOR_YOU && !showingSaved;
 
   // Web pull-to-refresh — RefreshControl is inert on react-native-web.
-  const { scrollRef, pull, nodeTop, threshold } = useWebPullToRefresh({ refreshing, onRefresh });
+  const { scrollRef, pull, nodeTop, threshold, contentStyle } = useWebPullToRefresh({ refreshing, onRefresh });
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
@@ -228,7 +228,7 @@ export default function MyFeedScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />
         }
-        contentContainerStyle={{ paddingBottom: tabClear }}
+        contentContainerStyle={[{ paddingBottom: tabClear }, contentStyle]}
       >
         {/* Title — greets the signed-in user by name; the feed is THEIRS,
             not a generic surface. */}

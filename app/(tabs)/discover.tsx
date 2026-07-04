@@ -109,7 +109,7 @@ export default function DiscoverScreen() {
   // Search hub tab: Items keeps the classic feed + grid; Aesthetics / Brands /
   // Users are index-style panels. Query state is shared so a typed term
   // carries across tabs (search "zara" → flip between brand hits and sellers).
-  const [tab, setTab] = useState<DiscoverTab>('items');
+  const [tab, setTab] = useState<DiscoverTab>('aesthetics');
   // Search-as-hub: focusing the search bar opens a browse landing (categories +
   // trending searches) instead of cluttering the idle feed with them. We toggle
   // an explicit mode (not raw blur) so selecting a tile on web doesn't lose the
@@ -210,7 +210,7 @@ export default function DiscoverScreen() {
   }, [gridRefetch, recRefetch, recentRefetch, qc, user?.id]);
 
   // Web pull-to-refresh — RefreshControl is inert on react-native-web.
-  const { scrollRef, pull, nodeTop, threshold } = useWebPullToRefresh({ refreshing, onRefresh });
+  const { scrollRef, pull, nodeTop, threshold, contentStyle } = useWebPullToRefresh({ refreshing, onRefresh });
 
   // Debounced server-side search across the whole catalog. Client filtering
   // below gives instant feedback; this replaces it with authoritative rows.
@@ -488,7 +488,7 @@ export default function DiscoverScreen() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />}
-        contentContainerStyle={{ paddingBottom: tabClear }}
+        contentContainerStyle={[{ paddingBottom: tabClear }, contentStyle]}
       >
         {/* Top bar */}
         <View

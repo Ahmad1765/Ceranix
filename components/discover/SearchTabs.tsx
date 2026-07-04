@@ -40,6 +40,12 @@ const TABS: { id: DiscoverTab; label: string }[] = [
   { id: 'users', label: 'Users' },
 ];
 
+// Pills hidden from the row (2026-07-04): the Items chip is suppressed per
+// product call. The item grid is still the default view — it just no longer has
+// its own chip. To restore, remove 'items' from this set.
+const HIDDEN_TABS = new Set<DiscoverTab>(['items']);
+const VISIBLE_TABS = TABS.filter((t) => !HIDDEN_TABS.has(t.id));
+
 // ── Segmented pills ─────────────────────────────────────────────────────────
 // Same idiom as the home feed's AnimatedTabPill: white pill that fills with
 // soft purple + purple border when active, spring scale on press.
@@ -58,7 +64,7 @@ export function DiscoverSegments({
       contentContainerStyle={{ paddingHorizontal: PAD, gap: 8 }}
       style={{ marginTop: 14, flexGrow: 0 }}
     >
-      {TABS.map(({ id, label }) => (
+      {VISIBLE_TABS.map(({ id, label }) => (
         <SegmentPill
           key={id}
           label={label}

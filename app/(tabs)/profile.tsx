@@ -222,7 +222,7 @@ function ProfileScreenInner() {
   }, [sellingRefetch, likedRefetch, savedRefetch, saveListsRefetch]);
 
   // Web pull-to-refresh — RefreshControl is inert on react-native-web.
-  const { scrollRef, pull, nodeTop, threshold } = useWebPullToRefresh({ refreshing, onRefresh });
+  const { scrollRef, pull, nodeTop, threshold, contentStyle } = useWebPullToRefresh({ refreshing, onRefresh });
 
 const handleShareProfile = useCallback(async () => {
   if (!profile?.id) return;
@@ -303,7 +303,7 @@ const handleShareProfile = useCallback(async () => {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />
         }
-        contentContainerStyle={{ paddingBottom: tabClear }}
+        contentContainerStyle={[{ paddingBottom: tabClear }, contentStyle]}
       >
         {/* Top bar */}
         <View

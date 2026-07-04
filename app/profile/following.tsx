@@ -77,7 +77,7 @@ export default function FollowingScreen() {
   }, [load]);
 
   // Web pull-to-refresh — RefreshControl is inert on react-native-web.
-  const { scrollRef, pull, nodeTop, threshold } = useWebPullToRefresh({ refreshing, onRefresh });
+  const { scrollRef, pull, nodeTop, threshold, contentStyle } = useWebPullToRefresh({ refreshing, onRefresh });
 
   const handleToggle = async (row: Row) => {
     if (!authUser) {
@@ -163,7 +163,7 @@ export default function FollowingScreen() {
           ref={scrollRef}
           data={rows}
           keyExtractor={(r) => r.id}
-          contentContainerStyle={{ paddingVertical: 4, paddingBottom: 80 }}
+          contentContainerStyle={[{ paddingVertical: 4, paddingBottom: 80 }, contentStyle]}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />
           }

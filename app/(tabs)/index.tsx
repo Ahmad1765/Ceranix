@@ -295,7 +295,7 @@ export default function HomeScreen() {
 
   // Web pull-to-refresh — RefreshControl is inert on react-native-web, so we
   // drive the scroll-down gesture ourselves. No-op on native.
-  const { scrollRef, pull, nodeTop, threshold } = useWebPullToRefresh({ refreshing, onRefresh });
+  const { scrollRef, pull, nodeTop, threshold, contentStyle } = useWebPullToRefresh({ refreshing, onRefresh });
 
   // Pad to a multiple of the column count so trailing rows don't stretch
   // their cards across the full width when listings.length isn't divisible.
@@ -605,7 +605,7 @@ export default function HomeScreen() {
           )
         }
         renderItem={renderItem}
-        contentContainerStyle={{ paddingBottom: tabClear }}
+        contentContainerStyle={[{ paddingBottom: tabClear }, contentStyle]}
         ref={activeTab !== 'Following' ? scrollRef : undefined}
       />
       <WebPullIndicator pull={pull} refreshing={refreshing} nodeTop={nodeTop} threshold={threshold} />

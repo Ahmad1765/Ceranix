@@ -24,7 +24,7 @@ export default function RatingsScreen() {
   }, [refreshProfile]);
 
   // Web pull-to-refresh — RefreshControl is inert on react-native-web.
-  const { scrollRef, pull, nodeTop, threshold } = useWebPullToRefresh({ refreshing, onRefresh });
+  const { scrollRef, pull, nodeTop, threshold, contentStyle } = useWebPullToRefresh({ refreshing, onRefresh });
   const rating = Number(profile?.rating ?? 0);
   const sales = profile?.total_sales ?? 0;
   const showStars = Math.max(0, Math.min(5, Math.round(rating)));
@@ -64,7 +64,7 @@ export default function RatingsScreen() {
       <ScrollView
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32 }}
+        contentContainerStyle={[{ paddingHorizontal: 16, paddingBottom: 32 }, contentStyle]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />
         }

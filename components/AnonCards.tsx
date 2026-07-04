@@ -488,7 +488,8 @@ export const AnonCards = memo(function AnonCards() {
 
       {/* Row 1 — hero carousel */}
       <View style={{ marginTop: 16 }}>
-        <SectionEyebrow>This week&apos;s spotlight</SectionEyebrow>
+        {/* Hidden 2026-07-04 — restore by uncommenting the line below. */}
+        {/* <SectionEyebrow>This week&apos;s spotlight</SectionEyebrow> */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -505,7 +506,7 @@ export const AnonCards = memo(function AnonCards() {
 
       {/* Row 2 — 2x2 grid */}
       <View style={{ marginTop: 16 }}>
-        <SectionEyebrow>Shop by aisle</SectionEyebrow>
+        {/* <SectionEyebrow>Shop by aisle</SectionEyebrow> */}
         <View
           style={{
             paddingHorizontal: SCREEN_PAD,
