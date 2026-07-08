@@ -98,6 +98,9 @@ export interface Listing {
   description: string;
   price: number; // in USD
   category: Category;
+  // Optional one-level subcategory (slug from lib/categories). Null on legacy
+  // rows created before the taxonomy landed.
+  subcategory?: string | null;
   gender: Gender;
   brand: string | null;
   size: string | null;

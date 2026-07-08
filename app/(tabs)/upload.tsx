@@ -32,6 +32,7 @@ import { putCachedListing } from '@/lib/listingCache';
 import { emitListingCreated } from '@/lib/listingEvents';
 import { invalidateFresh } from '@/lib/freshness';
 import type { Category, Condition, Gender, Listing } from '@/types';
+import { CATEGORIES, hasSubcategories, suggestSubcategory } from '@/lib/categories';
 
 type Step = 'photos' | 'details';
 
@@ -40,16 +41,6 @@ const CONDITIONS: { label: string; value: Condition; hint: string }[] = [
   { label: 'Like new', value: 'like_new', hint: 'Worn once or twice, no flaws' },
   { label: 'Good', value: 'good', hint: 'Gently used, minor signs of wear' },
   { label: 'Fair', value: 'fair', hint: 'Visible wear, still functional' },
-];
-
-const CATEGORIES: { label: string; value: Category; icon: keyof typeof Feather.glyphMap }[] = [
-  { label: 'Clothing', value: 'clothing', icon: 'shopping-bag' },
-  { label: 'Shoes', value: 'shoes', icon: 'package' },
-  { label: 'Bags', value: 'bags', icon: 'briefcase' },
-  { label: 'Accessories', value: 'accessories', icon: 'watch' },
-  { label: 'Electronics', value: 'electronics', icon: 'smartphone' },
-  { label: 'Beauty', value: 'beauty', icon: 'droplet' },
-  { label: 'Other', value: 'other', icon: 'box' },
 ];
 
 const GENDERS: { label: string; value: Gender }[] = [
@@ -111,7 +102,29 @@ function SellScreenInner() {
   const [size, setSize] = useState('');
   const [condition, setCondition] = useState<Condition>('good');
   const [category, setCategory] = useState<Category>('clothing');
+  const [subcategory, setSubcategory] = useState<string | null>(null);
+  const [subQuery, setSubQuery] = useState('');
   const [gender, setGender] = useState<Gender>('women');
+
+  // Pick a category and clear any subcategory chosen under the previous one.
+  const pickCategory = (id: Category) => {
+    setCategory(id);
+    setSubcategory(null);
+    setSubQuery('');
+  };
+
+  // Keyword hint from the title (e.g. "nike hoodie" → Clothing ▸ Hoodies).
+  // Only surfaced when it points somewhere the seller hasn't already selected.
+  const suggestion = useMemo(() => suggestSubcategory(title), [title]);
+  const showSuggestion =
+    !!suggestion && (suggestion.category !== category || suggestion.sub.id !== subcategory);
+
+  const activeCatDef = useMemo(() => CATEGORIES.find((c) => c.id === category), [category]);
+  const filteredSubs = useMemo(() => {
+    const subs = activeCatDef?.subs ?? [];
+    const q = subQuery.trim().toLowerCase();
+    return q ? subs.filter((s) => s.label.toLowerCase().includes(q)) : subs;
+  }, [activeCatDef, subQuery]);
   const [tags, setTags] = useState<string[]>([]);
   const [tagDraft, setTagDraft] = useState('');
 
@@ -166,6 +179,8 @@ function SellScreenInner() {
     setDescription('');
     setCondition('good');
     setCategory('clothing');
+    setSubcategory(null);
+    setSubQuery('');
     setGender('women');
     setTags([]);
     setTagDraft('');
@@ -197,6 +212,10 @@ function SellScreenInner() {
       Alert.alert('Missing photos', 'Add at least one photo first.');
       return;
     }
+    if (hasSubcategories(category) && !subcategory) {
+      Alert.alert('Missing info', 'Please choose a subcategory.');
+      return;
+    }
 
     setPublishing(true);
     let urls: string[] = [];
@@ -212,6 +231,7 @@ function SellScreenInner() {
           description: description.trim() || null,
           price: priceNum,
           category,
+          subcategory: subcategory || null,
           gender,
           brand: brand.trim() || null,
           size: size.trim() || null,
@@ -255,6 +275,7 @@ function SellScreenInner() {
         description: description.trim(),
         price: priceNum,
         category,
+        subcategory: subcategory || null,
         gender,
         brand: brand.trim() || null,
         size: size.trim() || null,
@@ -545,7 +566,11 @@ function SellScreenInner() {
   }
 
   // ── Step 2 — details ─────────────────────────────────────────────────
-  const canPublish = title.trim().length > 0 && parseFloat(price) > 0 && slots.length > 0;
+  const canPublish =
+    title.trim().length > 0 &&
+    parseFloat(price) > 0 &&
+    slots.length > 0 &&
+    (!hasSubcategories(category) || !!subcategory);
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-white">
@@ -745,11 +770,11 @@ function SellScreenInner() {
             <Eyebrow>Category</Eyebrow>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {CATEGORIES.map((c) => {
-                const active = category === c.value;
+                const active = category === c.id;
                 return (
                   <Pressable
-                    key={c.value}
-                    onPress={() => setCategory(c.value)}
+                    key={c.id}
+                    onPress={() => pickCategory(c.id)}
                     style={({ pressed }) => ({
                       flexDirection: 'row',
                       alignItems: 'center',
@@ -777,6 +802,101 @@ function SellScreenInner() {
                 );
               })}
             </View>
+
+            {/* Title-based suggestion — one tap to accept the inferred cat ▸ sub. */}
+            {showSuggestion ? (
+              <Pressable
+                onPress={() => {
+                  setCategory(suggestion!.category);
+                  setSubcategory(suggestion!.sub.id);
+                  setSubQuery('');
+                }}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  alignSelf: 'flex-start',
+                  marginTop: 12,
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  borderRadius: 999,
+                  backgroundColor: 'rgba(108,71,255,0.10)',
+                  opacity: pressed ? 0.7 : 1,
+                })}
+              >
+                <Feather name="zap" size={12} color="#6C47FF" />
+                <Text style={{ fontSize: 12.5, fontWeight: '600', color: '#6C47FF' }}>
+                  Suggested: {CATEGORIES.find((c) => c.id === suggestion!.category)?.label} ▸{' '}
+                  {suggestion!.sub.label}
+                </Text>
+              </Pressable>
+            ) : null}
+
+            {/* Subcategory picker — required when the category defines subs. */}
+            {activeCatDef && activeCatDef.subs.length > 0 ? (
+              <View style={{ marginTop: 22 }}>
+                <Eyebrow>Subcategory</Eyebrow>
+                {activeCatDef.subs.length > 8 ? (
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 8,
+                      borderWidth: 1,
+                      borderColor: 'rgba(15,15,15,0.08)',
+                      borderRadius: 12,
+                      paddingHorizontal: 12,
+                      height: 42,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Feather name="search" size={15} color="rgba(15,15,15,0.45)" />
+                    <TextInput
+                      value={subQuery}
+                      onChangeText={setSubQuery}
+                      placeholder={`Search ${activeCatDef.label.toLowerCase()}`}
+                      placeholderTextColor="rgba(15,15,15,0.4)"
+                      style={{ flex: 1, fontSize: 14, color: '#0F0F0F' }}
+                    />
+                  </View>
+                ) : null}
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {filteredSubs.map((s) => {
+                    const active = subcategory === s.id;
+                    return (
+                      <Pressable
+                        key={s.id}
+                        onPress={() => setSubcategory(s.id)}
+                        style={({ pressed }) => ({
+                          paddingHorizontal: 12,
+                          paddingVertical: 8,
+                          borderRadius: 999,
+                          borderWidth: 1,
+                          borderColor: active ? '#6C47FF' : 'rgba(15,15,15,0.08)',
+                          backgroundColor: active ? '#6C47FF' : '#FFFFFF',
+                          transform: [{ scale: pressed ? 0.97 : 1 }],
+                        })}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: '600',
+                            color: active ? '#FFFFFF' : '#0F0F0F',
+                          }}
+                        >
+                          {s.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                  {filteredSubs.length === 0 ? (
+                    <Text style={{ fontSize: 13, color: 'rgba(15,15,15,0.45)', paddingVertical: 6 }}>
+                      No matches
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+            ) : null}
 
             {/* Gender segmented */}
             <View

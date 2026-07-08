@@ -15,8 +15,9 @@ import { Feather } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import { ListingCard } from '@/components/ListingCard';
-import { searchListings } from '@/lib/listings';
+import { searchListings, type SortKey } from '@/lib/listings';
 import { searchUsers } from '@/lib/follows';
+import { CATEGORIES, getCategory, subcategoryLabel } from '@/lib/categories';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   qk,
@@ -71,15 +72,18 @@ type CatTile = {
   icon: keyof typeof Feather.glyphMap;
 };
 
+// Derived from the single-source taxonomy so tile icons/labels stay in lockstep
+// with upload + the product page. 'Trending' is a Discover-only pseudo-category.
 const CATEGORY_TILES: CatTile[] = [
   { id: 'trending', label: 'Trending', icon: 'trending-up' },
-  { id: 'clothing', label: 'Clothing', icon: 'shopping-bag' },
-  { id: 'shoes', label: 'Shoes', icon: 'compass' },
-  { id: 'bags', label: 'Bags', icon: 'briefcase' },
-  { id: 'accessories', label: 'Accessories', icon: 'watch' },
-  { id: 'electronics', label: 'Tech', icon: 'monitor' },
-  { id: 'beauty', label: 'Beauty', icon: 'droplet' },
-  { id: 'other', label: 'Other', icon: 'box' },
+  ...CATEGORIES.map((c) => ({ id: c.id, label: c.label, icon: c.icon })),
+];
+
+const SORT_OPTIONS: { id: SortKey; label: string }[] = [
+  { id: 'newest', label: 'Newest' },
+  { id: 'price_asc', label: 'Price ↑' },
+  { id: 'price_desc', label: 'Price ↓' },
+  { id: 'popular', label: 'Popular' },
 ];
 
 const HORIZONTAL_PAD = 12;
@@ -98,9 +102,10 @@ type UserResult = Awaited<ReturnType<typeof searchUsers>>[number];
 export default function DiscoverScreen() {
   // Query params from /news Saved tab (and external links). When set, the
   // screen boots with the search pre-applied so the user lands on results.
-  const params = useLocalSearchParams<{ q?: string; category?: Category; savedId?: string }>();
+  const params = useLocalSearchParams<{ q?: string; category?: Category; sub?: string; savedId?: string }>();
   const initialQuery = typeof params.q === 'string' ? params.q : '';
   const initialCat = typeof params.category === 'string' ? (params.category as CatTile['id']) : null;
+  const initialSub = typeof params.sub === 'string' ? params.sub : null;
   const savedId = typeof params.savedId === 'string' ? params.savedId : null;
 
   const { user } = useAuth();
@@ -117,6 +122,9 @@ export default function DiscoverScreen() {
   // swaps to results.
   const [searchActive, setSearchActive] = useState(false);
   const [activeCat, setActiveCat] = useState<CatTile['id'] | null>(initialCat);
+  // Subcategory + sort refine the category browse grid (eBay-style facets).
+  const [activeSub, setActiveSub] = useState<string | null>(initialSub);
+  const [sort, setSort] = useState<SortKey | null>(null);
   // Editorial digest "theme" applied to the trending grid (e.g. Now in demand /
   // Fresh drops). Reorders the idle grid in place; cleared via the grid header.
   const [digestSort, setDigestSort] = useState<'demand' | 'fresh' | null>(null);
@@ -141,13 +149,25 @@ export default function DiscoverScreen() {
     const nextQ = typeof params.q === 'string' ? params.q : '';
     setQuery(nextQ);
 
-    if (typeof params.category === 'string') {
+    const hasCat = typeof params.category === 'string';
+    if (hasCat) {
       const isValid = CATEGORY_TILES.some(t => t.id === params.category);
-      setActiveCat(isValid ? (params.category as CatTile['id']) : null);
+      const catId = isValid ? (params.category as CatTile['id']) : null;
+      setActiveCat(catId);
+      // Only honor a sub param that actually belongs to the linked category.
+      const sub = typeof params.sub === 'string' ? params.sub : null;
+      setActiveSub(sub && getCategory(catId)?.subs.some((s) => s.id === sub) ? sub : null);
     } else {
       setActiveCat(null);
+      setActiveSub(null);
     }
-  }, [params.q, params.category]);
+
+    // A deep-linked search or category (e.g. tapping Category on a product
+    // page) must land on the Items grid — that's where results and category
+    // filtering live. Without this the screen stays on the default Aesthetics
+    // panel and the filter appears to do nothing.
+    if (nextQ || hasCat) setTab('items');
+  }, [params.q, params.category, params.sub]);
 
   // When the screen mounts with a savedId param, mark that search seen so
   // the "N new" badge clears once the user actually opens it.
@@ -166,11 +186,20 @@ export default function DiscoverScreen() {
   });
 
   const browseCat = activeCat && activeCat !== 'trending' ? activeCat : null;
+  const browseSub = browseCat ? activeSub : null;
+  // Subcategories available for the current browse category (chip row).
+  const browseSubs = browseCat ? getCategory(browseCat)?.subs ?? [] : [];
 
   // React Query owns the grid + personalized rails. staleTime (60s) reproduces
   // the old isFresh() gate; the three reads dedupe and cache independently so
   // the grid skeleton no longer waits on the recommendation pipeline.
-  const gridQ = useFeedListingsQuery({ tab: 'popular', category: browseCat, limit: 60 });
+  const gridQ = useFeedListingsQuery({
+    tab: 'popular',
+    category: browseCat,
+    subcategory: browseSub,
+    sort,
+    limit: 60,
+  });
   const recQ = useRecommendationsQuery(user?.id ?? null, 12);
   const recentQ = useRecentlyViewedQuery(user?.id ?? null, 10);
 
@@ -460,16 +489,26 @@ export default function DiscoverScreen() {
     Keyboard.dismiss();
   }, []);
 
+  // Clear category browse entirely (category + subcategory + sort).
+  const clearCategory = useCallback(() => {
+    setActiveCat(null);
+    setActiveSub(null);
+    setSort(null);
+  }, []);
+
   const shopAll = useCallback(() => {
     setQuery('');
-    setActiveCat(null);
+    clearCategory();
     setDigestSort(null);
     setSearchActive(false);
     Keyboard.dismiss();
-  }, []);
+  }, [clearCategory]);
 
   const pickCategory = useCallback((id: CatTile['id']) => {
     setActiveCat((cur) => (cur === id ? null : id));
+    // Switching category invalidates any subcategory/sort chosen under the old one.
+    setActiveSub(null);
+    setSort(null);
     setSearchActive(false);
     Keyboard.dismiss();
   }, []);
@@ -725,7 +764,7 @@ export default function DiscoverScreen() {
               Browse by category
             </Text>
             {activeCat && (
-              <Pressable hitSlop={HIT_SLOP_8} onPress={() => setActiveCat(null)}>
+              <Pressable hitSlop={HIT_SLOP_8} onPress={clearCategory}>
                 <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.purple }}>Clear</Text>
               </Pressable>
             )}
@@ -919,13 +958,87 @@ export default function DiscoverScreen() {
           }}
         >
           {browseCat && !hasQuery ? (
-            // Category browse — give the user a way back out (the category tiles
-            // now live in the search landing, so the grid owns the Clear).
-            <SectionHeader
-              title={`In ${CATEGORY_TILES.find((c) => c.id === browseCat)?.label}`}
-              count={results.length}
-              action={{ label: 'Clear', onPress: () => setActiveCat(null) }}
-            />
+            // Category browse — subcategory chips + sort refine the grid; the
+            // header owns the Clear back out to the full catalog.
+            <>
+              <SectionHeader
+                title={
+                  activeSub
+                    ? subcategoryLabel(browseCat, activeSub)
+                    : `In ${CATEGORY_TILES.find((c) => c.id === browseCat)?.label}`
+                }
+                count={results.length}
+                action={{ label: 'Clear', onPress: clearCategory }}
+              />
+
+              {/* Subcategory chips */}
+              {browseSubs.length > 0 ? (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingTop: 4, paddingBottom: 8 }}
+                >
+                  {[{ id: null as string | null, label: 'All' }, ...browseSubs].map((s) => {
+                    const on = activeSub === s.id;
+                    return (
+                      <Pressable
+                        key={s.id ?? '__all'}
+                        onPress={() => setActiveSub(on ? null : s.id)}
+                        style={({ pressed }) => ({
+                          paddingHorizontal: 14,
+                          paddingVertical: 8,
+                          borderRadius: 999,
+                          backgroundColor: on ? colors.purple : colors.panel,
+                          transform: [{ scale: pressed ? 0.96 : 1 }],
+                        })}
+                      >
+                        <Text style={{ fontSize: 12.5, fontWeight: '700', color: on ? colors.white : colors.ink }}>
+                          {s.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              ) : null}
+
+              {/* Sort */}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingBottom: 12, alignItems: 'center' }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginRight: 2 }}>
+                  <Feather name="sliders" size={12} color={colors.muteSoft} />
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.muteSoft, letterSpacing: 0.4 }}>
+                    SORT
+                  </Text>
+                </View>
+                {SORT_OPTIONS.map((o) => {
+                  const on = (sort ?? 'popular') === o.id;
+                  return (
+                    <Pressable
+                      key={o.id}
+                      onPress={() => setSort(o.id)}
+                      style={({ pressed }) => ({
+                        paddingHorizontal: 12,
+                        paddingVertical: 7,
+                        borderRadius: 999,
+                        borderWidth: 1,
+                        borderColor: on ? colors.purple : colors.hair,
+                        backgroundColor: on ? colors.purpleSoft : colors.white,
+                        transform: [{ scale: pressed ? 0.96 : 1 }],
+                      })}
+                    >
+                      <Text style={{ fontSize: 12.5, fontWeight: '700', color: on ? colors.purple : colors.ink }}>
+                        {o.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </>
           ) : idle && digestSort ? (
             <SectionHeader
               title={idleGridTitle}

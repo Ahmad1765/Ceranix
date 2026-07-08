@@ -13,11 +13,15 @@ const SELECT_WITH_SELLER = '*, seller:profiles!listings_seller_id_fkey(*)';
 // the DB query itself runs in <1ms (verified). Inner join so vacation_mode
 // filter applies; every listing has a seller so no rows are lost.
 const FEED_LISTING_COLS =
-  'id, seller_id, title, brand, size, price, category, gender, condition, images, is_sold, likes, tags, created_at';
+  'id, seller_id, title, brand, size, price, category, subcategory, gender, condition, images, is_sold, likes, tags, created_at';
 const FEED_SELLER_COLS = 'id, username, full_name, avatar_url, is_verified, vacation_mode';
 const SELECT_FEED = `${FEED_LISTING_COLS}, seller:profiles!listings_seller_id_fkey!inner(${FEED_SELLER_COLS})`;
 
 export type FeedTab = 'for_you' | 'popular';
+
+// Sort options surfaced in Discover's category browse. When omitted, ordering
+// falls back to the tab default (popular → likes, otherwise newest).
+export type SortKey = 'newest' | 'price_asc' | 'price_desc' | 'popular';
 
 // Discriminated result: ok=false means the network/client wedged, the timeout
 // fired, or PostgREST returned an error — caller should preserve whatever
@@ -27,19 +31,32 @@ export type FeedTab = 'for_you' | 'popular';
 export type FetchListingsResult = { ok: true; rows: Listing[] } | { ok: false };
 
 export async function fetchListingsResult(
-  opts: { tab?: FeedTab; limit?: number; offset?: number; category?: string | null } = {},
+  opts: {
+    tab?: FeedTab;
+    limit?: number;
+    offset?: number;
+    category?: string | null;
+    subcategory?: string | null;
+    sort?: SortKey | null;
+  } = {},
 ): Promise<FetchListingsResult> {
-  const { tab = 'for_you', limit = 60, offset = 0, category = null } = opts;
+  const { tab = 'for_you', limit = 60, offset = 0, category = null, subcategory = null, sort = null } = opts;
   let query = supabase
     .from('listings')
     .select(SELECT_FEED)
     .eq('is_sold', false)
     .eq('seller.vacation_mode', false);
   if (category) query = query.eq('category', category);
+  if (subcategory) query = query.eq('subcategory', subcategory);
 
-  if (tab === 'popular') {
+  if (sort === 'price_asc') {
+    query = query.order('price', { ascending: true }).order('created_at', { ascending: false });
+  } else if (sort === 'price_desc') {
+    query = query.order('price', { ascending: false }).order('created_at', { ascending: false });
+  } else if (sort === 'popular' || (!sort && tab === 'popular')) {
     query = query.order('likes', { ascending: false }).order('created_at', { ascending: false });
   } else {
+    // 'newest' or the for_you default.
     query = query.order('created_at', { ascending: false });
   }
   if (offset > 0) {
@@ -86,7 +103,13 @@ export async function fetchListingsResult(
 // failure mode and just wants "whatever rows we got, or []". The home feed
 // uses fetchListingsResult directly so it can tell a wedge from an empty feed.
 export async function fetchListings(
-  opts: { tab?: FeedTab; limit?: number; category?: string | null } = {},
+  opts: {
+    tab?: FeedTab;
+    limit?: number;
+    category?: string | null;
+    subcategory?: string | null;
+    sort?: SortKey | null;
+  } = {},
 ): Promise<Listing[]> {
   const r = await fetchListingsResult(opts);
   return r.ok ? r.rows : [];
@@ -141,9 +164,10 @@ export async function fetchFollowingListingsResult(
 export async function searchListings(opts: {
   query: string;
   category?: string | null;
+  subcategory?: string | null;
   limit?: number;
 }): Promise<FetchListingsResult> {
-  const { query, category = null, limit = 60 } = opts;
+  const { query, category = null, subcategory = null, limit = 60 } = opts;
   const raw = query.trim();
   if (!raw) return { ok: true, rows: [] };
   // Neutralize PostgREST or() delimiters + escape LIKE wildcards (see lib/search).
@@ -158,6 +182,7 @@ export async function searchListings(opts: {
       .eq('seller.vacation_mode', false)
       .or(`title.ilike.%${safe}%,brand.ilike.%${safe}%,description.ilike.%${safe}%,tags.cs.{${safe}}`);
     if (category) q = q.eq('category', category);
+    if (subcategory) q = q.eq('subcategory', subcategory);
     const { data, error } = await q
       .order('likes', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })

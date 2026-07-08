@@ -41,15 +41,9 @@ export const CONDITION_LABELS: Record<string, string> = {
   fair: 'Fair',
 };
 
-export const CATEGORY_LABELS: Record<string, string> = {
-  clothing: 'Clothing',
-  shoes: 'Shoes',
-  bags: 'Bags',
-  accessories: 'Accessories',
-  electronics: 'Electronics',
-  beauty: 'Beauty',
-  other: 'Other',
-};
+// Category labels now live in the single-source taxonomy (lib/categories).
+// Re-exported here so existing product-screen imports keep working.
+export { CATEGORY_LABELS } from '@/lib/categories';
 
 export const ITEM_COLOR = { name: 'Carrinex purple', hex: '#6C47FF' };
 

@@ -55,7 +55,6 @@ import {
   width,
   IMAGE_HEIGHT,
   CONDITION_LABELS,
-  CATEGORY_LABELS,
   ITEM_COLOR,
   BRAND_PURPLE,
   BRAND_PURPLE_SOFT,
@@ -71,6 +70,7 @@ import {
   CARD_GAP,
   CARD_OUTER_PAD,
 } from '@/components/product/shared';
+import { categoryLabel, subcategoryLabel } from '@/lib/categories';
 
 const AnimatedExpoImage = Animated.createAnimatedComponent(Image);
 
@@ -515,11 +515,15 @@ export default function ProductScreen() {
     : (liked && !userLikedOnServer ? 1 : (!liked && userLikedOnServer ? -1 : 0));
   const heartCount = Math.max(0, baseLikes + heartDelta);
   const isOwnListing = !!user?.id && listing.seller_id === user.id;
+  const catSubLabel = listing.subcategory
+    ? subcategoryLabel(listing.category, listing.subcategory)
+    : '';
 
   return (
     <View style={{ flex: 1, backgroundColor: 'white' }}>
-      {/* Status-bar mode flips when sticky header takes over */}
-      <StatusBar style={showStickyHeader ? 'dark' : 'light'} animated />
+      {/* Product photos skew light (matte on white), so dark status-bar icons
+          stay legible over both the hero and the sticky header. */}
+      <StatusBar style="dark" animated />
 
       {/* Sticky header */}
       {showStickyHeader && (
@@ -552,6 +556,11 @@ export default function ProductScreen() {
         contentContainerStyle={{ paddingBottom: 120 }}
         onScroll={scrollHandler}
         scrollEventThrottle={16}
+        // Let the hero photo bleed all the way to the top edge, under the
+        // status bar / notch. Without this, iOS auto-insets the first scroll
+        // view by the safe-area top and drops a white gap above the image.
+        contentInsetAdjustmentBehavior="never"
+        automaticallyAdjustContentInsets={false}
       >
         {/* ── Image carousel (full-bleed to top, Plick style) ── */}
         <View style={{ position: 'relative' }}>
@@ -719,34 +728,34 @@ export default function ProductScreen() {
           >
             <View style={{ flex: 1, paddingRight: 14 }}>
               {heartCount > 0 && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6, gap: 6 }}>
-                <Feather name="heart" size={13} color="rgba(15,15,15,0.62)" />
-                <Text style={{ fontSize: 13, color: 'rgba(15,15,15,0.62)' }}>
-                  Liked by <Text style={{ fontWeight: '700', color: BRAND_INK }}>{heartCount} {heartCount === 1 ? 'person' : 'people'}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 6 }}>
+                <Feather name="heart" size={12} color="rgba(15,15,15,0.45)" />
+                <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.55)', fontFamily: 'Inter_500Medium' }}>
+                  Liked by <Text style={{ fontFamily: 'Inter_700Bold', color: BRAND_INK }}>{heartCount} {heartCount === 1 ? 'person' : 'people'}</Text>
                 </Text>
               </View>
               )}
               <Text
                 style={{
-                  fontSize: 28,
-                  fontWeight: '900',
+                  fontSize: 30,
+                  fontFamily: 'Fraunces_700Bold',
                   color: BRAND_INK,
-                  lineHeight: 32,
-                  letterSpacing: -0.6,
+                  lineHeight: 34,
+                  letterSpacing: -0.5,
                 }}
               >
                 {listing.title}
               </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: 8, gap: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: 10, gap: 8 }}>
                 <View
                   style={{
                     backgroundColor: 'rgba(15,15,15,0.04)',
                     borderRadius: 999,
-                    paddingHorizontal: 10,
-                    paddingVertical: 4,
+                    paddingHorizontal: 11,
+                    paddingVertical: 5,
                   }}
                 >
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: BRAND_INK }}>
+                  <Text style={{ fontSize: 12, fontFamily: 'Inter_600SemiBold', color: BRAND_INK, letterSpacing: 0.1 }}>
                     Size {listing.size}
                   </Text>
                 </View>
@@ -757,19 +766,19 @@ export default function ProductScreen() {
                     style={{
                       backgroundColor: BRAND_PURPLE_SOFT,
                       borderRadius: 999,
-                      paddingHorizontal: 10,
-                      paddingVertical: 4,
+                      paddingHorizontal: 11,
+                      paddingVertical: 5,
                     }}
                   >
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: BRAND_PURPLE }}>
+                    <Text style={{ fontSize: 12, fontFamily: 'Inter_600SemiBold', color: BRAND_PURPLE, letterSpacing: 0.1 }}>
                       {conditionLabel(listing.condition)}
                     </Text>
                   </View>
                 ) : null}
                 {listing.seller?.location ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Feather name="map-pin" size={11} color="rgba(15,15,15,0.62)" />
-                    <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.62)' }} numberOfLines={1}>
+                    <Feather name="map-pin" size={11} color="rgba(15,15,15,0.45)" />
+                    <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.55)', fontFamily: 'Inter_500Medium' }} numberOfLines={1}>
                       {listing.seller.location}
                     </Text>
                   </View>
@@ -779,11 +788,11 @@ export default function ProductScreen() {
             <View style={{ alignItems: 'flex-end' }}>
               <Text
                 style={{
-                  fontSize: 28,
-                  fontWeight: '900',
+                  fontSize: 26,
+                  fontFamily: 'Fraunces_700Bold',
                   color: BRAND_INK,
-                  lineHeight: 32,
-                  letterSpacing: -0.6,
+                  lineHeight: 30,
+                  letterSpacing: -0.5,
                 }}
               >
                 ${listing.price}
@@ -1116,19 +1125,81 @@ export default function ProductScreen() {
               </Pressable>
             </View>
 
+            {/* Category breadcrumb — category ▸ subcategory, each segment
+                searchable (taps into Discover filtered at that level). */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 18,
+                paddingVertical: 14,
+                borderTopWidth: HAIRLINE,
+                borderTopColor: 'rgba(15,15,15,0.08)',
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: 'Inter_700Bold',
+                  fontSize: 15,
+                  color: BRAND_INK,
+                  letterSpacing: 0.1,
+                  marginRight: 12,
+                }}
+              >
+                Category
+              </Text>
+              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                <Pressable
+                  onPress={() => {
+                    tap('selection');
+                    router.push(`/(tabs)/discover?category=${encodeURIComponent(listing.category)}` as any);
+                  }}
+                  style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+                >
+                  <Text style={{ fontFamily: 'Fraunces_400Regular', fontSize: 16, color: BRAND_INK }}>
+                    {categoryLabel(listing.category)}
+                  </Text>
+                </Pressable>
+                {catSubLabel ? (
+                  <>
+                    <Feather
+                      name="chevron-right"
+                      size={14}
+                      color="rgba(15,15,15,0.30)"
+                      style={{ marginHorizontal: 3 }}
+                    />
+                    <Pressable
+                      onPress={() => {
+                        tap('selection');
+                        router.push(
+                          `/(tabs)/discover?category=${encodeURIComponent(listing.category)}&sub=${encodeURIComponent(listing.subcategory!)}` as any,
+                        );
+                      }}
+                      style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+                    >
+                      <Text style={{ fontFamily: 'Fraunces_400Regular', fontSize: 16, color: BRAND_INK }}>
+                        {catSubLabel}
+                      </Text>
+                    </Pressable>
+                  </>
+                ) : null}
+              </View>
+              <Feather name="search" size={17} color={BRAND_PURPLE} />
+            </View>
+
             {/* Details rows */}
             {[
               {
-                label: 'Category',
-                value: CATEGORY_LABELS[listing.category] ?? listing.category,
-                onPress: () => {},
-                trailing: <Feather name="arrow-up-right" size={20} color={BRAND_INK} />,
-              },
-              {
                 label: 'Brand',
                 value: listing.brand,
-                onPress: () => {},
-                trailing: <Feather name="arrow-up-right" size={20} color={BRAND_INK} />,
+                // Tap to search Discover for other items from this brand.
+                onPress: listing.brand
+                  ? () => {
+                      tap('selection');
+                      router.push(`/(tabs)/discover?q=${encodeURIComponent(listing.brand!)}` as any);
+                    }
+                  : undefined,
+                trailing: listing.brand ? <Feather name="search" size={17} color={BRAND_PURPLE} /> : undefined,
               },
               {
                 label: 'Size',
@@ -1138,7 +1209,7 @@ export default function ProductScreen() {
                 label: 'Condition',
                 value: CONDITION_LABELS[listing.condition] ?? listing.condition,
                 onPress: () => Alert.alert('Condition info', 'Details about condition grading'),
-                trailing: <Feather name="arrow-up-right" size={20} color={BRAND_INK} />,
+                trailing: <Feather name="info" size={17} color="rgba(15,15,15,0.45)" />,
               },
               {
                 label: 'Color',

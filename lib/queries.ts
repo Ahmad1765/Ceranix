@@ -19,6 +19,7 @@ import {
   fetchSimilarListings,
   fetchUserListings,
   type FeedTab,
+  type SortKey,
 } from '@/lib/listings';
 import { fetchRecommendations, fetchRecentlyViewed } from '@/lib/recommendations';
 import { fetchNewFromFollowed, fetchPriceDrops, type PriceDropListing } from '@/lib/myFeed';
@@ -69,8 +70,12 @@ export const qk = {
   userListings: (id: string) => ['userListings', id] as const,
   followState: (viewerId: string | null, targetId: string) =>
     ['followState', viewerId, targetId] as const,
-  feedListings: (tab: FeedTab, category: string | null) =>
-    ['feedListings', tab, category] as const,
+  feedListings: (
+    tab: FeedTab,
+    category: string | null,
+    subcategory: string | null,
+    sort: SortKey | null,
+  ) => ['feedListings', tab, category, subcategory, sort] as const,
   recommendations: (userId: string | null) => ['recommendations', userId] as const,
   recentlyViewed: (userId: string | null) => ['recentlyViewed', userId] as const,
   homeFeed: (tab: HomeFeedTab, userId: string | null) =>
@@ -320,14 +325,16 @@ export function useHomeFeedQuery(tab: HomeFeedTab, userId: string | null) {
 export function useFeedListingsQuery(opts: {
   tab: FeedTab;
   category?: string | null;
+  subcategory?: string | null;
+  sort?: SortKey | null;
   limit?: number;
   enabled?: boolean;
 }) {
-  const { tab, category = null, limit = 60, enabled = true } = opts;
+  const { tab, category = null, subcategory = null, sort = null, limit = 60, enabled = true } = opts;
   return useQuery({
-    queryKey: qk.feedListings(tab, category),
+    queryKey: qk.feedListings(tab, category, subcategory, sort),
     enabled,
-    queryFn: (): Promise<Listing[]> => fetchListings({ tab, category, limit }),
+    queryFn: (): Promise<Listing[]> => fetchListings({ tab, category, subcategory, sort, limit }),
   });
 }
 
