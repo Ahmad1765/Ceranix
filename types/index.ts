@@ -104,6 +104,8 @@ export interface Listing {
   gender: Gender;
   brand: string | null;
   size: string | null;
+  // Optional colour slug from lib/itemColors. Null on legacy rows.
+  color?: string | null;
   condition: Condition;
   images: string[];
   is_sold: boolean;

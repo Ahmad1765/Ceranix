@@ -33,6 +33,8 @@ import { emitListingCreated } from '@/lib/listingEvents';
 import { invalidateFresh } from '@/lib/freshness';
 import type { Category, Condition, Gender, Listing } from '@/types';
 import { CATEGORIES, hasSubcategories, suggestSubcategory } from '@/lib/categories';
+import { ITEM_COLORS } from '@/lib/itemColors';
+import { ColorSwatch } from '@/components/ColorSwatch';
 
 type Step = 'photos' | 'details';
 
@@ -104,6 +106,7 @@ function SellScreenInner() {
   const [category, setCategory] = useState<Category>('clothing');
   const [subcategory, setSubcategory] = useState<string | null>(null);
   const [subQuery, setSubQuery] = useState('');
+  const [color, setColor] = useState<string | null>(null);
   const [gender, setGender] = useState<Gender>('women');
 
   // Pick a category and clear any subcategory chosen under the previous one.
@@ -181,6 +184,7 @@ function SellScreenInner() {
     setCategory('clothing');
     setSubcategory(null);
     setSubQuery('');
+    setColor(null);
     setGender('women');
     setTags([]);
     setTagDraft('');
@@ -232,6 +236,7 @@ function SellScreenInner() {
           price: priceNum,
           category,
           subcategory: subcategory || null,
+          color: color || null,
           gender,
           brand: brand.trim() || null,
           size: size.trim() || null,
@@ -276,6 +281,7 @@ function SellScreenInner() {
         price: priceNum,
         category,
         subcategory: subcategory || null,
+        color: color || null,
         gender,
         brand: brand.trim() || null,
         size: size.trim() || null,
@@ -933,6 +939,39 @@ function SellScreenInner() {
                     >
                       {g.label}
                     </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Section: Color */}
+          <View style={{ marginTop: 32 }}>
+            <Eyebrow>
+              {color ? `Color · ${ITEM_COLORS.find((c) => c.id === color)?.label}` : 'Color'}
+            </Eyebrow>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+              {ITEM_COLORS.map((c) => {
+                const active = color === c.id;
+                return (
+                  <Pressable
+                    key={c.id}
+                    onPress={() => setColor(active ? null : c.id)}
+                    accessibilityRole="button"
+                    accessibilityLabel={c.label}
+                    accessibilityState={{ selected: active }}
+                    style={({ pressed }) => ({
+                      width: 40,
+                      height: 40,
+                      borderRadius: 20,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: active ? 2 : 1,
+                      borderColor: active ? '#6C47FF' : 'rgba(15,15,15,0.10)',
+                      transform: [{ scale: pressed ? 0.94 : 1 }],
+                    })}
+                  >
+                    <ColorSwatch colorId={c.id} size={26} />
                   </Pressable>
                 );
               })}

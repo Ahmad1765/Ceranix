@@ -5,6 +5,7 @@ import {
   Text,
   Pressable,
   Alert,
+  Share,
   StyleSheet,
 } from 'react-native';
 import { Image } from 'expo-image';
@@ -55,14 +56,12 @@ import {
   width,
   IMAGE_HEIGHT,
   CONDITION_LABELS,
-  ITEM_COLOR,
   BRAND_PURPLE,
   BRAND_PURPLE_SOFT,
   BRAND_LIME,
   BRAND_INK,
   TAG_BG,
   TAG_BORDER,
-  LINK_PURPLE,
   FALLBACK_SELLER,
   EMPTY_LISTINGS,
   conditionLabel,
@@ -71,6 +70,10 @@ import {
   CARD_OUTER_PAD,
 } from '@/components/product/shared';
 import { categoryLabel, subcategoryLabel } from '@/lib/categories';
+import { itemColorLabel } from '@/lib/itemColors';
+import { ColorSwatch } from '@/components/ColorSwatch';
+import { BRAND, APP_URL } from '@/lib/brand';
+import { reportListing, REPORT_REASONS } from '@/lib/reports';
 
 const AnimatedExpoImage = Animated.createAnimatedComponent(Image);
 
@@ -408,6 +411,52 @@ export default function ProductScreen() {
       pathname: '/conversation/new',
       params: { listing: listing.id, mode },
     } as any);
+  };
+
+  const shareListing = async () => {
+    if (!listing) return;
+    tap('light');
+    try {
+      const url = `${APP_URL}/product/${listing.id}`;
+      await Share.share({
+        message: `${listing.title} · $${listing.price} on ${BRAND}\n${url}`,
+        url,
+      });
+    } catch {
+      // user dismissed the share sheet — nothing to report
+    }
+  };
+
+  const handleReport = () => {
+    tap('selection');
+    if (!user) {
+      toast.show('Sign in to report a listing', { variant: 'info', icon: 'log-in' });
+      router.push('/auth/login');
+      return;
+    }
+    if (!listing) return;
+    if (listing.seller_id === user.id) {
+      toast.show("You can't report your own listing", { variant: 'default', icon: 'info' });
+      return;
+    }
+    Alert.alert('Report listing', 'Why are you reporting this item?', [
+      ...REPORT_REASONS.map((r) => ({
+        text: r.label,
+        onPress: async () => {
+          const ok = await reportListing({
+            listingId: listing.id,
+            reporterId: user.id,
+            reportedUserId: listing.seller_id,
+            reason: r.id,
+          });
+          toast.show(ok ? 'Thanks — our team will review this.' : "Couldn't submit report", {
+            variant: ok ? 'success' : 'default',
+            icon: ok ? 'check' : 'alert-triangle',
+          });
+        },
+      })),
+      { text: 'Cancel', style: 'cancel' as const },
+    ]);
   };
 
   const sharedTagId = productIdParam ?? listing?.id ?? '';
@@ -1104,25 +1153,6 @@ export default function ProductScreen() {
               >
                 {listing.description}
               </Text>
-              <Pressable
-                onPress={() => Alert.alert('Translation')}
-                style={({ pressed }) => ({
-                  marginTop: 14,
-                  alignSelf: 'flex-start',
-                  opacity: pressed ? 0.6 : 1,
-                })}
-              >
-                <Text
-                  style={{
-                    fontSize: 14,
-                    color: LINK_PURPLE,
-                    fontFamily: 'Inter_600SemiBold',
-                    letterSpacing: 0.1,
-                  }}
-                >
-                  Show translation
-                </Text>
-              </Pressable>
             </View>
 
             {/* Category breadcrumb — category ▸ subcategory, each segment
@@ -1208,34 +1238,26 @@ export default function ProductScreen() {
               {
                 label: 'Condition',
                 value: CONDITION_LABELS[listing.condition] ?? listing.condition,
-                onPress: () => Alert.alert('Condition info', 'Details about condition grading'),
+                onPress: () =>
+                  Alert.alert(
+                    'Condition guide',
+                    'New with tags — Unworn, original tags still attached\n\n' +
+                      'Like new — Worn once or twice, no visible flaws\n\n' +
+                      'Very good — Gently used, only minor signs of wear\n\n' +
+                      'Fair — Noticeable wear, but still fully wearable',
+                  ),
                 trailing: <Feather name="info" size={17} color="rgba(15,15,15,0.45)" />,
               },
-              {
-                label: 'Color',
-                value: ITEM_COLOR.name,
-                trailing: (
-                  <View
-                    style={{
-                      width: 18,
-                      height: 18,
-                      borderRadius: 9,
-                      padding: 2,
-                      backgroundColor: 'white',
-                      borderWidth: HAIRLINE,
-                      borderColor: 'rgba(15,15,15,0.08)',
-                    }}
-                  >
-                    <View
-                      style={{
-                        flex: 1,
-                        borderRadius: 7,
-                        backgroundColor: ITEM_COLOR.hex,
-                      }}
-                    />
-                  </View>
-                ),
-              },
+              // Only shown when the seller set a real colour (legacy rows omit it).
+              ...(listing.color
+                ? [
+                    {
+                      label: 'Color',
+                      value: itemColorLabel(listing.color),
+                      trailing: <ColorSwatch colorId={listing.color} size={18} />,
+                    },
+                  ]
+                : []),
             ].map((row) => {
               return (
                 <Pressable
@@ -1306,7 +1328,9 @@ export default function ProductScreen() {
             }}
           >
             <Pressable
-              onPress={() => Alert.alert('Share')}
+              onPress={shareListing}
+              accessibilityRole="button"
+              accessibilityLabel="Share this listing"
               style={({ pressed }) => ({
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -1328,7 +1352,9 @@ export default function ProductScreen() {
               </Text>
             </Pressable>
             <Pressable
-              onPress={() => Alert.alert('Report')}
+              onPress={handleReport}
+              accessibilityRole="button"
+              accessibilityLabel="Report this listing"
               style={({ pressed }) => ({
                 flexDirection: 'row',
                 alignItems: 'center',

@@ -73,6 +73,7 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
   const [pwFocused, setPwFocused] = useState(false);
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
   const stepAnim = useRef(new Animated.Value(0)).current;
   const switchAnim = useRef(new Animated.Value(mode === 'signin' ? 0 : 1)).current;
@@ -102,21 +103,23 @@ export default function LoginScreen() {
     outputRange: [welcomeHeight, formHeight],
   });
 
-  const validate = (): string | null => {
-    if (!email) return 'Email is required';
-    if (!EMAIL_RE.test(email.trim())) return 'Enter a valid email';
-    if (!password) return 'Password is required';
-    if (password.length < 8) return 'Password must be at least 8 characters';
-    return null;
+  const validate = (): { email?: string; password?: string } => {
+    const next: { email?: string; password?: string } = {};
+    if (!email) next.email = 'Email is required';
+    else if (!EMAIL_RE.test(email.trim())) next.email = 'Enter a valid email';
+    if (!password) next.password = 'Password is required';
+    else if (password.length < 8) next.password = 'Password must be at least 8 characters';
+    return next;
   };
 
   const handleSubmit = async () => {
-    const err = validate();
-    if (err) {
+    const next = validate();
+    if (next.email || next.password) {
       tap('medium');
-      Alert.alert('Check your input', err);
+      setErrors(next);
       return;
     }
+    setErrors({});
     tap('medium');
     setLoading(true);
     try {
@@ -147,9 +150,38 @@ export default function LoginScreen() {
         }
       }
     } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Authentication failed');
+      const raw = e?.message ?? '';
+      const friendly = /invalid login/i.test(raw)
+        ? 'Wrong email or password'
+        : /email not confirmed/i.test(raw)
+          ? 'Confirm your email first, then sign in'
+          : /already registered|already exists/i.test(raw)
+            ? 'That email already has an account — try signing in'
+            : raw || 'Something went wrong. Please try again.';
+      toast.show(friendly, { variant: 'default', icon: 'alert-triangle' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleForgot = async () => {
+    tap('light');
+    if (!EMAIL_RE.test(email.trim())) {
+      toast.show('Enter your email above first', { variant: 'info', icon: 'mail' });
+      return;
+    }
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+      if (error) throw error;
+      toast.show('Password reset link sent — check your inbox', {
+        variant: 'success',
+        icon: 'check',
+      });
+    } catch (e: any) {
+      toast.show(e?.message ?? 'Could not send reset email', {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
     }
   };
 
@@ -464,15 +496,21 @@ export default function LoginScreen() {
                 />
 
                 <View style={{ marginTop: 22 }}>
-                  <Field label="Email" icon="mail" focused={emailFocused}>
+                  <Field label="Email" icon="mail" focused={emailFocused} error={errors.email}>
                     <TextInput
                       placeholder="you@example.com"
                       placeholderTextColor={colors.muteSoft}
                       keyboardType="email-address"
                       autoCapitalize="none"
                       autoCorrect={false}
+                      autoComplete="email"
+                      textContentType="emailAddress"
+                      accessibilityLabel="Email address"
                       value={email}
-                      onChangeText={setEmail}
+                      onChangeText={(t) => {
+                        setEmail(t);
+                        if (errors.email) setErrors((e) => ({ ...e, email: undefined }));
+                      }}
                       onFocus={() => setEmailFocused(true)}
                       onBlur={() => setEmailFocused(false)}
                       style={{
@@ -486,17 +524,23 @@ export default function LoginScreen() {
                     />
                   </Field>
 
-                  <Field label="Password" icon="lock" focused={pwFocused}>
+                  <Field label="Password" icon="lock" focused={pwFocused} error={errors.password}>
                     <View
                       style={{ flexDirection: 'row', alignItems: 'center' }}
                     >
                       <TextInput
-                        placeholder="At least 6 characters"
+                        placeholder="At least 8 characters"
                         placeholderTextColor={colors.muteSoft}
                         secureTextEntry={!showPw}
                         autoCapitalize="none"
+                        autoComplete={mode === 'signup' ? 'password-new' : 'password'}
+                        textContentType={mode === 'signup' ? 'newPassword' : 'password'}
+                        accessibilityLabel="Password"
                         value={password}
-                        onChangeText={setPassword}
+                        onChangeText={(t) => {
+                          setPassword(t);
+                          if (errors.password) setErrors((e) => ({ ...e, password: undefined }));
+                        }}
                         onFocus={() => setPwFocused(true)}
                         onBlur={() => setPwFocused(false)}
                         style={{
@@ -512,6 +556,8 @@ export default function LoginScreen() {
                       <Pressable
                         onPress={() => setShowPw((v) => !v)}
                         hitSlop={10}
+                        accessibilityRole="button"
+                        accessibilityLabel={showPw ? 'Hide password' : 'Show password'}
                         style={{ marginLeft: 8 }}
                       >
                         <Feather
@@ -522,6 +568,25 @@ export default function LoginScreen() {
                       </Pressable>
                     </View>
                   </Field>
+
+                  {mode === 'signin' && (
+                    <Pressable
+                      onPress={handleForgot}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel="Reset your password"
+                      style={({ pressed }) => ({
+                        alignSelf: 'flex-end',
+                        paddingVertical: 4,
+                        marginTop: -2,
+                        opacity: pressed ? 0.6 : 1,
+                      })}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>
+                        Forgot password?
+                      </Text>
+                    </Pressable>
+                  )}
                 </View>
 
                 <PressableScale
@@ -584,7 +649,7 @@ export default function LoginScreen() {
                 >
                   {mode === 'signup'
                     ? 'By creating an account you agree to our Terms and Privacy.'
-                    : 'Forgot your password? Reach out to support — we’ll help.'}
+                    : 'By continuing you agree to our Terms and Privacy.'}
                 </Text>
               </View>
             )}
@@ -694,19 +759,23 @@ function Field({
   icon,
   children,
   focused,
+  error,
 }: {
   label: string;
   icon: keyof typeof Feather.glyphMap;
   children: React.ReactNode;
   focused: boolean;
+  error?: string;
 }) {
+  const DANGER = '#E5484D';
+  const borderColor = error ? DANGER : focused ? colors.primary : colors.hairline;
   return (
     <View style={{ marginBottom: 14 }}>
       <Text
         style={{
           fontSize: 11,
           fontWeight: '700',
-          color: focused ? colors.ink : colors.mute,
+          color: error ? DANGER : focused ? colors.ink : colors.mute,
           letterSpacing: 1.2,
           textTransform: 'uppercase',
           marginBottom: 8,
@@ -723,17 +792,23 @@ function Field({
           height: 56,
           borderRadius: 18,
           backgroundColor: colors.white,
-          borderWidth: focused ? 2 : 1,
-          borderColor: focused ? colors.primary : colors.hairline,
+          borderWidth: error || focused ? 2 : 1,
+          borderColor,
         }}
       >
         <Feather
           name={icon}
           size={18}
-          color={focused ? colors.primary : colors.mute}
+          color={error ? DANGER : focused ? colors.primary : colors.mute}
         />
         <View style={{ flex: 1, marginLeft: 12 }}>{children}</View>
       </View>
+      {error ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6, marginLeft: 4 }}>
+          <Feather name="alert-circle" size={12} color={DANGER} />
+          <Text style={{ fontSize: 12.5, color: DANGER, fontWeight: '600' }}>{error}</Text>
+        </View>
+      ) : null}
     </View>
   );
 }

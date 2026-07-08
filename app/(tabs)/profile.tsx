@@ -48,8 +48,7 @@ import {
   type Badge,
   type ProfileCompletion,
 } from '@/lib/levels';
-
-const APP_URL = 'https://carrinex.vercel.app';
+import { BRAND, APP_URL } from '@/lib/brand';
 
 type ProfileTab = 'selling' | 'liked' | 'shop' | 'collections';
 
@@ -229,7 +228,7 @@ const handleShareProfile = useCallback(async () => {
   const displayName = profile.username ? `@${profile.username}` : 'this seller';
   const url = `${APP_URL}/user/${profile.id}`;
   try {
-    const result = await Share.share({ message: `Check out ${displayName} on Carrinix\n${url}`, url });
+    const result = await Share.share({ message: `Check out ${displayName} on ${BRAND}\n${url}`, url });
     if (result.action === Share.sharedAction) {
       if (result.activityType) {
         // shared with activity type of result.activityType
