@@ -130,16 +130,32 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
     }
     if (saveBusy) return;
     savedInteractedRef.current = true;
+    const uid = user.id;
     const prev = saved;
     const next = !prev;
     setSaved(next);
     setSaveBusy(true);
     try {
-      const result = await toggleSave(listing.id, user.id, prev);
+      const result = await toggleSave(listing.id, uid, prev);
       if (result !== next) {
         setSaved(prev);
       } else if (next) {
-        toast.show('Saved', { variant: 'success', icon: 'bookmark' });
+        toast.show('Saved', {
+          variant: 'success',
+          icon: 'bookmark',
+          action: {
+            label: 'Undo',
+            onPress: async () => {
+              setSaved(false);
+              try {
+                await toggleSave(listing.id, uid, true);
+              } catch {
+                setSaved(true);
+                toast.show('Could not undo', { variant: 'default', icon: 'alert-triangle' });
+              }
+            },
+          },
+        });
       }
     } catch (error) {
       // Roll back and toast; do NOT re-throw — see handleToggleLike.

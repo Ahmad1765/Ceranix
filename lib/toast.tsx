@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { View, Text, Animated, Easing, Platform, StyleSheet } from 'react-native';
+import { View, Text, Pressable, Animated, Easing, Platform, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -16,15 +16,27 @@ import * as Haptics from 'expo-haptics';
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 type ToastVariant = 'default' | 'success' | 'info';
+type ToastAction = { label: string; onPress: () => void };
 type Toast = {
   id: number;
   message: string;
   variant: ToastVariant;
   icon?: keyof typeof Feather.glyphMap;
+  action?: ToastAction;
 };
 
 type ToastApi = {
-  show: (message: string, opts?: { variant?: ToastVariant; icon?: keyof typeof Feather.glyphMap; durationMs?: number }) => void;
+  show: (
+    message: string,
+    opts?: {
+      variant?: ToastVariant;
+      icon?: keyof typeof Feather.glyphMap;
+      durationMs?: number;
+      // Optional trailing button (e.g. "Undo"). Tapping it runs onPress and
+      // dismisses the toast. Toasts with an action linger longer by default.
+      action?: ToastAction;
+    },
+  ) => void;
 };
 
 const ToastContext = createContext<ToastApi | undefined>(undefined);
@@ -91,7 +103,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       const id = ++counter.current;
       const variant = opts?.variant ?? 'default';
       const icon = opts?.icon;
-      const duration = opts?.durationMs ?? 1800;
+      const action = opts?.action;
+      // Actionable toasts linger so the user has time to hit the button.
+      const duration = opts?.durationMs ?? (action ? 4200 : 1800);
 
       if (dismissTimer.current) clearTimeout(dismissTimer.current);
 
@@ -99,7 +113,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
 
-      setToast({ id, message, variant, icon });
+      setToast({ id, message, variant, icon, action });
       setVisible(true);
 
       // If a toast is already on screen, jump-replace (skip slide-out)
@@ -117,6 +131,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     },
     [animateIn, animateOut],
   );
+
+  const dismiss = useCallback(() => {
+    if (dismissTimer.current) clearTimeout(dismissTimer.current);
+    animateOut(() => {
+      setVisible(false);
+      setToast(null);
+    });
+  }, [animateOut]);
 
   useEffect(() => {
     return () => {
@@ -139,7 +161,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             zIndex: 10000,
             transform: [{ translateY }],
             opacity,
-            pointerEvents: 'none',
+            // Let the action button receive taps; the rest stays pass-through.
+            pointerEvents: toast.action ? 'box-none' : 'none',
           }}
         >
           <View
@@ -176,7 +199,29 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             >
               {toast.message}
             </Text>
-            {toast.icon && (
+            {toast.action ? (
+              <Pressable
+                onPress={() => {
+                  toast.action?.onPress();
+                  dismiss();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={toast.action.label}
+                hitSlop={8}
+                style={({ pressed }) => ({
+                  marginLeft: 10,
+                  paddingHorizontal: 14,
+                  paddingVertical: 9,
+                  borderRadius: 10,
+                  backgroundColor: PURPLE,
+                  opacity: pressed ? 0.75 : 1,
+                })}
+              >
+                <Text style={{ color: 'white', fontSize: 13, fontWeight: '800', letterSpacing: 0.2 }}>
+                  {toast.action.label}
+                </Text>
+              </Pressable>
+            ) : toast.icon ? (
               <View
                 style={{
                   width: 36,
@@ -190,7 +235,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               >
                 <Feather name={toast.icon} size={16} color={v.accentFg as string} />
               </View>
-            )}
+            ) : null}
           </View>
         </Animated.View>
       )}

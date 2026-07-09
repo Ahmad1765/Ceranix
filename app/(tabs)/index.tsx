@@ -244,7 +244,22 @@ export default function HomeScreen() {
         const next = await toggleFollow(user.id, suggestedId, already);
         setFollowingState((prev) => ({ ...prev, [suggestedId]: next.isFollowing }));
         if (next.isFollowing) {
-          toast.show(`Following @${username}`, { variant: 'info', icon: 'user-check' });
+          toast.show(`Following @${username}`, {
+            variant: 'info',
+            icon: 'user-check',
+            action: {
+              label: 'Undo',
+              onPress: async () => {
+                setFollowingState((prev) => ({ ...prev, [suggestedId]: false }));
+                try {
+                  await toggleFollow(user.id, suggestedId, true);
+                } catch {
+                  setFollowingState((prev) => ({ ...prev, [suggestedId]: true }));
+                  toast.show('Could not undo', { variant: 'default', icon: 'alert-triangle' });
+                }
+              },
+            },
+          });
           // Invalidate the Following feed so the next visit refetches with the
           // newly-followed seller's listings.
           queryClient.invalidateQueries({ queryKey: qk.homeFeed('following', user.id) });

@@ -292,7 +292,22 @@ export default function ProductScreen() {
       const next = await toggleLike(productIdParam, user.id, originalLiked);
       setLiked(next);
       if (next) {
-        toast.show('Added to your favorites', { variant: 'success', icon: 'heart' });
+        toast.show('Added to your favorites', {
+          variant: 'success',
+          icon: 'heart',
+          action: {
+            label: 'Undo',
+            onPress: async () => {
+              setLiked(false);
+              try {
+                await toggleLike(productIdParam, user.id, true);
+              } catch {
+                setLiked(true);
+                toast.show('Could not undo', { variant: 'default', icon: 'alert-triangle' });
+              }
+            },
+          },
+        });
         capture('listing_liked', { listing_id: productIdParam });
       }
     } catch {
@@ -378,10 +393,28 @@ export default function ProductScreen() {
     try {
       const next = await toggleFollow(user.id, sellerId, followed);
       setFollowed(next.isFollowing);
-      if (next.isFollowing) capture('seller_followed', { seller_id: sellerId });
+      const nowFollowing = next.isFollowing;
+      if (nowFollowing) capture('seller_followed', { seller_id: sellerId });
       toast.show(
-        next.isFollowing ? `Following @${listing?.seller?.username ?? 'seller'}` : 'Unfollowed',
-        { variant: next.isFollowing ? 'info' : 'default', icon: next.isFollowing ? 'user-check' : 'user-x' },
+        nowFollowing ? `Following @${listing?.seller?.username ?? 'seller'}` : 'Unfollowed',
+        {
+          variant: nowFollowing ? 'info' : 'default',
+          icon: nowFollowing ? 'user-check' : 'user-x',
+          action: nowFollowing
+            ? {
+                label: 'Undo',
+                onPress: async () => {
+                  setFollowed(false);
+                  try {
+                    await toggleFollow(user.id, sellerId, true);
+                  } catch {
+                    setFollowed(true);
+                    toast.show('Could not undo', { variant: 'default', icon: 'alert-triangle' });
+                  }
+                },
+              }
+            : undefined,
+        },
       );
     } catch (e: any) {
       // Roll back optimistic state on failure.
