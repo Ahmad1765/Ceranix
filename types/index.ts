@@ -28,6 +28,8 @@ export interface User {
   is_pro?: boolean;
   followers_count?: number;
   following_count?: number;
+  // Category slugs captured at onboarding (feed personalization, future use).
+  interests?: string[] | null;
 }
 
 export interface ShippingAddress {

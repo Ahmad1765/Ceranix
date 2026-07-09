@@ -9,8 +9,10 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
 import { useLocalSearchParams, router, Redirect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { getOptimizedImageUrl } from '@/lib/images';
 import * as Haptics from 'expo-haptics';
 import { colors } from '@/lib/theme';
 import { fetchListingById } from '@/lib/listings';
@@ -293,6 +295,39 @@ export default function PaymentScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 160 }}
       >
+        {/* Item summary — what you're actually buying. */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 14,
+            backgroundColor: colors.panel,
+            borderRadius: 20,
+            padding: 14,
+            marginBottom: 12,
+          }}
+        >
+          <Image
+            source={{ uri: getOptimizedImageUrl(listing.images?.[0] ?? '', { width: 160 }) }}
+            style={{ width: 60, height: 76, borderRadius: 12, backgroundColor: 'rgba(15,15,15,0.06)' }}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 15, fontWeight: '800', color: colors.ink }} numberOfLines={2}>
+              {listing.title}
+            </Text>
+            {[listing.brand, listing.size ? `Size ${listing.size}` : null].filter(Boolean).length > 0 ? (
+              <Text style={{ fontSize: 13, color: colors.mute, marginTop: 3 }} numberOfLines={1}>
+                {[listing.brand, listing.size ? `Size ${listing.size}` : null].filter(Boolean).join(' · ')}
+              </Text>
+            ) : null}
+          </View>
+          <Text style={{ fontSize: 16, fontWeight: '900', color: colors.ink }}>
+            {formatMoney(Number(listing.price ?? 0))}
+          </Text>
+        </View>
+
         {/* Details card */}
         <View
           style={{
@@ -336,80 +371,50 @@ export default function PaymentScreen() {
 
           <RowDivider />
 
-          {/* From row */}
-          <Pressable
-            onPress={() =>
-              toast.show('Method picker coming soon', { variant: 'info', icon: 'credit-card' })
-            }
-            style={({ pressed }) => ({ opacity: pressed ? 0.55 : 1 })}
+          {/* From row — the real card is collected securely in Stripe checkout. */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: 20,
+              paddingVertical: 18,
+            }}
           >
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingHorizontal: 20,
-                paddingVertical: 18,
-              }}
-            >
-              <Text style={Label}>From</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View
-                  style={{
-                    width: 28,
-                    height: 20,
-                    borderRadius: 5,
-                    backgroundColor: colors.ink,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginRight: 10,
-                  }}
-                >
-                  <Feather name="credit-card" size={11} color={colors.white} />
-                </View>
-                <Text style={Value}>
-                  {cardBrand} ••••{cardLast4}
-                </Text>
-                <Feather
-                  name="chevron-right"
-                  size={16}
-                  color="rgba(15,15,15,0.45)"
-                  style={{ marginLeft: 6 }}
-                />
+            <Text style={Label}>Pay with</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View
+                style={{
+                  width: 28,
+                  height: 20,
+                  borderRadius: 5,
+                  backgroundColor: colors.ink,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: 10,
+                }}
+              >
+                <Feather name="credit-card" size={11} color={colors.white} />
               </View>
+              <Text style={Value}>{STRIPE_ENABLED ? 'Card at checkout' : `${cardBrand} ••••${cardLast4}`}</Text>
             </View>
-          </Pressable>
+          </View>
 
           <RowDivider />
 
           {/* Pay on row */}
-          <Pressable
-            onPress={() =>
-              toast.show('Schedule coming soon', { variant: 'info', icon: 'calendar' })
-            }
-            style={({ pressed }) => ({ opacity: pressed ? 0.55 : 1 })}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: 20,
+              paddingVertical: 18,
+            }}
           >
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingHorizontal: 20,
-                paddingVertical: 18,
-              }}
-            >
-              <Text style={Label}>Pay on</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={Value}>{payOn}</Text>
-                <Feather
-                  name="chevron-right"
-                  size={16}
-                  color="rgba(15,15,15,0.45)"
-                  style={{ marginLeft: 6 }}
-                />
-              </View>
-            </View>
-          </Pressable>
+            <Text style={Label}>Pay on</Text>
+            <Text style={Value}>{payOn}</Text>
+          </View>
 
           <RowDivider />
 
@@ -485,6 +490,22 @@ export default function PaymentScreen() {
               See details
             </Text>
           </Pressable>
+        </View>
+
+        {/* Reassurance at the point of payment. */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            marginTop: 20,
+            paddingHorizontal: 4,
+          }}
+        >
+          <Feather name="shield" size={14} color={colors.primary} />
+          <Text style={{ flex: 1, fontSize: 12.5, color: colors.mute, lineHeight: 18 }}>
+            Buyer protection included — you&apos;re covered if the item doesn&apos;t arrive or isn&apos;t as described.
+          </Text>
         </View>
       </ScrollView>
 

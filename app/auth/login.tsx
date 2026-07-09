@@ -140,7 +140,7 @@ export default function LoginScreen() {
         if (error) throw error;
         if (data.session) {
           toast.show('Account created', { variant: 'success', icon: 'check' });
-          router.replace('/profile/edit?onboarding=1');
+          router.replace('/onboarding');
         } else {
           Alert.alert(
             'Check your email',

@@ -29,6 +29,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { AuthProvider } from '@/lib/auth';
 import { ToastProvider } from '@/lib/toast';
+import { GuestGateProvider } from '@/components/GuestGate';
 
 // Initialize crash + error reporting before anything else renders so startup
 // failures are captured too. No-ops when EXPO_PUBLIC_SENTRY_DSN is unset.
@@ -142,8 +143,10 @@ function RootLayout() {
       <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <ToastProvider>
+        <GuestGateProvider>
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
           <Stack.Screen
             name="product/[id]"
             options={{ headerShown: false }}
@@ -189,6 +192,7 @@ function RootLayout() {
             options={{ headerShown: false, presentation: 'modal' }}
           />
         </Stack>
+        </GuestGateProvider>
         </ToastProvider>
       </AuthProvider>
       </QueryClientProvider>

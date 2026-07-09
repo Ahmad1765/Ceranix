@@ -24,6 +24,7 @@ import { onListingCreated } from '@/lib/listingEvents';
 import { getOptimizedImageUrl } from '@/lib/images';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
+import { useGuestGate } from '@/components/GuestGate';
 import { colors } from '@/lib/theme';
 import { useResponsiveColumns, useTabBarClearance } from '@/lib/responsive';
 import type { Listing, User as Profile } from '@/types';
@@ -126,6 +127,7 @@ const EMPTY_LISTINGS: Listing[] = [];
 export default function HomeScreen() {
   const { user } = useAuth();
   const toast = useToast();
+  const guestGate = useGuestGate();
   const columns = useResponsiveColumns({ min: 2, max: 4, thresholds: GRID_THRESHOLDS });
   // Bottom padding that clears the floating tab bar overlaying the feed.
   const tabClear = useTabBarClearance();
@@ -233,8 +235,12 @@ export default function HomeScreen() {
   const handleFollowSuggestion = useCallback(
     async (suggestedId: string, username: string) => {
       if (!user?.id) {
-        toast.show('Sign in to follow', { variant: 'info', icon: 'log-in' });
-        router.push('/auth/login');
+        guestGate.prompt({
+          title: 'Follow sellers you love',
+          message: 'Create a free account to follow sellers and get their new drops in your feed.',
+          icon: 'user-plus',
+          resume: { kind: 'follow', sellerId: suggestedId },
+        });
         return;
       }
       // Optimistic flip; rollback on failure.
@@ -272,7 +278,7 @@ export default function HomeScreen() {
         });
       }
     },
-    [followingState, user?.id, toast, queryClient],
+    [followingState, user?.id, toast, queryClient, guestGate],
   );
 
   // Revalidate on focus (e.g. after publishing from the upload tab), but only

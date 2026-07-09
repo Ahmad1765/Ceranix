@@ -18,6 +18,7 @@ import { useToast } from '@/lib/toast';
 import { isLiked as fetchIsLiked, toggleLike } from '@/lib/listings';
 import { isSaved as fetchIsSaved, toggleSave } from '@/lib/saves';
 import { SaveListSheet } from '@/components/SaveListSheet';
+import { useGuestGate } from '@/components/GuestGate';
 import type { Listing } from '@/types';
 
 const AnimatedExpoImage = Animated.createAnimatedComponent(Image);
@@ -29,6 +30,7 @@ interface Props {
 export const ListingCard = memo(function ListingCard({ listing }: Props) {
   const { user } = useAuth();
   const toast = useToast();
+  const guestGate = useGuestGate();
   const [activeIndex, setActiveIndex] = useState(0);
   const [cardWidth, setCardWidth] = useState(0);
   // Sibling carousel images only mount after the user actually engages with
@@ -88,8 +90,12 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
 
   const handleToggleLike = useCallback(async () => {
     if (!user?.id) {
-      toast.show('Sign in to like', { variant: 'info', icon: 'log-in' });
-      router.push('/auth/login');
+      guestGate.prompt({
+        title: 'Save your favourites',
+        message: 'Create a free account to like items and keep everything you love in one place.',
+        icon: 'heart',
+        resume: { kind: 'like', listingId: listing.id },
+      });
       return;
     }
     if (likeBusy) return;
@@ -117,15 +123,19 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
     } finally {
       setLikeBusy(false);
     }
-  }, [liked, likeBusy, listing.id, toast, user?.id]);
+  }, [liked, likeBusy, listing.id, toast, user?.id, guestGate]);
 
   const longPressHandled = useRef(false);
 
   const handleToggleSave = useCallback(async () => {
     if (longPressHandled.current) return;
     if (!user?.id) {
-      toast.show('Sign in to save', { variant: 'info', icon: 'log-in' });
-      router.push('/auth/login');
+      guestGate.prompt({
+        title: 'Save to a collection',
+        message: 'Create a free account to save items into collections you can come back to.',
+        icon: 'bookmark',
+        resume: { kind: 'save', listingId: listing.id },
+      });
       return;
     }
     if (saveBusy) return;
@@ -165,21 +175,24 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
     } finally {
       setSaveBusy(false);
     }
-  }, [saveBusy, saved, listing.id, toast, user?.id]);
+  }, [saveBusy, saved, listing.id, toast, user?.id, guestGate]);
 
   // Long-press opens the SaveListSheet so the user can pick a specific
   // collection (or create a new one) instead of dumping into the default.
   const handleOpenSheet = useCallback(() => {
     longPressHandled.current = true;
     if (!user?.id) {
-      toast.show('Sign in to save', { variant: 'info', icon: 'log-in' });
-      router.push('/auth/login');
+      guestGate.prompt({
+        title: 'Save to a collection',
+        message: 'Create a free account to save items into collections you can come back to.',
+        icon: 'bookmark',
+      });
       setTimeout(() => { longPressHandled.current = false; }, 300);
       return;
     }
     setSheetOpen(true);
     setTimeout(() => { longPressHandled.current = false; }, 300);
-  }, [toast, user?.id]);
+  }, [user?.id, guestGate]);
 
   const handleScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (cardWidth <= 0) return;

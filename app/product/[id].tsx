@@ -74,6 +74,7 @@ import { itemColorLabel } from '@/lib/itemColors';
 import { ColorSwatch } from '@/components/ColorSwatch';
 import { BRAND, APP_URL } from '@/lib/brand';
 import { reportListing, REPORT_REASONS } from '@/lib/reports';
+import { useGuestGate } from '@/components/GuestGate';
 
 const AnimatedExpoImage = Animated.createAnimatedComponent(Image);
 
@@ -82,6 +83,7 @@ export default function ProductScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const toast = useToast();
+  const guestGate = useGuestGate();
   const productIdParam = Array.isArray(id) ? id[0] : id;
 
   const heroOffsetX = useSharedValue(0);
@@ -278,8 +280,12 @@ export default function ProductScreen() {
   const handleHeartPress = async () => {
     tap('light');
     if (!user) {
-      toast.show('Sign in to like items', { variant: 'info', icon: 'log-in' });
-      router.push('/auth/login');
+      guestGate.prompt({
+        title: 'Save your favourites',
+        message: 'Create a free account to like items and keep everything you love in one place.',
+        icon: 'heart',
+        resume: productIdParam ? { kind: 'like', listingId: productIdParam } : undefined,
+      });
       return;
     }
     if (!productIdParam || likeBusy) return;
@@ -380,12 +386,16 @@ export default function ProductScreen() {
 
   const handleFollowPress = async () => {
     tap('selection');
+    const sellerId = listing?.seller?.id;
     if (!user) {
-      toast.show('Sign in to follow sellers', { variant: 'info', icon: 'log-in' });
-      router.push('/auth/login');
+      guestGate.prompt({
+        title: 'Follow sellers you love',
+        message: 'Create a free account to follow sellers and get their new drops in your feed.',
+        icon: 'user-plus',
+        resume: sellerId ? { kind: 'follow', sellerId } : undefined,
+      });
       return;
     }
-    const sellerId = listing?.seller?.id;
     if (!sellerId || sellerId === user.id || followBusy) return;
     setFollowBusy(true);
     const optimistic = !followed;
@@ -431,8 +441,11 @@ export default function ProductScreen() {
   const openChat = (mode: 'message' | 'offer') => {
     tap('medium');
     if (!user) {
-      toast.show('Sign in to message sellers', { variant: 'info', icon: 'log-in' });
-      router.push('/auth/login');
+      guestGate.prompt({
+        title: 'Message the seller',
+        message: 'Create a free account to message sellers, make offers, and track your chats.',
+        icon: 'message-circle',
+      });
       return;
     }
     if (!listing) return;
@@ -751,8 +764,12 @@ export default function ProductScreen() {
             <Pressable
               onPress={() => {
                 if (!user?.id) {
-                  toast.show('Sign in to save', { variant: 'info', icon: 'log-in' });
-                  router.push('/auth/login');
+                  guestGate.prompt({
+                    title: 'Save to a collection',
+                    message: 'Create a free account to save items into collections you can come back to.',
+                    icon: 'bookmark',
+                    resume: productIdParam ? { kind: 'save', listingId: productIdParam } : undefined,
+                  });
                   return;
                 }
                 tap('medium');
@@ -1560,8 +1577,11 @@ export default function ProductScreen() {
               onSendBundleOffer={(amount) => {
                 tap('medium');
                 if (!user) {
-                  toast.show('Sign in to message sellers', { variant: 'info', icon: 'log-in' });
-                  router.push('/auth/login');
+                  guestGate.prompt({
+                    title: 'Send a bundle offer',
+                    message: 'Create a free account to bundle items and send the seller an offer.',
+                    icon: 'message-circle',
+                  });
                   return;
                 }
                 if (listing.seller_id === user.id) {
@@ -1680,8 +1700,12 @@ export default function ProductScreen() {
             onPress={() => {
               tap('medium');
               if (!user) {
-                toast.show('Sign in to buy', { variant: 'info', icon: 'log-in' });
-                router.push('/auth/login');
+                guestGate.prompt({
+                  title: 'Almost yours',
+                  message: 'Create a free account to check out securely with buyer protection included.',
+                  icon: 'shopping-bag',
+                  cta: 'Create account & continue',
+                });
                 return;
               }
               if (!listing?.id) return;
