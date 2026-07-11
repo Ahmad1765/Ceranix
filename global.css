@@ -14,9 +14,21 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* Only suppress focus rings on mouse/touch clicks. Let keyboard nav use the native or custom focus-visible style. */
-  input:focus:not(:focus-visible),
-  textarea:focus:not(:focus-visible),
+  /* Text fields ALWAYS match :focus-visible when focused (browser heuristic),
+     so a focus-visible outline rule renders a purple ring on every field the
+     user taps. That's the "purple border on inputs everywhere" bug. Text
+     inputs already signal focus via the caret and their own border color, so
+     never draw a browser outline ring on them. */
+  input:focus,
+  input:focus-visible,
+  textarea:focus,
+  textarea:focus-visible {
+    outline: none;
+    box-shadow: none;
+  }
+
+  /* Non-text controls: suppress the ring on mouse/touch, but keep it for
+     keyboard navigation so tab-through stays accessible. */
   select:focus:not(:focus-visible),
   button:focus:not(:focus-visible),
   [role="button"]:focus:not(:focus-visible),
@@ -25,8 +37,6 @@
     box-shadow: none;
   }
 
-  input:focus-visible,
-  textarea:focus-visible,
   select:focus-visible,
   button:focus-visible,
   [role="button"]:focus-visible,

@@ -43,6 +43,7 @@ import { AnimatedNumber } from '@/components/AnimatedNumber';
 import { SaveListSheet } from '@/components/SaveListSheet';
 import { isSaved as fetchIsSaved } from '@/lib/saves';
 import { FullscreenImageViewer } from '@/components/product/FullscreenImageViewer';
+import { OfferSheet } from '@/components/product/OfferSheet';
 import { RelatedItemCard } from '@/components/product/RelatedItemCard';
 import { ProductSkeleton } from '@/components/product/ProductSkeleton';
 import { HeroPageDot } from '@/components/product/HeroPageDot';
@@ -111,6 +112,7 @@ export default function ProductScreen() {
   const [relatedTab, setRelatedTab] = useState<'members' | 'similar'>('members');
   const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
   const [saveListVisible, setSaveListVisible] = useState(false);
+  const [offerVisible, setOfferVisible] = useState(false);
   const [saved, setSaved] = useState(false);
   const [listing, setListing] = useState<Listing | null>(
     cached ? { ...cached, seller: cached.seller ?? (FALLBACK_SELLER as Listing['seller']) } : null,
@@ -456,6 +458,34 @@ export default function ProductScreen() {
     router.push({
       pathname: '/conversation/new',
       params: { listing: listing.id, mode },
+    } as any);
+  };
+
+  // Opens the price-suggestion sheet after the same gates openChat applies.
+  const openOffer = () => {
+    tap('medium');
+    if (!user) {
+      guestGate.prompt({
+        title: 'Make an offer',
+        message: 'Create a free account to send the seller a price suggestion.',
+        icon: 'tag',
+      });
+      return;
+    }
+    if (!listing) return;
+    if (listing.seller_id === user.id) {
+      toast.show("That's your own listing", { variant: 'default', icon: 'info' });
+      return;
+    }
+    setOfferVisible(true);
+  };
+
+  const submitOffer = (amount: number) => {
+    setOfferVisible(false);
+    if (!listing) return;
+    router.push({
+      pathname: '/conversation/new',
+      params: { listing: listing.id, mode: 'offer', amount: amount.toFixed(2) },
     } as any);
   };
 
@@ -836,12 +866,13 @@ export default function ProductScreen() {
               )}
               <Text
                 style={{
-                  fontSize: 30,
-                  fontFamily: 'Fraunces_700Bold',
+                  fontSize: 28,
+                  fontFamily: 'Inter_700Bold',
                   color: BRAND_INK,
-                  lineHeight: 34,
-                  letterSpacing: -0.5,
+                  lineHeight: 33,
+                  letterSpacing: -0.6,
                 }}
+                numberOfLines={2}
               >
                 {listing.title}
               </Text>
@@ -888,10 +919,10 @@ export default function ProductScreen() {
               <Text
                 style={{
                   fontSize: 26,
-                  fontFamily: 'Fraunces_700Bold',
+                  fontFamily: 'Inter_700Bold',
                   color: BRAND_INK,
                   lineHeight: 30,
-                  letterSpacing: -0.5,
+                  letterSpacing: -0.6,
                 }}
               >
                 ${listing.price}
@@ -951,10 +982,10 @@ export default function ProductScreen() {
         <View style={{ paddingHorizontal: 16, paddingTop: 18, paddingBottom: 16 }}>
           <View
             style={{
-              backgroundColor: 'rgba(15,15,15,0.04)',
+              backgroundColor: 'white',
               borderRadius: 18,
               borderWidth: HAIRLINE,
-              borderColor: 'rgba(15,15,15,0.08)',
+              borderColor: 'rgba(15,15,15,0.12)',
               padding: 14,
             }}
           >
@@ -1264,7 +1295,7 @@ export default function ProductScreen() {
                   </>
                 ) : null}
               </View>
-              <Feather name="search" size={17} color={BRAND_PURPLE} />
+              <Feather name="arrow-up-right" size={17} color={BRAND_PURPLE} />
             </View>
 
             {/* Details rows */}
@@ -1279,7 +1310,7 @@ export default function ProductScreen() {
                       router.push(`/(tabs)/discover?q=${encodeURIComponent(listing.brand!)}` as any);
                     }
                   : undefined,
-                trailing: listing.brand ? <Feather name="search" size={17} color={BRAND_PURPLE} /> : undefined,
+                trailing: listing.brand ? <Feather name="arrow-up-right" size={17} color={BRAND_PURPLE} /> : undefined,
               },
               {
                 label: 'Size',
@@ -1672,10 +1703,10 @@ export default function ProductScreen() {
 
         <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
           <Pressable
-            onPress={() => openChat('offer')}
+            onPress={openOffer}
             accessibilityRole="button"
             accessibilityLabel="Make an offer"
-            accessibilityHint="Opens a chat with the seller to negotiate the price"
+            accessibilityHint="Opens a sheet to send the seller a price suggestion"
             style={({ pressed }) => ({
               paddingHorizontal: 18,
               height: 50,
@@ -1767,6 +1798,14 @@ export default function ProductScreen() {
           }}
         />
       ) : null}
+
+      {/* Price-suggestion sheet — slides up from the "Offer" button */}
+      <OfferSheet
+        visible={offerVisible}
+        askingPrice={Number(listing.price ?? 0)}
+        onClose={() => setOfferVisible(false)}
+        onSubmit={submitOffer}
+      />
 
       {/* Fullscreen image viewer — opens on tap, swipe to navigate */}
       <FullscreenImageViewer
