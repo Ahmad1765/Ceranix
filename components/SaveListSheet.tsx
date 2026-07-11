@@ -275,7 +275,7 @@ export function SaveListSheet({
                 value={newName}
                 onChangeText={setNewName}
                 placeholder="List name"
-                placeholderTextColor="rgba(15,15,15,0.45)"
+                placeholderTextColor="rgba(15,15,15,0.55)"
                 autoFocus
                 returnKeyType="done"
                 onSubmitEditing={handleCreate}

@@ -416,7 +416,7 @@ function OfferSheet({
                 onChangeText={(t) => setAmount(t.replace(/[^0-9]/g, ''))}
                 keyboardType="number-pad"
                 style={{ fontSize: 28, fontWeight: '900', color: colors.ink, flex: 1, padding: 0 }}
-                placeholderTextColor="rgba(15,15,15,0.45)"
+                placeholderTextColor="rgba(15,15,15,0.55)"
                 autoFocus
               />
             </View>

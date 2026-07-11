@@ -78,7 +78,7 @@ export const PriceDropCard = memo(function PriceDropCard({ listing, width = 130 
         <Text
           style={{
             fontSize: 11.5,
-            color: 'rgba(15,15,15,0.45)',
+            color: 'rgba(15,15,15,0.55)',
             textDecorationLine: 'line-through',
           }}
         >

@@ -28,7 +28,6 @@ import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   IS_IOS,
-  HAIRLINE,
   SCREEN_HEIGHT,
   tap,
   BRAND_PURPLE,

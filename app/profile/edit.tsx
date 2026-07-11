@@ -74,8 +74,8 @@ function FieldShell({
     : overTwoThirds
       ? count! >= max!
         ? RED
-        : 'rgba(15,15,15,0.45)'
-      : 'rgba(15,15,15,0.45)';
+        : 'rgba(15,15,15,0.55)'
+      : 'rgba(15,15,15,0.55)';
 
   return (
     <View style={{ marginBottom: 14 }}>
@@ -117,7 +117,7 @@ function FieldShell({
             {count}/{max}
           </Text>
         ) : helper && !error ? (
-          <Text style={{ fontSize: 11, color: 'rgba(15,15,15,0.45)' }}>{helper}</Text>
+          <Text style={{ fontSize: 11, color: 'rgba(15,15,15,0.55)' }}>{helper}</Text>
         ) : null}
       </View>
       <View
@@ -725,7 +725,7 @@ export default function ProfileEditScreen() {
               <Text style={{ fontSize: 16, color: MUTE, marginRight: 2 }}>@</Text>
               <TextInput
                 placeholder="ahmad_saleem"
-                placeholderTextColor="rgba(15,15,15,0.45)"
+                placeholderTextColor="rgba(15,15,15,0.55)"
                 value={username}
                 onChangeText={(t) => {
                   const cleaned = t.replace(/\s+/g, '').toLowerCase();
@@ -790,7 +790,7 @@ export default function ProfileEditScreen() {
             <TextInput
               ref={fullNameRef}
               placeholder="Ahmad Saleem"
-              placeholderTextColor="rgba(15,15,15,0.45)"
+              placeholderTextColor="rgba(15,15,15,0.55)"
               value={fullName}
               onChangeText={(t) => setFullName(t.slice(0, LIMITS.fullName))}
               onFocus={() => setFocused('fullName')}
@@ -815,7 +815,7 @@ export default function ProfileEditScreen() {
             <TextInput
               ref={bioRef}
               placeholder="A line about your shop"
-              placeholderTextColor="rgba(15,15,15,0.45)"
+              placeholderTextColor="rgba(15,15,15,0.55)"
               value={bio}
               onChangeText={(t) => setBio(t.slice(0, LIMITS.bio))}
               onFocus={() => setFocused('bio')}
@@ -837,7 +837,7 @@ export default function ProfileEditScreen() {
             <TextInput
               ref={locationRef}
               placeholder="Karachi"
-              placeholderTextColor="rgba(15,15,15,0.45)"
+              placeholderTextColor="rgba(15,15,15,0.55)"
               value={location}
               onChangeText={(t) => setLocation(t.slice(0, LIMITS.location))}
               onFocus={() => setFocused('location')}

@@ -17,8 +17,11 @@ const PURPLE_TINT_45 = "rgba(108,71,255,0.45)";
 const WHITE = "#FFFFFF";
 
 const INK = "#0F0F0F"; // near-pure black for text
-const INK_MUTE = "rgba(15,15,15,0.62)"; // 5.62:1 on white — AA normal text
-const INK_MUTE_SOFT = "rgba(15,15,15,0.45)"; // large text / icons
+const INK_MUTE = "rgba(15,15,15,0.62)"; // ~5.4:1 on white — AA for normal text
+// Tertiary tier, bumped 0.45 → 0.55 (~4:1) for legibility. Still lighter than
+// INK_MUTE so hierarchy holds; use for secondary captions, icons, placeholders.
+// For small informational text that must clear AA (4.5:1), reach for INK_MUTE.
+const INK_MUTE_SOFT = "rgba(15,15,15,0.55)";
 const INK_HAIRLINE = "rgba(15,15,15,0.08)"; // borders, dividers
 const INK_PANEL = "rgba(15,15,15,0.04)"; // subtle surface fill
 const INK_OVERLAY = "rgba(15,15,15,0.45)";
@@ -195,3 +198,67 @@ export const eyebrowMute = {
 };
 
 export const tintedPurple = PURPLE_TINT_45;
+
+// ── Typography tokens ────────────────────────────────────────────────────
+// Ready-to-spread text styles encoding the brand fonts (Fraunces display /
+// Inter UI), the type scale, and AA-safe default colours. Prefer these (or the
+// <AppText variant> primitive that wraps them) over ad-hoc fontSize/fontWeight
+// so type stays consistent app-wide. Colours can be overridden per use.
+export const textStyles = {
+  display: {
+    fontFamily: type.family.serifBold,
+    fontSize: type.size.display,
+    color: colors.ink,
+    letterSpacing: -1,
+    lineHeight: 48,
+  },
+  h1: {
+    fontFamily: type.family.sansBold,
+    fontSize: type.size["5xl"],
+    color: colors.ink,
+    letterSpacing: -0.6,
+    lineHeight: 38,
+  },
+  h2: {
+    fontFamily: type.family.sansBold,
+    fontSize: type.size["4xl"],
+    color: colors.ink,
+    letterSpacing: -0.4,
+    lineHeight: 30,
+  },
+  title: {
+    fontFamily: type.family.sansBold,
+    fontSize: type.size["2xl"],
+    color: colors.ink,
+    letterSpacing: -0.2,
+  },
+  body: {
+    fontFamily: type.family.sans,
+    fontSize: type.size.lg,
+    color: colors.ink,
+    lineHeight: 22,
+  },
+  bodyStrong: {
+    fontFamily: type.family.sansSemibold,
+    fontSize: type.size.lg,
+    color: colors.ink,
+  },
+  bodyMuted: {
+    fontFamily: type.family.sans,
+    fontSize: type.size.md,
+    color: colors.mute, // AA-safe muted (0.62)
+    lineHeight: 20,
+  },
+  caption: {
+    fontFamily: type.family.sansMedium,
+    fontSize: type.size.sm,
+    color: colors.mute, // AA-safe muted (0.62)
+  },
+  label: {
+    fontFamily: type.family.sansBold,
+    fontSize: type.size.base,
+    color: colors.ink,
+    letterSpacing: 0.1,
+  },
+  eyebrow: { ...eyebrow },
+} as const;

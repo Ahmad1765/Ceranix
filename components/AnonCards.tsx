@@ -210,7 +210,7 @@ function CategoryTile({
 
         {/* Bottom-to-top dark gradient for text legibility */}
         <LinearGradient
-          colors={['rgba(15,15,15,0.05)', 'rgba(15,15,15,0.45)', 'rgba(15,15,15,0.85)']}
+          colors={['rgba(15,15,15,0.05)', 'rgba(15,15,15,0.55)', 'rgba(15,15,15,0.85)']}
           locations={[0, 0.55, 1]}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}

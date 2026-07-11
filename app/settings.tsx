@@ -952,7 +952,7 @@ export default function SettingsScreen() {
           style={{
             textAlign: 'center',
             fontSize: 11,
-            color: 'rgba(15,15,15,0.45)',
+            color: 'rgba(15,15,15,0.55)',
             marginTop: 18,
             fontWeight: '600',
             letterSpacing: 0.4,
@@ -1603,7 +1603,7 @@ function SheetModal({
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <View style={{ flex: 1, backgroundColor: 'rgba(15,15,15,0.45)', justifyContent: 'flex-end' }}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(15,15,15,0.55)', justifyContent: 'flex-end' }}>
         <Pressable style={{ flex: 1 }} onPress={onClose} />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -1729,7 +1729,7 @@ function SheetField({
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           placeholder={placeholder}
-          placeholderTextColor="rgba(15,15,15,0.45)"
+          placeholderTextColor="rgba(15,15,15,0.55)"
           keyboardType={keyboardType}
           style={{ fontSize: 15, color: INK, padding: 0 }}
         />

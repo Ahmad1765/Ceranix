@@ -240,7 +240,7 @@ export function BundleSection({
                 <Text
                   style={{
                     fontSize: 12,
-                    color: 'rgba(15,15,15,0.45)',
+                    color: 'rgba(15,15,15,0.55)',
                     textDecorationLine: 'line-through',
                     marginTop: 2,
                   }}
@@ -294,7 +294,7 @@ function BundleCollage({ images, extraCount }: { images: string[]; extraCount: n
           justifyContent: 'center',
         }}
       >
-        <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.45)' }}>No items yet</Text>
+        <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.55)' }}>No items yet</Text>
       </View>
     );
   }

@@ -22,7 +22,7 @@ import { colors, tintedPurple } from '../lib/theme';
 
 // Palette-locked: white dock, purple accent, black-at-opacity for muted.
 const ACCENT = colors.primary; // #6C47FF
-const INACTIVE = colors.muteSoft; // rgba(15,15,15,0.45)
+const INACTIVE = colors.muteSoft; // rgba(15,15,15,0.55)
 const PILL_FILL = colors.primarySofter; // purple @18%
 const PILL_BORDER = tintedPurple; // purple @45%
 

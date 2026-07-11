@@ -553,7 +553,7 @@ function SellScreenInner() {
           >
             <Text
               style={{
-                color: canContinue ? '#FFFFFF' : 'rgba(15,15,15,0.45)',
+                color: canContinue ? '#FFFFFF' : 'rgba(15,15,15,0.55)',
                 fontSize: 15,
                 fontWeight: '700',
               }}
@@ -563,7 +563,7 @@ function SellScreenInner() {
             <Feather
               name="arrow-right"
               size={16}
-              color={canContinue ? '#FFFFFF' : 'rgba(15,15,15,0.45)'}
+              color={canContinue ? '#FFFFFF' : 'rgba(15,15,15,0.55)'}
             />
           </Pressable>
         </View>
@@ -677,7 +677,7 @@ function SellScreenInner() {
               className="border border-ink-hair"
               style={{ borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 10 }}
             >
-              <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(15,15,15,0.45)', letterSpacing: 0.4 }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(15,15,15,0.55)', letterSpacing: 0.4 }}>
                 TITLE
               </Text>
               <TextInput
@@ -703,7 +703,7 @@ function SellScreenInner() {
               className="border border-ink-hair"
               style={{ borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 10 }}
             >
-              <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(15,15,15,0.45)', letterSpacing: 0.4 }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(15,15,15,0.55)', letterSpacing: 0.4 }}>
                 BRAND <Text style={{ color: 'rgba(15,15,15,0.35)' }}>(optional)</Text>
               </Text>
               <TextInput
@@ -736,7 +736,7 @@ function SellScreenInner() {
               }}
             >
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(15,15,15,0.45)', letterSpacing: 0.4 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(15,15,15,0.55)', letterSpacing: 0.4 }}>
                   PRICE
                 </Text>
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 2 }}>
@@ -856,7 +856,7 @@ function SellScreenInner() {
                       marginBottom: 12,
                     }}
                   >
-                    <Feather name="search" size={15} color="rgba(15,15,15,0.45)" />
+                    <Feather name="search" size={15} color="rgba(15,15,15,0.55)" />
                     <TextInput
                       value={subQuery}
                       onChangeText={setSubQuery}
@@ -896,7 +896,7 @@ function SellScreenInner() {
                     );
                   })}
                   {filteredSubs.length === 0 ? (
-                    <Text style={{ fontSize: 13, color: 'rgba(15,15,15,0.45)', paddingVertical: 6 }}>
+                    <Text style={{ fontSize: 13, color: 'rgba(15,15,15,0.55)', paddingVertical: 6 }}>
                       No matches
                     </Text>
                   ) : null}
@@ -1051,7 +1051,7 @@ function SellScreenInner() {
               className="border border-ink-hair"
               style={{ borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 10 }}
             >
-              <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(15,15,15,0.45)', letterSpacing: 0.4 }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(15,15,15,0.55)', letterSpacing: 0.4 }}>
                 SIZE <Text style={{ color: 'rgba(15,15,15,0.35)' }}>(optional)</Text>
               </Text>
               <TextInput
@@ -1077,7 +1077,7 @@ function SellScreenInner() {
               className="border border-ink-hair"
               style={{ borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 10 }}
             >
-              <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(15,15,15,0.45)', letterSpacing: 0.4 }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(15,15,15,0.55)', letterSpacing: 0.4 }}>
                 DESCRIPTION <Text style={{ color: 'rgba(15,15,15,0.35)' }}>(optional)</Text>
               </Text>
               <TextInput
@@ -1105,7 +1105,7 @@ function SellScreenInner() {
               className="border border-ink-hair"
               style={{ borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10 }}
             >
-              <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(15,15,15,0.45)', letterSpacing: 0.4 }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(15,15,15,0.55)', letterSpacing: 0.4 }}>
                 TAGS <Text style={{ color: 'rgba(15,15,15,0.35)' }}>(up to 10)</Text>
               </Text>
               <View
@@ -1236,7 +1236,7 @@ function SellScreenInner() {
             style={{
               fontSize: 16,
               fontWeight: '800',
-              color: canPublish ? '#FFFFFF' : 'rgba(15,15,15,0.45)',
+              color: canPublish ? '#FFFFFF' : 'rgba(15,15,15,0.55)',
               letterSpacing: 0.2,
               marginRight: 58,
             }}

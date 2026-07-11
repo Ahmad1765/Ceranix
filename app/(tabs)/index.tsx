@@ -365,7 +365,7 @@ export default function HomeScreen() {
           accessibilityLabel="Search items, brands, sellers"
           className="flex-1 flex-row items-center bg-ink-panel rounded-full px-4 py-[10px] mr-3"
         >
-          <Feather name="search" size={18} color="rgba(15,15,15,0.45)" />
+          <Feather name="search" size={18} color="rgba(15,15,15,0.55)" />
           <Text className="ml-2.5 flex-1 text-[15px] text-ink-mute">
             What are you looking for today?
           </Text>

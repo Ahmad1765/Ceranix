@@ -609,7 +609,7 @@ export default function NewConversationScreen() {
                               fontSize: 10,
                               fontWeight: '700',
                               letterSpacing: 0.4,
-                              color: selected ? 'rgba(255,255,255,0.7)' : 'rgba(15,15,15,0.45)',
+                              color: selected ? 'rgba(255,255,255,0.7)' : 'rgba(15,15,15,0.55)',
                             }}
                           >
                             {s.label}
@@ -746,7 +746,7 @@ export default function NewConversationScreen() {
               style={{
                 fontSize: 16,
                 fontWeight: '800',
-                color: canSend ? '#FFFFFF' : 'rgba(15,15,15,0.45)',
+                color: canSend ? '#FFFFFF' : 'rgba(15,15,15,0.55)',
                 letterSpacing: 0.2,
                 marginRight: 58,
               }}

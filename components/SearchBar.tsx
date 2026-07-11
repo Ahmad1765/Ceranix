@@ -18,11 +18,11 @@ export function SearchBar({
 }: Props) {
   const content = (
     <View className="flex-row items-center bg-ink-panel rounded-xl px-3 py-2.5">
-      <Feather name="search" size={16} color="rgba(15,15,15,0.45)" />
+      <Feather name="search" size={16} color="rgba(15,15,15,0.55)" />
       <TextInput
         className="flex-1 ml-2 text-sm text-ink"
         placeholder={placeholder}
-        placeholderTextColor="rgba(15,15,15,0.45)"
+        placeholderTextColor="rgba(15,15,15,0.55)"
         editable={editable}
         value={value}
         onChangeText={onChangeText}

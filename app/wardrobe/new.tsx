@@ -151,7 +151,7 @@ function NewWardrobeInner() {
           style={{ height: 54, borderRadius: 14, backgroundColor: !preview || processing || posting ? 'rgba(15,15,15,0.12)' : '#0F0F0F', alignItems: 'center', justifyContent: 'center' }}
         >
           {posting ? <ActivityIndicator color="#fff" /> : (
-            <Text style={{ color: !preview || processing ? 'rgba(15,15,15,0.45)' : '#fff', fontWeight: '800', fontSize: 16 }}>Post outfit</Text>
+            <Text style={{ color: !preview || processing ? 'rgba(15,15,15,0.55)' : '#fff', fontWeight: '800', fontSize: 16 }}>Post outfit</Text>
           )}
         </Pressable>
       </View>

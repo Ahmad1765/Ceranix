@@ -581,7 +581,7 @@ export default function ProductScreen() {
           <Feather name="arrow-left" size={22} color="#0F0F0F" />
         </Pressable>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
-          <Feather name="wifi-off" size={36} color="rgba(15,15,15,0.45)" />
+          <Feather name="wifi-off" size={36} color="rgba(15,15,15,0.55)" />
           <Text style={{ fontSize: 17, fontWeight: '800', color: '#0F0F0F', marginTop: 14, letterSpacing: -0.3 }}>
             Couldn&apos;t load this listing
           </Text>
@@ -621,7 +621,7 @@ export default function ProductScreen() {
           <Feather name="arrow-left" size={22} color="#0F0F0F" />
         </Pressable>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
-          <Feather name="alert-circle" size={42} color="rgba(15,15,15,0.45)" />
+          <Feather name="alert-circle" size={42} color="rgba(15,15,15,0.55)" />
           <Text style={{ fontSize: 17, fontWeight: '700', color: '#0F0F0F', marginTop: 14 }}>
             Listing not available
           </Text>
@@ -858,7 +858,7 @@ export default function ProductScreen() {
             <View style={{ flex: 1, paddingRight: 14 }}>
               {heartCount > 0 && (
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 6 }}>
-                <Feather name="heart" size={12} color="rgba(15,15,15,0.45)" />
+                <Feather name="heart" size={12} color="rgba(15,15,15,0.55)" />
                 <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.55)', fontFamily: 'Inter_500Medium' }}>
                   Liked by <Text style={{ fontFamily: 'Inter_700Bold', color: BRAND_INK }}>{heartCount} {heartCount === 1 ? 'person' : 'people'}</Text>
                 </Text>
@@ -907,7 +907,7 @@ export default function ProductScreen() {
                 ) : null}
                 {listing.seller?.location ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Feather name="map-pin" size={11} color="rgba(15,15,15,0.45)" />
+                    <Feather name="map-pin" size={11} color="rgba(15,15,15,0.55)" />
                     <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.55)', fontFamily: 'Inter_500Medium' }} numberOfLines={1}>
                       {listing.seller.location}
                     </Text>
@@ -1032,7 +1032,7 @@ export default function ProductScreen() {
                       transition={150}
                     />
                   ) : (
-                    <Feather name="user" size={22} color="rgba(15,15,15,0.45)" />
+                    <Feather name="user" size={22} color="rgba(15,15,15,0.55)" />
                   )}
                 </View>
               </View>
@@ -1327,7 +1327,7 @@ export default function ProductScreen() {
                       'Very good — Gently used, only minor signs of wear\n\n' +
                       'Fair — Noticeable wear, but still fully wearable',
                   ),
-                trailing: <Feather name="info" size={17} color="rgba(15,15,15,0.45)" />,
+                trailing: <Feather name="info" size={17} color="rgba(15,15,15,0.55)" />,
               },
               // Only shown when the seller set a real colour (legacy rows omit it).
               ...(listing.color
@@ -1460,7 +1460,7 @@ export default function ProductScreen() {
               <Text
                 style={{
                   fontSize: 11,
-                  color: 'rgba(15,15,15,0.45)',
+                  color: 'rgba(15,15,15,0.55)',
                   letterSpacing: 0.6,
                   fontFamily: 'Inter_500Medium',
                 }}
@@ -1695,7 +1695,7 @@ export default function ProductScreen() {
             marginBottom: 10,
           }}
         >
-          <Feather name="lock" size={11} color="rgba(15,15,15,0.45)" />
+          <Feather name="lock" size={11} color="rgba(15,15,15,0.55)" />
           <Text style={{ fontSize: 11.5, fontWeight: '600', color: 'rgba(15,15,15,0.62)' }}>
             Secure checkout · Buyer protection included
           </Text>

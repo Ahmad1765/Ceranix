@@ -466,7 +466,7 @@ export default function InvoiceScreen() {
                   <Feather
                     name="chevron-right"
                     size={16}
-                    color="rgba(15,15,15,0.45)"
+                    color="rgba(15,15,15,0.55)"
                     style={{ marginLeft: 4 }}
                   />
                 </View>
