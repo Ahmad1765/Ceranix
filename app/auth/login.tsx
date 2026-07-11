@@ -14,9 +14,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '@/lib/supabase';
+import { signInWithGoogle } from '@/lib/oauth';
 import { useToast } from '@/lib/toast';
 import { colors } from '@/lib/theme';
 
@@ -74,6 +75,7 @@ export default function LoginScreen() {
   const [emailFocused, setEmailFocused] = useState(false);
   const [pwFocused, setPwFocused] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [oauthLoading, setOauthLoading] = useState(false);
 
   const stepAnim = useRef(new Animated.Value(0)).current;
   const switchAnim = useRef(new Animated.Value(mode === 'signin' ? 0 : 1)).current;
@@ -189,6 +191,21 @@ export default function LoginScreen() {
     tap('light');
     if (router.canDismiss()) router.dismiss();
     else router.replace('/(tabs)');
+  };
+
+  const handleGoogle = async () => {
+    if (oauthLoading) return;
+    tap('light');
+    setOauthLoading(true);
+    const r = await signInWithGoogle();
+    setOauthLoading(false);
+    if (r.ok) {
+      toast.show('Welcome', { variant: 'success', icon: 'check' });
+      if (router.canDismiss()) router.dismiss();
+      else router.replace('/(tabs)');
+    } else if (!r.cancelled) {
+      toast.show(r.error ?? 'Google sign-in failed', { variant: 'default', icon: 'alert-triangle' });
+    }
   };
 
   const openForm = (m: Mode) => {
@@ -451,6 +468,52 @@ export default function LoginScreen() {
                       }}
                     >
                       Sign up with email
+                    </Text>
+                  </View>
+                </PressableScale>
+
+                {/* Divider */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 2 }}>
+                  <View style={{ flex: 1, height: 1, backgroundColor: colors.hairline }} />
+                  <Text
+                    style={{
+                      marginHorizontal: 12,
+                      fontSize: 12,
+                      fontWeight: '700',
+                      color: colors.muteSoft,
+                      letterSpacing: 0.6,
+                    }}
+                  >
+                    OR
+                  </Text>
+                  <View style={{ flex: 1, height: 1, backgroundColor: colors.hairline }} />
+                </View>
+
+                <PressableScale onPress={handleGoogle} disabled={oauthLoading} style={{}}>
+                  <View
+                    style={{
+                      height: 58,
+                      borderRadius: 18,
+                      backgroundColor: colors.white,
+                      borderWidth: 1.5,
+                      borderColor: colors.hairline,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      paddingHorizontal: 20,
+                    }}
+                  >
+                    <Ionicons name="logo-google" size={18} color={colors.ink} />
+                    <Text
+                      style={{
+                        marginLeft: 10,
+                        fontSize: 16,
+                        fontWeight: '700',
+                        color: colors.ink,
+                        letterSpacing: 0.1,
+                      }}
+                    >
+                      {oauthLoading ? 'Connecting…' : 'Continue with Google'}
                     </Text>
                   </View>
                 </PressableScale>
