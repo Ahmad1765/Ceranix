@@ -86,6 +86,9 @@ const AnimatedExpoImage = Animated.createAnimatedComponent(Image);
 const ROW_DIVIDER = 'rgba(15,15,15,0.06)';
 const CHEVRON_GRAY = '#9CA3AF';
 
+// Lines of description shown before the "Read more" toggle collapses the rest.
+const DESC_CLAMP_LINES = 6;
+
 export default function ProductScreen() {
   const { id } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
@@ -120,6 +123,7 @@ export default function ProductScreen() {
   const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
   const [saveListVisible, setSaveListVisible] = useState(false);
   const [offerVisible, setOfferVisible] = useState(false);
+  const [descExpanded, setDescExpanded] = useState(false);
   const [saved, setSaved] = useState(false);
   const [listing, setListing] = useState<Listing | null>(
     cached ? { ...cached, seller: cached.seller ?? (FALLBACK_SELLER as Listing['seller']) } : null,
@@ -272,6 +276,7 @@ export default function ProductScreen() {
   // IDs from a previous seller's items must not bleed into a new product page.
   useEffect(() => {
     setSelectedBundleIds(new Set());
+    setDescExpanded(false);
   }, [listing?.id]);
 
   // Other listings from this seller ("more from this seller") + "you might also
@@ -1212,20 +1217,54 @@ export default function ProductScreen() {
                   .map((s) => s.trim())
                   .filter(Boolean);
                 if (paras.length === 0) return null;
-                return paras.map((para, i) => (
-                  <Text
-                    key={i}
-                    style={{
-                      fontSize: 15,
-                      color: INK_700,
-                      lineHeight: 24,
-                      fontFamily: 'Inter_400Regular',
-                      marginBottom: i < paras.length - 1 ? 10 : 0,
-                    }}
-                  >
-                    {para}
-                  </Text>
-                ));
+                // Join paragraphs into one Text (blank line between) so the
+                // clamp counts the whole block; numberOfLines maps to CSS
+                // line-clamp on web and native truncation on device. A length/
+                // paragraph heuristic decides whether the toggle is warranted —
+                // deterministic, so there's no measure-then-clamp flicker.
+                const full = paras.join('\n\n');
+                const isLong = full.length > 240 || paras.length > 3;
+                const collapsed = isLong && !descExpanded;
+                return (
+                  <>
+                    <Text
+                      numberOfLines={collapsed ? DESC_CLAMP_LINES : undefined}
+                      style={{
+                        fontSize: 15,
+                        color: INK_700,
+                        lineHeight: 24,
+                        fontFamily: 'Inter_400Regular',
+                      }}
+                    >
+                      {full}
+                    </Text>
+                    {isLong ? (
+                      <Pressable
+                        onPress={() => { tap('selection'); setDescExpanded((v) => !v); }}
+                        hitSlop={10}
+                        accessibilityRole="button"
+                        accessibilityLabel={descExpanded ? 'Collapse description' : 'Expand full description'}
+                        style={({ pressed }) => ({
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 4,
+                          marginTop: 12,
+                          minHeight: 44,
+                          opacity: pressed ? 0.6 : 1,
+                        })}
+                      >
+                        <Text style={{ fontSize: 13, fontFamily: 'Inter_600SemiBold', color: BRAND_PURPLE, letterSpacing: 0.2 }}>
+                          {descExpanded ? 'Show less' : 'Read more'}
+                        </Text>
+                        <Feather
+                          name={descExpanded ? 'chevron-up' : 'chevron-down'}
+                          size={16}
+                          color={BRAND_PURPLE}
+                        />
+                      </Pressable>
+                    ) : null}
+                  </>
+                );
               })()}
             </View>
 
