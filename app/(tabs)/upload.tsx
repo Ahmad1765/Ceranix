@@ -22,9 +22,8 @@ import { RequireAuth } from '@/components/RequireAuth';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { uploadListingImages, deleteListingImages } from '@/lib/upload';
-import { cleanPhoto } from '@/lib/photoClean';
 import {
-  makeSlot, applyResult, toggleSlot, resolveImage, type PhotoSlot,
+  makeSlot, resolveImage, type PhotoSlot,
 } from '@/lib/photoClean/slots';
 import { useToast } from '@/lib/toast';
 import { useTabBarClearance } from '@/lib/responsive';
@@ -140,11 +139,6 @@ function SellScreenInner() {
     return Math.floor((usable - gaps) / 3);
   }, [width]);
 
-  const runClean = async (slot: PhotoSlot) => {
-    const result = await cleanPhoto(slot.original);
-    setSlots((prev) => prev.map((s) => (s.id === slot.id ? applyResult(s, result) : s)));
-  };
-
   const pickImages = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -156,19 +150,16 @@ function SellScreenInner() {
     if (!result.canceled) {
       const room = MAX_IMAGES - slots.length;
       const picked = result.assets.slice(0, room);
-      const newSlots = picked.map((a) =>
-        makeSlot(
+      const newSlots = picked.map((a) => ({
+        // Background removal is a Wardrobe-only feature; listing uploads use
+        // the photo exactly as picked, so mark the slot done with no clean pass.
+        ...makeSlot(
           { uri: a.uri, base64: a.base64 ?? null },
           (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`),
         ),
-      );
+        status: 'done' as const,
+      }));
       setSlots((prev) => [...prev, ...newSlots].slice(0, MAX_IMAGES));
-      // Concurrency 2: run in pairs so a big batch doesn't freeze the UI.
-      (async () => {
-        for (let i = 0; i < newSlots.length; i += 2) {
-          await Promise.all(newSlots.slice(i, i + 2).map(runClean));
-        }
-      })().catch(() => {});
     }
   };
 
@@ -405,30 +396,6 @@ function SellScreenInner() {
                     >
                       <Feather name="x" size={13} color="white" />
                     </Pressable>
-                    {slot.status === 'processing' && (
-                      <View style={{ position: 'absolute', bottom: 6, left: 6, right: 6, alignItems: 'center' }}>
-                        <View style={{ backgroundColor: 'rgba(15,15,15,0.72)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3, flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                          <ActivityIndicator size="small" color="#FFFFFF" />
-                          <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '700' }}>Cleaning…</Text>
-                        </View>
-                      </View>
-                    )}
-                    {slot.status === 'done' && slot.cleaned && (
-                      <Pressable
-                        onPress={() => setSlots((prev) => prev.map((s) => (s.id === slot.id ? toggleSlot(s) : s)))}
-                        hitSlop={6}
-                        style={{ position: 'absolute', bottom: 6, left: 6, backgroundColor: slot.useCleaned ? '#6C47FF' : 'rgba(15,15,15,0.72)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}
-                      >
-                        <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '800', letterSpacing: 0.3 }}>
-                          {slot.useCleaned ? 'CLEANED' : 'ORIGINAL'}
-                        </Text>
-                      </Pressable>
-                    )}
-                    {slot.status === 'failed' && (
-                      <View style={{ position: 'absolute', bottom: 6, left: 6, backgroundColor: 'rgba(15,15,15,0.72)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
-                        <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '700' }}>Original</Text>
-                      </View>
-                    )}
                   </View>
                 ))}
 
