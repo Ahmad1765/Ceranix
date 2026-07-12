@@ -1472,77 +1472,66 @@ export default function ProductScreen() {
           <View style={{ paddingHorizontal: 4 }}>
             <SectionEyebrow label="Buyer trust" />
           </View>
+          {/* Frosted-glass card: a real BlurView under a translucent white
+              fill, so it genuinely frosts wherever content sits behind it and
+              degrades to a soft off-white panel over the plain page. Soft
+              diffuse shadow + hairline edge give the premium lift. */}
           <View
             style={{
-              backgroundColor: 'white',
-              borderRadius: 16,
+              borderRadius: 20,
               borderWidth: HAIRLINE,
-              borderColor: 'rgba(15,15,15,0.10)',
+              borderColor: 'rgba(15,15,15,0.08)',
               overflow: 'hidden',
+              boxShadow: '0px 8px 30px rgba(0,0,0,0.04)',
             }}
           >
+            {IS_IOS ? (
+              <BlurView
+                intensity={24}
+                tint="systemUltraThinMaterialLight"
+                style={StyleSheet.absoluteFill}
+              />
+            ) : null}
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255,255,255,0.65)' }]} />
+
             {/* Plain info rows — these had pressed states and chevrons wired
                 to no-op handlers, which promises navigation that never
                 happens. Static until there's a real destination to open. */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'flex-start',
-                padding: 16,
-                gap: 12,
-              }}
-            >
-              <View
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 10,
-                  backgroundColor: 'rgba(108,71,255,0.10)',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Ionicons name="checkmark-circle" size={20} color={BRAND_PURPLE} />
+            <View style={{ padding: 20 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 16 }}>
+                <Ionicons
+                  name="checkmark-circle"
+                  size={26}
+                  color={BRAND_PURPLE}
+                  style={{ marginTop: 1 }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: BRAND_INK, marginBottom: 3 }}>
+                    Carrinex Verified
+                  </Text>
+                  <Text style={{ fontSize: 12.5, color: '#4B5563', lineHeight: 18 }}>
+                    Authenticated by our in-house team or a trusted partner.
+                  </Text>
+                </View>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: '800', color: BRAND_INK, marginBottom: 3 }}>
-                  Carrinex Verified
-                </Text>
-                <Text style={{ fontSize: 12.5, color: 'rgba(15,15,15,0.62)', lineHeight: 18 }}>
-                  Authenticated by our in-house team or a trusted partner.
-                </Text>
-              </View>
-            </View>
 
-            <View style={{ height: HAIRLINE, marginHorizontal: 16, backgroundColor: 'rgba(15,15,15,0.08)' }} />
+              <View style={{ height: HAIRLINE, marginVertical: 16, backgroundColor: 'rgba(15,15,15,0.06)' }} />
 
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'flex-start',
-                padding: 16,
-                gap: 12,
-              }}
-            >
-              <View
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 10,
-                  backgroundColor: 'rgba(108,71,255,0.10)',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Ionicons name="shield-checkmark" size={19} color={BRAND_PURPLE} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: '800', color: BRAND_INK, marginBottom: 3 }}>
-                  Purchase Protection
-                </Text>
-                <Text style={{ fontSize: 12.5, color: 'rgba(15,15,15,0.62)', lineHeight: 18 }}>
-                  Qualifying orders covered if something goes wrong.
-                </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 16 }}>
+                <Ionicons
+                  name="shield-checkmark"
+                  size={25}
+                  color={BRAND_PURPLE}
+                  style={{ marginTop: 1 }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: BRAND_INK, marginBottom: 3 }}>
+                    Purchase Protection
+                  </Text>
+                  <Text style={{ fontSize: 12.5, color: '#4B5563', lineHeight: 18 }}>
+                    Qualifying orders covered if something goes wrong.
+                  </Text>
+                </View>
               </View>
             </View>
           </View>
