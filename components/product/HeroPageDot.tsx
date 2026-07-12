@@ -18,12 +18,14 @@ export function HeroPageDot({
     const progress = offsetX.value / pageWidth;
     const dist = Math.min(1, Math.abs(progress - index));
     const proximity = 1 - dist;
-    const w = 6 + proximity * 18;
-    const opacity = 0.5 + proximity * 0.5;
+    // Inactive pages read as round 6px dots; the active page stretches into a
+    // short pill. Standard carousel pagination, not a progress bar.
+    const w = 6 + proximity * 12;
+    const opacity = 0.45 + proximity * 0.55;
     return {
       width: w,
       backgroundColor: `rgba(255,255,255,${opacity})`,
     };
   });
-  return <Animated.View style={[{ height: 4, borderRadius: 2 }, animStyle]} />;
+  return <Animated.View style={[{ height: 6, borderRadius: 3 }, animStyle]} />;
 }

@@ -48,6 +48,7 @@ import { RelatedItemCard } from '@/components/product/RelatedItemCard';
 import { ProductSkeleton } from '@/components/product/ProductSkeleton';
 import { HeroPageDot } from '@/components/product/HeroPageDot';
 import { BundleSection } from '@/components/product/BundleSection';
+import { BundleProgressBar } from '@/components/product/BundleProgressBar';
 import { SectionEyebrow, StarRating } from '@/components/product/bits';
 import {
   IS_IOS,
@@ -61,6 +62,7 @@ import {
   BRAND_PURPLE_SOFT,
   BRAND_LIME,
   BRAND_INK,
+  INK_700,
   TAG_BG,
   TAG_BORDER,
   FALLBACK_SELLER,
@@ -78,6 +80,11 @@ import { reportListing, REPORT_REASONS } from '@/lib/reports';
 import { useGuestGate } from '@/components/GuestGate';
 
 const AnimatedExpoImage = Animated.createAnimatedComponent(Image);
+
+// Item-description attribute list: subtle "gray-100" row dividers and a neutral
+// "gray-400" drill-down chevron, shared across the category + detail rows.
+const ROW_DIVIDER = 'rgba(15,15,15,0.06)';
+const CHEVRON_GRAY = '#9CA3AF';
 
 export default function ProductScreen() {
   const { id } = useLocalSearchParams();
@@ -703,7 +710,7 @@ export default function ProductScreen() {
                 <Pressable
                   key={i}
                   onPress={() => { tap('selection'); setFullscreenIndex(i); }}
-                  style={{ width, height: IMAGE_HEIGHT }}
+                  style={{ width, height: IMAGE_HEIGHT, backgroundColor: '#F3F4F6' }}
                 >
                   <AnimatedExpoImage
                     source={{ uri: getOptimizedImageUrl(uri, { width: thumbWidthFor(width), quality: 80 }) }}
@@ -932,54 +939,27 @@ export default function ProductScreen() {
 
         </View>
 
-        {/* ── Bundle teaser — the bundle builder lives at the bottom of the
-            page, so without this it's invisible until a buyer happens to
-            scroll past everything. Shown only when there's actually
-            something to bundle. ── */}
+        {/* ── Bundle progress indicator — the bundle builder lives at the
+            bottom of the page, so without this it's invisible until a buyer
+            happens to scroll past everything. Drives its "add N more to save
+            X%" nudge off the same tier math as the builder, and jumps there
+            on tap. Shown only when there's something to bundle. ── */}
         {!isOwnListing && sellerItems.length > 0 ? (
-          <Pressable
+          <BundleProgressBar
+            listing={listing}
+            sellerItems={sellerItems}
+            selectedIds={selectedBundleIds}
             onPress={() => {
               tap('selection');
               setRelatedTab('members');
               // Let the tab content mount, then jump to it.
               requestAnimationFrame(() => mainScrollRef.current?.scrollToEnd({ animated: true }));
             }}
-            style={({ pressed }) => ({
-              marginHorizontal: 16,
-              marginBottom: 4,
-              backgroundColor: BRAND_PURPLE_SOFT,
-              borderRadius: 16,
-              paddingLeft: 14,
-              paddingRight: 10,
-              paddingVertical: 12,
-              flexDirection: 'row',
-              alignItems: 'center',
-              opacity: pressed ? 0.8 : 1,
-            })}
-          >
-            <View
-              style={{
-                width: 30,
-                height: 30,
-                borderRadius: 15,
-                backgroundColor: 'white',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginRight: 10,
-              }}
-            >
-              <Ionicons name="pricetags" size={14} color={BRAND_PURPLE} />
-            </View>
-            <Text style={{ flex: 1, color: BRAND_INK, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>
-              <Text style={{ fontWeight: '800' }}>Bundle & save up to 20%</Text>
-              {' '}· {sellerItems.length} more from @{listing.seller.username}
-            </Text>
-            <Feather name="chevron-down" size={16} color={BRAND_PURPLE} />
-          </Pressable>
+          />
         ) : null}
 
         {/* ── Seller card ── */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 18, paddingBottom: 16 }}>
+        <View style={{ paddingHorizontal: 16, paddingTop: 24, paddingBottom: 16 }}>
           <View
             style={{
               backgroundColor: 'white',
@@ -1221,19 +1201,32 @@ export default function ProductScreen() {
               overflow: 'hidden',
             }}
           >
-            {/* Description block */}
-            <View style={{ paddingHorizontal: 18, paddingTop: 18, paddingBottom: 16 }}>
-              <Text
-                style={{
-                  fontSize: 18,
-                  color: BRAND_INK,
-                  lineHeight: 28,
-                  fontFamily: 'Fraunces_400Regular',
-                  letterSpacing: -0.1,
-                }}
-              >
-                {listing.description}
-              </Text>
+            {/* Description block — sellers separate paragraphs with pipes, so
+                split on "|" and render each as its own line to break up the
+                wall of text. Falls back to a single paragraph when there's no
+                pipe. */}
+            <View style={{ paddingHorizontal: 18, paddingTop: 18, paddingBottom: 18 }}>
+              {(() => {
+                const paras = String(listing.description ?? '')
+                  .split('|')
+                  .map((s) => s.trim())
+                  .filter(Boolean);
+                if (paras.length === 0) return null;
+                return paras.map((para, i) => (
+                  <Text
+                    key={i}
+                    style={{
+                      fontSize: 15,
+                      color: INK_700,
+                      lineHeight: 24,
+                      fontFamily: 'Inter_400Regular',
+                      marginBottom: i < paras.length - 1 ? 10 : 0,
+                    }}
+                  >
+                    {para}
+                  </Text>
+                ));
+              })()}
             </View>
 
             {/* Category breadcrumb — category ▸ subcategory, each segment
@@ -1243,14 +1236,14 @@ export default function ProductScreen() {
                 flexDirection: 'row',
                 alignItems: 'center',
                 paddingHorizontal: 18,
-                paddingVertical: 14,
+                paddingVertical: 16,
                 borderTopWidth: HAIRLINE,
-                borderTopColor: 'rgba(15,15,15,0.08)',
+                borderTopColor: ROW_DIVIDER,
               }}
             >
               <Text
                 style={{
-                  fontFamily: 'Inter_700Bold',
+                  fontFamily: 'Inter_600SemiBold',
                   fontSize: 15,
                   color: BRAND_INK,
                   letterSpacing: 0.1,
@@ -1267,7 +1260,7 @@ export default function ProductScreen() {
                   }}
                   style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
                 >
-                  <Text style={{ fontFamily: 'Fraunces_400Regular', fontSize: 16, color: BRAND_INK }}>
+                  <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 15, color: INK_700 }}>
                     {categoryLabel(listing.category)}
                   </Text>
                 </Pressable>
@@ -1288,14 +1281,14 @@ export default function ProductScreen() {
                       }}
                       style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
                     >
-                      <Text style={{ fontFamily: 'Fraunces_400Regular', fontSize: 16, color: BRAND_INK }}>
+                      <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 15, color: INK_700 }}>
                         {catSubLabel}
                       </Text>
                     </Pressable>
                   </>
                 ) : null}
               </View>
-              <Feather name="arrow-up-right" size={17} color={BRAND_PURPLE} />
+              <Feather name="chevron-right" size={18} color={CHEVRON_GRAY} />
             </View>
 
             {/* Details rows */}
@@ -1310,7 +1303,7 @@ export default function ProductScreen() {
                       router.push(`/(tabs)/discover?q=${encodeURIComponent(listing.brand!)}` as any);
                     }
                   : undefined,
-                trailing: listing.brand ? <Feather name="arrow-up-right" size={17} color={BRAND_PURPLE} /> : undefined,
+                trailing: listing.brand ? <Feather name="chevron-right" size={18} color={CHEVRON_GRAY} /> : undefined,
               },
               {
                 label: 'Size',
@@ -1349,16 +1342,18 @@ export default function ProductScreen() {
                     flexDirection: 'row',
                     alignItems: 'center',
                     paddingHorizontal: 18,
-                    paddingVertical: 14,
+                    paddingVertical: 16,
                     borderTopWidth: HAIRLINE,
-                    borderTopColor: 'rgba(15,15,15,0.08)',
+                    borderTopColor: ROW_DIVIDER,
+                    // Actionable rows get a pressed wash (the native equivalent
+                    // of hover:bg-gray-50); static rows like Size stay flat.
                     backgroundColor: pressed && row.onPress ? 'rgba(15,15,15,0.04)' : 'white',
                   })}
                 >
-                  <Text style={{ flex: 1, fontSize: 15, color: BRAND_INK }} numberOfLines={1}>
-                    <Text style={{ fontFamily: 'Inter_700Bold', letterSpacing: 0.1 }}>{row.label}</Text>
+                  <Text style={{ flex: 1, fontSize: 15, color: INK_700 }} numberOfLines={1}>
+                    <Text style={{ fontFamily: 'Inter_600SemiBold', color: BRAND_INK, letterSpacing: 0.1 }}>{row.label}</Text>
                     <Text style={{ fontFamily: 'Inter_400Regular' }}>   </Text>
-                    <Text style={{ fontFamily: 'Fraunces_400Regular', fontSize: 16 }}>{row.value}</Text>
+                    <Text style={{ fontFamily: 'Inter_400Regular' }}>{row.value}</Text>
                   </Text>
                   {row.trailing}
                 </Pressable>
@@ -1398,7 +1393,8 @@ export default function ProductScreen() {
             </View>
           )}
 
-          {/* Share / Report row */}
+          {/* Share / Report actions grouped left; listing ID pushed to the
+              right edge via space-between. */}
           <View
             style={{
               flexDirection: 'row',
@@ -1408,66 +1404,66 @@ export default function ProductScreen() {
               paddingHorizontal: 4,
             }}
           >
-            <Pressable
-              onPress={shareListing}
-              accessibilityRole="button"
-              accessibilityLabel="Share this listing"
-              style={({ pressed }) => ({
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 8,
-                paddingVertical: 6,
-                opacity: pressed ? 0.6 : 1,
-              })}
-            >
-              <Feather name="share-2" size={16} color={BRAND_INK} />
-              <Text
-                style={{
-                  fontSize: 13,
-                  color: BRAND_INK,
-                  fontFamily: 'Inter_600SemiBold',
-                  letterSpacing: 0.2,
-                }}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+              <Pressable
+                onPress={shareListing}
+                accessibilityRole="button"
+                accessibilityLabel="Share this listing"
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 8,
+                  paddingVertical: 6,
+                  opacity: pressed ? 0.6 : 1,
+                })}
               >
-                Share
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={handleReport}
-              accessibilityRole="button"
-              accessibilityLabel="Report this listing"
-              style={({ pressed }) => ({
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 8,
-                paddingVertical: 6,
-                opacity: pressed ? 0.6 : 1,
-              })}
-            >
-              <Feather name="flag" size={16} color="rgba(15,15,15,0.62)" />
-              <Text
-                style={{
-                  fontSize: 13,
-                  color: 'rgba(15,15,15,0.62)',
-                  fontFamily: 'Inter_600SemiBold',
-                  letterSpacing: 0.2,
-                }}
+                <Feather name="share-2" size={16} color={BRAND_INK} />
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: BRAND_INK,
+                    fontFamily: 'Inter_600SemiBold',
+                    letterSpacing: 0.2,
+                  }}
+                >
+                  Share
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={handleReport}
+                accessibilityRole="button"
+                accessibilityLabel="Report this listing"
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 8,
+                  paddingVertical: 6,
+                  opacity: pressed ? 0.6 : 1,
+                })}
               >
-                Report
-              </Text>
-            </Pressable>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text
-                style={{
-                  fontSize: 11,
-                  color: 'rgba(15,15,15,0.55)',
-                  letterSpacing: 0.6,
-                  fontFamily: 'Inter_500Medium',
-                }}
-              >
-                ID · {listing.id.slice(0, 8)}
-              </Text>
+                <Feather name="flag" size={16} color="rgba(15,15,15,0.62)" />
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: 'rgba(15,15,15,0.62)',
+                    fontFamily: 'Inter_600SemiBold',
+                    letterSpacing: 0.2,
+                  }}
+                >
+                  Report
+                </Text>
+              </Pressable>
             </View>
+            <Text
+              style={{
+                fontSize: 12,
+                color: CHEVRON_GRAY,
+                letterSpacing: 0.4,
+                fontFamily: 'Inter_500Medium',
+              }}
+            >
+              ID · {listing.id.slice(0, 8)}
+            </Text>
           </View>
         </View>
 
@@ -1478,8 +1474,10 @@ export default function ProductScreen() {
           </View>
           <View
             style={{
-              backgroundColor: BRAND_PURPLE_SOFT,
-              borderRadius: 18,
+              backgroundColor: 'white',
+              borderRadius: 16,
+              borderWidth: HAIRLINE,
+              borderColor: 'rgba(15,15,15,0.10)',
               overflow: 'hidden',
             }}
           >
@@ -1498,25 +1496,25 @@ export default function ProductScreen() {
                 style={{
                   width: 36,
                   height: 36,
-                  borderRadius: 18,
-                  backgroundColor: 'white',
+                  borderRadius: 10,
+                  backgroundColor: 'rgba(108,71,255,0.10)',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <Ionicons name="checkmark-circle" size={22} color={BRAND_PURPLE} />
+                <Ionicons name="checkmark-circle" size={20} color={BRAND_PURPLE} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 14, fontWeight: '800', color: BRAND_INK, marginBottom: 3 }}>
                   Carrinex Verified
                 </Text>
-                <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.62)', lineHeight: 18 }}>
+                <Text style={{ fontSize: 12.5, color: 'rgba(15,15,15,0.62)', lineHeight: 18 }}>
                   Authenticated by our in-house team or a trusted partner.
                 </Text>
               </View>
             </View>
 
-            <View style={{ height: HAIRLINE, marginHorizontal: 16, backgroundColor: 'rgba(108,71,255,0.18)' }} />
+            <View style={{ height: HAIRLINE, marginHorizontal: 16, backgroundColor: 'rgba(15,15,15,0.08)' }} />
 
             <View
               style={{
@@ -1530,19 +1528,19 @@ export default function ProductScreen() {
                 style={{
                   width: 36,
                   height: 36,
-                  borderRadius: 18,
-                  backgroundColor: 'white',
+                  borderRadius: 10,
+                  backgroundColor: 'rgba(108,71,255,0.10)',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <Ionicons name="shield-checkmark" size={20} color={BRAND_PURPLE} />
+                <Ionicons name="shield-checkmark" size={19} color={BRAND_PURPLE} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 14, fontWeight: '800', color: BRAND_INK, marginBottom: 3 }}>
                   Purchase Protection
                 </Text>
-                <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.62)', lineHeight: 18 }}>
+                <Text style={{ fontSize: 12.5, color: 'rgba(15,15,15,0.62)', lineHeight: 18 }}>
                   Qualifying orders covered if something goes wrong.
                 </Text>
               </View>
@@ -1676,11 +1674,11 @@ export default function ProductScreen() {
           borderTopWidth: HAIRLINE,
           borderTopColor: 'rgba(15,15,15,0.08)',
           paddingHorizontal: 16,
-          paddingTop: 10,
+          paddingTop: 12,
           paddingBottom: insets.bottom || 16,
-          ...(IS_IOS && {
-            boxShadow: '0px -3px 12px rgba(0,0,0,0.06)',
-          }),
+          // Soft lift off the content above it. boxShadow renders on iOS + web;
+          // Android falls back to the hairline top border.
+          boxShadow: '0px -4px 10px rgba(0,0,0,0.05)',
         }}
       >
         {/* Reassurance at the point of decision — answers "is this safe?"
@@ -1695,8 +1693,8 @@ export default function ProductScreen() {
             marginBottom: 10,
           }}
         >
-          <Feather name="lock" size={11} color="rgba(15,15,15,0.55)" />
-          <Text style={{ fontSize: 11.5, fontWeight: '600', color: 'rgba(15,15,15,0.62)' }}>
+          <Feather name="lock" size={12} color="rgba(15,15,15,0.62)" />
+          <Text style={{ fontSize: 12, fontWeight: '500', color: 'rgba(15,15,15,0.62)' }}>
             Secure checkout · Buyer protection included
           </Text>
         </View>
@@ -1709,10 +1707,11 @@ export default function ProductScreen() {
             accessibilityHint="Opens a sheet to send the seller a price suggestion"
             style={({ pressed }) => ({
               paddingHorizontal: 18,
-              height: 50,
+              height: 52,
+              minWidth: 88,
               borderRadius: 14,
               borderWidth: HAIRLINE,
-              borderColor: 'rgba(15,15,15,0.08)',
+              borderColor: 'rgba(15,15,15,0.14)',
               alignItems: 'center',
               justifyContent: 'center',
               flexDirection: 'row',
@@ -1751,7 +1750,7 @@ export default function ProductScreen() {
             accessibilityHint="Proceeds to secure checkout"
             style={({ pressed }) => ({
               flex: 1,
-              height: 50,
+              height: 52,
               backgroundColor: BRAND_INK,
               borderRadius: 14,
               paddingHorizontal: 16,
@@ -1763,21 +1762,8 @@ export default function ProductScreen() {
             })}
           >
             <Text style={{ fontSize: 15, fontWeight: '800', color: 'white', letterSpacing: 0.2 }}>
-              Buy now
+              Buy now · ${listing.price}
             </Text>
-            <View
-              style={{
-                marginLeft: 10,
-                backgroundColor: BRAND_LIME,
-                borderRadius: 999,
-                paddingHorizontal: 10,
-                paddingVertical: 3,
-              }}
-            >
-              <Text style={{ fontSize: 13, fontWeight: '900', color: '#FFFFFF', letterSpacing: 0.2 }}>
-                ${listing.price}
-              </Text>
-            </View>
           </Pressable>
         </View>
       </View>

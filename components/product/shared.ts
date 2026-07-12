@@ -12,7 +12,10 @@ export const HAIRLINE = StyleSheet.hairlineWidth;
 const win = Dimensions.get('window');
 export const width = win.width;
 export const SCREEN_HEIGHT = win.height;
-export const IMAGE_HEIGHT = width * 1.45;
+// Hero images render at a 4:5 portrait ratio — the e-commerce standard
+// (Instagram/Shopify), tall enough to show a garment without dominating the
+// fold. Rounded so the parallax math lands on whole pixels.
+export const IMAGE_HEIGHT = Math.round(width * 1.25);
 
 /** iOS-only haptic tap. No-op on Android/web. */
 export function tap(style: 'light' | 'medium' | 'selection' = 'selection') {
@@ -52,6 +55,9 @@ export const BRAND_PURPLE = '#6C47FF';
 export const BRAND_PURPLE_SOFT = 'rgba(108,71,255,0.10)';
 export const BRAND_LIME = '#6C47FF';
 export const BRAND_INK = '#0F0F0F';
+// Body/value text — the "gray-700" of this palette. ~#4a4a4a on white ≈ 8.9:1,
+// comfortable for long-form reading while staying softer than the ink title.
+export const INK_700 = 'rgba(15,15,15,0.72)';
 export const TAG_BG = 'rgba(15,15,15,0.04)';
 export const TAG_BORDER = 'rgba(15,15,15,0.08)';
 export const LINK_PURPLE = BRAND_PURPLE;
