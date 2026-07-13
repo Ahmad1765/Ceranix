@@ -1,35 +1,67 @@
 // Reusable "Shop and sell safely" trust banner. One surface, used on the
 // product page, checkout, offer sheet, sell flow, and chat so buyer/seller
-// protection reads identically everywhere. Palette-compliant: neutral panel
+// protection reads consistently everywhere. Palette-compliant: neutral panel
 // with a single purple accent (icon + link), no off-brand colours.
-import { View, Text, Alert, type ViewStyle, type StyleProp } from 'react-native';
+//
+// Copy is context-aware (buyer vs seller vs checkout) but the mark, link, and
+// coverage explainer stay identical across surfaces.
+import { View, Text, Alert, Platform, type ViewStyle, type StyleProp } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Platform } from 'react-native';
 import { colors, radii, type as typography } from '@/lib/theme';
 
+// Per-surface copy. Same trust mark and link everywhere; only the framing
+// changes so a seller listing an item never reads buyer-only wording.
+const PRESETS = {
+  shop: {
+    title: 'Shop and sell safely',
+    body: 'Every purchase is covered by our refund policy, secure payments, and support.',
+  },
+  checkout: {
+    title: 'Protected checkout',
+    body: 'Your payment is encrypted, and your order is covered if it doesn’t arrive or isn’t as described.',
+  },
+  offer: {
+    title: 'Offers are protected',
+    body: 'Once your offer’s accepted, pay securely in the app — covered by our refund policy if something goes wrong.',
+  },
+  sell: {
+    title: 'Sell with confidence',
+    body: 'List for free and get paid securely once your buyer receives the item. We handle payments and support.',
+  },
+  chat: {
+    title: 'Keep it safe, keep it in the app',
+    body: 'In-app payments are secure and every order is covered by our refund policy.',
+  },
+} as const;
+
 type Props = {
-  /** Override the wrapper style (e.g. drop the panel background on a card). */
+  /** Selects the per-surface copy. Defaults to the buyer-facing "shop" copy. */
+  context?: keyof typeof PRESETS;
+  /** Override the preset title. */
+  title?: string;
+  /** Override the preset body. */
+  body?: string;
+  /** Override the wrapper style (e.g. add margins on a specific page). */
   style?: StyleProp<ViewStyle>;
   /** Custom link handler. Defaults to an in-app coverage explainer. */
   onLinkPress?: () => void;
-  /** Hide the soft panel background and render the row bare. */
+  /** Drop the soft panel background and render the row bare (tight/overlay surfaces). */
   bare?: boolean;
 };
-
-const DEFAULT_BODY =
-  'Every purchase is covered by our refund policy, secure payments, and support.';
 
 function explainCoverage() {
   Alert.alert(
     "How you're covered",
-    'Refund policy — If an item never arrives or isn’t as described, you’re eligible for a full refund.\n\n' +
+    'Refund policy — Buyers get a full refund if an item never arrives or isn’t as described.\n\n' +
       'Secure payments — Card details are handled by our payment provider and are never stored on your device.\n\n' +
+      'Getting paid — Sellers are paid out securely once the buyer receives the item.\n\n' +
       'Support — Our team steps in to help resolve any issue between buyer and seller.',
   );
 }
 
-export function SafetyBanner({ style, onLinkPress, bare = false }: Props) {
+export function SafetyBanner({ context = 'shop', title, body, style, onLinkPress, bare = false }: Props) {
+  const preset = PRESETS[context];
   const onLink = () => {
     if (Platform.OS === 'ios') Haptics.selectionAsync();
     (onLinkPress ?? explainCoverage)();
@@ -41,8 +73,8 @@ export function SafetyBanner({ style, onLinkPress, bare = false }: Props) {
         {
           flexDirection: 'row',
           alignItems: 'flex-start',
-          gap: 14,
-          padding: bare ? 0 : 16,
+          gap: 12,
+          padding: bare ? 0 : 14,
           borderRadius: radii.xl,
           backgroundColor: bare ? 'transparent' : colors.panel,
         },
@@ -51,37 +83,37 @@ export function SafetyBanner({ style, onLinkPress, bare = false }: Props) {
     >
       <View
         style={{
-          width: 40,
-          height: 40,
-          borderRadius: 20,
+          width: 34,
+          height: 34,
+          borderRadius: 17,
           backgroundColor: colors.primarySofter,
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
-        <Ionicons name="shield-checkmark" size={20} color={colors.primary} />
+        <Ionicons name="shield-checkmark" size={18} color={colors.primary} />
       </View>
       <View style={{ flex: 1 }}>
         <Text
           style={{
             fontFamily: typography.family.sansBold,
-            fontSize: typography.size.lg,
+            fontSize: typography.size.md,
             color: colors.ink,
-            marginBottom: 3,
+            marginBottom: 2,
             letterSpacing: -0.2,
           }}
         >
-          Shop and sell safely
+          {title ?? preset.title}
         </Text>
         <Text
           style={{
             fontFamily: typography.family.sans,
-            fontSize: 13.5,
-            lineHeight: 19,
+            fontSize: 13,
+            lineHeight: 18,
             color: colors.mute,
           }}
         >
-          {DEFAULT_BODY}{' '}
+          {body ?? preset.body}{' '}
           <Text
             onPress={onLink}
             accessibilityRole="link"

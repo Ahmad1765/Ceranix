@@ -815,7 +815,7 @@ export default function ConversationScreen() {
         contentContainerStyle={{ paddingTop: 10, paddingBottom: 14 }}
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
         ListHeaderComponent={
-          <SafetyBanner bare style={{ paddingHorizontal: 12, marginBottom: 10 }} />
+          <SafetyBanner context="chat" bare style={{ paddingHorizontal: 12, marginBottom: 10 }} />
         }
         ListEmptyComponent={
           <EmptyState

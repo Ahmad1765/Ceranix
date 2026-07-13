@@ -1152,7 +1152,7 @@ function SellScreenInner() {
             </Text>
           </View>
 
-          <SafetyBanner style={{ marginTop: 24 }} />
+          <SafetyBanner context="sell" style={{ marginTop: 24 }} />
         </ScrollView>
       </KeyboardAvoidingView>
 

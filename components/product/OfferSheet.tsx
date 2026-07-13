@@ -306,7 +306,7 @@ export function OfferSheet({
               </Text>
             </Pressable>
 
-            <SafetyBanner bare style={{ marginTop: 16 }} />
+            <SafetyBanner context="offer" bare style={{ marginTop: 16 }} />
               </Pressable>
             </Animated.View>
           </GestureDetector>

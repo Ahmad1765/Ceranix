@@ -494,7 +494,7 @@ export default function PaymentScreen() {
         </View>
 
         {/* Reassurance at the point of payment. */}
-        <SafetyBanner style={{ marginTop: 20 }} />
+        <SafetyBanner context="checkout" style={{ marginTop: 20 }} />
       </ScrollView>
 
       {/* Slide to pay */}
