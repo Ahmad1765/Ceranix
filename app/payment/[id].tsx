@@ -15,6 +15,7 @@ import { Feather } from '@expo/vector-icons';
 import { getOptimizedImageUrl } from '@/lib/images';
 import * as Haptics from 'expo-haptics';
 import { colors } from '@/lib/theme';
+import { SafetyBanner } from '@/components/SafetyBanner';
 import { fetchListingById } from '@/lib/listings';
 import { getCachedListing } from '@/lib/listingCache';
 import { useAuth } from '@/lib/auth';
@@ -493,20 +494,7 @@ export default function PaymentScreen() {
         </View>
 
         {/* Reassurance at the point of payment. */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 8,
-            marginTop: 20,
-            paddingHorizontal: 4,
-          }}
-        >
-          <Feather name="shield" size={14} color={colors.primary} />
-          <Text style={{ flex: 1, fontSize: 12.5, color: colors.mute, lineHeight: 18 }}>
-            Buyer protection included — you&apos;re covered if the item doesn&apos;t arrive or isn&apos;t as described.
-          </Text>
-        </View>
+        <SafetyBanner style={{ marginTop: 20 }} />
       </ScrollView>
 
       {/* Slide to pay */}

@@ -34,6 +34,7 @@ import type { Category, Condition, Gender, Listing } from '@/types';
 import { CATEGORIES, hasSubcategories, suggestSubcategory } from '@/lib/categories';
 import { ITEM_COLORS } from '@/lib/itemColors';
 import { ColorSwatch } from '@/components/ColorSwatch';
+import { SafetyBanner } from '@/components/SafetyBanner';
 
 type Step = 'photos' | 'details';
 
@@ -1150,6 +1151,8 @@ function SellScreenInner() {
               Press space, comma, or return to add a tag.
             </Text>
           </View>
+
+          <SafetyBanner style={{ marginTop: 24 }} />
         </ScrollView>
       </KeyboardAvoidingView>
 

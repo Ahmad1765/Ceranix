@@ -34,6 +34,7 @@ import {
   BRAND_PURPLE_SOFT,
   BRAND_INK,
 } from './shared';
+import { SafetyBanner } from '@/components/SafetyBanner';
 
 // Discount presets the buyer can tap to pre-fill a sensible offer instead of
 // typing from scratch. Ordered gentlest-first.
@@ -304,6 +305,8 @@ export function OfferSheet({
                 Send price suggestion
               </Text>
             </Pressable>
+
+            <SafetyBanner bare style={{ marginTop: 16 }} />
               </Pressable>
             </Animated.View>
           </GestureDetector>

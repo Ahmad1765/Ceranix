@@ -34,6 +34,7 @@ import { useToast } from '@/lib/toast';
 import { captureError } from '@/lib/sentry';
 import { colors, radii } from '@/lib/theme';
 import { Button, EmptyState } from '@/components/ui';
+import { SafetyBanner } from '@/components/SafetyBanner';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { withTimeout } from '@/lib/async';
 
@@ -813,6 +814,9 @@ export default function ConversationScreen() {
         renderItem={renderItem}
         contentContainerStyle={{ paddingTop: 10, paddingBottom: 14 }}
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
+        ListHeaderComponent={
+          <SafetyBanner bare style={{ paddingHorizontal: 12, marginBottom: 10 }} />
+        }
         ListEmptyComponent={
           <EmptyState
             icon="message-circle"
