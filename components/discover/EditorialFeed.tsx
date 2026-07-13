@@ -18,6 +18,7 @@ import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { ListingCard } from '@/components/ListingCard';
+import { formatPrice } from '@/lib/currency';
 import { getOptimizedImageUrl } from '@/lib/images';
 import { colors, radii, shadow, type } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
@@ -618,7 +619,7 @@ function RecentRow({ listing }: { listing: Listing }) {
     <Pressable
       onPress={() => router.push(`/product/${listing.id}`)}
       accessibilityRole="button"
-      accessibilityLabel={`${listing.brand || listing.title}, $${listing.price}`}
+      accessibilityLabel={`${listing.brand || listing.title}, ${formatPrice(listing.price)}`}
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',
@@ -658,7 +659,7 @@ function RecentRow({ listing }: { listing: Listing }) {
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
           <Text style={{ fontSize: 14, fontFamily: type.family.sansBold, color: colors.ink }}>
-            ${listing.price}
+            {formatPrice(listing.price)}
           </Text>
           {listing.size ? (
             <Text style={{ fontSize: 12.5, color: colors.mute }}>· {listing.size}</Text>

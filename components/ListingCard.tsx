@@ -13,6 +13,7 @@ import Animated from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { PressableScale } from '@/components/PressableScale';
 import { getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
+import { formatPrice } from '@/lib/currency';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { isLiked as fetchIsLiked, toggleLike } from '@/lib/listings';
@@ -211,7 +212,7 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
     <PressableScale
       onPress={() => router.push(`/product/${listing.id}`)}
       accessibilityRole="button"
-      accessibilityLabel={`${listing.brand || listing.title}${listing.size ? `, size ${listing.size}` : ''}, $${listing.price}`}
+      accessibilityLabel={`${listing.brand || listing.title}${listing.size ? `, size ${listing.size}` : ''}, ${formatPrice(listing.price)}`}
       accessibilityHint="Opens listing details"
       style={{ flex: 1 }}
     >
@@ -380,7 +381,7 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
           )}
         </View>
         <Text className="text-[14px] font-bold text-black mt-0.5">
-          ${listing.price}
+          {formatPrice(listing.price)}
         </Text>
       </View>
     </PressableScale>

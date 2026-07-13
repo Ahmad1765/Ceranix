@@ -23,6 +23,7 @@ import { useToast } from '@/lib/toast';
 import { safeBack } from '@/lib/nav';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { createCheckoutSession, openCheckout, STRIPE_ENABLED } from '@/lib/payments';
+import { buyerProtectionFee, formatPrice } from '@/lib/fees';
 import { SlideToConfirm } from '@/components/SlideToConfirm';
 import type { Listing } from '@/types';
 
@@ -33,14 +34,6 @@ function tap(style: 'light' | 'medium' = 'light') {
       ? Haptics.ImpactFeedbackStyle.Light
       : Haptics.ImpactFeedbackStyle.Medium,
   );
-}
-
-function formatMoney(amount: number) {
-  return amount.toLocaleString('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-  });
 }
 
 function formatShortDate(d: Date) {
@@ -160,8 +153,12 @@ export default function PaymentScreen() {
     );
   }
 
-  const total = offerAmount ?? Number(listing.price ?? 0);
-  const fee = 0;
+  // Item price (an accepted offer overrides the listing price) + Buyer
+  // Protection = what the buyer pays. Kept in one place so the summary, the
+  // fee row, and the total below can't drift apart.
+  const itemPrice = offerAmount ?? Number(listing.price ?? 0);
+  const fee = buyerProtectionFee(itemPrice);
+  const total = itemPrice + fee;
   const sellerName =
     listing.seller?.full_name || listing.seller?.username || 'Seller';
   const sellerInitial = (listing.seller?.username || 'S').charAt(0).toUpperCase();
@@ -325,7 +322,7 @@ export default function PaymentScreen() {
             ) : null}
           </View>
           <Text style={{ fontSize: 16, fontWeight: '900', color: colors.ink }}>
-            {formatMoney(Number(listing.price ?? 0))}
+            {formatPrice(itemPrice)}
           </Text>
         </View>
 
@@ -419,7 +416,7 @@ export default function PaymentScreen() {
 
           <RowDivider />
 
-          {/* Fee row */}
+          {/* Item row */}
           <View
             style={{
               flexDirection: 'row',
@@ -429,8 +426,27 @@ export default function PaymentScreen() {
               paddingVertical: 18,
             }}
           >
-            <Text style={Label}>Fee (0%)</Text>
-            <Text style={Value}>{formatMoney(fee)}</Text>
+            <Text style={Label}>Item</Text>
+            <Text style={Value}>{formatPrice(itemPrice)}</Text>
+          </View>
+
+          <RowDivider />
+
+          {/* Buyer Protection row — the fee that backs every order. */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: 20,
+              paddingVertical: 18,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Feather name="shield" size={13} color={colors.primary} />
+              <Text style={Label}>Buyer Protection</Text>
+            </View>
+            <Text style={Value}>{formatPrice(fee)}</Text>
           </View>
         </View>
 
@@ -466,7 +482,7 @@ export default function PaymentScreen() {
                 lineHeight: 48,
               }}
             >
-              {formatMoney(total)}
+              {formatPrice(total)}
             </Text>
           </View>
           <Pressable
@@ -508,7 +524,7 @@ export default function PaymentScreen() {
         }}
       >
         <SlideToConfirm
-          label={`Slide to pay ${formatMoney(total)}`}
+          label={`Slide to pay ${formatPrice(total)}`}
           loadingLabel="Processing…"
           loading={paying}
           onConfirm={handlePay}

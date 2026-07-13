@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { formatPrice } from '@/lib/currency';
 import type { User, Listing } from '@/types';
 
 export type MessageKind = 'text' | 'offer' | 'system';
@@ -160,15 +161,15 @@ export async function sendOffer(args: {
   note?: string;
 }): Promise<ChatMessage | null> {
   if (!Number.isFinite(args.amount) || args.amount <= 0) return null;
-  const amountInDollars = Number(args.amount.toFixed(2));
+  const amountValue = Number(args.amount.toFixed(2));
   const { data, error } = await supabase
     .from('messages')
     .insert({
       conversation_id: args.conversationId,
       sender_id: args.senderId,
-      content: args.note?.trim() || `Offer: $${amountInDollars.toFixed(2)}`,
+      content: args.note?.trim() || `Offer: ${formatPrice(amountValue)}`,
       kind: 'offer',
-      metadata: { amount: amountInDollars, currency: 'USD', note: args.note?.trim() || null },
+      metadata: { amount: amountValue, currency: 'PKR', note: args.note?.trim() || null },
       offer_status: 'pending',
     })
     .select('id, conversation_id, sender_id, content, kind, metadata, offer_status, created_at, updated_at')

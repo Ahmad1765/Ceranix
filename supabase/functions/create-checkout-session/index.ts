@@ -142,6 +142,16 @@ Deno.serve(async (req: Request) => {
       return json({ error: 'Invalid listing price' }, 400, origin);
     }
 
+    // Buyer Protection fee, added as its own line item so the buyer is charged
+    // the same total shown in the app. Keep this math in sync with lib/fees.ts.
+    const BUYER_PROTECTION_FIXED = 0.7;
+    const BUYER_PROTECTION_RATE = 0.05;
+    const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+    const buyerProtectionDollars = round2(
+      BUYER_PROTECTION_FIXED + BUYER_PROTECTION_RATE * chargeDollars,
+    );
+    const feeCents = Math.round(buyerProtectionDollars * 100);
+
     let successUrlObj: URL;
     let cancelUrlObj: URL;
     try {
@@ -174,7 +184,7 @@ Deno.serve(async (req: Request) => {
     params.append('cancel_url', cancelUrlObj.toString());
     params.append('client_reference_id', buyerId);
     params.append('line_items[0][quantity]', '1');
-    params.append('line_items[0][price_data][currency]', 'usd');
+    params.append('line_items[0][price_data][currency]', 'pkr');
     params.append('line_items[0][price_data][unit_amount]', String(priceCents));
     params.append('line_items[0][price_data][product_data][name]', listing.title ?? 'Item');
     // Validate image URL: must be HTTPS and from a trusted source (Supabase storage)
@@ -191,6 +201,16 @@ Deno.serve(async (req: Request) => {
         // Silently skip invalid image URL — don't break the checkout
       }
     }
+    // Buyer Protection as a separate, clearly-labelled line item so it shows on
+    // the Stripe checkout page and the receipt. amount_total (item + fee) is
+    // what stripe-webhook records as the order amount.
+    if (feeCents > 0) {
+      params.append('line_items[1][quantity]', '1');
+      params.append('line_items[1][price_data][currency]', 'pkr');
+      params.append('line_items[1][price_data][unit_amount]', String(feeCents));
+      params.append('line_items[1][price_data][product_data][name]', 'Buyer Protection');
+    }
+
     // stripe-webhook reads these to record the order after payment.
     params.append('metadata[listing_id]', listing.id);
     params.append('metadata[buyer_id]', buyerId);

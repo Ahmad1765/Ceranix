@@ -174,7 +174,7 @@ Deno.serve(async (req: Request) => {
     buyer_id: buyerId,
     seller_id: sellerId,
     amount_cents: amountCents,
-    currency: session.currency ?? 'usd',
+    currency: session.currency ?? 'pkr',
     stripe_session_id: session.id,
     stripe_payment_intent: session.payment_intent ?? null,
     offer_message_id: offerMessageId,

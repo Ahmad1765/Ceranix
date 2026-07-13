@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
 import { CARD_WIDTH, CARD_IMAGE_HEIGHT, BRAND_INK, type RelatedItem } from './shared';
+import { formatPrice } from '@/lib/currency';
 
 export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress: () => void }) {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -128,7 +129,7 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
           {item.meta}
         </Text>
         <Text style={{ fontSize: 14, fontWeight: '800', color: BRAND_INK, marginTop: 4 }}>
-          ${item.price.toFixed(0)}
+          {formatPrice(item.price)}
         </Text>
       </View>
     </Pressable>

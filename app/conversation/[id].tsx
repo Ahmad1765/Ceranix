@@ -33,6 +33,7 @@ import { getOptimizedImageUrl } from '@/lib/images';
 import { useToast } from '@/lib/toast';
 import { captureError } from '@/lib/sentry';
 import { colors, radii } from '@/lib/theme';
+import { formatPrice, CURRENCY_SYMBOL } from '@/lib/currency';
 import { Button, EmptyState } from '@/components/ui';
 import { SafetyBanner } from '@/components/SafetyBanner';
 import { HIT_SLOP_8 } from '@/lib/responsive';
@@ -112,7 +113,7 @@ function MessageBubble({
               letterSpacing: -0.8,
             }}
           >
-            ${amount}
+            {formatPrice(amount)}
           </Text>
           {msg.metadata?.note ? (
             <Text
@@ -219,7 +220,7 @@ function MessageBubble({
             >
               <Feather name="credit-card" size={14} color="white" />
               <Text style={{ fontSize: 13.5, fontWeight: '800', color: 'white' }}>
-                Pay ${amount}
+                Pay {formatPrice(amount)}
               </Text>
             </Pressable>
           )}
@@ -395,7 +396,7 @@ function OfferSheet({
             </Text>
             {listingPrice && (
               <Text style={{ fontSize: 13, color: colors.mute, marginTop: 4 }}>
-                Listed at <Text style={{ fontWeight: '700', color: colors.ink }}>${listingPrice}</Text>
+                Listed at <Text style={{ fontWeight: '700', color: colors.ink }}>{formatPrice(listingPrice)}</Text>
               </Text>
             )}
 
@@ -410,7 +411,7 @@ function OfferSheet({
                 alignItems: 'center',
               }}
             >
-              <Text style={{ fontSize: 28, fontWeight: '900', color: colors.purple, marginRight: 6 }}>$</Text>
+              <Text style={{ fontSize: 22, fontWeight: '900', color: colors.purple, marginRight: 8 }}>{CURRENCY_SYMBOL}</Text>
               <TextInput
                 placeholder="0"
                 value={amount}
@@ -440,7 +441,7 @@ function OfferSheet({
                       })}
                     >
                       <Text style={{ fontSize: 13, fontWeight: '700', color: selected ? 'white' : colors.ink }}>
-                        ${v}
+                        {formatPrice(v)}
                       </Text>
                     </Pressable>
                   );
@@ -799,7 +800,7 @@ export default function ConversationScreen() {
               {conv.listing.title}
             </Text>
             <Text style={{ fontSize: 13, fontWeight: '800', color: colors.purple, marginTop: 2 }}>
-              ${conv.listing.price}
+              {formatPrice(conv.listing.price)}
               {conv.listing.is_sold ? ' · Sold' : ''}
             </Text>
           </View>

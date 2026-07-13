@@ -20,6 +20,7 @@ import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { safeBack } from '@/lib/nav';
 import { HIT_SLOP_8 } from '@/lib/responsive';
+import { buyerProtectionFee, formatPrice } from '@/lib/fees';
 import type { Listing } from '@/types';
 
 function tap(style: 'light' | 'medium' = 'light') {
@@ -29,14 +30,6 @@ function tap(style: 'light' | 'medium' = 'light') {
       ? Haptics.ImpactFeedbackStyle.Light
       : Haptics.ImpactFeedbackStyle.Medium,
   );
-}
-
-function formatMoney(amount: number) {
-  return amount.toLocaleString('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-  });
 }
 
 function formatDate(iso: string | undefined | null) {
@@ -193,7 +186,9 @@ export default function InvoiceScreen() {
     );
   }
 
-  const total = Number(listing.price ?? 0);
+  const itemPrice = Number(listing.price ?? 0);
+  const fee = buyerProtectionFee(itemPrice);
+  const total = itemPrice + fee;
   const seller = listing.seller;
   const invoiceNumber = deriveInvoiceNumber(listing.id);
   const issueDate = listing.created_at;
@@ -211,7 +206,7 @@ export default function InvoiceScreen() {
     tap('light');
     try {
       await Share.share({
-        message: `Invoice ${invoiceNumber}\n${listing.title} · ${formatMoney(total)}`,
+        message: `Invoice ${invoiceNumber}\n${listing.title} · ${formatPrice(total)}`,
       });
     } catch {
       toast.show('Share failed', { variant: 'default', icon: 'alert-triangle' });
@@ -442,7 +437,7 @@ export default function InvoiceScreen() {
                 letterSpacing: -0.3,
               }}
             >
-              {formatMoney(total)}
+              {formatPrice(itemPrice)}
             </Text>
           </View>
 
@@ -474,6 +469,12 @@ export default function InvoiceScreen() {
             </Pressable>
             <MetaRow label="Reference">
               <Text style={MetaValue}>#{invoiceNumber}</Text>
+            </MetaRow>
+            <MetaRow label="Item">
+              <Text style={MetaValue}>{formatPrice(itemPrice)}</Text>
+            </MetaRow>
+            <MetaRow label="Buyer Protection">
+              <Text style={MetaValue}>{formatPrice(fee)}</Text>
             </MetaRow>
           </View>
 
@@ -507,7 +508,7 @@ export default function InvoiceScreen() {
                 lineHeight: 46,
               }}
             >
-              {formatMoney(total)}
+              {formatPrice(total)}
             </Text>
           </View>
         </View>
@@ -597,7 +598,7 @@ export default function InvoiceScreen() {
                   marginRight: 48,
                 }}
               >
-                Pay {formatMoney(total)}
+                Pay {formatPrice(total)}
               </Text>
             </View>
           </Pressable>

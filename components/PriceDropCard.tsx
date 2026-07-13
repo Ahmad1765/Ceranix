@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
 import type { PriceDropListing } from '@/lib/myFeed';
+import { formatPrice as formatMoney } from '@/lib/currency';
 
 interface Props {
   listing: PriceDropListing;
@@ -12,7 +13,7 @@ interface Props {
 
 function formatPrice(value: unknown): string {
   const n = typeof value === 'number' ? value : Number(value);
-  return Number.isFinite(n) ? `$${n.toFixed(2)}` : 'N/A';
+  return Number.isFinite(n) ? formatMoney(n) : 'N/A';
 }
 
 export const PriceDropCard = memo(function PriceDropCard({ listing, width = 130 }: Props) {

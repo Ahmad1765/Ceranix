@@ -35,6 +35,7 @@ import {
   BRAND_INK,
 } from './shared';
 import { SafetyBanner } from '@/components/SafetyBanner';
+import { formatPrice, CURRENCY_SYMBOL } from '@/lib/currency';
 
 // Discount presets the buyer can tap to pre-fill a sensible offer instead of
 // typing from scratch. Ordered gentlest-first.
@@ -171,8 +172,8 @@ export function OfferSheet({
                 marginBottom: 16,
               }}
             >
-              <Text style={{ fontSize: 26, fontFamily: 'Inter_700Bold', color: 'white' }}>
-                $?
+              <Text style={{ fontSize: 22, fontFamily: 'Inter_700Bold', color: 'white' }}>
+                {CURRENCY_SYMBOL}
               </Text>
             </View>
 
@@ -203,14 +204,14 @@ export function OfferSheet({
             >
               <Text
                 style={{
-                  fontSize: 34,
+                  fontSize: 26,
                   fontFamily: 'Inter_700Bold',
                   color: 'rgba(15,15,15,0.28)',
-                  marginRight: 4,
-                  marginBottom: 4,
+                  marginRight: 6,
+                  marginBottom: 6,
                 }}
               >
-                $
+                {CURRENCY_SYMBOL}
               </Text>
               <TextInput
                 value={amount}
@@ -262,7 +263,7 @@ export function OfferSheet({
                         color: active ? 'white' : BRAND_PURPLE,
                       }}
                     >
-                      {Math.round(pct * 100)}% off · ${value}
+                      {Math.round(pct * 100)}% off · {formatPrice(value)}
                     </Text>
                   </Pressable>
                 );

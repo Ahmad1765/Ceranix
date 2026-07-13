@@ -79,6 +79,8 @@ import { ColorSwatch } from '@/components/ColorSwatch';
 import { BRAND, APP_URL } from '@/lib/brand';
 import { reportListing, REPORT_REASONS } from '@/lib/reports';
 import { useGuestGate } from '@/components/GuestGate';
+import { buyerProtectionFee, orderTotal, formatPrice } from '@/lib/fees';
+import { BuyerProtectionSheet } from '@/components/product/BuyerProtectionSheet';
 
 const AnimatedExpoImage = Animated.createAnimatedComponent(Image);
 
@@ -124,6 +126,7 @@ export default function ProductScreen() {
   const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
   const [saveListVisible, setSaveListVisible] = useState(false);
   const [offerVisible, setOfferVisible] = useState(false);
+  const [bpVisible, setBpVisible] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
   const [saved, setSaved] = useState(false);
   const [listing, setListing] = useState<Listing | null>(
@@ -508,7 +511,7 @@ export default function ProductScreen() {
     try {
       const url = `${APP_URL}/product/${listing.id}`;
       await Share.share({
-        message: `${listing.title} · $${listing.price} on ${BRAND}\n${url}`,
+        message: `${listing.title} · ${formatPrice(listing.price)} on ${BRAND}\n${url}`,
         url,
       });
     } catch {
@@ -653,6 +656,12 @@ export default function ProductScreen() {
     : (liked && !userLikedOnServer ? 1 : (!liked && userLikedOnServer ? -1 : 0));
   const heartCount = Math.max(0, baseLikes + heartDelta);
   const isOwnListing = !!user?.id && listing.seller_id === user.id;
+  // Buyer Protection math — item price plus a small protection fee. Computed
+  // from lib/fees so the number here matches the payment sheet, the invoice,
+  // and what the server actually charges.
+  const itemPrice = Number(listing.price ?? 0);
+  const bpFee = buyerProtectionFee(itemPrice);
+  const buyTotal = orderTotal(itemPrice);
   const catSubLabel = listing.subcategory
     ? subcategoryLabel(listing.category, listing.subcategory)
     : '';
@@ -683,7 +692,7 @@ export default function ProductScreen() {
             {listing.title}
           </Text>
           <Text style={{ fontSize: 15, fontWeight: '700', color: '#0F0F0F' }}>
-            ${listing.price}
+            {formatPrice(listing.price)}
           </Text>
         </View>
       )}
@@ -759,51 +768,56 @@ export default function ProductScreen() {
             <Feather name="arrow-left" size={22} color="#0F0F0F" />
           </Pressable>
 
-          {/* Right-side floating action cluster — unified glass pill */}
+          {/* Floating actions — one cohesive white control instead of two
+              mismatched blobs. Like (heart + count) leads; Save sits below a
+              hairline divider. Shared width + single shadow makes it read as a
+              deliberate segmented control. Press gives a subtle wash, not a
+              wobble, since the surface is shared. */}
           <View
             style={{
               position: 'absolute',
               right: 14,
-              bottom: 60,
-              borderRadius: 28,
+              bottom: 16,
+              minWidth: 48,
+              borderRadius: 20,
+              backgroundColor: 'white',
+              borderWidth: HAIRLINE,
+              borderColor: 'rgba(15,15,15,0.08)',
               overflow: 'hidden',
               ...iosShadow,
             }}
           >
-            {IS_IOS ? (
-              <BlurView intensity={85} tint="systemUltraThinMaterialLight" style={StyleSheet.absoluteFill} />
-            ) : (
-              <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255,255,255,0.94)' }]} />
-            )}
+            {/* Like — heart + count, laid out horizontally like Vinted */}
             <Pressable
               onPress={handleHeartPress}
               onLongPress={() => { tap('medium'); setSaveListVisible(true); }}
               delayLongPress={350}
+              accessibilityRole="button"
+              accessibilityLabel={liked ? 'Unlike this item' : 'Like this item'}
               style={({ pressed }) => ({
-                width: 50,
-                paddingTop: 12,
-                paddingBottom: 12,
+                flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'center',
-                transform: [{ scale: pressed ? 0.94 : 1 }],
+                gap: 6,
+                paddingHorizontal: 14,
+                height: 46,
+                backgroundColor: pressed ? 'rgba(15,15,15,0.05)' : 'transparent',
               })}
             >
-              <LikeBurst liked={liked} size={20} color={BRAND_PURPLE} inactiveColor={BRAND_INK} />
-              <AnimatedNumber
-                value={heartCount}
-                height={14}
-                style={{ fontSize: 11, fontWeight: '700', color: BRAND_INK, marginTop: 2 }}
-              />
+              <LikeBurst liked={liked} size={19} color={BRAND_PURPLE} inactiveColor={BRAND_INK} />
+              {heartCount > 0 ? (
+                <AnimatedNumber
+                  value={heartCount}
+                  height={17}
+                  style={{ fontSize: 13, fontWeight: '700', color: BRAND_INK }}
+                />
+              ) : null}
             </Pressable>
-            {/* Divider between heart and bookmark */}
-            <View
-              style={{
-                height: HAIRLINE,
-                width: 32,
-                alignSelf: 'center',
-                backgroundColor: 'rgba(15,15,15,0.12)',
-              }}
-            />
+
+            {/* Divider — full-bleed within the shared surface */}
+            <View style={{ height: HAIRLINE, backgroundColor: 'rgba(15,15,15,0.10)' }} />
+
+            {/* Save to collection */}
             <Pressable
               onPress={() => {
                 if (!user?.id) {
@@ -821,19 +835,13 @@ export default function ProductScreen() {
               accessibilityRole="button"
               accessibilityLabel={saved ? 'Edit save lists' : 'Save to list'}
               style={({ pressed }) => ({
-                width: 50,
-                paddingTop: 12,
-                paddingBottom: 12,
                 alignItems: 'center',
                 justifyContent: 'center',
-                transform: [{ scale: pressed ? 0.94 : 1 }],
+                height: 46,
+                backgroundColor: pressed ? 'rgba(15,15,15,0.05)' : 'transparent',
               })}
             >
-              <Feather
-                name="bookmark"
-                size={20}
-                color={saved ? BRAND_PURPLE : BRAND_INK}
-              />
+              <Feather name="bookmark" size={19} color={saved ? BRAND_PURPLE : BRAND_INK} />
             </Pressable>
           </View>
 
@@ -926,18 +934,67 @@ export default function ProductScreen() {
             );
           })()}
 
-          {/* Price — moved below the meta line, large and left-aligned */}
-          <Text
-            style={{
-              marginTop: 14,
-              fontSize: 28,
-              fontFamily: 'Inter_700Bold',
-              color: BRAND_INK,
-              letterSpacing: -0.6,
-            }}
-          >
-            ${listing.price}
-          </Text>
+          {/* Price — the buyer pays item + Buyer Protection, so the total leads
+              (large, left-aligned) with the item price kept visible beside it.
+              The protection line taps into a full breakdown sheet. */}
+          {bpFee > 0 ? (
+            <View style={{ marginTop: 14 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10 }}>
+                <Text
+                  style={{
+                    fontSize: 28,
+                    fontFamily: 'Inter_700Bold',
+                    color: BRAND_INK,
+                    letterSpacing: -0.6,
+                  }}
+                >
+                  {formatPrice(buyTotal)}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 15,
+                    fontFamily: 'Inter_500Medium',
+                    color: 'rgba(15,15,15,0.45)',
+                  }}
+                >
+                  {formatPrice(itemPrice)} item
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => { tap('selection'); setBpVisible(true); }}
+                accessibilityRole="button"
+                accessibilityLabel="See the Buyer Protection breakdown"
+                hitSlop={8}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  marginTop: 8,
+                  alignSelf: 'flex-start',
+                  minHeight: 28,
+                  opacity: pressed ? 0.6 : 1,
+                })}
+              >
+                <Feather name="shield" size={13} color={BRAND_PURPLE} />
+                <Text style={{ fontSize: 13, fontFamily: 'Inter_600SemiBold', color: BRAND_PURPLE, letterSpacing: 0.1 }}>
+                  Includes Buyer Protection
+                </Text>
+                <Feather name="chevron-right" size={14} color={BRAND_PURPLE} />
+              </Pressable>
+            </View>
+          ) : (
+            <Text
+              style={{
+                marginTop: 14,
+                fontSize: 28,
+                fontFamily: 'Inter_700Bold',
+                color: BRAND_INK,
+                letterSpacing: -0.6,
+              }}
+            >
+              {formatPrice(listing.price)}
+            </Text>
+          )}
 
         </View>
 
@@ -1429,18 +1486,18 @@ export default function ProductScreen() {
             </View>
           )}
 
-          {/* Share / Report actions grouped left; listing ID pushed to the
-              right edge via space-between. */}
+          {/* Three balanced columns: Share left, Report centered, listing ID
+              right. Equal-flex columns keep Report optically centered on the
+              page regardless of the neighbouring labels' widths. */}
           <View
             style={{
               flexDirection: 'row',
               alignItems: 'center',
-              justifyContent: 'space-between',
               marginTop: 22,
               paddingHorizontal: 4,
             }}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+            <View style={{ flex: 1, alignItems: 'flex-start' }}>
               <Pressable
                 onPress={shareListing}
                 accessibilityRole="button"
@@ -1465,6 +1522,8 @@ export default function ProductScreen() {
                   Share
                 </Text>
               </Pressable>
+            </View>
+            <View style={{ flex: 1, alignItems: 'center' }}>
               <Pressable
                 onPress={handleReport}
                 accessibilityRole="button"
@@ -1490,16 +1549,18 @@ export default function ProductScreen() {
                 </Text>
               </Pressable>
             </View>
-            <Text
-              style={{
-                fontSize: 12,
-                color: CHEVRON_GRAY,
-                letterSpacing: 0.4,
-                fontFamily: 'Inter_500Medium',
-              }}
-            >
-              ID · {listing.id.slice(0, 8)}
-            </Text>
+            <View style={{ flex: 1, alignItems: 'flex-end' }}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: CHEVRON_GRAY,
+                  letterSpacing: 0.4,
+                  fontFamily: 'Inter_500Medium',
+                }}
+              >
+                ID · {listing.id.slice(0, 8)}
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -1562,6 +1623,14 @@ export default function ProductScreen() {
                   else next.add(id);
                   return next;
                 });
+              }}
+              onSelectAll={() => {
+                tap('medium');
+                setSelectedBundleIds(new Set(sellerItems.map((s) => s.id)));
+              }}
+              onClearAll={() => {
+                tap('selection');
+                setSelectedBundleIds(new Set());
               }}
               onSendBundleOffer={(amount) => {
                 tap('medium');
@@ -1655,7 +1724,7 @@ export default function ProductScreen() {
         >
           <Feather name="lock" size={12} color="rgba(15,15,15,0.62)" />
           <Text style={{ fontSize: 12, fontWeight: '500', color: 'rgba(15,15,15,0.62)' }}>
-            Secure checkout · Buyer protection included
+            Secure checkout · Buyer Protection included
           </Text>
         </View>
 
@@ -1706,7 +1775,7 @@ export default function ProductScreen() {
               router.push(`/payment/${listing.id}` as any);
             }}
             accessibilityRole="button"
-            accessibilityLabel={`Buy now for $${listing.price}`}
+            accessibilityLabel={`Buy now for ${formatPrice(buyTotal)}, Buyer Protection included`}
             accessibilityHint="Proceeds to secure checkout"
             style={({ pressed }) => ({
               flex: 1,
@@ -1722,7 +1791,7 @@ export default function ProductScreen() {
             })}
           >
             <Text style={{ fontSize: 15, fontWeight: '800', color: 'white', letterSpacing: 0.2 }}>
-              Buy now · ${listing.price}
+              Buy now · {bpFee > 0 ? formatPrice(buyTotal) : formatPrice(listing.price)}
             </Text>
           </Pressable>
         </View>
@@ -1751,6 +1820,13 @@ export default function ProductScreen() {
         askingPrice={Number(listing.price ?? 0)}
         onClose={() => setOfferVisible(false)}
         onSubmit={submitOffer}
+      />
+
+      {/* Buyer Protection breakdown — opens from the price row */}
+      <BuyerProtectionSheet
+        visible={bpVisible}
+        itemPrice={itemPrice}
+        onClose={() => setBpVisible(false)}
       />
 
       {/* Fullscreen image viewer — opens on tap, swipe to navigate */}

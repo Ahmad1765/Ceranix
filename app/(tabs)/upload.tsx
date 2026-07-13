@@ -32,6 +32,7 @@ import { emitListingCreated } from '@/lib/listingEvents';
 import { invalidateFresh } from '@/lib/freshness';
 import type { Category, Condition, Gender, Listing } from '@/types';
 import { CATEGORIES, hasSubcategories, suggestSubcategory } from '@/lib/categories';
+import { CURRENCY_SYMBOL, CURRENCY_CODE } from '@/lib/currency';
 import { ITEM_COLORS } from '@/lib/itemColors';
 import { ColorSwatch } from '@/components/ColorSwatch';
 import { SafetyBanner } from '@/components/SafetyBanner';
@@ -52,6 +53,8 @@ const GENDERS: { label: string; value: Gender }[] = [
 ];
 
 const MAX_IMAGES = 7;
+const TITLE_MAX = 80;
+const DESCRIPTION_MAX = 1000;
 
 function StepDots({ current }: { current: 1 | 2 }) {
   return (
@@ -645,9 +648,20 @@ function SellScreenInner() {
               className="border border-ink-hair"
               style={{ borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 10 }}
             >
-              <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(15,15,15,0.55)', letterSpacing: 0.4 }}>
-                TITLE
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(15,15,15,0.55)', letterSpacing: 0.4 }}>
+                  TITLE
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: '600',
+                    color: title.length >= TITLE_MAX ? '#6C47FF' : 'rgba(15,15,15,0.35)',
+                  }}
+                >
+                  {title.length}/{TITLE_MAX}
+                </Text>
+              </View>
               <TextInput
                 style={{
                   fontSize: 16,
@@ -662,7 +676,8 @@ function SellScreenInner() {
                 placeholder="e.g. Zara floral midi dress"
                 placeholderTextColor="rgba(15,15,15,0.35)"
                 value={title}
-                onChangeText={setTitle}
+                onChangeText={(t) => setTitle(t.slice(0, TITLE_MAX))}
+                maxLength={TITLE_MAX}
               />
             </View>
 
@@ -708,8 +723,8 @@ function SellScreenInner() {
                   PRICE
                 </Text>
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 2 }}>
-                  <Text className="text-primary" style={{ fontSize: 26, fontWeight: '800', marginRight: 4 }}>
-                    $
+                  <Text className="text-primary" style={{ fontSize: 22, fontWeight: '800', marginRight: 6 }}>
+                    {CURRENCY_SYMBOL}
                   </Text>
                   <TextInput
                     style={{
@@ -734,7 +749,7 @@ function SellScreenInner() {
                 className="text-ink-mute"
                 style={{ fontSize: 12, fontWeight: '600' }}
               >
-                USD
+                {CURRENCY_CODE}
               </Text>
             </View>
           </View>
@@ -1045,9 +1060,27 @@ function SellScreenInner() {
               className="border border-ink-hair"
               style={{ borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 10 }}
             >
-              <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(15,15,15,0.55)', letterSpacing: 0.4 }}>
-                DESCRIPTION <Text style={{ color: 'rgba(15,15,15,0.35)' }}>(optional)</Text>
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(15,15,15,0.55)', letterSpacing: 0.4 }}>
+                  DESCRIPTION <Text style={{ color: 'rgba(15,15,15,0.35)' }}>(optional)</Text>
+                </Text>
+                {/* Live counter — stays quiet until the seller nears the cap, then
+                    turns purple as a gentle heads-up rather than a hard stop. */}
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: '600',
+                    color:
+                      description.length >= DESCRIPTION_MAX
+                        ? '#6C47FF'
+                        : description.length > DESCRIPTION_MAX - 100
+                          ? 'rgba(108,71,255,0.75)'
+                          : 'rgba(15,15,15,0.35)',
+                  }}
+                >
+                  {description.length}/{DESCRIPTION_MAX}
+                </Text>
+              </View>
               <TextInput
                 style={{
                   fontSize: 15,
@@ -1062,7 +1095,8 @@ function SellScreenInner() {
                 placeholder="Condition details, measurements, fit, why you're selling…"
                 placeholderTextColor="rgba(15,15,15,0.35)"
                 value={description}
-                onChangeText={setDescription}
+                onChangeText={(t) => setDescription(t.slice(0, DESCRIPTION_MAX))}
+                maxLength={DESCRIPTION_MAX}
                 multiline
                 textAlignVertical="top"
               />

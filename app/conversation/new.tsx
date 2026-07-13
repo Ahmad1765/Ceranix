@@ -20,6 +20,7 @@ import { useAuth } from '@/lib/auth';
 import { fetchListingById } from '@/lib/listings';
 import { getOrCreateConversation, sendMessage, sendOffer } from '@/lib/chat';
 import { getOptimizedImageUrl } from '@/lib/images';
+import { formatPrice, CURRENCY_SYMBOL } from '@/lib/currency';
 import { useToast } from '@/lib/toast';
 import { captureError } from '@/lib/sentry';
 import type { Listing } from '@/types';
@@ -350,7 +351,7 @@ export default function NewConversationScreen() {
                 </Text>
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 4 }}>
                   <Text className="text-ink" style={{ fontSize: 18, fontWeight: '800' }}>
-                    ${listing.price}
+                    {formatPrice(listing.price)}
                   </Text>
                   {listing.size ? (
                     <Text
@@ -545,9 +546,9 @@ export default function NewConversationScreen() {
                     <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
                       <Text
                         className="text-primary"
-                        style={{ fontSize: 32, fontWeight: '800', marginRight: 4 }}
+                        style={{ fontSize: 26, fontWeight: '800', marginRight: 6 }}
                       >
-                        $
+                        {CURRENCY_SYMBOL}
                       </Text>
                       <TextInput
                         ref={amountRef}
@@ -623,7 +624,7 @@ export default function NewConversationScreen() {
                             }}
                             numberOfLines={1}
                           >
-                            ${s.value}
+                            {formatPrice(s.value)}
                           </Text>
                         </Pressable>
                       );
@@ -755,7 +756,7 @@ export default function NewConversationScreen() {
                 ? 'Sending…'
                 : mode === 'offer'
                   ? offerValid
-                    ? `Send offer · $${amountNum}`
+                    ? `Send offer · ${formatPrice(amountNum)}`
                     : 'Enter an amount'
                   : msgValid
                     ? 'Send message'
