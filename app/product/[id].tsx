@@ -59,7 +59,6 @@ import {
   IMAGE_HEIGHT,
   CONDITION_LABELS,
   BRAND_PURPLE,
-  BRAND_PURPLE_SOFT,
   BRAND_LIME,
   BRAND_INK,
   INK_700,
@@ -68,6 +67,7 @@ import {
   FALLBACK_SELLER,
   EMPTY_LISTINGS,
   conditionLabel,
+  timeAgo,
   listingToRelated,
   CARD_GAP,
   CARD_OUTER_PAD,
@@ -859,88 +859,84 @@ export default function ProductScreen() {
 
         {/* ── Title block (editorial) ── */}
         <View style={{ paddingHorizontal: 20, paddingTop: 22, paddingBottom: 18 }}>
-          {/* Title + price row */}
-          <View
+          {heartCount > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 6 }}>
+              <Feather name="heart" size={12} color="rgba(15,15,15,0.55)" />
+              <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.55)', fontFamily: 'Inter_500Medium' }}>
+                Liked by <Text style={{ fontFamily: 'Inter_700Bold', color: BRAND_INK }}>{heartCount} {heartCount === 1 ? 'person' : 'people'}</Text>
+              </Text>
+            </View>
+          )}
+
+          <Text
             style={{
-              flexDirection: 'row',
-              alignItems: 'flex-end',
-              justifyContent: 'space-between',
+              fontSize: 28,
+              fontFamily: 'Inter_700Bold',
+              color: BRAND_INK,
+              lineHeight: 33,
+              letterSpacing: -0.6,
+            }}
+            numberOfLines={2}
+          >
+            {listing.title}
+          </Text>
+
+          {/* Meta line — one subtle row (size · condition · brand · location)
+              instead of chunky pills, so the title/price read as a clean
+              editorial stack. Brand stays a tappable purple link into
+              Discover; condition is still surfaced as a primary factor. */}
+          {(() => {
+            const cond = conditionLabel(listing.condition);
+            const uploaded = listing.created_at ? timeAgo(listing.created_at) : '';
+            const segs = [
+              listing.size ? { text: `Size ${listing.size}` } : null,
+              cond ? { text: cond } : null,
+              listing.brand ? { text: listing.brand, link: true } : null,
+              listing.seller?.location ? { text: listing.seller.location } : null,
+              uploaded ? { text: `Uploaded ${uploaded}` } : null,
+            ].filter(Boolean) as { text: string; link?: boolean }[];
+            if (segs.length === 0) return null;
+            return (
+              <Text
+                numberOfLines={2}
+                style={{ marginTop: 10, fontSize: 14, lineHeight: 20, color: 'rgba(15,15,15,0.55)', fontFamily: 'Inter_500Medium' }}
+              >
+                {segs.map((s, i) => (
+                  <Text key={i}>
+                    {i > 0 ? <Text style={{ color: 'rgba(15,15,15,0.28)' }}>{' · '}</Text> : null}
+                    {s.link ? (
+                      <Text
+                        style={{ color: BRAND_PURPLE, fontFamily: 'Inter_600SemiBold' }}
+                        accessibilityRole="link"
+                        accessibilityLabel={`Shop more from ${s.text}`}
+                        onPress={() => {
+                          tap('selection');
+                          router.push(`/(tabs)/discover?q=${encodeURIComponent(listing.brand!)}` as any);
+                        }}
+                      >
+                        {s.text}
+                      </Text>
+                    ) : (
+                      s.text
+                    )}
+                  </Text>
+                ))}
+              </Text>
+            );
+          })()}
+
+          {/* Price — moved below the meta line, large and left-aligned */}
+          <Text
+            style={{
+              marginTop: 14,
+              fontSize: 28,
+              fontFamily: 'Inter_700Bold',
+              color: BRAND_INK,
+              letterSpacing: -0.6,
             }}
           >
-            <View style={{ flex: 1, paddingRight: 14 }}>
-              {heartCount > 0 && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 6 }}>
-                <Feather name="heart" size={12} color="rgba(15,15,15,0.55)" />
-                <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.55)', fontFamily: 'Inter_500Medium' }}>
-                  Liked by <Text style={{ fontFamily: 'Inter_700Bold', color: BRAND_INK }}>{heartCount} {heartCount === 1 ? 'person' : 'people'}</Text>
-                </Text>
-              </View>
-              )}
-              <Text
-                style={{
-                  fontSize: 28,
-                  fontFamily: 'Inter_700Bold',
-                  color: BRAND_INK,
-                  lineHeight: 33,
-                  letterSpacing: -0.6,
-                }}
-                numberOfLines={2}
-              >
-                {listing.title}
-              </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: 10, gap: 8 }}>
-                <View
-                  style={{
-                    backgroundColor: 'rgba(15,15,15,0.04)',
-                    borderRadius: 999,
-                    paddingHorizontal: 11,
-                    paddingVertical: 5,
-                  }}
-                >
-                  <Text style={{ fontSize: 12, fontFamily: 'Inter_600SemiBold', color: BRAND_INK, letterSpacing: 0.1 }}>
-                    Size {listing.size}
-                  </Text>
-                </View>
-                {/* Condition is a primary purchase factor — surface it next to
-                    size instead of burying it in the details rows below. */}
-                {conditionLabel(listing.condition) ? (
-                  <View
-                    style={{
-                      backgroundColor: BRAND_PURPLE_SOFT,
-                      borderRadius: 999,
-                      paddingHorizontal: 11,
-                      paddingVertical: 5,
-                    }}
-                  >
-                    <Text style={{ fontSize: 12, fontFamily: 'Inter_600SemiBold', color: BRAND_PURPLE, letterSpacing: 0.1 }}>
-                      {conditionLabel(listing.condition)}
-                    </Text>
-                  </View>
-                ) : null}
-                {listing.seller?.location ? (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Feather name="map-pin" size={11} color="rgba(15,15,15,0.55)" />
-                    <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.55)', fontFamily: 'Inter_500Medium' }} numberOfLines={1}>
-                      {listing.seller.location}
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-            </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Text
-                style={{
-                  fontSize: 26,
-                  fontFamily: 'Inter_700Bold',
-                  color: BRAND_INK,
-                  lineHeight: 30,
-                  letterSpacing: -0.6,
-                }}
-              >
-                ${listing.price}
-              </Text>
-            </View>
-          </View>
+            ${listing.price}
+          </Text>
 
         </View>
 

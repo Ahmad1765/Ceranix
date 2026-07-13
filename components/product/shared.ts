@@ -105,6 +105,25 @@ export function conditionLabel(c: Listing['condition']) {
   }
 }
 
+// Relative "uploaded X ago" label for listing timestamps. Coarsens as the
+// listing ages (min → hours → days → weeks) and falls back to an absolute
+// short date past ~a month, so old items don't read as "6 weeks ago".
+export function timeAgo(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return '';
+  const secs = Math.max(0, Math.round((Date.now() - then) / 1000));
+  if (secs < 45) return 'just now';
+  const mins = Math.round(secs / 60);
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
+  const days = Math.round(hours / 24);
+  if (days < 7) return `${days} ${days === 1 ? 'day' : 'days'} ago`;
+  const weeks = Math.round(days / 7);
+  if (weeks < 5) return `${weeks} ${weeks === 1 ? 'week' : 'weeks'} ago`;
+  return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
+
 export function listingToRelated(row: Listing): RelatedItem {
   const meta = [row.size, conditionLabel(row.condition)].filter(Boolean).join(' · ');
   return {
