@@ -1,22 +1,51 @@
 // Product detail — drives the page from a live listing fetched at runtime.
-// We assert the page mounted (description block or seller card visible) and
-// that the not-found path renders the error state for an obviously bad id.
+// We assert the page mounted (details box or seller card visible) and that the
+// not-found path renders the error state for an obviously bad id.
 
 import { test, expect, waitForAppReady, fetchAnyLiveListing } from './helpers/page';
 
 test.describe('Product detail', () => {
-  test('renders a real listing\'s hero and description block', async ({ page }) => {
+  test('renders a real listing\'s hero and details box', async ({ page }) => {
     await page.goto('/');
     await waitForAppReady(page);
     const listing = await fetchAnyLiveListing(page);
     test.skip(!listing, 'no listings in the live DB to drive this test');
     await page.goto(`/product/${listing!.id}`);
     await waitForAppReady(page);
-    // The product page always renders an "Item description" eyebrow. That's
-    // a stable structural element regardless of what data backs the page.
-    await expect(page.getByText('Item description')).toBeVisible({ timeout: 20_000 });
-    // A `$<price>` Text also always renders in the hero block.
-    await expect(page.locator('text=/^\\$\\d[\\d,]*$/').first()).toBeVisible();
+    // The details box always opens with a Category row, whatever data backs
+    // the page. This replaced the old "Item description" eyebrow, dropped when
+    // the description moved to the bottom of the box.
+    await expect(page.getByText('Category', { exact: true })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('Condition', { exact: true })).toBeVisible();
+    // A formatted price also always renders in the hero block. Money is PKR
+    // via lib/currency ("Rs 16,450" / "Rs 16,450.45"), never "$".
+    await expect(page.locator('text=/^Rs [\\d,]+(\\.\\d{2})?$/').first()).toBeVisible();
+  });
+
+  test('offer stays shut for signed-out visitors', async ({ page }) => {
+    await page.goto('/');
+    await waitForAppReady(page);
+    const listing = await fetchAnyLiveListing(page);
+    test.skip(!listing, 'no listings in the live DB to drive this test');
+    await page.goto(`/product/${listing!.id}`);
+    await waitForAppReady(page);
+
+    // The inline offer field replaced the OfferSheet modal. Signed out, the
+    // guest gate must intercept before the field can expand.
+    const offer = page.getByRole('button', { name: 'Make an offer' });
+    await expect(offer).toBeVisible({ timeout: 20_000 });
+    await offer.click();
+
+    // Assert on the pill's width, not the field's visibility: the field is
+    // always mounted and merely faded out, and Playwright counts opacity-0
+    // elements as visible. The pill only leaves its collapsed width when the
+    // gate passes.
+    const pill = page.getByLabel('Offer amount').locator('xpath=ancestor::div[2]');
+    await expect(async () => {
+      const box = await pill.boundingBox();
+      expect(box?.width).toBeLessThan(150);
+    }).toPass({ timeout: 5_000 });
+    await expect(page.getByText(/free account/i).first()).toBeVisible();
   });
 
   test('unknown listing id renders the "Listing not available" empty state', async ({ page }) => {

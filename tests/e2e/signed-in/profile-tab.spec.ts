@@ -3,7 +3,7 @@
 // the account in any way.
 
 import { test, expect } from '@playwright/test';
-import { waitForAppReady } from '../helpers/page';
+import { waitForAppReady, PRICE_PATTERN } from '../helpers/page';
 
 test.describe('Profile tab (signed in)', () => {
   test.beforeEach(async ({ page }) => {
@@ -25,9 +25,9 @@ test.describe('Profile tab (signed in)', () => {
 
   test('Liked tab is reachable and renders either its grid or empty state', async ({ page }) => {
     await page.getByText('Liked', { exact: true }).click();
-    // Either a `$<price>` chip (real liked listing) or the empty state.
+    // Either a price chip (real liked listing) or the empty state.
     await expect(
-      page.locator('text=/^\\$\\d[\\d,]*$|Nothing liked yet/').first(),
+      page.locator(`text=/${PRICE_PATTERN}|Nothing liked yet/`).first(),
     ).toBeVisible();
   });
 

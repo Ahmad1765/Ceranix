@@ -43,7 +43,7 @@ import { AnimatedNumber } from '@/components/AnimatedNumber';
 import { SaveListSheet } from '@/components/SaveListSheet';
 import { isSaved as fetchIsSaved } from '@/lib/saves';
 import { FullscreenImageViewer } from '@/components/product/FullscreenImageViewer';
-import { OfferSheet } from '@/components/product/OfferSheet';
+import { ProductActionBar } from '@/components/product/ProductActionBar';
 import { RelatedItemCard } from '@/components/product/RelatedItemCard';
 import { ProductSkeleton } from '@/components/product/ProductSkeleton';
 import { HeroPageDot } from '@/components/product/HeroPageDot';
@@ -60,7 +60,6 @@ import {
   IMAGE_HEIGHT,
   CONDITION_LABELS,
   BRAND_PURPLE,
-  BRAND_LIME,
   BRAND_INK,
   INK_700,
   TAG_BG,
@@ -91,6 +90,21 @@ const CHEVRON_GRAY = '#9CA3AF';
 
 // Lines of description shown before the "Read more" toggle collapses the rest.
 const DESC_CLAMP_LINES = 6;
+
+// Width of the label column in the details box. Values then start on a shared
+// left edge instead of hanging off each label's own width, which is what makes
+// the rows read as a table rather than a list of sentences. Sized off the
+// longest label ("Condition") at 15px semibold, plus breathing room.
+const LABEL_W = 104;
+
+type DetailRow = {
+  label: string;
+  value?: string | null;
+  /** Renders the value in brand purple — reserved for rows that navigate. */
+  link?: boolean;
+  onPress?: () => void;
+  trailing?: React.ReactNode;
+};
 
 export default function ProductScreen() {
   const { id } = useLocalSearchParams();
@@ -125,7 +139,6 @@ export default function ProductScreen() {
   const [relatedTab, setRelatedTab] = useState<'members' | 'similar'>('members');
   const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
   const [saveListVisible, setSaveListVisible] = useState(false);
-  const [offerVisible, setOfferVisible] = useState(false);
   const [bpVisible, setBpVisible] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -477,27 +490,27 @@ export default function ProductScreen() {
     } as any);
   };
 
-  // Opens the price-suggestion sheet after the same gates openChat applies.
-  const openOffer = () => {
-    tap('medium');
+  // Gates the action bar's inline offer field with the same rules openChat
+  // applies. Returns false — having already handled the refusal — when this
+  // buyer can't make an offer, which keeps the field from expanding.
+  const canOffer = () => {
     if (!user) {
       guestGate.prompt({
         title: 'Make an offer',
         message: 'Create a free account to send the seller a price suggestion.',
         icon: 'tag',
       });
-      return;
+      return false;
     }
-    if (!listing) return;
+    if (!listing) return false;
     if (listing.seller_id === user.id) {
       toast.show("That's your own listing", { variant: 'default', icon: 'info' });
-      return;
+      return false;
     }
-    setOfferVisible(true);
+    return true;
   };
 
   const submitOffer = (amount: number) => {
-    setOfferVisible(false);
     if (!listing) return;
     router.push({
       pathname: '/conversation/new',
@@ -665,6 +678,10 @@ export default function ProductScreen() {
   const catSubLabel = listing.subcategory
     ? subcategoryLabel(listing.category, listing.subcategory)
     : '';
+  // `listings.images` is nullable in Postgres, so a row can arrive with no
+  // array at all. Normalize once here rather than guarding at each of the four
+  // read sites below.
+  const images = listing.images ?? [];
 
   return (
     <View style={{ flex: 1, backgroundColor: 'white' }}>
@@ -721,7 +738,23 @@ export default function ProductScreen() {
               onScroll={heroScrollHandler}
               scrollEventThrottle={16}
             >
-              {listing.images.map((uri, i) => (
+              {/* An imageless row would collapse the hero to zero height and
+                  leave the floating like/save control sitting on the title, so
+                  hold the space with a neutral tile. */}
+              {images.length === 0 ? (
+                <View
+                  style={{
+                    width,
+                    height: IMAGE_HEIGHT,
+                    backgroundColor: '#F3F4F6',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Feather name="image" size={32} color="rgba(15,15,15,0.30)" />
+                </View>
+              ) : null}
+              {images.map((uri, i) => (
                 <Pressable
                   key={i}
                   onPress={() => { tap('selection'); setFullscreenIndex(i); }}
@@ -846,7 +879,7 @@ export default function ProductScreen() {
           </View>
 
           {/* Pagination dashes */}
-          {listing.images.length > 1 && (
+          {images.length > 1 && (
             <View
               style={{
                 position: 'absolute',
@@ -859,7 +892,7 @@ export default function ProductScreen() {
                 gap: 6,
               }}
             >
-              {listing.images.map((_, i) => (
+              {images.map((_, i) => (
                 <HeroPageDot key={i} index={i} offsetX={heroOffsetX} pageWidth={width} />
               ))}
             </View>
@@ -915,7 +948,11 @@ export default function ProductScreen() {
                     {i > 0 ? <Text style={{ color: 'rgba(15,15,15,0.28)' }}>{' · '}</Text> : null}
                     {s.link ? (
                       <Text
-                        style={{ color: BRAND_PURPLE, fontFamily: 'Inter_600SemiBold' }}
+                        style={{
+                          color: BRAND_PURPLE,
+                          fontFamily: 'Inter_600SemiBold',
+                          textDecorationLine: 'underline',
+                        }}
                         accessibilityRole="link"
                         accessibilityLabel={`Shop more from ${s.text}`}
                         onPress={() => {
@@ -1220,37 +1257,11 @@ export default function ProductScreen() {
           </View>
         </View>
 
-        {/* ── Description + Details ── */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 22, paddingBottom: 6 }}>
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              marginBottom: 10,
-              marginLeft: 4,
-            }}
-          >
-            <View
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: 3,
-                backgroundColor: BRAND_LIME,
-                marginRight: 8,
-              }}
-            />
-            <Text
-              style={{
-                fontSize: 11,
-                color: BRAND_INK,
-                letterSpacing: 1.6,
-                textTransform: 'uppercase',
-                fontFamily: 'Inter_700Bold',
-              }}
-            >
-              Item description
-            </Text>
-          </View>
+        {/* ── Details + description ──
+            Fixed-height attribute rows lead so the box's top edge lands in the
+            same place on every listing; the variable-length description sits
+            last, behind a divider. */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6 }}>
           <View
             style={{
               backgroundColor: 'white',
@@ -1260,87 +1271,24 @@ export default function ProductScreen() {
               overflow: 'hidden',
             }}
           >
-            {/* Description block — sellers separate paragraphs with pipes, so
-                split on "|" and render each as its own line to break up the
-                wall of text. Falls back to a single paragraph when there's no
-                pipe. */}
-            <View style={{ paddingHorizontal: 18, paddingTop: 18, paddingBottom: 18 }}>
-              {(() => {
-                const paras = String(listing.description ?? '')
-                  .split('|')
-                  .map((s) => s.trim())
-                  .filter(Boolean);
-                if (paras.length === 0) return null;
-                // Join paragraphs into one Text (blank line between) so the
-                // clamp counts the whole block; numberOfLines maps to CSS
-                // line-clamp on web and native truncation on device. A length/
-                // paragraph heuristic decides whether the toggle is warranted —
-                // deterministic, so there's no measure-then-clamp flicker.
-                const full = paras.join('\n\n');
-                const isLong = full.length > 240 || paras.length > 3;
-                const collapsed = isLong && !descExpanded;
-                return (
-                  <>
-                    <Text
-                      numberOfLines={collapsed ? DESC_CLAMP_LINES : undefined}
-                      style={{
-                        fontSize: 15,
-                        color: INK_700,
-                        lineHeight: 24,
-                        fontFamily: 'Inter_400Regular',
-                      }}
-                    >
-                      {full}
-                    </Text>
-                    {isLong ? (
-                      <Pressable
-                        onPress={() => { tap('selection'); setDescExpanded((v) => !v); }}
-                        hitSlop={10}
-                        accessibilityRole="button"
-                        accessibilityLabel={descExpanded ? 'Collapse description' : 'Expand full description'}
-                        style={({ pressed }) => ({
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 4,
-                          marginTop: 12,
-                          minHeight: 44,
-                          opacity: pressed ? 0.6 : 1,
-                        })}
-                      >
-                        <Text style={{ fontSize: 13, fontFamily: 'Inter_600SemiBold', color: BRAND_PURPLE, letterSpacing: 0.2 }}>
-                          {descExpanded ? 'Show less' : 'Read more'}
-                        </Text>
-                        <Feather
-                          name={descExpanded ? 'chevron-up' : 'chevron-down'}
-                          size={16}
-                          color={BRAND_PURPLE}
-                        />
-                      </Pressable>
-                    ) : null}
-                  </>
-                );
-              })()}
-            </View>
-
             {/* Category breadcrumb — category ▸ subcategory, each segment
-                searchable (taps into Discover filtered at that level). */}
+                searchable (taps into Discover filtered at that level). First
+                row in the box, so no top divider. */}
             <View
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
                 paddingHorizontal: 18,
                 paddingVertical: 16,
-                borderTopWidth: HAIRLINE,
-                borderTopColor: ROW_DIVIDER,
               }}
             >
               <Text
                 style={{
+                  width: LABEL_W,
                   fontFamily: 'Inter_600SemiBold',
                   fontSize: 15,
                   color: BRAND_INK,
                   letterSpacing: 0.1,
-                  marginRight: 12,
                 }}
               >
                 Category
@@ -1381,51 +1329,64 @@ export default function ProductScreen() {
                   </>
                 ) : null}
               </View>
-              <Feather name="chevron-right" size={18} color={CHEVRON_GRAY} />
+              {/* marginLeft matches the detail rows' trailing wrapper, so every
+                  chevron in the box lands on the same right edge. */}
+              <Feather
+                name="chevron-right"
+                size={18}
+                color={CHEVRON_GRAY}
+                style={{ marginLeft: 10 }}
+              />
             </View>
 
             {/* Details rows */}
-            {[
-              {
-                label: 'Brand',
-                value: listing.brand,
-                // Tap to search Discover for other items from this brand.
-                onPress: listing.brand
-                  ? () => {
-                      tap('selection');
-                      router.push(`/(tabs)/discover?q=${encodeURIComponent(listing.brand!)}` as any);
-                    }
-                  : undefined,
-                trailing: listing.brand ? <Feather name="chevron-right" size={18} color={CHEVRON_GRAY} /> : undefined,
-              },
-              {
-                label: 'Size',
-                value: listing.size,
-              },
-              {
-                label: 'Condition',
-                value: CONDITION_LABELS[listing.condition] ?? listing.condition,
-                onPress: () =>
-                  Alert.alert(
-                    'Condition guide',
-                    'New with tags — Unworn, original tags still attached\n\n' +
-                      'Like new — Worn once or twice, no visible flaws\n\n' +
-                      'Very good — Gently used, only minor signs of wear\n\n' +
-                      'Fair — Noticeable wear, but still fully wearable',
-                  ),
-                trailing: <Feather name="info" size={17} color="rgba(15,15,15,0.55)" />,
-              },
-              // Only shown when the seller set a real colour (legacy rows omit it).
-              ...(listing.color
-                ? [
-                    {
-                      label: 'Color',
-                      value: itemColorLabel(listing.color),
-                      trailing: <ColorSwatch colorId={listing.color} size={18} />,
-                    },
-                  ]
-                : []),
-            ].map((row) => {
+            {(
+              [
+                {
+                  label: 'Brand',
+                  value: listing.brand,
+                  link: !!listing.brand,
+                  // Tap to search Discover for other items from this brand.
+                  onPress: listing.brand
+                    ? () => {
+                        tap('selection');
+                        router.push(`/(tabs)/discover?q=${encodeURIComponent(listing.brand!)}` as any);
+                      }
+                    : undefined,
+                  trailing: listing.brand ? <Feather name="chevron-right" size={18} color={CHEVRON_GRAY} /> : undefined,
+                },
+                {
+                  label: 'Size',
+                  value: listing.size,
+                },
+                {
+                  label: 'Condition',
+                  value: CONDITION_LABELS[listing.condition] ?? listing.condition,
+                  onPress: () =>
+                    Alert.alert(
+                      'Condition guide',
+                      'New with tags — Unworn, original tags still attached\n\n' +
+                        'Like new — Worn once or twice, no visible flaws\n\n' +
+                        'Very good — Gently used, only minor signs of wear\n\n' +
+                        'Fair — Noticeable wear, but still fully wearable',
+                    ),
+                  trailing: <Feather name="info" size={17} color="rgba(15,15,15,0.55)" />,
+                },
+                // Only shown when the seller set a real colour (legacy rows omit it).
+                ...(listing.color
+                  ? [
+                      {
+                        label: 'Color',
+                        value: itemColorLabel(listing.color),
+                        trailing: <ColorSwatch colorId={listing.color} size={18} />,
+                      },
+                    ]
+                  : []),
+                ...(listing.created_at
+                  ? [{ label: 'Uploaded', value: timeAgo(listing.created_at) }]
+                  : []),
+              ] as DetailRow[]
+            ).map((row) => {
               return (
                 <Pressable
                   key={row.label}
@@ -1443,15 +1404,99 @@ export default function ProductScreen() {
                     backgroundColor: pressed && row.onPress ? 'rgba(15,15,15,0.04)' : 'white',
                   })}
                 >
-                  <Text style={{ flex: 1, fontSize: 15, color: INK_700 }} numberOfLines={1}>
-                    <Text style={{ fontFamily: 'Inter_600SemiBold', color: BRAND_INK, letterSpacing: 0.1 }}>{row.label}</Text>
-                    <Text style={{ fontFamily: 'Inter_400Regular' }}>   </Text>
-                    <Text style={{ fontFamily: 'Inter_400Regular' }}>{row.value}</Text>
+                  <Text
+                    style={{
+                      width: LABEL_W,
+                      fontSize: 15,
+                      fontFamily: 'Inter_600SemiBold',
+                      color: BRAND_INK,
+                      letterSpacing: 0.1,
+                    }}
+                  >
+                    {row.label}
                   </Text>
-                  {row.trailing}
+                  <Text
+                    style={{
+                      flex: 1,
+                      fontSize: 15,
+                      fontFamily: 'Inter_400Regular',
+                      color: row.link ? BRAND_PURPLE : INK_700,
+                    }}
+                    numberOfLines={1}
+                  >
+                    {row.value}
+                  </Text>
+                  {row.trailing ? <View style={{ marginLeft: 10 }}>{row.trailing}</View> : null}
                 </Pressable>
               );
             })}
+
+            {/* Description — last, so its variable height can't shift the rows
+                above it. Sellers separate paragraphs with pipes, so split on
+                "|" and render each as its own line to break up the wall of
+                text. Falls back to a single paragraph when there's no pipe. */}
+            {(() => {
+              const paras = String(listing.description ?? '')
+                .split('|')
+                .map((s) => s.trim())
+                .filter(Boolean);
+              if (paras.length === 0) return null;
+              // Join paragraphs into one Text (blank line between) so the
+              // clamp counts the whole block; numberOfLines maps to CSS
+              // line-clamp on web and native truncation on device. A length/
+              // paragraph heuristic decides whether the toggle is warranted —
+              // deterministic, so there's no measure-then-clamp flicker.
+              const full = paras.join('\n\n');
+              const isLong = full.length > 240 || paras.length > 3;
+              const collapsed = isLong && !descExpanded;
+              return (
+                <View
+                  style={{
+                    paddingHorizontal: 18,
+                    paddingTop: 18,
+                    paddingBottom: isLong ? 6 : 18,
+                    borderTopWidth: HAIRLINE,
+                    borderTopColor: ROW_DIVIDER,
+                  }}
+                >
+                  <Text
+                    numberOfLines={collapsed ? DESC_CLAMP_LINES : undefined}
+                    style={{
+                      fontSize: 15,
+                      color: INK_700,
+                      lineHeight: 24,
+                      fontFamily: 'Inter_400Regular',
+                    }}
+                  >
+                    {full}
+                  </Text>
+                  {isLong ? (
+                    <Pressable
+                      onPress={() => { tap('selection'); setDescExpanded((v) => !v); }}
+                      hitSlop={10}
+                      accessibilityRole="button"
+                      accessibilityLabel={descExpanded ? 'Collapse description' : 'Expand full description'}
+                      style={({ pressed }) => ({
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 4,
+                        minHeight: 44,
+                        opacity: pressed ? 0.6 : 1,
+                      })}
+                    >
+                      <Text style={{ fontSize: 13, fontFamily: 'Inter_600SemiBold', color: BRAND_PURPLE, letterSpacing: 0.2 }}>
+                        {descExpanded ? 'Show less' : 'Read more'}
+                      </Text>
+                      <Feather
+                        name={descExpanded ? 'chevron-up' : 'chevron-down'}
+                        size={16}
+                        color={BRAND_PURPLE}
+                      />
+                    </Pressable>
+                  ) : null}
+                </View>
+              );
+            })()}
           </View>
 
           {/* Tags — tap to search by tag */}
@@ -1486,48 +1531,65 @@ export default function ProductScreen() {
             </View>
           )}
 
-          {/* Three balanced columns: Share left, Report centered, listing ID
-              right. Equal-flex columns keep Report optically centered on the
-              page regardless of the neighbouring labels' widths. */}
+          {/* Share left, Report centred, listing ID right. */}
           <View
             style={{
               flexDirection: 'row',
               alignItems: 'center',
+              justifyContent: 'space-between',
               marginTop: 22,
               paddingHorizontal: 4,
             }}
           >
-            <View style={{ flex: 1, alignItems: 'flex-start' }}>
-              <Pressable
-                onPress={shareListing}
-                accessibilityRole="button"
-                accessibilityLabel="Share this listing"
-                style={({ pressed }) => ({
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 8,
-                  paddingVertical: 6,
-                  opacity: pressed ? 0.6 : 1,
-                })}
+            <Pressable
+              onPress={shareListing}
+              accessibilityRole="button"
+              accessibilityLabel="Share this listing"
+              // The row is deliberately light, so the target is extended
+              // rather than padded — these sit ~28px tall on their own.
+              hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8,
+                paddingVertical: 6,
+                opacity: pressed ? 0.6 : 1,
+              })}
+            >
+              <Feather name="share-2" size={16} color={BRAND_INK} />
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: BRAND_INK,
+                  fontFamily: 'Inter_600SemiBold',
+                  letterSpacing: 0.2,
+                }}
               >
-                <Feather name="share-2" size={16} color={BRAND_INK} />
-                <Text
-                  style={{
-                    fontSize: 13,
-                    color: BRAND_INK,
-                    fontFamily: 'Inter_600SemiBold',
-                    letterSpacing: 0.2,
-                  }}
-                >
-                  Share
-                </Text>
-              </Pressable>
-            </View>
-            <View style={{ flex: 1, alignItems: 'center' }}>
+                Share
+              </Text>
+            </Pressable>
+
+            {/* Taken out of the flow so it centres on the row itself. Three
+                equal-flex columns didn't hold: flexBasis is 0 and flexShrink
+                is 1, so the ID column — wider than "Share" — grew past its
+                third and nudged Report left of centre. */}
+            <View
+              pointerEvents="box-none"
+              style={{
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                top: 0,
+                bottom: 0,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
               <Pressable
                 onPress={handleReport}
                 accessibilityRole="button"
                 accessibilityLabel="Report this listing"
+                hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
                 style={({ pressed }) => ({
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -1549,18 +1611,17 @@ export default function ProductScreen() {
                 </Text>
               </Pressable>
             </View>
-            <View style={{ flex: 1, alignItems: 'flex-end' }}>
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: CHEVRON_GRAY,
-                  letterSpacing: 0.4,
-                  fontFamily: 'Inter_500Medium',
-                }}
-              >
-                ID · {listing.id.slice(0, 8)}
-              </Text>
-            </View>
+
+            <Text
+              style={{
+                fontSize: 12,
+                color: CHEVRON_GRAY,
+                letterSpacing: 0.4,
+                fontFamily: 'Inter_500Medium',
+              }}
+            >
+              ID · {listing.id.slice(0, 8)}
+            </Text>
           </View>
         </View>
 
@@ -1691,111 +1752,36 @@ export default function ProductScreen() {
         </View>
       </Animated.ScrollView>
 
-      {/* ── Fixed bottom bar — hidden when viewing your own listing ── */}
+      {/* ── Fixed bottom bar — hidden when viewing your own listing ──
+          To back this out, swap the import for ProductActionBar.legacy and
+          restore the <OfferSheet> call site below. */}
       {!isOwnListing && (
-      <View
-        style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          backgroundColor: 'white',
-          borderTopWidth: HAIRLINE,
-          borderTopColor: 'rgba(15,15,15,0.08)',
-          paddingHorizontal: 16,
-          paddingTop: 12,
-          paddingBottom: insets.bottom || 16,
-          // Soft lift off the content above it. boxShadow renders on iOS + web;
-          // Android falls back to the hairline top border.
-          boxShadow: '0px -4px 10px rgba(0,0,0,0.05)',
-        }}
-      >
-        {/* Reassurance at the point of decision — answers "is this safe?"
-            right where the buyer commits, reinforcing the value proposition. */}
-        <View
-          accessibilityRole="text"
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 6,
-            marginBottom: 10,
+        <ProductActionBar
+          price={itemPrice}
+          buyTotal={buyTotal}
+          bpFee={bpFee}
+          bottomInset={insets.bottom}
+          onOfferOpen={canOffer}
+          onSubmitOffer={submitOffer}
+          onBuyPress={() => {
+            tap('medium');
+            if (!user) {
+              guestGate.prompt({
+                title: 'Almost yours',
+                message: 'Create a free account to check out securely with buyer protection included.',
+                icon: 'shopping-bag',
+                cta: 'Create account & continue',
+              });
+              return;
+            }
+            if (!listing?.id) return;
+            if (listing.seller_id === user.id) {
+              toast.show("That's your own listing", { variant: 'default', icon: 'info' });
+              return;
+            }
+            router.push(`/payment/${listing.id}` as any);
           }}
-        >
-          <Feather name="lock" size={12} color="rgba(15,15,15,0.62)" />
-          <Text style={{ fontSize: 12, fontWeight: '500', color: 'rgba(15,15,15,0.62)' }}>
-            Secure checkout · Buyer Protection included
-          </Text>
-        </View>
-
-        <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-          <Pressable
-            onPress={openOffer}
-            accessibilityRole="button"
-            accessibilityLabel="Make an offer"
-            accessibilityHint="Opens a sheet to send the seller a price suggestion"
-            style={({ pressed }) => ({
-              paddingHorizontal: 18,
-              height: 52,
-              minWidth: 88,
-              borderRadius: 14,
-              borderWidth: HAIRLINE,
-              borderColor: 'rgba(15,15,15,0.14)',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexDirection: 'row',
-              gap: 6,
-              backgroundColor: 'white',
-              opacity: pressed ? 0.7 : 1,
-              transform: [{ scale: pressed ? 0.98 : 1 }],
-            })}
-          >
-            <Feather name="tag" size={15} color={BRAND_INK} />
-            <Text style={{ fontSize: 13, fontWeight: '700', color: BRAND_INK }}>
-              Offer
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              tap('medium');
-              if (!user) {
-                guestGate.prompt({
-                  title: 'Almost yours',
-                  message: 'Create a free account to check out securely with buyer protection included.',
-                  icon: 'shopping-bag',
-                  cta: 'Create account & continue',
-                });
-                return;
-              }
-              if (!listing?.id) return;
-              if (listing.seller_id === user.id) {
-                toast.show("That's your own listing", { variant: 'default', icon: 'info' });
-                return;
-              }
-              router.push(`/payment/${listing.id}` as any);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={`Buy now for ${formatPrice(buyTotal)}, Buyer Protection included`}
-            accessibilityHint="Proceeds to secure checkout"
-            style={({ pressed }) => ({
-              flex: 1,
-              height: 52,
-              backgroundColor: BRAND_INK,
-              borderRadius: 14,
-              paddingHorizontal: 16,
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexDirection: 'row',
-              opacity: pressed ? 0.9 : 1,
-              transform: [{ scale: pressed ? 0.98 : 1 }],
-            })}
-          >
-            <Text style={{ fontSize: 15, fontWeight: '800', color: 'white', letterSpacing: 0.2 }}>
-              Buy now · {bpFee > 0 ? formatPrice(buyTotal) : formatPrice(listing.price)}
-            </Text>
-          </Pressable>
-        </View>
-      </View>
+        />
       )}
 
       {/* Save-to-list sheet — opens from the bookmark pill or by long-pressing
@@ -1814,14 +1800,6 @@ export default function ProductScreen() {
         />
       ) : null}
 
-      {/* Price-suggestion sheet — slides up from the "Offer" button */}
-      <OfferSheet
-        visible={offerVisible}
-        askingPrice={Number(listing.price ?? 0)}
-        onClose={() => setOfferVisible(false)}
-        onSubmit={submitOffer}
-      />
-
       {/* Buyer Protection breakdown — opens from the price row */}
       <BuyerProtectionSheet
         visible={bpVisible}
@@ -1832,7 +1810,7 @@ export default function ProductScreen() {
       {/* Fullscreen image viewer — opens on tap, swipe to navigate */}
       <FullscreenImageViewer
         visible={fullscreenIndex !== null}
-        images={listing.images}
+        images={images}
         initialIndex={fullscreenIndex ?? 0}
         onClose={() => setFullscreenIndex(null)}
       />

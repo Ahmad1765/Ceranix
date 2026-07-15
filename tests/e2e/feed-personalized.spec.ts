@@ -3,7 +3,7 @@
 // the title, subtitle, cold-start banner, the "For you" chip, and the
 // fallback grid that always renders when there are no personal signals.
 
-import { test, expect, waitForAppReady } from './helpers/page';
+import { test, expect, waitForAppReady, priceText } from './helpers/page';
 
 test.describe('My Feed (personalized)', () => {
   test.beforeEach(async ({ page }) => {
@@ -12,7 +12,10 @@ test.describe('My Feed (personalized)', () => {
   });
 
   test('renders title and subtitle', async ({ page }) => {
-    await expect(page.getByText('My Feed', { exact: true })).toBeVisible();
+    // "My Feed" appears twice — the screen heading and the tab-bar button —
+    // so an unqualified getByText is a strict-mode violation. Anchor on the
+    // heading via the subtitle it sits with.
+    await expect(page.getByText('My Feed', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Curated from what you like')).toBeVisible();
   });
 
@@ -27,11 +30,11 @@ test.describe('My Feed (personalized)', () => {
   });
 
   test('fallback grid renders listings', async ({ page }) => {
-    await expect(page.locator('text=/^\\$\\d[\\d,]*$/').first()).toBeVisible({ timeout: 15_000 });
+    await expect(priceText(page).first()).toBeVisible({ timeout: 15_000 });
   });
 
   test('tapping a card in the fallback grid routes to /product/<id>', async ({ page }) => {
-    await page.locator('text=/^\\$\\d[\\d,]*$/').first().click();
+    await priceText(page).first().click();
     await page.waitForURL(/\/product\/[\w-]+/);
     await expect(page).toHaveURL(/\/product\/[\w-]+/);
   });

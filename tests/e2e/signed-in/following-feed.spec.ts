@@ -4,7 +4,7 @@
 // We do NOT click any Follow CTA — that would mutate the account.
 
 import { test, expect } from '@playwright/test';
-import { waitForAppReady, scrollFeedToBottom } from '../helpers/page';
+import { waitForAppReady, scrollFeedToBottom, PRICE_PATTERN } from '../helpers/page';
 
 test.describe('Following feed (signed in)', () => {
   test.beforeEach(async ({ page }) => {
@@ -15,9 +15,9 @@ test.describe('Following feed (signed in)', () => {
 
   test('shows either a listing-price grid or the suggestions strip', async ({ page }) => {
     await scrollFeedToBottom(page);
-    // Either an @handle from the suggestions or a $price from the grid.
+    // Either an @handle from the suggestions or a price from the grid.
     await expect(
-      page.locator('text=/^\\$\\d[\\d,]*$|^@[\\w.]+$|not following anyone yet/').first(),
+      page.locator(`text=/${PRICE_PATTERN}|^@[\\w.]+$|not following anyone yet/`).first(),
     ).toBeVisible({ timeout: 20_000 });
   });
 

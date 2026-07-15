@@ -44,7 +44,9 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
   const [saved, setSaved] = useState(false);
   const [saveBusy, setSaveBusy] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const images = listing.images.length > 0 ? listing.images : [''];
+  // images is nullable in Postgres; `['']` keeps the carousel's single-slot
+  // placeholder behaviour for rows with no photos.
+  const images = listing.images?.length ? listing.images : [''];
   const hasMultiple = images.length > 1;
 
   const likedInteractedRef = useRef(false);

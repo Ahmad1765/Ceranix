@@ -11,7 +11,14 @@
 // silent empty grids in some flows; "no spinner forever" is the load-bearing
 // signal.
 
-import { test, expect, waitForAppReady, SUPABASE_URL } from './helpers/page';
+import {
+  test,
+  expect,
+  waitForAppReady,
+  priceText,
+  discoverSearch,
+  SUPABASE_URL,
+} from './helpers/page';
 
 const REST_RE = SUPABASE_URL
   ? new RegExp(`${SUPABASE_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/rest/v1/.*`)
@@ -47,7 +54,7 @@ test.describe('Network failures', () => {
     // The home shell is still rendered (we never showed a global error).
     await expect(page.getByText('What are you looking for today?')).toBeVisible();
     // And no listing prices snuck in despite the 500 — proves the stub took.
-    await expect(page.locator('text=/^\\$\\d[\\d,]*$/')).toHaveCount(0);
+    await expect(priceText(page)).toHaveCount(0);
   });
 
   test('REST timeout (route aborted) does not block the rest of the UI', async ({
@@ -67,7 +74,7 @@ test.describe('Network failures', () => {
     await page.waitForTimeout(3000);
     // Tab bar is still interactive even though the feed failed.
     await page.getByText('Discover', { exact: true }).click();
-    await expect(page.getByPlaceholder('Search items, brands, sellers')).toBeVisible();
+    await expect(discoverSearch(page)).toBeVisible();
   });
 
   test('slow network (3s delay) — header renders before the feed resolves', async ({

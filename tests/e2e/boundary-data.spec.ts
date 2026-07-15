@@ -7,7 +7,14 @@
 // layers before display). We assert structural signals: shell rendered, no
 // horizontal overflow, no unhandled-error overlay.
 
-import { test, expect, waitForAppReady, SUPABASE_URL } from './helpers/page';
+import {
+  test,
+  expect,
+  waitForAppReady,
+  priceText,
+  discoverSearch,
+  SUPABASE_URL,
+} from './helpers/page';
 
 const REST_RE = SUPABASE_URL
   ? new RegExp(`${SUPABASE_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/rest/v1/.*`)
@@ -53,7 +60,7 @@ test.describe('Boundary data', () => {
     await waitForAppReady(page);
     await expect(page.getByText('What are you looking for today?')).toBeVisible();
     // No prices because the array is empty.
-    await expect(page.locator('text=/^\\$\\d[\\d,]*$/')).toHaveCount(0);
+    await expect(priceText(page)).toHaveCount(0);
     // No global error.
     await expect(page.getByText(/Something went wrong/i)).toHaveCount(0);
   });
@@ -114,12 +121,11 @@ test.describe('Boundary data', () => {
   });
 
   test('discover zero-results query renders empty-state copy', async ({ page }) => {
-    await page.goto('/discover');
+    // "Nothing matched" is the Items grid's empty state, and Discover opens on
+    // Aesthetics with no Items chip — so deep-link the query, which is what
+    // routes the screen to Items (see discover.tsx: `if (nextQ || hasCat)`).
+    await page.goto('/discover?q=zzqqxx-nonexistent-search-token-9999');
     await waitForAppReady(page);
-    // A token with no plausible substring match.
-    await page
-      .getByPlaceholder('Search items, brands, sellers')
-      .fill('zzqqxx-nonexistent-search-token-9999');
     await expect(page.getByText('Nothing matched')).toBeVisible();
   });
 
@@ -127,11 +133,13 @@ test.describe('Boundary data', () => {
     await page.goto('/discover');
     await waitForAppReady(page);
     const tricky = '🛍️ café — 北京 ​';
-    const input = page.getByPlaceholder('Search items, brands, sellers');
+    const input = discoverSearch(page);
     await input.fill(tricky);
     await expect(input).toHaveValue(tricky);
-    // No crash — shell is still there.
-    await expect(page.getByText('Browse by category')).toBeVisible();
+    // No crash — the shell is still there. Asserted tab-agnostically: the old
+    // "Browse by category" anchor only exists on the Items grid, which this
+    // screen no longer opens on.
+    await expect(page.getByText('Discover', { exact: true }).first()).toBeVisible();
   });
 
   test('product detail with missing optional fields still renders the shell', async ({ page }) => {

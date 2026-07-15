@@ -10,7 +10,14 @@
 // to drift. We DO assert "at least one card visible", which proves the layout
 // math didn't collapse to zero.
 
-import { test, expect, waitForAppReady, scrollFeedToBottom } from './helpers/page';
+import {
+  test,
+  expect,
+  waitForAppReady,
+  scrollFeedToBottom,
+  priceText,
+  discoverSearch,
+} from './helpers/page';
 
 test.describe('Responsive layout', () => {
   test.beforeEach(async ({ page }) => {
@@ -36,7 +43,7 @@ test.describe('Responsive layout', () => {
 
   test('the For You grid renders at least one listing card', async ({ page }) => {
     await scrollFeedToBottom(page);
-    await expect(page.locator('text=/^\\$\\d[\\d,]*$/').first()).toBeVisible();
+    await expect(priceText(page).first()).toBeVisible();
   });
 
   test('bottom tab bar exposes all five tabs', async ({ page }) => {
@@ -88,9 +95,12 @@ test.describe('Responsive layout', () => {
   });
 
   test('discover screen category grid stays within viewport width', async ({ page }) => {
-    await page.goto('/discover');
+    // Deep-link a category so the screen lands on the Items grid — Discover
+    // opens on Aesthetics and the Items chip is hidden, so a bare /discover
+    // never reaches the category grid this test is named for.
+    await page.goto('/discover?category=clothing');
     await waitForAppReady(page);
-    await expect(page.getByPlaceholder('Search items, brands, sellers')).toBeVisible();
+    await expect(discoverSearch(page)).toBeVisible();
     const overflow = await page.evaluate(() => {
       const d = document.documentElement;
       return d.scrollWidth - d.clientWidth;

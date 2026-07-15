@@ -38,6 +38,34 @@ export async function gotoRoute(page: Page, route: string) {
   await waitForAppReady(page);
 }
 
+// A listing price exactly as lib/currency.formatPrice renders it: "Rs 8,000"
+// for whole amounts, "Rs 8,400.70" when there's a fraction.
+//
+// Every spec matches prices through here rather than inlining the pattern. The
+// suite previously hard-coded `^\$\d[\d,]*$` in eight places; when the app
+// moved to PKR they all silently stopped matching anything — the `toBeVisible`
+// ones went red, and worse, the `toHaveCount(0)` ones started passing for the
+// wrong reason. One definition means the next currency change breaks one line,
+// loudly, instead of eight quietly.
+export const PRICE_PATTERN = String.raw`^Rs [\d,]+(\.\d{2})?$`;
+
+/** Locator for any rendered listing price. */
+export function priceText(page: Page) {
+  return page.locator(`text=/${PRICE_PATTERN}/`);
+}
+
+// Discover's search box placeholder changes per tab: "Search items, brands,
+// sellers" / "Search aesthetics" / "Search brands" / "Search people".
+//
+// Since c00ce82 the screen OPENS on the Aesthetics tab and the Items chip is
+// hidden (components/discover/SearchTabs.tsx HIDDEN_TABS), so the Items grid is
+// only reachable by deep link (?q= or ?category=) or by tapping through a
+// brand/aesthetic. Specs that just need "the Discover screen loaded" should
+// match any placeholder rather than pinning to one tab's copy.
+export function discoverSearch(page: Page) {
+  return page.getByPlaceholder(/^Search (items, brands, sellers|aesthetics|brands|people)$/);
+}
+
 // RN-Web FlatList virtualizes off-screen rows; on web the outer `body`
 // doesn't scroll — the FlatList has its own div with overflow:auto. We sweep
 // every scrollable container on the page and pin its scrollTop to scrollHeight

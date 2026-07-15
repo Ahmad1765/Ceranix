@@ -1,3 +1,9 @@
+// RETAINED FOR BACK-OUT — no longer mounted. As of 2026-07-15 the product page
+// takes offers inline in the action bar (components/product/ProductActionBar).
+// This sheet is kept intact so that change can be reverted; see the header in
+// ProductActionBar.legacy.tsx. Note app/conversation/[id].tsx defines its own,
+// separate OfferSheet — that one is live and unrelated to this file.
+//
 // Bottom-sheet "price suggestion" surface for the product page. Replaces the
 // old flow that jumped straight into a chat thread — the buyer now proposes a
 // number here, and only on submit do we hand off to /conversation/new with the
@@ -34,7 +40,6 @@ import {
   BRAND_PURPLE_SOFT,
   BRAND_INK,
 } from './shared';
-import { SafetyBanner } from '@/components/SafetyBanner';
 import { formatPrice, CURRENCY_SYMBOL } from '@/lib/currency';
 
 // Discount presets the buyer can tap to pre-fill a sensible offer instead of
@@ -306,8 +311,6 @@ export function OfferSheet({
                 Send price suggestion
               </Text>
             </Pressable>
-
-            <SafetyBanner context="offer" bare style={{ marginTop: 16 }} />
               </Pressable>
             </Animated.View>
           </GestureDetector>

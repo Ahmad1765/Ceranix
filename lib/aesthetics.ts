@@ -167,7 +167,7 @@ export const AESTHETICS: Aesthetic[] = [
 // because they can't be shown or bought.
 export function matchAestheticListings(aesthetic: Aesthetic, listings: Listing[]): Listing[] {
   return listings.filter((l) => {
-    if (l.is_sold || l.images.length === 0) return false;
+    if (l.is_sold || !l.images?.length) return false;
     const hay = `${l.title} ${l.brand ?? ''} ${l.description ?? ''}`.toLowerCase();
     return aesthetic.keywords.some((k) => hay.includes(k));
   });

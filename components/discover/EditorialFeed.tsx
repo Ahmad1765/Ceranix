@@ -614,7 +614,7 @@ export function RecentlyViewedList({
 }
 
 function RecentRow({ listing }: { listing: Listing }) {
-  const img = listing.images[0] ? getOptimizedImageUrl(listing.images[0], { width: 160 }) : null;
+  const img = listing.images?.[0] ? getOptimizedImageUrl(listing.images[0], { width: 160 }) : null;
   return (
     <Pressable
       onPress={() => router.push(`/product/${listing.id}`)}

@@ -3,7 +3,7 @@
 // real Supabase backend; we only assert that listings render (any of them)
 // and that tapping one routes to /product/<id>.
 
-import { test, expect, waitForAppReady, scrollFeedToBottom } from './helpers/page';
+import { test, expect, waitForAppReady, scrollFeedToBottom, priceText } from './helpers/page';
 
 test.describe('Home feed', () => {
   test.beforeEach(async ({ page }) => {
@@ -20,16 +20,15 @@ test.describe('Home feed', () => {
 
   test('the For You feed shows at least one listing price', async ({ page }) => {
     await scrollFeedToBottom(page);
-    // Every ListingCard renders a `$<price>` Text. Any match means the grid
-    // hydrated against the real backend. We accept currency strings with or
-    // without commas (e.g. "$24", "$1,290").
-    await expect(page.locator('text=/^\\$\\d[\\d,]*$/').first()).toBeVisible();
+    // Every ListingCard renders a formatted price. Any match means the grid
+    // hydrated against the real backend.
+    await expect(priceText(page).first()).toBeVisible();
   });
 
   test('switching to Popular still renders at least one listing price', async ({ page }) => {
     await page.getByText('Popular', { exact: true }).click();
     await scrollFeedToBottom(page);
-    await expect(page.locator('text=/^\\$\\d[\\d,]*$/').first()).toBeVisible();
+    await expect(priceText(page).first()).toBeVisible();
   });
 
   test('Following tab shows the empty/suggestion state copy', async ({ page }) => {
@@ -44,9 +43,9 @@ test.describe('Home feed', () => {
 
   test('tapping the first listing card navigates to /product/<id>', async ({ page }) => {
     await scrollFeedToBottom(page);
-    // The first card's `$<price>` element is inside the same Pressable as the
+    // The first card's price element is inside the same Pressable as the
     // card; click it and wait for the route to change.
-    await page.locator('text=/^\\$\\d[\\d,]*$/').first().click();
+    await priceText(page).first().click();
     await page.waitForURL(/\/product\/[\w-]+/);
     await expect(page).toHaveURL(/\/product\/[\w-]+/);
   });

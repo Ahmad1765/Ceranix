@@ -364,7 +364,12 @@ export default function DiscoverScreen() {
           return {
             aesthetic,
             count: server ? server.count : local.length,
-            images: server ? server.images.slice(0, 3) : local.slice(0, 3).map((l) => l.images[0]),
+            images: server
+              ? server.images.slice(0, 3)
+              : local
+                  .slice(0, 3)
+                  .map((l) => l.images?.[0])
+                  .filter((u): u is string => !!u),
           };
         })
         .sort(
@@ -388,7 +393,7 @@ export default function DiscoverScreen() {
         const key = name.toLowerCase();
         const cur = counts.get(key);
         if (cur) cur.count += 1;
-        else counts.set(key, { name, count: 1, image: l.images[0] ?? null });
+        else counts.set(key, { name, count: 1, image: l.images?.[0] ?? null });
       }
       rows = [...counts.values()].sort(
         (a, b) => b.count - a.count || a.name.localeCompare(b.name),

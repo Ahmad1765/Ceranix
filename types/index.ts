@@ -109,7 +109,11 @@ export interface Listing {
   // Optional colour slug from lib/itemColors. Null on legacy rows.
   color?: string | null;
   condition: Condition;
-  images: string[];
+  // `listings.images` is `text[]` with no NOT NULL constraint, so Postgres can
+  // and does hand back null. Typing this as `string[]` hid that from the
+  // compiler and let `listing.images.map()` white-screen the product page on
+  // any such row. Keep it nullable so every read has to answer for it.
+  images: string[] | null;
   is_sold: boolean;
   views: number;
   likes: number;

@@ -62,8 +62,7 @@ export interface Collection {
   images: string[];
 }
 
-const firstImage = (l: Listing | undefined): string | null =>
-  l && l.images.length > 0 ? l.images[0] : null;
+const firstImage = (l: Listing | undefined): string | null => l?.images?.[0] ?? null;
 
 // "Nike, Stüssy + more" from a group of listings — the most common brands first.
 function brandLine(listings: Listing[], max = 2): string {
@@ -84,7 +83,7 @@ function brandLine(listings: Listing[], max = 2): string {
  * strongest categories. Each card targets a filter the idle screen can apply.
  */
 export function buildDigest(listings: Listing[]): DigestCard[] {
-  const live = listings.filter((l) => !l.is_sold && l.images.length > 0);
+  const live = listings.filter((l) => !l.is_sold && !!l.images?.length);
   if (live.length < MIN_PER_GROUP) return [];
 
   const cards: DigestCard[] = [];
@@ -140,7 +139,7 @@ export function buildDigest(listings: Listing[]): DigestCard[] {
  * so the carousel never repeats the same photo. Empty on a cold/blank catalog.
  */
 export function buildPromos(listings: Listing[]): PromoSlide[] {
-  const live = listings.filter((l) => !l.is_sold && l.images.length > 0);
+  const live = listings.filter((l) => !l.is_sold && !!l.images?.length);
   if (live.length === 0) return [];
 
   const used = new Set<string>();
@@ -231,7 +230,7 @@ export function buildTrendingSearches(listings: Listing[], max = 8): string[] {
  * collage. Returns top 3; empty when no brand clears the threshold.
  */
 export function buildCollections(listings: Listing[]): Collection[] {
-  const live = listings.filter((l) => !l.is_sold && l.images.length > 0);
+  const live = listings.filter((l) => !l.is_sold && !!l.images?.length);
 
   const byBrand = new Map<string, Listing[]>();
   for (const l of live) {
@@ -251,7 +250,7 @@ export function buildCollections(listings: Listing[]): Collection[] {
       const eyebrow =
         cats.length > 2 ? `${cats.slice(0, 2).join(', ')} + more` : cats.join(', ');
       const images = arr
-        .map((l) => l.images[0])
+        .map((l) => l.images?.[0])
         .filter((u): u is string => !!u)
         .slice(0, 3);
       return { id: `collection-${brand}`, brand, eyebrow, images };
