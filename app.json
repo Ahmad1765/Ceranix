@@ -7,6 +7,9 @@
     "icon": "./assets/images/icon.png",
     "scheme": "carrinex",
     "userInterfaceStyle": "light",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
     "splash": {
       "image": "./assets/images/splash.png",
       "resizeMode": "contain",

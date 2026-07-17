@@ -3,6 +3,12 @@
 // client gets the right URL/key on every Metro start, regardless of whether
 // a stale process.env value is cached in the bundle.
 
+// EAS project id — written by `eas init` (add it to your shell / CI env as
+// EAS_PROJECT_ID, or let `eas init` inject it). Until it's set, native builds
+// still work; over-the-air updates simply stay disabled rather than pointing at
+// a malformed https://u.expo.dev/undefined endpoint.
+const easProjectId = process.env.EAS_PROJECT_ID;
+
 module.exports = ({ config }) => ({
   ...config,
   expo: {
@@ -13,6 +19,21 @@ module.exports = ({ config }) => ({
     icon: './assets/images/icon.png',
     scheme: 'carrinex',
     userInterfaceStyle: 'light',
+    // Fingerprint policy derives runtimeVersion from the native module set, so an
+    // OTA JS update only lands on a build whose native layer actually matches —
+    // never a crash from shipping a bundle newer than the installed binary.
+    runtimeVersion: { policy: 'fingerprint' },
+    // OTA update endpoint, only wired once a project id exists. fallbackToCache
+    // timeout 0 = never block cold start on the update fetch; a downloaded
+    // update applies on the next launch instead.
+    ...(easProjectId
+      ? {
+          updates: {
+            url: `https://u.expo.dev/${easProjectId}`,
+            fallbackToCacheTimeout: 0,
+          },
+        }
+      : {}),
     splash: {
       image: './assets/images/splash.png',
       resizeMode: 'contain',
@@ -61,6 +82,7 @@ module.exports = ({ config }) => ({
       typedRoutes: true,
     },
     extra: {
+      ...(easProjectId ? { eas: { projectId: easProjectId } } : {}),
       supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
       supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
       sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
