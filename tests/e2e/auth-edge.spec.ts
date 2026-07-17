@@ -7,7 +7,7 @@
 // We don't drive a real auth roundtrip here — auth.setup.ts covers that.
 // These tests only exercise the client-side guards and resilience paths.
 
-import { test, expect, waitForAppReady, SUPABASE_URL } from './helpers/page';
+import { test, expect, waitForAppReady, passwordField, SUPABASE_URL } from './helpers/page';
 
 const AUTH_USER_RE = SUPABASE_URL
   ? new RegExp(`${SUPABASE_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/auth/v1/user.*`)
@@ -79,7 +79,7 @@ test.describe('Auth edges', () => {
     await page.getByText('Log in', { exact: true }).click();
     await expect(page.getByPlaceholder('you@example.com')).toBeVisible();
     await page.getByPlaceholder('you@example.com').fill('test@example.test');
-    await page.getByPlaceholder('At least 6 characters').fill('hunter22');
+    await passwordField(page).fill('hunter22');
     const submit = page.getByText('Sign in', { exact: true }).last();
     // Two clicks in quick succession — must not throw.
     await submit.click();

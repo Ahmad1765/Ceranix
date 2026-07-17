@@ -45,7 +45,12 @@ function formatShortDate(d: Date) {
 
 export default function PaymentScreen() {
   const { id, offer } = useLocalSearchParams<{ id: string; offer?: string }>();
-  const { user } = useAuth();
+  // `authLoading` is load-bearing: the auth context restores its session
+  // asynchronously, so `user` is null for the first frames of any cold load.
+  // Redirecting on that null bounces a signed-in buyer to the login screen on
+  // a hard refresh or a deep link into checkout. (Local `loading` below is the
+  // listing fetch — a different thing.)
+  const { user, loading: authLoading } = useAuth();
 
   const toast = useToast();
   const cached = getCachedListing(id ? String(id) : null);
@@ -100,6 +105,19 @@ export default function PaymentScreen() {
       active = false;
     };
   }, [id]);
+
+  // Wait for auth to settle before judging `user` — the same order
+  // components/RequireAuth uses. This screen hand-rolls that guard, and
+  // omitting the loading check is what sent signed-in buyers to /auth/login.
+  if (authLoading) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={colors.ink} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!user) {
     return <Redirect href="/auth/login" />;
@@ -369,7 +387,7 @@ export default function PaymentScreen() {
 
           <RowDivider />
 
-          {/* From row — the real card is collected securely in Stripe checkout. */}
+          {/* Pay-with row — the real card is collected securely in Stripe checkout. */}
           <View
             style={{
               flexDirection: 'row',

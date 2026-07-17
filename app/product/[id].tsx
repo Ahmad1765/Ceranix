@@ -682,6 +682,16 @@ export default function ProductScreen() {
   // array at all. Normalize once here rather than guarding at each of the four
   // read sites below.
   const images = listing.images ?? [];
+  // Description paragraphs (sellers separate them with pipes). Hoisted so the
+  // details box can lead with the description and only draw the Category
+  // divider beneath it when there's actually a description above.
+  const descParas = String(listing.description ?? '')
+    .split('|')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const descFull = descParas.join('\n\n');
+  const descIsLong = descFull.length > 240 || descParas.length > 3;
+  const hasDescription = descParas.length > 0;
 
   return (
     <View style={{ flex: 1, backgroundColor: 'white' }}>
@@ -900,7 +910,7 @@ export default function ProductScreen() {
         </View>
 
         {/* ── Title block (editorial) ── */}
-        <View style={{ paddingHorizontal: 20, paddingTop: 22, paddingBottom: 18 }}>
+        <View style={{ paddingHorizontal: 20, paddingTop: 22, paddingBottom: 14 }}>
           {heartCount > 0 && (
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 6 }}>
               <Feather name="heart" size={12} color="rgba(15,15,15,0.55)" />
@@ -1055,7 +1065,7 @@ export default function ProductScreen() {
         ) : null}
 
         {/* ── Seller card ── */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 24, paddingBottom: 16 }}>
+        <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12 }}>
           <View
             style={{
               backgroundColor: 'white',
@@ -1257,11 +1267,10 @@ export default function ProductScreen() {
           </View>
         </View>
 
-        {/* ── Details + description ──
-            Fixed-height attribute rows lead so the box's top edge lands in the
-            same place on every listing; the variable-length description sits
-            last, behind a divider. */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6 }}>
+        {/* ── Description + details ──
+            The description leads the box; the attribute rows follow beneath a
+            divider. */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 6 }}>
           <View
             style={{
               backgroundColor: 'white',
@@ -1271,15 +1280,67 @@ export default function ProductScreen() {
               overflow: 'hidden',
             }}
           >
+            {/* Description — first in the box. numberOfLines maps to CSS
+                line-clamp on web and native truncation on device; a length/
+                paragraph heuristic decides whether the toggle is warranted, so
+                there's no measure-then-clamp flicker. */}
+            {hasDescription ? (
+              <View
+                style={{
+                  paddingHorizontal: 18,
+                  paddingTop: 18,
+                  paddingBottom: descIsLong ? 8 : 18,
+                }}
+              >
+                <Text
+                  numberOfLines={descIsLong && !descExpanded ? DESC_CLAMP_LINES : undefined}
+                  style={{
+                    fontSize: 15,
+                    color: INK_700,
+                    lineHeight: 24,
+                    fontFamily: 'Inter_400Regular',
+                  }}
+                >
+                  {descFull}
+                </Text>
+                {descIsLong ? (
+                  <Pressable
+                    onPress={() => { tap('selection'); setDescExpanded((v) => !v); }}
+                    hitSlop={10}
+                    accessibilityRole="button"
+                    accessibilityLabel={descExpanded ? 'Collapse description' : 'Expand full description'}
+                    style={({ pressed }) => ({
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                      minHeight: 44,
+                      opacity: pressed ? 0.6 : 1,
+                    })}
+                  >
+                    <Text style={{ fontSize: 13, fontFamily: 'Inter_600SemiBold', color: BRAND_PURPLE, letterSpacing: 0.2 }}>
+                      {descExpanded ? 'Show less' : 'Read more'}
+                    </Text>
+                    <Feather
+                      name={descExpanded ? 'chevron-up' : 'chevron-down'}
+                      size={16}
+                      color={BRAND_PURPLE}
+                    />
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : null}
+
             {/* Category breadcrumb — category ▸ subcategory, each segment
-                searchable (taps into Discover filtered at that level). First
-                row in the box, so no top divider. */}
+                searchable (taps into Discover filtered at that level). Draws a
+                top divider only when the description sits above it. */}
             <View
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
                 paddingHorizontal: 18,
                 paddingVertical: 16,
+                borderTopWidth: hasDescription ? HAIRLINE : 0,
+                borderTopColor: ROW_DIVIDER,
               }}
             >
               <Text
@@ -1430,73 +1491,6 @@ export default function ProductScreen() {
                 </Pressable>
               );
             })}
-
-            {/* Description — last, so its variable height can't shift the rows
-                above it. Sellers separate paragraphs with pipes, so split on
-                "|" and render each as its own line to break up the wall of
-                text. Falls back to a single paragraph when there's no pipe. */}
-            {(() => {
-              const paras = String(listing.description ?? '')
-                .split('|')
-                .map((s) => s.trim())
-                .filter(Boolean);
-              if (paras.length === 0) return null;
-              // Join paragraphs into one Text (blank line between) so the
-              // clamp counts the whole block; numberOfLines maps to CSS
-              // line-clamp on web and native truncation on device. A length/
-              // paragraph heuristic decides whether the toggle is warranted —
-              // deterministic, so there's no measure-then-clamp flicker.
-              const full = paras.join('\n\n');
-              const isLong = full.length > 240 || paras.length > 3;
-              const collapsed = isLong && !descExpanded;
-              return (
-                <View
-                  style={{
-                    paddingHorizontal: 18,
-                    paddingTop: 18,
-                    paddingBottom: isLong ? 6 : 18,
-                    borderTopWidth: HAIRLINE,
-                    borderTopColor: ROW_DIVIDER,
-                  }}
-                >
-                  <Text
-                    numberOfLines={collapsed ? DESC_CLAMP_LINES : undefined}
-                    style={{
-                      fontSize: 15,
-                      color: INK_700,
-                      lineHeight: 24,
-                      fontFamily: 'Inter_400Regular',
-                    }}
-                  >
-                    {full}
-                  </Text>
-                  {isLong ? (
-                    <Pressable
-                      onPress={() => { tap('selection'); setDescExpanded((v) => !v); }}
-                      hitSlop={10}
-                      accessibilityRole="button"
-                      accessibilityLabel={descExpanded ? 'Collapse description' : 'Expand full description'}
-                      style={({ pressed }) => ({
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 4,
-                        minHeight: 44,
-                        opacity: pressed ? 0.6 : 1,
-                      })}
-                    >
-                      <Text style={{ fontSize: 13, fontFamily: 'Inter_600SemiBold', color: BRAND_PURPLE, letterSpacing: 0.2 }}>
-                        {descExpanded ? 'Show less' : 'Read more'}
-                      </Text>
-                      <Feather
-                        name={descExpanded ? 'chevron-up' : 'chevron-down'}
-                        size={16}
-                        color={BRAND_PURPLE}
-                      />
-                    </Pressable>
-                  ) : null}
-                </View>
-              );
-            })()}
           </View>
 
           {/* Tags — tap to search by tag */}
@@ -1569,10 +1563,13 @@ export default function ProductScreen() {
               </Text>
             </Pressable>
 
-            {/* Taken out of the flow so it centres on the row itself. Three
-                equal-flex columns didn't hold: flexBasis is 0 and flexShrink
-                is 1, so the ID column — wider than "Share" — grew past its
-                third and nudged Report left of centre. */}
+            {/* Taken out of the flow so it centres on the row itself (three
+                equal-flex columns didn't hold: the ID column, wider than
+                "Share", grew past its third and nudged Report left).
+                The −12 translate is optical centring: the flag + gap add 24px
+                of width entirely on the label's left, so geometric centring
+                parks the *word* "Report" ~12px right of true centre. Shift the
+                block back by half that so the label reads dead-centre. */}
             <View
               pointerEvents="box-none"
               style={{
@@ -1595,6 +1592,7 @@ export default function ProductScreen() {
                   alignItems: 'center',
                   gap: 8,
                   paddingVertical: 6,
+                  transform: [{ translateX: -12 }],
                   opacity: pressed ? 0.6 : 1,
                 })}
               >
@@ -1759,7 +1757,6 @@ export default function ProductScreen() {
         <ProductActionBar
           price={itemPrice}
           buyTotal={buyTotal}
-          bpFee={bpFee}
           bottomInset={insets.bottom}
           onOfferOpen={canOffer}
           onSubmitOffer={submitOffer}

@@ -41,8 +41,9 @@ const TABS: { id: DiscoverTab; label: string }[] = [
 ];
 
 // Pills hidden from the row (2026-07-04): the Items chip is suppressed per
-// product call. The item grid is still the default view — it just no longer has
-// its own chip. To restore, remove 'items' from this set.
+// product call. Discover deliberately lands on Aesthetics (see the useState in
+// discover.tsx); the Items grid is reached by a ?q= / ?category= deep link or
+// by tapping a brand, not by a chip. To restore the chip, remove 'items' here.
 const HIDDEN_TABS = new Set<DiscoverTab>(['items']);
 const VISIBLE_TABS = TABS.filter((t) => !HIDDEN_TABS.has(t.id));
 

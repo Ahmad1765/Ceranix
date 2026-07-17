@@ -5,10 +5,23 @@
 // the account clean. If the saved_searches migration hasn't been applied,
 // the writes will return null and the test skips gracefully.
 
-import { test, expect } from '@playwright/test';
-import { waitForAppReady, SUPABASE_URL, SUPABASE_ANON_KEY } from '../helpers/page';
+import { test, expect, type Page } from '@playwright/test';
+import { waitForAppReady, discoverSearch, SUPABASE_URL, SUPABASE_ANON_KEY } from '../helpers/page';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+
+// Discover lands on the Aesthetics tab and the Items chip is hidden, so the
+// item search box — the one that owns the save-search pill — isn't reachable
+// from a bare /discover. Deep-link a category to land on Items, then clear it,
+// which leaves the Items tab active with no query and no filter: the clean
+// state these tests assume.
+async function openItemSearch(page: Page) {
+  await page.goto('/discover?category=clothing');
+  await waitForAppReady(page);
+  await page.getByText('Clear', { exact: true }).first().click();
+  await expect(page.getByText('Clear', { exact: true })).toHaveCount(0);
+  return discoverSearch(page);
+}
 
 function readAuthToken(): { token: string; userId: string } | null {
   const storagePath = path.resolve(process.cwd(), 'playwright/.auth/user.json');
@@ -80,11 +93,10 @@ test.describe('Saved searches (signed in)', () => {
   test('Discover screen shows the Save CTA only when a query / filter is active', async ({
     page,
   }) => {
-    await page.goto('/discover');
-    await waitForAppReady(page);
+    const search = await openItemSearch(page);
     // Clean state: no query, no category → no Save chip.
     await expect(page.getByText('Save this search')).toHaveCount(0);
-    await page.getByPlaceholder('Search items, brands, sellers').fill('nike');
+    await search.fill('nike');
     // Pill should now appear (testID guarantees stable lookup).
     await expect(page.getByTestId('discover-save-search')).toBeVisible();
   });
@@ -100,10 +112,9 @@ test.describe('Saved searches (signed in)', () => {
       'supabase/saved_searches.sql migration not applied yet — apply it via the SQL editor',
     );
 
-    await page.goto('/discover');
-    await waitForAppReady(page);
+    const search = await openItemSearch(page);
     const term = `e2e-saved-${Date.now().toString(36)}`;
-    await page.getByPlaceholder('Search items, brands, sellers').fill(term);
+    await search.fill(term);
     await page.getByTestId('discover-save-search').click();
     // The "Saved — find it under Activity" copy on the pill is the stable
     // post-save state (the toast itself is animated out after ~2s).
@@ -118,7 +129,7 @@ test.describe('Saved searches (signed in)', () => {
     // Tapping the row re-opens Discover with the query pre-filled.
     await page.getByText(term).first().click();
     await page.waitForURL(/discover\?.*q=/);
-    await expect(page.getByPlaceholder('Search items, brands, sellers')).toHaveValue(term);
+    await expect(discoverSearch(page)).toHaveValue(term);
   });
 
   test('saving the same search twice is idempotent (no error, single row)', async ({ page }) => {
@@ -127,10 +138,9 @@ test.describe('Saved searches (signed in)', () => {
     const applied = await migrationApplied(auth!.token);
     test.skip(!applied, 'supabase/saved_searches.sql migration not applied yet');
 
-    await page.goto('/discover');
-    await waitForAppReady(page);
+    const search = await openItemSearch(page);
     const term = `e2e-dupe-${Date.now().toString(36)}`;
-    await page.getByPlaceholder('Search items, brands, sellers').fill(term);
+    await search.fill(term);
     await page.getByTestId('discover-save-search').click();
     // The "Saved — find it under Activity" copy on the pill is the stable
     // post-save state (the toast itself is animated out after ~2s).
@@ -153,7 +163,12 @@ test.describe('Saved searches (signed in)', () => {
     await fresh.goto('/news');
     await waitForAppReady(fresh);
     await fresh.getByText('Saved', { exact: true }).click();
-    await expect(fresh.getByText('No saved searches')).toBeVisible();
+    // Signed out, /news renders the sign-in empty state — which is what this
+    // test's name says. It asserted "No saved searches", the *signed-in*
+    // empty state, and never caught it: this describe is serial, so the
+    // earlier failing test skipped this one before it could run.
+    await expect(fresh.getByText('Sign in to save searches')).toBeVisible();
+    await expect(fresh.getByText('Sign in', { exact: true })).toBeVisible();
     await ctx.close();
   });
 });

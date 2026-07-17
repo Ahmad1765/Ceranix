@@ -11,14 +11,17 @@ test.describe('Inbox (signed in)', () => {
     await waitForAppReady(page);
   });
 
-  test('renders the Inbox header and the three pill tabs', async ({ page }) => {
+  // The inbox is Selling / Buying / Social / Support (see INBOX_TABS in
+  // app/(tabs)/chat.tsx). There is no "All" tab — this spec was written against
+  // an older three-pill layout.
+  test('renders the Inbox header and the four pill tabs', async ({ page }) => {
     await expect(page.getByText('Inbox', { exact: true })).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByText('All', { exact: true })).toBeVisible();
-    await expect(page.getByText('Buying', { exact: true })).toBeVisible();
-    await expect(page.getByText('Selling', { exact: true })).toBeVisible();
+    for (const label of ['Selling', 'Buying', 'Social', 'Support']) {
+      await expect(page.getByText(label, { exact: true }).first()).toBeVisible();
+    }
   });
 
-  test('All pill is the active default — content area mounts', async ({ page }) => {
+  test('the default tab hydrates its content area', async ({ page }) => {
     // Either at least one timestamp ("now", "5m", "1h", "3d" …) for a real
     // conversation OR the empty state. Both confirm the FlatList hydrated.
     await expect(

@@ -11,6 +11,7 @@ import {
   AUTH_STORAGE_PATH,
   E2E_USER_EMAIL,
   E2E_USER_PASSWORD,
+  passwordField,
   waitForAppReady,
 } from './helpers/page';
 
@@ -28,7 +29,7 @@ setup('authenticate user', async ({ page }) => {
   await expect(page.getByPlaceholder('you@example.com')).toBeVisible();
 
   await page.getByPlaceholder('you@example.com').fill(E2E_USER_EMAIL);
-  await page.getByPlaceholder('At least 6 characters').fill(E2E_USER_PASSWORD);
+  await passwordField(page).fill(E2E_USER_PASSWORD);
   // "Sign in" appears twice on the form step — the submit button is the last.
   await page.getByText('Sign in', { exact: true }).last().click();
 

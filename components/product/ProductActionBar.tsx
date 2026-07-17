@@ -26,7 +26,6 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
   interpolate,
-  interpolateColor,
   Easing,
 } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
@@ -34,11 +33,11 @@ import { IS_IOS, HAIRLINE, tap, BRAND_INK, BRAND_PURPLE } from './shared';
 import { formatPrice, CURRENCY_SYMBOL } from '@/lib/currency';
 
 const BAR_PAD = 16;
-const H = 52;
-const COLLAPSED_OFFER_W = 96;
-const GAP = 10;
-
-const BORDER_IDLE = 'rgba(15,15,15,0.14)';
+const H = 56;
+const GAP = 12;
+// Offer sits a touch wider than Buy now — the two balanced pills from the
+// reference. Both scale with the screen so the split holds on every width.
+const OFFER_RATIO = 0.52;
 
 // Strong ease-out. The stock curves are too weak to read as deliberate, and
 // ease-in would delay the first few frames — exactly where the eye is. A spring
@@ -51,7 +50,6 @@ const COLLAPSE_MS = 180;
 export function ProductActionBar({
   price,
   buyTotal,
-  bpFee,
   bottomInset,
   onOfferOpen,
   onSubmitOffer,
@@ -59,7 +57,6 @@ export function ProductActionBar({
 }: {
   price: number;
   buyTotal: number;
-  bpFee: number;
   bottomInset: number;
   /** Runs the auth / own-listing gates. Return false to refuse the expand. */
   onOfferOpen: () => boolean;
@@ -68,7 +65,8 @@ export function ProductActionBar({
 }) {
   const { width: screenW } = useWindowDimensions();
   const innerW = screenW - BAR_PAD * 2;
-  const buyW = innerW - COLLAPSED_OFFER_W - GAP;
+  const offerW = Math.round((innerW - GAP) * OFFER_RATIO);
+  const buyW = innerW - offerW - GAP;
 
   const [expanded, setExpanded] = useState(false);
   const [amount, setAmount] = useState('');
@@ -140,8 +138,7 @@ export function ProductActionBar({
   }));
 
   const offerStyle = useAnimatedStyle(() => ({
-    width: interpolate(t.value, [0, 1], [COLLAPSED_OFFER_W, innerW]),
-    borderColor: interpolateColor(t.value, [0, 1], [BORDER_IDLE, BRAND_PURPLE]),
+    width: interpolate(t.value, [0, 1], [offerW, innerW]),
   }));
 
   // Buy fades and drifts right as the offer pill grows over it, so the two
@@ -212,14 +209,14 @@ export function ProductActionBar({
           >
             <Text
               style={{
-                fontSize: 15,
+                fontSize: 16,
                 fontFamily: 'Inter_700Bold',
                 color: 'white',
                 letterSpacing: 0.2,
               }}
               numberOfLines={1}
             >
-              Buy now · {bpFee > 0 ? formatPrice(buyTotal) : formatPrice(price)}
+              Buy now
             </Text>
           </Pressable>
         </Animated.View>
@@ -234,7 +231,9 @@ export function ProductActionBar({
               top: 0,
               height: H,
               borderRadius: 14,
-              borderWidth: HAIRLINE,
+              // Solid purple outline, per the reference's outlined-accent pill.
+              borderWidth: 1.5,
+              borderColor: BRAND_PURPLE,
               backgroundColor: 'white',
               overflow: 'hidden',
             },
@@ -250,7 +249,7 @@ export function ProductActionBar({
                 position: 'absolute',
                 left: 0,
                 top: 0,
-                width: COLLAPSED_OFFER_W,
+                width: offerW,
                 height: H,
               },
               collapsedLabelStyle,
@@ -270,8 +269,8 @@ export function ProductActionBar({
                 backgroundColor: pressed ? 'rgba(15,15,15,0.04)' : 'transparent',
               })}
             >
-              <Text style={{ fontSize: 15, fontFamily: 'Inter_700Bold', color: BRAND_INK }}>
-                Offer
+              <Text style={{ fontSize: 16, fontFamily: 'Inter_700Bold', color: BRAND_PURPLE }}>
+                Make an offer
               </Text>
             </Pressable>
           </Animated.View>

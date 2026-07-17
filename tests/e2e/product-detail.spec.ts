@@ -36,16 +36,13 @@ test.describe('Product detail', () => {
     await expect(offer).toBeVisible({ timeout: 20_000 });
     await offer.click();
 
-    // Assert on the pill's width, not the field's visibility: the field is
-    // always mounted and merely faded out, and Playwright counts opacity-0
-    // elements as visible. The pill only leaves its collapsed width when the
-    // gate passes.
-    const pill = page.getByLabel('Offer amount').locator('xpath=ancestor::div[2]');
-    await expect(async () => {
-      const box = await pill.boundingBox();
-      expect(box?.width).toBeLessThan(150);
-    }).toPass({ timeout: 5_000 });
+    // Assert behaviour, not layout: the field is always mounted and merely
+    // faded out (Playwright counts opacity-0 as visible), and its width tracks
+    // the button size. The load-bearing property is that the field only becomes
+    // editable once expanded — so signed out it must stay non-editable while
+    // the guest gate takes over.
     await expect(page.getByText(/free account/i).first()).toBeVisible();
+    await expect(page.getByLabel('Offer amount')).not.toBeEditable();
   });
 
   test('unknown listing id renders the "Listing not available" empty state', async ({ page }) => {

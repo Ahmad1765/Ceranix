@@ -4,7 +4,7 @@
 // What we DO assert is that the inputs/buttons exist, validation rejects bad
 // shapes, and "Continue as guest" routes back to the tabs.
 
-import { test, expect, waitForAppReady, freshTestEmail } from "./helpers/page";
+import { test, expect, waitForAppReady, freshTestEmail, passwordField } from "./helpers/page";
 
 test.describe("Auth modal", () => {
   test.beforeEach(async ({ page }) => {
@@ -41,7 +41,7 @@ test.describe("Auth modal", () => {
   }) => {
     await page.getByText("Log in", { exact: true }).click();
     await expect(page.getByPlaceholder("you@example.com")).toBeVisible();
-    await expect(page.getByPlaceholder("At least 6 characters")).toBeVisible();
+    await expect(passwordField(page)).toBeVisible();
     // "Sign in" appears twice on the form step: in the mode toggle and on
     // the submit button. The submit button is the last one in document order.
     await expect(
@@ -66,7 +66,7 @@ test.describe("Auth modal", () => {
       page,
     }) => {
       await page.getByPlaceholder("you@example.com").fill("not-an-email");
-      await page.getByPlaceholder("At least 6 characters").fill("hunter22");
+      await passwordField(page).fill("hunter22");
       await page.getByText("Sign in", { exact: true }).last().click();
       // Form is still rendered; we never reached the tabs.
       await expect(page.getByPlaceholder("you@example.com")).toBeVisible();
@@ -77,7 +77,7 @@ test.describe("Auth modal", () => {
       page,
     }) => {
       await page.getByPlaceholder("you@example.com").fill("test@example.test");
-      await page.getByPlaceholder("At least 6 characters").fill("123");
+      await passwordField(page).fill("123");
       await page.getByText("Sign in", { exact: true }).last().click();
       await expect(page.getByPlaceholder("you@example.com")).toBeVisible();
       await expect(page).toHaveURL(/\/auth\/login/);
@@ -87,9 +87,7 @@ test.describe("Auth modal", () => {
       page,
     }) => {
       await page.getByPlaceholder("you@example.com").fill(freshTestEmail());
-      await page
-        .getByPlaceholder("At least 6 characters")
-        .fill("hunter22-not-real");
+      await passwordField(page).fill("hunter22-not-real");
       await page.getByText("Sign in", { exact: true }).last().click();
       // Give the auth roundtrip a moment to resolve.
       await page.waitForTimeout(2000);
@@ -103,7 +101,7 @@ test.describe("Auth modal", () => {
   }) => {
     await page.getByText("Sign up with email").click();
     await expect(page.getByPlaceholder("you@example.com")).toBeVisible();
-    await expect(page.getByPlaceholder("At least 6 characters")).toBeVisible();
+    await expect(passwordField(page)).toBeVisible();
     await expect(
       page.getByText("Create account", { exact: true }),
     ).toBeVisible();

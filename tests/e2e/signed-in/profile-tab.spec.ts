@@ -11,10 +11,12 @@ test.describe('Profile tab (signed in)', () => {
     await waitForAppReady(page);
   });
 
-  test('renders @handle, the three stat columns (Posts, Followers, Following), and the four tabs (Selling, Liked, Shop, Saved)', async ({ page }) => {
+  test('renders @handle, the three stat columns (Items, Followers, Following), and the four tabs (Selling, Liked, Shop, Saved)', async ({ page }) => {
     // The @handle prefix is unique enough — there's always at least one.
     await expect(page.locator('text=/^@[\\w.]+$/').first()).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByText('Posts', { exact: true })).toBeVisible();
+    // The first stat column is labelled "Items"; it was "Posts" when this spec
+    // was written.
+    await expect(page.getByText('Items', { exact: true })).toBeVisible();
     await expect(page.getByText('Followers', { exact: true })).toBeVisible();
     await expect(page.getByText('Following', { exact: true })).toBeVisible();
     await expect(page.getByText('Selling', { exact: true })).toBeVisible();
@@ -39,9 +41,14 @@ test.describe('Profile tab (signed in)', () => {
     await expect(page.getByText('Share your profile')).toBeVisible();
   });
 
-  test('Saved tab shows the placeholder empty state', async ({ page }) => {
+  test('Saved tab shows its grid or the empty state', async ({ page }) => {
     await page.getByText('Saved', { exact: true }).click();
-    await expect(page.getByText('No saved boards yet')).toBeVisible();
+    // Saved lists were reworked from "boards" to items: the empty copy is now
+    // "No saved items yet" (or "This list is empty" inside a specific list).
+    // Accept a populated grid too — this account's saves aren't fixed.
+    await expect(
+      page.locator(`text=/${PRICE_PATTERN}|No saved items yet|This list is empty/`).first(),
+    ).toBeVisible();
   });
 
   test('Edit profile button routes to /profile/edit', async ({ page }) => {

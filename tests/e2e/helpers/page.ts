@@ -66,6 +66,14 @@ export function discoverSearch(page: Page) {
   return page.getByPlaceholder(/^Search (items, brands, sellers|aesthetics|brands|people)$/);
 }
 
+// The password field's placeholder states the minimum length ("At least 8
+// characters"), so it changes every time that policy does — the specs pinned
+// "At least 6 characters" and broke silently when the minimum moved to 8.
+// Match the shape, not the number, so the next bump doesn't cost six tests.
+export function passwordField(page: Page) {
+  return page.getByPlaceholder(/^At least \d+ characters$/);
+}
+
 // RN-Web FlatList virtualizes off-screen rows; on web the outer `body`
 // doesn't scroll — the FlatList has its own div with overflow:auto. We sweep
 // every scrollable container on the page and pin its scrollTop to scrollHeight

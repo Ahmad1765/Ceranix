@@ -2,7 +2,7 @@
 // the upload/profile tabs render their RequireAuth gate when unauthenticated,
 // which is also a valid destination for "the route works".
 
-import { test, expect, waitForAppReady } from './helpers/page';
+import { test, expect, waitForAppReady, discoverSearch } from './helpers/page';
 
 test.describe('Tab navigation', () => {
   test.beforeEach(async ({ page }) => {
@@ -14,14 +14,21 @@ test.describe('Tab navigation', () => {
     await expect(page.getByText('What are you looking for today?')).toBeVisible();
   });
 
-  test('My Feed tab routes to the static promo screen', async ({ page }) => {
-    await page.getByText('My Feed', { exact: true }).click();
-    await expect(page.getByText('Cheaper than new,', { exact: false })).toBeVisible();
+  // /feed used to be a static promo screen headlined "Cheaper than new," —
+  // that copy no longer exists anywhere in the app; the route is now the
+  // personalized feed. Assert the URL (the thing this spec is actually about)
+  // plus the screen heading, rather than marketing copy that turns over.
+  test('My Feed tab routes to the personalized feed', async ({ page }) => {
+    await page.getByText('My Feed', { exact: true }).first().click();
+    await page.waitForURL(/\/feed/);
+    // "My Feed" is both the tab label and the screen heading — .first() to
+    // stay out of strict mode.
+    await expect(page.getByText('My Feed', { exact: true }).first()).toBeVisible();
   });
 
   test('Discover tab routes to the search screen', async ({ page }) => {
     await page.getByText('Discover', { exact: true }).click();
-    await expect(page.getByPlaceholder('Search items, brands, sellers')).toBeVisible();
+    await expect(discoverSearch(page)).toBeVisible();
   });
 
   test('Sell tab routes (gate or upload form depending on auth)', async ({ page }) => {

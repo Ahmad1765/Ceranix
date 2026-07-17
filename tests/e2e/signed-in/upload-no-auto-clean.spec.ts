@@ -14,12 +14,15 @@ test.describe('Upload has no auto-clean (signed in)', () => {
     await waitForAppReady(page);
     await expect(page.getByText('Add photos')).toBeVisible({ timeout: 20_000 });
 
-    // 2. Drive the hidden <input type="file"> that the web picker renders.
-    const fileInput = page.locator('input[type="file"]');
-    await expect(fileInput).toBeAttached({ timeout: 15_000 });
-    await fileInput.setInputFiles(
-      path.resolve(process.cwd(), 'tests/e2e/fixtures/portrait.jpg'),
-    );
+    // 2. Drive the picker. expo-image-picker's web implementation builds its
+    //    <input type="file"> on demand inside launchImageLibraryAsync and
+    //    clicks it — there is no input in the DOM beforehand, so locating one
+    //    up front never resolves. Catch the native file chooser instead.
+    const [chooser] = await Promise.all([
+      page.waitForEvent('filechooser'),
+      page.getByText('Add cover', { exact: true }).click(),
+    ]);
+    await chooser.setFiles(path.resolve(process.cwd(), 'tests/e2e/fixtures/portrait.jpg'));
 
     // 3. The photo lands — the first tile gets the COVER badge — and Continue
     //    becomes available.
