@@ -25,17 +25,23 @@ import {
   Inter_600SemiBold,
   Inter_700Bold,
 } from '@expo-google-fonts/inter';
-import { QueryClientProvider } from '@tanstack/react-query';
-import { queryClient } from '@/lib/queryClient';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { queryClient, persistOptions } from '@/lib/queryClient';
+import { initOnlineManager } from '@/lib/offline';
 import { AuthProvider } from '@/lib/auth';
 import { ToastProvider } from '@/lib/toast';
 import { GuestGateProvider } from '@/components/GuestGate';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { OfflineBanner } from '@/components/OfflineBanner';
 
 // Initialize crash + error reporting before anything else renders so startup
 // failures are captured too. No-ops when EXPO_PUBLIC_SENTRY_DSN is unset.
 initSentry();
 // Initialize PostHog analytics. No-ops when EXPO_PUBLIC_POSTHOG_KEY is unset.
 initAnalytics();
+// Bridge device connectivity into TanStack Query so fetches pause offline and
+// auto-resume on reconnect (rather than hanging on unreachable requests).
+initOnlineManager();
 
 // React-native-web ships Alert.alert as a no-op, so every validation /
 // confirm path that calls Alert.alert silently dies on web. The shim swaps
@@ -140,7 +146,8 @@ function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <StatusBar style="dark" />
-      <QueryClientProvider client={queryClient}>
+      <ErrorBoundary>
+      <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
       <AuthProvider>
         <ToastProvider>
         <GuestGateProvider>
@@ -192,10 +199,12 @@ function RootLayout() {
             options={{ headerShown: false, presentation: 'modal' }}
           />
         </Stack>
+        <OfflineBanner />
         </GuestGateProvider>
         </ToastProvider>
       </AuthProvider>
-      </QueryClientProvider>
+      </PersistQueryClientProvider>
+      </ErrorBoundary>
     </GestureHandlerRootView>
   );
 }
