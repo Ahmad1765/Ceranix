@@ -42,7 +42,9 @@ import { AnimatedNumber } from '@/components/AnimatedNumber';
 import { SaveListSheet } from '@/components/SaveListSheet';
 import { isSaved as fetchIsSaved } from '@/lib/saves';
 import { FullscreenImageViewer } from '@/components/product/FullscreenImageViewer';
-import { ProductActionBar } from '@/components/product/ProductActionBar';
+import { ProductActionBar } from '@/components/product/ProductActionBar.legacy';
+import { OfferSheet } from '@/components/product/OfferSheet';
+import { PopIcon, type PopIconHandle } from '@/components/product/PopIcon';
 import { RelatedItemCard } from '@/components/product/RelatedItemCard';
 import { ProductSkeleton } from '@/components/product/ProductSkeleton';
 import { HeroPageDot } from '@/components/product/HeroPageDot';
@@ -139,6 +141,11 @@ export default function ProductScreen() {
   const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
   const [saveListVisible, setSaveListVisible] = useState(false);
   const [bpVisible, setBpVisible] = useState(false);
+  const [offerVisible, setOfferVisible] = useState(false);
+  // Imperative handles for the like/save pop — fired on tap so the bounce never
+  // rides an async state hydration.
+  const heartAnimRef = useRef<PopIconHandle>(null);
+  const saveAnimRef = useRef<PopIconHandle>(null);
   const [descExpanded, setDescExpanded] = useState(false);
   const [saved, setSaved] = useState(false);
   const [listing, setListing] = useState<Listing | null>(
@@ -323,6 +330,10 @@ export default function ProductScreen() {
     const originalLiked = liked;
     // Optimistic flip — animation runs immediately, even before the round-trip.
     setLiked(!originalLiked);
+    // Instagram-style spring: the filled heart springs in (overshoot = pop) on
+    // like, and springs back out on un-like. Fired here, on the tap, so server
+    // hydration never triggers it.
+    heartAnimRef.current?.animateTo(!originalLiked);
     setLikeConfirmedFromServer(false);
     try {
       const next = await toggleLike(productIdParam, user.id, originalLiked);
@@ -829,7 +840,14 @@ export default function ProductScreen() {
                 transform: [{ scale: pressed ? 0.93 : 1 }],
               })}
             >
-              <Feather name="heart" size={20} color={liked ? BRAND_PURPLE : BRAND_INK} />
+              <PopIcon
+                ref={heartAnimRef}
+                name="heart"
+                active={liked}
+                size={20}
+                activeColor={BRAND_PURPLE}
+                inactiveColor={BRAND_INK}
+              />
               <AnimatedNumber
                 value={heartCount}
                 height={13}
@@ -868,7 +886,14 @@ export default function ProductScreen() {
                 transform: [{ scale: pressed ? 0.93 : 1 }],
               })}
             >
-              <Feather name="bookmark" size={20} color={saved ? BRAND_PURPLE : BRAND_INK} />
+              <PopIcon
+                ref={saveAnimRef}
+                name="bookmark"
+                active={saved}
+                size={20}
+                activeColor={BRAND_PURPLE}
+                inactiveColor={BRAND_INK}
+              />
             </Pressable>
           </View>
 
@@ -1713,16 +1738,16 @@ export default function ProductScreen() {
         </View>
       </Animated.ScrollView>
 
-      {/* ── Fixed bottom bar — hidden when viewing your own listing ──
-          To back this out, swap the import for ProductActionBar.legacy and
-          restore the <OfferSheet> call site below. */}
+      {/* ── Fixed bottom bar — hidden when viewing your own listing ── */}
       {!isOwnListing && (
         <ProductActionBar
           price={itemPrice}
           buyTotal={buyTotal}
+          bpFee={bpFee}
           bottomInset={insets.bottom}
-          onOfferOpen={canOffer}
-          onSubmitOffer={submitOffer}
+          onOfferPress={() => {
+            if (canOffer()) setOfferVisible(true);
+          }}
           onBuyPress={() => {
             tap('medium');
             if (!user) {
@@ -1754,11 +1779,25 @@ export default function ProductScreen() {
           listingId={listing.id}
           onClose={() => setSaveListVisible(false)}
           onChanged={(isSaved) => {
+            const wasSaved = saved;
             setSaved(isSaved);
+            // Spring the bookmark only when the saved state actually flips.
+            if (isSaved !== wasSaved) saveAnimRef.current?.animateTo(isSaved);
             if (isSaved) capture('listing_saved', { listing_id: productIdParam });
           }}
         />
       ) : null}
+
+      {/* Offer sheet — opens from the action bar's "Offer" button */}
+      <OfferSheet
+        visible={offerVisible}
+        askingPrice={itemPrice}
+        onClose={() => setOfferVisible(false)}
+        onSubmit={(amount) => {
+          setOfferVisible(false);
+          submitOffer(amount);
+        }}
+      />
 
       {/* Buyer Protection breakdown — opens from the price row */}
       <BuyerProtectionSheet
