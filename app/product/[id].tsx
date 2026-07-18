@@ -38,7 +38,6 @@ import { fetchFollowState, getCachedFollowState, toggleFollow } from '@/lib/foll
 import { getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
-import { LikeBurst } from '@/components/LikeBurst';
 import { AnimatedNumber } from '@/components/AnimatedNumber';
 import { SaveListSheet } from '@/components/SaveListSheet';
 import { isSaved as fetchIsSaved } from '@/lib/saves';
@@ -328,23 +327,9 @@ export default function ProductScreen() {
     try {
       const next = await toggleLike(productIdParam, user.id, originalLiked);
       setLiked(next);
+      // No confirmation toast on like — the heart's own state change is feedback
+      // enough, and the pop-up read as noise when favouriting.
       if (next) {
-        toast.show('Added to your favorites', {
-          variant: 'success',
-          icon: 'heart',
-          action: {
-            label: 'Undo',
-            onPress: async () => {
-              setLiked(false);
-              try {
-                await toggleLike(productIdParam, user.id, true);
-              } catch {
-                setLiked(true);
-                toast.show('Could not undo', { variant: 'default', icon: 'alert-triangle' });
-              }
-            },
-          },
-        });
         capture('listing_liked', { listing_id: productIdParam });
       }
     } catch {
@@ -811,54 +796,46 @@ export default function ProductScreen() {
             <Feather name="arrow-left" size={22} color="#0F0F0F" />
           </Pressable>
 
-          {/* Floating actions — one cohesive white control instead of two
-              mismatched blobs. Like (heart + count) leads; Save sits below a
-              hairline divider. Shared width + single shadow makes it read as a
-              deliberate segmented control. Press gives a subtle wash, not a
-              wobble, since the surface is shared. */}
+          {/* Floating actions — a stacked column of separate circular discs
+              (Mercari style): each an individual white circle with its icon over
+              a count, lifted on a soft shadow rather than joined into one pill. */}
           <View
             style={{
               position: 'absolute',
               right: 14,
               bottom: 16,
-              minWidth: 48,
-              borderRadius: 20,
-              backgroundColor: 'white',
-              borderWidth: HAIRLINE,
-              borderColor: 'rgba(15,15,15,0.08)',
-              overflow: 'hidden',
-              ...iosShadow,
+              alignItems: 'center',
+              gap: 12,
             }}
           >
-            {/* Like — heart + count, laid out horizontally like Vinted */}
+            {/* Like — heart over its count */}
             <Pressable
               onPress={handleHeartPress}
               onLongPress={() => { tap('medium'); setSaveListVisible(true); }}
               delayLongPress={350}
               accessibilityRole="button"
               accessibilityLabel={liked ? 'Unlike this item' : 'Like this item'}
+              accessibilityState={{ selected: liked }}
               style={({ pressed }) => ({
-                flexDirection: 'row',
+                width: 52,
+                height: 52,
+                borderRadius: 26,
+                backgroundColor: 'white',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: 6,
-                paddingHorizontal: 14,
-                height: 46,
-                backgroundColor: pressed ? 'rgba(15,15,15,0.05)' : 'transparent',
+                borderWidth: HAIRLINE,
+                borderColor: 'rgba(15,15,15,0.06)',
+                boxShadow: '0px 4px 14px rgba(0,0,0,0.12)',
+                transform: [{ scale: pressed ? 0.93 : 1 }],
               })}
             >
-              <LikeBurst liked={liked} size={19} color={BRAND_PURPLE} inactiveColor={BRAND_INK} />
-              {heartCount > 0 ? (
-                <AnimatedNumber
-                  value={heartCount}
-                  height={17}
-                  style={{ fontSize: 13, fontWeight: '700', color: BRAND_INK }}
-                />
-              ) : null}
+              <Feather name="heart" size={20} color={liked ? BRAND_PURPLE : BRAND_INK} />
+              <AnimatedNumber
+                value={heartCount}
+                height={13}
+                style={{ fontSize: 11, fontFamily: 'Inter_600SemiBold', color: 'rgba(15,15,15,0.55)', marginTop: 1 }}
+              />
             </Pressable>
-
-            {/* Divider — full-bleed within the shared surface */}
-            <View style={{ height: HAIRLINE, backgroundColor: 'rgba(15,15,15,0.10)' }} />
 
             {/* Save to collection */}
             <Pressable
@@ -877,14 +854,21 @@ export default function ProductScreen() {
               }}
               accessibilityRole="button"
               accessibilityLabel={saved ? 'Edit save lists' : 'Save to list'}
+              accessibilityState={{ selected: saved }}
               style={({ pressed }) => ({
+                width: 52,
+                height: 52,
+                borderRadius: 26,
+                backgroundColor: 'white',
                 alignItems: 'center',
                 justifyContent: 'center',
-                height: 46,
-                backgroundColor: pressed ? 'rgba(15,15,15,0.05)' : 'transparent',
+                borderWidth: HAIRLINE,
+                borderColor: 'rgba(15,15,15,0.06)',
+                boxShadow: '0px 4px 14px rgba(0,0,0,0.12)',
+                transform: [{ scale: pressed ? 0.93 : 1 }],
               })}
             >
-              <Feather name="bookmark" size={19} color={saved ? BRAND_PURPLE : BRAND_INK} />
+              <Feather name="bookmark" size={20} color={saved ? BRAND_PURPLE : BRAND_INK} />
             </Pressable>
           </View>
 
@@ -926,7 +910,7 @@ export default function ProductScreen() {
               fontFamily: 'Inter_700Bold',
               color: BRAND_INK,
               lineHeight: 33,
-              letterSpacing: -0.6,
+              letterSpacing: -0.7,
             }}
             numberOfLines={2}
           >
@@ -987,13 +971,13 @@ export default function ProductScreen() {
               item + fee (the action bar shows the total on the Buy button); this
               keeps the headline price honest to what's listed. The fee row taps
               into the full breakdown sheet. */}
-          <View style={{ marginTop: 14 }}>
+          <View style={{ marginTop: 18 }}>
             <Text
               style={{
-                fontSize: 28,
+                fontSize: 22,
                 fontFamily: 'Inter_700Bold',
                 color: BRAND_INK,
-                letterSpacing: -0.6,
+                letterSpacing: -0.4,
               }}
             >
               {formatPrice(itemPrice)}

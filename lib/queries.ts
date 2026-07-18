@@ -80,12 +80,7 @@ export const qk = {
   recentlyViewed: (userId: string | null) => ['recentlyViewed', userId] as const,
   homeFeed: (tab: HomeFeedTab, userId: string | null) =>
     ['homeFeed', tab, userId] as const,
-  // Renamed from 'myFeedListings' when the feed became infinite: the persisted
-  // cache (busted only on app-version change) still holds the old plain-array
-  // shape under that key, and rehydrating it into useInfiniteQuery — which
-  // expects { pages, pageParams } — throws. A distinct key sidesteps the stale
-  // entry entirely; it expires on its own via persist maxAge.
-  myFeedInfinite: (userId: string | null) => ['myFeedInfinite', userId] as const,
+  myFeedListings: (userId: string | null) => ['myFeedListings', userId] as const,
   priceDrops: (userId: string | null) => ['priceDrops', userId] as const,
   newFromFollowed: (userId: string | null) => ['newFromFollowed', userId] as const,
   savedSearches: (userId: string | null) => ['savedSearches', userId] as const,
@@ -212,53 +207,11 @@ export function useListingsInListQuery(listId: string | null) {
 // My Feed primary grid: personalized recommendations for a signed-in user,
 // trending as the anonymous fallback. Returns RecommendedListing[] for users
 // (carries rec_reason, used to detect the cold-start "fallback" state).
-// My Feed's grid, now infinite. The first page is the personalized set
-// (get_recommendations for signed-in users, popular for anon). The
-// recommendation RPC takes no offset — it returns a ranked candidate set — so
-// the tail can't page *it*; instead every page after the first extends the
-// feed with popular stock at a growing offset. The screen de-dupes by id when
-// it flattens the pages, which drops any popular rows already surfaced in the
-// personalized first page. This gives endless browsing with no RPC change.
-const MY_FEED_PRIMARY = 48; // first page: recs (signed-in) / popular (anon)
-const MY_FEED_TAIL = 30; // each "load more" popular page
-type MyFeedPageParam =
-  | { type: 'primary' }
-  | { type: 'popular'; offset: number };
-export function useMyFeedInfiniteQuery(userId: string | null) {
-  return useInfiniteQuery({
-    queryKey: qk.myFeedInfinite(userId),
-    initialPageParam: { type: 'primary' } as MyFeedPageParam,
-    queryFn: async ({ pageParam }): Promise<Listing[]> => {
-      if (pageParam.type === 'primary' && userId) {
-        return fetchRecommendations(MY_FEED_PRIMARY);
-      }
-      // Anon first page + every tail page come from popular stock.
-      const offset = pageParam.type === 'popular' ? pageParam.offset : 0;
-      const limit = pageParam.type === 'primary' ? MY_FEED_PRIMARY : MY_FEED_TAIL;
-      const r = await fetchListingsResult({ tab: 'popular', limit, offset });
-      if (!r.ok) throw new Error('popular feed unavailable');
-      return r.rows;
-    },
-    getNextPageParam: (lastPage, allPages, lastPageParam) => {
-      // Exhaustion is determined only by the popular pages — the recommendation
-      // set has a fixed size and should never stop tail pagination.
-      if (lastPageParam.type === 'popular' || lastPageParam.type === 'primary' && !userId) {
-        const askedFor = lastPageParam.type === 'primary' ? MY_FEED_PRIMARY : MY_FEED_TAIL;
-        if (lastPage.length < askedFor) return undefined;
-      }
-      // Calculate the next popular offset from the total popular rows loaded.
-      // For signed-in users the first page is recs (skip it); for anon the
-      // first page IS popular at offset 0.
-      const popularLoaded = allPages.reduce((n, page, i) => {
-        const param = i === 0
-          ? { type: 'primary' as const }
-          : { type: 'popular' as const, offset: 0 }; // placeholder, we just need the type check
-        // The first page for anon is popular; for signed-in it's recs (skip).
-        if (i === 0 && userId) return n;
-        return n + page.length;
-      }, 0);
-      return { type: 'popular', offset: popularLoaded } as MyFeedPageParam;
-    },
+export function useMyFeedListingsQuery(userId: string | null) {
+  return useQuery({
+    queryKey: qk.myFeedListings(userId),
+    queryFn: () =>
+      userId ? fetchRecommendations(48) : fetchListings({ tab: 'popular', limit: 60 }),
   });
 }
 

@@ -41,23 +41,13 @@ const persister = createAsyncStoragePersister({
   key: 'CARRINEX_QUERY_CACHE',
 });
 
-// Bump this whenever a persisted query's DATA SHAPE changes, independent of the
-// app version. The app version alone doesn't cover shape changes shipped via OTA
-// (or during local dev, where the version rarely moves), so a query that flips
-// from `Listing[]` to an infinite `{ pages, pageParams }` would otherwise
-// rehydrate the old shape and crash on mount. Changing this discards the whole
-// persisted cache on next load.
-//   v2 — 2026-07-18: My Feed grid became an infinite query.
-const CACHE_SCHEMA_VERSION = 'v2';
-
 export const persistOptions: PersistQueryClientProviderProps['persistOptions'] = {
   persister,
   // Discard anything older than a day so we never resurrect deeply stale data.
   maxAge: 1000 * 60 * 60 * 24,
-  // Bust the entire persisted cache when the app version OR the cache schema
-  // changes, so a shipped schema/shape change can't rehydrate incompatible
-  // cached entries.
-  buster: `${Constants.expoConfig?.version ?? '1'}-${CACHE_SCHEMA_VERSION}`,
+  // Bust the entire persisted cache when the app version changes, so a shipped
+  // schema/shape change can't rehydrate incompatible cached entries.
+  buster: Constants.expoConfig?.version ?? '1',
   dehydrateOptions: {
     // Only persist successful queries — never cache error/loading states to disk.
     shouldDehydrateQuery: (query) => query.state.status === 'success',
