@@ -3,6 +3,7 @@ import { Pressable, type PressableProps, type View } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
+  useReducedMotion,
   withSpring,
   withTiming,
   Easing,
@@ -20,6 +21,9 @@ export const PressableScale = forwardRef<View, Props>(function PressableScale(
   ref,
 ) {
   const scale = useSharedValue(1);
+  // Honor the OS "reduce motion" setting: skip the press-in shrink entirely.
+  const reduceMotion = useReducedMotion();
+  const pressScale = reduceMotion ? 1 : scaleTo;
 
   const animStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -31,7 +35,7 @@ export const PressableScale = forwardRef<View, Props>(function PressableScale(
       accessibilityRole={accessibilityRole}
       {...rest}
       onPressIn={(e) => {
-        scale.value = withTiming(scaleTo, { duration: 90, easing: Easing.out(Easing.cubic) });
+        scale.value = withTiming(pressScale, { duration: 90, easing: Easing.out(Easing.cubic) });
         onPressIn?.(e);
       }}
       onPressOut={(e) => {

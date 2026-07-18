@@ -981,67 +981,46 @@ export default function ProductScreen() {
             );
           })()}
 
-          {/* Price — the buyer pays item + Buyer Protection, so the total leads
-              (large, left-aligned) with the item price kept visible beside it.
-              The protection line taps into a full breakdown sheet. */}
-          {bpFee > 0 ? (
-            <View style={{ marginTop: 14 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10 }}>
-                <Text
-                  style={{
-                    fontSize: 28,
-                    fontFamily: 'Inter_700Bold',
-                    color: BRAND_INK,
-                    letterSpacing: -0.6,
-                  }}
-                >
-                  {formatPrice(buyTotal)}
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 15,
-                    fontFamily: 'Inter_500Medium',
-                    color: 'rgba(15,15,15,0.45)',
-                  }}
-                >
-                  {formatPrice(itemPrice)} item
-                </Text>
-              </View>
-              <Pressable
-                onPress={() => { tap('selection'); setBpVisible(true); }}
-                accessibilityRole="button"
-                accessibilityLabel="See the Buyer Protection breakdown"
-                hitSlop={8}
-                style={({ pressed }) => ({
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 6,
-                  marginTop: 8,
-                  alignSelf: 'flex-start',
-                  minHeight: 28,
-                  opacity: pressed ? 0.6 : 1,
-                })}
-              >
-                <Feather name="shield" size={13} color={BRAND_PURPLE} />
-                <Text style={{ fontSize: 13, fontFamily: 'Inter_600SemiBold', color: BRAND_PURPLE, letterSpacing: 0.1 }}>
-                  Includes Buyer Protection
-                </Text>
-                <Feather name="chevron-right" size={14} color={BRAND_PURPLE} />
-              </Pressable>
-            </View>
-          ) : (
+          {/* Price — Mercari/Vinted pattern: the item price is the hero, and
+              Buyer Protection is surfaced beneath it as a small "+fee" line
+              rather than folded into a combined total. The buyer still pays
+              item + fee (the action bar shows the total on the Buy button); this
+              keeps the headline price honest to what's listed. The fee row taps
+              into the full breakdown sheet. */}
+          <View style={{ marginTop: 14 }}>
             <Text
               style={{
-                marginTop: 14,
                 fontSize: 28,
                 fontFamily: 'Inter_700Bold',
                 color: BRAND_INK,
                 letterSpacing: -0.6,
               }}
             >
-              {formatPrice(listing.price)}
+              {formatPrice(itemPrice)}
             </Text>
-          )}
+            {bpFee > 0 ? (
+              <Pressable
+                onPress={() => { tap('selection'); setBpVisible(true); }}
+                accessibilityRole="button"
+                accessibilityLabel={`Plus ${formatPrice(bpFee)} Buyer Protection fee. See the breakdown.`}
+                hitSlop={8}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 7,
+                  marginTop: 6,
+                  alignSelf: 'flex-start',
+                  minHeight: 28,
+                  opacity: pressed ? 0.6 : 1,
+                })}
+              >
+                <Text style={{ fontSize: 14, fontFamily: 'Inter_500Medium', color: 'rgba(15,15,15,0.55)' }}>
+                  +{formatPrice(bpFee)} Buyer Protection fee
+                </Text>
+                <Feather name="shield" size={15} color={BRAND_PURPLE} />
+              </Pressable>
+            ) : null}
+          </View>
 
         </View>
 

@@ -39,13 +39,20 @@
           "photosPermission": "Carrinex needs access to your photos to upload listings."
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "expo-notifications"
     ],
     "web": {
       "favicon": "./assets/images/favicon.png"
     },
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "cea63614-ec61-46e8-b410-5fe84a7218bf"
+      }
     }
   }
 }

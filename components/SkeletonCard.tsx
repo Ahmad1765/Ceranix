@@ -1,13 +1,21 @@
 import { useEffect, useRef } from 'react';
 import { View, Animated, Platform } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 
 // JS-driven on web (no RCTAnimation native module), native-driven elsewhere.
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 export function SkeletonCard() {
   const opacity = useRef(new Animated.Value(0.4)).current;
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
+    // Respect the OS "reduce motion" setting: hold a steady mid opacity instead
+    // of pulsing, so the placeholder stays visible without animating.
+    if (reduceMotion) {
+      opacity.setValue(0.7);
+      return;
+    }
     const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: USE_NATIVE_DRIVER }),
@@ -18,7 +26,7 @@ export function SkeletonCard() {
     return () => {
       animation.stop();
     };
-  }, [opacity]);
+  }, [opacity, reduceMotion]);
 
   return (
     <Animated.View style={{ flex: 1, opacity }}>

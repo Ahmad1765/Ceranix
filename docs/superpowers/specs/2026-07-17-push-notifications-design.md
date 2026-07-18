@@ -21,11 +21,11 @@ Deliver remote push notifications for the marketplace's core retention + transac
 | --- | --- | --- |
 | `messages` INSERT, `kind='text'` | other conversation participant | `<sender>`: `<content, truncated>` |
 | `messages` INSERT, `kind='offer'` | other conversation participant | `<sender> sent an offer: <formatted amount>` |
-| `messages` UPDATE, `offer_status` → `accepted`/`declined` | the offer's `sender_id` | `Your offer was <accepted/declined>` |
+| `messages` UPDATE, `offer_status` → `accepted`/`declined` (mapper compares `old_record.offer_status` ≠ `record.offer_status`) | the offer's `sender_id` | `Your offer was <accepted/declined>` |
 | `orders` INSERT | `seller_id` | `You sold <listing title>` |
 | `orders` INSERT | `buyer_id` | `Payment confirmed — <listing title>` |
 
-A user never receives a push for their own action (sender ≠ recipient enforced in the mapper).
+For message events, the sender never receives a push for their own message (sender ≠ recipient enforced in the mapper). For `orders` INSERT, both the seller **and** the buyer receive a notification — the buyer's confirmation ("Payment confirmed") is intentionally delivered even though the buyer initiated the purchase.
 
 ## Architecture
 
@@ -89,9 +89,13 @@ begin
   if auth.uid() is null then
     raise exception 'not authenticated';
   end if;
-  delete from public.user_devices where expo_push_token = p_token;
   insert into public.user_devices (user_id, expo_push_token, platform, device_name)
-  values (auth.uid(), p_token, p_platform, p_device_name);
+  values (auth.uid(), p_token, p_platform, p_device_name)
+  on conflict (expo_push_token) do update
+    set user_id     = auth.uid(),
+        platform    = excluded.platform,
+        device_name = excluded.device_name,
+        updated_at  = now();
 end;
 $$;
 
@@ -99,7 +103,7 @@ revoke all on function public.register_device(text, text, text) from public;
 grant execute on function public.register_device(text, text, text) to authenticated;
 ```
 
-- `expo_push_token` is **globally unique**: `register_device()` deletes any prior row for the token then inserts for `auth.uid()`, so a physical device always maps to the currently-signed-in user. Prevents a shared device from pushing to a previous account.
+- `expo_push_token` is **globally unique**: `register_device()` upserts on `expo_push_token`, atomically reassigning the token to `auth.uid()` if it was previously owned by another user. Prevents a shared device from pushing to a previous account, and concurrent registrations resolve without race conditions.
 - **No public read, no client insert/update** — closes the harvest hole. Clients register via the definer RPC, read/delete only their own rows; only the service-role edge function reads tokens across users.
 - Unregister: the client deletes its own row directly (owner `DELETE` policy allows it).
 
@@ -110,13 +114,14 @@ grant execute on function public.register_device(text, text, text) to authentica
 - `ensurePermissionAndRegister(userId)` — requests permission; on grant, registers. Used by the soft-ask and the settings toggle.
 - `unregisterThisDevice()` — deletes this install's token row (called on sign-out and when the settings toggle is turned off).
 - `configureNotifications()` — sets the foreground handler (show banner + sound) and the Android default channel. Called once at startup (native only).
-- `attachResponseListener(router)` — on notification tap, routes via payload `data`.
+- `attachResponseListener(router)` — registers the live notification-response listener for taps while the app is running. Additionally, on first call, reads `Notifications.getLastNotificationResponseAsync()` to handle the notification that launched a terminated app; the initial response is routed once via `routeForNotificationData`, then cleared to prevent re-processing on subsequent mounts.
 
 ### `lib/notificationRouting.ts` (pure, unit-tested)
 - `routeForNotificationData(data): { pathname; params } | null` — maps `{type:'message', conversationId}` → `/conversation/[id]`, `{type:'order', listingId}` → `/product/[id]`. Unknown/malformed → null (no-op).
 
 ### Permission UX
-- **Silent register on sign-in:** in `lib/auth.tsx` `onAuthStateChange` SIGNED_IN handler (deferred, native only) — if permission already granted, `registerForPush(uid)`. On sign-out, `unregisterThisDevice()`.
+- **Silent register on sign-in:** in `lib/auth.tsx` `onAuthStateChange` SIGNED_IN handler (deferred, native only) — if permission already granted, `registerForPush(uid)`.
+- **Sign-out:** `unregisterThisDevice()` is awaited **before** calling `signOut()`, so `auth.uid()` is still available for the owner-only DELETE RLS policy. Device removal is performed in the sign-out handler (e.g. settings screen or sign-out button), **not** in the post-sign-out `SIGNED_OUT` callback. If `unregisterThisDevice()` fails, the error is caught and logged but sign-out proceeds (the orphaned token will be pruned on the next `DeviceNotRegistered` from Expo).
 - **Soft-ask on first conversation open:** `app/conversation/[id].tsx` — on first mount, if permission status is `undetermined` and an AsyncStorage flag `push_prompted` is unset, call `ensurePermissionAndRegister` and set the flag. Asks at most once contextually.
 - **Settings toggle:** a "Push notifications" row in `app/settings.tsx` (reuses the existing `Switch` pattern). Reflects current permission/registration; ON → `ensurePermissionAndRegister` (if the OS permission is blocked, deep-link to system settings via `Linking.openSettings()`); OFF → `unregisterThisDevice()`.
 - **Never** prompt on cold launch.
@@ -139,7 +144,7 @@ grant execute on function public.register_device(text, text, text) to authentica
 
 Migration `<ts>_push_webhooks.sql` creates triggers via `supabase_functions.http_request` on:
 - `messages` AFTER INSERT
-- `messages` AFTER UPDATE OF `offer_status`
+- `messages` AFTER UPDATE OF `offer_status` — the webhook fires on any write to the column; the **mapper** guards against no-op updates by comparing `old_record.offer_status` with `record.offer_status` and sending only when the value actually transitions to `accepted` or `declined`.
 - `orders` AFTER INSERT
 
 Each posts to `https://<project-ref>.supabase.co/functions/v1/send-push` with header `x-webhook-secret: <secret>`. The project ref + secret are **environment-specific placeholders** in the committed SQL, with equivalent Dashboard (Database → Webhooks) setup steps documented in the runbook. This mirrors how `stripe-webhook` documents its dashboard wiring.
@@ -162,6 +167,7 @@ Each posts to `https://<project-ref>.supabase.co/functions/v1/send-push` with he
 3. `send-push` deployed; `PUSH_WEBHOOK_SECRET` set; webhooks configured.
 4. Send a message from account B → account A (backgrounded) receives a push; tap → opens the conversation.
 5. Complete a checkout → seller + buyer receive pushes.
+6. Force-kill the app entirely (terminated state). Send a push from account B. Tap the notification in the OS tray → the app cold-starts and navigates to the correct conversation/product screen.
 
 A `PUSH_NOTIFICATIONS.md` runbook captures the setup + manual checklist.
 
@@ -170,7 +176,7 @@ A `PUSH_NOTIFICATIONS.md` runbook captures the setup + manual checklist.
 - **Untestable end-to-end here** — delivery depends on a native build and the user's Supabase project. Slice lands as fully-built, unit-tested, documented code that activates on first build. `registerForPush` no-ops safely until then.
 - **expo-notifications** is a new native dependency → must re-run the web-export regression.
 - **Payload size / batching** — Expo Push API accepts up to 100 messages per request; recipients here are 1–2 per event, well within limits.
-- **Duplicate sends** — DB webhooks fire once per committed row change; no dedup layer needed for this scope. (Stripe retries are already deduped upstream by the orders unique constraint, so `orders` INSERT fires once.)
+- **Duplicate sends** — DB webhooks fire once per committed row change, but transient edge-function failures or Supabase retry policies can re-deliver the same payload. The `send-push` function must enforce **idempotent delivery**: persist an idempotency key derived from `(source_table, record.id, event_type, recipient_user_id)` — either in a lightweight `push_deliveries` table or via an insert-if-not-exists check — and skip sending when the key already exists. The notification is marked sent only after a successful Expo Push API response. (Stripe-originated `orders` INSERT events are additionally deduplicated upstream by the orders unique constraint.)
 
 ## Dependencies
 
