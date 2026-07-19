@@ -3,6 +3,7 @@ import {
   Alert,
   View,
   Text,
+  TextInput,
   Pressable,
   ScrollView,
   RefreshControl,
@@ -27,7 +28,7 @@ import {
   useDeleteSavedSearch,
 } from '@/lib/queries';
 import { useToast } from '@/lib/toast';
-import { useGridDimensions, useTabBarClearance } from '@/lib/responsive';
+import { useGridDimensions, useTabBarClearance, HIT_SLOP_8 } from '@/lib/responsive';
 import type { Category, Listing } from '@/types';
 
 const HORIZONTAL_PAD = 12;
@@ -55,6 +56,11 @@ export default function MyFeedScreen() {
   const toast = useToast();
   const [activeChip, setActiveChip] = useState<string>(FOR_YOU);
   const [alertSheetOpen, setAlertSheetOpen] = useState(false);
+  // In-feed filter. Searches within the current view (For you / Saved / a saved
+  // search) by title or brand — Discover owns catalog-wide server search, so
+  // this stays an instant client-side refine over already-loaded rows.
+  const [query, setQuery] = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
 
   const { columns, cardWidth } = useGridDimensions({
     min: 2,
@@ -193,6 +199,19 @@ export default function MyFeedScreen() {
     return rows;
   }, [listings, savedListings, activeSavedSearch, showingSaved]);
 
+  // Instant local filter layered on top of the active view. Matches title and
+  // brand, the two fields a shopper scans for.
+  const trimmedQuery = query.trim().toLowerCase();
+  const isSearching = trimmedQuery.length > 0;
+  const searchedListings = useMemo(() => {
+    if (!isSearching) return visibleListings;
+    return visibleListings.filter(
+      (l) =>
+        l.title.toLowerCase().includes(trimmedQuery) ||
+        (l.brand?.toLowerCase().includes(trimmedQuery) ?? false),
+    );
+  }, [visibleListings, isSearching, trimmedQuery]);
+
   const showColdStartBanner = !user;
   const showFollowCta =
     !!user && savedSearches.length === 0 && isFallback;
@@ -215,7 +234,15 @@ export default function MyFeedScreen() {
       : 'From your likes, saves & sellers you follow';
   }, [user, isFallback, listings]);
 
-  const showRails = activeChip === FOR_YOU && !showingSaved;
+  // Rails are browsing aids; while filtering we hide them so results stay the
+  // sole focus.
+  const showRails = activeChip === FOR_YOU && !showingSaved && !isSearching;
+
+  const gridEmptyText = isSearching
+    ? `Nothing in ${showingSaved ? 'your saved items' : 'this feed'} matches “${query.trim()}”.`
+    : showingSaved
+      ? 'No saved items yet. Tap the bookmark on any listing to save it.'
+      : 'Nothing matches this feed yet.';
 
   // Web pull-to-refresh — RefreshControl is inert on react-native-web.
   const { scrollRef, pull, nodeTop, threshold, contentStyle } = useWebPullToRefresh({ refreshing, onRefresh });
@@ -225,6 +252,8 @@ export default function MyFeedScreen() {
       <ScrollView
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />
         }
@@ -252,6 +281,18 @@ export default function MyFeedScreen() {
             {subtitle}
           </Text>
         </View>
+
+        {/* In-feed search — filters the active view (For you / Saved / a saved
+            search) by title or brand. Focus lifts the hairline to purple; the
+            border is always present so focusing never shifts layout. */}
+        <FeedSearch
+          value={query}
+          onChangeText={setQuery}
+          focused={searchFocused}
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setSearchFocused(false)}
+          resultCount={isSearching ? searchedListings.length : null}
+        />
 
         {showColdStartBanner ? (
           <Pressable
@@ -345,15 +386,11 @@ export default function MyFeedScreen() {
         ) : null}
 
         <Grid
-          rows={visibleListings}
+          rows={searchedListings}
           loading={showingSaved ? loadingSaved : loading}
           columns={columns}
           cardWidth={cardWidth}
-          emptyText={
-            showingSaved
-              ? 'No saved items yet. Tap the bookmark on any listing to save it.'
-              : 'Nothing matches this feed yet.'
-          }
+          emptyText={gridEmptyText}
         />
       </ScrollView>
 
@@ -398,6 +435,95 @@ function RailHeader({ icon, title }: { icon: keyof typeof Feather.glyphMap; titl
       <Text style={{ fontSize: 14, fontWeight: '800', color: colors.ink, letterSpacing: -0.2 }}>
         {title}
       </Text>
+    </View>
+  );
+}
+
+// In-feed search field. Pill-shaped to match Discover's search vocabulary, but
+// scoped to an instant local filter rather than a server query. The hairline
+// border is always rendered (transparent → purple on focus) so the field never
+// reflows when focused, and a live result count reassures the user the filter
+// is working before they scan the grid.
+function FeedSearch({
+  value,
+  onChangeText,
+  focused,
+  onFocus,
+  onBlur,
+  resultCount,
+}: {
+  value: string;
+  onChangeText: (t: string) => void;
+  focused: boolean;
+  onFocus: () => void;
+  onBlur: () => void;
+  resultCount: number | null;
+}) {
+  const searching = value.trim().length > 0;
+  return (
+    <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.panel,
+          borderRadius: radii.pill,
+          paddingHorizontal: 14,
+          height: 44,
+          borderWidth: 1,
+          borderColor: focused ? colors.purple : 'transparent',
+        }}
+      >
+        <Feather name="search" size={17} color={focused ? colors.purple : colors.muteSoft} />
+        <TextInput
+          value={value}
+          onChangeText={onChangeText}
+          onFocus={onFocus}
+          onBlur={onBlur}
+          placeholder="Search your feed"
+          placeholderTextColor={colors.muteSoft}
+          style={
+            {
+              flex: 1,
+              marginLeft: 9,
+              fontSize: 14.5,
+              color: colors.ink,
+              padding: 0,
+              // RN-Web only: drop the browser's default focus ring — the purple
+              // border is our focus affordance.
+              outlineStyle: 'none',
+              outlineWidth: 0,
+            } as any
+          }
+          returnKeyType="search"
+          autoCorrect={false}
+          autoCapitalize="none"
+          accessibilityLabel="Search your feed"
+        />
+        {searching ? (
+          <Pressable
+            hitSlop={HIT_SLOP_8}
+            onPress={() => onChangeText('')}
+            accessibilityRole="button"
+            accessibilityLabel="Clear search"
+          >
+            <Feather name="x" size={16} color={colors.muteSoft} />
+          </Pressable>
+        ) : null}
+      </View>
+      {searching && resultCount !== null && resultCount > 0 ? (
+        <Text
+          style={{
+            marginTop: 8,
+            marginLeft: 2,
+            fontSize: 12,
+            color: colors.muteSoft,
+            letterSpacing: -0.1,
+          }}
+        >
+          {resultCount} {resultCount === 1 ? 'result' : 'results'}
+        </Text>
+      ) : null}
     </View>
   );
 }
