@@ -1,15 +1,8 @@
 import { memo, useEffect, useState, useCallback, useRef } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  ScrollView,
-  type NativeSyntheticEvent,
-  type NativeScrollEvent,
-} from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
-import Animated from 'react-native-reanimated';
+import Animated, { useReducedMotion } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { PressableScale } from '@/components/PressableScale';
 import { getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
@@ -36,10 +29,7 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
   const guestGate = useGuestGate();
   const [activeIndex, setActiveIndex] = useState(0);
   const [cardWidth, setCardWidth] = useState(0);
-  // Sibling carousel images only mount after the user actually engages with
-  // the card. This shaves ~2/3 of image requests on multi-image listings in
-  // the home grid since most users never swipe individual cards.
-  const [carouselArmed, setCarouselArmed] = useState(false);
+  const reduceMotion = useReducedMotion();
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(listing.likes ?? 0);
   const [likeBusy, setLikeBusy] = useState(false);
@@ -75,6 +65,19 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
   useEffect(() => {
     setLikeCount(listing.likes ?? 0);
   }, [listing.likes]);
+
+  // Multi-image listings auto-advance like a slideshow instead of being
+  // swipeable. A horizontal ScrollView nested inside a card hijacked any
+  // sideways-leaning touch — including a swipe meant for a surrounding
+  // horizontal list — and changed the photo instead. The dots below still
+  // show progress; reduced-motion users just see a static first photo.
+  useEffect(() => {
+    if (!hasMultiple || reduceMotion) return;
+    const id = setInterval(() => {
+      setActiveIndex((i) => (i + 1) % images.length);
+    }, 2600);
+    return () => clearInterval(id);
+  }, [hasMultiple, images.length, reduceMotion]);
 
   const handleToggleLike = useCallback(async () => {
     if (!user?.id) {
@@ -116,17 +119,9 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
     }
   }, [liked, likeBusy, listing.id, toast, user?.id, guestGate]);
 
-  const handleScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (cardWidth <= 0) return;
-    setActiveIndex(Math.round(e.nativeEvent.contentOffset.x / cardWidth));
-  }, [cardWidth]);
-
-  const armCarousel = useCallback(() => {
-    if (!carouselArmed) setCarouselArmed(true);
-  }, [carouselArmed]);
-
   const srcWidth = thumbWidthFor(cardWidth || 200);
-  const firstSrc = getOptimizedImageUrl(images[0], { width: srcWidth });
+  const currentUri = images[activeIndex] ?? images[0];
+  const currentSrc = getOptimizedImageUrl(currentUri, { width: srcWidth });
 
   const meta = [listing.size, conditionLabel(listing.condition)].filter(Boolean).join(' · ');
   const { item: itemPrice, total: totalPrice } = priceBreakdown(listing.price);
@@ -150,63 +145,21 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
         style={{ aspectRatio: 1 / 1.33, overflow: 'hidden', borderRadius: radii.lg, backgroundColor: colors.panel }}
         onLayout={(e) => setCardWidth(e.nativeEvent.layout.width)}
       >
-        {hasMultiple && cardWidth > 0 ? (
-          <ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            nestedScrollEnabled
-            onScroll={handleScroll}
-            onTouchStart={armCarousel}
-            onScrollBeginDrag={armCarousel}
-            scrollEventThrottle={16}
-            disableIntervalMomentum
-          >
-            {images.map((uri, i) => {
-              if (i === 0) {
-                return (
-                  <AnimatedExpoImage
-                    key={i}
-                    source={{ uri: firstSrc }}
-                    style={{ width: cardWidth, height: '100%' }}
-                    contentFit="cover"
-                    cachePolicy="memory-disk"
-                    recyclingKey={uri}
-                    transition={200}
-                    priority="high"
-                    sharedTransitionTag={`product-image-${listing.id}`}
-                  />
-                );
-              }
-              if (!carouselArmed) {
-                return <View key={i} style={{ width: cardWidth, height: '100%' }} />;
-              }
-              return (
-                <Image
-                  key={i}
-                  source={{ uri: getOptimizedImageUrl(uri, { width: srcWidth }) }}
-                  style={{ width: cardWidth, height: '100%' }}
-                  contentFit="cover"
-                  cachePolicy="memory-disk"
-                  recyclingKey={uri}
-                  transition={200}
-                  priority="low"
-                />
-              );
-            })}
-          </ScrollView>
-        ) : (
-          <AnimatedExpoImage
-            source={{ uri: firstSrc }}
-            style={{ width: '100%', height: '100%' }}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-            recyclingKey={images[0]}
-            transition={200}
-            priority="high"
-            sharedTransitionTag={`product-image-${listing.id}`}
-          />
-        )}
+        <AnimatedExpoImage
+          // Keyed by frame so each slideshow advance is a fresh mount rather
+          // than a source swap on a persisting instance — expo-image's web
+          // crossfade layer only reliably fades in on mount; swapping
+          // `source` in place on the same element left it stuck invisible.
+          key={activeIndex}
+          source={{ uri: currentSrc }}
+          style={{ width: '100%', height: '100%' }}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          recyclingKey={listing.id}
+          transition={280}
+          priority={activeIndex === 0 ? 'high' : 'normal'}
+          sharedTransitionTag={activeIndex === 0 ? `product-image-${listing.id}` : undefined}
+        />
 
         {hasMultiple && (
           <View
@@ -252,11 +205,11 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
             right: 8,
             backgroundColor: 'rgba(255,255,255,0.94)',
             borderRadius: 999,
-            paddingVertical: 4,
-            paddingHorizontal: 9,
+            paddingVertical: 6,
+            paddingHorizontal: 11,
             flexDirection: 'row',
             alignItems: 'center',
-            gap: 4,
+            gap: 5,
             opacity: pressed ? 0.85 : 1,
             ...shadow.sm,
           })}
@@ -265,11 +218,11 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
             ref={heartAnimRef}
             name="heart"
             active={liked}
-            size={13}
+            size={16}
             activeColor={BRAND_PURPLE}
             inactiveColor={BRAND_INK}
           />
-          <Text style={{ fontSize: 11, fontWeight: '700', color: '#0F0F0F' }}>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: '#0F0F0F' }}>
             {likeCount}
           </Text>
         </Pressable>

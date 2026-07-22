@@ -314,6 +314,23 @@ export default function ProductScreen() {
   const sellerItems = sellerItemsQ.data ?? EMPTY_LISTINGS;
   const similarItems = similarItemsQ.data ?? EMPTY_LISTINGS;
 
+  // Shared by the heart's long-press and the bookmark button — both open the
+  // same SaveListSheet, so signed-out users must hit the identical guest-gate
+  // prompt regardless of which control they used.
+  const handleOpenSaveList = () => {
+    if (!user?.id) {
+      guestGate.prompt({
+        title: 'Save to a collection',
+        message: 'Create a free account to save items into collections you can come back to.',
+        icon: 'bookmark',
+        resume: productIdParam ? { kind: 'save', listingId: productIdParam } : undefined,
+      });
+      return;
+    }
+    tap('medium');
+    setSaveListVisible(true);
+  };
+
   const handleHeartPress = async () => {
     tap('light');
     if (!user) {
@@ -822,10 +839,11 @@ export default function ProductScreen() {
             {/* Like — heart over its count */}
             <Pressable
               onPress={handleHeartPress}
-              onLongPress={() => { tap('medium'); setSaveListVisible(true); }}
+              onLongPress={handleOpenSaveList}
               delayLongPress={350}
               accessibilityRole="button"
               accessibilityLabel={liked ? 'Unlike this item' : 'Like this item'}
+              accessibilityHint="Long press to save this item to a collection"
               accessibilityState={{ selected: liked }}
               style={({ pressed }) => ({
                 width: 52,
@@ -857,19 +875,7 @@ export default function ProductScreen() {
 
             {/* Save to collection */}
             <Pressable
-              onPress={() => {
-                if (!user?.id) {
-                  guestGate.prompt({
-                    title: 'Save to a collection',
-                    message: 'Create a free account to save items into collections you can come back to.',
-                    icon: 'bookmark',
-                    resume: productIdParam ? { kind: 'save', listingId: productIdParam } : undefined,
-                  });
-                  return;
-                }
-                tap('medium');
-                setSaveListVisible(true);
-              }}
+              onPress={handleOpenSaveList}
               accessibilityRole="button"
               accessibilityLabel={saved ? 'Edit save lists' : 'Save to list'}
               accessibilityState={{ selected: saved }}
