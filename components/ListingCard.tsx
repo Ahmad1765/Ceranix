@@ -14,12 +14,14 @@ import { router } from 'expo-router';
 import { PressableScale } from '@/components/PressableScale';
 import { getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
 import { formatPrice } from '@/lib/currency';
+import { priceBreakdown } from '@/lib/fees';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { isLiked as fetchIsLiked, toggleLike } from '@/lib/listings';
-import { isSaved as fetchIsSaved, toggleSave } from '@/lib/saves';
-import { SaveListSheet } from '@/components/SaveListSheet';
 import { useGuestGate } from '@/components/GuestGate';
+import { PopIcon, type PopIconHandle } from '@/components/product/PopIcon';
+import { BRAND_PURPLE, BRAND_INK, conditionLabel } from '@/components/product/shared';
+import { colors, radii, shadow } from '@/lib/theme';
 import type { Listing } from '@/types';
 
 const AnimatedExpoImage = Animated.createAnimatedComponent(Image);
@@ -41,16 +43,15 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(listing.likes ?? 0);
   const [likeBusy, setLikeBusy] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [saveBusy, setSaveBusy] = useState(false);
-  const [sheetOpen, setSheetOpen] = useState(false);
   // images is nullable in Postgres; `['']` keeps the carousel's single-slot
   // placeholder behaviour for rows with no photos.
   const images = listing.images?.length ? listing.images : [''];
   const hasMultiple = images.length > 1;
 
   const likedInteractedRef = useRef(false);
-  const savedInteractedRef = useRef(false);
+  // Imperative handle for the like pop — fired on tap so the Instagram-style
+  // spring bounce never rides an async server-hydration update.
+  const heartAnimRef = useRef<PopIconHandle>(null);
 
   // Hydrate the liked state for the current user. Cards are recycled in the
   // feed grid so we re-run this whenever the listing id or user changes.
@@ -63,22 +64,6 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
     likedInteractedRef.current = false;
     fetchIsLiked(listing.id, user.id).then((v) => {
       if (!cancelled && !likedInteractedRef.current) setLiked(v);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [listing.id, user?.id]);
-
-  // Hydrate the saved/bookmarked state in parallel with liked.
-  useEffect(() => {
-    if (!user?.id) {
-      setSaved(false);
-      return;
-    }
-    let cancelled = false;
-    savedInteractedRef.current = false;
-    fetchIsSaved(listing.id, user.id).then((v) => {
-      if (!cancelled && !savedInteractedRef.current) setSaved(v);
     });
     return () => {
       cancelled = true;
@@ -106,12 +91,14 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
     const prev = liked;
     const next = !prev;
     // Optimistic flip — rollback below if the server disagrees.
+    heartAnimRef.current?.animateTo(next);
     setLiked(next);
     setLikeCount((c) => Math.max(0, c + (next ? 1 : -1)));
     setLikeBusy(true);
     try {
       const result = await toggleLike(listing.id, user.id, prev);
       if (result !== next) {
+        heartAnimRef.current?.animateTo(prev);
         setLiked(prev);
         setLikeCount((c) => Math.max(0, c + (next ? -1 : 1)));
       }
@@ -119,6 +106,7 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
       // Roll back the optimistic flip and surface a toast. We intentionally
       // do NOT re-throw — the onPress caller doesn't await this, so a throw
       // would become an unhandled promise rejection.
+      heartAnimRef.current?.animateTo(prev);
       setLiked(prev);
       setLikeCount((c) => Math.max(0, c + (next ? -1 : 1)));
       console.warn('[ListingCard] toggleLike failed:', error);
@@ -127,75 +115,6 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
       setLikeBusy(false);
     }
   }, [liked, likeBusy, listing.id, toast, user?.id, guestGate]);
-
-  const longPressHandled = useRef(false);
-
-  const handleToggleSave = useCallback(async () => {
-    if (longPressHandled.current) return;
-    if (!user?.id) {
-      guestGate.prompt({
-        title: 'Save to a collection',
-        message: 'Create a free account to save items into collections you can come back to.',
-        icon: 'bookmark',
-        resume: { kind: 'save', listingId: listing.id },
-      });
-      return;
-    }
-    if (saveBusy) return;
-    savedInteractedRef.current = true;
-    const uid = user.id;
-    const prev = saved;
-    const next = !prev;
-    setSaved(next);
-    setSaveBusy(true);
-    try {
-      const result = await toggleSave(listing.id, uid, prev);
-      if (result !== next) {
-        setSaved(prev);
-      } else if (next) {
-        toast.show('Saved', {
-          variant: 'success',
-          icon: 'bookmark',
-          action: {
-            label: 'Undo',
-            onPress: async () => {
-              setSaved(false);
-              try {
-                await toggleSave(listing.id, uid, true);
-              } catch {
-                setSaved(true);
-                toast.show('Could not undo', { variant: 'default', icon: 'alert-triangle' });
-              }
-            },
-          },
-        });
-      }
-    } catch (error) {
-      // Roll back and toast; do NOT re-throw — see handleToggleLike.
-      setSaved(prev);
-      console.warn('[ListingCard] toggleSave failed:', error);
-      toast.show("Couldn't update save", { variant: 'default', icon: 'alert-triangle' });
-    } finally {
-      setSaveBusy(false);
-    }
-  }, [saveBusy, saved, listing.id, toast, user?.id, guestGate]);
-
-  // Long-press opens the SaveListSheet so the user can pick a specific
-  // collection (or create a new one) instead of dumping into the default.
-  const handleOpenSheet = useCallback(() => {
-    longPressHandled.current = true;
-    if (!user?.id) {
-      guestGate.prompt({
-        title: 'Save to a collection',
-        message: 'Create a free account to save items into collections you can come back to.',
-        icon: 'bookmark',
-      });
-      setTimeout(() => { longPressHandled.current = false; }, 300);
-      return;
-    }
-    setSheetOpen(true);
-    setTimeout(() => { longPressHandled.current = false; }, 300);
-  }, [user?.id, guestGate]);
 
   const handleScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (cardWidth <= 0) return;
@@ -209,6 +128,9 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
   const srcWidth = thumbWidthFor(cardWidth || 200);
   const firstSrc = getOptimizedImageUrl(images[0], { width: srcWidth });
 
+  const meta = [listing.size, conditionLabel(listing.condition)].filter(Boolean).join(' · ');
+  const { item: itemPrice, total: totalPrice } = priceBreakdown(listing.price);
+
   return (
     <View style={{ flex: 1, marginBottom: 16 }}>
     <PressableScale
@@ -218,9 +140,14 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
       accessibilityHint="Opens listing details"
       style={{ flex: 1 }}
     >
+      {/* Outer wrapper carries the shadow — the inner view below needs
+          overflow: hidden to clip the image/carousel to its rounded corners,
+          and on iOS/Android that same clip silently eats a shadow applied to
+          the same layer. Splitting the two views is the standard fix. */}
+      <View className="w-full" style={{ borderRadius: radii.lg, ...shadow.sm }}>
       <View
         className="relative w-full"
-        style={{ aspectRatio: 1 / 1.33, overflow: 'hidden', borderRadius: 6, backgroundColor: 'rgba(15,15,15,0.04)' }}
+        style={{ aspectRatio: 1 / 1.33, overflow: 'hidden', borderRadius: radii.lg, backgroundColor: colors.panel }}
         onLayout={(e) => setCardWidth(e.nativeEvent.layout.width)}
       >
         {hasMultiple && cardWidth > 0 ? (
@@ -309,9 +236,10 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
           </View>
         )}
 
-        {/* Like badge — heart + count, top-right. Tap toggles like with
-            optimistic UI. Nested Pressable wins the touch responder so the
-            card's onPress doesn't fire when the badge is tapped. */}
+        {/* Like badge — animated heart + count, bottom-right. Tap toggles
+            like with optimistic UI. Nested Pressable wins the touch
+            responder so the card's onPress doesn't fire when the badge is
+            tapped. */}
         <Pressable
           onPress={handleToggleLike}
           hitSlop={6}
@@ -320,7 +248,7 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
           accessibilityState={{ selected: liked }}
           style={({ pressed }) => ({
             position: 'absolute',
-            top: 8,
+            bottom: 8,
             right: 8,
             backgroundColor: 'rgba(255,255,255,0.94)',
             borderRadius: 999,
@@ -330,40 +258,20 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
             alignItems: 'center',
             gap: 4,
             opacity: pressed ? 0.85 : 1,
+            ...shadow.sm,
           })}
         >
-          <Feather name="heart" size={11} color={liked ? '#6C47FF' : '#0F0F0F'} />
+          <PopIcon
+            ref={heartAnimRef}
+            name="heart"
+            active={liked}
+            size={13}
+            activeColor={BRAND_PURPLE}
+            inactiveColor={BRAND_INK}
+          />
           <Text style={{ fontSize: 11, fontWeight: '700', color: '#0F0F0F' }}>
             {likeCount}
           </Text>
-        </Pressable>
-
-        {/* Save / bookmark badge — bottom-right. Same pill treatment as the
-            like badge so they read as a pair. Tap toggles the bookmark with
-            optimistic UI; nested Pressable wins the touch responder so the
-            card's onPress doesn't fire. */}
-        <Pressable
-          onPress={handleToggleSave}
-          onLongPress={handleOpenSheet}
-          delayLongPress={300}
-          hitSlop={6}
-          accessibilityRole="button"
-          accessibilityLabel={saved ? 'Remove from saved (long-press for lists)' : 'Save listing (long-press for lists)'}
-          accessibilityState={{ selected: saved }}
-          style={({ pressed }) => ({
-            position: 'absolute',
-            bottom: 8,
-            right: 8,
-            backgroundColor: 'rgba(255,255,255,0.94)',
-            borderRadius: 999,
-            paddingVertical: 5,
-            paddingHorizontal: 7,
-            alignItems: 'center',
-            justifyContent: 'center',
-            opacity: pressed ? 0.85 : 1,
-          })}
-        >
-          <Feather name="bookmark" size={12} color={saved ? '#6C47FF' : '#0F0F0F'} />
         </Pressable>
 
         {listing.is_sold && (
@@ -372,30 +280,28 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
           </View>
         )}
       </View>
+      </View>
 
       <View className="mt-1.5 w-full">
-        <View className="flex-row items-center justify-between mt-1">
-          <Text className="text-[13px] font-medium text-ink flex-1" numberOfLines={1}>
-            {listing.brand || listing.title}
-          </Text>
-          {listing.size && (
-            <Text className="text-[13px] font-bold text-ink ml-1">{listing.size}</Text>
-          )}
-        </View>
-        <Text className="text-[14px] font-bold text-black mt-0.5">
-          {formatPrice(listing.price)}
+        <Text className="text-[13px] font-bold text-ink" numberOfLines={1}>
+          {listing.brand || listing.title}
         </Text>
+        {!!meta && (
+          <Text className="text-[11px] text-ink-mute mt-0.5" numberOfLines={1}>
+            {meta}
+          </Text>
+        )}
+        <Text className="text-[11px] text-ink-soft mt-1">
+          {formatPrice(itemPrice)}
+        </Text>
+        <View className="flex-row items-center mt-0.5" style={{ gap: 3 }}>
+          <Text className="text-[15px] font-extrabold text-ink">
+            {formatPrice(totalPrice)} incl.
+          </Text>
+          <Feather name="check-circle" size={13} color={BRAND_PURPLE} />
+        </View>
       </View>
     </PressableScale>
-    {user?.id ? (
-      <SaveListSheet
-        visible={sheetOpen}
-        userId={user.id}
-        listingId={listing.id}
-        onClose={() => setSheetOpen(false)}
-        onChanged={(savedSomewhere) => setSaved(savedSomewhere)}
-      />
-    ) : null}
     </View>
   );
 });
