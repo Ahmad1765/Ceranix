@@ -245,11 +245,14 @@ function TagTile({ entry, onPress }: { entry: TagIndexEntry; onPress: () => void
 // ── Brands ──────────────────────────────────────────────────────────────────
 // Brand storytelling gets the full-bleed editorial card — the promo banner's
 // tonal purple disc + serif name, reused so the hub reads as one magazine.
+// The preview collage below is real catalog photos (up to 3 recent covers
+// from that brand's live listings, from get_brand_index) — no fabricated
+// copy, unlike a "Brand is known for..." blurb would be.
 export interface BrandEntry {
   name: string;
   count: number;
-  /** Cover image from the brand's newest listing, when known. */
-  image?: string | null;
+  /** Up to 3 recent cover shots from that brand's live listings. */
+  images: string[];
 }
 
 export function BrandsPanel({
@@ -269,8 +272,7 @@ export function BrandsPanel({
 }
 
 function BrandCard({ brand, onPress }: { brand: BrandEntry; onPress: () => void }) {
-  const { name, count, image } = brand;
-  const uri = image ? getOptimizedImageUrl(image, { width: 480 }) : null;
+  const { name, count, images } = brand;
   return (
     <Pressable
       onPress={onPress}
@@ -306,26 +308,26 @@ function BrandCard({ brand, onPress }: { brand: BrandEntry; onPress: () => void 
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text
               style={{
+                fontFamily: SERIF_BOLD,
+                fontSize: 25,
+                color: colors.white,
+                letterSpacing: -0.3,
+              }}
+              numberOfLines={1}
+            >
+              {name}
+            </Text>
+            <Text
+              style={{
                 fontSize: 10.5,
                 fontFamily: type.family.sansBold,
                 color: 'rgba(255,255,255,0.62)',
                 letterSpacing: 1.3,
                 textTransform: 'uppercase',
-              }}
-            >
-              {count > 0 ? `${count} ${count === 1 ? 'item live' : 'items live'}` : 'Brand'}
-            </Text>
-            <Text
-              style={{
-                fontFamily: SERIF_BOLD,
-                fontSize: 25,
-                color: colors.white,
-                letterSpacing: -0.3,
                 marginTop: 4,
               }}
-              numberOfLines={1}
             >
-              {name}
+              {count} {count === 1 ? 'item live' : 'items live'}
             </Text>
           </View>
           <View
@@ -343,32 +345,34 @@ function BrandCard({ brand, onPress }: { brand: BrandEntry; onPress: () => void 
           </View>
         </View>
 
-        {/* Cover tile — brands only carry a single cover shot (not a preview
-            collage), so it's one hero tile with a quiet initial as fallback. */}
-        <View
-          style={{
-            marginTop: 16,
-            aspectRatio: 2.2,
-            borderRadius: radii.lg,
-            overflow: 'hidden',
-            backgroundColor: 'rgba(255,255,255,0.08)',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          {uri ? (
-            <Image
-              source={{ uri }}
-              style={{ width: '100%', height: '100%' }}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-              transition={200}
-            />
-          ) : (
-            <Text style={{ fontFamily: SERIF_BOLD, fontSize: 30, color: 'rgba(255,255,255,0.5)' }}>
-              {name.charAt(0).toUpperCase()}
-            </Text>
-          )}
+        {/* Preview collage — always three tiles so cards keep one rhythm;
+            unmatched slots stay as quiet placeholders (never an empty hole). */}
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
+          {Array.from({ length: 3 }).map((_, i) => {
+            const uri = images[i] ? getOptimizedImageUrl(images[i], { width: 240 }) : null;
+            return (
+              <View
+                key={i}
+                style={{
+                  flex: 1,
+                  aspectRatio: 0.72,
+                  borderRadius: radii.lg,
+                  overflow: 'hidden',
+                  backgroundColor: 'rgba(255,255,255,0.08)',
+                }}
+              >
+                {uri ? (
+                  <Image
+                    source={{ uri }}
+                    style={{ width: '100%', height: '100%' }}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                    transition={200}
+                  />
+                ) : null}
+              </View>
+            );
+          })}
         </View>
       </View>
     </Pressable>

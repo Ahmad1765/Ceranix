@@ -11,7 +11,8 @@ import type { Listing } from '@/types';
 export interface BrandIndexEntry {
   name: string;
   count: number;
-  image: string | null;
+  /** Up to 3 recent cover shots from that brand's live listings. */
+  images: string[];
 }
 
 // Every live brand in the catalog with stock depth, ranked by depth. The RPC
@@ -26,8 +27,8 @@ export async function fetchBrandIndex(query: string | null, limit = 100): Promis
     console.warn('[searchIndex] fetchBrandIndex', error.message);
     throw new Error(error.message);
   }
-  return ((data ?? []) as { brand: string; item_count: number; image: string | null }[]).map(
-    (r) => ({ name: r.brand, count: Number(r.item_count), image: r.image ?? null }),
+  return ((data ?? []) as { brand: string; item_count: number; images: string[] | null }[]).map(
+    (r) => ({ name: r.brand, count: Number(r.item_count), images: r.images ?? [] }),
   );
 }
 

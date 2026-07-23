@@ -392,8 +392,13 @@ export default function DiscoverScreen() {
         if (!name || l.is_sold) continue;
         const key = name.toLowerCase();
         const cur = counts.get(key);
-        if (cur) cur.count += 1;
-        else counts.set(key, { name, count: 1, image: l.images?.[0] ?? null });
+        const img = l.images?.[0];
+        if (cur) {
+          cur.count += 1;
+          if (img && cur.images.length < 3) cur.images.push(img);
+        } else {
+          counts.set(key, { name, count: 1, images: img ? [img] : [] });
+        }
       }
       rows = [...counts.values()].sort(
         (a, b) => b.count - a.count || a.name.localeCompare(b.name),
@@ -1110,7 +1115,7 @@ function BrandsSkeleton() {
   return (
     <View style={{ paddingHorizontal: 16, gap: 14, marginTop: 10 }}>
       {[0, 1, 2].map((i) => (
-        <View key={i} style={{ height: 200, borderRadius: radii['3xl'], backgroundColor: colors.divider }} />
+        <View key={i} style={{ height: 250, borderRadius: radii['3xl'], backgroundColor: colors.divider }} />
       ))}
     </View>
   );
