@@ -57,4 +57,31 @@ test.describe('Web pull-to-refresh', () => {
     }
     await expect(page.getByTestId('web-pull-indicator')).toHaveCount(0);
   });
+
+  // Regression: the page used to slide its whole content down in lockstep with
+  // the pull (translateY on the scroll content), which read as the page itself
+  // scrolling rather than a premium pull-to-refresh. The wrapper that used to
+  // carry that offset (app/(tabs)/index.tsx, testID="pull-refresh-page") must
+  // stay put; only the fixed-position indicator should ever translate.
+  test('pulling does not translate the page content — only the indicator moves', async ({ page }) => {
+    await page.goto('/');
+    await waitForAppReady(page);
+
+    await expect
+      .poll(() => wheelProbe(page, 0, -220), { timeout: 6000, intervals: [120, 120, 120, 120] })
+      .toBeTruthy();
+
+    const pageTranslateY = await page.evaluate(() => {
+      const el = document.querySelector('[data-testid="pull-refresh-page"]');
+      if (!el) return null;
+      const t = getComputedStyle(el).transform;
+      if (t === 'none') return 0;
+      const m = t.match(/^matrix3d\(([^)]+)\)$/) ?? t.match(/^matrix\(([^)]+)\)$/);
+      if (!m) return 0;
+      const parts = m[1].split(',').map(Number);
+      return parts.length === 16 ? parts[13] : parts[5];
+    });
+
+    expect(pageTranslateY).toBe(0);
+  });
 });

@@ -353,10 +353,9 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-white">
-      {/* Web pull-to-refresh: translate the whole page (header + feed) down with
-          the gesture so it tracks the pull. contentStyle is undefined on native,
-          so this wrapper is a no-op there — RefreshControl moves the list. */}
-      <View style={[{ flex: 1 }, contentStyle]}>
+      {/* contentStyle is always undefined (web and native) — the page stays put
+          during a pull; only the WebPullIndicator overlay tracks the gesture. */}
+      <View testID="pull-refresh-page" style={[{ flex: 1 }, contentStyle]}>
       {/* Search Header */}
       <View className="flex-row items-center px-4 pt-2 pb-3">
         <Pressable

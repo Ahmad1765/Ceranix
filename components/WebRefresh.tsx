@@ -12,7 +12,6 @@ import { colors } from '@/lib/theme';
 
 const IS_WEB = Platform.OS === 'web';
 const THRESHOLD = 70; // px of pull before release/accumulation triggers a refresh
-const REFRESH_HOLD = 52; // px the content rests at while a refresh is in flight
 const MAX_PULL = 110; // clamp so the indicator never runs away
 const RESISTANCE = 0.5; // pull feels rubber-banded, not 1:1
 const AXIS_LOCK = 10; // px of travel before we commit to horizontal vs vertical
@@ -181,12 +180,12 @@ export function useWebPullToRefresh({
     if (!refreshing) setPull(0);
   }, [refreshing]);
 
-  // Web-only transform the screen spreads into its scroll contentContainerStyle
-  // so the whole interface slides down with the pull (and rests under the
-  // spinner while refreshing), matching the native rubber-band feel. On native
-  // this is undefined — RefreshControl already moves the content itself.
-  const offset = refreshing ? REFRESH_HOLD : pull;
-  const contentStyle = IS_WEB && offset > 0 ? { transform: [{ translateY: offset }] } : undefined;
+  // Content itself never moves — only WebPullIndicator (a fixed-position
+  // overlay) tracks the pull, so the page keeps a premium, stationary feel
+  // instead of sliding down with the gesture. contentStyle is kept in the
+  // return shape (always undefined) so callers can keep spreading it into
+  // their contentContainerStyle as a no-op.
+  const contentStyle = undefined;
 
   return { scrollRef, pull, nodeTop, threshold: THRESHOLD, contentStyle };
 }
