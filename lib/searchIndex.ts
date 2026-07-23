@@ -1,11 +1,11 @@
 // Server-backed indexes for the Discover search hub (Brands / Aesthetics
-// tabs). Thin RPC wrappers — both functions are STABLE, SECURITY INVOKER
-// (listings RLS applies) and escape LIKE wildcards server-side, so the client
-// passes raw user text as a parameter and never builds SQL. Errors throw so
-// React Query keeps the last good rows instead of blanking the panel.
+// tabs). Thin RPC wrappers — every function here is STABLE, SECURITY INVOKER
+// (listings RLS applies) and escapes LIKE wildcards server-side, so the
+// client passes raw user text as a parameter and never builds SQL. Errors
+// throw so React Query keeps the last good rows instead of blanking the
+// panel.
 
 import { supabase } from '@/lib/supabase';
-import { AESTHETICS, type Aesthetic } from '@/lib/aesthetics';
 import type { Listing } from '@/types';
 
 export interface BrandIndexEntry {
@@ -31,37 +31,39 @@ export async function fetchBrandIndex(query: string | null, limit = 100): Promis
   );
 }
 
-export interface AestheticIndexEntry {
-  slug: string;
+export interface TagIndexEntry {
+  tag: string;
   count: number;
-  images: string[];
+  image: string | null;
 }
 
-// Catalog-wide match counts + preview images for the curated aesthetics, in
-// one round trip. Keyed by slug for O(1) merge with the client catalog.
-export async function fetchAestheticIndex(): Promise<Map<string, AestheticIndexEntry>> {
-  const defs = AESTHETICS.map((a) => ({ slug: a.slug, keywords: a.keywords }));
-  const { data, error } = await supabase.rpc('get_aesthetic_index', { p_defs: defs });
-  if (error) {
-    console.warn('[searchIndex] fetchAestheticIndex', error.message);
-    throw new Error(error.message);
-  }
-  const map = new Map<string, AestheticIndexEntry>();
-  for (const r of (data ?? []) as { slug: string; item_count: number; images: string[] | null }[]) {
-    map.set(r.slug, { slug: r.slug, count: Number(r.item_count), images: r.images ?? [] });
-  }
-  return map;
-}
-
-// The tap-through for an aesthetic card: full listing rows matching its
-// keywords, same semantics as the index so counts and results always agree.
-export async function fetchAestheticListings(aesthetic: Aesthetic, limit = 60): Promise<Listing[]> {
-  const { data, error } = await supabase.rpc('get_aesthetic_listings', {
-    p_keywords: aesthetic.keywords,
+// Every hashtag actually live on the catalog (public.listings.tags), ranked
+// by how many items carry it — this *is* the Aesthetics tab's catalog. No
+// curated list: a tag shows up the moment a seller uses it and disappears
+// once the last listing carrying it is gone or sold.
+export async function fetchTagIndex(query: string | null, limit = 100): Promise<TagIndexEntry[]> {
+  const { data, error } = await supabase.rpc('get_tag_index', {
+    p_query: query?.trim() || null,
     p_limit: limit,
   });
   if (error) {
-    console.warn('[searchIndex] fetchAestheticListings', error.message);
+    console.warn('[searchIndex] fetchTagIndex', error.message);
+    throw new Error(error.message);
+  }
+  return ((data ?? []) as { tag: string; item_count: number; image: string | null }[]).map(
+    (r) => ({ tag: r.tag, count: Number(r.item_count), image: r.image ?? null }),
+  );
+}
+
+// The tap-through for a tag tile: full listing rows carrying that exact tag,
+// same membership test as the index so counts and results always agree.
+export async function fetchTagListings(tag: string, limit = 60): Promise<Listing[]> {
+  const { data, error } = await supabase.rpc('get_tag_listings', {
+    p_tag: tag,
+    p_limit: limit,
+  });
+  if (error) {
+    console.warn('[searchIndex] fetchTagListings', error.message);
     throw new Error(error.message);
   }
   return (data ?? []) as Listing[];

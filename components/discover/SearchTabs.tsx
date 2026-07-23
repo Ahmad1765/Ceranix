@@ -16,7 +16,7 @@ import { fetchFollowingMask, toggleFollow } from '@/lib/follows';
 import { useToast } from '@/lib/toast';
 import { colors, radii, type } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
-import type { Aesthetic } from '@/lib/aesthetics';
+import type { TagIndexEntry } from '@/lib/searchIndex';
 import type { User } from '@/types';
 
 const PAD = 16;
@@ -162,37 +162,120 @@ export function HubTitle({ title, eyebrow }: { title: string; eyebrow?: string }
 }
 
 // ── Aesthetics ──────────────────────────────────────────────────────────────
-export interface AestheticCardData {
-  aesthetic: Aesthetic;
-  /** Live listings matching the aesthetic's keywords. */
-  count: number;
-  /** Up to 3 preview thumbnails from those matches. */
-  images: string[];
-}
-
+// Live hashtags, not a curated list — every tile here is a tag sellers
+// actually put on a listing (lib/searchIndex.ts's get_tag_index), so the
+// grid grows and shrinks with the catalog on its own. Quiet panel tiles,
+// name + live count on the left, a preview thumb on the right — a browsable
+// index to skim, not a trending rail.
 export function AestheticsPanel({
-  cards,
+  tags,
   onOpen,
 }: {
-  cards: AestheticCardData[];
-  onOpen: (aesthetic: Aesthetic) => void;
+  tags: TagIndexEntry[];
+  onOpen: (tag: string) => void;
 }) {
   return (
-    <View style={{ paddingHorizontal: PAD, gap: 14 }}>
-      {cards.map((card) => (
-        <AestheticCard key={card.aesthetic.slug} card={card} onPress={() => onOpen(card.aesthetic)} />
+    <View style={{ paddingHorizontal: PAD, flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+      {tags.map((t) => (
+        <TagTile key={t.tag} entry={t} onPress={() => onOpen(t.tag)} />
       ))}
     </View>
   );
 }
 
-function AestheticCard({ card, onPress }: { card: AestheticCardData; onPress: () => void }) {
-  const { aesthetic, count, images } = card;
+function TagTile({ entry, onPress }: { entry: TagIndexEntry; onPress: () => void }) {
+  const { tag, count } = entry;
+  const uri = entry.image ? getOptimizedImageUrl(entry.image, { width: 200 }) : null;
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`Explore the ${aesthetic.name} aesthetic`}
+      accessibilityLabel={`Explore #${tag}, ${count} ${count === 1 ? 'item' : 'items'}`}
+      style={({ pressed }) => ({ width: '48%', opacity: pressed ? 0.85 : 1 })}
+    >
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.panel,
+          borderRadius: radii.xl,
+          padding: 10,
+          gap: 6,
+        }}
+      >
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text
+            style={{ fontFamily: SERIF_BOLD, fontSize: 14, color: colors.ink }}
+            numberOfLines={1}
+          >
+            #{tag}
+          </Text>
+          <Text style={[eyebrowStyle, { color: colors.purple, letterSpacing: 0.4, marginTop: 3 }]} numberOfLines={1}>
+            {count.toLocaleString()} {count === 1 ? 'item' : 'items'}
+          </Text>
+        </View>
+        <View
+          style={{
+            width: 54,
+            aspectRatio: 0.72,
+            borderRadius: radii.lg,
+            overflow: 'hidden',
+            backgroundColor: colors.purpleSoft,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {uri ? (
+            <Image
+              source={{ uri }}
+              style={{ width: '100%', height: '100%' }}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={150}
+            />
+          ) : (
+            <Feather name="hash" size={16} color={colors.purple} />
+          )}
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+// ── Brands ──────────────────────────────────────────────────────────────────
+// Brand storytelling gets the full-bleed editorial card — the promo banner's
+// tonal purple disc + serif name, reused so the hub reads as one magazine.
+export interface BrandEntry {
+  name: string;
+  count: number;
+  /** Cover image from the brand's newest listing, when known. */
+  image?: string | null;
+}
+
+export function BrandsPanel({
+  brands,
+  onSelect,
+}: {
+  brands: BrandEntry[];
+  onSelect: (brand: string) => void;
+}) {
+  return (
+    <View style={{ paddingHorizontal: PAD, gap: 14 }}>
+      {brands.map((b) => (
+        <BrandCard key={b.name} brand={b} onPress={() => onSelect(b.name)} />
+      ))}
+    </View>
+  );
+}
+
+function BrandCard({ brand, onPress }: { brand: BrandEntry; onPress: () => void }) {
+  const { name, count, image } = brand;
+  const uri = image ? getOptimizedImageUrl(image, { width: 480 }) : null;
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Shop ${name}, ${count} ${count === 1 ? 'item' : 'items'}`}
       style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.985 : 1 }] })}
     >
       <View
@@ -230,7 +313,7 @@ function AestheticCard({ card, onPress }: { card: AestheticCardData; onPress: ()
                 textTransform: 'uppercase',
               }}
             >
-              {count > 0 ? `${count} ${count === 1 ? 'item live' : 'items live'}` : 'Aesthetic'}
+              {count > 0 ? `${count} ${count === 1 ? 'item live' : 'items live'}` : 'Brand'}
             </Text>
             <Text
               style={{
@@ -242,7 +325,7 @@ function AestheticCard({ card, onPress }: { card: AestheticCardData; onPress: ()
               }}
               numberOfLines={1}
             >
-              {aesthetic.name}
+              {name}
             </Text>
           </View>
           <View
@@ -260,133 +343,34 @@ function AestheticCard({ card, onPress }: { card: AestheticCardData; onPress: ()
           </View>
         </View>
 
-        <Text
+        {/* Cover tile — brands only carry a single cover shot (not a preview
+            collage), so it's one hero tile with a quiet initial as fallback. */}
+        <View
           style={{
-            fontSize: 14.5,
-            lineHeight: 21,
-            color: 'rgba(255,255,255,0.78)',
-            marginTop: 10,
+            marginTop: 16,
+            aspectRatio: 2.2,
+            borderRadius: radii.lg,
+            overflow: 'hidden',
+            backgroundColor: 'rgba(255,255,255,0.08)',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
-          numberOfLines={3}
         >
-          {aesthetic.description}
-        </Text>
-
-        {/* Preview collage — always three tiles so cards keep one rhythm;
-            unmatched slots stay as quiet placeholders (never an empty hole). */}
-        <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
-          {Array.from({ length: 3 }).map((_, i) => {
-            const uri = images[i] ? getOptimizedImageUrl(images[i], { width: 240 }) : null;
-            return (
-              <View
-                key={i}
-                style={{
-                  flex: 1,
-                  aspectRatio: 0.72,
-                  borderRadius: radii.lg,
-                  overflow: 'hidden',
-                  backgroundColor: 'rgba(255,255,255,0.08)',
-                }}
-              >
-                {uri ? (
-                  <Image
-                    source={{ uri }}
-                    style={{ width: '100%', height: '100%' }}
-                    contentFit="cover"
-                    cachePolicy="memory-disk"
-                    transition={200}
-                  />
-                ) : null}
-              </View>
-            );
-          })}
+          {uri ? (
+            <Image
+              source={{ uri }}
+              style={{ width: '100%', height: '100%' }}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={200}
+            />
+          ) : (
+            <Text style={{ fontFamily: SERIF_BOLD, fontSize: 30, color: 'rgba(255,255,255,0.5)' }}>
+              {name.charAt(0).toUpperCase()}
+            </Text>
+          )}
         </View>
       </View>
-    </Pressable>
-  );
-}
-
-// ── Brands ──────────────────────────────────────────────────────────────────
-export interface BrandEntry {
-  name: string;
-  count: number;
-  /** Cover image from the brand's newest listing, when known. */
-  image?: string | null;
-}
-
-// Rows in the Shop-by-brand language: cover thumb, serif brand name, eyebrow
-// stock line, and the purple outbound arrow the trending chips use.
-export function BrandsPanel({
-  brands,
-  onSelect,
-}: {
-  brands: BrandEntry[];
-  onSelect: (brand: string) => void;
-}) {
-  return (
-    <View style={{ paddingHorizontal: PAD }}>
-      {brands.map((b) => (
-        <BrandRow key={b.name} brand={b} onPress={() => onSelect(b.name)} />
-      ))}
-    </View>
-  );
-}
-
-function BrandRow({ brand, onPress }: { brand: BrandEntry; onPress: () => void }) {
-  const img = brand.image ? getOptimizedImageUrl(brand.image, { width: 120 }) : null;
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`Shop ${brand.name}, ${brand.count} ${brand.count === 1 ? 'item' : 'items'}`}
-      style={({ pressed }) => ({
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        paddingVertical: 11,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.hair,
-        backgroundColor: pressed ? colors.panel : 'transparent',
-        borderRadius: pressed ? radii.md : 0,
-      })}
-    >
-      <View
-        style={{
-          width: 46,
-          height: 46,
-          borderRadius: radii.md,
-          overflow: 'hidden',
-          backgroundColor: colors.purpleSoft,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        {img ? (
-          <Image
-            source={{ uri: img }}
-            style={{ width: '100%', height: '100%' }}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-            transition={150}
-          />
-        ) : (
-          <Text style={{ fontFamily: SERIF_BOLD, fontSize: 18, color: colors.purple }}>
-            {brand.name.charAt(0).toUpperCase()}
-          </Text>
-        )}
-      </View>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text
-          style={{ fontFamily: SERIF_BOLD, fontSize: 16, color: colors.ink }}
-          numberOfLines={1}
-        >
-          {brand.name}
-        </Text>
-        <Text style={[eyebrowStyle, { letterSpacing: 1, marginTop: 2 }]} numberOfLines={1}>
-          {brand.count} {brand.count === 1 ? 'item' : 'items'}
-        </Text>
-      </View>
-      <Feather name="arrow-up-right" size={16} color={colors.purple} />
     </Pressable>
   );
 }

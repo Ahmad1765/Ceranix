@@ -43,13 +43,12 @@ import {
   type FollowState,
 } from '@/lib/follows';
 import {
-  fetchAestheticIndex,
-  fetchAestheticListings,
+  fetchTagIndex,
+  fetchTagListings,
   fetchBrandIndex,
-  type AestheticIndexEntry,
+  type TagIndexEntry,
   type BrandIndexEntry,
 } from '@/lib/searchIndex';
-import type { Aesthetic } from '@/lib/aesthetics';
 import { listConversations, type ConversationRow } from '@/lib/chat';
 import type { User as Profile, Listing } from '@/types';
 import {
@@ -96,8 +95,8 @@ export const qk = {
   myWardrobe: (userId: string | null) => ['myWardrobe', userId] as const,
   likedWardrobe: (userId: string | null) => ['likedWardrobe', userId] as const,
   brandIndex: () => ['brandIndex'] as const,
-  aestheticIndex: () => ['aestheticIndex'] as const,
-  aestheticListings: (slug: string | null) => ['aestheticListings', slug] as const,
+  tagIndex: () => ['tagIndex'] as const,
+  tagListings: (tag: string | null) => ['tagListings', tag] as const,
   suggestedFollows: (userId: string | null) => ['suggestedFollows', userId] as const,
 };
 
@@ -113,24 +112,27 @@ export function useBrandIndexQuery(enabled = true) {
   });
 }
 
-// Catalog-wide counts + previews for the curated aesthetics, one round trip.
-export function useAestheticIndexQuery(enabled = true) {
+// The full live tag index (catalog-wide, ranked by stock) — same shape and
+// caching as the brand index above, just sourced from listings.tags instead
+// of listings.brand. Fetched once per staleTime and filtered client-side
+// while typing.
+export function useTagIndexQuery(enabled = true) {
   return useQuery({
-    queryKey: qk.aestheticIndex(),
+    queryKey: qk.tagIndex(),
     enabled,
     staleTime: 5 * 60_000,
-    queryFn: (): Promise<Map<string, AestheticIndexEntry>> => fetchAestheticIndex(),
+    queryFn: (): Promise<TagIndexEntry[]> => fetchTagIndex(null),
   });
 }
 
-// Listings behind one aesthetic card — keyed by slug so revisiting a card is
+// Listings behind one tag tile — keyed by tag so revisiting a tile is
 // instant from cache.
-export function useAestheticListingsQuery(aesthetic: Aesthetic | null) {
+export function useTagListingsQuery(tag: string | null) {
   return useQuery({
-    queryKey: qk.aestheticListings(aesthetic?.slug ?? null),
-    enabled: !!aesthetic,
+    queryKey: qk.tagListings(tag),
+    enabled: !!tag,
     staleTime: 5 * 60_000,
-    queryFn: (): Promise<Listing[]> => fetchAestheticListings(aesthetic as Aesthetic),
+    queryFn: (): Promise<Listing[]> => fetchTagListings(tag as string),
   });
 }
 

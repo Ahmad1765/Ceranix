@@ -25,11 +25,12 @@ import {
   useRecommendationsQuery,
   useRecentlyViewedQuery,
   useBrandIndexQuery,
-  useAestheticIndexQuery,
-  useAestheticListingsQuery,
+  useTagIndexQuery,
+  useTagListingsQuery,
   useSuggestedFollowsQuery,
 } from '@/lib/queries';
 import { createSavedSearch, touchSavedSearchSeen } from '@/lib/savedSearches';
+import type { TagIndexEntry } from '@/lib/searchIndex';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { colors, radii } from '@/lib/theme';
@@ -64,7 +65,6 @@ import {
   type DiscoverTab,
   type BrandEntry,
 } from '@/components/discover/SearchTabs';
-import { filterAesthetics, matchAestheticListings, type Aesthetic } from '@/lib/aesthetics';
 
 type CatTile = {
   id: Category | 'trending';
@@ -233,7 +233,7 @@ export default function DiscoverScreen() {
     // The search-hub indexes are invalidated (not refetched): active tabs
     // refetch immediately, gated tabs pick up fresh data on next open.
     qc.invalidateQueries({ queryKey: qk.brandIndex() });
-    qc.invalidateQueries({ queryKey: qk.aestheticIndex() });
+    qc.invalidateQueries({ queryKey: qk.tagIndex() });
     qc.invalidateQueries({ queryKey: qk.suggestedFollows(user?.id ?? null) });
     await Promise.all([gridRefetch(), recRefetch(), recentRefetch()]);
   }, [gridRefetch, recRefetch, recentRefetch, qc, user?.id]);
@@ -346,37 +346,37 @@ export default function DiscoverScreen() {
   // opens (enabled gate), then cached by React Query. Each panel falls back to
   // rows derived from the already-loaded grid until the authoritative index
   // lands, so switching tabs never shows a blank screen.
-  const aestheticIdxQ = useAestheticIndexQuery(tab === 'aesthetics');
+  const tagIdxQ = useTagIndexQuery(tab === 'aesthetics');
   const brandIdxQ = useBrandIndexQuery(tab === 'brands');
   const suggestedQ = useSuggestedFollowsQuery(user?.id ?? null, tab === 'users' && !hasQuery);
 
-  // ── Aesthetics tab ── curated catalog filtered by the query. Counts and
-  // preview collages prefer the catalog-wide server index; grid-derived
-  // matches fill in while it loads. Ranked by live stock so the styles that
-  // are actually trending in the catalog lead (name breaks ties, which also
-  // keeps the cold catalog alphabetical).
-  const aestheticCards = useMemo(
-    () =>
-      filterAesthetics(query)
-        .map((aesthetic) => {
-          const server = aestheticIdxQ.data?.get(aesthetic.slug);
-          const local = server ? [] : matchAestheticListings(aesthetic, listings);
-          return {
-            aesthetic,
-            count: server ? server.count : local.length,
-            images: server
-              ? server.images.slice(0, 3)
-              : local
-                  .slice(0, 3)
-                  .map((l) => l.images?.[0])
-                  .filter((u): u is string => !!u),
-          };
-        })
-        .sort(
-          (a, b) => b.count - a.count || a.aesthetic.name.localeCompare(b.aesthetic.name),
-        ),
-    [query, listings, aestheticIdxQ.data],
-  );
+  // ── Aesthetics tab ── the catalog-wide tag index (every hashtag actually in
+  // use), grid-derived rows filling in while it loads, same fallback story as
+  // the Brands tab below. No curated list: a tag exists here exactly as long
+  // as a live listing carries it. Sorted alphabetically — a browsable index
+  // to skim, not a trending rail (the RPC's own count ranking is discarded).
+  const tagResults = useMemo<TagIndexEntry[]>(() => {
+    let rows: TagIndexEntry[];
+    if (tagIdxQ.data) {
+      rows = tagIdxQ.data;
+    } else {
+      const counts = new Map<string, TagIndexEntry>();
+      for (const l of listings) {
+        if (l.is_sold) continue;
+        for (const raw of l.tags ?? []) {
+          const tag = raw.trim().toLowerCase();
+          if (!tag) continue;
+          const cur = counts.get(tag);
+          if (cur) cur.count += 1;
+          else counts.set(tag, { tag, count: 1, image: l.images?.[0] ?? null });
+        }
+      }
+      rows = [...counts.values()];
+    }
+    rows = [...rows].sort((a, b) => a.tag.localeCompare(b.tag));
+    const q = query.trim().toLowerCase();
+    return q ? rows.filter((t) => t.tag.includes(q)) : rows;
+  }, [tagIdxQ.data, listings, query]);
 
   // ── Brands tab ── the catalog-wide index (every live brand, ranked by stock
   // depth), filtered client-side per keystroke so typing is zero-latency.
@@ -405,18 +405,18 @@ export default function DiscoverScreen() {
 
   const suggested = suggestedQ.data ?? null;
 
-  // Tapping an aesthetic opens an in-tab detail: the listings behind the
-  // card's count (same RPC semantics), so the number shown is the number
-  // delivered. Typing exits the detail back to the filtered catalog.
-  const [activeAesthetic, setActiveAesthetic] = useState<Aesthetic | null>(null);
-  const aestheticListingsQ = useAestheticListingsQuery(activeAesthetic);
+  // Tapping a tag opens an in-tab detail: the listings carrying it (same
+  // membership test as the index), so the number shown is the number
+  // delivered. Typing exits the detail back to the filtered index.
+  const [activeTag, setActiveTag] = useState<string | null>(null);
+  const tagListingsQ = useTagListingsQuery(activeTag);
   useEffect(() => {
-    if (hasQuery) setActiveAesthetic(null);
+    if (hasQuery) setActiveTag(null);
   }, [hasQuery]);
 
-  const openAesthetic = useCallback(
-    (a: Aesthetic) => {
-      setActiveAesthetic(a);
+  const openTag = useCallback(
+    (tag: string) => {
+      setActiveTag(tag);
       setSearchActive(false);
       Keyboard.dismiss();
       scrollRef.current?.scrollTo?.({ y: 0, animated: false });
@@ -639,57 +639,52 @@ export default function DiscoverScreen() {
             index-style panels over the same shared query. */}
         <DiscoverSegments tab={tab} onChange={setTab} />
 
-        {/* ── Aesthetics ── curated style index; tapping a card opens its
-            matched listings in place. */}
+        {/* ── Aesthetics ── live tag index; tapping a tile opens the listings
+            carrying that tag in place. */}
         {tab === 'aesthetics' ? (
-          activeAesthetic ? (
+          activeTag ? (
             <View style={{ marginTop: 16 }}>
               <SectionHeader
-                title={activeAesthetic.name}
-                count={aestheticListingsQ.data?.length ?? undefined}
-                action={{ label: 'All aesthetics', onPress: () => setActiveAesthetic(null) }}
+                title={`#${activeTag}`}
+                count={tagListingsQ.data?.length ?? undefined}
+                action={{ label: 'All aesthetics', onPress: () => setActiveTag(null) }}
               />
-              <Text
-                style={{
-                  paddingHorizontal: 16,
-                  marginBottom: 14,
-                  fontSize: 13.5,
-                  lineHeight: 20,
-                  color: colors.mute,
-                }}
-              >
-                {activeAesthetic.description}
-              </Text>
-              {aestheticListingsQ.isLoading ? (
+              {tagListingsQ.isLoading ? (
                 <GridSkeleton columns={columns} cardW={cardW} />
-              ) : (aestheticListingsQ.data ?? []).length === 0 ? (
+              ) : (tagListingsQ.data ?? []).length === 0 ? (
                 <EmptyState
-                  icon="wind"
-                  title={`No ${activeAesthetic.name} items yet`}
-                  description="Nothing in the catalog matches this style right now — check back soon."
+                  icon="hash"
+                  title={`No #${activeTag} items yet`}
+                  description="Nothing in the catalog carries this tag right now — check back soon."
                 />
               ) : (
                 <GridSection
-                  listings={aestheticListingsQ.data ?? []}
+                  listings={tagListingsQ.data ?? []}
                   columns={columns}
                   cardW={cardW}
                 />
               )}
             </View>
-          ) : aestheticCards.length === 0 ? (
+          ) : (loading || tagIdxQ.isLoading) && tagResults.length === 0 ? (
+            <AestheticsSkeleton />
+          ) : tagResults.length === 0 ? (
             <EmptyState
-              icon="search"
-              title="No aesthetic matched"
-              description="Try streetwear, y2k, gorpcore, or old money."
+              icon="hash"
+              title={hasQuery ? 'No tag matched' : 'No aesthetics yet'}
+              description={
+                hasQuery
+                  ? 'Try a different word or a shorter spelling.'
+                  : 'Aesthetics appear here as sellers tag their listings.'
+              }
             />
           ) : (
             <>
               {!hasQuery ? (
-                <HubTitle eyebrow="Ranked by live stock" title="Trending aesthetics" />
+                <HubTitle title={`Browse all ${tagResults.length} Aesthetics`} />
               ) : (
                 <View style={{ height: 18 }} />
               )}
-              <AestheticsPanel cards={aestheticCards} onOpen={openAesthetic} />
+              <AestheticsPanel tags={tagResults} onOpen={openTag} />
             </>
           )
         ) : null}
@@ -1109,16 +1104,25 @@ function PeopleSkeleton() {
   );
 }
 
-// Loading pills for the Brands tab, staggered widths so the placeholder list
-// reads as chips rather than bars.
+// Loading blocks for the Brands tab — same ink hero-card silhouette as the
+// real cards so the loaded state doesn't jump.
 function BrandsSkeleton() {
-  const widths = [110, 150, 96, 132, 118, 144];
   return (
-    <View style={{ paddingHorizontal: 16, marginTop: 10 }}>
-      {widths.map((w, i) => (
-        <View key={i} style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.hair }}>
-          <View style={{ width: w, height: 38, borderRadius: radii.lg, backgroundColor: colors.divider }} />
-        </View>
+    <View style={{ paddingHorizontal: 16, gap: 14, marginTop: 10 }}>
+      {[0, 1, 2].map((i) => (
+        <View key={i} style={{ height: 200, borderRadius: radii['3xl'], backgroundColor: colors.divider }} />
+      ))}
+    </View>
+  );
+}
+
+// Loading tiles for the Aesthetics tab — same panel-row tile shape as the
+// real grid so the loaded state doesn't jump.
+function AestheticsSkeleton() {
+  return (
+    <View style={{ paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 10 }}>
+      {Array.from({ length: 6 }).map((_, i) => (
+        <View key={i} style={{ width: '48%', height: 78, borderRadius: radii.xl, backgroundColor: colors.divider }} />
       ))}
     </View>
   );
