@@ -3,7 +3,8 @@
 // buys, so the number the buyer sees is never a mystery. Read-only; the actual
 // charge is computed server-side from the same lib/fees math.
 
-import { View, Text, Pressable, Modal, StyleSheet } from 'react-native';
+import { View, Pressable, Modal, StyleSheet } from 'react-native';
+import { Text } from '@/lib/rnText';
 import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

@@ -1,5 +1,6 @@
 import { memo, useEffect, useState, useCallback, useRef } from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Pressable } from 'react-native';
+import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import Animated, { useReducedMotion } from 'react-native-reanimated';

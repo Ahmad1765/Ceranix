@@ -1,13 +1,7 @@
 import { capture } from '@/lib/analytics';
 import { useEffect, useState, useRef } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  ScrollView,
-  ActivityIndicator,
-  Platform,
-} from 'react-native';
+import { View, Pressable, ScrollView, ActivityIndicator, Platform } from 'react-native';
+import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, router, Redirect } from 'expo-router';

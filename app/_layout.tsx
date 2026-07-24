@@ -13,17 +13,11 @@ import * as Font from 'expo-font';
 import { Asset } from 'expo-asset';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import {
-  Fraunces_400Regular,
-  Fraunces_600SemiBold,
-  Fraunces_700Bold,
-  Fraunces_400Regular_Italic,
-  Fraunces_700Bold_Italic,
-} from '@expo-google-fonts/fraunces';
-import {
   Inter_400Regular,
   Inter_500Medium,
   Inter_600SemiBold,
   Inter_700Bold,
+  Inter_700Bold_Italic,
 } from '@expo-google-fonts/inter';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { queryClient, persistOptions } from '@/lib/queryClient';
@@ -56,15 +50,11 @@ _TI.defaultProps.underlineColorAndroid = 'transparent';
 _TI.defaultProps.selectionColor = '#6C47FF';
 
 const AESTHETIC_FONTS = {
-  Fraunces_400Regular,
-  Fraunces_600SemiBold,
-  Fraunces_700Bold,
-  Fraunces_400Regular_Italic,
-  Fraunces_700Bold_Italic,
   Inter_400Regular,
   Inter_500Medium,
   Inter_600SemiBold,
   Inter_700Bold,
+  Inter_700Bold_Italic,
 };
 
 SplashScreen.preventAutoHideAsync();
@@ -110,8 +100,8 @@ function RootLayout() {
 
   useEffect(() => {
     // Icon fonts are tiny — always block first paint on these so glyphs never
-    // render as boxes. Aesthetic fonts (Inter/Fraunces) are large; load in
-    // background so they don't delay the UI.
+    // render as boxes. Inter is large; load in background so it doesn't
+    // delay the UI.
     const iconFonts = Font.loadAsync({ ...Ionicons.font, ...Feather.font });
     Font.loadAsync(AESTHETIC_FONTS).catch(console.warn);
 

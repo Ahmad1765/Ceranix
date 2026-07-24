@@ -10,7 +10,8 @@
 // This bar pairs a small outlined "Offer" button — which opens the OfferSheet
 // modal — with a full-width ink "Buy now", under a "Secure checkout" trust line.
 
-import { View, Text, Pressable } from 'react-native';
+import { View, Pressable } from 'react-native';
+import { Text } from '@/lib/rnText';
 import { Feather } from '@expo/vector-icons';
 import { HAIRLINE, BRAND_INK } from './shared';
 import { formatPrice } from '@/lib/currency';

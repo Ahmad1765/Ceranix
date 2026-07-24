@@ -1,4 +1,5 @@
-import { View, Text } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '@/lib/rnText';
 import { Ionicons } from '@expo/vector-icons';
 import { BRAND_INK, BRAND_LIME } from './shared';
 

@@ -1,7 +1,8 @@
 // app/wardrobe/new.tsx — post an outfit to your wardrobe, optionally hiding
 // your face and/or the background (web: real processing; native: no-op today).
 import { useState, useRef } from 'react';
-import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { View, Pressable, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { Text, TextInput } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';

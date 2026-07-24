@@ -13,14 +13,8 @@
 // (scaleX) would distort the label and the field.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  TextInput,
-  Keyboard,
-  useWindowDimensions,
-} from 'react-native';
+import { View, Pressable, Keyboard, useWindowDimensions } from 'react-native';
+import { Text, TextInput } from '@/lib/rnText';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,

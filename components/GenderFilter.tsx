@@ -1,4 +1,5 @@
-import { Text, Pressable, ScrollView } from 'react-native';
+import { Pressable, ScrollView } from 'react-native';
+import { Text } from '@/lib/rnText';
 import type { Gender } from '@/types';
 
 const FILTERS: { label: string; value: Gender }[] = [

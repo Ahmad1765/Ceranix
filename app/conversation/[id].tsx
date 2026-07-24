@@ -1,17 +1,7 @@
 import { capture } from '@/lib/analytics';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ActivityIndicator,
-  Modal,
-  Alert,
-} from 'react-native';
+import { View, FlatList, KeyboardAvoidingView, Platform, Pressable, ActivityIndicator, Modal, Alert } from 'react-native';
+import { Text, TextInput } from '@/lib/rnText';
 import { useLocalSearchParams, router } from 'expo-router';
 import { safeBack } from '@/lib/nav';
 import { SafeAreaView } from 'react-native-safe-area-context';

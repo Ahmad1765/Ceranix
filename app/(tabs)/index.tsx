@@ -1,14 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  RefreshControl,
-  Pressable,
-  ScrollView,
-  Animated,
-  Platform,
-} from 'react-native';
+import { View, FlatList, RefreshControl, Pressable, ScrollView, Animated, Platform } from 'react-native';
+import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -104,7 +96,7 @@ function AnimatedTabPill({
             borderRadius: 999,
           }}
         >
-          <Animated.Text style={{ fontSize: 15, fontWeight: '500', color: textColor }}>
+          <Animated.Text style={{ fontSize: 15, fontFamily: 'Inter_500Medium', fontWeight: '500', color: textColor }}>
             {tab}
           </Animated.Text>
         </Animated.View>
@@ -609,7 +601,7 @@ export default function HomeScreen() {
                   color: colors.ink,
                   lineHeight: 40,
                   letterSpacing: -1,
-                  fontFamily: 'Fraunces_600SemiBold',
+                  fontFamily: 'Inter_600SemiBold',
                 }}
               >
                 Nothing here{'\n'}yet.

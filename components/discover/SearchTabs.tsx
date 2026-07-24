@@ -1,13 +1,14 @@
 // Discover search hub: the segmented pill row plus the three non-item panels
 // (Aesthetics / Brands / Users) it switches between. Speaks the app's own
-// editorial language — Fraunces serif titles, uppercase Inter eyebrows, the
+// editorial language — bold Inter titles, uppercase Inter eyebrows, the
 // promo card's tonal purple disc, hairline dividers, purple accents — strict
 // purple/white/black throughout. Data is derived upstream in discover.tsx;
 // only the Users panel owns state (its follow mask), because that state is
 // meaningless to the rest of the screen.
 
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, ScrollView, Animated, Platform } from 'react-native';
+import { View, Pressable, ScrollView, Animated, Platform } from 'react-native';
+import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -20,7 +21,7 @@ import type { TagIndexEntry } from '@/lib/searchIndex';
 import type { User } from '@/types';
 
 const PAD = 16;
-const SERIF_BOLD = type.family.serifBold; // Fraunces_700Bold
+const DISPLAY_BOLD = type.family.sansBold; // Inter_700Bold
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 const eyebrowStyle = {
@@ -148,13 +149,13 @@ function SegmentPill({
 }
 
 // ── Hub section title ───────────────────────────────────────────────────────
-// The serif heading the editorial rails use (Daily picks / Recently viewed),
+// The bold heading the editorial rails use (Daily picks / Recently viewed),
 // so the hub panels read as chapters of the same magazine.
 export function HubTitle({ title, eyebrow }: { title: string; eyebrow?: string }) {
   return (
     <View style={{ paddingHorizontal: PAD, marginTop: 20, marginBottom: 12 }}>
       {eyebrow ? <Text style={[eyebrowStyle, { marginBottom: 4 }]}>{eyebrow}</Text> : null}
-      <Text style={{ fontFamily: SERIF_BOLD, fontSize: 20, color: colors.ink, letterSpacing: -0.3 }}>
+      <Text style={{ fontFamily: DISPLAY_BOLD, fontSize: 20, color: colors.ink, letterSpacing: -0.3 }}>
         {title}
       </Text>
     </View>
@@ -205,7 +206,7 @@ function TagTile({ entry, onPress }: { entry: TagIndexEntry; onPress: () => void
       >
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text
-            style={{ fontFamily: SERIF_BOLD, fontSize: 14, color: colors.ink }}
+            style={{ fontFamily: DISPLAY_BOLD, fontSize: 14, color: colors.ink }}
             numberOfLines={1}
           >
             #{tag}
@@ -244,7 +245,7 @@ function TagTile({ entry, onPress }: { entry: TagIndexEntry; onPress: () => void
 
 // ── Brands ──────────────────────────────────────────────────────────────────
 // Brand storytelling gets the full-bleed editorial card — the promo banner's
-// tonal purple disc + serif name, reused so the hub reads as one magazine.
+// tonal purple disc + bold name, reused so the hub reads as one magazine.
 // The preview collage below is real catalog photos (up to 3 recent covers
 // from that brand's live listings, from get_brand_index) — no fabricated
 // copy, unlike a "Brand is known for..." blurb would be.
@@ -308,7 +309,7 @@ function BrandCard({ brand, onPress }: { brand: BrandEntry; onPress: () => void 
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text
               style={{
-                fontFamily: SERIF_BOLD,
+                fontFamily: DISPLAY_BOLD,
                 fontSize: 25,
                 color: colors.white,
                 letterSpacing: -0.3,
@@ -512,7 +513,7 @@ function UserRow({
             contentFit="cover"
           />
         ) : (
-          <Text style={{ fontFamily: SERIF_BOLD, fontSize: 18, color: colors.purple }}>{initial}</Text>
+          <Text style={{ fontFamily: DISPLAY_BOLD, fontSize: 18, color: colors.purple }}>{initial}</Text>
         )}
       </View>
       <View style={{ flex: 1, minWidth: 0, marginRight: 10 }}>

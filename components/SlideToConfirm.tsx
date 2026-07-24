@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, Platform } from 'react-native';
+import { View, ActivityIndicator, Platform } from 'react-native';
+import { Text } from '@/lib/rnText';
 import { Feather } from '@expo/vector-icons';
 import {
   Gesture,

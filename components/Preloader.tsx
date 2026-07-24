@@ -1,11 +1,12 @@
 import { useEffect, useRef } from 'react';
-import { View, Text, Animated, Easing, Platform } from 'react-native';
+import { View, Animated, Easing, Platform } from 'react-native';
+import { Text } from '@/lib/rnText';
 import { colors } from '@/lib/theme';
 
 // Shown while the app boots (icon fonts + assets). On native the OS splash
 // covers this window; on web there's no splash, so without it users stared at
 // a blank white page until the bundle was ready. Deliberately uses the system
-// font — the aesthetic fonts (Inter/Fraunces) haven't loaded yet at this point.
+// font — Inter hasn't loaded yet at this point.
 
 const BAR_WIDTH = 150;
 const SEGMENT = 48;

@@ -1,0 +1,1106 @@
+{
+  "url": "https://www.mercari.com/",
+  "extractedAt": "2026-07-23T18:30:48.780Z",
+  "siteName": "Your Go-to Marketplace for Deals on Used & Secondhand Items",
+  "logo": {
+    "source": "svg",
+    "url": "https://www.mercari.com/",
+    "width": 122,
+    "height": 28,
+    "safeZone": {
+      "top": 0,
+      "right": 0,
+      "bottom": 0,
+      "left": 0
+    },
+    "background": "rgb(37, 43, 96)"
+  },
+  "favicons": [
+    {
+      "type": "shortcut icon",
+      "url": "https://u-web-assets.mercdn.net/assets/icons/favicon/favicon.ico?1892410595",
+      "sizes": null
+    },
+    {
+      "type": "icon",
+      "url": "https://u-web-assets.mercdn.net/assets/icons/favicon/favicon-16x16.png?1892410595",
+      "sizes": "16x16"
+    },
+    {
+      "type": "icon",
+      "url": "https://u-web-assets.mercdn.net/assets/icons/favicon/favicon-32x32.png?1892410595",
+      "sizes": "32x32"
+    },
+    {
+      "type": "icon",
+      "url": "https://u-web-assets.mercdn.net/assets/icons/favicon/favicon-194x194.png?1892410595",
+      "sizes": "194x194"
+    },
+    {
+      "type": "icon",
+      "url": "https://u-web-assets.mercdn.net/assets/icons/favicon/android-chrome-192x192.png?1892410595",
+      "sizes": "192x192"
+    },
+    {
+      "type": "apple-touch-icon",
+      "url": "https://u-web-assets.mercdn.net/assets/icons/favicon/apple-touch-icons/apple-touch-icon.png?1892410595",
+      "sizes": null
+    },
+    {
+      "type": "icon",
+      "url": "https://u-web-assets.mercdn.net/assets/icons/favicon/android-chrome-192x192.png?1892410595",
+      "sizes": "192x192"
+    },
+    {
+      "type": "mask-icon",
+      "url": "https://u-web-assets.mercdn.net/assets/icons/favicon/safari-pinned-tab.svg?18924105951",
+      "sizes": null
+    },
+    {
+      "type": "apple-touch-icon",
+      "url": "https://u-web-assets.mercdn.net/assets/icons/favicon/apple-touch-icons/apple-touch-icon-57x57.png?1892410595",
+      "sizes": "57x57"
+    },
+    {
+      "type": "apple-touch-icon",
+      "url": "https://u-web-assets.mercdn.net/assets/icons/favicon/apple-touch-icons/apple-touch-icon-60x60.png?1892410595",
+      "sizes": "60x60"
+    },
+    {
+      "type": "apple-touch-icon",
+      "url": "https://u-web-assets.mercdn.net/assets/icons/favicon/apple-touch-icons/apple-touch-icon-72x72.png?1892410595",
+      "sizes": "72x72"
+    },
+    {
+      "type": "apple-touch-icon",
+      "url": "https://u-web-assets.mercdn.net/assets/icons/favicon/apple-touch-icons/apple-touch-icon-76x76.png?1892410595",
+      "sizes": "76x76"
+    },
+    {
+      "type": "apple-touch-icon",
+      "url": "https://u-web-assets.mercdn.net/assets/icons/favicon/apple-touch-icons/apple-touch-icon-114x114.png?1892410595",
+      "sizes": "114x114"
+    },
+    {
+      "type": "apple-touch-icon",
+      "url": "https://u-web-assets.mercdn.net/assets/icons/favicon/apple-touch-icons/apple-touch-icon-120x120.png?1892410595",
+      "sizes": "120x120"
+    },
+    {
+      "type": "apple-touch-icon",
+      "url": "https://u-web-assets.mercdn.net/assets/icons/favicon/apple-touch-icons/apple-touch-icon-144x144.png?1892410595",
+      "sizes": "144x144"
+    },
+    {
+      "type": "apple-touch-icon",
+      "url": "https://u-web-assets.mercdn.net/assets/icons/favicon/apple-touch-icons/apple-touch-icon-152x152.png?1892410595",
+      "sizes": "152x152"
+    },
+    {
+      "type": "apple-touch-icon",
+      "url": "https://u-web-assets.mercdn.net/assets/icons/favicon/apple-touch-icons/apple-touch-icon-180x180.png?1892410595",
+      "sizes": "180x180"
+    },
+    {
+      "type": "apple-touch-icon",
+      "url": "https://u-web-assets.mercdn.net/assets/icons/favicon/apple-touch-icons/apple-touch-icon.png?1892410595",
+      "sizes": null
+    },
+    {
+      "type": "apple-touch-icon",
+      "url": "https://u-web-assets.mercdn.net/assets/icons/favicon/apple-touch-icons/apple-touch-icon-57x57.png?1892410595",
+      "sizes": "57x57"
+    },
+    {
+      "type": "apple-touch-icon",
+      "url": "https://u-web-assets.mercdn.net/assets/icons/favicon/apple-touch-icons/apple-touch-icon-60x60.png?1892410595",
+      "sizes": "60x60"
+    },
+    {
+      "type": "apple-touch-icon",
+      "url": "https://u-web-assets.mercdn.net/assets/icons/favicon/apple-touch-icons/apple-touch-icon-72x72.png?1892410595",
+      "sizes": "72x72"
+    },
+    {
+      "type": "apple-touch-icon",
+      "url": "https://u-web-assets.mercdn.net/assets/icons/favicon/apple-touch-icons/apple-touch-icon-76x76.png?1892410595",
+      "sizes": "76x76"
+    },
+    {
+      "type": "apple-touch-icon",
+      "url": "https://u-web-assets.mercdn.net/assets/icons/favicon/apple-touch-icons/apple-touch-icon-114x114.png?1892410595",
+      "sizes": "114x114"
+    },
+    {
+      "type": "apple-touch-icon",
+      "url": "https://u-web-assets.mercdn.net/assets/icons/favicon/apple-touch-icons/apple-touch-icon-120x120.png?1892410595",
+      "sizes": "120x120"
+    },
+    {
+      "type": "apple-touch-icon",
+      "url": "https://u-web-assets.mercdn.net/assets/icons/favicon/apple-touch-icons/apple-touch-icon-144x144.png?1892410595",
+      "sizes": "144x144"
+    },
+    {
+      "type": "apple-touch-icon",
+      "url": "https://u-web-assets.mercdn.net/assets/icons/favicon/apple-touch-icons/apple-touch-icon-152x152.png?1892410595",
+      "sizes": "152x152"
+    },
+    {
+      "type": "apple-touch-icon",
+      "url": "https://u-web-assets.mercdn.net/assets/icons/favicon/apple-touch-icons/apple-touch-icon-180x180.png?1892410595",
+      "sizes": "180x180"
+    },
+    {
+      "type": "og:image",
+      "url": "https://u-web-assets.mercdn.net/assets/common/ogp_image_1.png",
+      "sizes": null
+    },
+    {
+      "type": "favicon.ico",
+      "url": "https://www.mercari.com/favicon.ico",
+      "sizes": null
+    }
+  ],
+  "colors": {
+    "semantic": {},
+    "palette": [
+      {
+        "color": "rgb(34, 34, 34)",
+        "normalized": "#222222",
+        "count": 676,
+        "confidence": "high",
+        "sources": [
+          "truste-cookie-link",
+          "truste-buttonscolumn",
+          "truste-button1"
+        ],
+        "lch": "lch(13.23% 0 158.2)",
+        "oklch": "oklch(25.2% 0 89.88)"
+      },
+      {
+        "color": "rgb(83, 86, 238)",
+        "normalized": "#5356ee",
+        "count": 201,
+        "confidence": "high",
+        "sources": [
+          "basebutton-sc-1y14cqd",
+          "image-sc-314f4345-1"
+        ],
+        "lch": "lch(45.17% 88.99 300.24)",
+        "oklch": "oklch(54.57% 0.223 275.28)"
+      },
+      {
+        "color": "rgb(255, 255, 255)",
+        "normalized": "#ffffff",
+        "count": 138,
+        "confidence": "high",
+        "sources": [
+          "basebutton-sc-1y14cqd",
+          "button-sc-3e5b0e03-0",
+          "link-sc-zv2dmn"
+        ],
+        "lch": "lch(100% 0 158.2)",
+        "oklch": "oklch(100% 0 89.88)"
+      },
+      {
+        "color": "rgb(107, 107, 107)",
+        "normalized": "#6b6b6b",
+        "count": 24,
+        "confidence": "high",
+        "sources": [
+          "policylinksgridlist-sc-10seie",
+          "link-sc-zv2dmn"
+        ],
+        "lch": "lch(45.22% 0 158.2)",
+        "oklch": "oklch(52.78% 0 89.88)"
+      },
+      {
+        "color": "rgb(37, 43, 96)",
+        "normalized": "#252b60",
+        "count": 7,
+        "confidence": "medium",
+        "sources": [],
+        "lch": "lch(19.9% 35.88 295.18)",
+        "oklch": "oklch(31.54% 0.093 274.87)"
+      },
+      {
+        "color": "rgb(220, 221, 224)",
+        "normalized": "#dcdde0",
+        "count": 1,
+        "confidence": "medium",
+        "sources": [
+          "hover/focus"
+        ]
+      },
+      {
+        "color": "rgb(16, 16, 16)",
+        "normalized": "#101010",
+        "count": 1,
+        "confidence": "medium",
+        "sources": [
+          "hover/focus"
+        ]
+      }
+    ],
+    "cssVariables": {
+      "--color-mktg-turquoise": {
+        "value": "#00cfac",
+        "lch": "lch(74.57% 51.18 173.95)",
+        "oklch": "oklch(76.27% 0.144 174.63)"
+      },
+      "--color-white": {
+        "value": "#fff",
+        "lch": "lch(100% 0 158.2)",
+        "oklch": "oklch(100% 0 89.88)"
+      },
+      "--color-gray-dark": {
+        "value": "#222",
+        "lch": "lch(13.23% 0 158.2)",
+        "oklch": "oklch(25.2% 0 89.88)"
+      },
+      "--color-red": {
+        "value": "#d4001a",
+        "lch": "lch(44.34% 85.49 35.07)",
+        "oklch": "oklch(54.74% 0.223 26.47)"
+      },
+      "--color-green": {
+        "value": "#3eb1c8",
+        "lch": "lch(67% 32.36 220.61)",
+        "oklch": "oklch(70.59% 0.106 213.7)"
+      },
+      "--color-primary-light": {
+        "value": "#87a7ff",
+        "lch": "lch(69.47% 48.6 284.27)",
+        "oklch": "oklch(74.1% 0.133 267.92)"
+      },
+      "--color-gold-light": {
+        "value": "#fcebb7",
+        "lch": "lch(93.25% 27.44 94.13)",
+        "oklch": "oklch(94.11% 0.069 92.11)"
+      },
+      "--color-blue-light": {
+        "value": "#babbf8",
+        "lch": "lch(77.73% 32.72 292.54)",
+        "oklch": "oklch(81.27% 0.086 283.59)"
+      },
+      "--color-mktg-green": {
+        "value": "#26f06b",
+        "lch": "lch(83.86% 89.18 145.36)",
+        "oklch": "oklch(83.64% 0.231 148.42)"
+      },
+      "--color-mktg-sky-blue": {
+        "value": "#41a7f7",
+        "lch": "lch(66.12% 48.36 266.08)",
+        "oklch": "oklch(70.54% 0.15 246.07)"
+      },
+      "--color-gray-light": {
+        "value": "#cdced2",
+        "lch": "lch(82.79% 2.14 280.67)",
+        "oklch": "oklch(85.18% 0.006 274.95)"
+      },
+      "--color-mktg-light-purple": {
+        "value": "#d6ddfd",
+        "lch": "lch(88.5% 16.8 283.53)",
+        "oklch": "oklch(90.22% 0.044 275.72)"
+      },
+      "--color-silver": {
+        "value": "#c1ccd7",
+        "lch": "lch(81.53% 6.92 256.76)",
+        "oklch": "oklch(84.01% 0.02 248.06)"
+      },
+      "--color-mktg-yellow": {
+        "value": "#e6ff4b",
+        "lch": "lch(95.52% 83.83 110.88)",
+        "oklch": "oklch(95.11% 0.196 117.21)"
+      },
+      "--color-secondary": {
+        "value": "#f47900",
+        "lch": "lch(64.09% 82.88 59.54)",
+        "oklch": "oklch(70.6% 0.18 52.47)"
+      },
+      "--color-secondary-light": {
+        "value": "#f69433",
+        "lch": "lch(70.19% 70 64.66)",
+        "oklch": "oklch(75.4% 0.157 60.24)"
+      },
+      "--color-facebook": {
+        "value": "#1877f2",
+        "lch": "lch(51.61% 71.63 286.34)",
+        "oklch": "oklch(58.91% 0.203 257.86)"
+      },
+      "--color-mktg-purple": {
+        "value": "#7001b6",
+        "lch": "lch(31.45% 94.33 314.82)",
+        "oklch": "oklch(44.06% 0.23 303.7)"
+      },
+      "--color-paypal": {
+        "value": "#ffc439",
+        "lch": "lch(82.4% 73.25 83.06)",
+        "oklch": "oklch(85.15% 0.159 83.95)"
+      },
+      "--color-gold": {
+        "value": "#f7cc4a",
+        "lch": "lch(83.68% 67.46 88.24)",
+        "oklch": "oklch(86.02% 0.15 90.18)"
+      },
+      "--color-black": {
+        "value": "#000",
+        "lch": "lch(0% 0 0)",
+        "oklch": "oklch(0% 0 0)"
+      }
+    },
+    "_raw": [
+      {
+        "color": "rgb(0, 0, 0)",
+        "normalized": "#000000",
+        "count": 14
+      },
+      {
+        "color": "rgb(255, 255, 255)",
+        "normalized": "#ffffff",
+        "count": 138
+      },
+      {
+        "color": "rgb(34, 34, 34)",
+        "normalized": "#222222",
+        "count": 676
+      },
+      {
+        "color": "rgb(83, 86, 238)",
+        "normalized": "#5356ee",
+        "count": 201
+      },
+      {
+        "color": "rgb(37, 43, 96)",
+        "normalized": "#252b60",
+        "count": 7
+      },
+      {
+        "color": "rgb(245, 245, 246)",
+        "normalized": "#f5f5f6",
+        "count": 10
+      },
+      {
+        "color": "rgb(0, 0, 238)",
+        "normalized": "#0000ee",
+        "count": 26
+      },
+      {
+        "color": "rgb(107, 107, 107)",
+        "normalized": "#6b6b6b",
+        "count": 24
+      }
+    ]
+  },
+  "typography": {
+    "styles": [
+      {
+        "context": "heading-1",
+        "family": "Averta",
+        "fallbacks": null,
+        "size": "32px (2.00rem)",
+        "weight": 400,
+        "lineHeight": "1.22",
+        "spacing": "-0.39047px",
+        "transform": null
+      },
+      {
+        "context": "heading-1",
+        "family": "Averta",
+        "fallbacks": null,
+        "size": "26px (1.63rem)",
+        "weight": 600,
+        "lineHeight": "1.23",
+        "spacing": "-1px",
+        "transform": null
+      },
+      {
+        "context": "heading-1",
+        "family": "Averta",
+        "fallbacks": null,
+        "size": "20px (1.25rem)",
+        "weight": 600,
+        "lineHeight": "1.30",
+        "spacing": "-0.64px",
+        "transform": null
+      },
+      {
+        "context": "heading-1",
+        "family": "averta-semibold",
+        "fallbacks": "Arial",
+        "size": "16px (1.00rem)",
+        "weight": 400,
+        "lineHeight": "1.38",
+        "spacing": "-0.24px",
+        "transform": null
+      },
+      {
+        "context": "button",
+        "family": "Averta",
+        "fallbacks": null,
+        "size": "16px (1.00rem)",
+        "weight": 600,
+        "lineHeight": "2.75",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "button",
+        "family": "Averta",
+        "fallbacks": null,
+        "size": "16px (1.00rem)",
+        "weight": 400,
+        "lineHeight": "1.15",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "button",
+        "family": "Averta",
+        "fallbacks": null,
+        "size": "16px (1.00rem)",
+        "weight": 600,
+        "lineHeight": "1.38",
+        "spacing": "-0.24px",
+        "transform": null
+      },
+      {
+        "context": "link",
+        "family": "Averta",
+        "fallbacks": null,
+        "size": "16px (1.00rem)",
+        "weight": 400,
+        "lineHeight": "1.38",
+        "spacing": "-0.24px",
+        "transform": null
+      },
+      {
+        "context": "heading-1",
+        "family": "Averta",
+        "fallbacks": null,
+        "size": "16px (1.00rem)",
+        "weight": 600,
+        "lineHeight": "1.38",
+        "spacing": "-0.24px",
+        "transform": null
+      },
+      {
+        "context": "link",
+        "family": "Averta",
+        "fallbacks": null,
+        "size": "16px (1.00rem)",
+        "weight": 400,
+        "lineHeight": "1.15",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "heading-1",
+        "family": "Averta",
+        "fallbacks": null,
+        "size": "16px (1.00rem)",
+        "weight": 400,
+        "lineHeight": "1.15",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "link",
+        "family": "averta-regular",
+        "fallbacks": "Arial",
+        "size": "14px (0.88rem)",
+        "weight": 400,
+        "lineHeight": "1.43",
+        "spacing": "-0.16px",
+        "transform": null
+      },
+      {
+        "context": "button",
+        "family": "averta-semibold",
+        "fallbacks": "Arial",
+        "size": "14px (0.88rem)",
+        "weight": 400,
+        "lineHeight": "1.43",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "link",
+        "family": "Averta",
+        "fallbacks": null,
+        "size": "14px (0.88rem)",
+        "weight": 400,
+        "lineHeight": "1.15",
+        "spacing": "-0.16px",
+        "transform": null
+      },
+      {
+        "context": "button",
+        "family": "Averta",
+        "fallbacks": null,
+        "size": "14px (0.88rem)",
+        "weight": 600,
+        "lineHeight": "2.29",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "caption",
+        "family": "Averta",
+        "fallbacks": null,
+        "size": "14px (0.88rem)",
+        "weight": 400,
+        "lineHeight": "1.43",
+        "spacing": "-0.16px",
+        "transform": null
+      },
+      {
+        "context": "caption",
+        "family": "Averta",
+        "fallbacks": null,
+        "size": "12px (0.75rem)",
+        "weight": 600,
+        "lineHeight": "1.33",
+        "spacing": "-0.08px",
+        "transform": null
+      },
+      {
+        "context": "caption",
+        "family": "Averta",
+        "fallbacks": null,
+        "size": "10px (0.63rem)",
+        "weight": 400,
+        "lineHeight": "1.40",
+        "spacing": "-0.08px",
+        "transform": null
+      },
+      {
+        "context": "link",
+        "family": "Averta",
+        "fallbacks": null,
+        "size": "10px (0.63rem)",
+        "weight": 400,
+        "lineHeight": "1.40",
+        "spacing": "-0.08px",
+        "transform": null
+      }
+    ],
+    "sources": {
+      "googleFonts": [],
+      "adobeFonts": false,
+      "variableFonts": false
+    }
+  },
+  "spacing": {
+    "scaleType": "8px",
+    "commonValues": [
+      {
+        "px": "4px",
+        "rem": "0.25rem",
+        "count": 1,
+        "numericValue": 4
+      },
+      {
+        "px": "6px",
+        "rem": "0.38rem",
+        "count": 4,
+        "numericValue": 6
+      },
+      {
+        "px": "8px",
+        "rem": "0.50rem",
+        "count": 8,
+        "numericValue": 8
+      },
+      {
+        "px": "10px",
+        "rem": "0.63rem",
+        "count": 2,
+        "numericValue": 10
+      },
+      {
+        "px": "12px",
+        "rem": "0.75rem",
+        "count": 1,
+        "numericValue": 12
+      },
+      {
+        "px": "13.73px",
+        "rem": "0.86rem",
+        "count": 1,
+        "numericValue": 13.73
+      },
+      {
+        "px": "16px",
+        "rem": "1.00rem",
+        "count": 16,
+        "numericValue": 16
+      },
+      {
+        "px": "20px",
+        "rem": "1.25rem",
+        "count": 26,
+        "numericValue": 20
+      },
+      {
+        "px": "24px",
+        "rem": "1.50rem",
+        "count": 5,
+        "numericValue": 24
+      },
+      {
+        "px": "28px",
+        "rem": "1.75rem",
+        "count": 1,
+        "numericValue": 28
+      },
+      {
+        "px": "30px",
+        "rem": "1.88rem",
+        "count": 1,
+        "numericValue": 30
+      },
+      {
+        "px": "32px",
+        "rem": "2.00rem",
+        "count": 2,
+        "numericValue": 32
+      },
+      {
+        "px": "40px",
+        "rem": "2.50rem",
+        "count": 9,
+        "numericValue": 40
+      },
+      {
+        "px": "48px",
+        "rem": "3.00rem",
+        "count": 3,
+        "numericValue": 48
+      },
+      {
+        "px": "56px",
+        "rem": "3.50rem",
+        "count": 1,
+        "numericValue": 56
+      },
+      {
+        "px": "76px",
+        "rem": "4.75rem",
+        "count": 1,
+        "numericValue": 76
+      },
+      {
+        "px": "80px",
+        "rem": "5.00rem",
+        "count": 1,
+        "numericValue": 80
+      },
+      {
+        "px": "152px",
+        "rem": "9.50rem",
+        "count": 8,
+        "numericValue": 152
+      }
+    ]
+  },
+  "borderRadius": {
+    "values": [
+      {
+        "value": "2px",
+        "count": 1,
+        "elements": [
+          "badge"
+        ],
+        "confidence": "low",
+        "numericValue": 2
+      },
+      {
+        "value": "4px",
+        "count": 8,
+        "elements": [
+          "button",
+          "img"
+        ],
+        "confidence": "medium",
+        "numericValue": 4
+      },
+      {
+        "value": "8px",
+        "count": 15,
+        "elements": [
+          "img"
+        ],
+        "confidence": "high",
+        "numericValue": 8
+      },
+      {
+        "value": "44px",
+        "count": 1,
+        "elements": [
+          "div"
+        ],
+        "confidence": "low",
+        "numericValue": 44
+      },
+      {
+        "value": "50%",
+        "count": 20,
+        "elements": [
+          "Search",
+          "button",
+          "div"
+        ],
+        "confidence": "high",
+        "numericValue": 50
+      }
+    ]
+  },
+  "borders": {
+    "combinations": [
+      {
+        "width": "2px",
+        "style": "inset",
+        "color": "rgb(34, 34, 34)",
+        "count": 3,
+        "elements": [
+          "iframe"
+        ],
+        "confidence": "low"
+      },
+      {
+        "width": "0px 0px 1px",
+        "style": "none none solid",
+        "color": "rgb(34, 34, 34)",
+        "count": 1,
+        "elements": [
+          "div"
+        ],
+        "confidence": "low"
+      },
+      {
+        "width": "1px",
+        "style": "solid",
+        "color": "rgb(236, 237, 241)",
+        "count": 1,
+        "elements": [
+          "div"
+        ],
+        "confidence": "low"
+      },
+      {
+        "width": "1px",
+        "style": "solid",
+        "color": "rgb(193, 193, 193)",
+        "count": 1,
+        "elements": [
+          "textarea"
+        ],
+        "confidence": "low"
+      }
+    ]
+  },
+  "shadows": [
+    {
+      "shadow": "rgba(51, 51, 51, 0.2) 0px 4px 8px 0px",
+      "count": 1,
+      "confidence": "low"
+    },
+    {
+      "shadow": "rgba(0, 0, 0, 0.25) 0px 0px 4px 0px",
+      "count": 1,
+      "confidence": "low"
+    },
+    {
+      "shadow": "rgba(0, 0, 0, 0.3) 0px 0px 4px 0px",
+      "count": 1,
+      "confidence": "low"
+    },
+    {
+      "shadow": "rgb(128, 128, 128) 0px 0px 5px 0px",
+      "count": 1,
+      "confidence": "low"
+    }
+  ],
+  "components": {
+    "buttons": [
+      {
+        "states": {
+          "default": {
+            "backgroundColor": "rgb(236, 237, 241)",
+            "color": "rgb(34, 34, 34)",
+            "padding": "6px 16px",
+            "borderRadius": "4px",
+            "border": "0px none rgb(34, 34, 34)",
+            "boxShadow": "none",
+            "outline": "rgb(34, 34, 34) none 3px",
+            "transform": "none",
+            "opacity": "1"
+          },
+          "hover": {
+            "backgroundColor": "rgb(220, 221, 224)",
+            "opacity": "0.8"
+          },
+          "active": {
+            "backgroundColor": "rgb(205, 206, 210)"
+          },
+          "focus": {
+            "backgroundColor": "rgb(220, 221, 224)"
+          }
+        },
+        "fontWeight": "400",
+        "fontSize": "14px",
+        "classes": "truste-button1",
+        "confidence": "high"
+      },
+      {
+        "states": {
+          "default": {
+            "backgroundColor": "rgb(83, 86, 238)",
+            "color": "rgb(255, 255, 255)",
+            "padding": "0px 16px",
+            "borderRadius": "4px",
+            "border": "0px none rgb(255, 255, 255)",
+            "boxShadow": "none",
+            "outline": "rgb(255, 255, 255) none 3px",
+            "transform": "matrix(1, 0, 0, 1, 0, -44)",
+            "opacity": "1"
+          },
+          "hover": {
+            "opacity": "0.8",
+            "backgroundColor": "rgb(220, 221, 224)"
+          },
+          "active": {
+            "backgroundColor": "rgb(205, 206, 210)"
+          },
+          "focus": {
+            "opacity": "0.76",
+            "transform": "translateY(-100%)",
+            "backgroundColor": "rgb(220, 221, 224)"
+          }
+        },
+        "fontWeight": "600",
+        "fontSize": "16px",
+        "classes": "BaseButton-sc-1y14cqd eUcznm SkipToContent__SkipBu",
+        "confidence": "high"
+      },
+      {
+        "states": {
+          "default": {
+            "backgroundColor": "rgba(0, 0, 0, 0)",
+            "color": "rgb(255, 255, 255)",
+            "padding": "0px",
+            "borderRadius": "0px",
+            "border": "1px 0px solid none rgba(0, 0, 0, 0) rgb(255, 255, 255)",
+            "boxShadow": "none",
+            "outline": "rgb(255, 255, 255) none 3px",
+            "transform": "none",
+            "opacity": "1"
+          },
+          "hover": {
+            "color": "var(--color-white)",
+            "backgroundColor": "rgb(220, 221, 224)",
+            "opacity": "0.8"
+          },
+          "active": {
+            "backgroundColor": "rgb(205, 206, 210)"
+          },
+          "focus": {
+            "backgroundColor": "rgb(220, 221, 224)"
+          }
+        },
+        "fontWeight": "600",
+        "fontSize": "16px",
+        "classes": "Button-sc-3e5b0e03-0 HeaderTextButton-sc-eb91df4-0",
+        "confidence": "high"
+      },
+      {
+        "states": {
+          "default": {
+            "backgroundColor": "rgb(255, 255, 255)",
+            "color": "rgb(34, 34, 34)",
+            "padding": "0px 16px",
+            "borderRadius": "4px",
+            "border": "0px none rgb(34, 34, 34)",
+            "boxShadow": "none",
+            "outline": "rgb(34, 34, 34) none 3px",
+            "transform": "none",
+            "opacity": "1"
+          },
+          "hover": {
+            "opacity": "0.8",
+            "backgroundColor": "rgb(220, 221, 224)"
+          },
+          "active": {
+            "backgroundColor": "rgb(205, 206, 210)"
+          },
+          "focus": {
+            "opacity": "0.76",
+            "backgroundColor": "rgb(220, 221, 224)"
+          }
+        },
+        "fontWeight": "600",
+        "fontSize": "14px",
+        "classes": "BaseButton-sc-1y14cqd izPBfp SellButton__Button-sc",
+        "confidence": "high"
+      }
+    ],
+    "inputs": {
+      "text": [
+        {
+          "specificType": "search",
+          "states": {
+            "default": {
+              "backgroundColor": "rgba(0, 0, 0, 0)",
+              "color": "rgb(34, 34, 34)",
+              "border": "0px none rgb(34, 34, 34)",
+              "borderRadius": "0px",
+              "padding": "0px",
+              "boxShadow": "none",
+              "outline": "rgb(34, 34, 34) none 3px"
+            },
+            "focus": {
+              "color": "var(--color-gray-light)"
+            }
+          }
+        }
+      ],
+      "checkbox": [],
+      "radio": [],
+      "select": []
+    },
+    "links": [
+      {
+        "color": "rgb(34, 34, 34)",
+        "textDecoration": "underline",
+        "fontWeight": "400",
+        "states": {
+          "default": {
+            "color": "rgb(34, 34, 34)",
+            "textDecoration": "underline"
+          },
+          "hover": null
+        }
+      },
+      {
+        "color": "rgb(83, 86, 238)",
+        "textDecoration": "none",
+        "fontWeight": "400",
+        "states": {
+          "default": {
+            "color": "rgb(83, 86, 238)",
+            "textDecoration": "none"
+          },
+          "hover": {
+            "textDecoration": "none"
+          }
+        }
+      },
+      {
+        "color": "rgb(255, 255, 255)",
+        "textDecoration": "none",
+        "fontWeight": "400",
+        "states": {
+          "default": {
+            "color": "rgb(255, 255, 255)",
+            "textDecoration": "none"
+          },
+          "hover": {
+            "textDecoration": "underline"
+          }
+        }
+      },
+      {
+        "color": "rgb(0, 0, 238)",
+        "textDecoration": "underline",
+        "fontWeight": "400",
+        "states": {
+          "default": {
+            "color": "rgb(0, 0, 238)",
+            "textDecoration": "underline"
+          },
+          "hover": null
+        }
+      },
+      {
+        "color": "rgb(107, 107, 107)",
+        "textDecoration": "none",
+        "fontWeight": "400",
+        "states": {
+          "default": {
+            "color": "rgb(107, 107, 107)",
+            "textDecoration": "none"
+          },
+          "hover": {
+            "textDecoration": "underline"
+          }
+        }
+      }
+    ],
+    "badges": {
+      "all": [],
+      "byVariant": {
+        "error": [],
+        "warning": [],
+        "success": [],
+        "info": [],
+        "neutral": []
+      }
+    }
+  },
+  "breakpoints": [
+    {
+      "px": "1px"
+    },
+    {
+      "px": "320px"
+    },
+    {
+      "px": "479px"
+    },
+    {
+      "px": "480px"
+    },
+    {
+      "px": "550px"
+    },
+    {
+      "px": "600px"
+    },
+    {
+      "px": "601px"
+    },
+    {
+      "px": "750px"
+    },
+    {
+      "px": "767px"
+    },
+    {
+      "px": "768px"
+    },
+    {
+      "px": "1023px"
+    },
+    {
+      "px": "1024px"
+    },
+    {
+      "px": "1452px"
+    }
+  ],
+  "iconSystem": [
+    {
+      "name": "Font Awesome",
+      "type": "icon-font"
+    }
+  ],
+  "frameworks": [
+    {
+      "name": "PrimeReact/Vue/NG",
+      "confidence": "high",
+      "evidence": "9 Prime components"
+    }
+  ]
+}

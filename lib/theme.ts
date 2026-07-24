@@ -132,9 +132,7 @@ export const type = {
     sansMedium: "Inter_500Medium",
     sansSemibold: "Inter_600SemiBold",
     sansBold: "Inter_700Bold",
-    serif: "Fraunces_400Regular",
-    serifBold: "Fraunces_700Bold",
-    serifItalic: "Fraunces_400Regular_Italic",
+    sansBoldItalic: "Inter_700Bold_Italic",
   },
   size: {
     "2xs": 10,
@@ -200,13 +198,13 @@ export const eyebrowMute = {
 export const tintedPurple = PURPLE_TINT_45;
 
 // ── Typography tokens ────────────────────────────────────────────────────
-// Ready-to-spread text styles encoding the brand fonts (Fraunces display /
-// Inter UI), the type scale, and AA-safe default colours. Prefer these (or the
-// <AppText variant> primitive that wraps them) over ad-hoc fontSize/fontWeight
-// so type stays consistent app-wide. Colours can be overridden per use.
+// Ready-to-spread text styles encoding the Inter type scale and AA-safe
+// default colours. Prefer these (or the <AppText variant> primitive that
+// wraps them) over ad-hoc fontSize/fontWeight so type stays consistent
+// app-wide. Colours can be overridden per use. Inter-only — no serif.
 export const textStyles = {
   display: {
-    fontFamily: type.family.serifBold,
+    fontFamily: type.family.sansBold,
     fontSize: type.size.display,
     color: colors.ink,
     letterSpacing: -1,

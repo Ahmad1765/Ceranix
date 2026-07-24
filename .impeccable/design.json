@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-24T00:00:00.000Z",
+  "title": "Design System: Carrinex",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Signal Purple",
+        "canonical": "oklch(52% 0.24 285)",
+        "tonalRamp": ["#FFFFFF", "#6C47FF0A", "#6C47FF1A", "#6C47FF2E", "#6C47FF4D", "#6C47FF73", "#6C47FFB8", "#6C47FF", "#5538D6"]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "oklch(15% 0.005 285)",
+        "tonalRamp": ["#FFFFFF", "#0F0F0F0A", "#0F0F0F14", "#0F0F0F8C", "#0F0F0F9E", "#0F0F0F"]
+      },
+      "white": {
+        "role": "neutral",
+        "displayName": "Paper White",
+        "canonical": "oklch(100% 0 0)",
+        "tonalRamp": ["#FFFFFF"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "One largest headline moment per screen; bold Inter, size and weight carry the emphasis." },
+      "h1": { "displayName": "Headline 1", "purpose": "Screen-level heading." },
+      "h2": { "displayName": "Headline 2", "purpose": "Section heading within a screen." },
+      "title": { "displayName": "Title", "purpose": "Card and list-item titles (listing title, seller name)." },
+      "body": { "displayName": "Body", "purpose": "Default reading copy." },
+      "body-strong": { "displayName": "Body, Strong", "purpose": "Inline emphasis without a color or size change." },
+      "body-muted": { "displayName": "Body, Muted", "purpose": "Secondary/supporting copy." },
+      "caption": { "displayName": "Caption", "purpose": "Metadata: timestamps, counts, fine print." },
+      "label": { "displayName": "Label", "purpose": "Button and form-field labels." },
+      "eyebrow": { "displayName": "Eyebrow", "purpose": "Uppercase kicker above a heading." }
+    },
+    "shadows": [
+      { "name": "sm", "value": "0px 2px 6px rgba(0,0,0,0.04)", "purpose": "Lightest lift for subtly-raised elements." },
+      { "name": "md", "value": "0px 4px 12px rgba(0,0,0,0.06)", "purpose": "Standard elevation for an explicitly `elevated` card." },
+      { "name": "lg", "value": "0px 8px 20px rgba(0,0,0,0.1)", "purpose": "Modals and sheets sitting above the page." },
+      { "name": "topBar", "value": "0px -3px 12px rgba(0,0,0,0.06)", "purpose": "Upward shadow for bottom-anchored bars." },
+      { "name": "button-primary", "value": "0px 4px 10px rgba(108,71,255,0.16)", "purpose": "Filled purple/dark buttons cast a shadow tinted to their own fill." }
+    ],
+    "motion": [
+      { "name": "press-feedback", "value": "opacity 0.9, scale 0.97", "purpose": "Every pressable control's response to touch-down; physical give, never a recolor." },
+      { "name": "tab-slide", "value": "spring(damping: 16, stiffness: 260, mass: 0.9)", "purpose": "Purple pill sliding to the newly active tab." },
+      { "name": "tab-pop", "value": "spring(damping: 11, stiffness: 200, mass: 0.7)", "purpose": "Bouncier overshoot spring for the tab-bar icon morph (outline to filled)." }
+    ],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single primary action on a screen (e.g. Buy Now, Make Offer).",
+      "html": "<button class=\"ds-btn-primary\">Make Offer</button>",
+      "css": ".ds-btn-primary { background: #6C47FF; color: #FFFFFF; height: 44px; padding: 0 18px; border-radius: 999px; border: none; font-family: 'Inter', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 0.1px; box-shadow: 0px 4px 10px rgba(108,71,255,0.16); transition: opacity 0.15s, transform 0.15s; } .ds-btn-primary:hover { opacity: 0.9; } .ds-btn-primary:active { opacity: 0.9; transform: scale(0.97); } .ds-btn-primary:focus-visible { outline: 2px solid #6C47FF; outline-offset: 2px; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Default secondary action; white fill with a hairline border.",
+      "html": "<button class=\"ds-btn-ghost\">Cancel</button>",
+      "css": ".ds-btn-ghost { background: #FFFFFF; color: #0F0F0F; height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid rgba(15,15,15,0.08); font-family: 'Inter', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 0.1px; transition: opacity 0.15s, transform 0.15s; } .ds-btn-ghost:hover { opacity: 0.9; } .ds-btn-ghost:active { transform: scale(0.97); } .ds-btn-ghost:focus-visible { outline: 2px solid #6C47FF; outline-offset: 2px; }"
+    },
+    {
+      "name": "Chip (selectable)",
+      "kind": "chip",
+      "refersTo": "chip-default",
+      "description": "Filter/category chip; flips to solid ink fill when active.",
+      "html": "<button class=\"ds-chip\">All Items</button><button class=\"ds-chip ds-chip--active\">Dresses</button>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; gap: 6px; background: #FFFFFF; color: #0F0F0F; border: 1px solid rgba(15,15,15,0.08); border-radius: 999px; padding: 8px 14px; font-family: 'Inter', sans-serif; font-weight: 700; font-size: 13px; letter-spacing: 0.1px; } .ds-chip--active { background: #0F0F0F; color: #FFFFFF; border-color: transparent; } .ds-chip:focus-visible { outline: 2px solid #6C47FF; outline-offset: 2px; }"
+    },
+    {
+      "name": "Listing Card",
+      "kind": "card",
+      "refersTo": "card-paper",
+      "description": "Flat-at-rest product card; white surface with a hairline border, no shadow unless elevated.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-title\">Vintage Denim Jacket</div><div class=\"ds-card-price\">Rs 2,400</div></div>",
+      "css": ".ds-card { background: #FFFFFF; border: 1px solid rgba(15,15,15,0.08); border-radius: 20px; padding: 16px; font-family: 'Inter', sans-serif; } .ds-card-title { font-weight: 700; font-size: 18px; letter-spacing: -0.2px; color: #0F0F0F; } .ds-card-price { font-weight: 400; font-size: 15px; color: #0F0F0F; margin-top: 4px; }"
+    },
+    {
+      "name": "Search Input",
+      "kind": "input",
+      "refersTo": "input-search",
+      "description": "Recessed search field; no visible stroke, ink-panel fill only.",
+      "html": "<div class=\"ds-input-search\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"rgba(15,15,15,0.55)\" stroke-width=\"2\"><circle cx=\"11\" cy=\"11\" r=\"7\"/><line x1=\"21\" y1=\"21\" x2=\"16.65\" y2=\"16.65\"/></svg><span class=\"ds-input-search-placeholder\">Search Carrinex...</span></div>",
+      "css": ".ds-input-search { display: flex; align-items: center; gap: 8px; background: rgba(15,15,15,0.04); border-radius: 16px; padding: 10px 12px; } .ds-input-search-placeholder { font-family: 'Inter', sans-serif; font-size: 15px; color: rgba(15,15,15,0.55); }"
+    },
+    {
+      "name": "Tab Bar Item (active)",
+      "kind": "nav",
+      "refersTo": "chip-active",
+      "description": "Signature floating tab bar item: filled icon inside a purple pill, spring-animated in the real app.",
+      "html": "<div class=\"ds-tab-active\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"#FFFFFF\"><circle cx=\"12\" cy=\"12\" r=\"10\"/></svg><span>Home</span></div>",
+      "css": ".ds-tab-active { display: inline-flex; align-items: center; gap: 6px; background: rgba(108,71,255,0.18); border: 1px solid rgba(108,71,255,0.45); color: #6C47FF; border-radius: 999px; padding: 10px 16px; font-family: 'Inter', sans-serif; font-weight: 700; font-size: 12px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Atelier",
+    "overview": "Carrinex is a peer-to-peer fashion resale marketplace where strangers exchange real money for secondhand clothing sight-unseen. The visual system's entire job is to make that transaction feel safe without ever performing safety, the way a well-run atelier communicates quality through restraint rather than signage. Three hues do all the work: a single confident purple, paper white, and ink black used at varying opacity for every level of hierarchy. There is no fourth color hiding anywhere in the app, and that constraint is deliberate, not a limitation waiting to be lifted.\n\nThe system explicitly rejects the visual language of cluttered resale apps: no Poshmark/Depop-style badges, ribbons, or banners stacked on every listing card, no gradients, no emoji-as-decoration, no sticker overlays competing with the product photography for attention. The product photography and the seller's own words are the content; the interface is the frame, not a second act.\n\nWhere the system does allow itself life is in motion: pill-shaped controls with springy, slightly overshooting press feedback, and a floating tab bar with genuine physics (drag-to-preview, liquid indicator stretch). Restraint in color and decoration is paired with confidence in interaction, not stiffness. A quiet atelier is calm, not cold.",
+    "keyCharacteristics": [
+      "Strict three-hue palette: purple, white, ink-at-opacity — nothing else",
+      "Inter only, one typeface for the entire app — no serif, ever",
+      "Flat surfaces by default; shadows appear only as a soft, color-matched lift, never as drama",
+      "Pill-shaped (999px radius) interactive controls; soft-rounded (16–28px) containers",
+      "Springy, physical micro-interactions on an otherwise restrained surface"
+    ],
+    "rules": [
+      { "name": "The Three-Hue Rule", "body": "Only purple, white, and ink-at-opacity are permitted. Any new accent need must resolve to one of these three, expressed through weight, opacity, or icon choice, never a new hue.", "section": "colors" },
+      { "name": "The Purpose-Built Alpha Rule", "body": "Every muted neutral is ink at a specific, documented opacity chosen for a specific contrast ratio, not an eyeballed gray.", "section": "colors" },
+      { "name": "The One Typeface Rule", "body": "Inter is the only typeface in the app, at every size and role. Hierarchy comes from size, weight, and letter-spacing, never a second family.", "section": "typography" },
+      { "name": "The Whisper Shadow Rule", "body": "No shadow in the system exceeds 16% opacity. If a shadow reads as 'a shadow' rather than a subtle lift, soften it.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep every accent color resolving to Signal Purple (#6C47FF) — no new hues, ever, per the Three-Hue Rule.",
+      "Do compute and document the contrast ratio for any new muted-ink tone before shipping it (target WCAG AA).",
+      "Do default new containers to flat (no shadow) and reach for a shadow only when something is genuinely floating above the page.",
+      "Do use pill radius (999px) for anything pressable, and 16–28px radius for containers.",
+      "Do let the product photography and the bundle collage be the visual centerpiece of the product page.",
+      "Do give pressable elements physical, springy feedback (scale + opacity), consistent with the tab bar's physics vocabulary."
+    ],
+    "donts": [
+      "Don't add Poshmark/Depop-style badges, ribbons, banners, or stickers to listing cards or profiles.",
+      "Don't use gradients anywhere, including 'just for a hero' or 'just for a button'.",
+      "Don't use emoji as decoration in the UI.",
+      "Don't introduce a second typeface anywhere, including a serif for a single headline moment.",
+      "Don't stack more than one primary (filled) button on a single screen.",
+      "Don't ship a shadow above 16% opacity, or a colored shadow that doesn't match the element casting it."
+    ]
+  }
+}

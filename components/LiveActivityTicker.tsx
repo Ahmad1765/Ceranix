@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, Animated, Easing, Platform, Dimensions } from 'react-native';
+import { View, Pressable, Animated, Easing, Platform, Dimensions } from 'react-native';
+import { Text } from '@/lib/rnText';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';

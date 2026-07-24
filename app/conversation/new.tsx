@@ -1,16 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  ActivityIndicator,
-  Alert,
-  useWindowDimensions,
-} from 'react-native';
+import { View, KeyboardAvoidingView, Platform, Pressable, ScrollView, ActivityIndicator, Alert, useWindowDimensions } from 'react-native';
+import { Text, TextInput } from '@/lib/rnText';
 import { useLocalSearchParams, router } from 'expo-router';
 import { safeBack } from '@/lib/nav';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';

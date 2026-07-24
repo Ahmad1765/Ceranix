@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, Platform, LayoutChangeEvent, StyleSheet } from 'react-native';
+import { View, Platform, LayoutChangeEvent, StyleSheet } from 'react-native';
+import { Text } from '@/lib/rnText';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -426,6 +427,7 @@ function TabItem({
         style={[
           {
             fontSize: 10,
+            fontFamily: focused ? 'Inter_600SemiBold' : 'Inter_500Medium',
             fontWeight: focused ? '600' : '500',
             letterSpacing: 0.3,
             color: focused ? ACCENT : INACTIVE,

@@ -1,18 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  ScrollView,
-  Switch,
-  Platform,
-  Share,
-  Linking,
-  ActivityIndicator,
-  Modal,
-  TextInput,
-  KeyboardAvoidingView,
-} from 'react-native';
+import { View, Pressable, ScrollView, Switch, Platform, Share, Linking, ActivityIndicator, Modal, KeyboardAvoidingView } from 'react-native';
+import { Text, TextInput } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';

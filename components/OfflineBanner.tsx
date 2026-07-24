@@ -7,7 +7,8 @@
 // web (react-native-web has no RCTAnimation).
 
 import { useEffect, useRef } from 'react';
-import { Animated, Easing, Platform, Text, View } from 'react-native';
+import { Animated, Easing, Platform, View } from 'react-native';
+import { Text } from '@/lib/rnText';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/lib/theme';

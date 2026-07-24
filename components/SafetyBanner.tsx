@@ -5,7 +5,8 @@
 //
 // Copy is context-aware (buyer vs seller vs checkout) but the mark, link, and
 // coverage explainer stay identical across surfaces.
-import { View, Text, Alert, Platform, type ViewStyle, type StyleProp } from 'react-native';
+import { View, Alert, Platform, type ViewStyle, type StyleProp } from 'react-native';
+import { Text } from '@/lib/rnText';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { colors, radii, type as typography } from '@/lib/theme';

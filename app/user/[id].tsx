@@ -1,14 +1,7 @@
 import { capture } from '@/lib/analytics';
 import { useState } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  ScrollView,
-  RefreshControl,
-  Alert,
-  Share,
-} from 'react-native';
+import { View, Pressable, ScrollView, RefreshControl, Alert, Share } from 'react-native';
+import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, router } from 'expo-router';

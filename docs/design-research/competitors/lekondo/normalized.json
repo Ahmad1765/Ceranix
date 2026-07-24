@@ -1,0 +1,36 @@
+{
+  "source": {
+    "url": "https://lekondo.com/",
+    "extractedAt": "2026-07-23T18:32:32.399Z",
+    "extractor": "dembrandt"
+  },
+  "colors": {
+    "palette": [],
+    "cssVariables": {}
+  },
+  "typography": {
+    "headingFont": "Outfit",
+    "bodyFont": "Outfit"
+  },
+  "spacing": {
+    "scale": [
+      "1px",
+      "4px",
+      "8px",
+      "12px",
+      "16px",
+      "20px",
+      "24px",
+      "32px",
+      "40px",
+      "64px",
+      "96px"
+    ]
+  },
+  "radius": {
+    "scale": []
+  },
+  "shadows": {
+    "scale": []
+  }
+}

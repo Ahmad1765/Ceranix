@@ -1,19 +1,11 @@
 // Editorial blocks for the Discover idle feed: a personalized welcome, a
 // horizontal "digest" of wide edit cards, a personalized picks rail, and brand
 // "collection" collages. All presentational — data is derived upstream in
-// lib/discover.ts and passed in. Strict purple/white/black, Inter + Fraunces.
+// lib/discover.ts and passed in. Strict purple/white/black, Inter only.
 
 import { useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  useWindowDimensions,
-  type NativeSyntheticEvent,
-  type NativeScrollEvent,
-} from 'react-native';
+import { View, Pressable, ScrollView, StyleSheet, useWindowDimensions, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
+import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -27,8 +19,8 @@ import type { DigestCard, Collection, PromoSlide, PromoTarget } from '@/lib/disc
 
 const PAD = 16;
 const GAP = 10;
-const SERIF_BOLD = type.family.serifBold; // Fraunces_700Bold
-const SERIF_SEMI = 'Fraunces_600SemiBold';
+const DISPLAY_BOLD = type.family.sansBold; // Inter_700Bold
+const DISPLAY_SEMI = type.family.sansSemibold; // Inter_600SemiBold
 
 const eyebrowStyle = {
   fontSize: 11,
@@ -46,7 +38,7 @@ export function WelcomeEyebrow() {
     <View style={{ paddingHorizontal: PAD, marginTop: 22 }}>
       <Text
         style={{
-          fontFamily: SERIF_SEMI,
+          fontFamily: DISPLAY_SEMI,
           fontSize: 26,
           color: colors.ink,
           letterSpacing: -0.4,
@@ -61,7 +53,7 @@ export function WelcomeEyebrow() {
 // ── Promo banner ─────────────────────────────────────────────────────────────
 // Hero promotional carousel at the top of the idle feed. Same shape as a
 // delivery-app promo banner, reinterpreted strictly on-brand: a deep purple
-// card with a tonal arc for depth, a serif headline with hard weight contrast,
+// card with a tonal arc for depth, a bold headline with hard weight contrast,
 // a high-contrast white CTA, and a framed product tile (no cheap bleed seam).
 // Swipe-driven, with an expanding-pill page indicator. Purple/white/black,
 // no gradients.
@@ -265,7 +257,7 @@ function PromoCard({
             <Text
               numberOfLines={2}
               style={{
-                fontFamily: SERIF_BOLD,
+                fontFamily: DISPLAY_BOLD,
                 fontSize: 21,
                 lineHeight: 25,
                 color: colors.white,
@@ -439,7 +431,7 @@ function EditCard({
         {card.subtitle}
       </Text>
       <Text
-        style={{ fontFamily: SERIF_BOLD, fontSize: 17, color: colors.ink, marginTop: 1 }}
+        style={{ fontFamily: DISPLAY_BOLD, fontSize: 17, color: colors.ink, marginTop: 1 }}
         numberOfLines={1}
       >
         {card.title}
@@ -470,7 +462,7 @@ export function DailyPicks({
           marginBottom: 12,
         }}
       >
-        <Text style={{ fontFamily: SERIF_BOLD, fontSize: 20, color: colors.ink, letterSpacing: -0.3 }}>
+        <Text style={{ fontFamily: DISPLAY_BOLD, fontSize: 20, color: colors.ink, letterSpacing: -0.3 }}>
           Daily picks for you
         </Text>
         <Pressable
@@ -555,7 +547,7 @@ export function RecentlyViewedList({
     <View style={{ marginTop: 26 }} testID={testID}>
       <Text
         style={{
-          fontFamily: SERIF_BOLD,
+          fontFamily: DISPLAY_BOLD,
           fontSize: 20,
           color: colors.ink,
           letterSpacing: -0.3,
@@ -686,7 +678,7 @@ export function ShopByBrandRail({
     <View style={{ marginTop: 26 }}>
       <Text
         style={{
-          fontFamily: SERIF_BOLD,
+          fontFamily: DISPLAY_BOLD,
           fontSize: 20,
           color: colors.ink,
           letterSpacing: -0.3,
@@ -743,7 +735,7 @@ function BrandCard({ collection, onPress }: { collection: Collection; onPress: (
         {collection.eyebrow}
       </Text>
       <Text
-        style={{ fontFamily: SERIF_BOLD, fontSize: 15, color: colors.ink, marginTop: 1 }}
+        style={{ fontFamily: DISPLAY_BOLD, fontSize: 15, color: colors.ink, marginTop: 1 }}
         numberOfLines={1}
       >
         {collection.brand}

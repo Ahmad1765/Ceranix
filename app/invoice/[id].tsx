@@ -1,13 +1,6 @@
 import { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  ScrollView,
-  ActivityIndicator,
-  Share,
-  Platform,
-} from 'react-native';
+import { View, Pressable, ScrollView, ActivityIndicator, Share, Platform } from 'react-native';
+import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Image } from 'expo-image';

@@ -12,7 +12,8 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { View, Text, Pressable, Modal, Platform } from 'react-native';
+import { View, Pressable, Modal, Platform } from 'react-native';
+import { Text } from '@/lib/rnText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';

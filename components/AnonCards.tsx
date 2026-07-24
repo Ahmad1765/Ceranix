@@ -1,5 +1,6 @@
 import { memo } from 'react';
-import { View, Text, Pressable, ScrollView, useWindowDimensions } from 'react-native';
+import { View, Pressable, ScrollView, useWindowDimensions } from 'react-native';
+import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -299,7 +300,7 @@ function CategoryTile({
               color: '#ffffff',
               letterSpacing: -0.6,
               lineHeight: titleSize * 1.05,
-              fontFamily: 'Fraunces_700Bold',
+              fontFamily: 'Inter_700Bold',
               textShadowColor: 'rgba(0,0,0,0.35)',
               textShadowOffset: { width: 0, height: 1 },
               textShadowRadius: 6,
@@ -458,11 +459,11 @@ export const AnonCards = memo(function AnonCards() {
             color: '#0F0F0F',
             letterSpacing: -1.4,
             lineHeight: 38,
-            fontFamily: 'Fraunces_600SemiBold',
+            fontFamily: 'Inter_600SemiBold',
           }}
         >
           Find your{' '}
-          <Text style={{ fontFamily: 'Fraunces_700Bold_Italic', color: '#6C47FF' }}>
+          <Text style={{ fontFamily: 'Inter_700Bold_Italic', color: '#6C47FF' }}>
             everything
           </Text>
           .
@@ -540,7 +541,7 @@ export const AnonCards = memo(function AnonCards() {
               color: '#0F0F0F',
               letterSpacing: -0.4,
               lineHeight: 26,
-              fontFamily: 'Fraunces_600SemiBold',
+              fontFamily: 'Inter_600SemiBold',
             }}
           >
             Picked for you

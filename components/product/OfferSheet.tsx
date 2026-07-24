@@ -13,15 +13,8 @@
 // `visible` is true.
 
 import { useEffect, useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  Modal,
-  StyleSheet,
-  TextInput,
-  KeyboardAvoidingView,
-} from 'react-native';
+import { View, Pressable, Modal, StyleSheet, KeyboardAvoidingView } from 'react-native';
+import { Text, TextInput } from '@/lib/rnText';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,

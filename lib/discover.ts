@@ -32,7 +32,7 @@ export interface DigestCard {
   id: string;
   /** Brands present in the group, e.g. "Nike, Stüssy + more". Small mute line. */
   subtitle: string;
-  /** The edit name, set in serif. e.g. "Now in demand". */
+  /** The edit name, set in bold Inter. e.g. "Now in demand". */
   title: string;
   image: string | null;
   target: DigestTarget;
@@ -47,7 +47,7 @@ export interface PromoSlide {
   id: string;
   /** Uppercase eyebrow chip, e.g. "JUST IN". */
   eyebrow: string;
-  /** Headline, set in serif. Short enough to wrap to ≤2 lines. */
+  /** Headline, set in bold Inter. Short enough to wrap to ≤2 lines. */
   title: string;
   image: string | null;
   target: PromoTarget;

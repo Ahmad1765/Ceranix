@@ -1,13 +1,7 @@
 import { capture, buildListingViewedProps } from '@/lib/analytics';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  Alert,
-  Share,
-  StyleSheet,
-} from 'react-native';
+import { View, Pressable, Alert, Share, StyleSheet } from 'react-native';
+import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { safeBack } from '@/lib/nav';

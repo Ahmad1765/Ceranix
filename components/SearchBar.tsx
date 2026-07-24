@@ -1,4 +1,5 @@
-import { View, TextInput, Pressable } from 'react-native';
+import { View, Pressable } from 'react-native';
+import { TextInput } from '@/lib/rnText';
 import { Feather } from '@expo/vector-icons';
 
 interface Props {

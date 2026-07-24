@@ -5,17 +5,8 @@
 // Mounting is cheap — the heavy fetch only runs when `visible` flips on.
 
 import { useEffect, useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  Modal,
-  StyleSheet,
-  ActivityIndicator,
-  TextInput,
-  Platform,
-  Dimensions,
-} from 'react-native';
+import { View, Pressable, Modal, StyleSheet, ActivityIndicator, Platform, Dimensions } from 'react-native';
+import { Text, TextInput } from '@/lib/rnText';
 import { BlurView } from 'expo-blur';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';

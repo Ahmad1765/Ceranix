@@ -1,17 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Animated,
-  Easing,
-  useWindowDimensions,
-} from 'react-native';
+import { View, Pressable, Alert, KeyboardAvoidingView, Platform, ScrollView, Animated, Easing, useWindowDimensions } from 'react-native';
+import { Text, TextInput } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -803,6 +792,7 @@ function ModeSwitch({
             <Animated.Text
               style={{
                 fontSize: 14,
+                fontFamily: 'Inter_700Bold',
                 fontWeight: '800',
                 color,
                 letterSpacing: 0.2,

@@ -1,0 +1,43 @@
+{
+  "source": {
+    "url": "https://www.mercari.com/",
+    "extractedAt": "2026-07-23T18:30:48.780Z",
+    "extractor": "dembrandt"
+  },
+  "colors": {
+    "palette": [],
+    "cssVariables": {}
+  },
+  "typography": {
+    "headingFont": "Averta",
+    "bodyFont": "Averta"
+  },
+  "spacing": {
+    "scale": [
+      "4px",
+      "6px",
+      "8px",
+      "10px",
+      "12px",
+      "13.73px",
+      "16px",
+      "20px",
+      "24px",
+      "28px",
+      "30px",
+      "32px",
+      "40px",
+      "48px",
+      "56px",
+      "76px",
+      "80px",
+      "152px"
+    ]
+  },
+  "radius": {
+    "scale": []
+  },
+  "shadows": {
+    "scale": []
+  }
+}

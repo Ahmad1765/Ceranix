@@ -1,4 +1,5 @@
-import { View, Text, Pressable, useWindowDimensions } from 'react-native';
+import { View, Pressable, useWindowDimensions } from 'react-native';
+import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import type { WardrobePost } from '@/lib/wardrobe';

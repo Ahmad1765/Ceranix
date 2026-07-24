@@ -6,18 +6,8 @@
 // in a dedicated sheet, not here.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  Alert,
-  Animated,
-  Easing,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Alert, Animated, Easing, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Text, TextInput } from '@/lib/rnText';
 import { BlurView } from 'expo-blur';
 import { colors } from '@/lib/theme';
 

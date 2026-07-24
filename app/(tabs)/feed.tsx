@@ -1,13 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
-import {
-  Alert,
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  ScrollView,
-  RefreshControl,
-} from 'react-native';
+import { Alert, View, Pressable, ScrollView, RefreshControl } from 'react-native';
+import { Text, TextInput } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';

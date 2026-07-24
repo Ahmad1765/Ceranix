@@ -1,13 +1,6 @@
 import { useCallback, useState } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  TextInput,
-  Modal,
-  ScrollView,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Pressable, Modal, ScrollView, ActivityIndicator } from 'react-native';
+import { Text, TextInput } from '@/lib/rnText';
 import { Feather } from '@expo/vector-icons';
 import { colors, radii } from '@/lib/theme';
 import { createSavedSearch } from '@/lib/savedSearches';

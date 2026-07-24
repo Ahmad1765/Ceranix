@@ -1,14 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
-import {
-  Alert,
-  View,
-  Text,
-  Pressable,
-  ScrollView,
-  ActivityIndicator,
-  RefreshControl,
-  Share,
-} from 'react-native';
+import { Alert, View, Pressable, ScrollView, ActivityIndicator, RefreshControl, Share } from 'react-native';
+import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { router, useFocusEffect, Href } from 'expo-router';

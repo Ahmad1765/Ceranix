@@ -3,7 +3,8 @@
 // capture a few interests to tune the feed, and seed the Following feed with a
 // handful of real sellers. Everything is skippable.
 import { useCallback, useEffect, useState } from 'react';
-import { View, Text, Pressable, ScrollView, Platform } from 'react-native';
+import { View, Pressable, ScrollView, Platform } from 'react-native';
+import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';

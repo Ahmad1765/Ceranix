@@ -1,15 +1,7 @@
 import { capture, buildSearchProps } from '@/lib/analytics';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  ScrollView,
-  RefreshControl,
-  ActivityIndicator,
-  Keyboard,
-} from 'react-native';
+import { View, Pressable, ScrollView, RefreshControl, ActivityIndicator, Keyboard } from 'react-native';
+import { Text, TextInput } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';

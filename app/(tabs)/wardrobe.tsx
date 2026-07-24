@@ -1,6 +1,7 @@
 // app/(tabs)/wardrobe.tsx — Swipe / My Wardrobe / Liked.
 import { useMemo, useState, useCallback } from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { View, Pressable, ScrollView } from 'react-native';
+import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
