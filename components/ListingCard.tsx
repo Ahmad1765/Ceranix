@@ -1,9 +1,9 @@
 import { memo, useEffect, useState, useCallback, useRef } from 'react';
-import { View, Pressable } from 'react-native';
+import { View, Pressable, ScrollView, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
-import Animated, { useReducedMotion } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { PressableScale } from '@/components/PressableScale';
 import { getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
@@ -30,7 +30,6 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
   const guestGate = useGuestGate();
   const [activeIndex, setActiveIndex] = useState(0);
   const [cardWidth, setCardWidth] = useState(0);
-  const reduceMotion = useReducedMotion();
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(listing.likes ?? 0);
   const [likeBusy, setLikeBusy] = useState(false);
@@ -67,18 +66,18 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
     setLikeCount(listing.likes ?? 0);
   }, [listing.likes]);
 
-  // Multi-image listings auto-advance like a slideshow instead of being
-  // swipeable. A horizontal ScrollView nested inside a card hijacked any
-  // sideways-leaning touch — including a swipe meant for a surrounding
-  // horizontal list — and changed the photo instead. The dots below still
-  // show progress; reduced-motion users just see a static first photo.
-  useEffect(() => {
-    if (!hasMultiple || reduceMotion) return;
-    const id = setInterval(() => {
-      setActiveIndex((i) => (i + 1) % images.length);
-    }, 2600);
-    return () => clearInterval(id);
-  }, [hasMultiple, images.length, reduceMotion]);
+  // Multi-image listings are swipeable again (reverted from the auto-advancing
+  // slideshow). A horizontal paging ScrollView lets the shopper flick through
+  // every photo at their own pace; the dots below track the current page.
+  const onCarouselScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const w = e.nativeEvent.layoutMeasurement.width;
+      if (w <= 0) return;
+      const next = Math.round(e.nativeEvent.contentOffset.x / w);
+      setActiveIndex((cur) => (cur === next ? cur : next));
+    },
+    [],
+  );
 
   const handleToggleLike = useCallback(async () => {
     if (!user?.id) {
@@ -146,21 +145,43 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
         style={{ aspectRatio: 1 / 1.33, overflow: 'hidden', borderRadius: radii.lg, backgroundColor: colors.panel }}
         onLayout={(e) => setCardWidth(e.nativeEvent.layout.width)}
       >
-        <AnimatedExpoImage
-          // Keyed by frame so each slideshow advance is a fresh mount rather
-          // than a source swap on a persisting instance — expo-image's web
-          // crossfade layer only reliably fades in on mount; swapping
-          // `source` in place on the same element left it stuck invisible.
-          key={activeIndex}
-          source={{ uri: currentSrc }}
-          style={{ width: '100%', height: '100%' }}
-          contentFit="cover"
-          cachePolicy="memory-disk"
-          recyclingKey={listing.id}
-          transition={280}
-          priority={activeIndex === 0 ? 'high' : 'normal'}
-          sharedTransitionTag={activeIndex === 0 ? `product-image-${listing.id}` : undefined}
-        />
+        {hasMultiple ? (
+          // Horizontal paging carousel — one full-width slide per photo. Nested
+          // inside the fixed-ratio, clipped container so pages snap edge to edge.
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onScroll={onCarouselScroll}
+            scrollEventThrottle={16}
+            style={{ width: '100%', height: '100%' }}
+          >
+            {images.map((uri, i) => (
+              <AnimatedExpoImage
+                key={`${listing.id}-${i}`}
+                source={{ uri: getOptimizedImageUrl(uri, { width: srcWidth }) }}
+                style={{ width: cardWidth || 200, height: '100%' }}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                recyclingKey={`${listing.id}-${i}`}
+                transition={200}
+                priority={i === 0 ? 'high' : 'normal'}
+                sharedTransitionTag={i === 0 ? `product-image-${listing.id}` : undefined}
+              />
+            ))}
+          </ScrollView>
+        ) : (
+          <AnimatedExpoImage
+            source={{ uri: currentSrc }}
+            style={{ width: '100%', height: '100%' }}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            recyclingKey={listing.id}
+            transition={280}
+            priority="high"
+            sharedTransitionTag={`product-image-${listing.id}`}
+          />
+        )}
 
         {hasMultiple && (
           <View

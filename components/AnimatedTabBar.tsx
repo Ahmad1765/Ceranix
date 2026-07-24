@@ -1,17 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { View, Platform, LayoutChangeEvent, StyleSheet } from 'react-native';
-import { Text } from '@/lib/rnText';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
   withTiming,
-  withSequence,
   withDelay,
   useReducedMotion,
   runOnJS,
-  interpolate,
-  Extrapolation,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { BlurView } from 'expo-blur';
@@ -19,32 +15,32 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { colors, tintedPurple } from '../lib/theme';
+import { colors } from '../lib/theme';
 
-// Palette-locked: white dock, purple accent, black-at-opacity for muted.
+// Clean Instagram-style dock: white pill, icon-only, a single soft-purple disc
+// that slides behind the active tab. Palette-locked (purple accent, ink icons,
+// white surface). No labels, no ghost word — just a smooth, quiet bar.
 const ACCENT = colors.primary; // #6C47FF
-const INACTIVE = colors.muteSoft; // rgba(15,15,15,0.55)
-const PILL_FILL = colors.primarySofter; // purple @18%
-const PILL_BORDER = tintedPurple; // purple @45%
+const INACTIVE = colors.ink; // near-black line icons, Instagram-clean
+const DISC_FILL = colors.primarySofter; // purple @18%
 
-const BAR_HEIGHT = 68;
-const PILL_INSET = 8;
-const PILL_H = BAR_HEIGHT - PILL_INSET * 2;
-// Snappy, premium settle for the slide.
-const SLIDE = { damping: 16, stiffness: 260, mass: 0.9 } as const;
-// Bouncier spring for the icon morph (a little overshoot = life).
-const POP = { damping: 11, stiffness: 200, mass: 0.7 } as const;
+const BAR_HEIGHT = 62;
+const ICON = 26;
+const DISC = 46; // sliding highlight diameter
+// Snappy, premium settle for the slide + morph.
+const SLIDE = { damping: 18, stiffness: 260, mass: 0.9 } as const;
+const POP = { damping: 12, stiffness: 220, mass: 0.7 } as const;
 
 const ICONS: Record<
   string,
-  { outline: keyof typeof Ionicons.glyphMap; filled: keyof typeof Ionicons.glyphMap; ghost: string }
+  { outline: keyof typeof Ionicons.glyphMap; filled: keyof typeof Ionicons.glyphMap }
 > = {
-  index: { outline: 'home-outline', filled: 'home', ghost: 'HOME' },
-  feed: { outline: 'grid-outline', filled: 'grid', ghost: 'MY FEED' },
-  discover: { outline: 'search-outline', filled: 'search', ghost: 'DISCOVER' },
-  wardrobe: { outline: 'shirt-outline', filled: 'shirt', ghost: 'WARDROBE' },
-  upload: { outline: 'add-circle-outline', filled: 'add-circle', ghost: 'SELL' },
-  profile: { outline: 'person-outline', filled: 'person', ghost: 'PROFILE' },
+  index: { outline: 'home-outline', filled: 'home' },
+  feed: { outline: 'grid-outline', filled: 'grid' },
+  discover: { outline: 'search-outline', filled: 'search' },
+  wardrobe: { outline: 'shirt-outline', filled: 'shirt' },
+  upload: { outline: 'add-circle-outline', filled: 'add-circle' },
+  profile: { outline: 'person-outline', filled: 'person' },
 };
 
 type ItemLayout = { x: number; width: number };
@@ -58,7 +54,6 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
   );
   const activeKey = state.routes[state.index].key;
   const activePos = routes.findIndex((r) => r.key === activeKey);
-  const activeRoute = routes[activePos];
 
   const [layouts, setLayouts] = useState<Record<number, ItemLayout>>({});
   const [previewPos, setPreviewPos] = useState<number | null>(null);
@@ -74,32 +69,28 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
   const previewRef = useRef<number | null>(null);
   const committedRef = useRef(false);
 
-  const indX = useSharedValue(0);
-  const indW = useSharedValue(0);
-  const prevX = useSharedValue(0); // for velocity-based liquid stretch
-  const floatV = useSharedValue(0); // pill lift while dragging
-  const pressV = useSharedValue(1); // pill squish on touch
-  const mount = useSharedValue(0); // entrance choreography
+  // Disc tracks the CENTER of the active item; translateX is derived below.
+  const discX = useSharedValue(0);
+  const pressV = useSharedValue(1); // disc squish on touch
+  const mount = useSharedValue(0); // entrance
   const didInit = useRef(false);
 
   useEffect(() => {
-    mount.value = reduced ? 1 : withDelay(60, withSpring(1, { damping: 15, stiffness: 140 }));
+    mount.value = reduced ? 1 : withDelay(60, withSpring(1, { damping: 16, stiffness: 150 }));
   }, [mount, reduced]);
 
-  // Keep the pill on the real active tab whenever selection changes externally.
+  // Keep the disc on the real active tab whenever selection changes externally.
   useEffect(() => {
     const l = layouts[activePos];
     if (!l) return;
+    const cx = l.x + l.width / 2 - DISC / 2;
     if (!didInit.current || reduced) {
-      indX.value = l.x;
-      indW.value = l.width;
-      prevX.value = l.x;
+      discX.value = cx;
       didInit.current = true;
     } else if (!draggingRef.current) {
-      indX.value = withSpring(l.x, SLIDE);
-      indW.value = withSpring(l.width, SLIDE);
+      discX.value = withSpring(cx, SLIDE);
     }
-  }, [activePos, layouts, reduced, indX, indW, prevX]);
+  }, [activePos, layouts, reduced, discX]);
 
   // ---- helpers (JS thread) ----
   const itemAtX = (x: number) => {
@@ -116,13 +107,8 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
   const moveTo = (pos: number, animate = true) => {
     const l = layoutsRef.current[pos];
     if (!l) return;
-    if (animate && !reduced) {
-      indX.value = withSpring(l.x, SLIDE);
-      indW.value = withSpring(l.width, SLIDE);
-    } else {
-      indX.value = l.x;
-      indW.value = l.width;
-    }
+    const cx = l.x + l.width / 2 - DISC / 2;
+    discX.value = animate && !reduced ? withSpring(cx, SLIDE) : cx;
   };
 
   const select = (pos: number) => {
@@ -140,12 +126,11 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
   // ---- gesture callbacks ----
   const onBegin = (x: number) => {
     committedRef.current = false;
-    pressV.value = withTiming(0.95, { duration: 120 });
+    pressV.value = withTiming(0.9, { duration: 110 });
     moveTo(itemAtX(x));
   };
   const onDragStart = () => {
     draggingRef.current = true;
-    floatV.value = withTiming(1, { duration: 160 });
     previewRef.current = null;
   };
   const onDragMove = (x: number) => {
@@ -168,7 +153,6 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
     select(itemAtX(x));
   };
   const onFinalize = () => {
-    floatV.value = withTiming(0, { duration: 200 });
     pressV.value = withSpring(1, POP);
     draggingRef.current = false;
     previewRef.current = null;
@@ -178,9 +162,8 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
     }
   };
 
-  // Drag engages as soon as the finger travels a few px (works for an
-  // immediate drag AND a hold-then-drag). A quick stationary touch falls
-  // through to the Tap gesture below and selects.
+  // Drag engages after a few px of travel; a quick stationary touch falls
+  // through to the Tap gesture and selects.
   const pan = Gesture.Pan()
     .minDistance(6)
     .onBegin((e) => runOnJS(onBegin)(e.x))
@@ -195,167 +178,115 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
 
   const gesture = Gesture.Race(pan, tap);
 
-  // Pill: slides, stretches toward its direction of travel (liquid), lifts on drag.
-  const pillStyle = useAnimatedStyle(() => {
-    const dx = indX.value - prevX.value;
-    prevX.value = indX.value;
-    const speed = Math.min(Math.abs(dx), 22);
-    const sx = 1 + interpolate(speed, [0, 22], [0, 0.22], Extrapolation.CLAMP);
-    const sy = 1 - interpolate(speed, [0, 22], [0, 0.1], Extrapolation.CLAMP);
-    return {
-      width: indW.value,
-      opacity: mount.value,
-      transform: [
-        { translateX: indX.value },
-        { translateY: -floatV.value * 3 },
-        { scaleX: sx },
-        { scaleY: sy * (1 + floatV.value * 0.1) },
-        { scale: pressV.value },
-      ],
-    };
-  });
+  const discStyle = useAnimatedStyle(() => ({
+    opacity: mount.value,
+    transform: [{ translateX: discX.value }, { scale: pressV.value }],
+  }));
 
   const barStyle = useAnimatedStyle(() => ({
     opacity: mount.value,
-    transform: [{ translateY: (1 - mount.value) * 24 }],
+    transform: [{ translateY: (1 - mount.value) * 20 }],
   }));
 
   return (
-    <>
-      <GhostLabel text={activeRoute ? ICONS[activeRoute.name]?.ghost : undefined} reduced={reduced} />
-
-      <Animated.View
-        pointerEvents="box-none"
-        style={[
-          {
-            position: 'absolute',
-            left: 16,
-            right: 16,
-            bottom: Platform.OS === 'ios' ? Math.max(insets.bottom, 16) : 24,
-          },
-          barStyle,
-        ]}
-      >
-        <GestureDetector gesture={gesture}>
-          <View
-            // Web only: hook for the corner-shape: squircle rule in global.css.
-            // RN-web renders nativeID as the DOM id; ignored on native.
-            nativeID="tab-dock"
+    <Animated.View
+      pointerEvents="box-none"
+      style={[
+        {
+          position: 'absolute',
+          left: 20,
+          right: 20,
+          bottom: Platform.OS === 'ios' ? Math.max(insets.bottom, 14) : 22,
+        },
+        barStyle,
+      ]}
+    >
+      <GestureDetector gesture={gesture}>
+        <View
+          nativeID="tab-dock"
+          style={{
+            flexDirection: 'row',
+            height: BAR_HEIGHT,
+            borderRadius: BAR_HEIGHT / 2,
+            borderCurve: 'continuous',
+            paddingHorizontal: 6,
+            backgroundColor: 'rgba(255,255,255,0.86)',
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.7)',
+            boxShadow:
+              '0px 2px 6px rgba(0,0,0,0.05), 0px 14px 30px rgba(0,0,0,0.12)',
+            elevation: 16,
+          }}
+        >
+          {/* Frosted glass fill */}
+          <BlurView
+            tint="light"
+            intensity={Platform.OS === 'android' ? 28 : 44}
+            experimentalBlurMethod="dimezisBlurView"
+            pointerEvents="none"
             style={{
-              flexDirection: 'row',
-              height: BAR_HEIGHT,
-              borderRadius: 34,
-              // Apple-style continuous (superellipse) corners on iOS — the
-              // edge eases into the curve instead of a quarter-circle "kink".
-              // No-op on Android/web, which keep the normal rounded corner.
+              ...StyleSheet.absoluteFillObject,
+              borderRadius: BAR_HEIGHT / 2,
               borderCurve: 'continuous',
-              paddingHorizontal: 8,
-              backgroundColor: 'rgba(255,255,255,0.70)',
-              borderWidth: 1,
-              borderColor: 'rgba(255,255,255,0.6)',
-              // Layered depth + a faint purple ambient = premium float.
-              boxShadow:
-                '0px 2px 6px rgba(0,0,0,0.05), 0px 12px 28px rgba(0,0,0,0.10), 0px 20px 44px rgba(108,71,255,0.12)',
-              elevation: 16,
+              overflow: 'hidden',
             }}
-          >
-            {/* Frosted glass fill */}
-            <BlurView
-              tint="light"
-              intensity={Platform.OS === 'android' ? 24 : 40}
-              experimentalBlurMethod="dimezisBlurView"
-              pointerEvents="none"
-              style={{ ...StyleSheet.absoluteFillObject, borderRadius: 34, borderCurve: 'continuous', overflow: 'hidden' }}
-            />
-            {/* Glass top-edge highlight */}
-            <View
-              pointerEvents="none"
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: '12%',
-                right: '12%',
-                height: 1,
-                borderRadius: 1,
-                backgroundColor: 'rgba(255,255,255,0.9)',
-              }}
-            />
+          />
 
-            {/* Sliding glossy pill */}
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                {
-                  position: 'absolute',
-                  top: PILL_INSET,
-                  height: PILL_H,
-                  left: 0,
-                  borderRadius: PILL_H / 2,
-                  backgroundColor: PILL_FILL,
-                  borderWidth: 1,
-                  borderColor: PILL_BORDER,
-                  overflow: 'hidden',
-                  boxShadow: '0px 6px 16px rgba(108,71,255,0.28)',
-                },
-                pillStyle,
-              ]}
-            >
-              {/* Top sheen for a glossy, raised feel */}
-              <View
-                style={{
-                  position: 'absolute',
-                  top: 1,
-                  left: 5,
-                  right: 5,
-                  height: '46%',
-                  borderRadius: PILL_H / 2,
-                  backgroundColor: 'rgba(255,255,255,0.40)',
+          {/* Sliding highlight disc */}
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              {
+                position: 'absolute',
+                top: (BAR_HEIGHT - DISC) / 2,
+                left: 0,
+                width: DISC,
+                height: DISC,
+                borderRadius: DISC / 2,
+                backgroundColor: DISC_FILL,
+              },
+              discStyle,
+            ]}
+          />
+
+          {routes.map((route, pos) => {
+            const { options } = descriptors[route.key];
+            const highlighted = (previewPos ?? activePos) === pos;
+            const label =
+              typeof options.tabBarLabel === 'string'
+                ? options.tabBarLabel
+                : (options.title ?? route.name);
+            return (
+              <TabItem
+                key={route.key}
+                routeName={route.name}
+                focused={highlighted}
+                reduced={reduced}
+                label={label}
+                onLayout={(e: LayoutChangeEvent) => {
+                  const { x, width } = e.nativeEvent.layout;
+                  setLayouts((prev) => {
+                    const cur = prev[pos];
+                    if (cur && cur.x === x && cur.width === width) return prev;
+                    return { ...prev, [pos]: { x, width } };
+                  });
                 }}
               />
-            </Animated.View>
-
-            {routes.map((route, pos) => {
-              const { options } = descriptors[route.key];
-              const highlighted = (previewPos ?? activePos) === pos;
-              const label =
-                typeof options.tabBarLabel === 'string'
-                  ? options.tabBarLabel
-                  : (options.title ?? route.name);
-              return (
-                <TabItem
-                  key={route.key}
-                  index={pos}
-                  routeName={route.name}
-                  focused={highlighted}
-                  reduced={reduced}
-                  label={label}
-                  onLayout={(e: LayoutChangeEvent) => {
-                    const { x, width } = e.nativeEvent.layout;
-                    setLayouts((prev) => {
-                      const cur = prev[pos];
-                      if (cur && cur.x === x && cur.width === width) return prev;
-                      return { ...prev, [pos]: { x, width } };
-                    });
-                  }}
-                />
-              );
-            })}
-          </View>
-        </GestureDetector>
-      </Animated.View>
-    </>
+            );
+          })}
+        </View>
+      </GestureDetector>
+    </Animated.View>
   );
 }
 
 function TabItem({
-  index,
   routeName,
   focused,
   reduced,
   label,
   onLayout,
 }: {
-  index: number;
   routeName: string;
   focused: boolean;
   reduced: boolean;
@@ -363,12 +294,7 @@ function TabItem({
   onLayout: (e: LayoutChangeEvent) => void;
 }) {
   const active = useSharedValue(focused ? 1 : 0);
-  const enter = useSharedValue(0);
   const icon = ICONS[routeName] ?? ICONS.index;
-
-  useEffect(() => {
-    enter.value = reduced ? 1 : withDelay(120 + index * 55, withSpring(1, { damping: 14, stiffness: 170 }));
-  }, [enter, index, reduced]);
 
   useEffect(() => {
     active.value = reduced
@@ -380,26 +306,14 @@ function TabItem({
         : withTiming(0, { duration: 180 });
   }, [focused, reduced, active]);
 
-  // Whole icon lifts + grows when active; staggers up on mount.
+  // Whole icon grows a touch when active.
   const wrapStyle = useAnimatedStyle(() => ({
-    opacity: enter.value,
-    transform: [
-      { translateY: -active.value * 3 + (1 - enter.value) * 10 },
-      { scale: (0.9 + enter.value * 0.1) * (1 + active.value * 0.08) },
-    ],
+    transform: [{ scale: 1 + active.value * 0.06 }],
   }));
   const outlineStyle = useAnimatedStyle(() => ({ opacity: 1 - active.value }));
   const filledStyle = useAnimatedStyle(() => ({
     opacity: active.value,
-    transform: [
-      { scale: 0.5 + active.value * 0.5 },
-      { rotate: `${(1 - active.value) * -12}deg` },
-    ],
-  }));
-  // Active label gets a touch bolder + brighter; inactive sits back.
-  const labelStyle = useAnimatedStyle(() => ({
-    opacity: enter.value * (0.55 + active.value * 0.45),
-    transform: [{ translateY: (1 - enter.value) * 6 }],
+    transform: [{ scale: 0.55 + active.value * 0.45 }],
   }));
 
   return (
@@ -408,87 +322,16 @@ function TabItem({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ selected: focused }}
-      style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 8 }}
+      style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
     >
-      <Animated.View style={[{ width: 26, height: 26, marginBottom: 4 }, wrapStyle]}>
+      <Animated.View style={[{ width: ICON, height: ICON }, wrapStyle]}>
         <Animated.View style={[StyleSheet.absoluteFill, outlineStyle]}>
-          <Ionicons name={icon.outline} size={26} color={INACTIVE} />
+          <Ionicons name={icon.outline} size={ICON} color={INACTIVE} />
         </Animated.View>
         <Animated.View style={[StyleSheet.absoluteFill, filledStyle]}>
-          <Ionicons
-            name={icon.filled}
-            size={26}
-            color={ACCENT}
-            style={{ textShadowColor: 'rgba(108,71,255,0.45)', textShadowRadius: 7, textShadowOffset: { width: 0, height: 1 } }}
-          />
+          <Ionicons name={icon.filled} size={ICON} color={ACCENT} />
         </Animated.View>
       </Animated.View>
-      <Animated.Text
-        style={[
-          {
-            fontSize: 10,
-            fontFamily: focused ? 'Inter_600SemiBold' : 'Inter_500Medium',
-            fontWeight: focused ? '600' : '500',
-            letterSpacing: 0.3,
-            color: focused ? ACCENT : INACTIVE,
-          },
-          labelStyle,
-        ]}
-        numberOfLines={1}
-      >
-        {label}
-      </Animated.Text>
     </View>
-  );
-}
-
-// Big faint purple word that fades in behind the screen on each tab change.
-function GhostLabel({ text, reduced }: { text?: string; reduced: boolean }) {
-  const op = useSharedValue(0);
-  const scale = useSharedValue(0.92);
-  const first = useRef(true);
-
-  useEffect(() => {
-    if (!text) return;
-    if (first.current) {
-      first.current = false;
-      return;
-    }
-    if (reduced) return;
-    op.value = withSequence(
-      withTiming(1, { duration: 280 }),
-      withDelay(900, withTiming(0, { duration: 500 })),
-    );
-    scale.value = withSequence(
-      withTiming(1, { duration: 600 }),
-      withDelay(800, withTiming(0.96, { duration: 400 })),
-    );
-  }, [text, reduced, op, scale]);
-
-  const style = useAnimatedStyle(() => ({
-    opacity: op.value,
-    transform: [{ scale: scale.value }],
-  }));
-
-  return (
-    <Animated.View
-      pointerEvents="none"
-      style={[
-        { position: 'absolute', left: 0, right: 0, bottom: 130, alignItems: 'center', zIndex: -1 },
-        style,
-      ]}
-    >
-      <Text
-        style={{
-          fontSize: 64,
-          fontWeight: '800',
-          letterSpacing: -2,
-          color: colors.primarySoft,
-          textTransform: 'uppercase',
-        }}
-      >
-        {text}
-      </Text>
-    </Animated.View>
   );
 }

@@ -1119,7 +1119,7 @@ function AestheticsSkeleton() {
   return (
     <View style={{ paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 10 }}>
       {Array.from({ length: 6 }).map((_, i) => (
-        <View key={i} style={{ width: '48%', height: 78, borderRadius: radii.xl, backgroundColor: colors.divider }} />
+        <View key={i} style={{ width: '48%', height: 95, borderRadius: radii.xl, backgroundColor: colors.divider }} />
       ))}
     </View>
   );

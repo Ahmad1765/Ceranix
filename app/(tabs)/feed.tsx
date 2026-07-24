@@ -11,6 +11,12 @@ import { PriceDropCard } from '@/components/PriceDropCard';
 import { type SavedSearch } from '@/lib/savedSearches';
 import { ListingCard } from '@/components/ListingCard';
 import { DropAlertSheet } from '@/components/DropAlertSheet';
+import {
+  FeedFilterSheet,
+  EMPTY_FEED_FILTERS,
+  countActiveFilters,
+  type FeedFilters,
+} from '@/components/FeedFilterSheet';
 import { useWebPullToRefresh, WebPullIndicator } from '@/components/WebRefresh';
 import {
   useMyFeedListingsQuery,
@@ -54,6 +60,12 @@ export default function MyFeedScreen() {
   // this stays an instant client-side refine over already-loaded rows.
   const [query, setQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
+  // Structured filters (category / condition / price / sort) applied on top of
+  // the text query, over the already-loaded rows. Opened from the filter button
+  // beside the search field; the red badge shows how many constraints are on.
+  const [filters, setFilters] = useState<FeedFilters>(EMPTY_FEED_FILTERS);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const activeFilterCount = countActiveFilters(filters);
 
   const { columns, cardWidth } = useGridDimensions({
     min: 2,
@@ -205,6 +217,34 @@ export default function MyFeedScreen() {
     );
   }, [visibleListings, isSearching, trimmedQuery]);
 
+  // Structured filters + sort, layered on top of the text search. Sorting
+  // copies before mutating so the source query cache is never reordered.
+  const filteredListings = useMemo(() => {
+    let rows = searchedListings;
+    if (filters.category) rows = rows.filter((l) => l.category === filters.category);
+    if (filters.conditions.length > 0)
+      rows = rows.filter((l) => filters.conditions.includes(l.condition));
+    if (filters.priceMin != null) rows = rows.filter((l) => l.price >= filters.priceMin!);
+    if (filters.priceMax != null) rows = rows.filter((l) => l.price <= filters.priceMax!);
+    switch (filters.sort) {
+      case 'newest':
+        rows = [...rows].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        );
+        break;
+      case 'price_asc':
+        rows = [...rows].sort((a, b) => a.price - b.price);
+        break;
+      case 'price_desc':
+        rows = [...rows].sort((a, b) => b.price - a.price);
+        break;
+      case 'popular':
+        rows = [...rows].sort((a, b) => (b.likes ?? 0) - (a.likes ?? 0));
+        break;
+    }
+    return rows;
+  }, [searchedListings, filters]);
+
   const showColdStartBanner = !user;
   const showFollowCta =
     !!user && savedSearches.length === 0 && isFallback;
@@ -229,13 +269,16 @@ export default function MyFeedScreen() {
 
   // Rails are browsing aids; while filtering we hide them so results stay the
   // sole focus.
-  const showRails = activeChip === FOR_YOU && !showingSaved && !isSearching;
+  const showRails =
+    activeChip === FOR_YOU && !showingSaved && !isSearching && activeFilterCount === 0;
 
   const gridEmptyText = isSearching
     ? `Nothing in ${showingSaved ? 'your saved items' : 'this feed'} matches “${query.trim()}”.`
-    : showingSaved
-      ? 'No saved items yet. Tap the bookmark on any listing to save it.'
-      : 'Nothing matches this feed yet.';
+    : activeFilterCount > 0
+      ? 'No items match these filters. Try loosening them.'
+      : showingSaved
+        ? 'No saved items yet. Tap the bookmark on any listing to save it.'
+        : 'Nothing matches this feed yet.';
 
   // Web pull-to-refresh — RefreshControl is inert on react-native-web.
   const { scrollRef, pull, nodeTop, threshold, contentStyle } = useWebPullToRefresh({ refreshing, onRefresh });
@@ -284,7 +327,9 @@ export default function MyFeedScreen() {
           focused={searchFocused}
           onFocus={() => setSearchFocused(true)}
           onBlur={() => setSearchFocused(false)}
-          resultCount={isSearching ? searchedListings.length : null}
+          resultCount={isSearching || activeFilterCount > 0 ? filteredListings.length : null}
+          filterCount={activeFilterCount}
+          onOpenFilter={() => setFilterOpen(true)}
         />
 
         {showColdStartBanner ? (
@@ -379,13 +424,20 @@ export default function MyFeedScreen() {
         ) : null}
 
         <Grid
-          rows={searchedListings}
+          rows={filteredListings}
           loading={showingSaved ? loadingSaved : loading}
           columns={columns}
           cardWidth={cardWidth}
           emptyText={gridEmptyText}
         />
       </ScrollView>
+
+      <FeedFilterSheet
+        visible={filterOpen}
+        initial={filters}
+        onApply={setFilters}
+        onClose={() => setFilterOpen(false)}
+      />
 
       {user?.id ? (
         <DropAlertSheet
@@ -444,6 +496,8 @@ function FeedSearch({
   onFocus,
   onBlur,
   resultCount,
+  filterCount,
+  onOpenFilter,
 }: {
   value: string;
   onChangeText: (t: string) => void;
@@ -451,58 +505,108 @@ function FeedSearch({
   onFocus: () => void;
   onBlur: () => void;
   resultCount: number | null;
+  filterCount: number;
+  onOpenFilter: () => void;
 }) {
   const searching = value.trim().length > 0;
+  const hasFilters = filterCount > 0;
   return (
     <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          backgroundColor: colors.panel,
-          borderRadius: radii.pill,
-          paddingHorizontal: 14,
-          height: 44,
-          borderWidth: 1,
-          borderColor: focused ? colors.purple : 'transparent',
-        }}
-      >
-        <Feather name="search" size={17} color={focused ? colors.purple : colors.muteSoft} />
-        <TextInput
-          value={value}
-          onChangeText={onChangeText}
-          onFocus={onFocus}
-          onBlur={onBlur}
-          placeholder="Search your feed"
-          placeholderTextColor={colors.muteSoft}
-          style={
-            {
-              flex: 1,
-              marginLeft: 9,
-              fontSize: 14.5,
-              color: colors.ink,
-              padding: 0,
-              // RN-Web only: drop the browser's default focus ring — the purple
-              // border is our focus affordance.
-              outlineStyle: 'none',
-              outlineWidth: 0,
-            } as any
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View
+          style={{
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: colors.panel,
+            borderRadius: radii.pill,
+            paddingHorizontal: 14,
+            height: 44,
+            borderWidth: 1,
+            borderColor: focused ? colors.purple : 'transparent',
+          }}
+        >
+          <Feather name="search" size={17} color={focused ? colors.purple : colors.muteSoft} />
+          <TextInput
+            value={value}
+            onChangeText={onChangeText}
+            onFocus={onFocus}
+            onBlur={onBlur}
+            placeholder="Search your feed"
+            placeholderTextColor={colors.muteSoft}
+            style={
+              {
+                flex: 1,
+                marginLeft: 9,
+                fontSize: 14.5,
+                color: colors.ink,
+                padding: 0,
+                // RN-Web only: drop the browser's default focus ring — the purple
+                // border is our focus affordance.
+                outlineStyle: 'none',
+                outlineWidth: 0,
+              } as any
+            }
+            returnKeyType="search"
+            autoCorrect={false}
+            autoCapitalize="none"
+            accessibilityLabel="Search your feed"
+          />
+          {searching ? (
+            <Pressable
+              hitSlop={HIT_SLOP_8}
+              onPress={() => onChangeText('')}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+            >
+              <Feather name="x" size={16} color={colors.muteSoft} />
+            </Pressable>
+          ) : null}
+        </View>
+
+        {/* Filter button — a count badge appears once constraints are applied. */}
+        <Pressable
+          onPress={onOpenFilter}
+          accessibilityRole="button"
+          accessibilityLabel={
+            hasFilters ? `Filters, ${filterCount} active` : 'Open filters'
           }
-          returnKeyType="search"
-          autoCorrect={false}
-          autoCapitalize="none"
-          accessibilityLabel="Search your feed"
-        />
-        {searching ? (
-          <Pressable
-            hitSlop={HIT_SLOP_8}
-            onPress={() => onChangeText('')}
-            accessibilityRole="button"
-            accessibilityLabel="Clear search"
-          >
-            <Feather name="x" size={16} color={colors.muteSoft} />
-          </Pressable>
-        ) : null}
+          style={({ pressed }) => ({
+            width: 44,
+            height: 44,
+            borderRadius: radii.pill,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderWidth: 1,
+            borderColor: hasFilters ? colors.purple : colors.hairline,
+            backgroundColor: hasFilters ? colors.purpleSoft : colors.white,
+            transform: [{ scale: pressed ? 0.94 : 1 }],
+          })}
+        >
+          <Feather name="sliders" size={18} color={hasFilters ? colors.purple : colors.ink} />
+          {hasFilters ? (
+            <View
+              style={{
+                position: 'absolute',
+                top: -4,
+                right: -4,
+                minWidth: 19,
+                height: 19,
+                borderRadius: 10,
+                paddingHorizontal: 5,
+                backgroundColor: colors.purple,
+                borderWidth: 2,
+                borderColor: colors.white,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text style={{ fontSize: 10.5, fontWeight: '800', color: colors.white }}>
+                {filterCount}
+              </Text>
+            </View>
+          ) : null}
+        </Pressable>
       </View>
       {searching && resultCount !== null && resultCount > 0 ? (
         <Text
