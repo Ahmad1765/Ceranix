@@ -726,7 +726,7 @@ export default function ProductScreen() {
             {listing.title}
           </Text>
           <Text style={{ fontSize: 15, fontWeight: '700', color: '#0F0F0F' }}>
-            {formatPrice(listing.price)}
+            {formatPrice(listing.price, { whole: true })}
           </Text>
         </View>
       )}
@@ -1005,7 +1005,7 @@ export default function ProductScreen() {
                 letterSpacing: -0.4,
               }}
             >
-              {formatPrice(itemPrice)}
+              {formatPrice(itemPrice, { whole: true })}
             </Text>
             {bpFee > 0 ? (
               <Pressable

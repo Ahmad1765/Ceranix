@@ -26,6 +26,15 @@ const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 type TabName = 'For you' | 'Popular' | 'Following';
 
+// A small leading glyph per tab — personalised (star), trending (trending-up),
+// and the people you follow (users). Colour tracks the label: ink when active,
+// mute when not.
+const TAB_ICONS: Record<TabName, keyof typeof Feather.glyphMap> = {
+  'For you': 'star',
+  Popular: 'trending-up',
+  Following: 'users',
+};
+
 // Same column ramp as discover so listings render at identical sizes on
 // every screen of the app: 2-up on phones, 3 on big phones, 4 on tablets.
 const GRID_THRESHOLDS = [560, 900, 1200];
@@ -96,6 +105,12 @@ function AnimatedTabPill({
             borderRadius: 999,
           }}
         >
+          <Feather
+            name={TAB_ICONS[tab]}
+            size={14}
+            color={isActive ? '#0F0F0F' : '#666666'}
+            style={{ marginRight: 6 }}
+          />
           <Animated.Text style={{ fontSize: 15, fontFamily: 'Inter_500Medium', fontWeight: '500', color: textColor }}>
             {tab}
           </Animated.Text>

@@ -51,7 +51,7 @@ const EMPTY_LISTINGS: Listing[] = [];
 const EMPTY_SAVED_SEARCHES: SavedSearch[] = [];
 
 export default function MyFeedScreen() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const toast = useToast();
   const [activeChip, setActiveChip] = useState<string>(FOR_YOU);
   const [alertSheetOpen, setAlertSheetOpen] = useState(false);
@@ -249,24 +249,6 @@ export default function MyFeedScreen() {
   const showFollowCta =
     !!user && savedSearches.length === 0 && isFallback;
 
-  // Personal subtitle: name the dominant category in today's picks instead
-  // of a static tagline, so the feed tells the user WHY it looks like this.
-  const subtitle = useMemo(() => {
-    if (!user || isFallback || listings.length === 0) return 'Curated from what you like';
-    const counts = new Map<string, number>();
-    for (const l of listings.slice(0, 24)) {
-      if (l.category) counts.set(l.category, (counts.get(l.category) ?? 0) + 1);
-    }
-    let top: string | null = null;
-    let max = 0;
-    for (const [cat, n] of counts) {
-      if (n > max) { top = cat; max = n; }
-    }
-    return top
-      ? `Heavy on ${top} today, from your likes, saves & sellers you follow`
-      : 'From your likes, saves & sellers you follow';
-  }, [user, isFallback, listings]);
-
   // Rails are browsing aids; while filtering we hide them so results stay the
   // sole focus.
   const showRails =
@@ -295,29 +277,6 @@ export default function MyFeedScreen() {
         }
         contentContainerStyle={[{ paddingBottom: tabClear }, contentStyle]}
       >
-        {/* Title — greets the signed-in user by name; the feed is THEIRS,
-            not a generic surface. */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 6, paddingBottom: 4 }}>
-          <Text style={{ fontSize: 24, fontWeight: '800', color: colors.ink, letterSpacing: -0.5 }}>
-            {(() => {
-              const first = (profile?.full_name || profile?.username || '')
-                .trim()
-                .split(/\s+/)[0];
-              return first ? `Hey ${first}` : 'My Feed';
-            })()}
-          </Text>
-          <Text
-            style={{
-              fontSize: 13,
-              color: colors.muteSoft,
-              marginTop: 2,
-              letterSpacing: -0.1,
-            }}
-          >
-            {subtitle}
-          </Text>
-        </View>
-
         {/* In-feed search — filters the active view (For you / Saved / a saved
             search) by title or brand. Focus lifts the hairline to purple; the
             border is always present so focusing never shifts layout. */}

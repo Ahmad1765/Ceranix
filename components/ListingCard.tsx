@@ -267,11 +267,11 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
           </Text>
         )}
         <Text className="text-[11px] text-ink-soft mt-1">
-          {formatPrice(itemPrice)}
+          {formatPrice(itemPrice, { whole: true })}
         </Text>
         <View className="flex-row items-center mt-0.5" style={{ gap: 3 }}>
           <Text className="text-[15px] font-extrabold text-ink">
-            {formatPrice(totalPrice)} incl.
+            {formatPrice(totalPrice, { whole: true })} incl.
           </Text>
           <Feather name="check-circle" size={13} color={BRAND_PURPLE} />
         </View>

@@ -130,7 +130,7 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
           {item.meta}
         </Text>
         <Text style={{ fontSize: 14, fontWeight: '800', color: BRAND_INK, marginTop: 4 }}>
-          {formatPrice(item.price)}
+          {formatPrice(item.price, { whole: true })}
         </Text>
       </View>
     </Pressable>

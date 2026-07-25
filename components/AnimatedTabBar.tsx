@@ -20,9 +20,9 @@ import { colors } from '../lib/theme';
 // Clean Instagram-style dock: white pill, icon-only, a single soft-purple disc
 // that slides behind the active tab. Palette-locked (purple accent, ink icons,
 // white surface). No labels, no ghost word — just a smooth, quiet bar.
-const ACCENT = colors.primary; // #6C47FF
+const ACCENT = colors.ink; // active icon stays dark (ink), like the reference
 const INACTIVE = colors.ink; // near-black line icons, Instagram-clean
-const DISC_FILL = colors.primarySofter; // purple @18%
+const DISC_FILL = 'rgba(15,15,15,0.08)'; // neutral grey disc (ink @8%)
 
 const BAR_HEIGHT = 62;
 const ICON = 26;

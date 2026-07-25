@@ -7,7 +7,7 @@
 // meaningless to the rest of the screen.
 
 import { useEffect, useRef, useState } from 'react';
-import { View, Pressable, ScrollView, Animated, Platform } from 'react-native';
+import { View, Pressable, ScrollView, Animated, Platform, StyleSheet } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
@@ -24,6 +24,13 @@ import type { User } from '@/types';
 const PAD = 16;
 const DISPLAY_BOLD = type.family.sansBold; // Inter_700Bold
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
+
+// Tags are stored lowercase (e.g. "cottagecore"); the aesthetics grid shows
+// them as proper names ("Cottagecore"), capitalising the first letter of each
+// word so the index reads like a style directory rather than raw hashtags.
+function titleCase(s: string): string {
+  return s.replace(/(^|[\s-])([a-z])/g, (_, sep, ch) => sep + ch.toUpperCase());
+}
 
 const eyebrowStyle = {
   fontSize: 11,
@@ -185,24 +192,22 @@ export function AestheticsPanel({
   );
 }
 
-// Compact index row: tag name + live count on the left, a small preview thumb
-// on the right — the browsable list layout. The card surface is frosted glass
-// (BlurView + translucent white + hairline) instead of a flat panel fill.
-// On-palette: glass is white-at-opacity, text ink, accent purple.
+// Compact index row: proper-cased name + live count on the left, a small
+// preview thumb on the right — the browsable list layout. Quiet light-grey
+// panel so the grid reads as a clean style directory; name in ink, count in
+// muted grey, thumb portrait on the right.
 function TagTile({ entry, onPress }: { entry: TagIndexEntry; onPress: () => void }) {
   const { tag, count } = entry;
+  const label = titleCase(tag);
   const uri = entry.image ? getOptimizedImageUrl(entry.image, { width: 200 }) : null;
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`Explore #${tag}, ${count} ${count === 1 ? 'item' : 'items'}`}
+      accessibilityLabel={`Explore ${label}, ${count.toLocaleString()} outfits`}
       style={({ pressed }) => ({ width: '48%', transform: [{ scale: pressed ? 0.97 : 1 }] })}
     >
-      <BlurView
-        tint="light"
-        intensity={Platform.OS === 'android' ? 32 : 40}
-        experimentalBlurMethod="dimezisBlurView"
+      <View
         style={{
           flexDirection: 'row',
           alignItems: 'center',
@@ -210,30 +215,26 @@ function TagTile({ entry, onPress }: { entry: TagIndexEntry; onPress: () => void
           overflow: 'hidden',
           padding: 10,
           gap: 8,
-          // Frosted white glass with a faint purple wash so the surface picks
-          // up the brand accent instead of reading as plain grey.
-          backgroundColor: 'rgba(108,71,255,0.10)',
-          borderWidth: 1,
-          borderColor: 'rgba(108,71,255,0.22)',
+          backgroundColor: colors.panel,
         }}
       >
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text
-            style={{ fontFamily: DISPLAY_BOLD, fontSize: 14, color: colors.ink }}
+            style={{ fontFamily: DISPLAY_BOLD, fontSize: 15, color: colors.ink, letterSpacing: -0.2 }}
             numberOfLines={1}
           >
-            #{tag}
+            {label}
           </Text>
           <Text
-            style={[eyebrowStyle, { color: colors.purple, letterSpacing: 0.4, marginTop: 3 }]}
+            style={{ fontSize: 12.5, color: colors.mute, marginTop: 3 }}
             numberOfLines={1}
           >
-            {count.toLocaleString()} {count === 1 ? 'item' : 'items'}
+            {count.toLocaleString()} outfits
           </Text>
         </View>
         <View
           style={{
-            width: 54,
+            width: 56,
             aspectRatio: 0.72,
             borderRadius: radii.lg,
             overflow: 'hidden',
@@ -254,7 +255,7 @@ function TagTile({ entry, onPress }: { entry: TagIndexEntry; onPress: () => void
             <Feather name="hash" size={16} color={colors.purple} />
           )}
         </View>
-      </BlurView>
+      </View>
     </Pressable>
   );
 }
@@ -300,11 +301,25 @@ function BrandCard({ brand, onPress }: { brand: BrandEntry; onPress: () => void 
       <View
         style={{
           borderRadius: radii['3xl'],
-          backgroundColor: colors.ink,
-          padding: 20,
           overflow: 'hidden',
         }}
       >
+        {/* Frosted glass surface — a dark BlurView frost over the white page,
+            darkened just enough to keep the white title/collage legible. Gives
+            the brand card the same glass language as the tab dock. */}
+        <BlurView
+          tint="dark"
+          intensity={Platform.OS === 'android' ? 40 : 60}
+          experimentalBlurMethod="dimezisBlurView"
+          pointerEvents="none"
+          style={StyleSheet.absoluteFill}
+        />
+        <View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15,15,15,0.55)' }]}
+        />
+
+        <View style={{ padding: 20 }}>
         {/* Tonal purple disc — the promo banner's depth cue, reused so the
             hub and the idle feed share one visual family. Not a gradient. */}
         <View
@@ -390,6 +405,7 @@ function BrandCard({ brand, onPress }: { brand: BrandEntry; onPress: () => void 
               </View>
             );
           })}
+        </View>
         </View>
       </View>
     </Pressable>

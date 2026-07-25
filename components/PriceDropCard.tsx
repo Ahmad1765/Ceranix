@@ -14,7 +14,7 @@ interface Props {
 
 function formatPrice(value: unknown): string {
   const n = typeof value === 'number' ? value : Number(value);
-  return Number.isFinite(n) ? formatMoney(n) : 'N/A';
+  return Number.isFinite(n) ? formatMoney(n, { whole: true }) : 'N/A';
 }
 
 export const PriceDropCard = memo(function PriceDropCard({ listing, width = 130 }: Props) {
