@@ -270,10 +270,10 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
           {formatPrice(itemPrice, { whole: true })}
         </Text>
         <View className="flex-row items-center mt-0.5" style={{ gap: 3 }}>
-          <Text className="text-[15px] font-extrabold text-ink">
+          <Text className="text-[12px] font-bold text-ink">
             {formatPrice(totalPrice, { whole: true })} incl.
           </Text>
-          <Feather name="check-circle" size={13} color={BRAND_PURPLE} />
+          <Feather name="check-circle" size={11} color={BRAND_PURPLE} />
         </View>
       </View>
     </PressableScale>

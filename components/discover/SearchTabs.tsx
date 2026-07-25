@@ -7,10 +7,9 @@
 // meaningless to the rest of the screen.
 
 import { useEffect, useRef, useState } from 'react';
-import { View, Pressable, ScrollView, Animated, Platform, StyleSheet } from 'react-native';
+import { View, Pressable, ScrollView, Animated, Platform } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
-import { BlurView } from 'expo-blur';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { getOptimizedImageUrl } from '@/lib/images';
@@ -183,9 +182,12 @@ export function AestheticsPanel({
   tags: TagIndexEntry[];
   onOpen: (tag: string) => void;
 }) {
+  // An odd count leaves one tile alone on the last row instead of a paired
+  // grid — floor to an even count so every row always reads as a pair.
+  const evenTags = tags.length % 2 === 1 ? tags.slice(0, -1) : tags;
   return (
     <View style={{ paddingHorizontal: PAD, flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-      {tags.map((t) => (
+      {evenTags.map((t) => (
         <TagTile key={t.tag} entry={t} onPress={() => onOpen(t.tag)} />
       ))}
     </View>
@@ -302,23 +304,10 @@ function BrandCard({ brand, onPress }: { brand: BrandEntry; onPress: () => void 
         style={{
           borderRadius: radii['3xl'],
           overflow: 'hidden',
+          borderWidth: 1,
+          borderColor: colors.divider,
         }}
       >
-        {/* Frosted glass surface — a dark BlurView frost over the white page,
-            darkened just enough to keep the white title/collage legible. Gives
-            the brand card the same glass language as the tab dock. */}
-        <BlurView
-          tint="dark"
-          intensity={Platform.OS === 'android' ? 40 : 60}
-          experimentalBlurMethod="dimezisBlurView"
-          pointerEvents="none"
-          style={StyleSheet.absoluteFill}
-        />
-        <View
-          pointerEvents="none"
-          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15,15,15,0.55)' }]}
-        />
-
         <View style={{ padding: 20 }}>
         {/* Tonal purple disc — the promo banner's depth cue, reused so the
             hub and the idle feed share one visual family. Not a gradient. */}
@@ -332,7 +321,7 @@ function BrandCard({ brand, onPress }: { brand: BrandEntry; onPress: () => void 
             height: 190,
             borderRadius: 95,
             backgroundColor: colors.purple,
-            opacity: 0.3,
+            opacity: 0.1,
           }}
         />
 
@@ -342,7 +331,7 @@ function BrandCard({ brand, onPress }: { brand: BrandEntry; onPress: () => void 
               style={{
                 fontFamily: DISPLAY_BOLD,
                 fontSize: 25,
-                color: colors.white,
+                color: colors.ink,
                 letterSpacing: -0.3,
               }}
               numberOfLines={1}
@@ -353,7 +342,7 @@ function BrandCard({ brand, onPress }: { brand: BrandEntry; onPress: () => void 
               style={{
                 fontSize: 10.5,
                 fontFamily: type.family.sansBold,
-                color: 'rgba(255,255,255,0.62)',
+                color: colors.mute,
                 letterSpacing: 1.3,
                 textTransform: 'uppercase',
                 marginTop: 4,
@@ -367,13 +356,13 @@ function BrandCard({ brand, onPress }: { brand: BrandEntry; onPress: () => void 
               width: 32,
               height: 32,
               borderRadius: 16,
-              backgroundColor: 'rgba(255,255,255,0.14)',
+              backgroundColor: colors.purpleSoft,
               alignItems: 'center',
               justifyContent: 'center',
               marginLeft: 10,
             }}
           >
-            <Feather name="arrow-up-right" size={15} color={colors.white} />
+            <Feather name="arrow-up-right" size={15} color={colors.purple} />
           </View>
         </View>
 
@@ -390,7 +379,7 @@ function BrandCard({ brand, onPress }: { brand: BrandEntry; onPress: () => void 
                   aspectRatio: 0.72,
                   borderRadius: radii.lg,
                   overflow: 'hidden',
-                  backgroundColor: 'rgba(255,255,255,0.08)',
+                  backgroundColor: colors.panel,
                 }}
               >
                 {uri ? (

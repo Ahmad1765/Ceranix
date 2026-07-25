@@ -21,7 +21,6 @@ import { useWebPullToRefresh, WebPullIndicator } from '@/components/WebRefresh';
 import {
   useMyFeedListingsQuery,
   usePriceDropsQuery,
-  useNewFromFollowedQuery,
   useSavedSearchesQuery,
   useSavedListingsQuery,
   useDeleteSavedSearch,
@@ -83,7 +82,6 @@ export default function MyFeedScreen() {
   const userId = user?.id ?? null;
   const feedQ = useMyFeedListingsQuery(userId);
   const priceDropsQ = usePriceDropsQuery(userId);
-  const followedQ = useNewFromFollowedQuery(userId);
   const savedSearchesQ = useSavedSearchesQuery(userId);
   const savedListingsQ = useSavedListingsQuery(userId);
   const deleteSavedSearchM = useDeleteSavedSearch(userId);
@@ -98,21 +96,18 @@ export default function MyFeedScreen() {
       (r) => !r.rec_reason || r.rec_reason === 'trending',
     );
   const priceDrops = priceDropsQ.data ?? [];
-  const fromFollowed = followedQ.data ?? EMPTY_LISTINGS;
   const savedSearches = savedSearchesQ.data ?? EMPTY_SAVED_SEARCHES;
   const savedListings = savedListingsQ.data ?? EMPTY_LISTINGS;
   const loadingSaved = savedListingsQ.isLoading;
   const refreshing =
     feedQ.isRefetching ||
     priceDropsQ.isRefetching ||
-    followedQ.isRefetching ||
     savedSearchesQ.isRefetching ||
     savedListingsQ.isRefetching;
 
   // Stable refetch fns + isStale snapshots for the focus gate (see discover).
   const { isStale: feedStale, refetch: feedRefetch } = feedQ;
   const { isStale: dropsStale, refetch: dropsRefetch } = priceDropsQ;
-  const { isStale: followedStale, refetch: followedRefetch } = followedQ;
   const { isStale: searchesStale, refetch: searchesRefetch } = savedSearchesQ;
   const { isStale: savedStale, refetch: savedRefetch } = savedListingsQ;
 
@@ -122,13 +117,11 @@ export default function MyFeedScreen() {
     useCallback(() => {
       if (feedStale) feedRefetch();
       if (dropsStale) dropsRefetch();
-      if (followedStale) followedRefetch();
       if (searchesStale) searchesRefetch();
       if (savedStale) savedRefetch();
     }, [
       feedStale, feedRefetch,
       dropsStale, dropsRefetch,
-      followedStale, followedRefetch,
       searchesStale, searchesRefetch,
       savedStale, savedRefetch,
     ]),
@@ -138,11 +131,10 @@ export default function MyFeedScreen() {
     await Promise.all([
       feedRefetch(),
       dropsRefetch(),
-      followedRefetch(),
       searchesRefetch(),
       savedRefetch(),
     ]);
-  }, [feedRefetch, dropsRefetch, followedRefetch, searchesRefetch, savedRefetch]);
+  }, [feedRefetch, dropsRefetch, searchesRefetch, savedRefetch]);
 
   const onDeleteChip = useCallback(
     (search: SavedSearch) => {
@@ -289,6 +281,8 @@ export default function MyFeedScreen() {
           resultCount={isSearching || activeFilterCount > 0 ? filteredListings.length : null}
           filterCount={activeFilterCount}
           onOpenFilter={() => setFilterOpen(true)}
+          savedActive={showingSaved}
+          onToggleSaved={() => setActiveChip(showingSaved ? FOR_YOU : SAVED)}
         />
 
         {showColdStartBanner ? (
@@ -359,24 +353,6 @@ export default function MyFeedScreen() {
             >
               {priceDrops.map((drop) => (
                 <PriceDropCard key={drop.id} listing={drop} width={130} />
-              ))}
-            </ScrollView>
-          </View>
-        ) : null}
-
-        {/* Fresh stock from sellers the user follows. */}
-        {showRails && fromFollowed.length > 0 ? (
-          <View style={{ marginBottom: 14 }}>
-            <RailHeader icon="user-check" title="New from sellers you follow" />
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: HORIZONTAL_PAD, gap: GRID_GAP }}
-            >
-              {fromFollowed.map((listing) => (
-                <View key={listing.id} style={{ width: 160 }}>
-                  <ListingCard listing={listing} />
-                </View>
               ))}
             </ScrollView>
           </View>
@@ -457,6 +433,8 @@ function FeedSearch({
   resultCount,
   filterCount,
   onOpenFilter,
+  savedActive,
+  onToggleSaved,
 }: {
   value: string;
   onChangeText: (t: string) => void;
@@ -466,6 +444,8 @@ function FeedSearch({
   resultCount: number | null;
   filterCount: number;
   onOpenFilter: () => void;
+  savedActive: boolean;
+  onToggleSaved: () => void;
 }) {
   const searching = value.trim().length > 0;
   const hasFilters = filterCount > 0;
@@ -566,6 +546,31 @@ function FeedSearch({
             </View>
           ) : null}
         </Pressable>
+
+        {/* Saved toggle — icon-only, beside the filter button (Polymarket
+            reference). Replaces the old "Saved" text chip. */}
+        <Pressable
+          onPress={onToggleSaved}
+          accessibilityRole="button"
+          accessibilityLabel={savedActive ? 'Showing saved items' : 'Show saved items'}
+          style={({ pressed }) => ({
+            width: 44,
+            height: 44,
+            borderRadius: radii.pill,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderWidth: 1,
+            borderColor: savedActive ? colors.purple : colors.hairline,
+            backgroundColor: savedActive ? colors.purpleSoft : colors.white,
+            transform: [{ scale: pressed ? 0.94 : 1 }],
+          })}
+        >
+          <Feather
+            name="bookmark"
+            size={18}
+            color={savedActive ? colors.purple : colors.ink}
+          />
+        </Pressable>
       </View>
       {searching && resultCount !== null && resultCount > 0 ? (
         <Text
@@ -607,11 +612,6 @@ function ChipRow({
         label="For you"
         active={activeChip === FOR_YOU}
         onPress={() => onSelectChip(FOR_YOU)}
-      />
-      <Chip
-        label="Saved"
-        active={activeChip === SAVED}
-        onPress={() => onSelectChip(SAVED)}
       />
       <AddChip onPress={onAdd} />
       {savedSearches.map((s) => (
