@@ -638,28 +638,29 @@ function Chip({
   onPress: () => void;
   onLongPress?: () => void;
 }) {
-  // Selected state: solid purple fill with white label — Ceranix identity,
-  // replacing the old Instagram-grey selection. Unselected keeps the
-  // hairline border on a white surface.
+  // Same selected-fill / unselected-outline structure as Instagram's
+  // custom-feed tabs, tuned to Carrinex's whisper-border language: the
+  // outline is a soft hairline (not a hard black stroke), and hierarchy
+  // comes from ink vs. muted text + weight rather than a loud border.
   return (
     <Pressable
       onPress={onPress}
       onLongPress={onLongPress}
       delayLongPress={350}
       style={({ pressed }) => ({
-        paddingHorizontal: 20,
-        paddingVertical: 9,
+        paddingHorizontal: 14,
+        paddingVertical: 7,
         borderRadius: radii.pill,
-        borderWidth: 1,
-        borderColor: active ? colors.purple : '#E5E5E5',
-        backgroundColor: active ? colors.purpleSoft : colors.white,
+        borderWidth: active ? 0 : 1,
+        borderColor: colors.hairline,
+        backgroundColor: active ? colors.hairline : 'transparent',
         opacity: pressed ? 0.7 : 1,
       })}
     >
       <Text
         style={{
-          fontSize: 15,
-          fontWeight: '500',
+          fontSize: 13,
+          fontWeight: active ? '700' : '600',
           color: active ? colors.ink : colors.mute,
           letterSpacing: -0.1,
         }}
@@ -678,18 +679,18 @@ function AddChip({ onPress }: { onPress: () => void }) {
       accessibilityRole="button"
       accessibilityLabel="Add a new feed"
       style={({ pressed }) => ({
-        width: 40,
-        height: 40,
+        width: 34,
+        height: 34,
         borderRadius: radii.pill,
         borderWidth: 1,
-        borderColor: '#E5E5E5',
-        backgroundColor: colors.white,
+        borderColor: colors.hairline,
+        backgroundColor: 'transparent',
         alignItems: 'center',
         justifyContent: 'center',
         opacity: pressed ? 0.7 : 1,
       })}
     >
-      <Feather name="plus" size={16} color={colors.ink} />
+      <Feather name="plus" size={14} color={colors.ink} />
     </Pressable>
   );
 }
