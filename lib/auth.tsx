@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -115,38 +116,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Stable identity across profile refetches — refreshProfile only needs the
+  // user id, not the current profile/session objects. Previously this was
+  // defined inline inside the `value` useMemo below, so calling it (which
+  // sets a new `profile` object) changed one of that memo's own deps, which
+  // gave refreshProfile a new identity, which re-triggered any effect keyed
+  // on it (e.g. profile.tsx's useFocusEffect) — an infinite refetch loop.
+  const refreshProfile = useCallback(async () => {
+    if (session?.user?.id) await fetchProfileWithRetry(session.user.id);
+  }, [session?.user?.id]);
+
+  const signOut = useCallback(async () => {
+    // Clear local state first so the UI updates immediately. On web,
+    // supabase.auth.signOut()'s default global scope calls the server's
+    // /logout endpoint, which can hang under Chrome (extensions/SW/CORS)
+    // and leave the spinner stuck even though the session is gone.
+    if (mounted.current) {
+      setSession(null);
+      setProfile(null);
+    }
+    // scope: 'local' wipes the AsyncStorage/localStorage session without
+    // a network round-trip. Race with a short timeout as a final safety
+    // net so the caller's await never blocks the UI.
+    try {
+      await Promise.race([
+        supabase.auth.signOut({ scope: 'local' }),
+        new Promise<void>((resolve) => setTimeout(resolve, 1500)),
+      ]);
+    } catch (e) {
+      console.warn('[auth] signOut error', e);
+    }
+  }, []);
+
   const value = useMemo<AuthState>(
     () => ({
       session,
       user: session?.user ?? null,
       profile,
       loading,
-      refreshProfile: async () => {
-        if (session?.user?.id) await fetchProfileWithRetry(session.user.id);
-      },
-      signOut: async () => {
-        // Clear local state first so the UI updates immediately. On web,
-        // supabase.auth.signOut()'s default global scope calls the server's
-        // /logout endpoint, which can hang under Chrome (extensions/SW/CORS)
-        // and leave the spinner stuck even though the session is gone.
-        if (mounted.current) {
-          setSession(null);
-          setProfile(null);
-        }
-        // scope: 'local' wipes the AsyncStorage/localStorage session without
-        // a network round-trip. Race with a short timeout as a final safety
-        // net so the caller's await never blocks the UI.
-        try {
-          await Promise.race([
-            supabase.auth.signOut({ scope: 'local' }),
-            new Promise<void>((resolve) => setTimeout(resolve, 1500)),
-          ]);
-        } catch (e) {
-          console.warn('[auth] signOut error', e);
-        }
-      },
+      refreshProfile,
+      signOut,
     }),
-    [session, profile, loading],
+    [session, profile, loading, refreshProfile, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -120,6 +120,10 @@ export interface Listing {
   // Seller-defined free-form tags. Stored as text[] in Postgres with a GIN
   // index so discover can do `tags && '{x,y}'` lookups cheaply.
   tags?: string[];
+  // Optional free-text material (e.g. "Faux fur", "Cotton"). Null on legacy rows.
+  material?: string | null;
+  // Optional shipping parcel size, one of 'small' | 'medium' | 'large'. Null on legacy rows.
+  parcel_size?: string | null;
   user_has_liked?: boolean;
   created_at: string;
 }

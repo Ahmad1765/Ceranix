@@ -25,6 +25,7 @@ import { initOnlineManager } from '@/lib/offline';
 import { AuthProvider } from '@/lib/auth';
 import { ToastProvider } from '@/lib/toast';
 import { GuestGateProvider } from '@/components/GuestGate';
+import { SellSheetProvider } from '@/components/sell/SellSheet';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { OfflineBanner } from '@/components/OfflineBanner';
 
@@ -141,6 +142,7 @@ function RootLayout() {
       <AuthProvider>
         <ToastProvider>
         <GuestGateProvider>
+        <SellSheetProvider>
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
@@ -190,6 +192,7 @@ function RootLayout() {
           />
         </Stack>
         <OfflineBanner />
+        </SellSheetProvider>
         </GuestGateProvider>
         </ToastProvider>
       </AuthProvider>

@@ -41,6 +41,7 @@ import {
   type ProfileCompletion,
 } from '@/lib/levels';
 import { BRAND, APP_URL } from '@/lib/brand';
+import { useSellSheet } from '@/components/sell/SellSheet';
 
 type ProfileTab = 'selling' | 'liked' | 'shop' | 'collections';
 
@@ -63,6 +64,7 @@ const EMPTY_SAVE_LISTS: SaveList[] = [];
 function ProfileScreenInner() {
   const { profile, refreshProfile } = useAuth();
   const toast = useToast();
+  const { open: openSellSheet } = useSellSheet();
   const { prompt, element: promptElement } = usePrompt();
   const [activeTab, setActiveTab] = useState<ProfileTab>('selling');
   // null = "All" — flat union of every list. A specific list id narrows
@@ -278,7 +280,7 @@ const handleShareProfile = useCallback(async () => {
     const next = completion.steps.find((s) => !s.done);
     if (!next) return;
     if (next.key === 'first_listing' || next.key === 'three_listings') {
-      router.push('/(tabs)/upload');
+      openSellSheet();
     } else if (next.key === 'verify') {
       router.push('/settings' as any);
     } else {
@@ -571,7 +573,7 @@ const handleShareProfile = useCallback(async () => {
                   cta: {
                     label: 'Post an item',
                     icon: 'plus',
-                    onPress: () => router.push('/(tabs)/upload'),
+                    onPress: () => openSellSheet(),
                   },
                 }}
               />

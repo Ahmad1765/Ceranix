@@ -1,7 +1,10 @@
 import { Tabs } from 'expo-router';
 import { AnimatedTabBar } from '../../components/AnimatedTabBar';
+import { useSellSheet } from '@/components/sell/SellSheet';
 
 export default function TabsLayout() {
+  const { open: openSellSheet } = useSellSheet();
+
   return (
     <Tabs
       tabBar={(props) => <AnimatedTabBar {...props} />}
@@ -13,7 +16,23 @@ export default function TabsLayout() {
       {/* Wardrobe tab hidden 2026-07-04. Route file app/(tabs)/wardrobe.tsx is untouched.
           To restore: swap options back to { title: 'Wardrobe' }. */}
       <Tabs.Screen name="wardrobe" options={{ href: null }} />
-      <Tabs.Screen name="upload" options={{ title: 'Sell' }} />
+      {/* The Sell tab stays a real Tabs.Screen so it keeps its slot/icon in
+          AnimatedTabBar, but tapping it never switches to the flat tab
+          content — it opens the sell form as a Modal on top of whatever
+          screen is active (components/sell/SellSheet.tsx), the same way the
+          product page's "Offer" button opens OfferSheet. The tab's own
+          content (app/(tabs)/upload.tsx) is just a fallback for paths that
+          bypass this listener (deep link, back/forward). */}
+      <Tabs.Screen
+        name="upload"
+        options={{ title: 'Sell' }}
+        listeners={{
+          tabPress: (e) => {
+            e.preventDefault();
+            openSellSheet();
+          },
+        }}
+      />
       <Tabs.Screen name="chat" options={{ href: null }} />
       <Tabs.Screen name="profile" options={{ title: 'My profile' }} />
     </Tabs>

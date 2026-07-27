@@ -54,6 +54,19 @@ export function priceText(page: Page) {
   return page.locator(`text=/${PRICE_PATTERN}/`);
 }
 
+// The sell form is a Modal (components/sell/SellSheet.tsx), not a route — it
+// opens over whatever screen is active rather than navigating to a URL, the
+// same way the product page's "Offer" button opens OfferSheet. So specs that
+// need it can't `page.goto('/sell')`; they have to land somewhere with the
+// tab bar and tap the Sell tab, exactly like a real user would.
+export async function openSellSheet(page: Page) {
+  await page.goto('/');
+  await waitForAppReady(page);
+  const sellTab = page.locator('[aria-label="Sell"]');
+  await sellTab.waitFor({ state: 'visible', timeout: 15_000 });
+  await sellTab.click();
+}
+
 // Discover's search box placeholder changes per tab: "Search items, brands,
 // sellers" / "Search aesthetics" / "Search brands" / "Search people".
 //
