@@ -98,7 +98,7 @@ test.describe('Upload listing (signed in)', () => {
     await expect(page.getByText('Sell an item')).toHaveCount(0);
     // The Home screen underneath is still there — the tab bar never actually
     // switched to Sell, so we land right back on it.
-    await expect(page.getByText('What are you looking for today?')).toBeVisible();
+    await expect(page.getByPlaceholder('Search your feed')).toBeVisible();
   });
 
   test('Category row opens a picker sheet and writes the chosen value back to the row', async ({ page }) => {

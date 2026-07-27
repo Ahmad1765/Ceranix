@@ -10,20 +10,18 @@ test.describe('Tab navigation', () => {
     await waitForAppReady(page);
   });
 
+  // Home now renders what used to live at /feed (the personalized feed) —
+  // the old search-header Home screen was removed and this became "/".
   test('Home is the default route', async ({ page }) => {
-    await expect(page.getByText('What are you looking for today?')).toBeVisible();
+    await expect(page.getByPlaceholder('Search your feed')).toBeVisible();
   });
 
-  // /feed used to be a static promo screen headlined "Cheaper than new," —
-  // that copy no longer exists anywhere in the app; the route is now the
-  // personalized feed. Assert the URL (the thing this spec is actually about)
-  // plus the screen heading, rather than marketing copy that turns over.
-  test('My Feed tab routes to the personalized feed', async ({ page }) => {
-    await page.getByText('My Feed', { exact: true }).first().click();
-    await page.waitForURL(/\/feed/);
-    // "My Feed" is both the tab label and the screen heading — .first() to
-    // stay out of strict mode.
-    await expect(page.getByText('My Feed', { exact: true }).first()).toBeVisible();
+  test('Chat tab routes to the inbox', async ({ page }) => {
+    await page.getByText('Chat', { exact: true }).click();
+    await page.waitForURL(/\/chat/);
+    await expect(
+      page.getByText(/Inbox|Sign in to chat|It's quiet here/).first(),
+    ).toBeVisible();
   });
 
   test('Discover tab routes to the search screen', async ({ page }) => {

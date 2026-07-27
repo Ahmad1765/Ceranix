@@ -36,10 +36,10 @@ const ICONS: Record<
   { outline: keyof typeof Ionicons.glyphMap; filled: keyof typeof Ionicons.glyphMap }
 > = {
   index: { outline: 'home-outline', filled: 'home' },
-  feed: { outline: 'grid-outline', filled: 'grid' },
   discover: { outline: 'search-outline', filled: 'search' },
   wardrobe: { outline: 'shirt-outline', filled: 'shirt' },
   upload: { outline: 'add-circle-outline', filled: 'add-circle' },
+  chat: { outline: 'chatbubble-outline', filled: 'chatbubble' },
   profile: { outline: 'person-outline', filled: 'person' },
 };
 

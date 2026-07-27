@@ -1,22 +1,19 @@
-// My Feed structural checks. We run against the real Supabase backend in
-// the unsigned-in state, so we only assert what every visitor sees:
-// the title, subtitle, cold-start banner, the "For you" chip, and the
-// fallback grid that always renders when there are no personal signals.
+// Home (the former "My Feed" screen — it took over "/" when the old search-
+// header Home was removed) structural checks. We run against the real
+// Supabase backend in the unsigned-in state, so we only assert what every
+// visitor sees: the search field, cold-start banner, the "For you" chip, and
+// the fallback grid that always renders when there are no personal signals.
 
 import { test, expect, waitForAppReady, priceText } from './helpers/page';
 
-test.describe('My Feed (personalized)', () => {
+test.describe('Home (personalized feed)', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/feed');
+    await page.goto('/');
     await waitForAppReady(page);
   });
 
-  test('renders title and subtitle', async ({ page }) => {
-    // "My Feed" appears twice — the screen heading and the tab-bar button —
-    // so an unqualified getByText is a strict-mode violation. Anchor on the
-    // heading via the subtitle it sits with.
-    await expect(page.getByText('My Feed', { exact: true }).first()).toBeVisible();
-    await expect(page.getByText('Curated from what you like')).toBeVisible();
+  test('renders the feed search field', async ({ page }) => {
+    await expect(page.getByPlaceholder('Search your feed')).toBeVisible();
   });
 
   test('signed-out viewer sees the sign-in prompt banner', async ({ page }) => {

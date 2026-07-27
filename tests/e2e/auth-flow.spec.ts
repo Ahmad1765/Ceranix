@@ -29,10 +29,10 @@ test.describe("Auth modal", () => {
   }) => {
     await page.getByText("Continue as guest").click();
     await page.waitForURL((u) => !u.pathname.includes("/auth/login"));
-    // Some path under the tab navigator — the home search header is unique
-    // enough to identify it.
+    // Some path under the tab navigator — the home feed's search field is
+    // unique enough to identify it.
     await expect(
-      page.getByText("What are you looking for today?"),
+      page.getByPlaceholder("Search your feed"),
     ).toBeVisible();
   });
 

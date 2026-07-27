@@ -34,8 +34,8 @@ setup('authenticate user', async ({ page }) => {
   await page.getByText('Sign in', { exact: true }).last().click();
 
   // Successful sign-in dismisses the modal back to the tabs. The home
-  // search header is the unique signal that we're past the auth flow.
-  await expect(page.getByText('What are you looking for today?')).toBeVisible({
+  // feed's search field is the unique signal that we're past the auth flow.
+  await expect(page.getByPlaceholder('Search your feed')).toBeVisible({
     timeout: 30_000,
   });
 

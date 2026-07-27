@@ -11,7 +11,6 @@ export default function TabsLayout() {
       screenOptions={{ headerShown: false }}
     >
       <Tabs.Screen name="index" options={{ title: 'Home' }} />
-      <Tabs.Screen name="feed" options={{ title: 'My Feed' }} />
       <Tabs.Screen name="discover" options={{ title: 'Discover' }} />
       {/* Wardrobe tab hidden 2026-07-04. Route file app/(tabs)/wardrobe.tsx is untouched.
           To restore: swap options back to { title: 'Wardrobe' }. */}
@@ -33,7 +32,7 @@ export default function TabsLayout() {
           },
         }}
       />
-      <Tabs.Screen name="chat" options={{ href: null }} />
+      <Tabs.Screen name="chat" options={{ title: 'Chat' }} />
       <Tabs.Screen name="profile" options={{ title: 'My profile' }} />
     </Tabs>
   );

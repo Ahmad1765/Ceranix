@@ -58,7 +58,7 @@ test.describe('Boundary data', () => {
     });
     await page.goto('/');
     await waitForAppReady(page);
-    await expect(page.getByText('What are you looking for today?')).toBeVisible();
+    await expect(page.getByPlaceholder('Search your feed')).toBeVisible();
     // No prices because the array is empty.
     await expect(priceText(page)).toHaveCount(0);
     // No global error.
@@ -87,7 +87,7 @@ test.describe('Boundary data', () => {
     });
     await page.goto('/');
     await waitForAppReady(page);
-    await expect(page.getByText('What are you looking for today?')).toBeVisible();
+    await expect(page.getByPlaceholder('Search your feed')).toBeVisible();
     // No horizontal overflow even with a 9-digit price string in a card.
     const overflow = await page.evaluate(() => {
       const d = document.documentElement;
@@ -112,7 +112,7 @@ test.describe('Boundary data', () => {
     });
     await page.goto('/');
     await waitForAppReady(page);
-    await expect(page.getByText('What are you looking for today?')).toBeVisible();
+    await expect(page.getByPlaceholder('Search your feed')).toBeVisible();
     const overflow = await page.evaluate(() => {
       const d = document.documentElement;
       return d.scrollWidth - d.clientWidth;

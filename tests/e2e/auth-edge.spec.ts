@@ -68,7 +68,7 @@ test.describe('Auth edges', () => {
     await page.goto('/');
     await waitForAppReady(page);
     // The home shell still rendered.
-    await expect(page.getByText('What are you looking for today?')).toBeVisible();
+    await expect(page.getByPlaceholder('Search your feed')).toBeVisible();
     // And no error overlay was raised.
     await expect(page.getByText(/Something went wrong|Unhandled error/i)).toHaveCount(0);
   });

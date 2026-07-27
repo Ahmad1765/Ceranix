@@ -52,7 +52,7 @@ test.describe('Network failures', () => {
     // Give the query layer ~3s to settle into its error/empty state.
     await page.waitForTimeout(3000);
     // The home shell is still rendered (we never showed a global error).
-    await expect(page.getByText('What are you looking for today?')).toBeVisible();
+    await expect(page.getByPlaceholder('Search your feed')).toBeVisible();
     // And no listing prices snuck in despite the 500 — proves the stub took.
     await expect(priceText(page)).toHaveCount(0);
   });
@@ -93,7 +93,7 @@ test.describe('Network failures', () => {
     await page.goto('/');
     await waitForAppReady(page);
     // Header should be visible well before the 3s delay finishes.
-    await expect(page.getByText('What are you looking for today?')).toBeVisible({
+    await expect(page.getByPlaceholder('Search your feed')).toBeVisible({
       timeout: 2500,
     });
     const elapsed = Date.now() - start;
@@ -117,7 +117,8 @@ test.describe('Network failures', () => {
     // tabs and coming back. If the query layer has a stale-while-error policy
     // this should produce live data.
     await page.unroute(REST_RE);
-    await page.getByText('Popular', { exact: true }).click();
+    await page.getByText('Discover', { exact: true }).click();
+    await page.getByText('Home', { exact: true }).click();
     await page.waitForTimeout(2500);
     // We accept either: real listings now visible, OR the empty state still
     // showing (the suite may run against a low-volume staging DB). What we

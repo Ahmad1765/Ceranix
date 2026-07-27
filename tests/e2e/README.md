@@ -32,7 +32,6 @@ tests/e2e/
 │   └── page.ts                   # Custom test() fixture: fresh state + waitForAppReady
 ├── signed-in/
 │   ├── chat-inbox.spec.ts        # Signed-out empty, list, All/Buying/Selling filters
-│   ├── following-feed.spec.ts
 │   ├── owner-actions.spec.ts
 │   ├── profile-edit.spec.ts      # Username validation, debounce, save PATCH, onboarding
 │   ├── profile-tab.spec.ts       # Own profile tabs, stats, edit CTA
@@ -45,8 +44,7 @@ tests/e2e/
 ├── auth.setup.ts
 ├── boundary-data.spec.ts
 ├── discover.spec.ts              # Search + category filters + clear
-├── feed-personalized.spec.ts
-├── home-feed.spec.ts             # For you / Popular / Following, empty state, navigation
+├── feed-personalized.spec.ts     # Home (personalized feed took over "/"): search field, cold-start banner, fallback grid
 ├── invoice-detail.spec.ts        # Pending / paid status, Pay → /payment redirect
 ├── network-failure.spec.ts
 ├── news-activity.spec.ts         # Following / For you / Saved empty states

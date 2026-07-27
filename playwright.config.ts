@@ -90,13 +90,13 @@ export default defineConfig({
       name: 'chromium-mobile',
       use: { ...devices['Pixel 7'], channel: 'chromium' },
       // Mobile-specific smoke run — the responsive layout switches columns.
-      testMatch: /(tab-navigation|home-feed|discover|product-detail|responsive)\.spec\.ts$/,
+      testMatch: /(tab-navigation|discover|product-detail|responsive)\.spec\.ts$/,
     },
     // Small phone — catches narrow-column overflow on iPhone SE / older Androids.
     {
       name: 'chromium-iphone-se',
       use: { ...devices['iPhone SE'], channel: 'chromium' },
-      testMatch: /(tab-navigation|home-feed|responsive)\.spec\.ts$/,
+      testMatch: /(tab-navigation|responsive)\.spec\.ts$/,
     },
     // Tablet — landscape iPad-ish viewport. Layout shifts to 3+ columns here.
     {
@@ -106,7 +106,7 @@ export default defineConfig({
         viewport: { width: 1024, height: 1366 },
         channel: 'chromium',
       },
-      testMatch: /(tab-navigation|home-feed|discover|product-detail|responsive)\.spec\.ts$/,
+      testMatch: /(tab-navigation|discover|product-detail|responsive)\.spec\.ts$/,
     },
     // Wide desktop / ultrawide — catches max-width clamps and stretched layouts.
     {
@@ -116,7 +116,7 @@ export default defineConfig({
         viewport: { width: 1920, height: 1080 },
         channel: 'chromium',
       },
-      testMatch: /(tab-navigation|home-feed|discover|product-detail|responsive)\.spec\.ts$/,
+      testMatch: /(tab-navigation|discover|product-detail|responsive)\.spec\.ts$/,
     },
   ],
 
