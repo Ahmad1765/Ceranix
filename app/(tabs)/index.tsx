@@ -20,6 +20,7 @@ import {
 import { useWebPullToRefresh, WebPullIndicator } from '@/components/WebRefresh';
 import {
   useMyFeedListingsQuery,
+  useFeedListingsQuery,
   usePriceDropsQuery,
   useSavedSearchesQuery,
   useSavedListingsQuery,
@@ -32,6 +33,7 @@ import type { Category, Listing } from '@/types';
 const HORIZONTAL_PAD = 12;
 const GRID_GAP = 8;
 const FOR_YOU: 'for-you' = 'for-you';
+const TRENDING: 'trending' = 'trending';
 const SAVED: 'saved' = 'saved';
 
 // Mirrors the CHECK constraint on listings.category in setup.sql. Saved
@@ -81,6 +83,9 @@ export default function HomeScreen() {
   // gate; each query now caches and revalidates independently.
   const userId = user?.id ?? null;
   const feedQ = useMyFeedListingsQuery(userId);
+  // Trending chip — likes-sorted, same source Discover's "popular" sort uses.
+  // Not gated on the chip being active so switching to it is instant.
+  const trendingQ = useFeedListingsQuery({ tab: 'popular', limit: 60 });
   const priceDropsQ = usePriceDropsQuery(userId);
   const savedSearchesQ = useSavedSearchesQuery(userId);
   const savedListingsQ = useSavedListingsQuery(userId);
@@ -95,32 +100,38 @@ export default function HomeScreen() {
     (listings as RecommendedListing[]).every(
       (r) => !r.rec_reason || r.rec_reason === 'trending',
     );
+  const trendingListings = trendingQ.data ?? EMPTY_LISTINGS;
+  const trendingLoading = trendingQ.isLoading;
   const priceDrops = priceDropsQ.data ?? [];
   const savedSearches = savedSearchesQ.data ?? EMPTY_SAVED_SEARCHES;
   const savedListings = savedListingsQ.data ?? EMPTY_LISTINGS;
   const loadingSaved = savedListingsQ.isLoading;
   const refreshing =
     feedQ.isRefetching ||
+    trendingQ.isRefetching ||
     priceDropsQ.isRefetching ||
     savedSearchesQ.isRefetching ||
     savedListingsQ.isRefetching;
 
   // Stable refetch fns + isStale snapshots for the focus gate (see discover).
   const { isStale: feedStale, refetch: feedRefetch } = feedQ;
+  const { isStale: trendingStale, refetch: trendingRefetch } = trendingQ;
   const { isStale: dropsStale, refetch: dropsRefetch } = priceDropsQ;
   const { isStale: searchesStale, refetch: searchesRefetch } = savedSearchesQ;
   const { isStale: savedStale, refetch: savedRefetch } = savedListingsQ;
 
   // Revalidate stale queries on focus — reuses fresh data so returning to this
-  // 4-fetch tab doesn't re-hit the network every time.
+  // 5-fetch tab doesn't re-hit the network every time.
   useFocusEffect(
     useCallback(() => {
       if (feedStale) feedRefetch();
+      if (trendingStale) trendingRefetch();
       if (dropsStale) dropsRefetch();
       if (searchesStale) searchesRefetch();
       if (savedStale) savedRefetch();
     }, [
       feedStale, feedRefetch,
+      trendingStale, trendingRefetch,
       dropsStale, dropsRefetch,
       searchesStale, searchesRefetch,
       savedStale, savedRefetch,
@@ -130,11 +141,12 @@ export default function HomeScreen() {
   const onRefresh = useCallback(async () => {
     await Promise.all([
       feedRefetch(),
+      trendingRefetch(),
       dropsRefetch(),
       searchesRefetch(),
       savedRefetch(),
     ]);
-  }, [feedRefetch, dropsRefetch, searchesRefetch, savedRefetch]);
+  }, [feedRefetch, trendingRefetch, dropsRefetch, searchesRefetch, savedRefetch]);
 
   const onDeleteChip = useCallback(
     (search: SavedSearch) => {
@@ -172,13 +184,16 @@ export default function HomeScreen() {
   );
 
   const showingSaved = activeChip === SAVED;
+  const showingTrending = activeChip === TRENDING;
 
   // Client-side filter when a saved search chip is selected. Mirrors the
   // discover screen's filter logic so the chip's params actually narrow the
   // grid in-place rather than navigating away. When the "Saved" chip is
-  // active we swap the dataset entirely to the user's bookmarks.
+  // active we swap the dataset entirely to the user's bookmarks; "Trending"
+  // swaps it to the likes-sorted grid.
   const visibleListings = useMemo(() => {
     if (showingSaved) return savedListings;
+    if (showingTrending) return trendingListings;
     if (!activeSavedSearch) return listings;
     let rows = listings;
     if (isValidCategory(activeSavedSearch.category)) {
@@ -194,7 +209,7 @@ export default function HomeScreen() {
       );
     }
     return rows;
-  }, [listings, savedListings, activeSavedSearch, showingSaved]);
+  }, [listings, savedListings, trendingListings, showingTrending, activeSavedSearch, showingSaved]);
 
   // Instant local filter layered on top of the active view. Matches title and
   // brand, the two fields a shopper scans for.
@@ -252,7 +267,9 @@ export default function HomeScreen() {
       ? 'No items match these filters. Try loosening them.'
       : showingSaved
         ? 'No saved items yet. Tap the bookmark on any listing to save it.'
-        : 'Nothing matches this feed yet.';
+        : showingTrending
+          ? 'Nothing trending right now.'
+          : 'Nothing matches this feed yet.';
 
   // Web pull-to-refresh — RefreshControl is inert on react-native-web.
   const { scrollRef, pull, nodeTop, threshold, contentStyle } = useWebPullToRefresh({ refreshing, onRefresh });
@@ -325,7 +342,7 @@ export default function HomeScreen() {
           </Pressable>
         ) : null}
 
-        {/* Chip row: For you + Saved + saved searches + add */}
+        {/* Chip row: For you + Trending + Saved + saved searches + add */}
         <ChipRow
           savedSearches={savedSearches}
           activeChip={activeChip}
@@ -360,7 +377,7 @@ export default function HomeScreen() {
 
         <Grid
           rows={filteredListings}
-          loading={showingSaved ? loadingSaved : loading}
+          loading={showingSaved ? loadingSaved : showingTrending ? trendingLoading : loading}
           columns={columns}
           cardWidth={cardWidth}
           emptyText={gridEmptyText}
@@ -612,6 +629,11 @@ function ChipRow({
         label="For you"
         active={activeChip === FOR_YOU}
         onPress={() => onSelectChip(FOR_YOU)}
+      />
+      <Chip
+        label="Trending"
+        active={activeChip === TRENDING}
+        onPress={() => onSelectChip(TRENDING)}
       />
       <AddChip onPress={onAdd} />
       {savedSearches.map((s) => (

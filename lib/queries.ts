@@ -207,13 +207,16 @@ export function useListingsInListQuery(listId: string | null) {
 }
 
 // My Feed primary grid: personalized recommendations for a signed-in user,
-// trending as the anonymous fallback. Returns RecommendedListing[] for users
-// (carries rec_reason, used to detect the cold-start "fallback" state).
+// newest-first as the anonymous fallback. Returns RecommendedListing[] for
+// users (carries rec_reason, used to detect the cold-start "fallback" state).
+// Newest (not 'popular') so the fallback stays visibly distinct from the
+// Trending chip, which is explicitly likes-sorted — otherwise the two views
+// are byte-identical for a signed-out visitor.
 export function useMyFeedListingsQuery(userId: string | null) {
   return useQuery({
     queryKey: qk.myFeedListings(userId),
     queryFn: () =>
-      userId ? fetchRecommendations(48) : fetchListings({ tab: 'popular', limit: 60 }),
+      userId ? fetchRecommendations(48) : fetchListings({ tab: 'for_you', limit: 60 }),
   });
 }
 
