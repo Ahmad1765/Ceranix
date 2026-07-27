@@ -259,27 +259,6 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
-      {/* Top-right chat entry point — the only non-tab way into the inbox,
-          so it stays pinned above the scroll rather than living inside it. */}
-      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 16, paddingTop: 8 }}>
-        <Pressable
-          onPress={() => router.push('/(tabs)/chat' as any)}
-          accessibilityRole="button"
-          accessibilityLabel="Open chats"
-          style={{
-            width: 42,
-            height: 42,
-            borderRadius: 21,
-            borderWidth: 1,
-            borderColor: colors.hairline,
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: colors.white,
-          }}
-        >
-          <Feather name="message-circle" size={18} color={colors.ink} />
-        </Pressable>
-      </View>
       <ScrollView
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
