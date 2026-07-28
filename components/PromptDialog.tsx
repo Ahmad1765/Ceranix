@@ -44,7 +44,7 @@ export function usePrompt() {
             { text: opts.cancelLabel ?? 'Cancel', style: 'cancel', onPress: () => resolve(null) },
             {
               text: opts.submitLabel ?? 'OK',
-              onPress: (value) => resolve((value ?? '').trim() || null),
+              onPress: (value?: string) => resolve((value ?? '').trim() || null),
             },
           ],
           'plain-text',

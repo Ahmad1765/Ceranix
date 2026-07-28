@@ -16,13 +16,7 @@
 //
 // Native (iOS / Android) is left untouched.
 
-import { Alert, Platform } from 'react-native';
-
-type AlertButton = {
-  text?: string;
-  onPress?: (value?: string) => void;
-  style?: 'default' | 'cancel' | 'destructive';
-};
+import { Alert, Platform, type AlertButton } from 'react-native';
 
 let installed = false;
 

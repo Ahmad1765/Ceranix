@@ -166,7 +166,6 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
                 recyclingKey={`${listing.id}-${i}`}
                 transition={200}
                 priority={i === 0 ? 'high' : 'normal'}
-                sharedTransitionTag={i === 0 ? `product-image-${listing.id}` : undefined}
               />
             ))}
           </ScrollView>
@@ -179,7 +178,6 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
             recyclingKey={listing.id}
             transition={280}
             priority="high"
-            sharedTransitionTag={`product-image-${listing.id}`}
           />
         )}
 

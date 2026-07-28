@@ -571,8 +571,6 @@ export default function ProductScreen() {
     ]);
   };
 
-  const sharedTagId = productIdParam ?? listing?.id ?? '';
-
   // Vertical scroll-driven parallax + sticky-header toggle
   const scrollY = useSharedValue(0);
   const scrollHandler = useAnimatedScrollHandler({
@@ -785,7 +783,6 @@ export default function ProductScreen() {
                     recyclingKey={uri}
                     transition={0}
                     priority={i === 0 ? 'high' : 'normal'}
-                    sharedTransitionTag={i === 0 ? `product-image-${sharedTagId}` : undefined}
                   />
                 </Pressable>
               ))}

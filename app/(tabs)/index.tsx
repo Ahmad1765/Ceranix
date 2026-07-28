@@ -649,6 +649,7 @@ function ChipRow({
     >
       <Chip
         label="For you"
+        icon="zap"
         active={activeChip === FOR_YOU}
         onPress={() => onSelectChip(FOR_YOU)}
       />
