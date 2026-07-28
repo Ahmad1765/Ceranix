@@ -128,20 +128,25 @@ export default function HomeScreen() {
   const { isStale: savedStale, refetch: savedRefetch } = savedListingsQ;
 
   // Revalidate stale queries on focus — reuses fresh data so returning to this
-  // 5-fetch tab doesn't re-hit the network every time.
+  // 5-fetch tab doesn't re-hit the network every time. The three user-scoped
+  // queries (drops/searches/saved) are gated on userId here too — refetch()
+  // ignores each query's own `enabled: !!userId`, so calling it unconditionally
+  // sends a null userId straight to Postgres and Supabase stringifies it into
+  // the literal text "null", which fails a uuid-column comparison every time.
   useFocusEffect(
     useCallback(() => {
       if (feedStale) feedRefetch();
       if (trendingStale) trendingRefetch();
-      if (dropsStale) dropsRefetch();
-      if (searchesStale) searchesRefetch();
-      if (savedStale) savedRefetch();
+      if (userId && dropsStale) dropsRefetch();
+      if (userId && searchesStale) searchesRefetch();
+      if (userId && savedStale) savedRefetch();
     }, [
       feedStale, feedRefetch,
       trendingStale, trendingRefetch,
       dropsStale, dropsRefetch,
       searchesStale, searchesRefetch,
       savedStale, savedRefetch,
+      userId,
     ]),
   );
 
@@ -149,11 +154,9 @@ export default function HomeScreen() {
     await Promise.all([
       feedRefetch(),
       trendingRefetch(),
-      dropsRefetch(),
-      searchesRefetch(),
-      savedRefetch(),
+      ...(userId ? [dropsRefetch(), searchesRefetch(), savedRefetch()] : []),
     ]);
-  }, [feedRefetch, trendingRefetch, dropsRefetch, searchesRefetch, savedRefetch]);
+  }, [feedRefetch, trendingRefetch, dropsRefetch, searchesRefetch, savedRefetch, userId]);
 
   const onDeleteChip = useCallback(
     (search: SavedSearch) => {

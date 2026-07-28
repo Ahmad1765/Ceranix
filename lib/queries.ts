@@ -388,7 +388,11 @@ export function useUserListingsQuery(userId: string) {
 export function useFollowStateQuery(viewerId: string | null, targetId: string) {
   return useQuery({
     queryKey: qk.followState(viewerId, targetId),
-    enabled: !!targetId,
+    // get_follow_state requires an authenticated caller (public execute was
+    // revoked — see supabase/migrations/20260611223243_revoke_public_execute_on_rpcs.sql).
+    // Signed-out visitors can't be "following" anyone anyway, so skip the call
+    // rather than let it 403 every time.
+    enabled: !!viewerId && !!targetId,
     // Seed from the last-known-good module cache so the Follow button renders
     // correctly on first paint instead of flashing the default state.
     initialData: () => getCachedFollowState(viewerId, targetId) ?? undefined,

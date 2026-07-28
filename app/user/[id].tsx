@@ -61,8 +61,10 @@ export default function UserProfileScreen() {
   // Pull-to-refresh spinner: a refetch while data is already on screen.
   const refreshing = profileQ.isRefetching || listingsQ.isRefetching;
   const followed = followQ.data?.isFollowing ?? false;
-  const followersCount = followQ.data?.followersCount ?? 0;
-  const followingCount = followQ.data?.followingCount ?? 0;
+  // followQ only runs for a signed-in viewer (get_follow_state requires auth).
+  // Signed-out visitors still see real counts via the public profile row.
+  const followersCount = followQ.data?.followersCount ?? profile?.followers_count ?? 0;
+  const followingCount = followQ.data?.followingCount ?? profile?.following_count ?? 0;
   const followBusy = toggleFollowM.isPending;
 
   const handleFollowToggle = () => {
@@ -114,10 +116,12 @@ export default function UserProfileScreen() {
 
   const onRefresh = () => {
     if (!userId) return;
-    // Force all three reads to revalidate, bypassing staleTime.
+    // Force all reads to revalidate, bypassing staleTime. followQ.refetch()
+    // ignores its own `enabled` gate, so only call it for a signed-in viewer —
+    // otherwise it 403s against get_follow_state on every pull-to-refresh.
     profileQ.refetch();
     listingsQ.refetch();
-    followQ.refetch();
+    if (authUser?.id) followQ.refetch();
   };
 
   if (loading) {
