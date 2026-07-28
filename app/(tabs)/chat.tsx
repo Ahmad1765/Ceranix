@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/lib/auth';
 import {
   subscribeToInbox,
@@ -13,9 +14,9 @@ import {
 } from '@/lib/chat';
 import { useInboxQuery } from '@/lib/queries';
 import { getOptimizedImageUrl } from '@/lib/images';
-import { colors } from '@/lib/theme';
+import { colors, radii, shadow } from '@/lib/theme';
 import { EmptyState } from '@/components/ui';
-import { HIT_SLOP_8 } from '@/lib/responsive';
+import { HIT_SLOP_8, useTabBarClearance } from '@/lib/responsive';
 
 type InboxTab = 'selling' | 'buying' | 'social' | 'support';
 
@@ -32,6 +33,12 @@ const INBOX_TABS: { value: InboxTab; label: string }[] = [
 const TAB_COUNT = INBOX_TABS.length;
 // Width ratio of the underline indicator relative to its tab cell.
 const UNDERLINE_WIDTH_RATIO = 0.42;
+
+// Light tap on every interactive control on this screen. No-op on web, where
+// the Haptics API has nothing to drive.
+function haptic() {
+  if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+}
 
 function formatRelativeTime(iso: string): string {
   const d = new Date(iso);
@@ -334,48 +341,101 @@ function ConversationPage({
   );
 }
 
+// Floating card, not a full-width bar — sits above the tab dock (which is
+// absolutely positioned and reserves no layout space of its own) with the
+// same breathing room the dock keeps off the screen edges, so it reads as
+// part of the same floating-surface language instead of a stray strip
+// peeking out from behind it.
 function PushNotificationBanner({ onDismiss }: { onDismiss: () => void }) {
+  const bottom = useTabBarClearance();
   return (
     <View
       style={{
-        backgroundColor: 'rgba(15,15,15,0.72)',
-        paddingVertical: 14,
-        paddingHorizontal: 16,
+        position: 'absolute',
+        left: 16,
+        right: 16,
+        bottom,
+        backgroundColor: colors.white,
+        borderRadius: radii['2xl'],
+        borderWidth: 1,
+        borderColor: colors.hairline,
+        padding: 12,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 10,
+        ...shadow.lg,
       }}
     >
-      <Feather name="bell-off" size={18} color={colors.white} />
-      <View style={{ flex: 1, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline' }}>
-        <Text style={{ color: colors.white, fontSize: 13, fontWeight: '400' }}>
-          Never miss a message{' '}
-        </Text>
-        <Text style={{ color: colors.white, fontSize: 13, fontWeight: '800' }}>
-          Activate push notifications{' '}
-        </Text>
-        <Pressable
-          hitSlop={HIT_SLOP_8}
-          onPress={() => router.push('/profile/notifications' as any)}
-        >
-          <Text
-            style={{
-              color: colors.white,
-              fontSize: 13,
-              fontWeight: '700',
-              textDecorationLine: 'underline',
-            }}
-          >
-            now
-          </Text>
-        </Pressable>
+      <View
+        style={{
+          width: 38,
+          height: 38,
+          borderRadius: 19,
+          backgroundColor: colors.purpleSoft,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Feather name="bell" size={17} color={colors.purple} />
       </View>
+
+      <View style={{ flex: 1 }}>
+        <Text
+          style={{ fontSize: 13, fontWeight: '700', color: colors.ink, letterSpacing: -0.1 }}
+          numberOfLines={1}
+        >
+          Turn on notifications
+        </Text>
+        <Text
+          style={{ fontSize: 11.5, color: colors.mute, marginTop: 1 }}
+          numberOfLines={1}
+        >
+          Never miss a new message or offer
+        </Text>
+      </View>
+
       <Pressable
         hitSlop={HIT_SLOP_8}
-        onPress={onDismiss}
-        style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+        onPress={() => {
+          haptic();
+          router.push('/profile/notifications' as any);
+        }}
+        style={({ pressed }) => ({
+          paddingHorizontal: 13,
+          paddingVertical: 8,
+          borderRadius: radii.pill,
+          backgroundColor: colors.purple,
+          opacity: pressed ? 0.85 : 1,
+        })}
       >
-        <Feather name="x" size={16} color={colors.white} />
+        <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.white }}>Enable</Text>
+      </Pressable>
+
+      <Pressable
+        hitSlop={HIT_SLOP_8}
+        accessibilityRole="button"
+        accessibilityLabel="Dismiss"
+        onPress={() => {
+          haptic();
+          onDismiss();
+        }}
+        style={({ pressed }) => ({
+          position: 'absolute',
+          top: -7,
+          right: -7,
+          width: 22,
+          height: 22,
+          borderRadius: 11,
+          backgroundColor: colors.white,
+          borderWidth: 1,
+          borderColor: colors.hairline,
+          alignItems: 'center',
+          justifyContent: 'center',
+          opacity: pressed ? 0.7 : 1,
+          ...shadow.sm,
+        })}
+      >
+        <Feather name="x" size={12} color={colors.mute} />
       </Pressable>
     </View>
   );

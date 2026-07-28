@@ -1,8 +1,9 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, View, Pressable, ScrollView, RefreshControl } from 'react-native';
+import { Alert, View, Pressable, ScrollView, RefreshControl, Platform } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { router, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/lib/auth';
 import { colors, radii } from '@/lib/theme';
@@ -45,6 +46,12 @@ const VALID_CATEGORIES: ReadonlySet<Category> = new Set<Category>([
 ]);
 function isValidCategory(v: unknown): v is Category {
   return typeof v === 'string' && VALID_CATEGORIES.has(v as Category);
+}
+
+// Light tap on every interactive control on this screen. No-op on web, where
+// the Haptics API has nothing to drive.
+function haptic() {
+  if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 }
 
 // Stable empty references so query fallbacks don't churn the useMemos below.
@@ -304,7 +311,10 @@ export default function HomeScreen() {
 
         {showColdStartBanner ? (
           <Pressable
-            onPress={() => router.push('/auth/login')}
+            onPress={() => {
+              haptic();
+              router.push('/auth/login');
+            }}
             style={{
               marginHorizontal: 16,
               marginTop: 14,
@@ -324,7 +334,10 @@ export default function HomeScreen() {
 
         {showFollowCta ? (
           <Pressable
-            onPress={() => router.push('/(tabs)/discover')}
+            onPress={() => {
+              haptic();
+              router.push('/(tabs)/discover');
+            }}
             style={{
               marginHorizontal: 16,
               marginTop: 14,
@@ -511,7 +524,10 @@ function FeedSearch({
           {searching ? (
             <Pressable
               hitSlop={HIT_SLOP_8}
-              onPress={() => onChangeText('')}
+              onPress={() => {
+                haptic();
+                onChangeText('');
+              }}
               accessibilityRole="button"
               accessibilityLabel="Clear search"
             >
@@ -522,7 +538,10 @@ function FeedSearch({
 
         {/* Filter button — a count badge appears once constraints are applied. */}
         <Pressable
-          onPress={onOpenFilter}
+          onPress={() => {
+            haptic();
+            onOpenFilter();
+          }}
           accessibilityRole="button"
           accessibilityLabel={
             hasFilters ? `Filters, ${filterCount} active` : 'Open filters'
@@ -567,7 +586,10 @@ function FeedSearch({
         {/* Saved toggle — icon-only, beside the filter button (Polymarket
             reference). Replaces the old "Saved" text chip. */}
         <Pressable
-          onPress={onToggleSaved}
+          onPress={() => {
+            haptic();
+            onToggleSaved();
+          }}
           accessibilityRole="button"
           accessibilityLabel={savedActive ? 'Showing saved items' : 'Show saved items'}
           style={({ pressed }) => ({
@@ -632,6 +654,7 @@ function ChipRow({
       />
       <Chip
         label="Trending"
+        icon="trending-up"
         active={activeChip === TRENDING}
         onPress={() => onSelectChip(TRENDING)}
       />
@@ -651,11 +674,13 @@ function ChipRow({
 
 function Chip({
   label,
+  icon,
   active,
   onPress,
   onLongPress,
 }: {
   label: string;
+  icon?: keyof typeof Feather.glyphMap;
   active: boolean;
   onPress: () => void;
   onLongPress?: () => void;
@@ -663,13 +688,28 @@ function Chip({
   // Same selected-fill / unselected-outline structure as Instagram's
   // custom-feed tabs, tuned to Carrinex's whisper-border language: the
   // outline is a soft hairline (not a hard black stroke), and hierarchy
-  // comes from ink vs. muted text + weight rather than a loud border.
+  // comes from ink vs. muted text alone — weight stays a constant semibold
+  // so the active chip doesn't jump in width when selected.
+  const textColor = active ? colors.ink : colors.mute;
   return (
     <Pressable
-      onPress={onPress}
-      onLongPress={onLongPress}
+      onPress={() => {
+        haptic();
+        onPress();
+      }}
+      onLongPress={
+        onLongPress
+          ? () => {
+              haptic();
+              onLongPress();
+            }
+          : undefined
+      }
       delayLongPress={350}
       style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
         paddingHorizontal: 14,
         paddingVertical: 7,
         borderRadius: radii.pill,
@@ -679,11 +719,12 @@ function Chip({
         opacity: pressed ? 0.7 : 1,
       })}
     >
+      {icon ? <Feather name={icon} size={13} color={textColor} /> : null}
       <Text
         style={{
           fontSize: 13,
-          fontWeight: active ? '700' : '600',
-          color: active ? colors.ink : colors.mute,
+          fontWeight: '600',
+          color: textColor,
           letterSpacing: -0.1,
         }}
         numberOfLines={1}
@@ -697,7 +738,10 @@ function Chip({
 function AddChip({ onPress }: { onPress: () => void }) {
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        haptic();
+        onPress();
+      }}
       accessibilityRole="button"
       accessibilityLabel="Add a new feed"
       style={({ pressed }) => ({
