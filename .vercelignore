@@ -1,0 +1,42 @@
+# Files the Vercel build never needs. Without this, `vercel deploy` from a
+# developer machine uploads ~147MB of local artifacts and aborts mid-upload.
+# (Git-integration deploys clone the repo instead, so they only ever saw the
+# tracked subset — this keeps CLI deploys in line with that.)
+
+# Dependencies / build output — Vercel installs and builds these itself
+node_modules
+dist
+.expo
+web-build
+build
+
+# Local media + capture artifacts
+brag-output
+Sreenshots
+References
+Testing for wardrobe
+
+# Test artifacts and suites (not part of the web bundle)
+playwright
+playwright-report
+test-results
+tests
+.last-run.json
+
+# Native / backend tooling irrelevant to the web export
+supabase
+android
+ios
+
+# Docs
+docs
+*.md
+*.pdf
+
+# Local env + editor
+.env.local
+.env.test
+.env.sentry-build-plugin
+.vscode
+.idea
+.github

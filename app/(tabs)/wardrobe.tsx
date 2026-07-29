@@ -17,6 +17,7 @@ import {
   useRecordSwipe, useDeleteWardrobePost,
 } from '@/lib/queries';
 import { useToast } from '@/lib/toast';
+import { useTabBarClearance } from '@/lib/responsive';
 
 type Section = 'swipe' | 'mine' | 'liked';
 
@@ -32,6 +33,10 @@ function WardrobeInner() {
   const recordSwipe = useRecordSwipe(uid);
   const deletePost = useDeleteWardrobePost(uid);
   const toast = useToast();
+  // AnimatedTabBar floats over screen content and reserves no layout space, so
+  // every section here has to pad its own bottom or the bar covers the last
+  // grid row / the bottom of the swipe deck.
+  const tabBarClearance = useTabBarClearance();
 
   // Cards not yet swiped in this session (deck refetch may lag the optimistic pop).
   const cards = useMemo(
@@ -80,7 +85,7 @@ function WardrobeInner() {
       />
 
       {section === 'swipe' && (
-        <View style={{ flex: 1, padding: 20 }}>
+        <View style={{ flex: 1, paddingHorizontal: 20, paddingTop: 20, paddingBottom: tabBarClearance }}>
           {cards.length > 0 ? (
             <SwipeDeck posts={cards} onSwipe={onSwipe} onNeedMore={onNeedMore} />
           ) : (
@@ -95,13 +100,13 @@ function WardrobeInner() {
       )}
 
       {section === 'mine' && (
-        <ScrollView contentContainerStyle={{ paddingVertical: 16 }}>
+        <ScrollView contentContainerStyle={{ paddingTop: 16, paddingBottom: tabBarClearance }}>
           <WardrobeGrid posts={mine.data ?? []} onDelete={(id) => deletePost.mutate(id)} />
         </ScrollView>
       )}
 
       {section === 'liked' && (
-        <ScrollView contentContainerStyle={{ paddingVertical: 16 }}>
+        <ScrollView contentContainerStyle={{ paddingTop: 16, paddingBottom: tabBarClearance }}>
           <WardrobeGrid posts={liked.data ?? []} />
         </ScrollView>
       )}

@@ -7,7 +7,7 @@
 // meaningless to the rest of the screen.
 
 import { useEffect, useRef, useState } from 'react';
-import { View, Pressable, ScrollView, Animated, Platform } from 'react-native';
+import { View, Pressable, ScrollView, Animated, Platform, useWindowDimensions } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
@@ -175,6 +175,8 @@ export function HubTitle({ title, eyebrow }: { title: string; eyebrow?: string }
 // grid grows and shrinks with the catalog on its own. Quiet panel tiles,
 // name + live count on the left, a preview thumb on the right — a browsable
 // index to skim, not a trending rail.
+const TAG_TILE_GAP = 10;
+
 export function AestheticsPanel({
   tags,
   onOpen,
@@ -185,10 +187,15 @@ export function AestheticsPanel({
   // An odd count leaves one tile alone on the last row instead of a paired
   // grid — floor to an even count so every row always reads as a pair.
   const evenTags = tags.length % 2 === 1 ? tags.slice(0, -1) : tags;
+  // Width computed in px rather than '48%' — a percentage width sharing a
+  // flex-wrap row with `gap` resolves too narrow on native (RN 0.81's Yoga),
+  // packing 3 tiles per row instead of 2 and squeezing the label to nothing.
+  const { width: winWidth } = useWindowDimensions();
+  const tileWidth = (winWidth - PAD * 2 - TAG_TILE_GAP) / 2;
   return (
-    <View style={{ paddingHorizontal: PAD, flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+    <View style={{ paddingHorizontal: PAD, flexDirection: 'row', flexWrap: 'wrap', gap: TAG_TILE_GAP }}>
       {evenTags.map((t) => (
-        <TagTile key={t.tag} entry={t} onPress={() => onOpen(t.tag)} />
+        <TagTile key={t.tag} entry={t} width={tileWidth} onPress={() => onOpen(t.tag)} />
       ))}
     </View>
   );
@@ -198,7 +205,15 @@ export function AestheticsPanel({
 // preview thumb on the right — the browsable list layout. Quiet light-grey
 // panel so the grid reads as a clean style directory; name in ink, count in
 // muted grey, thumb portrait on the right.
-function TagTile({ entry, onPress }: { entry: TagIndexEntry; onPress: () => void }) {
+function TagTile({
+  entry,
+  width,
+  onPress,
+}: {
+  entry: TagIndexEntry;
+  width: number;
+  onPress: () => void;
+}) {
   const { tag, count } = entry;
   const label = titleCase(tag);
   const uri = entry.image ? getOptimizedImageUrl(entry.image, { width: 200 }) : null;
@@ -207,7 +222,7 @@ function TagTile({ entry, onPress }: { entry: TagIndexEntry; onPress: () => void
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`Explore ${label}, ${count.toLocaleString()} outfits`}
-      style={({ pressed }) => ({ width: '48%', transform: [{ scale: pressed ? 0.97 : 1 }] })}
+      style={({ pressed }) => ({ width, transform: [{ scale: pressed ? 0.97 : 1 }] })}
     >
       <View
         style={{
@@ -217,6 +232,10 @@ function TagTile({ entry, onPress }: { entry: TagIndexEntry; onPress: () => void
           overflow: 'hidden',
           padding: 10,
           gap: 8,
+          // Explicit height (padding + the 56/0.72 image height below) rather
+          // than letting the row derive it from children — same native Yoga
+          // row-sizing issue as the width fix above, just on the other axis.
+          height: 98,
           backgroundColor: colors.panel,
         }}
       >
@@ -237,7 +256,10 @@ function TagTile({ entry, onPress }: { entry: TagIndexEntry; onPress: () => void
         <View
           style={{
             width: 56,
-            aspectRatio: 0.72,
+            // Explicit height (56 / 0.72) instead of aspectRatio — kept
+            // numeric everywhere in this tile since it's the piece under
+            // suspicion for the native sizing bug.
+            height: 78,
             borderRadius: radii.lg,
             overflow: 'hidden',
             backgroundColor: colors.purpleSoft,

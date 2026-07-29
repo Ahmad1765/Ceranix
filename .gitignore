@@ -62,3 +62,5 @@ References
 
 Testing for wardrobe
 brag-output
+.vercel
+.env*

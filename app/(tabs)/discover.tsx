@@ -1,6 +1,6 @@
 import { capture, buildSearchProps } from '@/lib/analytics';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Pressable, ScrollView, RefreshControl, ActivityIndicator, Keyboard } from 'react-native';
+import { View, Pressable, ScrollView, RefreshControl, ActivityIndicator, Keyboard, useWindowDimensions } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -1115,11 +1115,18 @@ function BrandsSkeleton() {
 
 // Loading tiles for the Aesthetics tab — same panel-row tile shape as the
 // real grid so the loaded state doesn't jump.
+//
+// Width is computed in px rather than '48%' — a percentage width sharing a
+// flex-wrap row with `gap` resolves too narrow on native (RN 0.81's Yoga),
+// packing 3 tiles per row instead of 2. Matches the same fix in
+// components/discover/SearchTabs.tsx's AestheticsPanel/TagTile.
 function AestheticsSkeleton() {
+  const { width: winWidth } = useWindowDimensions();
+  const tileWidth = (winWidth - 16 * 2 - 10) / 2;
   return (
     <View style={{ paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 10 }}>
       {Array.from({ length: 6 }).map((_, i) => (
-        <View key={i} style={{ width: '48%', height: 95, borderRadius: radii.xl, backgroundColor: colors.divider }} />
+        <View key={i} style={{ width: tileWidth, height: 95, borderRadius: radii.xl, backgroundColor: colors.divider }} />
       ))}
     </View>
   );
