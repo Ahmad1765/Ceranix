@@ -130,26 +130,34 @@ function SegmentPill({
       accessibilityState={{ selected: active }}
       accessibilityLabel={`Search ${label.toLowerCase()}`}
     >
-      <Animated.View
-        style={{
-          paddingHorizontal: 16,
-          paddingVertical: 8,
-          borderRadius: radii.pill,
-          borderWidth: 1,
-          backgroundColor,
-          borderColor,
-          transform: [{ scale: scaleAnim }],
-        }}
-      >
-        <Text
+      {/* Two nested Animated.Views on purpose. The scale spring runs on the
+          native driver while the colour timing cannot (colour is not a
+          natively-animatable prop). Putting both on ONE view moves that view's
+          props node to native on first press, after which the JS-driven colour
+          animation throws "Attempting to run JS driven animation on animated
+          node that has been moved to native". Splitting them gives each driver
+          its own props node. */}
+      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+        <Animated.View
           style={{
-            fontSize: 13,
-            fontFamily: type.family.sansBold,
-            color: active ? colors.ink : colors.mute,
+            paddingHorizontal: 16,
+            paddingVertical: 8,
+            borderRadius: radii.pill,
+            borderWidth: 1,
+            backgroundColor,
+            borderColor,
           }}
         >
-          {label}
-        </Text>
+          <Text
+            style={{
+              fontSize: 13,
+              fontFamily: type.family.sansBold,
+              color: active ? colors.ink : colors.mute,
+            }}
+          >
+            {label}
+          </Text>
+        </Animated.View>
       </Animated.View>
     </Pressable>
   );

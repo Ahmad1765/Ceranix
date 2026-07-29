@@ -45,7 +45,9 @@ import {
   buildCollections,
   buildTrendingSearches,
   buildPromos,
+  buildTopicCovers,
   type DigestCard,
+  type GridTheme,
   type PromoTarget,
 } from '@/lib/discover';
 import {
@@ -57,6 +59,11 @@ import {
   type DiscoverTab,
   type BrandEntry,
 } from '@/components/discover/SearchTabs';
+import {
+  SearchLanding,
+  type BrowseAction,
+  type TopicAction,
+} from '@/components/discover/SearchLanding';
 
 type CatTile = {
   id: Category | 'trending';
@@ -91,10 +98,42 @@ const EMPTY_LISTINGS: Listing[] = [];
 
 type UserResult = Awaited<ReturnType<typeof searchUsers>>[number];
 
+// Grid header per theme. GridTheme itself lives in lib/discover so the digest
+// cards, the search landing and this screen all speak one vocabulary.
+// Param whitelists — a `?tab=` / `?sort=` off a link is untrusted input, so
+// both are matched against the real unions rather than cast.
+const HUB_TABS: DiscoverTab[] = ['items', 'aesthetics', 'brands', 'users'];
+const SORT_KEYS: SortKey[] = SORT_OPTIONS.map((o) => o.id);
+
+const GRID_THEME_TITLE: Record<GridTheme, string> = {
+  demand: 'Now in demand',
+  fresh: 'Fresh drops',
+};
+
+// Header shown when a sort is browsing the whole catalog (no category, no
+// query) — i.e. the search panel's New / Trending / Lowest price chips.
+const SORT_TITLE: Record<SortKey, string> = {
+  newest: 'New in',
+  popular: 'Trending',
+  price_asc: 'Lowest price',
+  price_desc: 'Highest price',
+};
+
 export default function DiscoverScreen() {
-  // Query params from /news Saved tab (and external links). When set, the
-  // screen boots with the search pre-applied so the user lands on results.
-  const params = useLocalSearchParams<{ q?: string; category?: Category; sub?: string; savedId?: string }>();
+  // Query params from the Discover search sheet, the /news Saved tab and
+  // external links. When set, the screen boots with that intent already
+  // applied so the user lands on results rather than on the default hub.
+  // `n` is the sheet's nonce — it carries no meaning beyond making a repeated
+  // pick a distinct navigation (see DiscoverSheet.tsx).
+  const params = useLocalSearchParams<{
+    q?: string;
+    category?: Category;
+    sub?: string;
+    savedId?: string;
+    tab?: string;
+    sort?: string;
+    n?: string;
+  }>();
   const initialQuery = typeof params.q === 'string' ? params.q : '';
   const initialCat = typeof params.category === 'string' ? (params.category as CatTile['id']) : null;
   const initialSub = typeof params.sub === 'string' ? params.sub : null;
@@ -118,8 +157,9 @@ export default function DiscoverScreen() {
   const [activeSub, setActiveSub] = useState<string | null>(initialSub);
   const [sort, setSort] = useState<SortKey | null>(null);
   // Editorial digest "theme" applied to the trending grid (e.g. Now in demand /
-  // Fresh drops). Reorders the idle grid in place; cleared via the grid header.
-  const [digestSort, setDigestSort] = useState<'demand' | 'fresh' | null>(null);
+  // Fresh drops / Lowest price). Reorders the idle grid in place; cleared via
+  // the grid header. Also what the search landing's Browse sorts drive.
+  const [digestSort, setDigestSort] = useState<GridTheme | null>(null);
   const [savingSearch, setSavingSearch] = useState(false);
   // We disable the Save CTA once the current query has been saved this
   // session to avoid spam — the underlying unique index would reject anyway.
@@ -154,12 +194,24 @@ export default function DiscoverScreen() {
       setActiveSub(null);
     }
 
-    // A deep-linked search or category (e.g. tapping Category on a product
-    // page) must land on the Items grid — that's where results and category
-    // filtering live. Without this the screen stays on the default Aesthetics
-    // panel and the filter appears to do nothing.
-    if (nextQ || hasCat) setTab('items');
-  }, [params.q, params.category, params.sub]);
+    // A catalog sort from the search panel's New / Trending / Lowest price
+    // chips. Applied only when present, so an unrelated navigation never
+    // silently clears a sort the user picked in-screen. A category link with
+    // no sort resets it, since sorts belong to the grid they were chosen on.
+    const wantSort = SORT_KEYS.find((s) => s === params.sort) ?? null;
+    if (wantSort) setSort(wantSort);
+    else if (hasCat) setSort(null);
+
+    // Landing tab. An explicit ?tab= (the sheet's Aesthetics / Brands /
+    // Sellers chips) wins; otherwise a deep-linked search, category or sort —
+    // e.g. tapping Category on a product page — must land on the Items grid,
+    // since that's where results and filtering live. Without this the screen
+    // stays on the default Aesthetics panel and the filter appears to do
+    // nothing.
+    const wantTab = HUB_TABS.find((t) => t === params.tab) ?? null;
+    if (wantTab) setTab(wantTab);
+    else if (nextQ || hasCat || wantSort) setTab('items');
+  }, [params.q, params.category, params.sub, params.tab, params.sort, params.n]);
 
   // When the screen mounts with a savedId param, mark that search seen so
   // the "N new" badge clears once the user actually opens it.
@@ -322,7 +374,13 @@ export default function DiscoverScreen() {
   const results = hasQuery && serverResults !== null ? serverResults : clientFiltered;
   // Idle = browsing, not searching: the editorial feed (welcome, digest, picks,
   // collections) is shown only here so search results stay focused on the query.
-  const idle = !hasQuery && !browseCat;
+  // Browsing the whole catalog under one sort (the search panel's New /
+  // Trending / Lowest price chips) — no query, no category, just an ordering.
+  const sortOnly = !hasQuery && !browseCat && !!sort;
+  // Idle = browsing with no intent at all. A bare sort is an intent, so it
+  // drops the editorial feed and shows the sorted grid instead — otherwise
+  // "Lowest price" would bury its own results under promos and picks.
+  const idle = !hasQuery && !browseCat && !sortOnly;
 
   // Editorial blocks derived from the already-loaded trending grid — no extra
   // fetches. Recomputed only when the listing set changes.
@@ -479,11 +537,12 @@ export default function DiscoverScreen() {
     [scrollRef],
   );
 
-  const idleGridTitle =
-    digestSort === 'demand' ? 'Now in demand' : digestSort === 'fresh' ? 'Fresh drops' : 'Trending';
+  const idleGridTitle = digestSort ? GRID_THEME_TITLE[digestSort] : 'Trending';
 
-  // The browse landing only makes sense for item search, so other tabs skip it.
-  const showSearchLanding = searchActive && !hasQuery && tab === 'items';
+  // Focusing the empty search field opens the browse landing over the whole
+  // hub — the tab strip and its panels step aside so the field, Browse and
+  // Topics are the only things on screen (Cancel restores them).
+  const showSearchLanding = searchActive && !hasQuery;
 
   const selectSearchTerm = useCallback((term: string) => {
     setQuery(term);
@@ -506,14 +565,54 @@ export default function DiscoverScreen() {
     Keyboard.dismiss();
   }, [clearCategory]);
 
-  const pickCategory = useCallback((id: CatTile['id']) => {
-    setActiveCat((cur) => (cur === id ? null : id));
-    // Switching category invalidates any subcategory/sort chosen under the old one.
-    setActiveSub(null);
-    setSort(null);
-    setSearchActive(false);
-    Keyboard.dismiss();
-  }, []);
+  // Browse chip — either a catalog-wide sort on the Items grid (scrolled into
+  // view), a jump to one of the hub tabs, or the saved-search list on Activity.
+  const handleBrowse = useCallback(
+    (action: BrowseAction) => {
+      setSearchActive(false);
+      Keyboard.dismiss();
+      if (action.kind === 'saved') {
+        router.push('/news' as any);
+        return;
+      }
+      if (action.kind === 'tab') {
+        setTab(action.tab);
+        return;
+      }
+      setTab('items');
+      // Clears the category *and* its sort, then applies the chip's own — the
+      // chip browses the whole catalog, not whatever category was open.
+      clearCategory();
+      setDigestSort(null);
+      setSort(action.sort);
+      requestAnimationFrame(() =>
+        scrollRef.current?.scrollTo?.({ y: Math.max(0, gridY.current - 8), animated: true }),
+      );
+    },
+    [clearCategory, scrollRef],
+  );
+
+  // Topic tile — a category browse, or "All items" back to the full catalog.
+  const handleTopic = useCallback(
+    (action: TopicAction) => {
+      setTab('items');
+      setDigestSort(null);
+      if (action.kind === 'all') {
+        shopAll();
+        return;
+      }
+      setActiveCat(action.category);
+      setActiveSub(null);
+      setSort(null);
+      setSearchActive(false);
+      Keyboard.dismiss();
+    },
+    [shopAll],
+  );
+
+  // Live cover shots for the Topics tiles, from the already-loaded grid. Same
+  // derivation the search sheet uses, so both landings show the same stock.
+  const topicCovers = useMemo(() => buildTopicCovers(listings), [listings]);
 
   const cancelSearch = useCallback(() => {
     setQuery('');
@@ -633,12 +732,13 @@ export default function DiscoverScreen() {
         </Animated.View>
 
         {/* Search hub tabs — Items keeps the classic feed; the rest are
-            index-style panels over the same shared query. */}
-        <DiscoverSegments tab={tab} onChange={setTab} />
+            index-style panels over the same shared query. Hidden while the
+            browse landing is open so the panel owns the screen. */}
+        {!showSearchLanding ? <DiscoverSegments tab={tab} onChange={setTab} /> : null}
 
         {/* ── Aesthetics ── live tag index; tapping a tile opens the listings
             carrying that tag in place. */}
-        {tab === 'aesthetics' ? (
+        {tab === 'aesthetics' && !showSearchLanding ? (
           activeTag ? (
             <View style={{ marginTop: 16 }}>
               <SectionHeader
@@ -687,7 +787,7 @@ export default function DiscoverScreen() {
         ) : null}
 
         {/* ── Brands ── every brand in the live catalog, filtered by the query. */}
-        {tab === 'brands' ? (
+        {tab === 'brands' && !showSearchLanding ? (
           (loading || brandIdxQ.isLoading) && brandResults.length === 0 ? (
             <BrandsSkeleton />
           ) : brandResults.length === 0 ? (
@@ -713,7 +813,7 @@ export default function DiscoverScreen() {
         ) : null}
 
         {/* ── Users ── seller search with inline follow; suggestions when idle. */}
-        {tab === 'users' ? (
+        {tab === 'users' && !showSearchLanding ? (
           hasQuery ? (
             searching && userResults.length === 0 ? (
               <PeopleSkeleton />
@@ -744,84 +844,18 @@ export default function DiscoverScreen() {
           )
         ) : null}
 
-        {/* Search-focus landing — browse tools (categories + trending searches)
-            live here instead of the idle feed, so Discover stays editorial. */}
+        {/* Search-focus landing — Browse chips + a Topics grid over the live
+            taxonomy. Browse tools live here instead of the idle feed, so
+            Discover itself stays editorial. */}
         {showSearchLanding ? (
-        <View style={{ marginTop: 20 }}>
-          <View
-            style={{
-              paddingHorizontal: 16,
-              marginBottom: 10,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <Text style={{ fontSize: 15, fontWeight: '800', color: colors.ink, letterSpacing: -0.2 }}>
-              Browse by category
-            </Text>
-            {activeCat && (
-              <Pressable hitSlop={HIT_SLOP_8} onPress={clearCategory}>
-                <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.purple }}>Clear</Text>
-              </Pressable>
-            )}
-          </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{ paddingHorizontal: 16, gap: 14 }}
-          >
-            {CATEGORY_TILES.map((cat) => {
-              const active = activeCat === cat.id;
-              return (
-                <Pressable
-                  key={cat.id}
-                  onPress={() => pickCategory(cat.id)}
-                  style={({ pressed }) => ({
-                    alignItems: 'center',
-                    width: 64,
-                    opacity: pressed ? 0.7 : 1,
-                  })}
-                >
-                  <View
-                    style={{
-                      width: 56,
-                      height: 56,
-                      borderRadius: 28,
-                      backgroundColor: active ? colors.purple : colors.purpleSoft,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Feather
-                      name={cat.icon}
-                      size={20}
-                      color={active ? 'white' : colors.purple}
-                    />
-                  </View>
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      fontWeight: '700',
-                      color: active ? colors.purple : colors.ink,
-                      marginTop: 6,
-                    }}
-                    numberOfLines={1}
-                  >
-                    {cat.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-
-          <TrendingSearches
-            terms={trendingSearches}
-            onSelect={selectSearchTerm}
-            onShopAll={shopAll}
-          />
-        </View>
+          <>
+            <SearchLanding covers={topicCovers} onBrowse={handleBrowse} onTopic={handleTopic} />
+            <TrendingSearches
+              terms={trendingSearches}
+              onSelect={selectSearchTerm}
+              onShopAll={shopAll}
+            />
+          </>
         ) : null}
 
         {/* Everything below the landing — Items tab only, hidden while the
@@ -1036,6 +1070,14 @@ export default function DiscoverScreen() {
                 })}
               </ScrollView>
             </>
+          ) : sortOnly ? (
+            // Catalog-wide sort from a Browse chip — named so the user can see
+            // which ordering they're in, and clearable back to the idle feed.
+            <SectionHeader
+              title={SORT_TITLE[sort!]}
+              count={results.length}
+              action={{ label: 'Clear', onPress: () => setSort(null) }}
+            />
           ) : idle && digestSort ? (
             <SectionHeader
               title={idleGridTitle}

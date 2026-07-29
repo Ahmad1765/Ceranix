@@ -12,9 +12,6 @@ import { colors } from '@/lib/theme';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// JS-driven on web (no RCTAnimation), native-driven on iOS/Android.
-const USE_NATIVE_DRIVER = Platform.OS !== 'web';
-
 type Mode = 'signin' | 'signup';
 type Step = 'welcome' | 'form';
 
@@ -74,7 +71,11 @@ export default function LoginScreen() {
       toValue: step === 'welcome' ? 0 : 1,
       duration: 280,
       easing: Easing.bezier(0.23, 1, 0.32, 1),
-      useNativeDriver: USE_NATIVE_DRIVER,
+      // MUST stay false: stepAnim is interpolated into `panelHeight` and applied
+      // as a `height` (see below). The native driver only supports transform and
+      // opacity, so driving a layout prop natively throws on iOS/Android — web
+      // never hit it because useNativeDriver is a no-op there.
+      useNativeDriver: false,
     }).start();
   }, [step, stepAnim]);
 

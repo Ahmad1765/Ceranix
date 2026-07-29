@@ -22,6 +22,7 @@ import React from 'react';
 import { Text as RNText, TextInput as RNTextInput, StyleSheet } from 'react-native';
 import type { TextProps, TextInputProps } from 'react-native';
 import { cssInterop } from 'nativewind';
+import { colors } from '@/lib/theme';
 
 const WEIGHT_FONT: Record<string, string> = {
   '400': 'Inter_400Regular',
@@ -37,20 +38,35 @@ const WEIGHT_FONT: Record<string, string> = {
 function withDefaultInterFont<P extends { style?: any }>(
   Base: React.ComponentType<P>,
   displayName: string,
+  // Spread BEFORE the caller's props so any of these stays overridable at the
+  // call site — they're defaults, not overrides.
+  extraDefaults?: Partial<P>,
 ) {
   const Wrapped = React.forwardRef<unknown, P>((props, ref) => {
     const flat = StyleSheet.flatten(props.style as any) || ({} as any);
     const style = flat.fontFamily
       ? props.style
       : [{ fontFamily: WEIGHT_FONT[String(flat.fontWeight ?? '400')] ?? 'Inter_400Regular' }, props.style];
-    return <Base ref={ref as any} {...(props as any)} style={style} />;
+    return <Base ref={ref as any} {...(extraDefaults as any)} {...(props as any)} style={style} />;
   });
   Wrapped.displayName = displayName;
   return Wrapped;
 }
 
 const BaseText = withDefaultInterFont<TextProps>(RNText, 'DefaultFontText');
-const BaseTextInput = withDefaultInterFont<TextInputProps>(RNTextInput, 'DefaultFontTextInput');
+// Android paints a black underline under every TextInput and uses a black
+// selection handle unless told otherwise; neither prop has any effect on web
+// or iOS. This used to live in app/_layout.tsx as a `TextInput.defaultProps`
+// mutation, which React 19 ignores for function components — so it silently
+// stopped applying and only Android showed the regression.
+const BaseTextInput = withDefaultInterFont<TextInputProps>(
+  RNTextInput,
+  'DefaultFontTextInput',
+  {
+    underlineColorAndroid: 'transparent',
+    selectionColor: colors.primary,
+  },
+);
 
 export const Text = cssInterop(BaseText, { className: 'style' }) as typeof RNText;
 export const TextInput = cssInterop(BaseTextInput, {

@@ -25,19 +25,24 @@ test.describe('Discover', () => {
     }
   });
 
-  test('focusing search opens the browse landing with the eight category tiles', async ({ page }) => {
+  test('focusing search opens the browse landing with its Browse chips and Topics tiles', async ({ page }) => {
     await page.goto('/discover?category=clothing');
     await waitForAppReady(page);
     const search = discoverSearch(page);
     await expect(search).toBeVisible();
-    // Category tiles live in the search-focus landing, not the idle feed.
+    // Browse / Topics live in the search-focus landing, not the idle feed.
     await search.click();
-    await expect(page.getByText('Browse by category')).toBeVisible();
-    // Derived from the same source the tiles are built from (discover.tsx's
-    // CATEGORY_TILES = 'Trending' + CATEGORIES). Hard-coding the labels is what
-    // broke this test: the taxonomy moved to lib/categories.ts and renamed
-    // "Tech" to "Electronics", which no one propagated here.
-    for (const label of ['Trending', ...CATEGORIES.map((c) => c.label)]) {
+    await expect(page.getByText('Browse', { exact: true })).toBeVisible();
+    await expect(page.getByText('Topics', { exact: true })).toBeVisible();
+    // Browse chips: three grid sorts + the three hub tabs + saved searches.
+    for (const label of ['New', 'Trending', 'Lowest price', 'Aesthetics', 'Brands', 'Sellers', 'Saved']) {
+      await expect(page.getByText(label, { exact: true }).first()).toBeVisible();
+    }
+    // Topics tiles are derived from the same source they're built from
+    // (lib/categories.ts, plus the "All items" tile). Hard-coding the labels is
+    // what broke this test before: the taxonomy moved and renamed "Tech" to
+    // "Electronics", which no one propagated here.
+    for (const label of [...CATEGORIES.map((c) => c.label), 'All items']) {
       await expect(page.getByText(label, { exact: true }).first()).toBeVisible();
     }
   });

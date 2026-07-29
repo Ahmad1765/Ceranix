@@ -1,9 +1,11 @@
 import { Tabs } from 'expo-router';
 import { AnimatedTabBar } from '../../components/AnimatedTabBar';
 import { useSellSheet } from '@/components/sell/SellSheet';
+import { useDiscoverSheet } from '@/components/discover/DiscoverSheet';
 
 export default function TabsLayout() {
   const { open: openSellSheet } = useSellSheet();
+  const { open: openDiscoverSheet } = useDiscoverSheet();
 
   return (
     <Tabs
@@ -11,7 +13,21 @@ export default function TabsLayout() {
       screenOptions={{ headerShown: false }}
     >
       <Tabs.Screen name="index" options={{ title: 'Home' }} />
-      <Tabs.Screen name="discover" options={{ title: 'Discover' }} />
+      {/* Like the Sell tab below, Discover never switches to its flat tab
+          content on press — it slides the search sheet up over whatever
+          screen is active (components/discover/DiscoverSheet.tsx). Picking
+          anything in the sheet is what navigates here, carrying the intent as
+          params. app/(tabs)/discover.tsx stays the real screen behind it. */}
+      <Tabs.Screen
+        name="discover"
+        options={{ title: 'Discover' }}
+        listeners={{
+          tabPress: (e) => {
+            e.preventDefault();
+            openDiscoverSheet();
+          },
+        }}
+      />
       {/* Wardrobe tab hidden 2026-07-04. Route file app/(tabs)/wardrobe.tsx is untouched.
           To restore: swap options back to { title: 'Wardrobe' }. */}
       <Tabs.Screen name="wardrobe" options={{ href: null }} />

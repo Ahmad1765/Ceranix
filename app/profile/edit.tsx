@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Pressable, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, BackHandler } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
@@ -167,6 +167,11 @@ export default function ProfileEditScreen() {
   const toast = useToast();
   const params = useLocalSearchParams<{ onboarding?: string }>();
   const isOnboarding = params.onboarding === '1';
+  // The SafeAreaView below only guards the top edge, so the sticky Save bar has
+  // to clear the home indicator / gesture bar itself. Matches the pattern in
+  // app/conversation/new.tsx rather than hardcoding a per-platform guess.
+  const insets = useSafeAreaInsets();
+  const ctaBottomPad = Math.max(insets.bottom, 12) + 12;
 
   const [username, setUsername] = useState('');
   const [fullName, setFullName] = useState('');
@@ -914,7 +919,7 @@ export default function ProfileEditScreen() {
             bottom: 0,
             paddingHorizontal: 20,
             paddingTop: 16,
-            paddingBottom: Platform.OS === 'ios' ? 32 : 20,
+            paddingBottom: ctaBottomPad,
             backgroundColor: SOFT,
             borderTopWidth: 1,
             borderTopColor: 'rgba(15,15,15,0.08)',

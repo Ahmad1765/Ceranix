@@ -64,6 +64,12 @@ export async function fetchFollowState(
   followerId: string | null | undefined,
   followeeId: string,
 ): Promise<FollowState | null> {
+  // get_follow_state is granted to `authenticated` only, so a signed-out viewer
+  // is guaranteed a "permission denied for function get_follow_state" round
+  // trip. The error path already returns null, so short-circuiting is
+  // behaviour-identical — it just drops a request that can never succeed.
+  if (!followerId) return getCachedFollowState(followerId, followeeId);
+
   const { data, error } = await supabase.rpc('get_follow_state', {
     p_followee: followeeId,
   });

@@ -24,6 +24,17 @@ const CATEGORY_LABEL: Record<Category, string> = {
 // this a section would look like filler, so we drop it.
 const MIN_PER_GROUP = 3;
 
+/**
+ * Client-side reorderings Discover can apply to its idle grid in place, as
+ * emitted by the digest / promo cards below. Single source so the screen's
+ * grid sort and its header title agree.
+ *
+ * Note this is NOT how the search panel's Browse chips sort — those use real
+ * server-side `SortKey`s, because the digest rail these themes belong to is
+ * switched off in Discover (SHOW_DIGEST_RAIL).
+ */
+export type GridTheme = 'demand' | 'fresh';
+
 export type DigestTarget =
   | { kind: 'theme'; theme: 'demand' | 'fresh' }
   | { kind: 'category'; category: Category };
@@ -212,6 +223,23 @@ export function buildPromos(listings: Listing[]): PromoSlide[] {
  * search shortcuts. Unlike collections this has no depth threshold (a single
  * listing is a valid shortcut), so the row is populated even on thin catalogs.
  */
+/**
+ * One live cover shot per category, for the search landing's Topics tiles.
+ * Sold rows are skipped so a tile never fronts stock nobody can buy; the first
+ * live listing wins, which tracks the grid's own ranking. Categories the grid
+ * hasn't reached yet are simply absent — the tile falls back to its taxonomy
+ * icon rather than showing a hole.
+ */
+export function buildTopicCovers(listings: Listing[]): Partial<Record<string, string>> {
+  const covers: Partial<Record<string, string>> = {};
+  for (const l of listings) {
+    if (l.is_sold || covers[l.category]) continue;
+    const img = l.images?.[0];
+    if (img) covers[l.category] = img;
+  }
+  return covers;
+}
+
 export function buildTrendingSearches(listings: Listing[], max = 8): string[] {
   const counts = new Map<string, number>();
   for (const l of listings) {

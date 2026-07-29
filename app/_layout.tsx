@@ -1,6 +1,6 @@
 import '../global.css';
 import { useEffect, useState } from 'react';
-import { Platform, TextInput } from 'react-native';
+import { Platform } from 'react-native';
 import { installAlertShim } from '@/lib/alertShim';
 import { initSentry, wrapWithSentry } from '@/lib/sentry';
 import { initAnalytics, screen } from '@/lib/analytics';
@@ -26,6 +26,7 @@ import { AuthProvider } from '@/lib/auth';
 import { ToastProvider } from '@/lib/toast';
 import { GuestGateProvider } from '@/components/GuestGate';
 import { SellSheetProvider } from '@/components/sell/SellSheet';
+import { DiscoverSheetProvider } from '@/components/discover/DiscoverSheet';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { OfflineBanner } from '@/components/OfflineBanner';
 
@@ -43,12 +44,11 @@ initOnlineManager();
 // in a window-backed implementation that honours the standard RN signature.
 installAlertShim();
 
-// Strip Android's default black TextInput underline and align selection
-// handles with the brand purple so focus/select never paints black.
-const _TI: any = TextInput;
-_TI.defaultProps = _TI.defaultProps || {};
-_TI.defaultProps.underlineColorAndroid = 'transparent';
-_TI.defaultProps.selectionColor = '#6C47FF';
+// NOTE: Android's TextInput underline / selection-handle colour is set in
+// lib/rnText.tsx, where every app-level TextInput already funnels through.
+// It used to be assigned here by mutating `TextInput.defaultProps`, which
+// React 19 ignores entirely for function components — so it silently did
+// nothing and Android painted the default black underline.
 
 const AESTHETIC_FONTS = {
   Inter_400Regular,
@@ -101,12 +101,15 @@ function RootLayout() {
 
   useEffect(() => {
     // Icon fonts are tiny — always block first paint on these so glyphs never
-    // render as boxes. Inter is large; load in background so it doesn't
-    // delay the UI.
+    // render as boxes.
     const iconFonts = Font.loadAsync({ ...Ionicons.font, ...Feather.font });
-    Font.loadAsync(AESTHETIC_FONTS).catch(console.warn);
+    const interFonts = Font.loadAsync(AESTHETIC_FONTS);
 
     if (Platform.OS === 'web') {
+      // Web can paint before Inter arrives: expo-font injects an @font-face and
+      // the browser reflows already-painted text the moment the file lands. So
+      // keep Inter off the critical path here and let it swap in.
+      interFonts.catch(console.warn);
       iconFonts
         .catch(console.warn)
         .finally(() => {
@@ -116,8 +119,14 @@ function RootLayout() {
       return;
     }
 
+    // Native MUST block on Inter — this is NOT the same tradeoff as web.
+    // Android does not repaint a mounted <Text> when a font registers after
+    // the fact, so anything painted before Inter resolves keeps rendering in
+    // the system font for the life of that view. Releasing the gate early
+    // meant the whole app came up in Roboto on Android while web looked right.
     Promise.all([
       iconFonts,
+      interFonts,
       Asset.loadAsync([
         require('../assets/images/adaptive-icon.png'),
         require('../assets/images/favicon.png'),
@@ -143,6 +152,7 @@ function RootLayout() {
         <ToastProvider>
         <GuestGateProvider>
         <SellSheetProvider>
+        <DiscoverSheetProvider>
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
@@ -192,6 +202,7 @@ function RootLayout() {
           />
         </Stack>
         <OfflineBanner />
+        </DiscoverSheetProvider>
         </SellSheetProvider>
         </GuestGateProvider>
         </ToastProvider>
