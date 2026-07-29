@@ -33,6 +33,15 @@ import { useFeedListingsQuery } from '@/lib/queries';
 import { colors, radii, type } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { SearchLanding, type BrowseAction, type TopicAction } from './SearchLanding';
+import { DummySheetBody } from './DiscoverSheet.dummy'; // DUMMY SKIN
+
+// ── DUMMY SKIN (temporary) ──────────────────────────────────────────────────
+// Swaps the body below for a visual-only reskin matching the reference
+// screenshot. Revert with either:
+//   • flip this to false, or
+//   • delete these three "DUMMY SKIN" lines + components/discover/DiscoverSheet.dummy.tsx
+// The real DiscoverSheetBody underneath is unmodified.
+const DUMMY_SKIN = true;
 
 // Every navigation out of the sheet carries a monotonic `n`. Without it,
 // picking the same chip twice produces an identical URL, expo-router hands
@@ -82,7 +91,7 @@ export function DiscoverSheetProvider({ children }: { children: ReactNode }) {
           // instead of zeros, so the header doesn't jump once measurement
           // lands — the jump would otherwise happen mid slide-up.
           <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-            <DiscoverSheetBody onClose={close} />
+            {DUMMY_SKIN ? <DummySheetBody onClose={close} /> : <DiscoverSheetBody onClose={close} />}
           </SafeAreaProvider>
         ) : null}
       </Modal>
