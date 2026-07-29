@@ -11,7 +11,7 @@ import {
 import { capture } from '@/lib/analytics';
 import { View, Pressable, ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, useWindowDimensions, Modal } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView, initialWindowMetrics } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { Feather } from '@expo/vector-icons';
@@ -98,13 +98,27 @@ export function SellSheetProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={api}>
       {children}
+      {/* Android edge-to-edge (mandatory from Expo SDK 54) needs BOTH translucency
+          flags, or the modal window stops at the navigation bar and this
+          "full screen" sheet renders short while web looks correct. */}
       <Modal
         visible={visible}
         animationType="slide"
         onRequestClose={close}
         statusBarTranslucent
+        navigationBarTranslucent
       >
-        <SellForm onClose={close} />
+        {/* SellForm's <SafeAreaView edges={['top','bottom']}> measures against the
+            nearest provider, and the app-root one lives outside this modal's
+            window — so without a provider in here it reads zeros on Android and
+            the form runs under the status and gesture bars. initialMetrics seeds
+            the first frame with real insets so nothing jumps mid slide-up.
+            Same fix as DiscoverSheet; see its header note. */}
+        {visible ? (
+          <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+            <SellForm onClose={close} />
+          </SafeAreaProvider>
+        ) : null}
       </Modal>
     </Ctx.Provider>
   );

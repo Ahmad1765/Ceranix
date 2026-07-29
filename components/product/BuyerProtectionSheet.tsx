@@ -29,8 +29,18 @@ export function BuyerProtectionSheet({
   const insets = useSafeAreaInsets();
   const { item, protection, total } = priceBreakdown(itemPrice);
 
+  // Both translucency flags: Android edge-to-edge (mandatory from Expo SDK 54)
+  // otherwise ends the modal window at the navigation bar, leaving an opaque
+  // strip under the backdrop and double-counting the insets.bottom padding.
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+      statusBarTranslucent
+      navigationBarTranslucent
+    >
       <Pressable onPress={onClose} style={{ flex: 1, justifyContent: 'flex-end' }}>
         {IS_IOS ? (
           <BlurView intensity={22} tint="dark" style={StyleSheet.absoluteFill} />

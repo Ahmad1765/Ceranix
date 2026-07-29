@@ -112,7 +112,12 @@ export function GuestGateProvider({ children }: { children: ReactNode }) {
         transparent
         animationType="slide"
         onRequestClose={close}
+        // Android edge-to-edge (mandatory from Expo SDK 54): both flags, or the
+        // modal window stops at the navigation bar. The sheet then sits on top of
+        // an opaque strip AND still pads itself by insets.bottom, so the bottom
+        // gap is counted twice on Android and once on web.
         statusBarTranslucent
+        navigationBarTranslucent
       >
         <Pressable
           onPress={close}

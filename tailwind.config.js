@@ -8,7 +8,15 @@ const WHITE = '#FFFFFF';
 const INK = '#0F0F0F';
 
 module.exports = {
-  content: ['./app/**/*.{js,jsx,ts,tsx}', './components/**/*.{js,jsx,ts,tsx}'],
+  // Every directory that can contain a className string has to be listed, or
+  // Tailwind never emits those rules and the class silently does nothing at
+  // runtime. `lib/` counts: it holds the shared Text/TextInput shim and other
+  // rendering helpers.
+  content: [
+    './app/**/*.{js,jsx,ts,tsx}',
+    './components/**/*.{js,jsx,ts,tsx}',
+    './lib/**/*.{js,jsx,ts,tsx}',
+  ],
   presets: [require('nativewind/preset')],
   theme: {
     extend: {

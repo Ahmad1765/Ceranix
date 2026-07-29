@@ -24,6 +24,11 @@ const ACCENT = colors.ink; // active icon stays dark (ink), like the reference
 const INACTIVE = colors.ink; // near-black line icons, Instagram-clean
 const DISC_FILL = 'rgba(15,15,15,0.08)'; // neutral grey disc (ink @8%)
 
+// Android-only knob; ignored on iOS/web, where BlurView is natively backed.
+// `Platform.Version` is the API level on Android.
+const ANDROID_BLUR_METHOD: 'none' | 'dimezisBlurView' =
+  Platform.OS === 'android' && Number(Platform.Version) >= 31 ? 'dimezisBlurView' : 'none';
+
 const BAR_HEIGHT = 62;
 const ICON = 26;
 const DISC = 46; // sliding highlight diameter
@@ -196,7 +201,13 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
           position: 'absolute',
           left: 20,
           right: 20,
-          bottom: Platform.OS === 'ios' ? Math.max(insets.bottom, 14) : 22,
+          // Android was pinned to a flat 22 here, which predates SDK 54 making
+          // edge-to-edge mandatory: insets.bottom is now the real system bar, so
+          // a fixed 22 tucks the dock under the navigation bar on 3-button
+          // devices (~48dp) while looking fine on gesture nav (~24dp) and on web.
+          // Honouring the inset on both platforms clears it; the 22/14 floors
+          // keep the resting position identical where the inset is small.
+          bottom: Math.max(insets.bottom, Platform.OS === 'android' ? 22 : 14),
         },
         barStyle,
       ]}
@@ -222,7 +233,17 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
           <BlurView
             tint="light"
             intensity={Platform.OS === 'android' ? 28 : 44}
-            experimentalBlurMethod="dimezisBlurView"
+            // `dimezisBlurView` blurs on every Android version, but below API 31
+            // there is no RenderNode so it falls back to RenderScript, which
+            // expo-blur's docs call out as much less efficient. This dock renders
+            // on every screen, so that cost is paid app-wide.
+            //
+            // Newer expo-blur has a `dimezisBlurViewSdk31Plus` method for exactly
+            // this; expo-blur@15.0.8 (what SDK 54 pins) does not — its union is
+            // only 'none' | 'dimezisBlurView'. So gate it by hand, which is what
+            // that method does internally. Below API 31 the translucent white
+            // fill and border already read fine without a blur.
+            experimentalBlurMethod={ANDROID_BLUR_METHOD}
             pointerEvents="none"
             style={{
               ...StyleSheet.absoluteFillObject,

@@ -10,6 +10,11 @@ import Constants from 'expo-constants';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
+import {
+  ensurePermissionAndRegister,
+  isThisDeviceRegistered,
+  unregisterThisDevice,
+} from '@/lib/notifications';
 import { confirm } from '@/lib/confirm';
 import { safeBack } from '@/lib/nav';
 import { isOptedOut, setAnalyticsOptOut } from '@/lib/analytics';
@@ -34,6 +39,9 @@ const PRIVACY_URL = 'https://carrinex.vercel.app/privacy';
 const APP_URL_BASE = 'https://carrinex.vercel.app';
 
 type Section = 'shop' | 'verify' | 'enhance' | 'account' | 'help';
+// Runtime mirror of Section, so an `?open=` deep-link param can be validated
+// before it's trusted as a section id.
+const SECTIONS: readonly Section[] = ['shop', 'verify', 'enhance', 'account', 'help'];
 type Busy = 'logout' | 'delete' | 'password' | null;
 
 function tap(style: 'light' | 'medium' = 'light') {
@@ -55,6 +63,10 @@ export default function SettingsScreen() {
 
   const [open, setOpen] = useState<Section | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
+  // Push toggle. `pushOn` reflects OS permission AND a live user_devices row,
+  // so turning it off here really stops the pushes rather than just looking off.
+  const [pushOn, setPushOn] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
   const [shareUsage, setShareUsage] = useState(!isOptedOut());
   const mounted = useRef(true);
 
@@ -128,18 +140,30 @@ export default function SettingsScreen() {
   const [showVerify, setShowVerify] = useState(false);
   const [showBundle, setShowBundle] = useState(false);
 
-  // Open modal from a deep-link param. Guard so the effect fires exactly
-  // once per arrival — if the user closes the modal we don't want a stale
-  // `?open=bundle` in the URL to reopen it.
+  // Open a section (or the Bundle modal) from a deep-link param. `?open=bundle`
+  // is the original special case — a modal plus the section that hosts it — and
+  // any Section id now also works, so callers elsewhere can land the user on the
+  // right card instead of dropping them at the top of a long page. Guard so the
+  // effect fires exactly once per arrival: if the user closes the modal or
+  // collapses the section, a stale `?open=` in the URL must not reopen it.
   const handledDeepLink = useRef(false);
   useEffect(() => {
-    if (params.open !== 'bundle') {
+    const target = params.open;
+    if (!target) {
       handledDeepLink.current = false;
       return;
     }
     if (handledDeepLink.current) return;
-    setShowBundle(true);
-    setOpen('shop');
+    if (target === 'bundle') {
+      setShowBundle(true);
+      setOpen('shop');
+    } else if (SECTIONS.includes(target as Section)) {
+      setOpen(target as Section);
+    } else {
+      // Unknown value — leave the page as-is rather than guessing.
+      handledDeepLink.current = false;
+      return;
+    }
     handledDeepLink.current = true;
   }, [params.open]);
 
@@ -224,6 +248,62 @@ export default function SettingsScreen() {
       toast.show('Open device settings manually', { variant: 'info', icon: 'settings' });
     }
   }, [toast]);
+
+  // ---------- Push notifications ----------
+  // Declared after openSystemSettings on purpose: handlePushToggle lists it as a
+  // dependency, and a dep array referencing a `const` declared further down the
+  // component would hit the temporal dead zone on the very first render.
+  useEffect(() => {
+    if (Platform.OS === 'web' || !session) return;
+    let cancelled = false;
+    isThisDeviceRegistered()
+      .then((on) => {
+        if (!cancelled) setPushOn(on);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [session]);
+
+  const handlePushToggle = useCallback(
+    async (next: boolean) => {
+      if (!user?.id || pushBusy) return;
+      setPushBusy(true);
+      // Optimistic — the switch should follow the thumb immediately; every
+      // failure path below puts it back.
+      setPushOn(next);
+      try {
+        if (next) {
+          const { granted, blocked } = await ensurePermissionAndRegister(user.id);
+          setPushOn(granted);
+          if (!granted) {
+            // iOS only shows the permission dialog once. If it was already
+            // denied, the only way back is the system settings app.
+            if (blocked) {
+              toast.show('Enable notifications in system settings', {
+                variant: 'info',
+                icon: 'bell',
+              });
+              await openSystemSettings();
+            } else {
+              toast.show('Notifications not enabled', { variant: 'info', icon: 'bell' });
+            }
+          }
+        } else {
+          await unregisterThisDevice();
+          setPushOn(false);
+        }
+      } catch (e) {
+        console.warn('[settings] push toggle failed', e);
+        setPushOn(!next);
+        toast.show('Could not update notifications', { variant: 'info', icon: 'alert-circle' });
+      } finally {
+        setPushBusy(false);
+      }
+    },
+    [user?.id, pushBusy, toast, openSystemSettings],
+  );
 
   const handleShare = useCallback(async () => {
     if (!profile?.id) return;
@@ -785,6 +865,20 @@ export default function SettingsScreen() {
           expanded={open === 'enhance'}
           onToggle={() => toggleSection('enhance')}
         >
+          {/* Web has no remote push yet (VAPID + service worker is a separate
+              slice), so the toggle is native-only rather than shown broken. */}
+          {Platform.OS !== 'web' && (
+            <>
+              <ToggleRow
+                label="Push notifications"
+                desc="Messages, offers & sales on this device"
+                value={pushOn}
+                onValueChange={handlePushToggle}
+                disabled={pushBusy || !session}
+              />
+              <Divider />
+            </>
+          )}
           <Row
             label="Notifications"
             desc="Push, email & in-app"

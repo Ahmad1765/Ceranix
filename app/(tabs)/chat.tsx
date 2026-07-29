@@ -398,7 +398,11 @@ function PushNotificationBanner({ onDismiss }: { onDismiss: () => void }) {
         hitSlop={HIT_SLOP_8}
         onPress={() => {
           haptic();
-          router.push('/profile/notifications' as any);
+          // `/profile/notifications` was pushed here and that route does not
+          // exist — the tap dead-ended on expo-router's "Unmatched Route"
+          // screen. Notification prefs live on the Settings page's "Enhance the
+          // experience" card, so open it directly.
+          router.push('/settings?open=enhance' as any);
         }}
         style={({ pressed }) => ({
           paddingHorizontal: 13,
@@ -586,7 +590,10 @@ export default function InboxScreen() {
       >
         <Pressable
           hitSlop={HIT_SLOP_8}
-          onPress={() => router.push('/profile/settings' as any)}
+          // `/profile/settings` is not a route (the screen is `app/settings.tsx`),
+          // so this overflow button used to land on "Unmatched Route". No `as any`
+          // here on purpose — the cast is what let the broken path compile.
+          onPress={() => router.push('/settings')}
           style={({ pressed }) => ({
             width: 36,
             height: 36,

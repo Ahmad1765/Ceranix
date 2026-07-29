@@ -28,6 +28,7 @@ import { Button, EmptyState } from '@/components/ui';
 import { SafetyBanner } from '@/components/SafetyBanner';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { withTimeout } from '@/lib/async';
+import { maybeSoftAskForPush } from '@/lib/notifications';
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -524,6 +525,15 @@ export default function ConversationScreen() {
       cancelled = true;
     };
   }, [conversationId]);
+
+  // Contextual soft-ask. Opening a conversation is the one moment where "let us
+  // notify you" is self-evidently useful, so this is where the OS dialog is
+  // spent — never on cold launch, and at most once ever (the helper keeps its
+  // own AsyncStorage flag and bails unless the status is still undetermined).
+  useEffect(() => {
+    if (!user?.id || !conversationId) return;
+    maybeSoftAskForPush(user.id).catch(() => {});
+  }, [user?.id, conversationId]);
 
   useEffect(() => {
     if (!conversationId) return;

@@ -12,6 +12,7 @@ import type { Session, User as AuthUser } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { setSentryUser } from '@/lib/sentry';
 import { identify, resetIdentity } from '@/lib/analytics';
+import { registerForPush, unregisterThisDevice } from '@/lib/notifications';
 import type { User as Profile } from '@/types';
 
 type AuthState = {
@@ -103,6 +104,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const uid = next.user.id;
           setTimeout(() => {
             if (mounted.current) fetchProfileWithRetry(uid).catch(() => {});
+            // Silent re-registration: only ever writes a token when the user has
+            // ALREADY granted permission, so this never surfaces a prompt. It
+            // has to run on every sign-in because Expo push tokens rotate and a
+            // device can change hands between accounts.
+            registerForPush(uid).catch(() => {});
           }, 0);
         }
       } else {
@@ -127,6 +133,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [session?.user?.id]);
 
   const signOut = useCallback(async () => {
+    // Drop this device's push token FIRST, while the session still exists: the
+    // user_devices DELETE policy is evaluated against auth.uid(), so doing this
+    // after signOut() would silently delete nothing and the next owner of the
+    // phone would keep receiving this account's notifications. Failure is
+    // logged, not fatal — an orphaned token is pruned on the next
+    // DeviceNotRegistered ticket from Expo.
+    await unregisterThisDevice().catch((e) =>
+      console.warn('[auth] push unregister failed', e),
+    );
     // Clear local state first so the UI updates immediately. On web,
     // supabase.auth.signOut()'s default global scope calls the server's
     // /logout endpoint, which can hang under Chrome (extensions/SW/CORS)

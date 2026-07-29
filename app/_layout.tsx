@@ -22,6 +22,7 @@ import {
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { queryClient, persistOptions } from '@/lib/queryClient';
 import { initOnlineManager } from '@/lib/offline';
+import { attachResponseListener, configureNotifications } from '@/lib/notifications';
 import { AuthProvider } from '@/lib/auth';
 import { ToastProvider } from '@/lib/toast';
 import { GuestGateProvider } from '@/components/GuestGate';
@@ -38,6 +39,10 @@ initAnalytics();
 // Bridge device connectivity into TanStack Query so fetches pause offline and
 // auto-resume on reconnect (rather than hanging on unreachable requests).
 initOnlineManager();
+// Foreground presentation + the Android notification channel. Never prompts for
+// permission — that happens contextually (first conversation) or from Settings.
+// No-ops on web.
+configureNotifications();
 
 // React-native-web ships Alert.alert as a no-op, so every validation /
 // confirm path that calls Alert.alert silently dies on web. The shim swaps
@@ -98,6 +103,11 @@ function RootLayout() {
   useEffect(() => {
     if (pathname) screen(normalizeScreenName(pathname));
   }, [pathname]);
+
+  // Notification taps → deep link. Mounted here (not at module scope) because
+  // routing a tap needs a mounted navigator; this also covers the cold-start
+  // case where the tap is what launched the app.
+  useEffect(() => attachResponseListener(), []);
 
   useEffect(() => {
     // Icon fonts are tiny — always block first paint on these so glyphs never

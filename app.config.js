@@ -3,15 +3,21 @@
 // client gets the right URL/key on every Metro start, regardless of whether
 // a stale process.env value is cached in the bundle.
 
-// EAS project id — written by `eas init` (add it to your shell / CI env as
-// EAS_PROJECT_ID, or let `eas init` inject it). Until it's set, native builds
-// still work; over-the-air updates simply stay disabled rather than pointing at
-// a malformed https://u.expo.dev/undefined endpoint.
-const easProjectId = process.env.EAS_PROJECT_ID;
+// EAS project id — written by `eas init`. The literal below is this project's
+// real id; EAS_PROJECT_ID stays supported as an override so CI can point a fork
+// or a test project somewhere else. It used to be env-only, which meant that on
+// any machine without EAS_PROJECT_ID exported (i.e. every one of them — it is in
+// no .env file here) `extra.eas.projectId` resolved to undefined and OTA updates
+// silently stayed off.
+const easProjectId =
+  process.env.EAS_PROJECT_ID || 'cea63614-ec61-46e8-b410-5fe84a7218bf';
 
-module.exports = ({ config }) => ({
-  ...config,
-  expo: {
+// This file is the ONLY app config. There is no app.json — a dynamic config that
+// returns an object keyed `expo` makes @expo/config's reduceExpoObject() collapse
+// to exactly that object, so anything merged in from a static app.json was thrown
+// away wholesale. Adding a plugin or an `extra` key to an app.json here would look
+// right and do nothing; check the resolved result with `npx expo config --type public`.
+module.exports = () => ({
     name: 'Carrinex',
     slug: 'carrinex',
     version: '1.0.0',
@@ -65,6 +71,15 @@ module.exports = ({ config }) => ({
       ],
       'expo-asset',
       [
+        'expo-notifications',
+        {
+          // Android tints the small status-bar icon with this colour. Left to
+          // default, the notification icon renders as a white square.
+          color: '#6C47FF',
+          defaultChannel: 'default',
+        },
+      ],
+      [
         '@sentry/react-native',
         {
           // Org + project for source map / debug symbol upload during builds.
@@ -90,5 +105,4 @@ module.exports = ({ config }) => ({
       posthogKey: process.env.EXPO_PUBLIC_POSTHOG_KEY,
       posthogHost: process.env.EXPO_PUBLIC_POSTHOG_HOST,
     },
-  },
 });

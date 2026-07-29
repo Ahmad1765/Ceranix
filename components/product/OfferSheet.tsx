@@ -117,7 +117,11 @@ export function OfferSheet({
       transparent
       animationType="slide"
       onRequestClose={onClose}
+      // Android edge-to-edge (mandatory from Expo SDK 54) needs both flags, or
+      // the modal window stops at the navigation bar: the backdrop leaves an
+      // opaque strip and the sheet's insets.bottom padding double-counts.
       statusBarTranslucent
+      navigationBarTranslucent
     >
       {/* Backdrop — tap outside to dismiss */}
       <Pressable onPress={onClose} style={{ flex: 1, justifyContent: 'flex-end' }}>
