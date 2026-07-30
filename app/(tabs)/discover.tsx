@@ -1,6 +1,7 @@
 import { capture, buildSearchProps } from '@/lib/analytics';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Pressable, ScrollView, RefreshControl, ActivityIndicator, Keyboard, useWindowDimensions } from 'react-native';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { Text, TextInput } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -30,7 +31,6 @@ import { useGridDimensions, useTabBarClearance, HIT_SLOP_8 } from '@/lib/respons
 import { useFadeIn } from '@/lib/motion';
 import type { Category, Listing } from '@/types';
 import { EmptyState, SectionHeader } from '@/components/ui';
-import { useWebPullToRefresh, WebPullIndicator } from '@/components/WebRefresh';
 import {
   WelcomeEyebrow,
   PromoBanner,
@@ -283,7 +283,8 @@ export default function DiscoverScreen() {
   }, [gridRefetch, recRefetch, recentRefetch, qc, user?.id]);
 
   // Web pull-to-refresh — RefreshControl is inert on react-native-web.
-  const { scrollRef, pull, nodeTop, threshold, contentStyle } = useWebPullToRefresh({ refreshing, onRefresh });
+  // Kept for the programmatic scroll-to-grid jumps below (not for refresh).
+  const scrollRef = useRef<FlashListRef<Listing[]>>(null);
 
   // Debounced server-side search across the whole catalog. Client filtering
   // below gives instant feedback; this replaces it with authoritative rows.
@@ -474,7 +475,7 @@ export default function DiscoverScreen() {
       setActiveTag(tag);
       setSearchActive(false);
       Keyboard.dismiss();
-      scrollRef.current?.scrollTo?.({ y: 0, animated: false });
+      scrollRef.current?.scrollToOffset({ offset: 0, animated: false });
     },
     [scrollRef],
   );
@@ -511,7 +512,7 @@ export default function DiscoverScreen() {
       }
       setDigestSort(card.target.theme);
       requestAnimationFrame(() =>
-        scrollRef.current?.scrollTo?.({ y: Math.max(0, gridY.current - 8), animated: true }),
+        scrollRef.current?.scrollToOffset({ offset: Math.max(0, gridY.current - 8), animated: true }),
       );
     },
     [scrollRef],
@@ -531,7 +532,7 @@ export default function DiscoverScreen() {
       }
       setDigestSort(target.theme);
       requestAnimationFrame(() =>
-        scrollRef.current?.scrollTo?.({ y: Math.max(0, gridY.current - 8), animated: true }),
+        scrollRef.current?.scrollToOffset({ offset: Math.max(0, gridY.current - 8), animated: true }),
       );
     },
     [scrollRef],
@@ -586,7 +587,7 @@ export default function DiscoverScreen() {
       setDigestSort(null);
       setSort(action.sort);
       requestAnimationFrame(() =>
-        scrollRef.current?.scrollTo?.({ y: Math.max(0, gridY.current - 8), animated: true }),
+        scrollRef.current?.scrollToOffset({ offset: Math.max(0, gridY.current - 8), animated: true }),
       );
     },
     [clearCategory, scrollRef],
@@ -620,16 +621,67 @@ export default function DiscoverScreen() {
     Keyboard.dismiss();
   }, []);
 
+  // ── Virtualized grid ──────────────────────────────────────────────────────
+  // This screen shows a listing grid in exactly two places (the Aesthetics tab
+  // with a tag open, and the Items tab), and in BOTH the grid is the last thing
+  // rendered in its branch. That lets the whole existing tree stay intact as the
+  // list header while only the grid rows move into FlashList's `data` — the
+  // rows land immediately after the header, i.e. exactly where they were.
+  //
+  // The conditions below mirror the two JSX branches one-for-one. Where a branch
+  // renders a skeleton or an empty state instead of a grid, this returns the
+  // empty array, so the header keeps owning those states and no rows appear.
+  const gridListings = useMemo<Listing[]>(() => {
+    if (showSearchLanding) return EMPTY_LISTINGS;
+    if (tab === 'aesthetics') {
+      if (!activeTag || tagListingsQ.isLoading) return EMPTY_LISTINGS;
+      return tagListingsQ.data ?? EMPTY_LISTINGS;
+    }
+    if (tab === 'items') {
+      if (loading) return EMPTY_LISTINGS;
+      return idle ? gridResults : results;
+    }
+    return EMPTY_LISTINGS;
+  }, [
+    showSearchLanding, tab, activeTag,
+    tagListingsQ.isLoading, tagListingsQ.data,
+    loading, idle, gridResults, results,
+  ]);
+
+  const gridRows = useMemo(() => {
+    const out: Listing[][] = [];
+    for (let i = 0; i < gridListings.length; i += columns) {
+      out.push(gridListings.slice(i, i + columns));
+    }
+    return out;
+  }, [gridListings, columns]);
+
+  const renderRow = useCallback(
+    ({ item }: { item: Listing[] }) => (
+      <GridRow row={item} columns={columns} cardW={cardW} />
+    ),
+    [columns, cardW],
+  );
+
+  const rowKey = useCallback((row: Listing[]) => row[0]?.id ?? 'empty', []);
+
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
-      <ScrollView
+      <FlashList
         ref={scrollRef}
+        data={gridRows}
+        renderItem={renderRow}
+        keyExtractor={rowKey}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />}
-        contentContainerStyle={[{ paddingBottom: tabClear }, contentStyle]}
-      >
+        contentContainerStyle={{ paddingBottom: tabClear }}
+        // An ELEMENT, not an inline `() => ...` component — an inline function
+        // is a new component type every render, which remounts the header and
+        // drops focus from the search field on every keystroke.
+        ListHeaderComponent={
+      <>
         {/* Top bar */}
         <View
           style={{
@@ -754,13 +806,7 @@ export default function DiscoverScreen() {
                   title={`No #${activeTag} items yet`}
                   description="Nothing in the catalog carries this tag right now — check back soon."
                 />
-              ) : (
-                <GridSection
-                  listings={tagListingsQ.data ?? []}
-                  columns={columns}
-                  cardW={cardW}
-                />
-              )}
+              ) : null /* rows render below the header via FlashList `data` */}
             </View>
           ) : (loading || tagIdxQ.isLoading) && tagResults.length === 0 ? (
             <AestheticsSkeleton />
@@ -1112,14 +1158,13 @@ export default function DiscoverScreen() {
                 description="Try a different word, brand, or category."
               />
             )
-          ) : (
-            <GridSection listings={idle ? gridResults : results} columns={columns} cardW={cardW} />
-          )}
+          ) : null /* rows render below the header via FlashList `data` */}
         </View>
         </>
         ) : null}
-      </ScrollView>
-      <WebPullIndicator pull={pull} refreshing={refreshing} nodeTop={nodeTop} threshold={threshold} />
+      </>
+        }
+      />
     </SafeAreaView>
   );
 }
@@ -1200,33 +1245,39 @@ function GridSkeleton({ columns, cardW }: { columns: number; cardW: number }) {
   );
 }
 
-function GridSection({ listings, columns, cardW }: { listings: Listing[]; columns: number; cardW: number }) {
-  const rows: Listing[][] = [];
-  for (let i = 0; i < listings.length; i += columns) {
-    rows.push(listings.slice(i, i + columns));
-  }
+// One row of the virtualized grid. Same layout the old <GridSection> emitted per
+// row: its wrapper's paddingHorizontal moved onto the row, and the wrapper's
+// vertical `gap` became a marginBottom, so row spacing is unchanged.
+const GridRow = memo(function GridRow({
+  row,
+  columns,
+  cardW,
+}: {
+  row: Listing[];
+  columns: number;
+  cardW: number;
+}) {
   return (
-    <View style={{ paddingHorizontal: HORIZONTAL_PAD, gap: GRID_GAP }}>
-      {rows.map((row, ri) => (
-        <View key={ri} style={{ flexDirection: 'row', gap: GRID_GAP }}>
-          {row.map((listing, ci) => (
-            <GridCard key={listing.id} index={ri * columns + ci} width={cardW}>
-              <ListingCard listing={listing} />
-            </GridCard>
-          ))}
-          {row.length < columns &&
-            Array.from({ length: columns - row.length }).map((_, i) => (
-              <View key={`pad-${i}`} style={{ width: cardW }} />
-            ))}
+    <View
+      style={{
+        flexDirection: 'row',
+        gap: GRID_GAP,
+        paddingHorizontal: HORIZONTAL_PAD,
+        marginBottom: GRID_GAP,
+      }}
+    >
+      {row.map((listing) => (
+        <View key={listing.id} style={{ width: cardW }}>
+          <ListingCard listing={listing} width={cardW} />
         </View>
       ))}
+      {row.length < columns &&
+        Array.from({ length: columns - row.length }).map((_, i) => (
+          <View key={`pad-${i}`} style={{ width: cardW }} />
+        ))}
     </View>
   );
-}
-
-function GridCard({ index, width, children }: { index: number; width: number; children: React.ReactNode }) {
-  return <View style={{ width }}>{children}</View>;
-}
+});
 
 function SkeletonTile({ width }: { width: number }) {
   return (

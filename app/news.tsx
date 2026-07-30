@@ -15,7 +15,6 @@ import {
   listSavedSearches,
   type SavedSearch,
 } from '@/lib/savedSearches';
-import { useWebPullToRefresh, WebPullIndicator } from '@/components/WebRefresh';
 
 type NewsTab = 'following' | 'foryou' | 'searches';
 
@@ -92,8 +91,6 @@ export default function NewsScreen() {
     }
   }, [refreshSearches]);
 
-  // Web pull-to-refresh — RefreshControl is inert on react-native-web.
-  const { scrollRef, pull, nodeTop, threshold, contentStyle } = useWebPullToRefresh({ refreshing, onRefresh });
 
   const applySearch = useCallback((s: SavedSearch) => {
     const params = new URLSearchParams();
@@ -191,9 +188,8 @@ export default function NewsScreen() {
 
       {/* Content */}
       <ScrollView
-        ref={scrollRef}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[{ paddingBottom: 24 }, contentStyle]}
+        contentContainerStyle={{ paddingBottom: 24 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />
         }
@@ -313,7 +309,6 @@ export default function NewsScreen() {
           </View>
         )}
       </ScrollView>
-      <WebPullIndicator pull={pull} refreshing={refreshing} nodeTop={nodeTop} threshold={threshold} />
     </SafeAreaView>
   );
 }

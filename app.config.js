@@ -95,6 +95,21 @@ module.exports = () => ({
     },
     experiments: {
       typedRoutes: true,
+      // React Compiler auto-memoizes app code at build time (node_modules are
+      // never touched, and it's disabled for server rendering). This codebase
+      // is written with inline arrow props and inline style objects throughout
+      // — readable, but it means fresh identities every render that React.memo
+      // can't help with. The compiler fixes that without a source diff.
+      //
+      // Verified before enabling, not assumed:
+      //   npx react-compiler-healthcheck@latest
+      //   → Successfully compiled 156 out of 156 components.
+      //   → StrictMode usage not found.
+      //   → Found no usage of incompatible libraries.
+      //
+      // Babel needs no manual setup — babel-preset-expo wires the plugin from
+      // SDK 54 onward. To roll back, delete this one line.
+      reactCompiler: true,
     },
     extra: {
       ...(easProjectId ? { eas: { projectId: easProjectId } } : {}),

@@ -1,5 +1,6 @@
-import { useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { Alert, View, Pressable, ScrollView, RefreshControl, Platform } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { Text, TextInput } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -8,6 +9,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/lib/auth';
 import { colors, radii } from '@/lib/theme';
 import type { RecommendedListing } from '@/lib/recommendations';
+import type { PriceDropListing } from '@/lib/myFeed';
 import { PriceDropCard } from '@/components/PriceDropCard';
 import { type SavedSearch } from '@/lib/savedSearches';
 import { ListingCard } from '@/components/ListingCard';
@@ -18,7 +20,6 @@ import {
   countActiveFilters,
   type FeedFilters,
 } from '@/components/FeedFilterSheet';
-import { useWebPullToRefresh, WebPullIndicator } from '@/components/WebRefresh';
 import {
   useMyFeedListingsQuery,
   useFeedListingsQuery,
@@ -57,6 +58,7 @@ function haptic() {
 // Stable empty references so query fallbacks don't churn the useMemos below.
 const EMPTY_LISTINGS: Listing[] = [];
 const EMPTY_SAVED_SEARCHES: SavedSearch[] = [];
+const EMPTY_PRICE_DROPS: PriceDropListing[] = [];
 
 export default function HomeScreen() {
   const { user } = useAuth();
@@ -109,7 +111,9 @@ export default function HomeScreen() {
     );
   const trendingListings = trendingQ.data ?? EMPTY_LISTINGS;
   const trendingLoading = trendingQ.isLoading;
-  const priceDrops = priceDropsQ.data ?? [];
+  // Stable empty reference, matching the three fallbacks around it — a fresh
+  // `[]` per render is a latent trap for any future useMemo keyed on this.
+  const priceDrops = priceDropsQ.data ?? EMPTY_PRICE_DROPS;
   const savedSearches = savedSearchesQ.data ?? EMPTY_SAVED_SEARCHES;
   const savedListings = savedListingsQ.data ?? EMPTY_LISTINGS;
   const loadingSaved = savedListingsQ.isLoading;
@@ -281,25 +285,41 @@ export default function HomeScreen() {
           ? 'Nothing trending right now.'
           : 'Nothing matches this feed yet.';
 
-  // Web pull-to-refresh — RefreshControl is inert on react-native-web.
-  const { scrollRef, pull, nodeTop, threshold, contentStyle } = useWebPullToRefresh({ refreshing, onRefresh });
+  // Chunk the flat listing array into grid rows. The FlashList below virtualizes
+  // ROWS (numColumns stays 1) rather than individual cards: it keeps the exact
+  // flex-row + fixed cardWidth layout this screen already had — so the grid is
+  // pixel-identical — while still mounting only the rows near the viewport
+  // instead of all ~60 listings at once.
+  const gridRows = useMemo(() => {
+    const out: Listing[][] = [];
+    for (let i = 0; i < filteredListings.length; i += columns) {
+      out.push(filteredListings.slice(i, i + columns));
+    }
+    return out;
+  }, [filteredListings, columns]);
 
-  return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
-      <ScrollView
-        ref={scrollRef}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />
-        }
-        contentContainerStyle={[{ paddingBottom: tabClear }, contentStyle]}
-      >
-        {/* In-feed search — filters the active view (For you / Saved / a saved
-            search) by title or brand. Focus lifts the hairline to purple; the
-            border is always present so focusing never shifts layout. */}
-        <FeedSearch
+  const gridLoading = showingSaved ? loadingSaved : showingTrending ? trendingLoading : loading;
+
+  const renderRow = useCallback(
+    ({ item }: { item: Listing[] }) => (
+      <GridRow row={item} columns={columns} cardWidth={cardWidth} />
+    ),
+    [columns, cardWidth],
+  );
+
+  // Row identity is its first listing — stable across re-sorts and filters.
+  const rowKey = useCallback((row: Listing[]) => row[0]?.id ?? 'empty', []);
+
+  // NOTE: passed as an ELEMENT, never as an inline `() => <Header/>` component.
+  // An inline function creates a new component type every render, which makes
+  // React unmount and remount the header — that would blow away focus in the
+  // search field on every keystroke.
+  const listHeader = (
+    <>
+      {/* In-feed search — filters the active view (For you / Saved / a saved
+          search) by title or brand. Focus lifts the hairline to purple; the
+          border is always present so focusing never shifts layout. */}
+      <FeedSearch
           value={query}
           onChangeText={setQuery}
           focused={searchFocused}
@@ -390,15 +410,32 @@ export default function HomeScreen() {
             </ScrollView>
           </View>
         ) : null}
+    </>
+  );
 
-        <Grid
-          rows={filteredListings}
-          loading={showingSaved ? loadingSaved : showingTrending ? trendingLoading : loading}
-          columns={columns}
-          cardWidth={cardWidth}
-          emptyText={gridEmptyText}
-        />
-      </ScrollView>
+  return (
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
+      <FlashList
+        data={gridRows}
+        renderItem={renderRow}
+        keyExtractor={rowKey}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={
+          <GridPlaceholder
+            loading={gridLoading}
+            columns={columns}
+            cardWidth={cardWidth}
+            emptyText={gridEmptyText}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />
+        }
+        contentContainerStyle={{ paddingBottom: tabClear }}
+      />
 
       <FeedFilterSheet
         visible={filterOpen}
@@ -415,7 +452,6 @@ export default function HomeScreen() {
           onCreated={() => searchesRefetch()}
         />
       ) : null}
-      <WebPullIndicator pull={pull} refreshing={refreshing} nodeTop={nodeTop} threshold={threshold} />
     </SafeAreaView>
   );
 }
@@ -765,14 +801,49 @@ function AddChip({ onPress }: { onPress: () => void }) {
   );
 }
 
-function Grid({
-  rows,
+// One row of the virtualized grid. Layout is byte-for-byte what the old
+// non-virtualized <Grid> emitted per row — the horizontal padding moved from the
+// (now absent) wrapper onto each row, and the wrapper's `gap` became a
+// marginBottom, so spacing between rows is unchanged.
+const GridRow = memo(function GridRow({
+  row,
+  columns,
+  cardWidth,
+}: {
+  row: Listing[];
+  columns: number;
+  cardWidth: number;
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        gap: GRID_GAP,
+        paddingHorizontal: HORIZONTAL_PAD,
+        marginBottom: GRID_GAP,
+      }}
+    >
+      {row.map((listing) => (
+        <View key={listing.id} style={{ width: cardWidth }}>
+          <ListingCard listing={listing} width={cardWidth} />
+        </View>
+      ))}
+      {row.length < columns &&
+        Array.from({ length: columns - row.length }).map((_, i) => (
+          <View key={`pad-${i}`} style={{ width: cardWidth }} />
+        ))}
+    </View>
+  );
+});
+
+// Rendered by FlashList's ListEmptyComponent — covers both the loading skeleton
+// and the "nothing here" copy, which is exactly when the row list is empty.
+function GridPlaceholder({
   loading,
   columns,
   cardWidth,
   emptyText,
 }: {
-  rows: Listing[];
   loading: boolean;
   columns: number;
   cardWidth: number;
@@ -795,32 +866,11 @@ function Grid({
       </View>
     );
   }
-  if (rows.length === 0) {
-    return (
-      <View style={{ paddingHorizontal: 16, paddingTop: 40, alignItems: 'center' }}>
-        <Text style={{ fontSize: 13, color: colors.muteSoft, textAlign: 'center' }}>
-          {emptyText ?? 'Nothing matches this feed yet.'}
-        </Text>
-      </View>
-    );
-  }
-  const grid: Listing[][] = [];
-  for (let i = 0; i < rows.length; i += columns) grid.push(rows.slice(i, i + columns));
   return (
-    <View style={{ paddingHorizontal: HORIZONTAL_PAD, gap: GRID_GAP }}>
-      {grid.map((row, ri) => (
-        <View key={ri} style={{ flexDirection: 'row', gap: GRID_GAP }}>
-          {row.map((listing) => (
-            <View key={listing.id} style={{ width: cardWidth }}>
-              <ListingCard listing={listing} />
-            </View>
-          ))}
-          {row.length < columns &&
-            Array.from({ length: columns - row.length }).map((_, i) => (
-              <View key={`pad-${i}`} style={{ width: cardWidth }} />
-            ))}
-        </View>
-      ))}
+    <View style={{ paddingHorizontal: 16, paddingTop: 40, alignItems: 'center' }}>
+      <Text style={{ fontSize: 13, color: colors.muteSoft, textAlign: 'center' }}>
+        {emptyText ?? 'Nothing matches this feed yet.'}
+      </Text>
     </View>
   );
 }

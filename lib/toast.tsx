@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -151,8 +152,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const v = toast ? variantStyles(toast.variant) : null;
 
+  // Stable context value. This provider wraps the entire <Stack>, and it
+  // re-renders on every show / dismiss / animation callback. Allocating a
+  // fresh `{ show }` on each of those renders changed the context identity,
+  // which re-rendered EVERY useToast() consumer — including all ~60
+  // <ListingCard>s in a feed grid, whose React.memo cannot block context
+  // propagation. `show` is already a stable useCallback, so the value only
+  // needs to be pinned to it. Same fix every other provider in the tree
+  // (Auth / GuestGate / SellSheet / DiscoverSheet) already carries.
+  const api = useMemo<ToastApi>(() => ({ show }), [show]);
+
   return (
-    <ToastContext.Provider value={{ show }}>
+    <ToastContext.Provider value={api}>
       {children}
       {visible && toast && v && (
         <Animated.View

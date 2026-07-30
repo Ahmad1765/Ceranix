@@ -1,6 +1,7 @@
 import { capture } from '@/lib/analytics';
-import { useState } from 'react';
-import { View, Pressable, ScrollView, RefreshControl, Alert, Share } from 'react-native';
+import { memo, useCallback, useMemo, useState } from 'react';
+import { View, Pressable, RefreshControl, Alert, Share } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -24,6 +25,9 @@ import { useGridDimensions, HIT_SLOP_8 } from '@/lib/responsive';
 import { useFadeIn } from '@/lib/motion';
 import type { Listing } from '@/types';
 import { Button, EmptyState, SectionHeader } from '@/components/ui';
+
+// Module-level so the identity never changes across renders.
+const EMPTY_LISTINGS: Listing[] = [];
 
 const HORIZONTAL_PAD = 12;
 const GRID_GAP = 8;
@@ -55,7 +59,9 @@ export default function UserProfileScreen() {
   const toggleFollowM = useToggleFollow(authUser?.id ?? null, userId);
 
   const profile = profileQ.data ?? null;
-  const listings = listingsQ.data ?? [];
+  // Stable empty reference — a fresh `[]` per render would make the
+  // visibleListings/gridRows memos below recompute on every single render.
+  const listings = listingsQ.data ?? EMPTY_LISTINGS;
   // First-load skeleton: only while the primary reads have no data yet.
   const loading = profileQ.isLoading || listingsQ.isLoading;
   // Pull-to-refresh spinner: a refetch while data is already on screen.
@@ -123,6 +129,39 @@ export default function UserProfileScreen() {
     listingsQ.refetch();
     if (authUser?.id) followQ.refetch();
   };
+
+  // ── Virtualized grid ──────────────────────────────────────────────────────
+  // The seller's listing grid is the last element on the page, so the existing
+  // tree stays intact as the FlashList header and only the rows move into
+  // `data` — landing exactly where the inline grid used to be. Empty states are
+  // still owned by the header, which is why they aren't re-checked here.
+  //
+  // These hooks MUST sit above the `loading` / `!profile` early returns below,
+  // or the hook order changes between renders.
+  const visibleListings = useMemo(
+    () =>
+      shopFilter === 'available'
+        ? listings.filter((l) => !l.is_sold)
+        : shopFilter === 'sold'
+          ? listings.filter((l) => l.is_sold)
+          : listings,
+    [listings, shopFilter],
+  );
+
+  const gridRows = useMemo(() => {
+    const out: Listing[][] = [];
+    for (let i = 0; i < visibleListings.length; i += columns) {
+      out.push(visibleListings.slice(i, i + columns));
+    }
+    return out;
+  }, [visibleListings, columns]);
+
+  const renderRow = useCallback(
+    ({ item }: { item: Listing[] }) => <GridRow row={item} columns={columns} cardW={cardW} />,
+    [columns, cardW],
+  );
+
+  const rowKey = useCallback((row: Listing[]) => row[0]?.id ?? 'empty', []);
 
   if (loading) {
     // Skeleton mirroring the real layout (avatar + stats + lines + grid)
@@ -211,20 +250,20 @@ export default function UserProfileScreen() {
   }).current;
   const availableCount = listings.filter((l) => !l.is_sold).length;
   const soldCount = listings.length - availableCount;
-  const visibleListings =
-    shopFilter === 'available'
-      ? listings.filter((l) => !l.is_sold)
-      : shopFilter === 'sold'
-        ? listings.filter((l) => l.is_sold)
-        : listings;
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
-      <ScrollView
+      <FlashList
+        data={gridRows}
+        renderItem={renderRow}
+        keyExtractor={rowKey}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />}
         contentContainerStyle={{ paddingBottom: 80 }}
-      >
+        // An ELEMENT, never an inline `() => ...` component — an inline function
+        // is a new component type each render and would remount the whole header.
+        ListHeaderComponent={
+      <>
         {/* Top bar */}
         <View
           style={{
@@ -526,11 +565,11 @@ export default function UserProfileScreen() {
                   : 'Everything is sold — follow to catch the next drop.'
               }
             />
-          ) : (
-            <GridSection listings={visibleListings} columns={columns} cardW={cardW} />
-          )}
+          ) : null /* rows render below the header via FlashList `data` */}
         </View>
-      </ScrollView>
+      </>
+        }
+      />
     </SafeAreaView>
   );
 }
@@ -601,30 +640,36 @@ function TrustBadge({
   );
 }
 
-function GridSection({ listings, columns, cardW }: { listings: Listing[]; columns: number; cardW: number }) {
-  const rows: Listing[][] = [];
-  for (let i = 0; i < listings.length; i += columns) {
-    rows.push(listings.slice(i, i + columns));
-  }
+// One row of the virtualized grid. Same layout the old <GridSection> emitted per
+// row: its wrapper's paddingHorizontal moved onto the row, and the wrapper's
+// vertical `gap` became a marginBottom, so row spacing is unchanged.
+const GridRow = memo(function GridRow({
+  row,
+  columns,
+  cardW,
+}: {
+  row: Listing[];
+  columns: number;
+  cardW: number;
+}) {
   return (
-    <View style={{ paddingHorizontal: HORIZONTAL_PAD, gap: GRID_GAP }}>
-      {rows.map((row, ri) => (
-        <View key={ri} style={{ flexDirection: 'row', gap: GRID_GAP }}>
-          {row.map((listing, ci) => (
-            <GridCard key={listing.id} index={ri * columns + ci} width={cardW}>
-              <ListingCard listing={listing} />
-            </GridCard>
-          ))}
-          {row.length < columns &&
-            Array.from({ length: columns - row.length }).map((_, i) => (
-              <View key={`pad-${i}`} style={{ width: cardW }} />
-            ))}
+    <View
+      style={{
+        flexDirection: 'row',
+        gap: GRID_GAP,
+        paddingHorizontal: HORIZONTAL_PAD,
+        marginBottom: GRID_GAP,
+      }}
+    >
+      {row.map((listing) => (
+        <View key={listing.id} style={{ width: cardW }}>
+          <ListingCard listing={listing} width={cardW} />
         </View>
       ))}
+      {row.length < columns &&
+        Array.from({ length: columns - row.length }).map((_, i) => (
+          <View key={`pad-${i}`} style={{ width: cardW }} />
+        ))}
     </View>
   );
-}
-
-function GridCard({ index, width, children }: { index: number; width: number; children: React.ReactNode }) {
-  return <View style={{ width }}>{children}</View>;
-}
+});

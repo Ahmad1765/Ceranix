@@ -22,14 +22,22 @@ const AnimatedExpoImage = Animated.createAnimatedComponent(Image);
 
 interface Props {
   listing: Listing;
+  // Rendered width of the card, when the caller already knows it. Every grid in
+  // the app computes this via useGridDimensions and wraps the card in a
+  // `style={{ width }}` view, so measuring it again with onLayout only bought a
+  // second render per card (and a first frame at the wrong image source width).
+  // Left optional so any call site that genuinely can't know its width keeps
+  // the self-measuring behaviour.
+  width?: number;
 }
 
-export const ListingCard = memo(function ListingCard({ listing }: Props) {
+export const ListingCard = memo(function ListingCard({ listing, width }: Props) {
   const { user } = useAuth();
   const toast = useToast();
   const guestGate = useGuestGate();
   const [activeIndex, setActiveIndex] = useState(0);
-  const [cardWidth, setCardWidth] = useState(0);
+  const [measuredWidth, setMeasuredWidth] = useState(0);
+  const cardWidth = width ?? measuredWidth;
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(listing.likes ?? 0);
   const [likeBusy, setLikeBusy] = useState(false);
@@ -61,8 +69,15 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
   }, [listing.id, user?.id]);
 
   // Keep the visible count in sync when the parent re-fetches and `likes`
-  // changes from the server (e.g. someone else liked the listing).
+  // changes from the server (e.g. someone else liked the listing). Skipped on
+  // the first run: likeCount is already initialized to this exact value above,
+  // so firing on mount was a guaranteed no-op render for every card in the grid.
+  const likesHydrated = useRef(false);
   useEffect(() => {
+    if (!likesHydrated.current) {
+      likesHydrated.current = true;
+      return;
+    }
     setLikeCount(listing.likes ?? 0);
   }, [listing.likes]);
 
@@ -143,7 +158,11 @@ export const ListingCard = memo(function ListingCard({ listing }: Props) {
       <View
         className="relative w-full"
         style={{ aspectRatio: 1 / 1.33, overflow: 'hidden', borderRadius: radii.lg, backgroundColor: colors.panel }}
-        onLayout={(e) => setCardWidth(e.nativeEvent.layout.width)}
+        onLayout={
+          width == null
+            ? (e) => setMeasuredWidth(e.nativeEvent.layout.width)
+            : undefined
+        }
       >
         {hasMultiple ? (
           // Horizontal paging carousel — one full-width slide per photo. Nested

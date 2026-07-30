@@ -1,5 +1,6 @@
-import { useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { Alert, View, Pressable, ScrollView, ActivityIndicator, RefreshControl, Share } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -31,7 +32,6 @@ import { useFadeIn } from '@/lib/motion';
 import type { Listing } from '@/types';
 import { useToast } from '@/lib/toast';
 import { Button, Card, ListRow, EmptyState, Tabs } from '@/components/ui';
-import { useWebPullToRefresh, WebPullIndicator } from '@/components/WebRefresh';
 import {
   LEVELS,
   computeLevel,
@@ -109,6 +109,43 @@ function ProfileScreenInner() {
     () => (activeListId ? listListings : savedItems),
     [activeListId, listListings, savedItems],
   );
+
+  // ── Virtualized grid ──────────────────────────────────────────────────────
+  // Three of the four tabs end in a listing grid, and in each the grid is the
+  // last element of its branch — so the existing tree stays intact as the
+  // FlashList header and only the rows move into `data`. The conditions here
+  // mirror <ListingsGrid>'s own guards: while it shows a skeleton or an empty
+  // state, this yields no rows.
+  //
+  // These hooks MUST stay above the `!profile` early return further down, or
+  // the hook order changes between renders.
+  const gridListings = useMemo<Listing[]>(() => {
+    if (activeTab === 'selling') return loadingSelling ? EMPTY_LISTINGS : selling;
+    if (activeTab === 'liked') return loadingLiked ? EMPTY_LISTINGS : liked;
+    if (activeTab === 'collections') {
+      const busy = activeListId ? loadingListListings : loadingSaved;
+      return busy ? EMPTY_LISTINGS : visibleSavedListings;
+    }
+    return EMPTY_LISTINGS; // 'shop' has no grid
+  }, [
+    activeTab, selling, loadingSelling, liked, loadingLiked,
+    activeListId, loadingListListings, loadingSaved, visibleSavedListings,
+  ]);
+
+  const gridRows = useMemo(() => {
+    const out: Listing[][] = [];
+    for (let i = 0; i < gridListings.length; i += columns) {
+      out.push(gridListings.slice(i, i + columns));
+    }
+    return out;
+  }, [gridListings, columns]);
+
+  const renderRow = useCallback(
+    ({ item }: { item: Listing[] }) => <GridRow row={item} columns={columns} cardW={cardW} />,
+    [columns, cardW],
+  );
+
+  const rowKey = useCallback((row: Listing[]) => row[0]?.id ?? 'empty', []);
 
   // Stable refetch fns + isStale snapshots for the focus gate.
   const { isStale: sellingStale, refetch: sellingRefetch } = sellingQ;
@@ -215,7 +252,6 @@ function ProfileScreenInner() {
   }, [sellingRefetch, likedRefetch, savedRefetch, saveListsRefetch]);
 
   // Web pull-to-refresh — RefreshControl is inert on react-native-web.
-  const { scrollRef, pull, nodeTop, threshold, contentStyle } = useWebPullToRefresh({ refreshing, onRefresh });
 
 const handleShareProfile = useCallback(async () => {
   if (!profile?.id) return;
@@ -290,14 +326,19 @@ const handleShareProfile = useCallback(async () => {
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
-      <ScrollView
-        ref={scrollRef}
+      <FlashList
+        data={gridRows}
+        renderItem={renderRow}
+        keyExtractor={rowKey}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />
         }
-        contentContainerStyle={[{ paddingBottom: tabClear }, contentStyle]}
-      >
+        contentContainerStyle={{ paddingBottom: tabClear }}
+        // An ELEMENT, never an inline `() => ...` component — an inline function
+        // is a new component type each render and would remount the whole header.
+        ListHeaderComponent={
+      <>
         {/* Top bar */}
         <View
           style={{
@@ -694,8 +735,9 @@ const handleShareProfile = useCallback(async () => {
             </View>
           )}
         </View>
-      </ScrollView>
-      <WebPullIndicator pull={pull} refreshing={refreshing} nodeTop={nodeTop} threshold={threshold} />
+      </>
+        }
+      />
       {promptElement}
     </SafeAreaView>
   );
@@ -1059,33 +1101,46 @@ function ListingsGrid({
     );
   }
 
-  const rows: Listing[][] = [];
-  for (let i = 0; i < listings.length; i += columns) {
-    rows.push(listings.slice(i, i + columns));
-  }
+  // The rows themselves are rendered by the screen's FlashList, which appends
+  // them directly below this header. Each of the three tabs puts its grid last
+  // in its own branch, so "header, then rows" lands them exactly where the
+  // inline grid used to be — while only the on-screen rows stay mounted.
+  return null;
+}
 
+// One row of the virtualized grid. Same layout the inline grid emitted per row:
+// the wrapper's paddingHorizontal moved onto the row, its vertical `gap` became
+// a marginBottom, so row spacing is unchanged.
+const GridRow = memo(function GridRow({
+  row,
+  columns,
+  cardW,
+}: {
+  row: Listing[];
+  columns: number;
+  cardW: number;
+}) {
   return (
-    <View style={{ paddingHorizontal: HORIZONTAL_PAD, gap: GRID_GAP }}>
-      {rows.map((row, ri) => (
-        <View key={ri} style={{ flexDirection: 'row', gap: GRID_GAP }}>
-          {row.map((listing, ci) => (
-            <GridCard key={listing.id} index={ri * columns + ci} width={cardW}>
-              <ListingCard listing={listing} />
-            </GridCard>
-          ))}
-          {row.length < columns &&
-            Array.from({ length: columns - row.length }).map((_, i) => (
-              <View key={`pad-${i}`} style={{ width: cardW }} />
-            ))}
+    <View
+      style={{
+        flexDirection: 'row',
+        gap: GRID_GAP,
+        paddingHorizontal: HORIZONTAL_PAD,
+        marginBottom: GRID_GAP,
+      }}
+    >
+      {row.map((listing) => (
+        <View key={listing.id} style={{ width: cardW }}>
+          <ListingCard listing={listing} width={cardW} />
         </View>
       ))}
+      {row.length < columns &&
+        Array.from({ length: columns - row.length }).map((_, i) => (
+          <View key={`pad-${i}`} style={{ width: cardW }} />
+        ))}
     </View>
   );
-}
-
-function GridCard({ index, width, children }: { index: number; width: number; children: React.ReactNode }) {
-  return <View style={{ width }}>{children}</View>;
-}
+});
 
 function SkeletonTile({ width }: { width: number }) {
   return (
