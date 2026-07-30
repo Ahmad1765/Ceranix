@@ -31,6 +31,7 @@ const INK_OVERLAY_LIGHT = "rgba(15,15,15,0.18)";
 // explicitly as a dark slate rather than ink, so it lives as its own token
 // instead of being hardcoded at the call site.
 const SLATE_SELECTED = "#f1f2f6";
+const BLACK = "#0F0F0F";
 
 // ── Semantic colors ──────────────────────────────────────────────────────
 // Consumers should reach for these names; raw values stay above.
@@ -73,7 +74,7 @@ export const colors = {
 
   // Selected chip/segment fill + the text color that sits on it.
   selected: SLATE_SELECTED,
-  onSelected: WHITE,
+  onSelected: BLACK,
 
   // Legacy aliases — all collapse to purple/black so the 3-color rule holds.
   purple: PURPLE,

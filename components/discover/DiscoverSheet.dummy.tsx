@@ -62,7 +62,7 @@ const CSS = {
   chipRadius: 13,
   chipBorder: '#e2e6ec',
   chipText: 16,
-  chipTextColor: '#f1f2f6',
+  chipTextColor: '#2b2f36',
   chipIconColor: '#5f6673',
   chipPress: '#f7f7f7', // .chip:hover
 
