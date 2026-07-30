@@ -104,11 +104,13 @@ export const CONTENT_MAX_WIDTH = 720;
 // overlays screen content — it does NOT reserve layout space. Screens inside the
 // (tabs) group must pad the bottom of their scroll content (and any sticky CTA
 // bar) by this much, or the bar covers the last row / buttons beneath it.
-// Mirrors AnimatedTabBar's BAR_HEIGHT (68) + its bottom offset.
+// AnimatedTabBar's own BAR_HEIGHT is 62; the extra 6 here is deliberate slack so
+// content clears the dock's shadow, not just its box. Keep it >= 62.
 export const TAB_BAR_HEIGHT = 68;
 export function useTabBarClearance(extra = 12): number {
   const insets = useSafeAreaInsets();
-  // Matches AnimatedTabBar: bottom = max(insets.bottom, 16) on iOS, else 24.
+  // AnimatedTabBar sits at max(insets.bottom, android ? 22 : 14). These floors
+  // are rounded up rather than mirrored exactly, for the same slack reason.
   const bottomOffset = Platform.OS === 'ios' ? Math.max(insets.bottom, 16) : 24;
   return bottomOffset + TAB_BAR_HEIGHT + extra;
 }
