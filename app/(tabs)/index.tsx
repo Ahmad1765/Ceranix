@@ -691,10 +691,10 @@ function Chip({
 }) {
   // Same selected-fill / unselected-outline structure as Instagram's
   // custom-feed tabs, tuned to Carrinex's whisper-border language: the
-  // outline is a soft hairline (not a hard black stroke), and hierarchy
-  // comes from ink vs. muted text alone — weight stays a constant semibold
-  // so the active chip doesn't jump in width when selected.
-  const textColor = active ? colors.ink : colors.mute;
+  // outline is a soft hairline (not a hard black stroke), and the selected
+  // chip carries a solid slate fill with white text — weight stays a constant
+  // semibold so the active chip doesn't jump in width when selected.
+  const textColor = active ? colors.onSelected : colors.mute;
   return (
     <Pressable
       onPress={() => {
@@ -719,7 +719,7 @@ function Chip({
         borderRadius: radii.pill,
         borderWidth: active ? 0 : 1,
         borderColor: colors.hairline,
-        backgroundColor: active ? colors.hairline : 'transparent',
+        backgroundColor: active ? colors.selected : 'transparent',
         opacity: pressed ? 0.7 : 1,
       })}
     >

@@ -27,6 +27,11 @@ const INK_PANEL = "rgba(15,15,15,0.04)"; // subtle surface fill
 const INK_OVERLAY = "rgba(15,15,15,0.45)";
 const INK_OVERLAY_LIGHT = "rgba(15,15,15,0.18)";
 
+// Selected-state fill for segmented controls / filter chips. Requested
+// explicitly as a dark slate rather than ink, so it lives as its own token
+// instead of being hardcoded at the call site.
+const SLATE_SELECTED = "#f1f2f6";
+
 // ── Semantic colors ──────────────────────────────────────────────────────
 // Consumers should reach for these names; raw values stay above.
 // Legacy aliases (pink/coral/amber/lime/sky/red/green) are kept so older
@@ -65,6 +70,10 @@ export const colors = {
   // Overlays (black at opacity — palette-compliant)
   overlay: INK_OVERLAY,
   overlayLight: INK_OVERLAY_LIGHT,
+
+  // Selected chip/segment fill + the text color that sits on it.
+  selected: SLATE_SELECTED,
+  onSelected: WHITE,
 
   // Legacy aliases — all collapse to purple/black so the 3-color rule holds.
   purple: PURPLE,
