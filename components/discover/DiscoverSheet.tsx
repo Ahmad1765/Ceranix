@@ -1,10 +1,12 @@
-// The Discover tab doesn't navigate — it opens this full-screen search sheet.
+// The Discover tab doesn't navigate — it opens this search sheet.
 //
 // Same primitive as SellSheet (`<Modal animationType="slide">`), so it slides
-// up from the bottom over whatever screen is active and fills the screen. The
-// layout mirrors the reference: grabber, one search field, a BROWSE chip row
-// and a TOPICS grid (components/discover/SearchLanding.tsx renders the last
-// two, shared with the Discover screen's own focus landing).
+// up from the bottom over whatever screen is active. It stops short of the top
+// edge (SheetShell below) so the screen underneath stays visible — that strip
+// is what makes it read as a sheet rather than a page, and it's tappable to
+// dismiss. The layout mirrors the reference: grabber, one search field, a
+// BROWSE chip row and a TOPICS grid (components/discover/SearchLanding.tsx
+// renders the last two, shared with the Discover screen's own focus landing).
 //
 // Nothing here holds search state. Every tap closes the sheet and navigates to
 // /discover with the intent encoded as params, which is what makes the sheet
@@ -22,8 +24,26 @@
 //      zeros on Android and content slides under the status/gesture bars.
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { View, Pressable, ScrollView, Modal, InteractionManager, Platform } from 'react-native';
+import {
+  View,
+  Pressable,
+  ScrollView,
+  Modal,
+  InteractionManager,
+  Platform,
+  StyleSheet,
+  useWindowDimensions,
+} from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
+import Animated, {
+  Easing,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { SafeAreaProvider, initialWindowMetrics, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -91,11 +111,178 @@ export function DiscoverSheetProvider({ children }: { children: ReactNode }) {
           // instead of zeros, so the header doesn't jump once measurement
           // lands — the jump would otherwise happen mid slide-up.
           <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-            {DUMMY_SKIN ? <DummySheetBody onClose={close} /> : <DiscoverSheetBody onClose={close} />}
+            {/* Same reason as the nested SafeAreaProvider: a Modal is its own
+                view root on Android, and gesture-handler only sees touches
+                below a root view of its own. Without this the drag-to-dismiss
+                works on web/iOS and does nothing on Android. */}
+            <GestureHandlerRootView style={{ flex: 1 }}>
+              <SheetShell onClose={close} skin={DUMMY_SKIN ? DUMMY_SKIN_HANDLE : DEFAULT_HANDLE}>
+                {DUMMY_SKIN ? <DummySheetBody onClose={close} /> : <DiscoverSheetBody onClose={close} />}
+              </SheetShell>
+            </GestureHandlerRootView>
           </SafeAreaProvider>
         ) : null}
       </Modal>
     </Ctx.Provider>
+  );
+}
+
+// ── Shell: top gap + grabber + drag-to-dismiss ──────────────────────────────
+// The shell owns everything outside the content: the strip of screen left
+// showing above the sheet, the sheet's rounded top and background, and the
+// grabber. The bodies below render content only.
+//
+// Why the grabber lives here and not in the bodies: it doubles as the drag
+// surface, and the drag has to be scoped to it. A Pan wrapping the whole sheet
+// would win against the body's ScrollView the moment it passed its activation
+// offset (both engage at ~10px), so dragging the content would move the sheet
+// instead of scrolling. Header-only keeps both gestures unambiguous.
+type SheetSkin = {
+  radius: number;
+  handleW: number;
+  handleH: number;
+  handleColor: string;
+  padTop: number;
+  gap: number;
+};
+
+const DEFAULT_HANDLE: SheetSkin = {
+  radius: radii['3xl'],
+  handleW: 38,
+  handleH: 4,
+  handleColor: colors.hairline,
+  padTop: 10,
+  gap: 14,
+};
+
+// Mirrors the mock's .handle (70×5 #ececec) and its 16px/20px spacing.
+const DUMMY_SKIN_HANDLE: SheetSkin = {
+  radius: 22,
+  handleW: 70,
+  handleH: 5,
+  handleColor: '#ececec',
+  padTop: 16,
+  gap: 20,
+};
+
+// Dismiss on either a deliberate drag or a flick — requiring the full distance
+// makes a quick swipe feel like it was ignored.
+const DRAG_CLOSE_PX = 96;
+const DRAG_CLOSE_VELOCITY = 700;
+
+function SheetShell({
+  onClose,
+  skin,
+  children,
+}: {
+  onClose: () => void;
+  skin: SheetSkin;
+  children: ReactNode;
+}) {
+  const insets = useSafeAreaInsets();
+  const { height: winHeight } = useWindowDimensions();
+  const translateY = useSharedValue(0);
+  // Scrim fades in rather than arriving with the slide — the Modal animates
+  // this whole view up, so a fully-opaque scrim would read as a dark band
+  // rising behind the sheet.
+  const appear = useSharedValue(0);
+
+  useEffect(() => {
+    appear.value = withTiming(1, { duration: 240 });
+  }, [appear]);
+
+  // Leave the sheet below the status bar with a little air on top of that.
+  // Floored on web/Android tablets, where insets.top can be 0.
+  const topGap = Math.max(insets.top, 20) + 12;
+
+  const pan = Gesture.Pan()
+    // Down only: a tap never hijacks it, and an upward drag hands the touch
+    // back instead of rubber-banding against a wall.
+    .activeOffsetY(8)
+    .failOffsetY(-8)
+    .onUpdate((e) => {
+      translateY.value = Math.max(0, e.translationY);
+    })
+    .onEnd((e) => {
+      if (translateY.value > DRAG_CLOSE_PX || e.velocityY > DRAG_CLOSE_VELOCITY) {
+        translateY.value = withTiming(
+          winHeight,
+          { duration: 180, easing: Easing.out(Easing.quad) },
+          (done) => {
+            if (done) runOnJS(onClose)();
+          },
+        );
+      } else {
+        // Snaps back with no bounce — this is a correction, not a flourish.
+        translateY.value = withSpring(0, { damping: 26, stiffness: 280, mass: 0.7 });
+      }
+    });
+
+  const sheetStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  // Scrim tracks the drag, so a half-committed swipe already shows the screen
+  // beneath coming back.
+  const scrimStyle = useAnimatedStyle(() => ({
+    opacity: appear.value * (1 - Math.min(1, translateY.value / (winHeight * 0.5))),
+  }));
+
+  return (
+    <View style={{ flex: 1 }}>
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.28)' }, scrimStyle]}
+      />
+
+      {/* The gap itself — tapping outside a sheet closes it. */}
+      <Pressable
+        onPress={onClose}
+        accessibilityRole="button"
+        accessibilityLabel="Dismiss search"
+        style={{ height: topGap }}
+      />
+
+      <Animated.View
+        style={[
+          {
+            flex: 1,
+            backgroundColor: colors.white,
+            borderTopLeftRadius: skin.radius,
+            borderTopRightRadius: skin.radius,
+            overflow: 'hidden',
+          },
+          sheetStyle,
+        ]}
+      >
+        <GestureDetector gesture={pan}>
+          <View style={{ paddingTop: skin.padTop, paddingBottom: skin.gap, alignItems: 'center' }}>
+            <Pressable
+              // Tap closes; a drag must not. On release the Pressable still
+              // reports a press (its press rect is generous, and web keeps the
+              // responder through the whole drag), so a short drag that should
+              // spring back would close the sheet instead. The offset at
+              // release tells the two apart — a real tap never moves it.
+              onPress={() => {
+                if (translateY.value > 4) return;
+                onClose();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Close search"
+              hitSlop={{ top: 12, bottom: 12, left: 60, right: 60 }}
+              style={{
+                width: skin.handleW,
+                height: skin.handleH,
+                borderRadius: 50,
+                backgroundColor: skin.handleColor,
+              }}
+            />
+          </View>
+        </GestureDetector>
+
+        <View style={{ flex: 1 }}>{children}</View>
+      </Animated.View>
+    </View>
   );
 }
 
@@ -162,28 +349,9 @@ function DiscoverSheetBody({ onClose }: { onClose: () => void }) {
     [go],
   );
 
+  // Background, rounded top, top inset and the grabber all belong to SheetShell.
   return (
-    <View
-      style={{
-        flex: 1,
-        backgroundColor: colors.white,
-        borderTopLeftRadius: radii['3xl'],
-        borderTopRightRadius: radii['3xl'],
-        paddingTop: insets.top + 10,
-      }}
-    >
-      {/* Grabber — kept as the sheet's identity even at full height. */}
-      <View
-        style={{
-          alignSelf: 'center',
-          width: 38,
-          height: 4,
-          borderRadius: 2,
-          backgroundColor: colors.hairline,
-          marginBottom: 14,
-        }}
-      />
-
+    <View style={{ flex: 1 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, gap: 10 }}>
         <View
           style={{
@@ -230,8 +398,8 @@ function DiscoverSheetBody({ onClose }: { onClose: () => void }) {
             </Pressable>
           ) : null}
         </View>
-        {/* At full height there's no overlay left to tap, so the sheet owns an
-            explicit way out (Android's back button also closes it). */}
+        {/* Explicit way out, alongside the grabber, the gap above and Android's
+            back button — the keyboard covers the other three while typing. */}
         <Pressable hitSlop={HIT_SLOP_8} onPress={onClose} accessibilityRole="button">
           <Text style={{ fontSize: 14, fontFamily: type.family.sansBold, color: colors.purple }}>
             Cancel

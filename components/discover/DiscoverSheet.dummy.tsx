@@ -105,7 +105,7 @@ const TOPICS = [
 ] as const;
 
 // ── Body ────────────────────────────────────────────────────────────────────
-export function DummySheetBody({ onClose }: { onClose: () => void }) {
+export function DummySheetBody(_props: { onClose: () => void }) {
   const insets = useSafeAreaInsets();
   const { width: winWidth } = useWindowDimensions();
   const [query, setQuery] = useState('');
@@ -115,34 +115,13 @@ export function DummySheetBody({ onClose }: { onClose: () => void }) {
   // resolves too narrow on native and packs three per row.
   const topicWidth = (winWidth - CSS.padX * 2 - CSS.topicGap) / 2;
 
+  // .sheet's own chrome — white fill, the 22px top radius, `padding-top: 16px`
+  // and .handle — is drawn by SheetShell in DiscoverSheet.tsx instead, because
+  // the handle is also the drag-to-dismiss surface. The tokens for it are
+  // mirrored there as DUMMY_SKIN_HANDLE; CSS.sheetRadius/padTop/handle* below
+  // stay as the record of where those numbers came from.
   return (
-    <View
-      style={{
-        flex: 1,
-        backgroundColor: '#ffffff',
-        borderTopLeftRadius: CSS.sheetRadius,
-        borderTopRightRadius: CSS.sheetRadius,
-        paddingTop: insets.top + CSS.padTop,
-        paddingHorizontal: CSS.padX,
-      }}
-    >
-      {/* .handle — also the way out: the mock has no Cancel button, and a
-          full-screen modal needs one on web (Android still has back). */}
-      <Pressable
-        onPress={onClose}
-        accessibilityRole="button"
-        accessibilityLabel="Close search"
-        hitSlop={{ top: 16, bottom: 16, left: 40, right: 40 }}
-        style={{
-          alignSelf: 'center',
-          width: CSS.handleW,
-          height: CSS.handleH,
-          borderRadius: 50,
-          backgroundColor: CSS.handleColor,
-          marginBottom: CSS.handleGap,
-        }}
-      />
-
+    <View style={{ flex: 1, paddingHorizontal: CSS.padX }}>
       {/* .search */}
       <View
         style={{
