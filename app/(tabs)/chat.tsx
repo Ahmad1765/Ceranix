@@ -13,7 +13,7 @@ import {
 import { useInboxQuery } from '@/lib/queries';
 import { colors, radii, shadow, type as typography } from '@/lib/theme';
 import { EmptyState } from '@/components/ui';
-import { InboxRow, InboxSkeleton, INBOX_ROW_INSET } from '@/components/chat';
+import { InboxRow, InboxSkeleton } from '@/components/chat';
 import { HIT_SLOP_8, useTabBarClearance } from '@/lib/responsive';
 
 type InboxTab = 'selling' | 'buying' | 'social' | 'support';
@@ -191,13 +191,7 @@ function ConversationPage({
           />
         )}
         ItemSeparatorComponent={() => (
-          <View
-            style={{
-              height: 1,
-              backgroundColor: colors.hairline,
-              marginLeft: INBOX_ROW_INSET,
-            }}
-          />
+          <View style={{ height: 1, backgroundColor: colors.hairline }} />
         )}
         ListEmptyComponent={
           <EmptyState icon={empty.icon} title={empty.title} description={empty.description} />

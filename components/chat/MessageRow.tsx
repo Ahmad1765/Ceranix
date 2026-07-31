@@ -7,14 +7,16 @@
 // what was actually said, and the metadata reads as a consistent muted column
 // down each side instead of as chrome inside every message.
 
-import { memo } from 'react';
-import { View } from 'react-native';
+import { memo, useCallback, useRef } from 'react';
+import { Platform, Pressable, View } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Feather } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { PressableScale } from '@/components/PressableScale';
 import { colors, radii, type as typography } from '@/lib/theme';
 import { formatPrice } from '@/lib/currency';
 import type { ChatMessage } from '@/lib/chat';
+import type { Anchor } from './ReactionPicker';
 import { bubbleStamp } from './format';
 
 const TAIL_RADIUS = 6;
@@ -34,10 +36,14 @@ export type MessageRowProps = {
   listingId: string | null;
   listingPrice: number | null;
   listingSold: boolean;
+  /** Every emoji on this message, in arrival order. */
+  reactions: string[];
   onAccept: () => void;
   onDecline: () => void;
   onPay: (amount: number) => void;
   onRetry: () => void;
+  /** Long-press: opens the reaction bar over the measured bubble. */
+  onLongPress: (anchor: Anchor) => void;
 };
 
 // ── Meta line ─────────────────────────────────────────────────────────────
@@ -128,7 +134,10 @@ function OfferBubble({
   onAccept,
   onDecline,
   onPay,
-}: Omit<MessageRowProps, 'grouped' | 'lastOfGroup' | 'senderName' | 'onRetry'>) {
+}: Omit<
+  MessageRowProps,
+  'grouped' | 'lastOfGroup' | 'senderName' | 'onRetry' | 'reactions' | 'onLongPress'
+>) {
   const amount = msg.metadata?.amount ?? 0;
   const status = msg.offer_status ?? 'pending';
   const canRespond = !mine && isSeller && status === 'pending';
@@ -377,10 +386,78 @@ function TextBubble({
   );
 }
 
+// ── Reactions ─────────────────────────────────────────────────────────────
+
+/** The chip that rides the bottom edge of a reacted-to bubble, iMessage-style:
+ *  it overlaps the corner so it reads as attached to that message and not as a
+ *  new row in the thread. */
+function ReactionChip({ reactions, mine }: { reactions: string[]; mine: boolean }) {
+  if (reactions.length === 0) return null;
+
+  // Two people, one reaction each — so at most a couple of emoji, and counting
+  // duplicates is cheaper than showing the same emoji twice.
+  const counts = new Map<string, number>();
+  reactions.forEach((e) => counts.set(e, (counts.get(e) ?? 0) + 1));
+
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        alignSelf: mine ? 'flex-end' : 'flex-start',
+        marginTop: -9,
+        marginRight: mine ? 8 : 0,
+        marginLeft: mine ? 0 : 8,
+        paddingHorizontal: 7,
+        paddingVertical: 3,
+        borderRadius: radii.pill,
+        backgroundColor: colors.white,
+        borderWidth: 1,
+        borderColor: colors.hairline,
+      }}
+    >
+      {[...counts.entries()].map(([emoji, count]) => (
+        <View key={emoji} style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+          <Text style={{ fontSize: 13, lineHeight: 17 }}>{emoji}</Text>
+          {count > 1 && (
+            <Text
+              style={{
+                fontFamily: typography.family.sansSemibold,
+                fontSize: 11,
+                color: colors.mute,
+              }}
+            >
+              {count}
+            </Text>
+          )}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 // ── Row ───────────────────────────────────────────────────────────────────
 
 function MessageRowImpl(props: MessageRowProps) {
-  const { msg, mine, grouped, lastOfGroup, senderName, onRetry } = props;
+  const { msg, mine, grouped, lastOfGroup, senderName, reactions, onRetry, onLongPress } = props;
+  const bubbleRef = useRef<View>(null);
+
+  // A message that hasn't landed yet has no server id to hang a reaction off.
+  const canReact = msg.kind !== 'system' && !msg.pending && !msg.failed;
+
+  const handleLongPress = useCallback(() => {
+    if (!canReact) return;
+    bubbleRef.current?.measureInWindow((x, y, width, height) => {
+      // A zero measurement means the row scrolled out from under the press —
+      // opening a bar pinned to (0,0) would be worse than doing nothing.
+      if (!width && !height) return;
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      }
+      onLongPress({ x, y, width, height, mine });
+    });
+  }, [canReact, mine, onLongPress]);
 
   if (msg.kind === 'system') return <SystemNotice msg={msg} />;
 
@@ -392,7 +469,21 @@ function MessageRowImpl(props: MessageRowProps) {
         alignItems: mine ? 'flex-end' : 'flex-start',
       }}
     >
-      {msg.kind === 'offer' ? <OfferBubble {...props} /> : <TextBubble {...props} />}
+      <Pressable
+        ref={bubbleRef}
+        onLongPress={canReact ? handleLongPress : undefined}
+        // Long enough not to fire while someone is scrolling with a finger
+        // resting on a bubble, short enough to feel deliberate.
+        delayLongPress={320}
+        accessibilityRole={canReact ? 'button' : undefined}
+        accessibilityLabel={canReact ? 'Message. Long press to react' : undefined}
+        // No pressed styling: the bubble isn't a button, and flashing it on
+        // every tap-through would be noise.
+        style={{ alignItems: mine ? 'flex-end' : 'flex-start' }}
+      >
+        {msg.kind === 'offer' ? <OfferBubble {...props} /> : <TextBubble {...props} />}
+        <ReactionChip reactions={reactions} mine={mine} />
+      </Pressable>
       {lastOfGroup && (
         <MetaLine msg={msg} mine={mine} senderName={senderName} onRetry={onRetry} />
       )}

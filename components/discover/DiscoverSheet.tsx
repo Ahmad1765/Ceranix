@@ -23,7 +23,7 @@
 //      modal's window. Without a provider inside, useSafeAreaInsets() reports
 //      zeros on Android and content slides under the status/gesture bars.
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   View,
   Pressable,
@@ -53,6 +53,7 @@ import { useFeedListingsQuery } from '@/lib/queries';
 import { colors, radii, type } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { SearchLanding, type BrowseAction, type TopicAction } from './SearchLanding';
+import { useSheetSearchFocus } from './useSheetSearchFocus';
 import { DummySheetBody, registerDummySkinFont } from './DiscoverSheet.dummy'; // DUMMY SKIN
 
 // ── DUMMY SKIN (temporary) ──────────────────────────────────────────────────
@@ -296,6 +297,11 @@ function DiscoverSheetBody({ onClose }: { onClose: () => void }) {
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
 
+  // Opening the sheet is unambiguously an intent to search, so the keyboard
+  // comes up with it rather than costing a second tap.
+  const searchRef = useRef<TextInput>(null);
+  useSheetSearchFocus(searchRef);
+
   // Hold the covers fetch until the slide-up has finished. RN's performance
   // guide is explicit that work competing with a transition is what makes it
   // stutter; the tiles render their taxonomy icon in the meantime and the
@@ -374,6 +380,7 @@ function DiscoverSheetBody({ onClose }: { onClose: () => void }) {
         >
           <Feather name="search" size={18} color={colors.muteSoft} />
           <TextInput
+            ref={searchRef}
             value={query}
             onChangeText={setQuery}
             onSubmitEditing={submit}

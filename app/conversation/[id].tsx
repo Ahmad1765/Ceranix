@@ -12,6 +12,7 @@ import {
   Alert,
 } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
+import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, router } from 'expo-router';
 import { safeBack } from '@/lib/nav';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,16 +20,23 @@ import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@/lib/auth';
 import {
   fetchMessages,
+  fetchReactions,
   getConversation,
+  markConversationRead,
   sendMessage,
   sendOffer,
+  setReaction,
   subscribeToMessages,
+  subscribeToReactions,
   updateOfferStatus,
   otherParticipant,
   type ChatMessage,
   type ConversationRow,
+  type MessageReaction,
 } from '@/lib/chat';
 import { getOptimizedImageUrl } from '@/lib/images';
+import { useQueryClient } from '@tanstack/react-query';
+import { qk } from '@/lib/queries';
 import { useToast } from '@/lib/toast';
 import { captureError } from '@/lib/sentry';
 import { colors, radii, type as typography } from '@/lib/theme';
@@ -47,11 +55,28 @@ import {
   ListingBar,
   listingStatus,
   MessageRow,
+  ReactionPicker,
   SafetyNote,
   ThreadHeader,
+  type Anchor,
   type ChatAction,
+  type MessageAction,
   type ThreadRow,
 } from '@/components/chat';
+
+/** Breathing room under the composer at rest. The dock is white on a white
+ *  page, so there's no edge to see — the gap only reads as deliberate once
+ *  it's clearly bigger than the row's own 8px padding. Phones with a home
+ *  indicator already pay more than this via the safe-area inset. */
+const DOCK_GAP = 32;
+
+/** With the keyboard up the screen is short and the keyboard's own top edge
+ *  supplies the boundary, so a hair of separation is enough. */
+const DOCK_GAP_KEYBOARD = 8;
+
+/** One shared empty array so an unreacted message keeps a stable prop identity
+ *  and never re-renders its row for nothing. */
+const EMPTY_REACTIONS: string[] = [];
 
 // Is the software keyboard up? The bottom dock pads itself by the safe-area
 // inset at rest, but once the keyboard covers that area the padding has to
@@ -304,12 +329,15 @@ export default function ConversationScreen() {
   const conversationId = typeof id === 'string' ? id : '';
   const { user } = useAuth();
   const toast = useToast();
+  const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const keyboardUp = useKeyboardVisible();
   const listRef = useRef<FlatList<ThreadRow>>(null);
 
   const [conv, setConv] = useState<ConversationRow | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [reactions, setReactions] = useState<MessageReaction[]>([]);
+  const [pressed, setPressed] = useState<{ msg: ChatMessage; anchor: Anchor } | null>(null);
   const [loading, setLoading] = useState(true);
   const [input, setInput] = useState('');
   const [offerVisible, setOfferVisible] = useState(false);
@@ -323,13 +351,15 @@ export default function ConversationScreen() {
     setLoading(true);
     (async () => {
       try {
-        const [c, m] = await Promise.all([
+        const [c, m, r] = await Promise.all([
           withTimeout(getConversation(conversationId), 12_000, null),
           withTimeout(fetchMessages(conversationId), 12_000, []),
+          withTimeout(fetchReactions(conversationId), 12_000, [] as MessageReaction[]),
         ]);
         if (cancelled) return;
         setConv(c);
         setMessages(m);
+        setReactions(r);
       } catch (e) {
         console.warn('[conversation] load failed', e);
       } finally {
@@ -364,6 +394,38 @@ export default function ConversationScreen() {
     return unsub;
   }, [conversationId]);
 
+  // Mark read on open, and again whenever a message arrives while the thread is
+  // on screen — otherwise reading a live conversation would leave the dot
+  // behind the moment they sent something after you opened it. Keyed on the
+  // message count so it re-stamps per message rather than per render.
+  //
+  // The inbox is invalidated rather than patched: it's a different screen with
+  // its own query, and it re-reads on focus anyway.
+  useEffect(() => {
+    if (!conversationId || !user?.id) return;
+    markConversationRead(conversationId).then(() => {
+      queryClient.invalidateQueries({ queryKey: qk.inbox(user.id) });
+    });
+  }, [conversationId, user?.id, messages.length, queryClient]);
+
+  useEffect(() => {
+    if (!conversationId) return;
+    return subscribeToReactions(conversationId, (event) => {
+      setReactions((prev) => {
+        // Both branches drop the sender's existing row first — one reaction per
+        // person per message, so an emoji swap is a replace, not an append.
+        if (event.type === 'cleared') {
+          return prev.filter(
+            (r) => !(r.message_id === event.messageId && r.user_id === event.userId),
+          );
+        }
+        const { message_id, user_id, emoji } = event.reaction;
+        const rest = prev.filter((r) => !(r.message_id === message_id && r.user_id === user_id));
+        return [...rest, { message_id, user_id, emoji }];
+      });
+    });
+  }, [conversationId]);
+
   useEffect(() => {
     if (messages.length === 0) return;
     const t = setTimeout(() => {
@@ -375,6 +437,65 @@ export default function ConversationScreen() {
   const other = useMemo(() => (user && conv ? otherParticipant(conv, user.id) : null), [user, conv]);
   const isSeller = !!user && !!conv && conv.seller_id === user.id;
   const rows = useMemo(() => buildThreadRows(messages), [messages]);
+
+  // Indexed once per reaction change rather than filtered inside every row —
+  // and the array identity per message stays stable, so MessageRow's memo holds.
+  const byMessage = useMemo(() => {
+    const map = new Map<string, string[]>();
+    reactions.forEach((r) => {
+      const list = map.get(r.message_id);
+      if (list) list.push(r.emoji);
+      else map.set(r.message_id, [r.emoji]);
+    });
+    return map;
+  }, [reactions]);
+
+  const myReactionOn = useCallback(
+    (messageId: string) =>
+      reactions.find((r) => r.message_id === messageId && r.user_id === user?.id)?.emoji ?? null,
+    [reactions, user?.id],
+  );
+
+  // Optimistic, then persisted: a reaction is a one-tap gesture and waiting a
+  // round-trip to see it makes the whole thread feel remote. On failure the
+  // realtime feed and the next fetch both correct it.
+  const handleReact = useCallback(
+    async (emoji: string) => {
+      const msg = pressed?.msg;
+      if (!user || !msg) return;
+      const current = myReactionOn(msg.id);
+      const removing = current === emoji;
+      setPressed(null);
+
+      setReactions((prev) => {
+        const rest = prev.filter((r) => !(r.message_id === msg.id && r.user_id === user.id));
+        return removing ? rest : [...rest, { message_id: msg.id, user_id: user.id, emoji }];
+      });
+
+      // A clear is a NULL emoji, not a delete — see subscribeToReactions.
+      const ok = await setReaction({
+        messageId: msg.id,
+        userId: user.id,
+        emoji: removing ? null : emoji,
+      });
+      if (!ok) {
+        setReactions(await fetchReactions(conversationId));
+        toast.show("Couldn't save reaction", { variant: 'default', icon: 'alert-triangle' });
+      }
+    },
+    [conversationId, myReactionOn, pressed?.msg, toast, user],
+  );
+
+  const handleCopy = useCallback(async () => {
+    const msg = pressed?.msg;
+    if (!msg) return;
+    const text =
+      msg.kind === 'offer' && msg.metadata?.amount
+        ? formatPrice(msg.metadata.amount)
+        : msg.content;
+    await Clipboard.setStringAsync(text);
+    toast.show('Copied', { variant: 'success', icon: 'check' });
+  }, [pressed?.msg, toast]);
 
   // One send path for both the first attempt and any retry, so a retried
   // message goes through exactly the same dedupe as the original.
@@ -510,12 +631,14 @@ export default function ConversationScreen() {
           listingId={conv?.listing_id ?? null}
           listingPrice={conv?.listing?.price ?? null}
           listingSold={conv?.listing?.is_sold ?? false}
+          reactions={byMessage.get(item.msg.id) ?? EMPTY_REACTIONS}
           onAccept={() => handleOfferResponse(item.msg, 'accepted')}
           onDecline={() => handleOfferResponse(item.msg, 'declined')}
           onPay={(amount) =>
             conv?.listing_id && router.push(`/payment/${conv.listing_id}?offer=${amount}` as any)
           }
           onRetry={() => handleRetry(item.msg)}
+          onLongPress={(anchor) => setPressed({ msg: item.msg, anchor })}
         />
       );
     },
@@ -523,6 +646,7 @@ export default function ConversationScreen() {
       user,
       isSeller,
       senderName,
+      byMessage,
       conv?.listing_id,
       conv?.listing?.price,
       conv?.listing?.is_sold,
@@ -616,6 +740,10 @@ export default function ConversationScreen() {
     },
   ];
 
+  const messageActions: MessageAction[] = [
+    { id: 'copy', label: 'Copy', icon: 'copy', onPress: handleCopy },
+  ];
+
   const overflowActions: ChatAction[] = [
     ...(other?.id
       ? [
@@ -704,9 +832,12 @@ export default function ConversationScreen() {
             borderTopWidth: 1,
             borderTopColor: colors.hairline,
             backgroundColor: colors.white,
-            // The inset only needs paying for while the keyboard isn't already
-            // covering it.
-            paddingBottom: keyboardUp ? 0 : insets.bottom,
+            // The composer never sits flush against the bottom edge — it reads
+            // as cut off, and on a gesture-bar phone the send button lands in
+            // the swipe-up zone. The safe-area inset already buys that gap
+            // where there is one; DOCK_GAP is the floor everywhere else (web,
+            // older Android, and whenever the keyboard has eaten the inset).
+            paddingBottom: keyboardUp ? DOCK_GAP_KEYBOARD : Math.max(insets.bottom, DOCK_GAP),
           }}
         >
           {conv.listing_id && (
@@ -726,6 +857,14 @@ export default function ConversationScreen() {
           />
         </View>
       </KeyboardAvoidingView>
+
+      <ReactionPicker
+        anchor={pressed?.anchor ?? null}
+        selected={pressed ? myReactionOn(pressed.msg.id) : null}
+        actions={messageActions}
+        onSelect={handleReact}
+        onClose={() => setPressed(null)}
+      />
 
       <ChatActionSheet
         visible={plusOpen}

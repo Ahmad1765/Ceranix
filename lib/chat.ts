@@ -34,6 +34,8 @@ export interface ConversationRow {
   last_message: string | null;
   last_sender_id?: string | null;
   updated_at: string;
+  buyer_last_read_at?: string | null;
+  seller_last_read_at?: string | null;
   listing?: Pick<Listing, 'id' | 'title' | 'price' | 'images' | 'is_sold'> | null;
   buyer?: Pick<User, 'id' | 'username' | 'avatar_url' | 'full_name'> | null;
   seller?: Pick<User, 'id' | 'username' | 'avatar_url' | 'full_name'> | null;
@@ -41,6 +43,7 @@ export interface ConversationRow {
 
 const CONVERSATION_SELECT = `
   id, listing_id, buyer_id, seller_id, last_message, last_sender_id, updated_at,
+  buyer_last_read_at, seller_last_read_at,
   listing:listings(id, title, price, images, is_sold),
   buyer:profiles!conversations_buyer_id_fkey(id, username, avatar_url, full_name),
   seller:profiles!conversations_seller_id_fkey(id, username, avatar_url, full_name)
@@ -201,6 +204,102 @@ export async function updateOfferStatus(
   return true;
 }
 
+// ── Reactions ─────────────────────────────────────────────────────────────
+// One emoji per person per message, enforced by a unique key in the database:
+// picking a second emoji replaces the first, picking the same one again clears
+// it.
+//
+// Clearing sets `emoji` to NULL rather than deleting the row. That isn't
+// squeamishness about deletes — Realtime can't filter DELETE events at all, and
+// strips their payload down to the primary key on an RLS-enabled table, so a
+// delete could never tell a thread *which* message just lost its reaction. An
+// update carries the whole row and respects the conversation filter. See
+// supabase/migrations/20260731164411_message_reactions_clear_as_update.sql.
+
+/** The quick-reaction row, in the order it's drawn. */
+export const REACTION_EMOJI = ['💜', '🤝', '💯', '🔥', '👍'] as const;
+
+export interface MessageReaction {
+  message_id: string;
+  user_id: string;
+  emoji: string;
+}
+
+/** A row as it arrives from Postgres, where a cleared reaction is a NULL emoji. */
+type MessageReactionRow = Omit<MessageReaction, 'emoji'> & { emoji: string | null };
+
+export async function fetchReactions(conversationId: string): Promise<MessageReaction[]> {
+  const { data, error } = await supabase
+    .from('message_reactions')
+    .select('message_id, user_id, emoji')
+    .eq('conversation_id', conversationId)
+    // Skip the tombstones — a cleared reaction is a row that still exists.
+    .not('emoji', 'is', null);
+  if (error) {
+    console.warn('[chat] fetchReactions', error.message);
+    return [];
+  }
+  return (data ?? []) as MessageReaction[];
+}
+
+/** Sets, replaces, or (with `emoji: null`) clears this user's reaction. */
+export async function setReaction(args: {
+  messageId: string;
+  userId: string;
+  emoji: string | null;
+}): Promise<boolean> {
+  // conversation_id is deliberately absent: the BEFORE trigger fills it, and
+  // Postgres checks NOT NULL after BEFORE triggers run.
+  const { error } = await supabase.from('message_reactions').upsert(
+    { message_id: args.messageId, user_id: args.userId, emoji: args.emoji },
+    { onConflict: 'message_id,user_id' },
+  );
+  if (error) {
+    console.warn('[chat] setReaction', error.message);
+    return false;
+  }
+  return true;
+}
+
+export type ReactionEvent =
+  | { type: 'set'; reaction: MessageReaction }
+  | { type: 'cleared'; messageId: string; userId: string };
+
+export function subscribeToReactions(
+  conversationId: string,
+  onEvent: (e: ReactionEvent) => void,
+): () => void {
+  const channel = supabase
+    .channel(`reactions:${conversationId}`)
+    .on(
+      'postgres_changes',
+      {
+        // INSERT is a first reaction, UPDATE is a swap or a clear — the unique
+        // key means a person's second pick lands on their existing row. DELETE
+        // is deliberately not handled: rows are never deleted, precisely
+        // because Realtime can't filter or populate those events under RLS.
+        event: '*',
+        schema: 'public',
+        table: 'message_reactions',
+        filter: `conversation_id=eq.${conversationId}`,
+      },
+      (payload) => {
+        const row = payload.new as MessageReactionRow | undefined;
+        if (!row?.message_id || !row?.user_id) return;
+        onEvent(
+          row.emoji
+            ? { type: 'set', reaction: { ...row, emoji: row.emoji } }
+            : { type: 'cleared', messageId: row.message_id, userId: row.user_id },
+        );
+      },
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
 export type MessageEvent =
   | { type: 'insert'; message: ChatMessage }
   | { type: 'update'; message: ChatMessage };
@@ -284,6 +383,27 @@ export function formatChatTime(iso: string): string {
   const days = Math.floor(hrs / 24);
   if (days < 7) return `${days}d`;
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+/** Does this thread have something in it the viewer hasn't seen?
+ *
+ *  Two conditions, both required: someone else spoke last, and they spoke after
+ *  the viewer last opened the thread. The second half is what was missing —
+ *  without it the dot could only ever be cleared by replying. */
+export function isConversationUnread(conv: ConversationRow, userId: string): boolean {
+  if (!conv.last_sender_id || conv.last_sender_id === userId) return false;
+  const readAt = conv.buyer_id === userId ? conv.buyer_last_read_at : conv.seller_last_read_at;
+  if (!readAt) return true; // never opened
+  return new Date(conv.updated_at).getTime() > new Date(readAt).getTime();
+}
+
+/** Stamps "I've seen this" for the calling participant. Fire-and-forget: a
+ *  failed read receipt must never block opening a thread. */
+export async function markConversationRead(conversationId: string): Promise<void> {
+  const { error } = await supabase.rpc('mark_conversation_read', {
+    p_conversation_id: conversationId,
+  });
+  if (error) console.warn('[chat] markConversationRead', error.message);
 }
 
 export function otherParticipant(

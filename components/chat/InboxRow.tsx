@@ -11,11 +11,9 @@ import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import { getOptimizedImageUrl } from '@/lib/images';
 import { colors, radii, type as typography } from '@/lib/theme';
-import { otherParticipant, type ConversationRow } from '@/lib/chat';
+import { isConversationUnread, otherParticipant, type ConversationRow } from '@/lib/chat';
 import { ListingThumb, listingStatus } from './ListingThumb';
 import { relativeTime } from './format';
-
-export const INBOX_ROW_INSET = 82; // avatar + gutter — where the separator starts
 
 function InboxRowImpl({
   conv,
@@ -32,7 +30,7 @@ function InboxRowImpl({
     ? getOptimizedImageUrl(conv.listing.images[0], { width: 240 })
     : null;
 
-  const unread = !!conv.last_sender_id && conv.last_sender_id !== userId;
+  const unread = isConversationUnread(conv, userId);
   const fromMe = !!conv.last_sender_id && conv.last_sender_id === userId;
   const displayName = other?.full_name || other?.username || 'Unknown';
   const initial = displayName.trim().charAt(0).toUpperCase();

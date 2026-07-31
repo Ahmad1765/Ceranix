@@ -12,7 +12,7 @@
 // or delete the three "DUMMY SKIN" lines there plus this file. The real
 // DiscoverSheetBody is untouched.
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   View,
   Pressable,
@@ -28,6 +28,7 @@ import { captureError } from '@/lib/sentry';
 import { withFontDisplay } from '@/lib/fonts';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type as type_ } from '@/lib/theme';
+import { useSheetSearchFocus } from './useSheetSearchFocus';
 
 // FontAwesome6 is the one icon family in the app that app/_layout.tsx does not
 // preload, because this throwaway skin is its only consumer.
@@ -167,6 +168,10 @@ export function DummySheetBody(_props: { onClose: () => void }) {
   const { width: winWidth } = useWindowDimensions();
   const [query, setQuery] = useState('');
 
+  // Opening the sheet is an intent to search — bring the keyboard with it.
+  const searchRef = useRef<TextInput>(null);
+  useSheetSearchFocus(searchRef);
+
   // `grid-template-columns: repeat(2, 1fr)` with a 12px gap. Computed in px
   // rather than '48%' — a percentage width in a flex-wrap row with `gap`
   // resolves too narrow on native and packs three per row.
@@ -199,6 +204,7 @@ export function DummySheetBody(_props: { onClose: () => void }) {
           style={{ marginRight: CSS.searchIconGap }}
         />
         <TextInput
+          ref={searchRef}
           value={query}
           onChangeText={setQuery}
           placeholder="Search polymarkets..."
