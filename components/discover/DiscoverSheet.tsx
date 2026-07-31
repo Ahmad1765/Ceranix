@@ -53,7 +53,7 @@ import { useFeedListingsQuery } from '@/lib/queries';
 import { colors, radii, type } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { SearchLanding, type BrowseAction, type TopicAction } from './SearchLanding';
-import { DummySheetBody } from './DiscoverSheet.dummy'; // DUMMY SKIN
+import { DummySheetBody, registerDummySkinFont } from './DiscoverSheet.dummy'; // DUMMY SKIN
 
 // ── DUMMY SKIN (temporary) ──────────────────────────────────────────────────
 // Swaps the body below for a visual-only reskin matching the reference
@@ -87,7 +87,13 @@ export function useDiscoverSheet(): DiscoverSheetApi {
 
 export function DiscoverSheetProvider({ children }: { children: ReactNode }) {
   const [visible, setVisible] = useState(false);
-  const open = useCallback(() => setVisible(true), []);
+  const open = useCallback(() => {
+    // Claim the skin's icon family before its icons mount — see
+    // registerDummySkinFont. Synchronous, idempotent, and a no-op once the
+    // DUMMY SKIN lines are removed. (DUMMY SKIN)
+    if (DUMMY_SKIN) registerDummySkinFont();
+    setVisible(true);
+  }, []);
   const close = useCallback(() => setVisible(false), []);
   const api = useMemo(() => ({ open }), [open]);
 

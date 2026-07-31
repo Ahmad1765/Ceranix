@@ -12,6 +12,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import * as Font from 'expo-font';
 import { Asset } from 'expo-asset';
 import { Ionicons, Feather } from '@expo/vector-icons';
+import { withFontDisplay } from '@/lib/fonts';
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -55,13 +56,26 @@ installAlertShim();
 // React 19 ignores entirely for function components — so it silently did
 // nothing and Android painted the default black underline.
 
-const AESTHETIC_FONTS = {
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
-  Inter_700Bold_Italic,
-};
+// Both maps are tagged FontDisplay.BLOCK — see lib/fonts.ts for the reasoning.
+// Short version: without it the browser paints a fallback face while these are
+// still downloading, which showed up as tofu boxes for every icon and as body
+// text flashing from the system serif to Inter. BLOCK keeps the glyphs
+// invisible until the real file lands. Web-only; native ignores the field.
+const ICON_FONTS = withFontDisplay(
+  { ...Ionicons.font, ...Feather.font },
+  Font.FontDisplay.BLOCK,
+);
+
+const AESTHETIC_FONTS = withFontDisplay(
+  {
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+    Inter_700Bold_Italic,
+  },
+  Font.FontDisplay.BLOCK,
+);
 
 SplashScreen.preventAutoHideAsync();
 
@@ -110,15 +124,19 @@ function RootLayout() {
   useEffect(() => attachResponseListener(), []);
 
   useEffect(() => {
-    // Icon fonts are tiny — always block first paint on these so glyphs never
-    // render as boxes.
-    const iconFonts = Font.loadAsync({ ...Ionicons.font, ...Feather.font });
+    // Gate first paint on the icon fonts. Note this is a best-effort gate, not
+    // a guarantee: the `.finally` below releases it even when loadAsync
+    // *rejects*, and it does reject on slow links — Ionicons is 381 KB and
+    // FontFaceObserver gives it a fixed 6s. What actually stops boxes from
+    // being painted in that case is FontDisplay.BLOCK on ICON_FONTS, not this.
+    const iconFonts = Font.loadAsync(ICON_FONTS);
     const interFonts = Font.loadAsync(AESTHETIC_FONTS);
 
     if (Platform.OS === 'web') {
-      // Web can paint before Inter arrives: expo-font injects an @font-face and
-      // the browser reflows already-painted text the moment the file lands. So
-      // keep Inter off the critical path here and let it swap in.
+      // Inter stays off the critical path — 5 weights at ~335 KB each is far
+      // too much to hold first paint on. It no longer *flashes* through the
+      // system serif on the way in, though: FontDisplay.BLOCK keeps that text
+      // invisible until Inter resolves rather than painting the wrong face.
       interFonts.catch(console.warn);
       iconFonts
         .catch(console.warn)

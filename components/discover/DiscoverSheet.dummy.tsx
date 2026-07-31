@@ -23,8 +23,65 @@ import {
 } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
 import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
+import * as Font from 'expo-font';
+import { captureError } from '@/lib/sentry';
+import { withFontDisplay } from '@/lib/fonts';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type as type_ } from '@/lib/theme';
+
+// FontAwesome6 is the one icon family in the app that app/_layout.tsx does not
+// preload, because this throwaway skin is its only consumer.
+//
+// That mattered: @expo/vector-icons loads an unregistered family lazily from an
+// `async componentDidMount` with no try/catch (see
+// node_modules/@expo/vector-icons/build/createIconSet.js). On web that load
+// races FontFaceObserver's fixed 6000ms deadline, so a slow fetch — cold Metro,
+// throttled connection — failed twice over: the rejection escaped as an
+// *uncaught* "6000ms timeout exceeded", and since `setState({ fontIsLoaded:
+// true })` never ran, the glyphs stayed an empty <Text> even after the file
+// landed.
+//
+// Font.loadAsync injects the @font-face rule synchronously before it returns
+// its promise (expo-font's loadSingleFontAsync is deliberately not `async`), so
+// calling this at the moment the sheet is opened is enough: by the time React
+// renders the icons a tick later, Font.isLoaded() is true and the lazy path is
+// never taken. Doing it here rather than at boot keeps ~480 KB of TTF off
+// startup for everyone who never opens Discover.
+//
+// Brands is excluded — this skin only uses solid/regular glyphs, and
+// FontAwesome6_Brands.ttf is another 204 KB for nothing.
+//
+// No "already registered" flag on purpose: expo-font already dedupes. Font.js's
+// loadFontInNamespaceAsync bails on `isLoaded(fontFamily)` and otherwise shares
+// the in-flight entry in `loadPromises`, so repeat opens cost one map lookup.
+// A local flag would only add a failure mode — a first attempt that rejected
+// could never be retried.
+//
+// The catch is mandatory, not cosmetic: expo-font's docs say to wrap loadAsync
+// "to ensure the app continues if the font fails to load", and without it this
+// is the very unhandled rejection described above. It reports through
+// captureError rather than console.warn because @sentry/react-native tracks
+// unhandled rejections automatically (including on react-native-web, since
+// 6.15.0) — so a bare catch here would not just fix the crash, it would delete a
+// signal Sentry was already sending us. At most one event per session: once the
+// @font-face rule exists, isLoaded() is true and later calls no-op.
+// FontDisplay.BLOCK is load-bearing, not decorative. Registering the family
+// here is what makes @expo/vector-icons consider it loaded, so its icons now
+// mount rendering the real glyph immediately instead of an empty <Text> — which
+// means that without a display hint they paint as tofu boxes for as long as the
+// TTF is in flight. BLOCK keeps them invisible until it lands, so the trade is
+// "blank then icon" (as before) rather than "box then icon". See lib/fonts.ts.
+export function registerDummySkinFont() {
+  const fonts = withFontDisplay(
+    Object.fromEntries(
+      Object.entries(FontAwesome6.font as Record<string, Font.FontSource>).filter(
+        ([family]) => !family.includes('Brands'),
+      ),
+    ),
+    Font.FontDisplay.BLOCK,
+  );
+  Font.loadAsync(fonts).catch((e) => captureError(e, { fn: 'discoverSheet.dummySkinFont' }));
+}
 
 // ── Tokens, straight from the stylesheet ────────────────────────────────────
 const CSS = {
