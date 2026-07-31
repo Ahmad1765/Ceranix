@@ -51,7 +51,9 @@ type Props = {
   bare?: boolean;
 };
 
-function explainCoverage() {
+// Exported so surfaces that show the trust copy in a different shape (the
+// chat thread prints it as a single muted line) still open the same explainer.
+export function explainCoverage() {
   Alert.alert(
     "How you're covered",
     'Refund policy — Buyers get a full refund if an item never arrives or isn’t as described.\n\n' +

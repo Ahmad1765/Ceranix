@@ -1,21 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, FlatList, Pressable, RefreshControl, ActivityIndicator, Animated, Platform, useWindowDimensions, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
+import { View, FlatList, Pressable, RefreshControl, Animated, Platform, useWindowDimensions, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/lib/auth';
 import {
   subscribeToInbox,
-  otherParticipant,
   type ConversationRow,
 } from '@/lib/chat';
 import { useInboxQuery } from '@/lib/queries';
-import { getOptimizedImageUrl } from '@/lib/images';
-import { colors, radii, shadow } from '@/lib/theme';
+import { colors, radii, shadow, type as typography } from '@/lib/theme';
 import { EmptyState } from '@/components/ui';
+import { InboxRow, InboxSkeleton, INBOX_ROW_INSET } from '@/components/chat';
 import { HIT_SLOP_8, useTabBarClearance } from '@/lib/responsive';
 
 type InboxTab = 'selling' | 'buying' | 'social' | 'support';
@@ -38,22 +36,6 @@ const UNDERLINE_WIDTH_RATIO = 0.42;
 // the Haptics API has nothing to drive.
 function haptic() {
   if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-}
-
-function formatRelativeTime(iso: string): string {
-  const d = new Date(iso);
-  const diffMs = Date.now() - d.getTime();
-  const mins = Math.floor(diffMs / 60_000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins} min${mins === 1 ? '' : 's'} ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs} hour${hrs === 1 ? '' : 's'} ago`;
-  const days = Math.floor(hrs / 24);
-  if (days < 30) return `${days} day${days === 1 ? '' : 's'} ago`;
-  const months = Math.floor(days / 30);
-  if (months < 12) return `${months} month${months === 1 ? '' : 's'} ago`;
-  const years = Math.floor(months / 12);
-  return `${years} year${years === 1 ? '' : 's'} ago`;
 }
 
 function SignedOutState() {
@@ -118,8 +100,8 @@ function UnderlineTabs({
             >
               <Text
                 style={{
+                  fontFamily: active ? typography.family.sansBold : typography.family.sansMedium,
                   fontSize: 15,
-                  fontWeight: active ? '800' : '500',
                   color: active ? colors.ink : colors.muteSoft,
                   letterSpacing: -0.1,
                 }}
@@ -146,126 +128,6 @@ function UnderlineTabs({
         />
       )}
     </View>
-  );
-}
-
-function ConversationRowItem({
-  conv,
-  userId,
-  onPress,
-}: {
-  conv: ConversationRow;
-  userId: string;
-  onPress: () => void;
-}) {
-  const other = otherParticipant(conv, userId);
-  const thumb = conv.listing?.images?.[0]
-    ? getOptimizedImageUrl(conv.listing.images[0], { width: 240 })
-    : null;
-  const avatar = other?.avatar_url ? getOptimizedImageUrl(other.avatar_url, { width: 140 }) : null;
-  const isUnread = !!conv.last_sender_id && conv.last_sender_id !== userId;
-  const preview = conv.last_message ?? 'Tap to start the conversation';
-  const initial = (other?.full_name || other?.username || 'U').trim().charAt(0).toUpperCase();
-  const displayName = other?.full_name || other?.username || 'Unknown';
-
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => ({
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        backgroundColor: pressed ? colors.panel : 'transparent',
-      })}
-    >
-      {/* Avatar */}
-      <View
-        style={{
-          width: 56,
-          height: 56,
-          borderRadius: 28,
-          backgroundColor: colors.panel,
-          overflow: 'hidden',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginRight: 12,
-        }}
-      >
-        {avatar ? (
-          <Image
-            source={{ uri: avatar }}
-            style={{ width: '100%', height: '100%' }}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-            transition={120}
-          />
-        ) : (
-          <Text style={{ fontSize: 20, fontWeight: '800', color: colors.purple }}>{initial}</Text>
-        )}
-      </View>
-
-      {/* Body */}
-      <View style={{ flex: 1, minWidth: 0, marginRight: 10 }}>
-        <Text
-          style={{
-            fontSize: 15.5,
-            fontWeight: '800',
-            color: colors.ink,
-            letterSpacing: -0.2,
-            marginBottom: 2,
-          }}
-          numberOfLines={1}
-        >
-          {displayName}
-        </Text>
-        <Text
-          style={{
-            fontSize: 13.5,
-            color: isUnread ? colors.ink : colors.mute,
-            fontWeight: isUnread ? '600' : '400',
-          }}
-          numberOfLines={1}
-        >
-          {preview}
-        </Text>
-        <Text
-          style={{
-            fontSize: 12,
-            color: colors.muteSoft,
-            marginTop: 4,
-          }}
-        >
-          {formatRelativeTime(conv.updated_at)}
-        </Text>
-      </View>
-
-      {/* Listing thumbnail */}
-      {thumb ? (
-        <Image
-          source={{ uri: thumb }}
-          style={{ width: 56, height: 72, borderRadius: 8, backgroundColor: colors.panel }}
-          contentFit="cover"
-          cachePolicy="memory-disk"
-        />
-      ) : (
-        <View style={{ width: 56, height: 72 }} />
-      )}
-
-      {isUnread && (
-        <View
-          style={{
-            position: 'absolute',
-            top: 18,
-            right: 10,
-            width: 8,
-            height: 8,
-            borderRadius: 4,
-            backgroundColor: colors.purple,
-          }}
-        />
-      )}
-    </Pressable>
   );
 }
 
@@ -305,6 +167,7 @@ function ConversationPage({
   pageWidth,
   refreshing,
   onRefresh,
+  bottomInset,
 }: {
   data: ConversationRow[];
   userId: string;
@@ -312,6 +175,7 @@ function ConversationPage({
   pageWidth: number;
   refreshing: boolean;
   onRefresh: () => void;
+  bottomInset: number;
 }) {
   const empty = emptyStateFor(tab);
   return (
@@ -320,21 +184,27 @@ function ConversationPage({
         data={data}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <ConversationRowItem
+          <InboxRow
             conv={item}
             userId={userId}
             onPress={() => router.push(`/conversation/${item.id}` as any)}
           />
         )}
         ItemSeparatorComponent={() => (
-          <View style={{ height: 1, backgroundColor: colors.hairline, marginLeft: 84 }} />
+          <View
+            style={{
+              height: 1,
+              backgroundColor: colors.hairline,
+              marginLeft: INBOX_ROW_INSET,
+            }}
+          />
         )}
         ListEmptyComponent={
           <EmptyState icon={empty.icon} title={empty.title} description={empty.description} />
         }
-        contentContainerStyle={data.length === 0 ? { flex: 1 } : { paddingBottom: 24 }}
+        contentContainerStyle={data.length === 0 ? { flex: 1 } : { paddingBottom: bottomInset }}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
       />
     </View>
@@ -371,23 +241,33 @@ function PushNotificationBanner({ onDismiss }: { onDismiss: () => void }) {
           width: 38,
           height: 38,
           borderRadius: 19,
-          backgroundColor: colors.purpleSoft,
+          backgroundColor: colors.primarySoft,
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
-        <Feather name="bell" size={17} color={colors.purple} />
+        <Feather name="bell" size={17} color={colors.primary} />
       </View>
 
       <View style={{ flex: 1 }}>
         <Text
-          style={{ fontSize: 13, fontWeight: '700', color: colors.ink, letterSpacing: -0.1 }}
+          style={{
+            fontFamily: typography.family.sansBold,
+            fontSize: 13,
+            color: colors.ink,
+            letterSpacing: -0.1,
+          }}
           numberOfLines={1}
         >
           Turn on notifications
         </Text>
         <Text
-          style={{ fontSize: 11.5, color: colors.mute, marginTop: 1 }}
+          style={{
+            fontFamily: typography.family.sans,
+            fontSize: 11.5,
+            color: colors.mute,
+            marginTop: 1,
+          }}
           numberOfLines={1}
         >
           Never miss a new message or offer
@@ -408,11 +288,19 @@ function PushNotificationBanner({ onDismiss }: { onDismiss: () => void }) {
           paddingHorizontal: 13,
           paddingVertical: 8,
           borderRadius: radii.pill,
-          backgroundColor: colors.purple,
+          backgroundColor: colors.primary,
           opacity: pressed ? 0.85 : 1,
         })}
       >
-        <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.white }}>Enable</Text>
+        <Text
+          style={{
+            fontFamily: typography.family.sansBold,
+            fontSize: 12.5,
+            color: colors.white,
+          }}
+        >
+          Enable
+        </Text>
       </Pressable>
 
       <Pressable
@@ -448,6 +336,7 @@ function PushNotificationBanner({ onDismiss }: { onDismiss: () => void }) {
 export default function InboxScreen() {
   const { user, loading: authLoading } = useAuth();
   const { width: pageWidth } = useWindowDimensions();
+  const tabBarClearance = useTabBarClearance();
   const [activeTab, setActiveTab] = useState<InboxTab>('buying');
   const [bannerDismissed, setBannerDismissed] = useState(false);
 
@@ -467,8 +356,6 @@ export default function InboxScreen() {
   // ~300ms animation. Platform-agnostic: doesn't rely on begin/end-drag
   // events (which react-native-web doesn't fire for native scrollers).
   const ignoreListenerUntilRef = useRef(0);
-  const userIdRef = useRef<string | null>(null);
-  userIdRef.current = user?.id ?? null;
 
   // Drive activeTab from scrollX so the bold text tracks the indicator
   // under your finger during a swipe. After a tap, the listener is briefly
@@ -594,6 +481,8 @@ export default function InboxScreen() {
           // so this overflow button used to land on "Unmatched Route". No `as any`
           // here on purpose — the cast is what let the broken path compile.
           onPress={() => router.push('/settings')}
+          accessibilityRole="button"
+          accessibilityLabel="Settings"
           style={({ pressed }) => ({
             width: 36,
             height: 36,
@@ -606,8 +495,8 @@ export default function InboxScreen() {
         </Pressable>
         <Text
           style={{
+            fontFamily: typography.family.sansSemibold,
             fontSize: 17,
-            fontWeight: '600',
             color: colors.ink,
             letterSpacing: -0.2,
           }}
@@ -617,6 +506,8 @@ export default function InboxScreen() {
         <Pressable
           hitSlop={HIT_SLOP_8}
           onPress={() => router.push('/discover' as any)}
+          accessibilityRole="button"
+          accessibilityLabel="Find something to talk about"
           style={({ pressed }) => ({
             width: 36,
             height: 36,
@@ -625,7 +516,7 @@ export default function InboxScreen() {
             opacity: pressed ? 0.6 : 1,
           })}
         >
-          <Feather name="message-circle" size={22} color={colors.ink} />
+          <Feather name="search" size={21} color={colors.ink} />
         </Pressable>
       </View>
 
@@ -639,9 +530,9 @@ export default function InboxScreen() {
 
       {/* Content */}
       {authLoading || (loading && conversations.length === 0) ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={colors.purple} />
-        </View>
+        // Skeleton rows rather than a centred spinner: the list geometry is
+        // already on screen, so nothing jumps when the data lands.
+        <InboxSkeleton />
       ) : !user ? (
         <SignedOutState />
       ) : (
@@ -673,6 +564,7 @@ export default function InboxScreen() {
               pageWidth={pageWidth}
               refreshing={refreshing}
               onRefresh={onRefresh}
+              bottomInset={tabBarClearance}
             />
           )}
         />

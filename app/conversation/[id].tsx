@@ -1,12 +1,21 @@
 import { capture } from '@/lib/analytics';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, FlatList, KeyboardAvoidingView, Platform, Pressable, ActivityIndicator, Modal, Alert } from 'react-native';
+import {
+  View,
+  FlatList,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ActivityIndicator,
+  Modal,
+  Alert,
+} from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
 import { useLocalSearchParams, router } from 'expo-router';
 import { safeBack } from '@/lib/nav';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Feather, Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@/lib/auth';
 import {
   fetchMessages,
@@ -22,290 +31,46 @@ import {
 import { getOptimizedImageUrl } from '@/lib/images';
 import { useToast } from '@/lib/toast';
 import { captureError } from '@/lib/sentry';
-import { colors, radii } from '@/lib/theme';
+import { colors, radii, type as typography } from '@/lib/theme';
 import { formatPrice, CURRENCY_SYMBOL } from '@/lib/currency';
 import { Button, EmptyState } from '@/components/ui';
-import { SafetyBanner } from '@/components/SafetyBanner';
+import { explainCoverage } from '@/components/SafetyBanner';
+import { reportListing, REPORT_REASONS } from '@/lib/reports';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { withTimeout } from '@/lib/async';
 import { maybeSoftAskForPush } from '@/lib/notifications';
+import {
+  buildThreadRows,
+  ChatActionSheet,
+  Composer,
+  DateDivider,
+  ListingBar,
+  listingStatus,
+  MessageRow,
+  SafetyNote,
+  ThreadHeader,
+  type ChatAction,
+  type ThreadRow,
+} from '@/components/chat';
 
-function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-
-function MessageBubble({
-  msg,
-  mine,
-  isSeller,
-  listingId,
-  listingSold,
-  onAccept,
-  onDecline,
-}: {
-  msg: ChatMessage;
-  mine: boolean;
-  isSeller: boolean;
-  listingId: string | null;
-  listingSold: boolean;
-  onAccept: () => void;
-  onDecline: () => void;
-}) {
-  if (msg.kind === 'offer') {
-    const amount = msg.metadata?.amount ?? 0;
-    const status = msg.offer_status ?? 'pending';
-    const canRespond = !mine && isSeller && status === 'pending';
-    // Buyer sees a Pay CTA on their own accepted offer until the listing is
-    // marked sold. Seller sees a passive "Awaiting payment" status.
-    const canPay = mine && !isSeller && status === 'accepted' && !!listingId && !listingSold;
-    const awaitingPayment = !mine && isSeller && status === 'accepted' && !listingSold;
-
-    return (
-      <View style={{ paddingHorizontal: 14, marginBottom: 12, alignItems: mine ? 'flex-end' : 'flex-start' }}>
-        <View
-          style={{
-            maxWidth: '85%',
-            backgroundColor: mine ? colors.purple : colors.purpleSoft,
-            borderRadius: 18,
-            padding: 14,
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-            <View
-              style={{
-                width: 22,
-                height: 22,
-                borderRadius: 11,
-                backgroundColor: mine ? 'rgba(255,255,255,0.22)' : 'white',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginRight: 6,
-              }}
-            >
-              <Feather name="tag" size={11} color={mine ? 'white' : colors.purple} />
-            </View>
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: '800',
-                letterSpacing: 1,
-                color: mine ? 'rgba(255,255,255,0.9)' : colors.purple,
-                textTransform: 'uppercase',
-              }}
-            >
-              {mine ? 'You offered' : 'Offer'}
-            </Text>
-          </View>
-          <Text
-            style={{
-              fontSize: 28,
-              fontWeight: '900',
-              color: mine ? 'white' : colors.ink,
-              letterSpacing: -0.8,
-            }}
-          >
-            {formatPrice(amount)}
-          </Text>
-          {msg.metadata?.note ? (
-            <Text
-              style={{
-                fontSize: 13,
-                color: mine ? 'rgba(255,255,255,0.9)' : colors.ink,
-                marginTop: 6,
-              }}
-            >
-              {msg.metadata.note}
-            </Text>
-          ) : null}
-
-          {status !== 'pending' && (
-            <View
-              style={{
-                marginTop: 10,
-                alignSelf: 'flex-start',
-                paddingHorizontal: 9,
-                paddingVertical: 3,
-                borderRadius: 999,
-                backgroundColor:
-                  status === 'accepted'
-                    ? 'rgba(108,71,255,0.18)'
-                    : status === 'declined'
-                      ? 'rgba(15,15,15,0.18)'
-                      : 'rgba(255,255,255,0.18)',
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 10.5,
-                  fontWeight: '800',
-                  letterSpacing: 0.6,
-                  color: mine
-                    ? 'white'
-                    : status === 'accepted'
-                      ? colors.primary
-                      : status === 'declined'
-                        ? colors.ink
-                        : colors.mute,
-                  textTransform: 'uppercase',
-                }}
-              >
-                {status}
-              </Text>
-            </View>
-          )}
-
-          {canRespond && (
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-              <Pressable
-                onPress={onDecline}
-                style={({ pressed }) => ({
-                  flex: 1,
-                  height: 38,
-                  borderRadius: 999,
-                  borderWidth: 1,
-                  borderColor: colors.hairline,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: 'white',
-                  opacity: pressed ? 0.75 : 1,
-                })}
-              >
-                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.ink }}>Decline</Text>
-              </Pressable>
-              <Pressable
-                onPress={onAccept}
-                style={({ pressed }) => ({
-                  flex: 1,
-                  height: 38,
-                  borderRadius: 999,
-                  backgroundColor: colors.ink,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  opacity: pressed ? 0.85 : 1,
-                  flexDirection: 'row',
-                  gap: 5,
-                })}
-              >
-                <Feather name="check" size={14} color="white" />
-                <Text style={{ fontSize: 13, fontWeight: '800', color: 'white' }}>Accept</Text>
-              </Pressable>
-            </View>
-          )}
-
-          {canPay && (
-            <Pressable
-              onPress={() =>
-                router.push(`/payment/${listingId}?offer=${amount}` as any)
-              }
-              style={({ pressed }) => ({
-                marginTop: 12,
-                height: 40,
-                borderRadius: 999,
-                backgroundColor: colors.purple,
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexDirection: 'row',
-                gap: 6,
-                opacity: pressed ? 0.85 : 1,
-              })}
-            >
-              <Feather name="credit-card" size={14} color="white" />
-              <Text style={{ fontSize: 13.5, fontWeight: '800', color: 'white' }}>
-                Pay {formatPrice(amount)}
-              </Text>
-            </Pressable>
-          )}
-
-          {awaitingPayment && (
-            <View
-              style={{
-                marginTop: 10,
-                paddingHorizontal: 10,
-                paddingVertical: 6,
-                borderRadius: 8,
-                backgroundColor: 'rgba(15,15,15,0.05)',
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 6,
-              }}
-            >
-              <Feather name="clock" size={11} color={colors.muteSoft} />
-              <Text style={{ fontSize: 11.5, fontWeight: '600', color: colors.muteSoft }}>
-                Awaiting buyer payment
-              </Text>
-            </View>
-          )}
-
-          {status === 'accepted' && listingSold && (
-            <View
-              style={{
-                marginTop: 10,
-                paddingHorizontal: 10,
-                paddingVertical: 6,
-                borderRadius: 8,
-                backgroundColor: 'rgba(108,71,255,0.12)',
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 6,
-              }}
-            >
-              <Feather name="check-circle" size={11} color={colors.purple} />
-              <Text style={{ fontSize: 11.5, fontWeight: '700', color: colors.purple }}>
-                Paid · sold
-              </Text>
-            </View>
-          )}
-
-          <Text
-            style={{
-              fontSize: 10,
-              color: mine ? 'rgba(255,255,255,0.6)' : colors.muteSoft,
-              marginTop: 8,
-            }}
-          >
-            {formatTime(msg.created_at)}
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        marginBottom: 6,
-        paddingHorizontal: 14,
-        justifyContent: mine ? 'flex-end' : 'flex-start',
-      }}
-    >
-      <View
-        style={{
-          maxWidth: '78%',
-          paddingHorizontal: 14,
-          paddingVertical: 9,
-          borderRadius: 18,
-          borderTopRightRadius: mine ? 6 : 18,
-          borderTopLeftRadius: mine ? 18 : 6,
-          backgroundColor: mine ? colors.purple : colors.panel,
-        }}
-      >
-        <Text style={{ fontSize: 15, lineHeight: 20, color: mine ? 'white' : colors.ink }}>
-          {msg.content}
-        </Text>
-        <Text
-          style={{
-            fontSize: 10,
-            marginTop: 3,
-            color: mine ? 'rgba(255,255,255,0.6)' : colors.muteSoft,
-            textAlign: mine ? 'right' : 'left',
-          }}
-        >
-          {formatTime(msg.created_at)}
-        </Text>
-      </View>
-    </View>
-  );
+// Is the software keyboard up? The bottom dock pads itself by the safe-area
+// inset at rest, but once the keyboard covers that area the padding has to
+// collapse or the composer floats above the keyboard with a gap.
+function useKeyboardVisible(): boolean {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    // iOS gets the `will` events so the dock moves with the keyboard rather
+    // than snapping after it lands. Android only emits `did`.
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const show = Keyboard.addListener(showEvt, () => setVisible(true));
+    const hide = Keyboard.addListener(hideEvt, () => setVisible(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+  return visible;
 }
 
 function OfferSheet({
@@ -358,15 +123,22 @@ function OfferSheet({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+      statusBarTranslucent
+      navigationBarTranslucent
+    >
+      <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: colors.overlay }}>
         <View style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Pressable
             onPress={() => {}}
             style={{
-              backgroundColor: 'white',
-              borderTopLeftRadius: 28,
-              borderTopRightRadius: 28,
+              backgroundColor: colors.white,
+              borderTopLeftRadius: radii['4xl'],
+              borderTopRightRadius: radii['4xl'],
               paddingHorizontal: 20,
               paddingTop: 12,
               paddingBottom: 28,
@@ -382,12 +154,29 @@ function OfferSheet({
                 marginBottom: 16,
               }}
             />
-            <Text style={{ fontSize: 20, fontWeight: '800', color: colors.ink, letterSpacing: -0.3 }}>
+            <Text
+              style={{
+                fontFamily: typography.family.sansBold,
+                fontSize: 20,
+                color: colors.ink,
+                letterSpacing: -0.3,
+              }}
+            >
               Make an offer
             </Text>
             {listingPrice && (
-              <Text style={{ fontSize: 13, color: colors.mute, marginTop: 4 }}>
-                Listed at <Text style={{ fontWeight: '700', color: colors.ink }}>{formatPrice(listingPrice)}</Text>
+              <Text
+                style={{
+                  fontFamily: typography.family.sans,
+                  fontSize: 13,
+                  color: colors.mute,
+                  marginTop: 4,
+                }}
+              >
+                Listed at{' '}
+                <Text style={{ fontFamily: typography.family.sansBold, color: colors.ink }}>
+                  {formatPrice(listingPrice)}
+                </Text>
               </Text>
             )}
 
@@ -396,20 +185,35 @@ function OfferSheet({
                 marginTop: 18,
                 paddingHorizontal: 16,
                 paddingVertical: 14,
-                backgroundColor: colors.purpleSoft,
-                borderRadius: 16,
+                backgroundColor: colors.primarySoft,
+                borderRadius: radii.xl,
                 flexDirection: 'row',
                 alignItems: 'center',
               }}
             >
-              <Text style={{ fontSize: 22, fontWeight: '900', color: colors.purple, marginRight: 8 }}>{CURRENCY_SYMBOL}</Text>
+              <Text
+                style={{
+                  fontFamily: typography.family.sansBold,
+                  fontSize: 22,
+                  color: colors.primary,
+                  marginRight: 8,
+                }}
+              >
+                {CURRENCY_SYMBOL}
+              </Text>
               <TextInput
                 placeholder="0"
                 value={amount}
                 onChangeText={(t) => setAmount(t.replace(/[^0-9]/g, ''))}
                 keyboardType="number-pad"
-                style={{ fontSize: 28, fontWeight: '900', color: colors.ink, flex: 1, padding: 0 }}
-                placeholderTextColor="rgba(15,15,15,0.55)"
+                style={{
+                  fontFamily: typography.family.sansBold,
+                  fontSize: 28,
+                  color: colors.ink,
+                  flex: 1,
+                  padding: 0,
+                }}
+                placeholderTextColor={colors.muteSoft}
                 autoFocus
               />
             </View>
@@ -425,13 +229,19 @@ function OfferSheet({
                       style={({ pressed }) => ({
                         flex: 1,
                         paddingVertical: 10,
-                        borderRadius: 999,
+                        borderRadius: radii.pill,
                         backgroundColor: selected ? colors.ink : colors.panel,
                         alignItems: 'center',
                         opacity: pressed ? 0.75 : 1,
                       })}
                     >
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: selected ? 'white' : colors.ink }}>
+                      <Text
+                        style={{
+                          fontFamily: typography.family.sansBold,
+                          fontSize: 13,
+                          color: selected ? colors.white : colors.ink,
+                        }}
+                      >
                         {formatPrice(v)}
                       </Text>
                     </Pressable>
@@ -442,8 +252,8 @@ function OfferSheet({
 
             <Text
               style={{
+                fontFamily: typography.family.sansBold,
                 fontSize: 11,
-                fontWeight: '800',
                 color: colors.mute,
                 marginTop: 18,
                 marginBottom: 6,
@@ -458,10 +268,11 @@ function OfferSheet({
               onChangeText={setNote}
               multiline
               style={{
+                fontFamily: typography.family.sans,
                 fontSize: 14,
                 color: colors.ink,
                 backgroundColor: colors.panel,
-                borderRadius: 14,
+                borderRadius: radii.lg,
                 paddingHorizontal: 14,
                 paddingVertical: 12,
                 minHeight: 60,
@@ -493,14 +304,18 @@ export default function ConversationScreen() {
   const conversationId = typeof id === 'string' ? id : '';
   const { user } = useAuth();
   const toast = useToast();
-  const listRef = useRef<FlatList<ChatMessage>>(null);
+  const insets = useSafeAreaInsets();
+  const keyboardUp = useKeyboardVisible();
+  const listRef = useRef<FlatList<ThreadRow>>(null);
 
   const [conv, setConv] = useState<ConversationRow | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [input, setInput] = useState('');
-  const [sending, setSending] = useState(false);
   const [offerVisible, setOfferVisible] = useState(false);
+  const [plusOpen, setPlusOpen] = useState(false);
+  const [overflowOpen, setOverflowOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   useEffect(() => {
     if (!conversationId) return;
@@ -559,12 +374,40 @@ export default function ConversationScreen() {
 
   const other = useMemo(() => (user && conv ? otherParticipant(conv, user.id) : null), [user, conv]);
   const isSeller = !!user && !!conv && conv.seller_id === user.id;
+  const rows = useMemo(() => buildThreadRows(messages), [messages]);
 
-  const handleSend = useCallback(async () => {
-    if (!user || !conversationId || sending) return;
+  // One send path for both the first attempt and any retry, so a retried
+  // message goes through exactly the same dedupe as the original.
+  const deliver = useCallback(
+    async (text: string, tempId: string) => {
+      if (!user || !conversationId) return;
+      try {
+        const saved = await sendMessage({ conversationId, senderId: user.id, content: text });
+        if (saved) {
+          setMessages((prev) => {
+            // Realtime may have already inserted the saved message — dedupe.
+            if (prev.some((m) => m.id === saved.id)) return prev.filter((m) => m.id !== tempId);
+            return prev.map((m) => (m.id === tempId ? saved : m));
+          });
+          return;
+        }
+        throw new Error('insert returned no row');
+      } catch (e) {
+        // The message stays in the thread carrying a "Tap to retry" stamp
+        // instead of vanishing behind an alert — nothing typed is ever lost.
+        console.warn('[conversation] send failed', e);
+        setMessages((prev) =>
+          prev.map((m) => (m.id === tempId ? { ...m, pending: false, failed: true } : m)),
+        );
+      }
+    },
+    [conversationId, user],
+  );
+
+  const handleSend = useCallback(() => {
+    if (!user || !conversationId) return;
     const text = input.trim();
     if (!text) return;
-    setSending(true);
     const temp: ChatMessage = {
       id: `temp-${Date.now()}`,
       conversation_id: conversationId,
@@ -574,34 +417,22 @@ export default function ConversationScreen() {
       metadata: null,
       offer_status: null,
       created_at: new Date().toISOString(),
+      pending: true,
     };
     setMessages((prev) => [...prev, temp]);
     setInput('');
+    deliver(text, temp.id);
+  }, [conversationId, deliver, input, user]);
 
-    try {
-      const saved = await sendMessage({ conversationId, senderId: user.id, content: text });
-      if (saved) {
-        // Realtime may have already inserted the saved message — dedupe.
-        setMessages((prev) => {
-          const realtimeAlreadyInserted = prev.some((m) => m.id === saved.id);
-          if (realtimeAlreadyInserted) {
-            // Remove the temp; the real message is already present.
-            return prev.filter((m) => m.id !== temp.id);
-          }
-          // Replace the temp with the saved message.
-          return prev.map((m) => (m.id === temp.id ? saved : m));
-        });
-      } else {
-        setMessages((prev) => prev.filter((m) => m.id !== temp.id));
-        Alert.alert('Could not send', 'Please try again in a moment.');
-      }
-    } catch {
-      setMessages((prev) => prev.filter((m) => m.id !== temp.id));
-      Alert.alert('Could not send', 'Please try again in a moment.');
-    } finally {
-      setSending(false);
-    }
-  }, [conversationId, input, sending, user]);
+  const handleRetry = useCallback(
+    (msg: ChatMessage) => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === msg.id ? { ...m, pending: true, failed: false } : m)),
+      );
+      deliver(msg.content, msg.id);
+    },
+    [deliver],
+  );
 
   const handleSendOffer = useCallback(
     async (amount: number, note: string) => {
@@ -642,275 +473,283 @@ export default function ConversationScreen() {
     [toast],
   );
 
-  const renderItem = useCallback(
-    ({ item }: { item: ChatMessage }) => (
-      <MessageBubble
-        msg={item}
-        mine={!!user && item.sender_id === user.id}
-        isSeller={isSeller}
-        listingId={conv?.listing_id ?? null}
-        listingSold={conv?.listing?.is_sold ?? false}
-        onAccept={() => handleOfferResponse(item, 'accepted')}
-        onDecline={() => handleOfferResponse(item, 'declined')}
-      />
-    ),
-    [user, isSeller, conv?.listing_id, conv?.listing?.is_sold, handleOfferResponse],
+  const handleReport = useCallback(
+    async (reason: string) => {
+      if (!user || !conv?.listing_id) return;
+      const ok = await reportListing({
+        listingId: conv.listing_id,
+        reporterId: user.id,
+        reason,
+        reportedUserId: other?.id ?? null,
+      });
+      toast.show(ok ? 'Report sent — thank you' : "Couldn't send report", {
+        variant: ok ? 'success' : 'default',
+        icon: ok ? 'check' : 'alert-triangle',
+      });
+    },
+    [conv?.listing_id, other?.id, toast, user],
+  );
+
+  const openListing = useCallback(() => {
+    if (conv?.listing_id) router.push(`/product/${conv.listing_id}` as any);
+  }, [conv?.listing_id]);
+
+  const senderName = other?.full_name || other?.username || 'User';
+
+  const renderRow = useCallback(
+    ({ item }: { item: ThreadRow }) => {
+      if (item.type === 'date') return <DateDivider iso={item.iso} />;
+      return (
+        <MessageRow
+          msg={item.msg}
+          mine={!!user && item.msg.sender_id === user.id}
+          isSeller={isSeller}
+          grouped={item.grouped}
+          lastOfGroup={item.lastOfGroup}
+          senderName={senderName}
+          listingId={conv?.listing_id ?? null}
+          listingPrice={conv?.listing?.price ?? null}
+          listingSold={conv?.listing?.is_sold ?? false}
+          onAccept={() => handleOfferResponse(item.msg, 'accepted')}
+          onDecline={() => handleOfferResponse(item.msg, 'declined')}
+          onPay={(amount) =>
+            conv?.listing_id && router.push(`/payment/${conv.listing_id}?offer=${amount}` as any)
+          }
+          onRetry={() => handleRetry(item.msg)}
+        />
+      );
+    },
+    [
+      user,
+      isSeller,
+      senderName,
+      conv?.listing_id,
+      conv?.listing?.price,
+      conv?.listing?.is_sold,
+      handleOfferResponse,
+      handleRetry,
+    ],
   );
 
   if (loading) {
     return (
-      <SafeAreaView
-        edges={['top']}
-        style={{ flex: 1, backgroundColor: 'white', alignItems: 'center', justifyContent: 'center' }}
-      >
-        <ActivityIndicator color={colors.purple} />
+      <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6 }}>
+          <Pressable
+            onPress={() => safeBack()}
+            hitSlop={HIT_SLOP_8}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+            style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Feather name="arrow-left" size={22} color={colors.ink} />
+          </Pressable>
+        </View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
       </SafeAreaView>
     );
   }
 
   if (!conv) {
     return (
-      <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: 'white' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', padding: 14 }}>
-          <Pressable onPress={() => safeBack()}>
-            <Feather name="chevron-left" size={26} color={colors.ink} />
+      <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6 }}>
+          <Pressable
+            onPress={() => safeBack()}
+            hitSlop={HIT_SLOP_8}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+            style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Feather name="arrow-left" size={22} color={colors.ink} />
           </Pressable>
         </View>
-        <EmptyState icon="alert-circle" title="Conversation unavailable" description="This thread may have been removed." />
+        <EmptyState
+          icon="alert-circle"
+          title="Conversation unavailable"
+          description="This thread may have been removed."
+        />
       </SafeAreaView>
     );
   }
 
-  const otherAvatar = other?.avatar_url ? getOptimizedImageUrl(other.avatar_url, { width: 120 }) : null;
+  const otherAvatar = other?.avatar_url
+    ? getOptimizedImageUrl(other.avatar_url, { width: 120 })
+    : null;
   const listingThumb = conv.listing?.images?.[0]
     ? getOptimizedImageUrl(conv.listing.images[0], { width: 200 })
     : null;
-  const otherInitial = (other?.full_name || other?.username || 'U').trim().charAt(0).toUpperCase();
+  const status = listingStatus(conv.listing);
+  const canOffer = !isSeller && !!conv.listing_id && status === 'active';
+
+  const plusActions: ChatAction[] = [
+    ...(canOffer
+      ? [
+          {
+            id: 'offer',
+            label: 'Make an offer',
+            hint: conv.listing?.price ? `Listed at ${formatPrice(conv.listing.price)}` : undefined,
+            icon: 'tag' as const,
+            tone: 'primary' as const,
+            onPress: () => setOfferVisible(true),
+          },
+        ]
+      : []),
+    ...(conv.listing_id
+      ? [
+          {
+            id: 'listing',
+            label: 'View listing',
+            icon: 'external-link' as const,
+            onPress: openListing,
+          },
+        ]
+      : []),
+    {
+      id: 'coverage',
+      label: "How you're covered",
+      hint: 'Buyer Protection, payments, and support',
+      icon: 'shield' as const,
+      onPress: explainCoverage,
+    },
+  ];
+
+  const overflowActions: ChatAction[] = [
+    ...(other?.id
+      ? [
+          {
+            id: 'profile',
+            label: 'View profile',
+            icon: 'user' as const,
+            onPress: () => router.push(`/user/${other.id}` as any),
+          },
+        ]
+      : []),
+    ...(conv.listing_id
+      ? [
+          {
+            id: 'listing',
+            label: 'View listing',
+            icon: 'external-link' as const,
+            onPress: openListing,
+          },
+        ]
+      : []),
+    {
+      id: 'coverage',
+      label: "How you're covered",
+      icon: 'shield' as const,
+      onPress: explainCoverage,
+    },
+    ...(conv.listing_id
+      ? [
+          {
+            id: 'report',
+            label: 'Report this conversation',
+            icon: 'flag' as const,
+            onPress: () => setReportOpen(true),
+          },
+        ]
+      : []),
+  ];
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
-      {/* Header */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingHorizontal: 12,
-          paddingTop: 6,
-          paddingBottom: 10,
-          borderBottomWidth: 1,
-          borderBottomColor: colors.hairline,
-        }}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0 }}>
-          <Pressable
-            onPress={() => safeBack()}
-            hitSlop={HIT_SLOP_8}
-            style={({ pressed }) => ({
-              width: 36,
-              height: 36,
-              alignItems: 'center',
-              justifyContent: 'center',
-              opacity: pressed ? 0.6 : 1,
-            })}
-          >
-            <Feather name="chevron-left" size={24} color={colors.ink} />
-          </Pressable>
-          <View
-            style={{
-              width: 38,
-              height: 38,
-              borderRadius: 19,
-              backgroundColor: colors.purpleSoft,
-              overflow: 'hidden',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginRight: 10,
-              marginLeft: 2,
-            }}
-          >
-            {otherAvatar ? (
-              <Image source={{ uri: otherAvatar }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
-            ) : (
-              <Text style={{ fontSize: 15, fontWeight: '800', color: colors.purple }}>{otherInitial}</Text>
-            )}
-          </View>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={{ fontSize: 15, fontWeight: '800', color: colors.ink }} numberOfLines={1}>
-              {other?.full_name || other?.username || 'User'}
-            </Text>
-            {other?.username && (
-              <Text style={{ fontSize: 11, color: colors.mute }} numberOfLines={1}>
-                @{other.username}
-              </Text>
-            )}
-          </View>
-        </View>
-        {other?.id && (
-          <Pressable
-            onPress={() => router.push(`/user/${other.id}` as any)}
-            hitSlop={HIT_SLOP_8}
-            style={({ pressed }) => ({
-              width: 38,
-              height: 38,
-              borderRadius: 19,
-              backgroundColor: colors.panel,
-              alignItems: 'center',
-              justifyContent: 'center',
-              opacity: pressed ? 0.7 : 1,
-            })}
-          >
-            <Feather name="user" size={16} color={colors.ink} />
-          </Pressable>
-        )}
-      </View>
-
-      {/* Product ticket */}
-      {conv.listing && (
-        <Pressable
-          onPress={() => conv.listing_id && router.push(`/product/${conv.listing_id}` as any)}
-          style={({ pressed }) => ({
-            marginHorizontal: 12,
-            marginTop: 10,
-            marginBottom: 6,
-            flexDirection: 'row',
-            alignItems: 'center',
-            paddingHorizontal: 10,
-            paddingVertical: 8,
-            borderRadius: radii.xl,
-            backgroundColor: pressed ? colors.purpleSoft : colors.panel,
-          })}
-        >
-          <View
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 10,
-              overflow: 'hidden',
-              backgroundColor: colors.divider,
-              marginRight: 12,
-            }}
-          >
-            {listingThumb && (
-              <Image source={{ uri: listingThumb }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
-            )}
-          </View>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={{ fontSize: 13.5, fontWeight: '700', color: colors.ink }} numberOfLines={1}>
-              {conv.listing.title}
-            </Text>
-            <Text style={{ fontSize: 13, fontWeight: '800', color: colors.purple, marginTop: 2 }}>
-              {formatPrice(conv.listing.price)}
-              {conv.listing.is_sold ? ' · Sold' : ''}
-            </Text>
-          </View>
-          <Feather name="chevron-right" size={18} color={colors.muteSoft} />
-        </Pressable>
-      )}
+      <ThreadHeader
+        name={senderName}
+        subtitle={other?.username ? `@${other.username}` : null}
+        avatar={otherAvatar}
+        onBack={() => safeBack()}
+        onPressIdentity={other?.id ? () => router.push(`/user/${other.id}` as any) : undefined}
+        onOverflow={() => setOverflowOpen(true)}
+      />
 
       <FlatList
         ref={listRef}
-        data={messages}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        contentContainerStyle={{ paddingTop: 10, paddingBottom: 14 }}
+        data={rows}
+        keyExtractor={(row) => row.key}
+        renderItem={renderRow}
+        // flexGrow + flex-end pins a short thread to the bottom of the screen,
+        // where a conversation belongs, instead of stranding two bubbles under
+        // the header. Once the content overflows, this is a no-op.
+        contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end', paddingBottom: 12 }}
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
-        ListHeaderComponent={
-          <SafetyBanner context="chat" bare style={{ paddingHorizontal: 12, marginBottom: 10 }} />
-        }
+        keyboardDismissMode="interactive"
+        keyboardShouldPersistTaps="handled"
+        ListHeaderComponent={<SafetyNote onPress={explainCoverage} />}
         ListEmptyComponent={
-          <EmptyState
-            icon="message-circle"
-            title="Say hi"
-            description="Start the conversation — ask a question or send an offer."
-          />
+          <View style={{ paddingHorizontal: 32, paddingVertical: 16 }}>
+            <Text
+              style={{
+                fontFamily: typography.family.sans,
+                fontSize: 13,
+                color: colors.muteSoft,
+                textAlign: 'center',
+              }}
+            >
+              No messages yet. Ask a question, or send an offer.
+            </Text>
+          </View>
         }
       />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        keyboardVerticalOffset={0}
       >
         <View
           style={{
-            flexDirection: 'row',
-            alignItems: 'flex-end',
-            paddingHorizontal: 12,
-            paddingVertical: 10,
             borderTopWidth: 1,
             borderTopColor: colors.hairline,
-            backgroundColor: 'white',
-            gap: 8,
+            backgroundColor: colors.white,
+            // The inset only needs paying for while the keyboard isn't already
+            // covering it.
+            paddingBottom: keyboardUp ? 0 : insets.bottom,
           }}
         >
-          {!isSeller && (
-            <Pressable
-              onPress={() => setOfferVisible(true)}
-              style={({ pressed }) => ({
-                height: 40,
-                paddingHorizontal: 12,
-                borderRadius: 999,
-                backgroundColor: colors.purpleSoft,
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 5,
-                opacity: pressed ? 0.75 : 1,
-              })}
-            >
-              <Feather name="tag" size={14} color={colors.purple} />
-              <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.purple }}>Offer</Text>
-            </Pressable>
-          )}
-          <View
-            style={{
-              flex: 1,
-              minHeight: 40,
-              maxHeight: 120,
-              backgroundColor: colors.panel,
-              borderRadius: 20,
-              paddingHorizontal: 14,
-              paddingVertical: 8,
-              justifyContent: 'center',
-            }}
-          >
-            <TextInput
-              placeholder="Write a message..."
-              placeholderTextColor={colors.muteSoft}
-              value={input}
-              onChangeText={setInput}
-              multiline
-              style={{
-                fontSize: 15,
-                color: colors.ink,
-                padding: 0,
-                maxHeight: 100,
-                // RN-Web: kill the browser's default input focus ring.
-                outlineStyle: 'none',
-                outlineWidth: 0,
-              } as any}
+          {conv.listing_id && (
+            <ListingBar
+              title={conv.listing?.title ?? 'Listing removed'}
+              price={conv.listing?.price ?? null}
+              thumb={listingThumb}
+              status={status}
+              onPress={openListing}
             />
-          </View>
-          <Pressable
-            onPress={handleSend}
-            disabled={!input.trim() || sending}
-            style={({ pressed }) => ({
-              width: 40,
-              height: 40,
-              borderRadius: 20,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: input.trim() ? colors.purple : colors.panel,
-              opacity: pressed ? 0.85 : 1,
-            })}
-          >
-            {sending ? (
-              <ActivityIndicator size="small" color={input.trim() ? 'white' : colors.muteSoft} />
-            ) : (
-              <Ionicons name="arrow-up" size={20} color={input.trim() ? 'white' : colors.muteSoft} />
-            )}
-          </Pressable>
+          )}
+          <Composer
+            value={input}
+            onChangeText={setInput}
+            onSend={handleSend}
+            onPlus={() => setPlusOpen(true)}
+          />
         </View>
       </KeyboardAvoidingView>
+
+      <ChatActionSheet
+        visible={plusOpen}
+        actions={plusActions}
+        onClose={() => setPlusOpen(false)}
+      />
+
+      <ChatActionSheet
+        visible={overflowOpen}
+        actions={overflowActions}
+        onClose={() => setOverflowOpen(false)}
+      />
+
+      <ChatActionSheet
+        visible={reportOpen}
+        title="WHY ARE YOU REPORTING THIS?"
+        actions={REPORT_REASONS.map((r) => ({
+          id: r.id,
+          label: r.label,
+          icon: 'flag' as const,
+          onPress: () => handleReport(r.id),
+        }))}
+        onClose={() => setReportOpen(false)}
+      />
 
       <OfferSheet
         visible={offerVisible}

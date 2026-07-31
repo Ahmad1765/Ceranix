@@ -20,6 +20,10 @@ export interface ChatMessage {
   offer_status: OfferStatus | null;
   created_at: string;
   updated_at?: string;
+  /** Client-only: an optimistic message still in flight. Never selected. */
+  pending?: boolean;
+  /** Client-only: the send failed and the row offers a retry. Never selected. */
+  failed?: boolean;
 }
 
 export interface ConversationRow {
