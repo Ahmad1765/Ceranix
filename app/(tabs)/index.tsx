@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useDeferredValue, useMemo, useState } from 'react';
 import { Alert, View, Pressable, ScrollView, RefreshControl, Platform } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { Text, TextInput } from '@/lib/rnText';
@@ -227,7 +227,18 @@ export default function HomeScreen() {
 
   // Instant local filter layered on top of the active view. Matches title and
   // brand, the two fields a shopper scans for.
-  const trimmedQuery = query.trim().toLowerCase();
+  //
+  // The TextInput stays bound to `query` so keystrokes paint immediately, but
+  // everything derived from the text reads `deferredQuery` instead. Without the
+  // split, one keystroke synchronously re-ran the title/brand filter AND the
+  // sort (which copies the array) over the whole feed, rebuilt gridRows, and
+  // re-rendered the list plus the header — all on the UI thread, between the
+  // key press and the caret moving. useDeferredValue lets React paint the
+  // character first and recompute the results at lower priority, and it
+  // coalesces: typing quickly skips the intermediate filters entirely rather
+  // than running one per character.
+  const deferredQuery = useDeferredValue(query);
+  const trimmedQuery = deferredQuery.trim().toLowerCase();
   const isSearching = trimmedQuery.length > 0;
   const searchedListings = useMemo(() => {
     if (!isSearching) return visibleListings;
@@ -276,7 +287,7 @@ export default function HomeScreen() {
     activeChip === FOR_YOU && !showingSaved && !isSearching && activeFilterCount === 0;
 
   const gridEmptyText = isSearching
-    ? `Nothing in ${showingSaved ? 'your saved items' : 'this feed'} matches “${query.trim()}”.`
+    ? `Nothing in ${showingSaved ? 'your saved items' : 'this feed'} matches “${deferredQuery.trim()}”.`
     : activeFilterCount > 0
       ? 'No items match these filters. Try loosening them.'
       : showingSaved
