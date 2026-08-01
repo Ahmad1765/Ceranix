@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 import { Text } from '@/lib/rnText';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { BRAND_INK, BRAND_LIME } from './shared';
 
 export function SectionEyebrow({ label, color = BRAND_INK }: { label: string; color?: string }) {

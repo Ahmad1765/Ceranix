@@ -1,7 +1,7 @@
 import { View } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { colors } from '@/lib/theme';
 
 type Props = {

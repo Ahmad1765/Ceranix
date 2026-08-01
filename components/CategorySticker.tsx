@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 // Die-cut sticker icons for the home quick-category row. Deliberately
 // off-palette: the user wants these to pop against the purple/white/black

@@ -17,7 +17,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { View, Platform, type NativeSyntheticEvent, type TextInputContentSizeChangeEventData } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import Animated, {
   Easing,
   interpolateColor,

@@ -3,7 +3,7 @@ import { View, FlatList, Pressable, RefreshControl, Animated, Platform, useWindo
 import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/lib/auth';
 import {

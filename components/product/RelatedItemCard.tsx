@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View, ScrollView, Pressable } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
 import { CARD_WIDTH, CARD_IMAGE_HEIGHT, BRAND_INK, type RelatedItem } from './shared';
 import { formatPrice } from '@/lib/currency';

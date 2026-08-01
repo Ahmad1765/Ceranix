@@ -5,7 +5,7 @@
 
 import { View, Pressable, Modal, StyleSheet } from 'react-native';
 import { Text } from '@/lib/rnText';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { priceBreakdown, formatPrice } from '@/lib/fees';

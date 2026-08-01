@@ -1,6 +1,6 @@
 import { View, Pressable, ScrollView } from 'react-native';
 import { Text } from '@/lib/rnText';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { router } from 'expo-router';
 import { colors, radii } from '@/lib/theme';
 import type { Category } from '@/types';

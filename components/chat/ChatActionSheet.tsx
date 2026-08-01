@@ -8,7 +8,7 @@
 
 import { Modal, Pressable, View } from 'react-native';
 import { Text } from '@/lib/rnText';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { SafeAreaProvider, SafeAreaView, initialWindowMetrics } from 'react-native-safe-area-context';
 import { colors, radii, type as typography } from '@/lib/theme';
 

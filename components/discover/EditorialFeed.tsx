@@ -7,7 +7,7 @@ import { useRef, useState } from 'react';
 import { View, Pressable, ScrollView, StyleSheet, useWindowDimensions, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { router } from 'expo-router';
 import { ListingCard } from '@/components/ListingCard';
 import { formatPrice } from '@/lib/currency';

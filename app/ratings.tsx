@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { View, Pressable, ScrollView, RefreshControl } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { useAuth } from '@/lib/auth';
 import { colors, radii } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';

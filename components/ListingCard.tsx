@@ -2,7 +2,7 @@ import { memo, useEffect, useState, useCallback, useRef } from 'react';
 import { View, Pressable, ScrollView, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import Animated from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { PressableScale } from '@/components/PressableScale';

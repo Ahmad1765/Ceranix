@@ -4,7 +4,7 @@ import { Text, TextInput } from '@/lib/rnText';
 import { useLocalSearchParams, router } from 'expo-router';
 import { safeBack } from '@/lib/nav';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { Image } from 'expo-image';
 import { useAuth } from '@/lib/auth';
 import { fetchListingById } from '@/lib/listings';

@@ -3,7 +3,7 @@ import { View, Pressable, ScrollView, ActivityIndicator, Alert, RefreshControl }
 import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { colors, radii } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { Tabs, EmptyState } from '@/components/ui';

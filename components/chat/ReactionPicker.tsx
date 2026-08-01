@@ -15,7 +15,7 @@
 import { useEffect } from 'react';
 import { Modal, Pressable, View, useWindowDimensions } from 'react-native';
 import { Text } from '@/lib/rnText';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import Animated, {
   Easing,
   useAnimatedStyle,

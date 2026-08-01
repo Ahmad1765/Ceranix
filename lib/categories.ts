@@ -8,7 +8,7 @@
 // Model: one flat top-level category + one optional subcategory level (the
 // modern eBay / Vinted pattern). Deep multi-level trees are intentionally
 // avoided. Subcategories are stored on `listings.subcategory` as the slug id.
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import type { Category } from '@/types';
 
 export type CategoryId = Category;

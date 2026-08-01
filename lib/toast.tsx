@@ -12,7 +12,7 @@ import { View, Pressable, Animated, Easing, Platform, StyleSheet } from 'react-n
 // Text comes from the rnText shim, not react-native, so toast copy renders in
 // Inter on native instead of falling back to the OS system font.
 import { Text } from './rnText';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 

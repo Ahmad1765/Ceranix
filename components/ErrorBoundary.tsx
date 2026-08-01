@@ -12,7 +12,7 @@
 import { Component, type ReactNode } from 'react';
 import { View, Pressable, Platform } from 'react-native';
 import { Text } from '@/lib/rnText';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { colors, radii } from '@/lib/theme';
 import { captureError } from '@/lib/sentry';
 

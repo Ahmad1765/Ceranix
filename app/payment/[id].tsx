@@ -5,7 +5,7 @@ import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, router, Redirect } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { getOptimizedImageUrl } from '@/lib/images';
 import * as Haptics from 'expo-haptics';
 import { colors } from '@/lib/theme';

@@ -56,9 +56,42 @@ module.exports = () => ({
       },
       package: 'com.carrinex.app',
     },
+    // Only the icon families this app actually renders. The previous `Fonts/*`
+    // wildcard declared all 20 @expo/vector-icons families (~4.1 MB) when four
+    // files (~940 KB) are used — MaterialCommunityIcons alone is 1.31 MB of
+    // glyphs nothing references.
+    //
+    // NOTE — narrowing this list does NOT by itself shrink the bundle, and it
+    // was measured: `expo export` emitted the same 62 assets / 10 MB before and
+    // after. assetBundlePatterns can only ADD files to a build; it cannot remove
+    // what Metro already has in the dependency graph. Every font is in that
+    // graph because `import { Ionicons } from '@expo/vector-icons'` resolves to
+    // build/Icons.js, a barrel re-exporting 19 families, each of which does
+    // `import font from './Fonts/<Family>.ttf'` — and Metro does not tree-shake
+    // re-exports. The same applies to @expo-google-fonts/inter (20 re-exports →
+    // all 18 weights, ~5.9 MB, for the 5 the app names).
+    //
+    // The actual fix is deep imports at the call sites
+    // ('@expo/vector-icons/Ionicons'), as components/discover/DiscoverSheet.dummy.tsx
+    // already does for FontAwesome6. This list is kept as the accurate
+    // declaration of intent so it is correct once those land.
+    //
+    // The list is exhaustive; verify before trimming further:
+    //   • Ionicons + Feather — preloaded in app/_layout.tsx (ICON_FONTS).
+    //   • FontAwesome6 Solid + Regular — registered lazily by
+    //     registerDummySkinFont() in components/discover/DiscoverSheet.dummy.tsx,
+    //     which is live while DUMMY_SKIN is true in DiscoverSheet.tsx.
+    //     Brands is deliberately absent: that skin uses no brand glyphs.
+    //
+    // A family missing here renders as blank/tofu only in a production binary,
+    // never in dev (Metro serves it from disk), so re-check this list when
+    // adding an icon set rather than trusting `expo start`.
     assetBundlePatterns: [
       'assets/**',
-      'node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/*',
+      'node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf',
+      'node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Feather.ttf',
+      'node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome6_Solid.ttf',
+      'node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome6_Regular.ttf',
     ],
     plugins: [
       'expo-router',

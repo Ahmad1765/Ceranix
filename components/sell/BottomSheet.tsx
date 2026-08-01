@@ -1,6 +1,6 @@
 import { View, Pressable, Modal, ScrollView } from 'react-native';
 import { Text } from '@/lib/rnText';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { colors, radii, type } from '@/lib/theme';
 
 const DISPLAY_BOLD = type.family.sansBold;

@@ -10,7 +10,7 @@
 import { memo, useCallback, useRef } from 'react';
 import { Platform, Pressable, View } from 'react-native';
 import { Text } from '@/lib/rnText';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
 import { PressableScale } from '@/components/PressableScale';
 import { colors, radii, type as typography } from '@/lib/theme';

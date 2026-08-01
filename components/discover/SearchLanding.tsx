@@ -16,7 +16,7 @@ import { memo, useCallback } from 'react';
 import { View, Pressable, useWindowDimensions } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { getOptimizedImageUrl } from '@/lib/images';
 import { CATEGORIES, type CategoryId } from '@/lib/categories';
 import { colors, radii, type } from '@/lib/theme';

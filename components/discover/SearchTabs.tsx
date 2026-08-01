@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from 'react';
 import { View, Pressable, ScrollView, Animated, Platform, useWindowDimensions } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { router } from 'expo-router';
 import { getOptimizedImageUrl } from '@/lib/images';
 import { fetchFollowingMask, toggleFollow } from '@/lib/follows';

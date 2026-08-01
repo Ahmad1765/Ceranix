@@ -7,7 +7,7 @@
 import { View, Pressable } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { colors, type as typography } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 

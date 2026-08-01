@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Pressable } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { colors, radii, type } from '@/lib/theme';
 import { CATEGORIES, hasSubcategories } from '@/lib/categories';
 import { ITEM_COLORS } from '@/lib/itemColors';

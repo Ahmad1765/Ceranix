@@ -7,7 +7,7 @@
 
 import { View, Pressable } from 'react-native';
 import { Text } from '@/lib/rnText';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { colors, radii, type as typography } from '@/lib/theme';
 import { formatPrice } from '@/lib/currency';
 import { ListingThumb, type ListingStatus } from './ListingThumb';

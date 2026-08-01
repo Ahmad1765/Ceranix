@@ -3,7 +3,8 @@ import { View, Pressable, Alert, KeyboardAvoidingView, Platform, ScrollView, Ani
 import { Text, TextInput } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '@/lib/supabase';
 import { signInWithGoogle } from '@/lib/oauth';

@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { View, Pressable, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { Image } from 'expo-image';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
@@ -12,12 +12,13 @@ import { getOptimizedImageUrl } from '@/lib/images';
 import { colors } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { Button, EmptyState } from '@/components/ui';
-import { supabase } from '@/lib/supabase';
 import {
-  fetchFollowing,
-  fetchFollowingMask,
-  toggleFollow,
-} from '@/lib/follows';
+  useFollowingMaskQuery,
+  useFollowingQuery,
+  useProfileQuery,
+  useToggleFollowInList,
+} from '@/lib/queries';
+import { fetchFollowing } from '@/lib/follows';
 
 type Row = Awaited<ReturnType<typeof fetchFollowing>>[number];
 
@@ -28,94 +29,59 @@ export default function FollowingScreen() {
   const isSelf = targetId === authUser?.id;
   const toast = useToast();
 
-  const [rows, setRows] = useState<Row[]>([]);
-  const [followingSet, setFollowingSet] = useState<Set<string>>(new Set());
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [headerName, setHeaderName] = useState<string>(
-    (typeof params.username === 'string' && params.username) || authProfile?.username || '',
-  );
+  const listQuery = useFollowingQuery(targetId);
+  const rows = useMemo(() => listQuery.data ?? [], [listQuery.data]);
 
-  const load = useCallback(async (opts?: { silent?: boolean }) => {
-    if (!targetId) {
-      setLoading(false);
-      return;
-    }
-    // Silent refresh keeps the list mounted (and the pull-to-refresh spinner
-    // visible) instead of swapping in the full-screen loader.
-    if (!opts?.silent) setLoading(true);
-    try {
-      const list = await fetchFollowing(targetId);
-      setRows(list);
-      const mask = await fetchFollowingMask(authUser?.id ?? null, list.map((r) => r.id));
-      setFollowingSet(mask);
-      if (!headerName) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('username')
-          .eq('id', targetId)
-          .maybeSingle();
-        if (data?.username) setHeaderName(data.username);
-      }
-    } finally {
-      if (!opts?.silent) setLoading(false);
-    }
-  }, [targetId, authUser?.id, headerName]);
+  // Sibling query, not a follow-on. This also retires a refetch loop: the old
+  // load() listed `headerName` in its useCallback deps, so resolving the name
+  // changed load's identity, re-ran useEffect([load]), and re-fetched the whole
+  // list a second time on every visit that started without a username param.
+  const profileQuery = useProfileQuery(targetId);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const scope = `following:${targetId}`;
+  const ids = useMemo(() => rows.map((r) => r.id), [rows]);
+  const maskQuery = useFollowingMaskQuery(authUser?.id ?? null, scope, ids);
+  // The cache holds string[] (see useFollowingMaskQuery); rebuild the Set here
+  // so row lookups stay O(1).
+  const followingSet = useMemo(() => new Set(maskQuery.data ?? []), [maskQuery.data]);
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await load({ silent: true });
-    } finally {
-      setRefreshing(false);
-    }
-  }, [load]);
+  const toggle = useToggleFollowInList(authUser?.id ?? null, scope, ids);
 
+  // authProfile is only a valid fallback for the viewer's own list — see the
+  // matching note in followers.tsx.
+  const headerName =
+    (typeof params.username === 'string' && params.username) ||
+    profileQuery.data?.username ||
+    (isSelf ? authProfile?.username : '') ||
+    '';
 
-  const handleToggle = async (row: Row) => {
+  // A disabled query sits in `pending` forever, so an absent targetId must not
+  // read as "still loading".
+  const loading = !!targetId && listQuery.isPending;
+  const refreshing = listQuery.isRefetching || maskQuery.isRefetching;
+
+  const onRefresh = useCallback(() => {
+    listQuery.refetch();
+    maskQuery.refetch();
+  }, [listQuery, maskQuery]);
+
+  const handleToggle = (row: Row) => {
     if (!authUser) {
       toast.show('Sign in to follow', { variant: 'info', icon: 'log-in' });
       router.push('/auth/login' as any);
       return;
     }
-    if (row.id === authUser.id || busyId) return;
-    const wasFollowing = followingSet.has(row.id);
-    setBusyId(row.id);
-    // Optimistic flip
-    setFollowingSet((prev) => {
-      const next = new Set(prev);
-      if (wasFollowing) next.delete(row.id);
-      else next.add(row.id);
-      return next;
-    });
-    try {
-      const state = await toggleFollow(authUser.id, row.id, wasFollowing);
-      setFollowingSet((prev) => {
-        const next = new Set(prev);
-        if (state.isFollowing) next.add(row.id);
-        else next.delete(row.id);
-        return next;
-      });
-    } catch (e: any) {
-      // Roll back
-      setFollowingSet((prev) => {
-        const next = new Set(prev);
-        if (wasFollowing) next.add(row.id);
-        else next.delete(row.id);
-        return next;
-      });
-      toast.show(e?.message ?? 'Could not update follow', {
-        variant: 'default',
-        icon: 'alert-triangle',
-      });
-    } finally {
-      setBusyId(null);
-    }
+    if (row.id === authUser.id || toggle.isPending) return;
+    toggle.mutate(
+      { id: row.id, currentlyFollowing: followingSet.has(row.id) },
+      {
+        onError: (e: any) =>
+          toast.show(e?.message ?? 'Could not update follow', {
+            variant: 'default',
+            icon: 'alert-triangle',
+          }),
+      },
+    );
   };
 
   return (
@@ -169,7 +135,7 @@ export default function FollowingScreen() {
               row={item}
               isFollowing={followingSet.has(item.id)}
               isSelfRow={item.id === authUser?.id}
-              busy={busyId === item.id}
+              busy={toggle.isPending && toggle.variables?.id === item.id}
               onToggle={() => handleToggle(item)}
             />
           )}

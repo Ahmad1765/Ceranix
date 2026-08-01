@@ -4,7 +4,7 @@ import { View, Pressable, ScrollView, RefreshControl, ActivityIndicator, Keyboar
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { Text, TextInput } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import { ListingCard } from '@/components/ListingCard';

@@ -1,7 +1,7 @@
 import { View } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import type { WardrobePost } from '@/lib/wardrobe';
 
 export function WardrobeCard({ post }: { post: WardrobePost }) {

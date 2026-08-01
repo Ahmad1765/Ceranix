@@ -9,7 +9,7 @@
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, Platform, View } from 'react-native';
 import { Text } from '@/lib/rnText';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/lib/theme';
 import { useIsOffline } from '@/lib/offline';

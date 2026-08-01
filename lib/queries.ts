@@ -36,6 +36,9 @@ import {
   type SavedSearch,
 } from '@/lib/savedSearches';
 import {
+  fetchFollowers,
+  fetchFollowing,
+  fetchFollowingMask,
   fetchFollowState,
   fetchSuggestedFollows,
   getCachedFollowState,
@@ -98,6 +101,20 @@ export const qk = {
   tagIndex: () => ['tagIndex'] as const,
   tagListings: (tag: string | null) => ['tagListings', tag] as const,
   suggestedFollows: (userId: string | null) => ['suggestedFollows', userId] as const,
+  followers: (userId: string) => ['followers', userId] as const,
+  following: (userId: string) => ['following', userId] as const,
+  // `scope` distinguishes the two lists that can be on screen for the same
+  // viewer (e.g. 'followers:<id>' vs 'following:<id>'), so opening one does not
+  // clobber the other's cached mask.
+  //
+  // `ids` is part of the key, not just the queryFn's closure. The mask is a
+  // dependent query — its answer is only valid for the exact id set it was asked
+  // about — so keying without them meant a refresh that changed the list (a new
+  // follower) recomputed nothing and left that row rendering the wrong button
+  // until gcTime expired. Follow lists are tens-to-hundreds of ids, so the
+  // larger key is a fair trade for staying correct.
+  followingMask: (viewerId: string | null, scope: string, ids: string[]) =>
+    ['followingMask', viewerId, scope, ids] as const,
 };
 
 // ── Discover search hub ─────────────────────────────────────────────────────
@@ -437,6 +454,105 @@ export function useToggleFollow(viewerId: string | null, targetId: string) {
     },
     onSuccess: (next) => {
       qc.setQueryData(key, next);
+    },
+  });
+}
+
+// ── Follow lists (profile/followers, profile/following) ─────────────────────
+// These two screens previously fetched in a hand-rolled `load()` that awaited
+// three calls in series — list, then mask, then the header's username — even
+// though the username depends on neither of the others. As sibling useQuery
+// calls the independent ones now start together, and revisiting the screen
+// paints from cache instead of re-running the whole chain.
+type FollowRow = Awaited<ReturnType<typeof fetchFollowers>>[number];
+
+export function useFollowersQuery(userId: string) {
+  return useQuery({
+    queryKey: qk.followers(userId),
+    enabled: !!userId,
+    queryFn: (): Promise<FollowRow[]> => fetchFollowers(userId),
+  });
+}
+
+export function useFollowingQuery(userId: string) {
+  return useQuery({
+    queryKey: qk.following(userId),
+    enabled: !!userId,
+    queryFn: (): Promise<FollowRow[]> => fetchFollowing(userId),
+  });
+}
+
+/**
+ * Which of `ids` the viewer already follows — drives each row's Follow/Following
+ * button. Dependent on the list query, so it stays disabled until ids arrive.
+ *
+ * Returns string[], NOT the Set that fetchFollowingMask hands back. That is
+ * load-bearing: the Query cache is persisted to AsyncStorage through
+ * JSON.stringify (see persistOptions in lib/queryClient.ts), and
+ * `JSON.stringify(new Set(['a']))` is `"{}"` — a cached Set would silently
+ * rehydrate empty on the next cold launch and every row would render "Follow"
+ * regardless of the truth. Callers rebuild the Set for O(1) lookups.
+ */
+export function useFollowingMaskQuery(
+  viewerId: string | null,
+  scope: string,
+  ids: string[],
+) {
+  return useQuery({
+    queryKey: qk.followingMask(viewerId, scope, ids),
+    enabled: !!viewerId && ids.length > 0,
+    // Keep the previous mask on screen while a changed id set refetches, so
+    // rows don't flash back to "Follow" mid-refresh.
+    placeholderData: (prev) => prev,
+    queryFn: async (): Promise<string[]> =>
+      Array.from(await fetchFollowingMask(viewerId, ids)),
+  });
+}
+
+/**
+ * Follow/unfollow one row of a follow list. Flips that id in the cached mask
+ * immediately and rolls back if the server rejects, which is what keeps the
+ * button from visibly bouncing on a slow link.
+ *
+ * Distinct from useToggleFollow above: that one owns a single profile's
+ * FollowState (with counts) for the profile screen, this one owns membership in
+ * a list-wide mask. Both are invalidated on success so the two views cannot
+ * disagree after a toggle in either place.
+ */
+export function useToggleFollowInList(
+  viewerId: string | null,
+  scope: string,
+  ids: string[],
+) {
+  const qc = useQueryClient();
+  // Must match the mask query's key exactly, ids included, or the optimistic
+  // write lands on an entry nothing is reading.
+  const key = qk.followingMask(viewerId, scope, ids);
+  return useMutation({
+    mutationFn: ({ id, currentlyFollowing }: { id: string; currentlyFollowing: boolean }) =>
+      toggleFollow(viewerId as string, id, currentlyFollowing),
+    onMutate: async ({ id, currentlyFollowing }) => {
+      await qc.cancelQueries({ queryKey: key });
+      const prev = qc.getQueryData<string[]>(key);
+      qc.setQueryData<string[]>(key, (old) => {
+        const list = old ?? [];
+        return currentlyFollowing ? list.filter((x) => x !== id) : [...list, id];
+      });
+      return { prev };
+    },
+    onError: (_e, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(key, ctx.prev);
+    },
+    onSuccess: (state, { id }) => {
+      // Reconcile against what the RPC actually decided rather than assuming
+      // the optimistic flip was right.
+      qc.setQueryData<string[]>(key, (old) => {
+        const list = (old ?? []).filter((x) => x !== id);
+        return state.isFollowing ? [...list, id] : list;
+      });
+      // The profile screen caches this pair's FollowState (with counts)
+      // separately; drop it so a later visit re-reads the new truth.
+      qc.invalidateQueries({ queryKey: qk.followState(viewerId, id) });
     },
   });
 }

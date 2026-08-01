@@ -3,7 +3,7 @@ import { Alert, View, Pressable, ScrollView, RefreshControl, Platform } from 're
 import { FlashList } from '@shopify/flash-list';
 import { Text, TextInput } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
 import { router, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/lib/auth';

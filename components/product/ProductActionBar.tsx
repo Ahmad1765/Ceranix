@@ -22,7 +22,7 @@ import Animated, {
   interpolate,
   Easing,
 } from 'react-native-reanimated';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { IS_IOS, HAIRLINE, tap, BRAND_INK, BRAND_PURPLE } from './shared';
 import { formatPrice, CURRENCY_SYMBOL } from '@/lib/currency';
 

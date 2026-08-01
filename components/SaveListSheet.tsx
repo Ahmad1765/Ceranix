@@ -8,7 +8,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { View, Pressable, Modal, StyleSheet, ActivityIndicator, Platform, Dimensions } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
 import { BlurView } from 'expo-blur';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import {
   addToList,

@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { View, Pressable, Modal, ScrollView, ActivityIndicator } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { colors, radii } from '@/lib/theme';
 import { createSavedSearch } from '@/lib/savedSearches';
 import { useToast } from '@/lib/toast';

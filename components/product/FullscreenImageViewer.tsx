@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { View, ScrollView, Pressable, Modal } from 'react-native';
 import { Image } from 'expo-image';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { StatusBar } from 'expo-status-bar';
 import Animated, { useSharedValue, useAnimatedScrollHandler } from 'react-native-reanimated';
 import { getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
