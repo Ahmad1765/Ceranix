@@ -34,7 +34,10 @@ export function SearchBar({
 
   if (onPress) {
     return (
-      <Pressable onPress={onPress} className="mx-4 my-2">
+      // Inline style, not className: Pressable is deliberately excluded from
+      // NativeWind's cssInterop (see lib/pressableInterop.ts), so className
+      // does nothing here. Mirrors the `mx-4 my-2` on the View below.
+      <Pressable onPress={onPress} style={{ marginHorizontal: 16, marginVertical: 8 }}>
         {content}
       </Pressable>
     );

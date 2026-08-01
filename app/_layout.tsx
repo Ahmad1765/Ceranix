@@ -1,6 +1,7 @@
 import '../global.css';
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
+import { disablePressableInterop } from '@/lib/pressableInterop';
 import { installAlertShim } from '@/lib/alertShim';
 import { initSentry, wrapWithSentry } from '@/lib/sentry';
 import { initAnalytics, screen } from '@/lib/analytics';
@@ -30,6 +31,13 @@ import { SellSheetProvider } from '@/components/sell/SellSheet';
 import { DiscoverSheetProvider } from '@/components/discover/DiscoverSheet';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { OfflineBanner } from '@/components/OfflineBanner';
+
+// FIRST, before any element is created: take Pressable out of NativeWind's
+// cssInterop. That wrapper silently drops function-valued `style` props
+// (`style={({ pressed }) => ({ ... })}`), which is what broke chips, the
+// listing-card like badge, and the tab bar on native while web looked fine.
+// See lib/pressableInterop.ts for the full mechanism.
+disablePressableInterop();
 
 // Initialize crash + error reporting before anything else renders so startup
 // failures are captured too. No-ops when EXPO_PUBLIC_SENTRY_DSN is unset.

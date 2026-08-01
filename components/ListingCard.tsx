@@ -7,6 +7,7 @@ import Animated from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { PressableScale } from '@/components/PressableScale';
 import { getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
+import { peekLikedIds } from '@/lib/engagementCache';
 import { formatPrice } from '@/lib/currency';
 import { priceBreakdown } from '@/lib/fees';
 import { useAuth } from '@/lib/auth';
@@ -38,7 +39,12 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
   const [activeIndex, setActiveIndex] = useState(0);
   const [measuredWidth, setMeasuredWidth] = useState(0);
   const cardWidth = width ?? measuredWidth;
-  const [liked, setLiked] = useState(false);
+  // Seeded from the warm cache so the very first paint already shows the right
+  // heart, rather than rendering unliked and correcting itself a tick later.
+  // (Only runs on a true mount; FlashList recycles are handled by the effect.)
+  const [liked, setLiked] = useState(() =>
+    user?.id ? (peekLikedIds(user.id)?.has(listing.id) ?? false) : false,
+  );
   const [likeCount, setLikeCount] = useState(listing.likes ?? 0);
   const [likeBusy, setLikeBusy] = useState(false);
   // images is nullable in Postgres; `['']` keeps the carousel's single-slot
@@ -53,13 +59,31 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
 
   // Hydrate the liked state for the current user. Cards are recycled in the
   // feed grid so we re-run this whenever the listing id or user changes.
+  //
+  // The warm-cache path is deliberately synchronous. fetchIsLiked is async even
+  // when the answer is already in memory, so every card used to render once with
+  // `liked=false`, resolve a microtask, then setState and render AGAIN — per
+  // card, and again on every FlashList recycle mid-scroll. That doubled render
+  // work sat on the UI thread and was the main contributor to the 33% janky
+  // frames measured while scrolling the feed. peekLikedIds answers from the same
+  // cache without a promise, so the common case now costs zero extra renders
+  // (setState with an unchanged value bails out inside React).
   useEffect(() => {
     if (!user?.id) {
       setLiked(false);
       return;
     }
-    let cancelled = false;
     likedInteractedRef.current = false;
+
+    const warm = peekLikedIds(user.id);
+    if (warm) {
+      setLiked(warm.has(listing.id));
+      return;
+    }
+
+    // Cold cache only: one batched round-trip, shared by every card mounting in
+    // this frame (engagementCache dedupes in-flight requests).
+    let cancelled = false;
     fetchIsLiked(listing.id, user.id).then((v) => {
       if (!cancelled && !likedInteractedRef.current) setLiked(v);
     });

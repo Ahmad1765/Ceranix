@@ -76,6 +76,24 @@ export async function getSavedIds(userId: string): Promise<Set<string>> {
   return p;
 }
 
+// Synchronous peeks. getLikedIds/getSavedIds are async even when the answer is
+// already in memory, so a card asking "am I liked?" always paid a microtask and
+// a setState — i.e. a second render. On a 60-card grid that FlashList recycles
+// while scrolling, that is a re-render per card per recycle, all of it on the UI
+// thread, and it showed up as 33% janky frames (p90 44ms) with "Slow UI thread"
+// as the dominant cause and bitmap uploads near zero.
+//
+// These let a component seed its initial state from the warm cache during the
+// first render and skip the effect entirely. They never fetch: null means "not
+// known yet", and the caller should fall back to the async path.
+export function peekLikedIds(userId: string): Set<string> | null {
+  return fresh(likedCache, userId) ? likedCache.ids : null;
+}
+
+export function peekSavedIds(userId: string): Set<string> | null {
+  return fresh(savedCache, userId) ? savedCache.ids : null;
+}
+
 // Optimistic updates from the toggle paths keep the cache truthful without
 // a refetch. Wrong-user updates are ignored.
 export function updateLikedCache(userId: string, listingId: string, liked: boolean): void {
