@@ -36,6 +36,7 @@ import {
   type SavedSearch,
 } from '@/lib/savedSearches';
 import {
+  FOLLOW_PAGE_SIZE,
   fetchFollowers,
   fetchFollowing,
   fetchFollowingMask,
@@ -114,7 +115,17 @@ export const qk = {
   // until gcTime expired. Follow lists are tens-to-hundreds of ids, so the
   // larger key is a fair trade for staying correct.
   followingMask: (viewerId: string | null, scope: string, ids: string[]) =>
-    ['followingMask', viewerId, scope, ids] as const,
+    [...qk.followingMaskScope(viewerId, scope), ids] as const,
+  // Every mask entry for one viewer+list, whatever id set it was fetched for.
+  //
+  // Needed because the full key above is only stable while `ids` is. The follow
+  // lists paginate, so `ids` grows as the reader scrolls, and a mutation that
+  // captured the key at render time can settle *after* a new page has changed
+  // it — leaving the optimistic write on an entry nothing reads and the button
+  // visibly snapping back. Writing through this prefix updates every cached
+  // mask for the list instead, which is correct regardless of paging.
+  followingMaskScope: (viewerId: string | null, scope: string) =>
+    ['followingMask', viewerId, scope] as const,
 };
 
 // ── Discover search hub ─────────────────────────────────────────────────────
@@ -466,19 +477,31 @@ export function useToggleFollow(viewerId: string | null, targetId: string) {
 // paints from cache instead of re-running the whole chain.
 type FollowRow = Awaited<ReturnType<typeof fetchFollowers>>[number];
 
+// Paged, because these lists are as long as the account is popular. `pageParam`
+// is the page INDEX (fetchFollowers/fetchFollowing take a page number, not an
+// offset); a short page means the end of the list.
+//
+// Both hooks return the raw useInfiniteQuery result — callers flatten
+// `data.pages` themselves, the same way the home feed does.
 export function useFollowersQuery(userId: string) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: qk.followers(userId),
     enabled: !!userId,
-    queryFn: (): Promise<FollowRow[]> => fetchFollowers(userId),
+    initialPageParam: 0,
+    queryFn: ({ pageParam }): Promise<FollowRow[]> => fetchFollowers(userId, pageParam),
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length < FOLLOW_PAGE_SIZE ? undefined : allPages.length,
   });
 }
 
 export function useFollowingQuery(userId: string) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: qk.following(userId),
     enabled: !!userId,
-    queryFn: (): Promise<FollowRow[]> => fetchFollowing(userId),
+    initialPageParam: 0,
+    queryFn: ({ pageParam }): Promise<FollowRow[]> => fetchFollowing(userId, pageParam),
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length < FOLLOW_PAGE_SIZE ? undefined : allPages.length,
   });
 }
 
@@ -519,37 +542,41 @@ export function useFollowingMaskQuery(
  * a list-wide mask. Both are invalidated on success so the two views cannot
  * disagree after a toggle in either place.
  */
-export function useToggleFollowInList(
-  viewerId: string | null,
-  scope: string,
-  ids: string[],
-) {
+export function useToggleFollowInList(viewerId: string | null, scope: string) {
   const qc = useQueryClient();
-  // Must match the mask query's key exactly, ids included, or the optimistic
-  // write lands on an entry nothing is reading.
-  const key = qk.followingMask(viewerId, scope, ids);
+  // Prefix, NOT the exact key. The exact key embeds the id array, and these
+  // lists paginate — a page landing mid-flight changes it, which would strand
+  // the optimistic write on a cache entry nothing reads and snap the button
+  // back. Writing through the prefix hits every mask cached for this list.
+  const prefix = qk.followingMaskScope(viewerId, scope);
+
+  // Flip one id in a mask, or reconcile it to a known server answer.
+  const withId = (list: string[] | undefined, id: string, following: boolean) => {
+    const without = (list ?? []).filter((x) => x !== id);
+    return following ? [...without, id] : without;
+  };
+
   return useMutation({
     mutationFn: ({ id, currentlyFollowing }: { id: string; currentlyFollowing: boolean }) =>
       toggleFollow(viewerId as string, id, currentlyFollowing),
     onMutate: async ({ id, currentlyFollowing }) => {
-      await qc.cancelQueries({ queryKey: key });
-      const prev = qc.getQueryData<string[]>(key);
-      qc.setQueryData<string[]>(key, (old) => {
-        const list = old ?? [];
-        return currentlyFollowing ? list.filter((x) => x !== id) : [...list, id];
-      });
+      await qc.cancelQueries({ queryKey: prefix });
+      // Snapshot every matching entry so a failure restores all of them.
+      const prev = qc.getQueriesData<string[]>({ queryKey: prefix });
+      qc.setQueriesData<string[]>({ queryKey: prefix }, (old) =>
+        withId(old, id, !currentlyFollowing),
+      );
       return { prev };
     },
     onError: (_e, _vars, ctx) => {
-      if (ctx?.prev) qc.setQueryData(key, ctx.prev);
+      for (const [key, data] of ctx?.prev ?? []) qc.setQueryData(key, data);
     },
     onSuccess: (state, { id }) => {
       // Reconcile against what the RPC actually decided rather than assuming
       // the optimistic flip was right.
-      qc.setQueryData<string[]>(key, (old) => {
-        const list = (old ?? []).filter((x) => x !== id);
-        return state.isFollowing ? [...list, id] : list;
-      });
+      qc.setQueriesData<string[]>({ queryKey: prefix }, (old) =>
+        withId(old, id, state.isFollowing),
+      );
       // The profile screen caches this pair's FollowState (with counts)
       // separately; drop it so a later visit re-reads the new truth.
       qc.invalidateQueries({ queryKey: qk.followState(viewerId, id) });

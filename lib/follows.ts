@@ -149,32 +149,58 @@ async function fetchProfilesByIds(ids: string[]): Promise<FollowListRow[]> {
   return ids.map((id) => byId.get(id)).filter(Boolean) as FollowListRow[];
 }
 
-// Profiles that `userId` follows (i.e. their "Following" list).
-export async function fetchFollowing(userId: string): Promise<FollowListRow[]> {
+// Rows per page for both follow lists.
+//
+// These two used to be unpaginated: every edge row for the profile, plus a
+// profile join for each. On a seller with 5,000 followers that is 5,000 rows
+// over the wire before a single name renders — the list virtualization on those
+// screens bounds the *rendering* cost but can do nothing about the query.
+//
+// Offset paging via .range() rather than a created_at keyset, to match the
+// convention lib/listings.ts already uses. The tradeoff is the usual one: a
+// follow added while the reader is mid-scroll shifts the window and can repeat
+// or skip one row at a page boundary. For a follow list that is acceptable;
+// switch to a keyset on (created_at, id) if it ever isn't.
+export const FOLLOW_PAGE_SIZE = 30;
+
+/** One page of follow edges, newest first, resolved to profiles. */
+async function fetchFollowPage(
+  matchColumn: 'follower_id' | 'followee_id',
+  selectColumn: 'follower_id' | 'followee_id',
+  userId: string,
+  page: number,
+  pageSize: number,
+): Promise<FollowListRow[]> {
+  const from = page * pageSize;
   const { data, error } = await supabase
     .from('user_follows')
-    .select('followee_id, created_at')
-    .eq('follower_id', userId)
-    .order('created_at', { ascending: false });
+    .select(`${selectColumn}, created_at`)
+    .eq(matchColumn, userId)
+    .order('created_at', { ascending: false })
+    .range(from, from + pageSize - 1);
   if (error) {
-    console.warn('[follows] fetchFollowing', error.message);
+    console.warn(`[follows] fetchFollowPage(${selectColumn})`, error.message);
     return [];
   }
-  return fetchProfilesByIds((data ?? []).map((r: any) => r.followee_id));
+  return fetchProfilesByIds((data ?? []).map((r: any) => r[selectColumn]));
+}
+
+// Profiles that `userId` follows (i.e. their "Following" list).
+export async function fetchFollowing(
+  userId: string,
+  page = 0,
+  pageSize = FOLLOW_PAGE_SIZE,
+): Promise<FollowListRow[]> {
+  return fetchFollowPage('follower_id', 'followee_id', userId, page, pageSize);
 }
 
 // Profiles that follow `userId` (i.e. their "Followers" list).
-export async function fetchFollowers(userId: string): Promise<FollowListRow[]> {
-  const { data, error } = await supabase
-    .from('user_follows')
-    .select('follower_id, created_at')
-    .eq('followee_id', userId)
-    .order('created_at', { ascending: false });
-  if (error) {
-    console.warn('[follows] fetchFollowers', error.message);
-    return [];
-  }
-  return fetchProfilesByIds((data ?? []).map((r: any) => r.follower_id));
+export async function fetchFollowers(
+  userId: string,
+  page = 0,
+  pageSize = FOLLOW_PAGE_SIZE,
+): Promise<FollowListRow[]> {
+  return fetchFollowPage('followee_id', 'follower_id', userId, page, pageSize);
 }
 
 // Free-text search across profiles by username / full name. Powers the

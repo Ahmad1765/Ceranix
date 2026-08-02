@@ -57,15 +57,23 @@ export function WardrobeGrid({
     );
   }
 
+  // The flex:1 wrapper is required, not cosmetic. This grid renders as one
+  // sibling among several in the wardrobe screen's column (header, tabs, then
+  // this), and a flex child with no flex style sizes to its CONTENT. An
+  // unbounded-height list does not scroll and does not virtualize — it would
+  // mount every tile, silently undoing the point of the FlashList. The screen's
+  // other section wraps itself the same way.
   return (
-    <FlashList
-      data={rows}
-      renderItem={renderRow}
-      keyExtractor={rowKey}
-      drawDistance={GRID_DRAW_DISTANCE}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingTop, paddingBottom }}
-    />
+    <View style={{ flex: 1 }}>
+      <FlashList
+        data={rows}
+        renderItem={renderRow}
+        keyExtractor={rowKey}
+        drawDistance={GRID_DRAW_DISTANCE}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingTop, paddingBottom }}
+      />
+    </View>
   );
 }
 

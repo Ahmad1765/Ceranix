@@ -25,6 +25,9 @@ type Row = Awaited<ReturnType<typeof fetchFollowing>>[number];
 // Module-level so the list doesn't see a new keyExtractor identity each render.
 const keyById = (r: Row) => r.id;
 
+// Stable empty reference so a pending query doesn't churn the memos below.
+const EMPTY_ROWS: Row[] = [];
+
 export default function FollowingScreen() {
   const { user: authUser, profile: authProfile } = useAuth();
   const params = useLocalSearchParams<{ user?: string; username?: string }>();
@@ -33,7 +36,17 @@ export default function FollowingScreen() {
   const toast = useToast();
 
   const listQuery = useFollowingQuery(targetId);
-  const rows = useMemo(() => listQuery.data ?? [], [listQuery.data]);
+  // The list is paged now (FOLLOW_PAGE_SIZE rows at a time) — flatten the pages
+  // the way the home feed does.
+  const rows = useMemo(
+    () => listQuery.data?.pages.flat() ?? EMPTY_ROWS,
+    [listQuery.data],
+  );
+
+  const { fetchNextPage, hasNextPage, isFetchingNextPage } = listQuery;
+  const onEndReached = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // Sibling query, not a follow-on. This also retires a refetch loop: the old
   // load() listed `headerName` in its useCallback deps, so resolving the name
@@ -48,7 +61,7 @@ export default function FollowingScreen() {
   // so row lookups stay O(1).
   const followingSet = useMemo(() => new Set(maskQuery.data ?? []), [maskQuery.data]);
 
-  const toggle = useToggleFollowInList(authUser?.id ?? null, scope, ids);
+  const toggle = useToggleFollowInList(authUser?.id ?? null, scope);
 
   // authProfile is only a valid fallback for the viewer's own list — see the
   // matching note in followers.tsx.
@@ -61,7 +74,11 @@ export default function FollowingScreen() {
   // A disabled query sits in `pending` forever, so an absent targetId must not
   // read as "still loading".
   const loading = !!targetId && listQuery.isPending;
-  const refreshing = listQuery.isRefetching || maskQuery.isRefetching;
+  // `isRefetching` is also true while fetchNextPage is in flight, so it has to
+  // be excluded — otherwise scrolling to the bottom spins the pull-to-refresh
+  // control as well as the list footer.
+  const refreshing =
+    (listQuery.isRefetching && !isFetchingNextPage) || maskQuery.isRefetching;
 
   const onRefresh = useCallback(() => {
     listQuery.refetch();
@@ -130,15 +147,27 @@ export default function FollowingScreen() {
           data={rows}
           keyExtractor={keyById}
           contentContainerStyle={{ paddingVertical: 4, paddingBottom: 80 }}
-          // fetchFollowing() is unpaginated — it returns every followee row for
-          // the profile — so this list is as long as the account is active.
-          // The RN defaults (windowSize 21) would keep ~10 screens of rows
-          // mounted in each direction off a single fling.
+          // The query is paged (FOLLOW_PAGE_SIZE at a time), so what is mounted
+          // is bounded by what has been pulled. These still matter on an active
+          // account after several pages: the RN defaults (windowSize 21) keep
+          // ~10 screens of rows mounted in each direction off a single fling.
           windowSize={7}
           initialNumToRender={12}
           maxToRenderPerBatch={10}
           updateCellsBatchingPeriod={50}
           removeClippedSubviews={Platform.OS === 'android'}
+          onEndReached={onEndReached}
+          // Half a screen of runway: far enough that the next page is usually
+          // there before the user reaches the bottom, near enough that idle
+          // scrolling doesn't pull pages nobody looks at.
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            isFetchingNextPage ? (
+              <View style={{ paddingVertical: 20 }}>
+                <ActivityIndicator color={colors.purple} />
+              </View>
+            ) : null
+          }
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />
           }

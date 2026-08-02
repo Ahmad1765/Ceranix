@@ -163,7 +163,12 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
       return Math.round(offsetX.value / pageW.value);
     },
     (page, previous) => {
-      if (page !== previous) runOnJS(setActiveIndex)(page);
+      // `previous` is null on the reaction's first run, at mount. Without the
+      // null guard that first run always crosses to JS to set activeIndex to
+      // the 0 it already is — one wasted hop per card, i.e. ~60 on a feed
+      // screen, which is precisely the cost this handler exists to avoid.
+      // A real 0 → 1 change still fires: by then `previous` is 0, not null.
+      if (previous !== null && page !== previous) runOnJS(setActiveIndex)(page);
     },
   );
 

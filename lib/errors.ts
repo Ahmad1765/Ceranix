@@ -19,11 +19,30 @@
 // silent in a normal build (the preset runs the plugin with
 // `panicThreshold: 'NONE'` in production).
 
+// Both helpers read `.name`/`.message` structurally rather than testing
+// `e instanceof Error`, and that is load-bearing rather than defensive style.
+//
+// A fetch abort rejects with a DOMException, which is NOT reliably an instance
+// of Error across JS engines (WebIDL only made DOMException inherit from Error
+// in a later revision, and Hermes/react-native-web do not agree with each other
+// here). An `instanceof Error` check therefore silently fails to recognise the
+// one rejection type these helpers exist to classify. Reading the property is
+// exactly what the hand-written `e?.name === 'AbortError'` / `e?.message ?? ''`
+// call sites did before they were centralised here, so this also keeps those
+// rewrites behaviour-preserving.
+
+function readStringProp(e: unknown, key: 'name' | 'message'): string {
+  if (typeof e === 'object' && e !== null) {
+    const v = (e as Record<string, unknown>)[key];
+    if (typeof v === 'string') return v;
+  }
+  return '';
+}
+
 /** Best-effort message for an unknown thrown value. Never throws. */
 export function errorMessage(e: unknown): string {
-  if (e instanceof Error) return e.message;
   if (typeof e === 'string') return e;
-  return '';
+  return readStringProp(e, 'message');
 }
 
 /**
@@ -39,7 +58,7 @@ export function errorMessage(e: unknown): string {
  */
 export function isAbortError(e: unknown, signal?: AbortSignal): boolean {
   if (signal?.aborted) return true;
-  if (e instanceof Error && e.name === 'AbortError') return true;
+  if (readStringProp(e, 'name') === 'AbortError') return true;
   const msg = errorMessage(e);
   return msg.includes('aborted') || msg.includes('AbortError');
 }

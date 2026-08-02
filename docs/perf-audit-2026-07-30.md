@@ -649,13 +649,38 @@ component *type* every render, which unmounts and remounts every separator — a
 handed `InboxRow` a fresh `onPress` closure, defeating the `memo` it already had.
 Both fixed (`InboxSeparator`, and `InboxListRow` owns the navigation).
 
-### ⚠️ `fetchFollowers` / `fetchFollowing` are unpaginated
+### `fetchFollowers` / `fetchFollowing` were unpaginated — now fixed
 
-`lib/follows.ts:153,167` have no `.limit()` and no pagination — a seller with
-5,000 followers pulls all 5,000 rows plus a profile join for each. The list
-tuning above bounds the *rendering* cost and does nothing about the query. **Not
-fixed here** (it needs a paging UX decision), but it is the next real problem on
-those screens.
+`lib/follows.ts` had no `.limit()` and no pagination on either list: a seller
+with 5,000 followers pulled all 5,000 edge rows plus a profile join for each,
+before a single name rendered. The list tuning above bounds the *rendering* cost
+and can do nothing about the query.
+
+Both now page at `FOLLOW_PAGE_SIZE = 30` through a shared `fetchFollowPage`
+helper, with `useFollowersQuery` / `useFollowingQuery` converted from `useQuery`
+to `useInfiniteQuery` (same shape as `useHomeFeedQuery`) and both screens wired
+to `onEndReached` with a footer spinner.
+
+Choices worth recording:
+
+- **Offset paging via `.range()`, not a `created_at` keyset**, to match the
+  convention `lib/listings.ts` already uses. The tradeoff is the standard one: a
+  follow added while the reader is mid-scroll shifts the window and can repeat or
+  skip a row at a page boundary. Acceptable for a follow list; switch to a keyset
+  on `(created_at, id)` if it ever isn't.
+- **`isRefetching` had to be gated on `!isFetchingNextPage`.** It is true during
+  `fetchNextPage` too, so without that the pull-to-refresh control spun every
+  time the reader hit the bottom.
+- **The follow mask still covers every loaded id**, so it refetches as pages
+  accumulate. `placeholderData: (prev) => prev` keeps rows from flashing back to
+  "Follow" during that refetch. One `.in()` query per page is cheap enough to
+  leave alone.
+
+Covered by `lib/follows.test.ts` (8 tests): the range window per page, the
+`follower_id`/`followee_id` direction of each list, edge-order preservation
+across the profile join, missing-profile rows being dropped rather than left as
+holes, and an empty page skipping the profile round-trip (an empty `.in()` would
+otherwise match every profile).
 
 ### `WardrobeGrid` was the last unvirtualized grid
 
@@ -694,7 +719,30 @@ that transform flag is ever switched on.
 - **Still nothing measured on-device.** Every claim above is mechanical (fewer
   mounted views, fewer renders, work moved off the JS thread) and gated by
   typecheck/lint/tests/export — but no frame timing or startup trace was taken.
-- **The unpaginated follow queries** described above.
+  Four passes in, this is now the binding constraint: what remains cannot be
+  ranked without a trace.
 - **Cold screens without compiler coverage** — `settings.tsx` alone has 10
   bailouts. All the same mechanical patterns; low value because those screens
   render once.
+
+### Pass 4 verification
+
+```
+npx tsc --noEmit          → 0 errors
+npx expo lint             → 0 errors, 0 warnings
+npx vitest run            → 18 files, 163/163 passed
+npx expo export -p web    → exit 0
+```
+
+E2E, with the same stash-and-compare discipline as the earlier passes — the
+suite was run on the changed tree, the tree was reverted to the parent commit,
+re-exported, and the identical suite run again:
+
+| | Passed | Failed | Skipped |
+|---|---|---|---|
+| Baseline (parent commit) | 124 | 32 | 6 |
+| With Pass 4 | 124 | 32 | 6 |
+
+The failing **sets** were diffed, not just the counts: **byte-identical**. Zero
+new failures, zero disappeared. (The suite's 32 pre-existing failures are the
+long-standing ones documented above and are unrelated to this work.)
