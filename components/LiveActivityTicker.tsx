@@ -42,14 +42,14 @@ function timeAgo(iso: string): string {
 export function LiveActivityTicker() {
   const [items, setItems] = useState<Activity[]>([]);
   const [index, setIndex] = useState(0);
-  const slide = useRef(new Animated.Value(0)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
-  const dotPulse = useRef(new Animated.Value(0)).current;
+  const [slide] = useState(() => new Animated.Value(0));
+  const [opacity] = useState(() => new Animated.Value(0));
+  const [dotPulse] = useState(() => new Animated.Value(0));
   // Dynamic Island-style entrance: tiny "blob" that expands into the pill
-  const islandScale = useRef(new Animated.Value(0.2)).current;
-  const islandOpacity = useRef(new Animated.Value(0)).current;
+  const [islandScale] = useState(() => new Animated.Value(0.2));
+  const [islandOpacity] = useState(() => new Animated.Value(0));
   // Press-to-expand spring (subtle squish-grow like iOS interactive widgets)
-  const pressScale = useRef(new Animated.Value(1)).current;
+  const [pressScale] = useState(() => new Animated.Value(1));
 
   // Pulse the live dot continuously
   useEffect(() => {
@@ -94,8 +94,14 @@ export function LiveActivityTicker() {
     };
   }, []);
 
+  // Synced in an effect, not assigned during render. Writing a ref while
+  // rendering is a Rules-of-React violation, and it made React Compiler bail out
+  // of this whole component. Every reader is inside an interval callback, which
+  // runs long after commit.
   const latestItemsRef = useRef(items);
-  latestItemsRef.current = items;
+  useEffect(() => {
+    latestItemsRef.current = items;
+  }, [items]);
 
   // Cycle through items
   useEffect(() => {

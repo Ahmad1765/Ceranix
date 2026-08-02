@@ -5,7 +5,7 @@
 // Keep this tiny — anything richer (multi-field forms, validation) belongs
 // in a dedicated sheet, not here.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, Animated, Easing, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
 import { BlurView } from 'expo-blur';
@@ -83,7 +83,7 @@ function PromptModal({
   // Entrance: the backdrop fades in while the card scales up from 96% and
   // fades — the RN equivalent of CSS @starting-style. ~180ms ease-out reads
   // as the dialog being physically placed in front of the (receding) page.
-  const enter = useRef(new Animated.Value(0)).current;
+  const [enter] = useState(() => new Animated.Value(0));
   useEffect(() => {
     Animated.timing(enter, {
       toValue: 1,

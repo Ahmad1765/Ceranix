@@ -27,7 +27,7 @@ import type { TagIndexEntry } from '@/lib/searchIndex';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { colors, radii } from '@/lib/theme';
-import { useGridDimensions, useTabBarClearance, HIT_SLOP_8 } from '@/lib/responsive';
+import { useGridDimensions, useTabBarClearance, HIT_SLOP_8, GRID_DRAW_DISTANCE } from '@/lib/responsive';
 import { useFadeIn } from '@/lib/motion';
 import type { Category, Listing } from '@/types';
 import { EmptyState, SectionHeader } from '@/components/ui';
@@ -332,24 +332,37 @@ export default function DiscoverScreen() {
     }
     if (!currentSaveKey || savingSearch) return;
     setSavingSearch(true);
+
+    // The `||` is resolved before the try and there is no `finally`, both
+    // required by babel-plugin-react-compiler@1.0.0 — it cannot lower a
+    // finalizer, nor a value block (`||`, `??`, `?.`, `?:`) inside a try/catch,
+    // and bails out of the ENTIRE enclosing component when it meets one. That
+    // one `finally` was costing DiscoverScreen its compiler memoization.
+    //
+    // Behaviour is preserved: the old `finally` ran on every path including the
+    // early `return` in the `!row` branch, which is what the unconditional
+    // trailing call below does. "Threw" and "returned no row" always produced
+    // the same toast, so they are merged.
+    const queryValue = query.trim() || null;
+    let row: Awaited<ReturnType<typeof createSavedSearch>> | null = null;
     try {
-      const row = await createSavedSearch({
+      row = await createSavedSearch({
         userId: user.id,
-        query: query.trim() || null,
+        query: queryValue,
         category: browseCat as Category | null,
         gender: null,
       });
-      if (!row) {
-        toast.show("Couldn't save the search", { variant: 'default', icon: 'alert-triangle' });
-        return;
-      }
+    } catch {
+      row = null;
+    }
+
+    if (!row) {
+      toast.show("Couldn't save the search", { variant: 'default', icon: 'alert-triangle' });
+    } else {
       setSavedKey(currentSaveKey);
       toast.show('Search saved', { variant: 'success', icon: 'bookmark' });
-    } catch {
-      toast.show("Couldn't save the search", { variant: 'default', icon: 'alert-triangle' });
-    } finally {
-      setSavingSearch(false);
     }
+    setSavingSearch(false);
   }, [user, currentSaveKey, savingSearch, query, browseCat, toast]);
 
   const canSaveSearch = !!currentSaveKey && currentSaveKey !== savedKey;
@@ -672,6 +685,9 @@ export default function DiscoverScreen() {
         data={gridRows}
         renderItem={renderRow}
         keyExtractor={rowKey}
+        // Default is 250 — shorter than one grid row, so a flick outruns the
+        // buffer. See GRID_DRAW_DISTANCE in lib/responsive.ts for the geometry.
+        drawDistance={GRID_DRAW_DISTANCE}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"

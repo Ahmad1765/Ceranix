@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { View, Pressable, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Pressable, FlatList, ActivityIndicator, Platform, RefreshControl } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -21,6 +21,9 @@ import {
 import { fetchFollowing } from '@/lib/follows';
 
 type Row = Awaited<ReturnType<typeof fetchFollowing>>[number];
+
+// Module-level so the list doesn't see a new keyExtractor identity each render.
+const keyById = (r: Row) => r.id;
 
 export default function FollowingScreen() {
   const { user: authUser, profile: authProfile } = useAuth();
@@ -125,8 +128,17 @@ export default function FollowingScreen() {
       ) : (
         <FlatList
           data={rows}
-          keyExtractor={(r) => r.id}
+          keyExtractor={keyById}
           contentContainerStyle={{ paddingVertical: 4, paddingBottom: 80 }}
+          // fetchFollowing() is unpaginated — it returns every followee row for
+          // the profile — so this list is as long as the account is active.
+          // The RN defaults (windowSize 21) would keep ~10 screens of rows
+          // mounted in each direction off a single fling.
+          windowSize={7}
+          initialNumToRender={12}
+          maxToRenderPerBatch={10}
+          updateCellsBatchingPeriod={50}
+          removeClippedSubviews={Platform.OS === 'android'}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />
           }

@@ -29,7 +29,7 @@ import {
   useDeleteSavedSearch,
 } from '@/lib/queries';
 import { useToast } from '@/lib/toast';
-import { useGridDimensions, useTabBarClearance, HIT_SLOP_8 } from '@/lib/responsive';
+import { useGridDimensions, useTabBarClearance, HIT_SLOP_8, GRID_DRAW_DISTANCE } from '@/lib/responsive';
 import type { Category, Listing } from '@/types';
 
 const HORIZONTAL_PAD = 12;
@@ -430,6 +430,9 @@ export default function HomeScreen() {
         data={gridRows}
         renderItem={renderRow}
         keyExtractor={rowKey}
+        // Default is 250 — shorter than one grid row, so a flick outruns the
+        // buffer. See GRID_DRAW_DISTANCE in lib/responsive.ts for the geometry.
+        drawDistance={GRID_DRAW_DISTANCE}
         ListHeaderComponent={listHeader}
         ListEmptyComponent={
           <GridPlaceholder

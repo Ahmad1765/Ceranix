@@ -1,6 +1,6 @@
 // app/(tabs)/wardrobe.tsx — Swipe / My Wardrobe / Liked.
 import { useMemo, useState, useCallback } from 'react';
-import { View, Pressable, ScrollView } from 'react-native';
+import { View, Pressable } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
@@ -20,6 +20,10 @@ import { useToast } from '@/lib/toast';
 import { useTabBarClearance } from '@/lib/responsive';
 
 type Section = 'swipe' | 'mine' | 'liked';
+
+// Stable empty reference so a pending query doesn't hand the grid a new array
+// (and re-chunk its rows) on every render.
+const EMPTY_POSTS: WardrobePost[] = [];
 
 function WardrobeInner() {
   const { user } = useAuth();
@@ -64,6 +68,10 @@ function WardrobeInner() {
   const refetchDeck = deck.refetch;
   const onNeedMore = useCallback(() => { refetchDeck(); }, [refetchDeck]);
 
+  // Stable identity so WardrobeGrid's memoized rows/tiles don't all re-render
+  // whenever this screen does.
+  const handleDelete = useCallback((id: string) => { deletePost.mutate(id); }, [deletePost]);
+
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-white">
       <View className="flex-row items-center justify-between px-5 pt-2 pb-3">
@@ -99,16 +107,25 @@ function WardrobeInner() {
         </View>
       )}
 
+      {/* No ScrollView wrapper — WardrobeGrid is a FlashList and owns its own
+          scroll. Nesting it in a ScrollView gives it unbounded height, which
+          silently defeats virtualization and mounts every tile. The padding
+          that used to live on the ScrollView is passed down instead. */}
       {section === 'mine' && (
-        <ScrollView contentContainerStyle={{ paddingTop: 16, paddingBottom: tabBarClearance }}>
-          <WardrobeGrid posts={mine.data ?? []} onDelete={(id) => deletePost.mutate(id)} />
-        </ScrollView>
+        <WardrobeGrid
+          posts={mine.data ?? EMPTY_POSTS}
+          onDelete={handleDelete}
+          paddingTop={16}
+          paddingBottom={tabBarClearance}
+        />
       )}
 
       {section === 'liked' && (
-        <ScrollView contentContainerStyle={{ paddingTop: 16, paddingBottom: tabBarClearance }}>
-          <WardrobeGrid posts={liked.data ?? []} />
-        </ScrollView>
+        <WardrobeGrid
+          posts={liked.data ?? EMPTY_POSTS}
+          paddingTop={16}
+          paddingBottom={tabBarClearance}
+        />
       )}
     </SafeAreaView>
   );

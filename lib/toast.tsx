@@ -58,8 +58,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<Toast | null>(null);
   const [visible, setVisible] = useState(false);
   const insets = useSafeAreaInsets();
-  const translateY = useRef(new Animated.Value(-120)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
+  // `useState(() => ...)` rather than `useRef(new Animated.Value(x)).current`.
+  // Reading `.current` during render is a Rules-of-React violation that makes
+  // React Compiler bail out of the whole component — and ToastProvider wraps the
+  // entire app. The useRef form also builds a throwaway Animated.Value on every
+  // render (useRef keeps only the first); the lazy initializer runs once.
+  // Semantics are identical: one instance per component lifetime.
+  const [translateY] = useState(() => new Animated.Value(-120));
+  const [opacity] = useState(() => new Animated.Value(0));
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const counter = useRef(0);
 

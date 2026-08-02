@@ -403,3 +403,298 @@ of 48–60) and the build/test gates confirm nothing broke — but **no on-devic
 frame timing or startup measurement was taken.** Before/after profiling on a
 low-end Android device is the honest next step, along with
 `EXPO_ATLAS=true npx expo export` if Tier 4 tree shaking is ever picked up.
+
+---
+
+## Feed scroll, pass 3 (2026-08-02)
+
+Virtualization (P0-1) capped *how many* cards are alive; the earlier
+`peekLikedIds` fix removed the extra render per card. What was left is the cost
+of the card itself, paid on **every FlashList recycle** — which is precisely the
+work that lands mid-scroll. All three items below are per-card-per-recycle, and
+none of them changes a pixel.
+
+| # | Change | File |
+|---|---|---|
+| 1 | Carousel slides mount lazily | `components/ListingCard.tsx` |
+| 2 | Dropped the Reanimated wrapper around the card photo | `components/ListingCard.tsx` |
+| 3 | Cached `Intl.NumberFormat`; skip the throwaway `new URL()` parse | `lib/currency.ts`, `lib/images.ts` |
+
+### 1 — Multi-photo cards mounted every photo
+
+A grid card is a thumbnail first and a gallery second, but the paging
+`ScrollView` mounted one `expo-image` per photo unconditionally. A 4-photo
+listing therefore built four native image views and fired four downloads for a
+card the shopper may never swipe — times every card FlashList mounts and
+re-mounts while scrolling, all competing with the *visible* photos for both the
+JS thread and the connection pool.
+
+Now only slide 0 is real; the rest render as empty slots **of the exact same
+width**, so paging geometry, dot count, and scroll offsets are identical from
+the first frame — only the pixels arrive later. `onTouchStart` hydrates the rest
+on finger-down, before the drag produces any movement, so the images are
+requested well before the swipe lands.
+
+Two invariants keep this honest on a recycled card:
+
+- A slide is also rendered real when `i === activeIndex`, so an instance parked
+  mid-carousel never shows an empty slot.
+- The `[listing.id, user?.id]` effect resets the hydrated flag. Cards that were
+  never swiped are already `false` and React bails out of the unchanged
+  setState, so this costs a render only on cards the shopper actually opened.
+
+**Tradeoff, stated plainly:** the second photo now starts loading at finger-down
+rather than at card mount. On a cold cache a fast swiper can meet a blank slide
+for a moment. That is the price of not spending 3–5× the image budget on photos
+nobody looks at, and it is the right trade for a browsing grid.
+
+### 2 — `Animated.createAnimatedComponent(Image)` with nothing animated
+
+`ListingCard` wrapped every photo in a Reanimated animated component and then
+passed it a plain style object — no shared value, no animated style, ever. The
+wrapper was pure overhead: a Reanimated-managed component plus its props node,
+per photo, per card, per recycle. Now it uses `expo-image` directly, with a
+comment at the import so it does not get "restored".
+
+`app/product/[id].tsx` has the same wrapper and is **left alone** — that is the
+hero carousel, a different screen with a different scroll story, and out of
+scope for a feed-scroll pass.
+
+### 3 — Two hot helpers doing native work per render
+
+- **`formatPrice`** used `Number.prototype.toLocaleString('en-US', …)`, which
+  constructs a fresh formatter on every call — on Hermes a JSI hop into the
+  platform number formatter (ICU on Android, Foundation on iOS). It runs **three
+  times per card render** (accessibility label, item price, total). Three
+  `Intl.NumberFormat` instances are now built lazily and reused. Output parity
+  was checked across 18 value/option combinations before the swap; falls back to
+  the old per-call API if an engine has no `Intl`.
+- **`getOptimizedImageUrl`** ran `new URL(url)` on every image on every render,
+  then — with the Supabase transform flag off, which is the default — returned
+  the original string unchanged. A two-`String.includes` guard now short-circuits
+  before the parse. Every documented case still reaches the code it did before;
+  `lib/images.test.ts` covers both flag states and is unchanged.
+
+### Verification
+
+```
+npx tsc --noEmit          → 0 errors
+npx expo lint             → 0 errors, 0 warnings
+npx vitest run            → 17 files, 155/155 passed
+npx expo export -p web    → exit 0, bundle 4.81 MB
+```
+
+One trap worth recording: the **first** `expo export` after this failed with
+`TypeError: dependencies is not iterable`. That is a stale incremental Metro
+graph, not a code fault — removing the `react-native-reanimated` import from
+`ListingCard` desyncs the cached module graph. `npx expo export -p web --clear`
+succeeds. Clear the cache before believing that error.
+
+E2E was **not** re-baselined for this pass. The suite is red for unrelated
+reasons (see above), no spec asserts carousel or image behaviour, and nothing
+here changes layout or the DOM shape — so a stash-and-compare run would have
+produced noise, not signal.
+
+### Still open
+
+- **Nothing here is measured on-device.** Same caveat as the pass above, and it
+  is now the binding constraint: the remaining candidates cannot be ranked
+  without a trace.
+- **FlashList `drawDistance`** is at its 250 default while a grid row is roughly
+  310px tall, so a fast flick can outrun the buffer. Raising it trades more
+  mount work for fewer blank cells — exactly the trade that needs a measurement
+  to settle, especially now that mount work per card is cheaper.
+- **`PopIcon` costs 3 Reanimated nodes + 2 icon glyphs per card.** Both layers
+  must stay mounted for the cross-fade, so there is no free win — it would be a
+  design change, not an optimization.
+
+---
+
+## Pass 4 (2026-08-02) — React Compiler was silently off on the hot path
+
+### The finding
+
+`experiments.reactCompiler: true` has been set since Pass 1, and the
+`react-compiler-healthcheck` run recorded above ("156 out of 156 components") was
+read as proof it was working. It is not the same thing. The healthcheck reports
+whether components *could* compile in principle; it does not run the plugin the
+way `babel-preset-expo` runs it in a build.
+
+Running the real plugin over the real tree tells a different story. The two most
+expensive components in the app were getting **zero** compiler memoization:
+
+| File | Compiled | Bailed |
+|---|---|---|
+| `components/ListingCard.tsx` | **0** | `try/finally` |
+| `app/product/[id].tsx` | **0** | `try/finally` ×4 |
+| `app/(tabs)/discover.tsx` | 7 skeletons | `DiscoverScreen` — `try/finally` |
+| `app/(tabs)/profile.tsx` | 11 | `ProfileScreenInner` — memo dep mismatch |
+| `app/(tabs)/chat.tsx` | 6 | `InboxScreen` — eslint-disable |
+| `lib/toast.tsx` | `useToast` only | `ToastProvider` — ref during render |
+| `lib/auth.tsx` | `useAuth` only | `AuthProvider` — memo dep mismatch |
+
+`ToastProvider` and `AuthProvider` wrap the entire application.
+
+### Why it is invisible
+
+`babel-preset-expo` runs the plugin with `panicThreshold: 'NONE'` in production.
+A component the compiler cannot lower is skipped **silently** — no warning, no
+build failure, nothing visible in the bundle unless you go looking. And a bailout
+is per-component, not per-function: one unsupported statement anywhere inside a
+component body forfeits memoization for that entire component.
+
+### How to check it (do this after touching any pattern below)
+
+`react-compiler-healthcheck` is not sufficient. Run the plugin directly with a
+logger. `babel-preset-expo` cannot be used for this — it needs Metro's
+`supportsReactCompiler` caller flag, and it swallows the diagnostics anyway:
+
+```js
+babel.transformSync(src, {
+  filename: file,
+  presets: [[require('@babel/preset-typescript'), { isTSX: true, allExtensions: true }]],
+  plugins: [[require('babel-plugin-react-compiler'), {
+    target: '19',
+    logger: { logEvent(_f, e) { console.log(e.kind, e.fnName, e.detail?.options?.reason); } },
+  }]],
+});
+```
+
+`CompileSuccess` events name the components that made it; `CompileError` gives
+the reason and the line.
+
+### The patterns that bail out, and what to write instead
+
+These are limitations of `babel-plugin-react-compiler@1.0.0`, not code smells in
+themselves. None of the rewrites change behaviour.
+
+1. **`try { … } finally { … }`** — *"Handle TryStatement with a finalizer"*. Move
+   the finalizer body after the `try/catch`. Only equivalent when neither block
+   does `return`/`break`/`continue` or re-throws — **verify that each time**.
+   Where an early `return` existed, it was restructured into a result variable
+   and a single exit path.
+
+2. **Value blocks inside `try`/`catch`** — *"Support value blocks (conditional,
+   logical, optional chaining, etc) within a try/catch statement"*. `?.`, `??`,
+   `?:`, `&&`, `||` are all forbidden in those bodies. Hoist them above the
+   `try`, or call a helper. `lib/errors.ts` was added for the common case
+   (`errorMessage`, `isAbortError`) so catch clauses stay bare.
+
+3. **`throw` inside `try/catch`** — *"Support ThrowStatement inside of
+   try/catch"*. `app/conversation/[id].tsx` used `throw new Error('insert
+   returned no row')` to funnel a falsy result into its own catch; that is now a
+   branch on the result.
+
+4. **Refs touched during render** — *"Cannot access refs during render"*. Two
+   shapes, both common here:
+   - `someRef.current = value` in the component body → sync inside a `useEffect`.
+   - `useRef(new Animated.Value(0)).current` → `useState(() => new Animated.Value(0))`.
+     Independently a small real win: the `useRef` form constructs an
+     `Animated.Value` on *every* render and discards all but the first, while the
+     lazy initializer runs once.
+
+5. **`useCallback`/`useMemo` dependency mismatch** — *"Existing memoization could
+   not be preserved … Inferred less specific property than source"*. This one is
+   a genuine correctness signal, not a quirk. Reading `user.id` in a body whose
+   dep list says `user?.id` makes the compiler infer the whole object. Narrow
+   once (`const userId = user?.id ?? null`) and depend on the primitive. In
+   `app/conversation/[id].tsx` this is also strictly more precise: those
+   callbacks no longer churn when an unrelated field of `conv` changes on every
+   incoming realtime event.
+
+And one real latent bug the suppressions were hiding: `app/(tabs)/chat.tsx`
+assigned `activeTabRef.current = activeTab` during render. Both of that file's
+`eslint-disable react-hooks/exhaustive-deps` comments are now gone — the compiler
+refuses to optimize any component where a React ESLint rule was disabled, so a
+suppression costs the whole screen its memoization.
+
+### Result
+
+`app/` + `components/`: **193 → 202 components compiled, 23 → 16 files with
+bailouts**, and every remaining bailout is on a cold screen (`settings`, `login`,
+`onboarding`, `payment`, `invoice`, `news`, `ratings`, `wardrobe/new`,
+`profile/edit`, `conversation/new`) or a Reanimated shared-value writer.
+
+**The Reanimated ones are deliberately left alone.** `AnimatedTabBar`,
+`PressableScale`, `OfferSheet` and `SlideToConfirm` bail with *"This value cannot
+be modified"* on `sharedValue.value = …`. Hoisting the handlers into `useCallback`
+was tried on `PressableScale` and does **not** fix it — the limitation is the
+write itself, and the experiment was reverted. It costs little regardless:
+`AnimatedTabBar` is explicitly built so interaction never re-renders React at
+all, so there is almost no render work there to memoize.
+
+---
+
+## Pass 4, part 2 — list tuning, the last unvirtualized grid, the card carousel
+
+### `drawDistance` — the Pass 3 open item, now closed
+
+`lib/responsive.ts` exports `GRID_DRAW_DISTANCE = 700`, applied to all four
+listing grids plus the new wardrobe grid. The geometry, so it isn't a magic
+number: on a 390pt phone the grid is 2 columns → card 179pt wide → photo 238pt
+tall (aspectRatio 1/1.33) + ~76pt text + 24pt margins ≈ **338pt per row**.
+FlashList's default of 250 is less than a single row, so a flick outran the
+buffer. 700 buys ~2 rows of runway. This is the trade Pass 3 flagged as needing a
+decision; it is worth taking *now* precisely because Pass 3 cut the per-card
+mount cost first.
+
+### FlatList tuning — there was none anywhere in the app
+
+A grep for `windowSize|initialNumToRender|maxToRenderPerBatch|removeClippedSubviews|getItemType|drawDistance`
+returned **no matches** across the entire codebase before this pass. Now set on
+the inbox (`chat.tsx`) and both follow lists.
+
+`app/(tabs)/chat.tsx` also had `ItemSeparatorComponent={() => …}` — a new
+component *type* every render, which unmounts and remounts every separator — and
+handed `InboxRow` a fresh `onPress` closure, defeating the `memo` it already had.
+Both fixed (`InboxSeparator`, and `InboxListRow` owns the navigation).
+
+### ⚠️ `fetchFollowers` / `fetchFollowing` are unpaginated
+
+`lib/follows.ts:153,167` have no `.limit()` and no pagination — a seller with
+5,000 followers pulls all 5,000 rows plus a profile join for each. The list
+tuning above bounds the *rendering* cost and does nothing about the query. **Not
+fixed here** (it needs a paging UX decision), but it is the next real problem on
+those screens.
+
+### `WardrobeGrid` was the last unvirtualized grid
+
+`app/(tabs)/wardrobe.tsx` rendered `posts.map(...)` inside a plain `ScrollView`.
+Converted to the same row-virtualized FlashList shape as the other four grids.
+
+The parent `ScrollView` had to be **removed**, not kept: a FlashList nested in a
+ScrollView gets unbounded height and silently mounts every row, which would have
+made the change worthless. The padding moved to props.
+
+### The card carousel now scrolls on the UI thread
+
+`ListingCard`'s photo carousel used a plain `onScroll` at
+`scrollEventThrottle={16}` — a JS-thread callback every frame of every swipe, on
+a card inside a feed that is itself scrolling and recycling. It is now
+`useAnimatedScrollHandler` writing a shared value, with the dots reading it in
+`useAnimatedStyle`, so a swipe repaints without any React render. The JS thread
+is crossed once per *page change* via `useAnimatedReaction`, only because
+`activeIndex` still gates which slides mount for real (the Pass 3 lazy-slide
+invariant).
+
+The dots look exactly as before — 5px, solid white on the current page, 55% white
+otherwise. Only the mechanism moved.
+
+### Considered and rejected: prefetching the product hero on card press
+
+The idea was that tapping a card should warm the full-size hero image. It would
+be dead code. Listing photos are Supabase storage public URLs and
+`EXPO_PUBLIC_SUPABASE_IMAGE_TRANSFORM` is off by default, so
+`getOptimizedImageUrl` returns the **identical** URL for the card and the hero —
+expo-image already holds it in its memory-disk cache. Worth revisiting only if
+that transform flag is ever switched on.
+
+### Still open after this pass
+
+- **Still nothing measured on-device.** Every claim above is mechanical (fewer
+  mounted views, fewer renders, work moved off the JS thread) and gated by
+  typecheck/lint/tests/export — but no frame timing or startup trace was taken.
+- **The unpaginated follow queries** described above.
+- **Cold screens without compiler coverage** — `settings.tsx` alone has 10
+  bailouts. All the same mechanical patterns; low value because those screens
+  render once.

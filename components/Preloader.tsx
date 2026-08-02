@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Animated, Easing, Platform } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { colors } from '@/lib/theme';
@@ -12,7 +12,7 @@ const BAR_WIDTH = 150;
 const SEGMENT = 48;
 
 export function Preloader() {
-  const progress = useRef(new Animated.Value(0)).current;
+  const [progress] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     const loop = Animated.loop(

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Pressable, Alert, KeyboardAvoidingView, Platform, ScrollView, Animated, Easing, useWindowDimensions } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -64,8 +64,8 @@ export default function LoginScreen() {
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [oauthLoading, setOauthLoading] = useState(false);
 
-  const stepAnim = useRef(new Animated.Value(0)).current;
-  const switchAnim = useRef(new Animated.Value(mode === 'signin' ? 0 : 1)).current;
+  const [stepAnim] = useState(() => new Animated.Value(0));
+  const [switchAnim] = useState(() => new Animated.Value(mode === 'signin' ? 0 : 1));
 
   useEffect(() => {
     Animated.timing(stepAnim, {

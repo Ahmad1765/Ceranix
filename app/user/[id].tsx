@@ -21,7 +21,7 @@ import { useToast } from '@/lib/toast';
 import { ListingCard } from '@/components/ListingCard';
 import { colors, radii } from '@/lib/theme';
 import { computeLevel } from '@/lib/levels';
-import { useGridDimensions, HIT_SLOP_8 } from '@/lib/responsive';
+import { useGridDimensions, HIT_SLOP_8, GRID_DRAW_DISTANCE } from '@/lib/responsive';
 import { useFadeIn } from '@/lib/motion';
 import type { Listing } from '@/types';
 import { Button, EmptyState, SectionHeader } from '@/components/ui';
@@ -257,6 +257,9 @@ export default function UserProfileScreen() {
         data={gridRows}
         renderItem={renderRow}
         keyExtractor={rowKey}
+        // Default is 250 — shorter than one grid row, so a flick outruns the
+        // buffer. See GRID_DRAW_DISTANCE in lib/responsive.ts for the geometry.
+        drawDistance={GRID_DRAW_DISTANCE}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />}
         contentContainerStyle={{ paddingBottom: 80 }}

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Animated, Platform } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 
@@ -6,7 +6,7 @@ import { useReducedMotion } from 'react-native-reanimated';
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 export function SkeletonCard() {
-  const opacity = useRef(new Animated.Value(0.4)).current;
+  const [opacity] = useState(() => new Animated.Value(0.4));
   const reduceMotion = useReducedMotion();
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, FlatList, Pressable, RefreshControl, Animated, Platform, useWindowDimensions, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,6 +20,9 @@ type InboxTab = 'selling' | 'buying' | 'social' | 'support';
 
 // Stable empty reference so the inbox fallback doesn't churn the pageData memo.
 const EMPTY_CONVERSATIONS: ConversationRow[] = [];
+
+// Module-level so the FlatList doesn't see a new keyExtractor every render.
+const keyById = (item: ConversationRow) => item.id;
 
 const INBOX_TABS: { value: InboxTab; label: string }[] = [
   { value: 'selling', label: 'Selling' },
@@ -160,6 +163,31 @@ function emptyStateFor(tab: InboxTab) {
   }
 }
 
+// Module-level so the component TYPE is stable. As an inline
+// `ItemSeparatorComponent={() => ...}` this was a brand-new type on every render
+// of the page, which unmounts and remounts every separator in the list.
+function InboxSeparator() {
+  return <View style={{ height: 1, backgroundColor: colors.hairline }} />;
+}
+
+// `InboxRow` is already memo'd, but it was being handed a fresh
+// `onPress={() => router.push(...)}` closure on every render, so the memo never
+// bit. Owning the navigation here keeps the row's props down to two values that
+// are stable between renders (the row object out of `data`, and a string id), so
+// re-rendering the page now re-renders zero rows.
+const InboxListRow = memo(function InboxListRow({
+  conv,
+  userId,
+}: {
+  conv: ConversationRow;
+  userId: string;
+}) {
+  const onPress = useCallback(() => {
+    router.push(`/conversation/${conv.id}` as any);
+  }, [conv.id]);
+  return <InboxRow conv={conv} userId={userId} onPress={onPress} />;
+});
+
 function ConversationPage({
   data,
   userId,
@@ -178,21 +206,30 @@ function ConversationPage({
   bottomInset: number;
 }) {
   const empty = emptyStateFor(tab);
+  const renderItem = useCallback(
+    ({ item }: { item: ConversationRow }) => <InboxListRow conv={item} userId={userId} />,
+    [userId],
+  );
   return (
     <View style={{ width: pageWidth, flex: 1 }}>
       <FlatList
         data={data}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <InboxRow
-            conv={item}
-            userId={userId}
-            onPress={() => router.push(`/conversation/${item.id}` as any)}
-          />
-        )}
-        ItemSeparatorComponent={() => (
-          <View style={{ height: 1, backgroundColor: colors.hairline }} />
-        )}
+        keyExtractor={keyById}
+        renderItem={renderItem}
+        ItemSeparatorComponent={InboxSeparator}
+        // Four of these lists are mounted at once (one per inbox tab in the
+        // horizontal pager), so the defaults — windowSize 21, i.e. 10 screens of
+        // rows in each direction — were being paid four times over for three
+        // pages the user isn't looking at. An inbox row is a fixed-height
+        // 3-column strip, so a tighter window is safe here.
+        windowSize={7}
+        initialNumToRender={10}
+        maxToRenderPerBatch={8}
+        updateCellsBatchingPeriod={50}
+        // Android-only in practice; detaches off-screen rows from the native
+        // view hierarchy. Rows have no absolutely-positioned overflow, which is
+        // the case where this is known to clip content.
+        removeClippedSubviews={Platform.OS === 'android'}
         ListEmptyComponent={
           <EmptyState icon={empty.icon} title={empty.title} description={empty.description} />
         }
@@ -342,9 +379,27 @@ export default function InboxScreen() {
   const { refetch: inboxRefetch, isStale: inboxStale } = inboxQ;
 
   const pagerRef = useRef<FlatList<{ value: InboxTab; label: string }>>(null);
-  const scrollX = useRef(new Animated.Value(0)).current;
+  // `useState(() => ...)` rather than the more familiar
+  // `useRef(new Animated.Value(0)).current`, for two reasons:
+  //   1. Reading `.current` during render is a Rules-of-React violation, and
+  //      React Compiler bails out of the whole component over it.
+  //   2. The useRef form evaluates `new Animated.Value(0)` on EVERY render and
+  //      throws the result away — useRef only keeps the first one. The lazy
+  //      initializer actually runs once.
+  // Identical semantics: one instance for the lifetime of the component.
+  const [scrollX] = useState(() => new Animated.Value(0));
+  // Mirrors activeTab for the scroll/gesture callbacks, which need the current
+  // value without being re-created on every tab change.
+  //
+  // Synced in an effect, NOT by assigning during render. The render-time
+  // assignment that used to sit here is a Rules-of-React violation ("Cannot
+  // access refs during render"), and it made React Compiler bail out of this
+  // whole screen. Every reader is an event handler or an effect, so all of them
+  // run after commit and see the synced value.
   const activeTabRef = useRef<InboxTab>(activeTab);
-  activeTabRef.current = activeTab;
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
   // Timestamp until which the scroll listener should ignore updates because
   // a tap kicked off a programmatic animated scroll. This window covers the
   // ~300ms animation. Platform-agnostic: doesn't rely on begin/end-drag
@@ -439,21 +494,27 @@ export default function InboxScreen() {
   );
 
   // Keep pager aligned with activeTab if window width changes (e.g. rotation).
+  //
+  // Reads activeTabRef rather than activeTab so the dep list is honest and no
+  // eslint-disable is needed. That matters beyond tidiness: React Compiler
+  // refuses to optimize any component where a React ESLint rule has been
+  // disabled ("React Compiler has skipped optimizing this component because one
+  // or more React ESLint rules were disabled"), so the two suppressions that
+  // used to be here cost ChatScreen its memoization entirely. The ref is
+  // assigned on every render above, so it always holds the current tab; the
+  // intent — resync on width change only, since tab changes already scroll via
+  // goToTab/onMomentumScrollEnd — is unchanged.
   useEffect(() => {
-    const index = INBOX_TABS.findIndex((t) => t.value === activeTab);
+    const index = INBOX_TABS.findIndex((t) => t.value === activeTabRef.current);
     if (index < 0) return;
     pagerRef.current?.scrollToOffset({ offset: index * pageWidth, animated: false });
-    // We intentionally only sync on pageWidth changes; activeTab changes are
-    // already handled via goToTab/onMomentumScrollEnd.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageWidth]);
 
-  const initialScrollIndex = useMemo(
-    () => INBOX_TABS.findIndex((t) => t.value === activeTab),
-    // initialScrollIndex is only read on mount; activeTab is intentionally
-    // omitted to avoid forcing a remount of the pager.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+  // Mount-only value. A useState initializer says "compute once" directly,
+  // instead of a useMemo with a dep list that lies about what it reads.
+  // Recomputing would remount the pager.
+  const [initialScrollIndex] = useState(() =>
+    INBOX_TABS.findIndex((t) => t.value === activeTab),
   );
 
   return (

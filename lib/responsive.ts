@@ -96,6 +96,25 @@ export function useGridDimensions(opts: {
   return { columns, cardWidth: w, viewportWidth: width };
 }
 
+// FlashList `drawDistance` for the four listing grids (home, discover, profile,
+// user). Derived from the row geometry above rather than picked by feel:
+//
+//   On a 390pt phone the grid is 2 columns, so a card is
+//   (390 - 12*2 - 8) / 2 = 179pt wide. Its photo is aspectRatio 1/1.33, i.e.
+//   238pt tall, the text block under it runs ~76pt, and the card + row margins
+//   add 24pt. One row is therefore ~338pt.
+//
+// FlashList's default drawDistance is 250 — LESS than a single row, so a fast
+// flick outruns the buffer and lands on blank cells. 700 buys ~2 rows (4 cards)
+// of runway ahead of the viewport in each direction.
+//
+// This is a real trade, not a free win: a bigger draw distance mounts more
+// cards. It is worth taking now specifically because the per-card mount cost
+// was cut first (lazy carousel slides, no Reanimated wrapper on the photo,
+// synchronous liked-state seeding) — the same number would have been the wrong
+// call against the older, heavier card.
+export const GRID_DRAW_DISTANCE = 700;
+
 // Standard max width for content on large screens — keeps layouts readable
 // instead of stretching edge-to-edge on tablets/web.
 export const CONTENT_MAX_WIDTH = 720;

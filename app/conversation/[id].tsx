@@ -136,15 +136,16 @@ function OfferSheet({
   const handleSubmit = async () => {
     if (!valid) return;
     setSending(true);
+    // No `finally` — see lib/errors.ts. Equivalent: the catch neither returns
+    // nor re-throws, so control always reaches the call below.
     try {
       await onSubmit(parsed, note);
     } catch (e) {
       // The parent already surfaces toast/Alert on failure. Swallow here so
       // the rejection doesn't bubble as an unhandled promise.
       console.warn('[OfferSheet] submit failed', e);
-    } finally {
-      setSending(false);
     }
+    setSending(false);
   };
 
   return (
@@ -335,6 +336,20 @@ export default function ConversationScreen() {
   const listRef = useRef<FlatList<ThreadRow>>(null);
 
   const [conv, setConv] = useState<ConversationRow | null>(null);
+  // Narrowed once and used by every memoized callback below instead of
+  // `conv?.listing_id` / `conv?.listing?.price` inline.
+  //
+  // React Compiler will not compile a component whose manual memoization it
+  // can't preserve, and a body that reads `conv.listing_id` under a dep list
+  // saying `conv?.listing_id` made it infer the whole `conv` object as the true
+  // dependency ("Inferred less specific property than source") — four separate
+  // times, which bailed out this entire screen. Depending on primitives makes
+  // the inferred and declared dependencies agree, and is also strictly more
+  // precise: these callbacks no longer churn when an unrelated field of `conv`
+  // changes (e.g. last_message on every incoming realtime event).
+  const convListingId = conv?.listing_id ?? null;
+  const convListingPrice = conv?.listing?.price ?? null;
+  const convListingSold = conv?.listing?.is_sold ?? false;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [reactions, setReactions] = useState<MessageReaction[]>([]);
   const [pressed, setPressed] = useState<{ msg: ChatMessage; anchor: Anchor } | null>(null);
@@ -350,21 +365,31 @@ export default function ConversationScreen() {
     let cancelled = false;
     setLoading(true);
     (async () => {
+      // The `finally` this replaces ran `if (!cancelled) setLoading(false)` on
+      // every path, including the early `return` — which is exactly what the
+      // `if (cancelled) return` plus the trailing call below do. Rewritten
+      // because React Compiler cannot lower a finalizer and bails out of the
+      // whole screen over one; see lib/errors.ts.
+      let loaded:
+        | [Awaited<ReturnType<typeof getConversation>>, ChatMessage[], MessageReaction[]]
+        | null = null;
       try {
-        const [c, m, r] = await Promise.all([
+        loaded = await Promise.all([
           withTimeout(getConversation(conversationId), 12_000, null),
           withTimeout(fetchMessages(conversationId), 12_000, []),
           withTimeout(fetchReactions(conversationId), 12_000, [] as MessageReaction[]),
         ]);
-        if (cancelled) return;
-        setConv(c);
-        setMessages(m);
-        setReactions(r);
       } catch (e) {
         console.warn('[conversation] load failed', e);
-      } finally {
-        if (!cancelled) setLoading(false);
       }
+
+      if (cancelled) return;
+      if (loaded !== null) {
+        setConv(loaded[0]);
+        setMessages(loaded[1]);
+        setReactions(loaded[2]);
+      }
+      setLoading(false);
     })();
     return () => {
       cancelled = true;
@@ -502,25 +527,37 @@ export default function ConversationScreen() {
   const deliver = useCallback(
     async (text: string, tempId: string) => {
       if (!user || !conversationId) return;
+
+      // The old shape used `throw new Error('insert returned no row')` inside
+      // the try to funnel "no row" into its own catch. React Compiler can't
+      // lower a ThrowStatement inside a try/catch and bailed out of this whole
+      // screen over it. Branching on the result instead is equivalent — both
+      // paths always led to the same failure handling.
+      let saved: ChatMessage | null = null;
+      let failure: unknown = null;
       try {
-        const saved = await sendMessage({ conversationId, senderId: user.id, content: text });
-        if (saved) {
-          setMessages((prev) => {
-            // Realtime may have already inserted the saved message — dedupe.
-            if (prev.some((m) => m.id === saved.id)) return prev.filter((m) => m.id !== tempId);
-            return prev.map((m) => (m.id === tempId ? saved : m));
-          });
-          return;
-        }
-        throw new Error('insert returned no row');
+        saved = await sendMessage({ conversationId, senderId: user.id, content: text });
       } catch (e) {
-        // The message stays in the thread carrying a "Tap to retry" stamp
-        // instead of vanishing behind an alert — nothing typed is ever lost.
-        console.warn('[conversation] send failed', e);
-        setMessages((prev) =>
-          prev.map((m) => (m.id === tempId ? { ...m, pending: false, failed: true } : m)),
-        );
+        failure = e;
       }
+
+      const delivered = saved;
+      if (delivered) {
+        setMessages((prev) => {
+          // Realtime may have already inserted the saved message — dedupe.
+          if (prev.some((m) => m.id === delivered.id)) return prev.filter((m) => m.id !== tempId);
+          return prev.map((m) => (m.id === tempId ? delivered : m));
+        });
+        return;
+      }
+
+      // Threw, or the insert returned no row — same outcome for the sender. The
+      // message stays in the thread carrying a "Tap to retry" stamp instead of
+      // vanishing behind an alert, so nothing typed is ever lost.
+      console.warn('[conversation] send failed', failure ?? 'insert returned no row');
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tempId ? { ...m, pending: false, failed: true } : m)),
+      );
     },
     [conversationId, user],
   );
@@ -564,7 +601,7 @@ export default function ConversationScreen() {
           setMessages((prev) => (prev.some((m) => m.id === saved.id) ? prev : [...prev, saved]));
           setOfferVisible(false);
           toast.show('Offer sent', { variant: 'success', icon: 'check' });
-          capture('offer_made', { listing_id: conv?.listing_id ?? null, amount });
+          capture('offer_made', { listing_id: convListingId, amount });
         } else {
           // Sheet stays open so the user can retry without retyping.
           Alert.alert('Could not send offer', 'Please try again.');
@@ -574,7 +611,7 @@ export default function ConversationScreen() {
         toast.show("Couldn't send offer", { variant: 'default', icon: 'alert-triangle' });
       }
     },
-    [conversationId, user, toast, conv?.listing_id],
+    [conversationId, user, toast, convListingId],
   );
 
   const handleOfferResponse = useCallback(
@@ -596,9 +633,9 @@ export default function ConversationScreen() {
 
   const handleReport = useCallback(
     async (reason: string) => {
-      if (!user || !conv?.listing_id) return;
+      if (!user || !convListingId) return;
       const ok = await reportListing({
-        listingId: conv.listing_id,
+        listingId: convListingId,
         reporterId: user.id,
         reason,
         reportedUserId: other?.id ?? null,
@@ -608,12 +645,12 @@ export default function ConversationScreen() {
         icon: ok ? 'check' : 'alert-triangle',
       });
     },
-    [conv?.listing_id, other?.id, toast, user],
+    [convListingId, other?.id, toast, user],
   );
 
   const openListing = useCallback(() => {
-    if (conv?.listing_id) router.push(`/product/${conv.listing_id}` as any);
-  }, [conv?.listing_id]);
+    if (convListingId) router.push(`/product/${convListingId}` as any);
+  }, [convListingId]);
 
   const senderName = other?.full_name || other?.username || 'User';
 
@@ -628,14 +665,14 @@ export default function ConversationScreen() {
           grouped={item.grouped}
           lastOfGroup={item.lastOfGroup}
           senderName={senderName}
-          listingId={conv?.listing_id ?? null}
-          listingPrice={conv?.listing?.price ?? null}
-          listingSold={conv?.listing?.is_sold ?? false}
+          listingId={convListingId}
+          listingPrice={convListingPrice}
+          listingSold={convListingSold}
           reactions={byMessage.get(item.msg.id) ?? EMPTY_REACTIONS}
           onAccept={() => handleOfferResponse(item.msg, 'accepted')}
           onDecline={() => handleOfferResponse(item.msg, 'declined')}
           onPay={(amount) =>
-            conv?.listing_id && router.push(`/payment/${conv.listing_id}?offer=${amount}` as any)
+            convListingId && router.push(`/payment/${convListingId}?offer=${amount}` as any)
           }
           onRetry={() => handleRetry(item.msg)}
           onLongPress={(anchor) => setPressed({ msg: item.msg, anchor })}
@@ -647,9 +684,9 @@ export default function ConversationScreen() {
       isSeller,
       senderName,
       byMessage,
-      conv?.listing_id,
-      conv?.listing?.price,
-      conv?.listing?.is_sold,
+      convListingId,
+      convListingPrice,
+      convListingSold,
       handleOfferResponse,
       handleRetry,
     ],

@@ -6,7 +6,7 @@
 // Slide/fade animation mirrors the Toast: native driver on device, JS driver on
 // web (react-native-web has no RCTAnimation).
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, Easing, Platform, View } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
@@ -19,8 +19,8 @@ const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 export function OfflineBanner() {
   const offline = useIsOffline();
   const insets = useSafeAreaInsets();
-  const translateY = useRef(new Animated.Value(-80)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
+  const [translateY] = useState(() => new Animated.Value(-80));
+  const [opacity] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     Animated.parallel([

@@ -22,6 +22,19 @@ export function getOptimizedImageUrl(
   if (!url) return '';
   const { width = 400, quality = 70 } = opts;
 
+  // Fast path. Only two hosts are ever rewritten below, and with the Supabase
+  // transform flag off (the default) that leaves just Unsplash — so for every
+  // other URL the whole `new URL(...)` parse + reserialize was built and thrown
+  // away. This runs once per image per render on a grid that recycles cards
+  // while scrolling, so the parse is worth skipping. Two substring scans decide
+  // it, and every case below still reaches the same code it did before.
+  if (
+    !url.includes('images.unsplash.com') &&
+    !(SUPABASE_TRANSFORM_ENABLED && url.includes('.supabase.co'))
+  ) {
+    return url;
+  }
+
   try {
     const u = new URL(url);
 

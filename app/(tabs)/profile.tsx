@@ -27,7 +27,7 @@ import {
   type SaveList,
 } from '@/lib/saves';
 import { colors, radii } from '@/lib/theme';
-import { useGridDimensions, useTabBarClearance, HIT_SLOP_8 } from '@/lib/responsive';
+import { useGridDimensions, useTabBarClearance, HIT_SLOP_8, GRID_DRAW_DISTANCE } from '@/lib/responsive';
 import { useFadeIn } from '@/lib/motion';
 import type { Listing } from '@/types';
 import { useToast } from '@/lib/toast';
@@ -41,6 +41,7 @@ import {
   type ProfileCompletion,
 } from '@/lib/levels';
 import { BRAND, APP_URL } from '@/lib/brand';
+import { errorMessage } from '@/lib/errors';
 import { useSellSheet } from '@/components/sell/SellSheet';
 
 type ProfileTab = 'selling' | 'liked' | 'shop' | 'collections';
@@ -63,6 +64,10 @@ const EMPTY_SAVE_LISTS: SaveList[] = [];
 
 function ProfileScreenInner() {
   const { profile, refreshProfile } = useAuth();
+  // Narrowed once so callbacks below depend on plain strings rather than the
+  // whole `profile` object — see the note on handleShareProfile.
+  const profileId = profile?.id ?? null;
+  const profileUsername = profile?.username ?? null;
   const toast = useToast();
   const { open: openSellSheet } = useSellSheet();
   const { prompt, element: promptElement } = usePrompt();
@@ -253,26 +258,38 @@ function ProfileScreenInner() {
 
   // Web pull-to-refresh — RefreshControl is inert on react-native-web.
 
+// `profileId` / `profileUsername` are narrowed above rather than read as
+// `profile?.id` inside the callback. React Compiler refuses to compile a
+// component whose manual memoization it can't preserve, and reading `profile.x`
+// in a body whose dep list says `profile?.x` made it infer the whole `profile`
+// object ("Inferred less specific property than source") — bailing out of all of
+// ProfileScreenInner. The try body is likewise reduced to the await; see
+// lib/errors.ts for why value blocks can't live inside it.
 const handleShareProfile = useCallback(async () => {
-  if (!profile?.id) return;
-  const displayName = profile.username ? `@${profile.username}` : 'this seller';
-  const url = `${APP_URL}/user/${profile.id}`;
+  if (!profileId) return;
+  const displayName = profileUsername ? `@${profileUsername}` : 'this seller';
+  const url = `${APP_URL}/user/${profileId}`;
+  const message = `Check out ${displayName} on ${BRAND}\n${url}`;
+
+  let shared = false;
+  let failure: unknown = null;
   try {
-    const result = await Share.share({ message: `Check out ${displayName} on ${BRAND}\n${url}`, url });
-    if (result.action === Share.sharedAction) {
-      if (result.activityType) {
-        // shared with activity type of result.activityType
-      } else {
-        // shared
-      }
-      toast.show('Profile shared successfully!', { variant: 'success', icon: 'check-circle' });
-    } else if (result.action === Share.dismissedAction) {
-      // dismissed
-    }
-  } catch (error: any) {
-    toast.show(error.message || 'Could not share profile', { variant: 'default', icon: 'alert-triangle' });
+    const result = await Share.share({ message, url });
+    shared = result.action === Share.sharedAction;
+  } catch (e) {
+    failure = e;
   }
-}, [profile?.id, profile?.username, toast]);
+
+  if (failure !== null) {
+    toast.show(errorMessage(failure) || 'Could not share profile', {
+      variant: 'default',
+      icon: 'alert-triangle',
+    });
+  } else if (shared) {
+    // The dismissed case is deliberately silent — the user chose to back out.
+    toast.show('Profile shared successfully!', { variant: 'success', icon: 'check-circle' });
+  }
+}, [profileId, profileUsername, toast]);
 
   if (!profile) {
     return (
@@ -330,6 +347,9 @@ const handleShareProfile = useCallback(async () => {
         data={gridRows}
         renderItem={renderRow}
         keyExtractor={rowKey}
+        // Default is 250 — shorter than one grid row, so a flick outruns the
+        // buffer. See GRID_DRAW_DISTANCE in lib/responsive.ts for the geometry.
+        drawDistance={GRID_DRAW_DISTANCE}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />

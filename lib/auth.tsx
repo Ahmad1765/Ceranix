@@ -128,9 +128,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // sets a new `profile` object) changed one of that memo's own deps, which
   // gave refreshProfile a new identity, which re-triggered any effect keyed
   // on it (e.g. profile.tsx's useFocusEffect) — an infinite refetch loop.
+  //
+  // The id is narrowed to a local before the callback rather than read as
+  // `session.user.id` inside a body whose dep list says `session?.user?.id`.
+  // That mismatch made React Compiler infer the whole `session` object as the
+  // real dependency ("Inferred less specific property than source") and bail out
+  // of AuthProvider — which wraps the entire app. Depending on a plain string
+  // keeps exactly the stability guarantee described above: the identity changes
+  // only when the signed-in user changes, never on a profile refetch.
+  const sessionUserId = session?.user?.id ?? null;
   const refreshProfile = useCallback(async () => {
-    if (session?.user?.id) await fetchProfileWithRetry(session.user.id);
-  }, [session?.user?.id]);
+    if (sessionUserId) await fetchProfileWithRetry(sessionUserId);
+  }, [sessionUserId]);
 
   const signOut = useCallback(async () => {
     // Drop this device's push token FIRST, while the session still exists: the

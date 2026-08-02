@@ -6,7 +6,7 @@
 // only the Users panel owns state (its follow mask), because that state is
 // meaningless to the rest of the screen.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View, Pressable, ScrollView, Animated, Platform, useWindowDimensions } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
@@ -94,8 +94,8 @@ function SegmentPill({
   active: boolean;
   onPress: () => void;
 }) {
-  const colorAnim = useRef(new Animated.Value(active ? 1 : 0)).current;
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const [colorAnim] = useState(() => new Animated.Value(active ? 1 : 0));
+  const [scaleAnim] = useState(() => new Animated.Value(1));
 
   useEffect(() => {
     // Color interpolation can't ride the native driver.
@@ -445,20 +445,30 @@ export function UsersPanel({ users, viewerId }: { users: PersonRow[]; viewerId: 
   const [following, setFollowing] = useState<Set<string>>(new Set());
   const [pending, setPending] = useState<Set<string>>(new Set());
 
-  const ids = users.map((u) => u.id).join(',');
+  // Keyed on the id SET rather than the `users` array identity — the parent
+  // rebuilds that array on every render, and refetching the follow mask each
+  // time would be pointless traffic.
+  //
+  // Deriving `ids` back out of the key (rather than listing `users` in the dep
+  // array and suppressing the lint rule) makes the dependency list honest, so no
+  // eslint-disable is needed. That matters: React Compiler refuses to optimize
+  // any component where a React ESLint rule was disabled, so the suppression
+  // that used to sit here cost UsersPanel its memoization.
+  const idsKey = users.map((u) => u.id).join(',');
+  const ids = useMemo(() => (idsKey ? idsKey.split(',') : []), [idsKey]);
+
   useEffect(() => {
     let on = true;
-    if (!viewerId || users.length === 0) {
+    if (!viewerId || ids.length === 0) {
       setFollowing(new Set());
       return;
     }
-    fetchFollowingMask(viewerId, users.map((u) => u.id)).then((mask) => {
+    fetchFollowingMask(viewerId, ids).then((mask) => {
       if (on) setFollowing(mask);
     });
     return () => {
       on = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewerId, ids]);
 
   const toggle = async (id: string) => {
@@ -477,29 +487,36 @@ export function UsersPanel({ users, viewerId }: { users: PersonRow[]; viewerId: 
       return next;
     });
     setPending((prev) => new Set(prev).add(id));
+
+    // No `finally` — babel-plugin-react-compiler@1.0.0 can't lower one and bails
+    // out of the whole component over it (see lib/errors.ts). Equivalent here:
+    // neither branch returns or re-throws, so control always reaches the
+    // un-pending call below.
+    let isFollowing = wasFollowing;
+    let failed = false;
     try {
       const state = await toggleFollow(viewerId, id, wasFollowing);
-      setFollowing((prev) => {
-        const next = new Set(prev);
-        if (state.isFollowing) next.add(id);
-        else next.delete(id);
-        return next;
-      });
+      isFollowing = state.isFollowing;
     } catch {
-      setFollowing((prev) => {
-        const next = new Set(prev);
-        if (wasFollowing) next.add(id);
-        else next.delete(id);
-        return next;
-      });
-      toast.show("Couldn't update follow", { variant: 'default', icon: 'alert-triangle' });
-    } finally {
-      setPending((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
+      failed = true;
     }
+
+    if (failed) {
+      toast.show("Couldn't update follow", { variant: 'default', icon: 'alert-triangle' });
+    }
+    // On success this reconciles to the server's answer; on failure `isFollowing`
+    // is still `wasFollowing`, which reverts the optimistic flip above.
+    setFollowing((prev) => {
+      const next = new Set(prev);
+      if (isFollowing) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+    setPending((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
   };
 
   return (

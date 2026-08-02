@@ -76,6 +76,7 @@ import { reportListing, REPORT_REASONS } from '@/lib/reports';
 import { useGuestGate } from '@/components/GuestGate';
 import { buyerProtectionFee, orderTotal, formatPrice } from '@/lib/fees';
 import { BuyerProtectionSheet } from '@/components/product/BuyerProtectionSheet';
+import { errorMessage, isAbortError } from '@/lib/errors';
 
 const AnimatedExpoImage = Animated.createAnimatedComponent(Image);
 
@@ -102,6 +103,10 @@ type DetailRow = {
   trailing?: React.ReactNode;
 };
 
+// Error classification lives in lib/errors.ts, and the catch clauses below are
+// bare `catch (e) { failure = e; }` on purpose — see that file for why value
+// blocks (`?.`, `??`, `?:`, `&&`, `||`) must stay out of a try/catch here.
+
 export default function ProductScreen() {
   const { id } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
@@ -126,8 +131,13 @@ export default function ProductScreen() {
   // supabase client doesn't blink the button back to "Follow" before the
   // refetch resolves. The cache is updated on every successful fetchFollowState
   // and toggleFollow.
-  const initialFollowed =
-    getCachedFollowState(user?.id ?? null, cached?.seller?.id)?.isFollowing ?? false;
+  // Split across two statements rather than written as
+  // `getCachedFollowState(...)?.isFollowing ?? false`. Optional member access
+  // directly on a CALL result trips a react-compiler@1.0.0 lowering bug
+  // ("Unexpected terminal kind `optional` for optional test block") which bails
+  // it out of this entire screen. Binding the call result first avoids it.
+  const cachedFollow = getCachedFollowState(user?.id ?? null, cached?.seller?.id);
+  const initialFollowed = cachedFollow ? cachedFollow.isFollowing : false;
   const [followed, setFollowed] = useState(initialFollowed);
   const [followBusy, setFollowBusy] = useState(false);
   const [selectedBundleIds, setSelectedBundleIds] = useState<Set<string>>(new Set());
@@ -172,43 +182,48 @@ export default function ProductScreen() {
     setLoadError(null);
     const controller = new AbortController();
     (async () => {
+      // The try body is deliberately just the await, and there is no `finally`
+      // — see the note on errorMessage/isCancellation above for why. The
+      // rewrite is behaviour-preserving: the old `finally` ran
+      // `if (active) setLoadingListing(false)` on every path including the
+      // early `return`s, which is exactly what the `if (!active) return` plus
+      // the trailing call below do.
+      //
+      // Supabase's client already enforces a 12s fetch ceiling via timeoutFetch
+      // in lib/supabase.ts, so no outer race is needed. The AbortController
+      // cancels the request when the effect re-runs (HMR, param change,
+      // unmount) so stale fetches don't resolve into state we no longer want.
+      let row: Awaited<ReturnType<typeof fetchListingById>> = null;
+      let failure: unknown = null;
       try {
-        // Supabase client already enforces a 12s fetch ceiling via
-        // timeoutFetch in lib/supabase.ts, so no outer race is needed.
-        // The AbortController here cancels the request when the effect
-        // re-runs (HMR, param change, unmount) so stale fetches don't
-        // resolve into state we no longer want.
-        const row = await fetchListingById(productIdParam, controller.signal);
-        if (!active) return;
-        if (!row) {
-          if (!haveCached) setNotFound(true);
-        } else {
-          setListing({
-            ...row,
-            seller: row.seller ?? (FALLBACK_SELLER as Listing['seller']),
-          });
-          capture('listing_viewed', buildListingViewedProps(
-            { id: row.id, seller_id: row.seller_id, price: row.price, category: row.category },
-            'product_page',
-          ));
-        }
-      } catch (e: any) {
-        // Silently swallow cancellations — they fire on unmount/HMR and
-        // are expected, not errors.
-        const msg = e?.message ?? '';
-        const cancelled =
-          controller.signal.aborted ||
-          e?.name === 'AbortError' ||
-          msg.includes('aborted') ||
-          msg.includes('AbortError');
-        if (cancelled || !active) return;
-        console.warn('[product] load failed', e);
-        if (!haveCached) {
-          setLoadError(msg || 'Could not load listing');
-        }
-      } finally {
-        if (active) setLoadingListing(false);
+        row = await fetchListingById(productIdParam, controller.signal);
+      } catch (e) {
+        failure = e;
       }
+
+      if (!active) return;
+
+      if (failure !== null) {
+        if (!isAbortError(failure, controller.signal)) {
+          console.warn('[product] load failed', failure);
+          if (!haveCached) {
+            setLoadError(errorMessage(failure) || 'Could not load listing');
+          }
+        }
+      } else if (!row) {
+        if (!haveCached) setNotFound(true);
+      } else {
+        setListing({
+          ...row,
+          seller: row.seller ?? (FALLBACK_SELLER as Listing['seller']),
+        });
+        capture('listing_viewed', buildListingViewedProps(
+          { id: row.id, seller_id: row.seller_id, price: row.price, category: row.category },
+          'product_page',
+        ));
+      }
+
+      setLoadingListing(false);
     })();
     return () => {
       active = false;
@@ -347,6 +362,8 @@ export default function ProductScreen() {
     // hydration never triggers it.
     heartAnimRef.current?.animateTo(!originalLiked);
     setLikeConfirmedFromServer(false);
+    // No `finally` — see the errorMessage/isCancellation note at module scope.
+    // Equivalent here because neither branch returns or re-throws.
     try {
       const next = await toggleLike(productIdParam, user.id, originalLiked);
       setLiked(next);
@@ -359,9 +376,8 @@ export default function ProductScreen() {
       // Revert optimistic flip.
       setLiked(originalLiked);
       toast.show('Could not update like', { variant: 'default', icon: 'alert-triangle' });
-    } finally {
-      setLikeBusy(false);
     }
+    setLikeBusy(false);
   };
 
   // Owner-only actions. Both update local state optimistically so the UI
@@ -371,33 +387,37 @@ export default function ProductScreen() {
   const handleToggleSold = async () => {
     if (!listing || ownerBusy) return;
     const next = !listing.is_sold;
+    const listingId = listing.id;
     setOwnerBusy('sold');
-    setListing((prev) => (prev ? { ...prev, is_sold: next } : prev));
+
+    // Ternary hoisted out and the try body reduced to the await — a conditional
+    // inside try/catch bails React Compiler out of this whole screen. See the
+    // module-scope note on errorMessage/isCancellation.
+    const applySold = (value: boolean) =>
+      setListing((prev) => (prev ? { ...prev, is_sold: value } : prev));
+    const successMessage = next ? 'Marked as sold' : 'Marked as available';
+
+    applySold(next); // optimistic
+
+    // null covers both "threw" and "server disagreed" — the response to each is
+    // the same rollback, exactly as the old catch/else pair did.
+    let committed: boolean | null = null;
     try {
-      const committed = await setListingSold(listing.id, next);
-      if (committed !== next) {
-        // Rollback.
-        setListing((prev) => (prev ? { ...prev, is_sold: !next } : prev));
-        toast.show("Couldn't update the listing", {
-          variant: 'default',
-          icon: 'alert-triangle',
-        });
-      } else {
-        toast.show(next ? 'Marked as sold' : 'Marked as available', {
-          variant: 'success',
-          icon: 'check',
-        });
-      }
+      committed = await setListingSold(listingId, next);
     } catch {
-      // Rollback.
-      setListing((prev) => (prev ? { ...prev, is_sold: !next } : prev));
+      committed = null;
+    }
+
+    if (committed === next) {
+      toast.show(successMessage, { variant: 'success', icon: 'check' });
+    } else {
+      applySold(!next); // rollback
       toast.show("Couldn't update the listing", {
         variant: 'default',
         icon: 'alert-triangle',
       });
-    } finally {
-      setOwnerBusy(null);
     }
+    setOwnerBusy(null);
   };
 
   const handleDelete = async () => {
@@ -436,45 +456,52 @@ export default function ProductScreen() {
       return;
     }
     if (!sellerId || sellerId === user.id || followBusy) return;
+    const userId = user.id;
     setFollowBusy(true);
     const optimistic = !followed;
     setFollowed(optimistic); // optimistic flip
+
+    // Everything with a `?.`, `??` or `?:` in it is resolved BEFORE the try, and
+    // the try body is just the await — see the module-scope note on
+    // errorMessage/isCancellation. Value blocks inside a try/catch make React
+    // Compiler bail out of this entire screen.
+    const sellerHandle = listing?.seller?.username ?? 'seller';
+    const undoFollow = async () => {
+      setFollowed(false);
+      try {
+        await toggleFollow(userId, sellerId, true);
+      } catch {
+        setFollowed(true);
+        toast.show('Could not undo', { variant: 'default', icon: 'alert-triangle' });
+      }
+    };
+
+    let nowFollowing: boolean | null = null;
+    let failure: unknown = null;
     try {
-      const next = await toggleFollow(user.id, sellerId, followed);
-      setFollowed(next.isFollowing);
-      const nowFollowing = next.isFollowing;
-      if (nowFollowing) capture('seller_followed', { seller_id: sellerId });
-      toast.show(
-        nowFollowing ? `Following @${listing?.seller?.username ?? 'seller'}` : 'Unfollowed',
-        {
-          variant: nowFollowing ? 'info' : 'default',
-          icon: nowFollowing ? 'user-check' : 'user-x',
-          action: nowFollowing
-            ? {
-                label: 'Undo',
-                onPress: async () => {
-                  setFollowed(false);
-                  try {
-                    await toggleFollow(user.id, sellerId, true);
-                  } catch {
-                    setFollowed(true);
-                    toast.show('Could not undo', { variant: 'default', icon: 'alert-triangle' });
-                  }
-                },
-              }
-            : undefined,
-        },
-      );
-    } catch (e: any) {
+      const next = await toggleFollow(userId, sellerId, followed);
+      nowFollowing = next.isFollowing;
+    } catch (e) {
+      failure = e;
+    }
+
+    if (nowFollowing === null) {
       // Roll back optimistic state on failure.
       setFollowed(!optimistic);
-      toast.show(e?.message ?? 'Could not update follow', {
+      toast.show(errorMessage(failure) || 'Could not update follow', {
         variant: 'default',
         icon: 'alert-triangle',
       });
-    } finally {
-      setFollowBusy(false);
+    } else {
+      setFollowed(nowFollowing);
+      if (nowFollowing) capture('seller_followed', { seller_id: sellerId });
+      toast.show(nowFollowing ? `Following @${sellerHandle}` : 'Unfollowed', {
+        variant: nowFollowing ? 'info' : 'default',
+        icon: nowFollowing ? 'user-check' : 'user-x',
+        action: nowFollowing ? { label: 'Undo', onPress: undoFollow } : undefined,
+      });
     }
+    setFollowBusy(false);
   };
 
   const openChat = (mode: 'message' | 'offer') => {
