@@ -15,10 +15,23 @@ type PillProps<T extends string> = {
   value: T;
   onChange: (v: T) => void;
   variant?: 'pill' | 'underline';
+  /**
+   * Colour of the active label + underline in the `underline` variant.
+   * Defaults to ink; `primary` opts into the purple accent. Opt-in rather than
+   * a global switch so existing underline tabs keep the look they shipped with.
+   */
+  accent?: 'ink' | 'primary';
 };
 
-export function Tabs<T extends string>({ tabs, value, onChange, variant = 'pill' }: PillProps<T>) {
+export function Tabs<T extends string>({
+  tabs,
+  value,
+  onChange,
+  variant = 'pill',
+  accent = 'ink',
+}: PillProps<T>) {
   if (variant === 'underline') {
+    const activeColor = accent === 'primary' ? colors.primary : colors.ink2;
     return (
       <View
         style={{
@@ -48,14 +61,14 @@ export function Tabs<T extends string>({ tabs, value, onChange, variant = 'pill'
                   <Feather
                     name={t.icon}
                     size={14}
-                    color={active ? colors.ink2 : colors.muteSoft}
+                    color={active ? activeColor : colors.muteSoft}
                   />
                 )}
                 <Text
                   style={{
                     fontSize: 13.5,
                     fontWeight: active ? '800' : '600',
-                    color: active ? colors.ink2 : colors.muteSoft,
+                    color: active ? activeColor : colors.muteSoft,
                   }}
                 >
                   {t.label}
@@ -79,7 +92,7 @@ export function Tabs<T extends string>({ tabs, value, onChange, variant = 'pill'
                     bottom: -1,
                     height: 2.5,
                     width: 36,
-                    backgroundColor: colors.ink,
+                    backgroundColor: activeColor,
                     borderRadius: 2,
                   }}
                 />

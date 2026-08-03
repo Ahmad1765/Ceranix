@@ -15,6 +15,9 @@ export interface User {
   id: string;
   username: string;
   avatar_url: string | null;
+  // Wide header image behind the avatar on the profile screens. Null on every
+  // row created before the column existed — callers must render a fallback.
+  banner_url?: string | null;
   full_name: string;
   bio: string | null;
   location: string | null;

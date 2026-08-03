@@ -11,18 +11,20 @@ test.describe('Profile tab (signed in)', () => {
     await waitForAppReady(page);
   });
 
-  test('renders @handle, the three stat columns (Items, Followers, Following), and the four tabs (Selling, Liked, Shop, Saved)', async ({ page }) => {
+  test('renders @handle, the four stat columns (Items, Sold, Followers, Following), and the four tabs (Selling, Liked, Saved, Details)', async ({ page }) => {
     // The @handle prefix is unique enough — there's always at least one.
     await expect(page.locator('text=/^@[\\w.]+$/').first()).toBeVisible({ timeout: 20_000 });
     // The first stat column is labelled "Items"; it was "Posts" when this spec
-    // was written.
+    // was written. "Sold" joined the bar in the banner redesign.
     await expect(page.getByText('Items', { exact: true })).toBeVisible();
+    await expect(page.getByText('Sold', { exact: true })).toBeVisible();
     await expect(page.getByText('Followers', { exact: true })).toBeVisible();
     await expect(page.getByText('Following', { exact: true })).toBeVisible();
     await expect(page.getByText('Selling', { exact: true })).toBeVisible();
     await expect(page.getByText('Liked', { exact: true })).toBeVisible();
-    await expect(page.getByText('Shop', { exact: true })).toBeVisible();
     await expect(page.getByText('Saved', { exact: true })).toBeVisible();
+    // The old "Shop" tab became "Details"; its settings rows moved inside it.
+    await expect(page.getByText('Details', { exact: true })).toBeVisible();
   });
 
   test('Liked tab is reachable and renders either its grid or empty state', async ({ page }) => {
@@ -33,8 +35,11 @@ test.describe('Profile tab (signed in)', () => {
     ).toBeVisible();
   });
 
-  test('Shop tab lists the shop settings rows', async ({ page }) => {
-    await page.getByText('Shop', { exact: true }).click();
+  test('Details tab shows About me, the seller level and the shop settings rows', async ({ page }) => {
+    await page.getByText('Details', { exact: true }).click();
+    await expect(page.getByText('About me')).toBeVisible();
+    await expect(page.getByText('Seller level')).toBeVisible();
+    // The rows that used to live behind the "Shop" tab.
     await expect(page.getByText('My shop')).toBeVisible();
     await expect(page.getByText('Bundle discount')).toBeVisible();
     await expect(page.getByText('Vacation mode')).toBeVisible();

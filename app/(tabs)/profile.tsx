@@ -3,7 +3,6 @@ import { Alert, View, Pressable, ScrollView, ActivityIndicator, RefreshControl, 
 import { FlashList } from '@shopify/flash-list';
 import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Image } from 'expo-image';
 import { router, useFocusEffect, Href } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import Animated from 'react-native-reanimated';
@@ -27,7 +26,13 @@ import {
   type SaveList,
 } from '@/lib/saves';
 import { colors, radii } from '@/lib/theme';
-import { useGridDimensions, useTabBarClearance, HIT_SLOP_8, GRID_DRAW_DISTANCE } from '@/lib/responsive';
+import {
+  useGridDimensions,
+  useTabBarClearance,
+  HIT_SLOP_8,
+  GRID_DRAW_DISTANCE,
+  CONTENT_MAX_WIDTH,
+} from '@/lib/responsive';
 import { useFadeIn } from '@/lib/motion';
 import type { Listing } from '@/types';
 import { useToast } from '@/lib/toast';
@@ -43,8 +48,16 @@ import {
 import { BRAND, APP_URL } from '@/lib/brand';
 import { errorMessage } from '@/lib/errors';
 import { useSellSheet } from '@/components/sell/SellSheet';
+import {
+  ProfileBanner,
+  ProfileIdentity,
+  StatsBar,
+  InfoCard,
+  CredentialList,
+  sellerCredentials,
+} from '@/components/profile';
 
-type ProfileTab = 'selling' | 'liked' | 'shop' | 'collections';
+type ProfileTab = 'selling' | 'liked' | 'details' | 'collections';
 
 type ShopItem = {
   icon: any;
@@ -56,7 +69,6 @@ type ShopItem = {
 
 const HORIZONTAL_PAD = 12;
 const GRID_GAP = 8;
-const AVATAR_SIZE = 88;
 
 // Stable empty references so query fallbacks don't churn the useMemos below.
 const EMPTY_LISTINGS: Listing[] = [];
@@ -131,7 +143,7 @@ function ProfileScreenInner() {
       const busy = activeListId ? loadingListListings : loadingSaved;
       return busy ? EMPTY_LISTINGS : visibleSavedListings;
     }
-    return EMPTY_LISTINGS; // 'shop' has no grid
+    return EMPTY_LISTINGS; // 'details' has no grid
   }, [
     activeTab, selling, loadingSelling, liked, loadingLiked,
     activeListId, loadingListListings, loadingSaved, visibleSavedListings,
@@ -305,7 +317,8 @@ const handleShareProfile = useCallback(async () => {
   const sellingCount = selling.length;
   const likedCount = liked.length;
   const savedCount = savedItems.length;
-  const initial = (profile.full_name || profile.username || 'U').trim().charAt(0).toUpperCase();
+  const displayName = profile.full_name || profile.username;
+  const initial = (displayName || 'U').trim().charAt(0).toUpperCase();
   const rating = Number(profile.rating ?? 0);
   const totalSales = Number(profile.total_sales ?? 0);
   const memberSince = profile.created_at ? new Date(profile.created_at).getFullYear() : null;
@@ -327,6 +340,22 @@ const handleShareProfile = useCallback(async () => {
   const completion = profileCompletion(profile, sellingCount);
   const badges = computeBadges(sellerStats, profile, completion.isComplete);
   const earnedBadges = badges.filter((b) => b.earned);
+  // 'owner' drops the rows this tab already renders as controls (seller level,
+  // bundle discount, vacation mode) — see sellerCredentials for the rule.
+  const credentials = sellerCredentials(
+    profile,
+    { listingsCount: sellingCount, totalLikes: shopLikes },
+    { viewer: 'owner' },
+  );
+
+  // The line under the handle, where the reference layout puts a job title.
+  // States the seller's own track record, falling back to tenure.
+  const identityLine =
+    rating > 0 && totalSales > 0
+      ? `${rating.toFixed(1)} rating · ${totalSales} ${totalSales === 1 ? 'sale' : 'sales'}`
+      : memberSince
+        ? `Member since ${memberSince}`
+        : null;
   const handleCompletionCta = () => {
     // Route to the highest-leverage next step. Listing-related steps go to the
     // upload flow; identity steps go to profile edit / settings.
@@ -386,220 +415,90 @@ const handleShareProfile = useCallback(async () => {
           </View>
         </View>
 
-        {/* Hero — clean white card */}
-        <Animated.View style={[{ paddingHorizontal: 16, paddingTop: 4 }, heroFade]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            {/* Avatar with thin purple ring */}
-            <View
-              style={{
-                width: AVATAR_SIZE,
-                height: AVATAR_SIZE,
-                borderRadius: AVATAR_SIZE / 2,
-                borderWidth: 2,
-                borderColor: colors.purple,
-                padding: 3,
-              }}
-            >
-              <View
-                style={{
-                  flex: 1,
-                  borderRadius: (AVATAR_SIZE - 10) / 2,
-                  overflow: 'hidden',
-                  backgroundColor: colors.purpleSoft,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                {profile.avatar_url ? (
-                  <Image
-                    source={{ uri: profile.avatar_url }}
-                    style={{ width: '100%', height: '100%' }}
-                    contentFit="cover"
-                    cachePolicy="memory-disk"
-                  />
-                ) : (
-                  <Text style={{ fontSize: 30, fontWeight: '900', color: colors.purple }}>
-                    {initial}
-                  </Text>
-                )}
+        {/* Hero — banner, overlapping avatar, identity, stats. The level
+            block, trust badges and achievements moved into the Details tab so
+            this stays a single readable column. */}
+        <Animated.View style={heroFade}>
+          <ProfileBanner
+            bannerUrl={profile.banner_url}
+            avatarUrl={profile.avatar_url}
+            initial={initial}
+            verified={profile.is_verified}
+            label="Your profile photo"
+          />
+
+          <ProfileIdentity
+            name={displayName}
+            username={profile.username}
+            subtitle={identityLine}
+            levelName={levelProgress.current.id >= 2 ? levelProgress.current.name : null}
+          >
+            {/* Sharing your shop is the action that grows it, so it carries the
+                accent; editing stays quiet. */}
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <View style={{ flex: 1 }}>
+                <Button
+                  label="Edit profile"
+                  variant="ghost"
+                  full
+                  onPress={() => router.push('/profile/edit')}
+                />
               </View>
-              {profile.is_verified && (
-                <View
-                  style={{
-                    position: 'absolute',
-                    right: -2,
-                    bottom: -2,
-                    width: 22,
-                    height: 22,
-                    borderRadius: 11,
-                    backgroundColor: colors.purple,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderWidth: 2,
-                    borderColor: 'white',
-                  }}
-                >
-                  <Feather name="check" size={11} color="white" />
-                </View>
-              )}
-            </View>
-
-            {/* Stats — a contained panel strip with dividers instead of
-                Instagram's floating numbers. */}
-            <View
-              style={{
-                flex: 1,
-                flexDirection: 'row',
-                alignItems: 'center',
-                marginLeft: 16,
-                backgroundColor: colors.panel,
-                borderRadius: radii.md,
-                paddingVertical: 10,
-              }}
-            >
-              <Stat value={String(sellingCount)} label="Items" />
-              <View style={{ width: 1, alignSelf: 'stretch', backgroundColor: colors.hairline }} />
-              <Stat
-                value={String(profile.followers_count ?? 0)}
-                label="Followers"
-                onPress={() => router.push('/profile/followers' as Href)}
-              />
-              <View style={{ width: 1, alignSelf: 'stretch', backgroundColor: colors.hairline }} />
-              <Stat
-                value={String(profile.following_count ?? 0)}
-                label="Following"
-                onPress={() => router.push('/profile/following' as Href)}
-              />
-            </View>
-          </View>
-
-          {/* Seller level — the progression spine. Level name + a thin
-              progress bar + the single next-step requirement. Computed from
-              existing data; no network. */}
-          <View style={{ marginTop: 16 }}>
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: 8,
-              }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Feather name="award" size={13} color={colors.purple} />
-                <Text
-                  style={{ fontSize: 13.5, fontWeight: '800', color: colors.ink, letterSpacing: -0.2 }}
-                >
-                  {levelProgress.current.name}
-                </Text>
+              <View style={{ flex: 1 }}>
+                <Button label="Share profile" variant="primary" full onPress={handleShareProfile} />
               </View>
-              <Text
-                style={{
-                  fontSize: 11,
-                  fontWeight: '800',
-                  color: levelProgress.next ? colors.muteSoft : colors.purple,
-                  letterSpacing: 0.4,
-                }}
-              >
-                {levelProgress.next ? `LEVEL ${levelProgress.current.id} / ${LEVELS.length}` : 'MAX LEVEL'}
-              </Text>
             </View>
-            <ProgressBar fraction={levelProgress.progress} />
-            {levelProgress.nextRequirement ? (
-              <Text style={{ fontSize: 12.5, color: colors.mute, fontWeight: '600', marginTop: 8 }}>
-                {levelProgress.nextRequirement}
-              </Text>
-            ) : null}
-          </View>
+          </ProfileIdentity>
 
-          {/* Name + bio */}
-          <View style={{ marginTop: 14 }}>
-            <Text
-              style={{ fontSize: 16, fontWeight: '800', color: colors.ink, letterSpacing: -0.2 }}
-              numberOfLines={1}
-            >
-              {profile.full_name || profile.username}
-            </Text>
-            {profile.bio && (
-              <Text style={{ fontSize: 14, color: colors.ink, marginTop: 4, lineHeight: 19 }}>
-                {profile.bio}
-              </Text>
-            )}
-            {profile.location && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 4 }}>
-                <Feather name="map-pin" size={12} color={colors.mute} />
-                <Text style={{ fontSize: 12, color: colors.mute }}>{profile.location}</Text>
-              </View>
-            )}
-
-            {/* Seller identity — the part Instagram has no answer to. Only
-                segments backed by real data render; new accounts just show
-                their member-since year. */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                flexWrap: 'wrap',
-                marginTop: 10,
-                gap: 6,
-              }}
-            >
-              {rating > 0 ? (
-                <TrustBadge icon="star" label={`${rating.toFixed(1)} rating`} />
-              ) : null}
-              {totalSales > 0 ? (
-                <TrustBadge icon="check-circle" label={`${totalSales} ${totalSales === 1 ? 'sale' : 'sales'}`} />
-              ) : null}
-              {memberSince ? (
-                <TrustBadge icon="clock" label={`Joined ${memberSince}`} />
-              ) : null}
-              {profile.vacation_mode ? (
-                <Pressable onPress={() => router.push('/settings' as any)}>
-                  <TrustBadge icon="pause-circle" label="On vacation" emphasized />
-                </Pressable>
-              ) : null}
-            </View>
-
-            {/* Earned achievements — purple-accent pills, set apart from the
-                neutral trust facts above. Only earned badges render. */}
-            <AchievementsStrip badges={earnedBadges} />
-          </View>
-
-          {/* CTA row — sharing your shop is the action that grows it, so it
-              carries the accent; editing stays quiet. */}
-          <View style={{ flexDirection: 'row', marginTop: 14, gap: 8 }}>
-            <View style={{ flex: 1 }}>
-              <Button
-                label="Edit profile"
-                variant="ghost"
-                full
-                onPress={() => router.push('/profile/edit')}
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Button label="Share profile" variant="primary" full onPress={handleShareProfile} />
-            </View>
-          </View>
+          <StatsBar
+            items={[
+              { key: 'items', value: sellingCount, label: 'Items' },
+              { key: 'sold', value: soldCount, label: 'Sold' },
+              {
+                key: 'followers',
+                value: profile.followers_count ?? 0,
+                label: 'Followers',
+                onPress: () => router.push('/profile/followers' as Href),
+              },
+              {
+                key: 'following',
+                value: profile.following_count ?? 0,
+                label: 'Following',
+                onPress: () => router.push('/profile/following' as Href),
+              },
+            ]}
+          />
 
           {/* Activation meter — only while the shop is incomplete, so it
               vanishes once set up (no permanent clutter). Tapping routes to the
-              next missing step. */}
-          <CompletionMeter completion={completion} onPressNext={handleCompletionCta} />
+              next missing step. It stays in the hero rather than moving to
+              Details because it is the one thing a new seller must act on. */}
+          <View style={{ paddingHorizontal: 16, alignItems: 'center' }}>
+            <View style={{ width: '100%', maxWidth: CONTENT_MAX_WIDTH }}>
+              <CompletionMeter completion={completion} onPressNext={handleCompletionCta} />
+            </View>
+          </View>
         </Animated.View>
 
-        {/* Tabs */}
-        <View style={{ marginTop: 22 }}>
+        {/* Tabs — clamped to the same column as the cards above, so the labels
+            don't drift apart on a wide viewport. */}
+        <View style={{ marginTop: 22, alignItems: 'center' }}>
+          <View style={{ width: '100%', maxWidth: CONTENT_MAX_WIDTH }}>
           <Tabs
             variant="underline"
+            accent="primary"
             value={activeTab}
             onChange={setActiveTab}
+            // Label-only: four columns with an icon, a label and a count each
+            // wrap on a small phone.
             tabs={[
-              { value: 'selling', label: 'Selling', icon: 'grid', count: sellingCount },
-              { value: 'liked', label: 'Liked', icon: 'heart', count: likedCount },
-              { value: 'collections', label: 'Saved', icon: 'bookmark', count: savedCount },
-              { value: 'shop', label: 'Shop', icon: 'shopping-bag' },
+              { value: 'selling', label: 'Selling', count: sellingCount },
+              { value: 'liked', label: 'Liked', count: likedCount },
+              { value: 'collections', label: 'Saved', count: savedCount },
+              { value: 'details', label: 'Details' },
             ]}
           />
+          </View>
         </View>
 
         {/* Tab content */}
@@ -653,8 +552,74 @@ const handleShareProfile = useCallback(async () => {
               }}
             />
           )}
-          {activeTab === 'shop' && (
-            <View style={{ paddingHorizontal: 16 }}>
+          {activeTab === 'details' && (
+            <View>
+              <InfoCard icon="user" title="About me">
+                <Text
+                  style={{
+                    fontSize: 14,
+                    lineHeight: 20,
+                    color: profile.bio?.trim() ? colors.ink : colors.muteSoft,
+                  }}
+                >
+                  {profile.bio?.trim()
+                    ? profile.bio
+                    : 'Add a short bio so buyers know who they’re dealing with.'}
+                </Text>
+              </InfoCard>
+
+              {/* Seller level — the progression spine. Level name + a thin
+                  progress bar + the single next-step requirement. Computed from
+                  existing data; no network. */}
+              <InfoCard icon="award" title="Seller level">
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: 8,
+                  }}
+                >
+                  <Text
+                    style={{ fontSize: 13.5, fontWeight: '800', color: colors.ink, letterSpacing: -0.2 }}
+                  >
+                    {levelProgress.current.name}
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      fontWeight: '800',
+                      color: levelProgress.next ? colors.muteSoft : colors.purple,
+                      letterSpacing: 0.4,
+                    }}
+                  >
+                    {levelProgress.next
+                      ? `LEVEL ${levelProgress.current.id} / ${LEVELS.length}`
+                      : 'MAX LEVEL'}
+                  </Text>
+                </View>
+                <ProgressBar fraction={levelProgress.progress} />
+                {levelProgress.nextRequirement ? (
+                  <Text style={{ fontSize: 12.5, color: colors.mute, fontWeight: '600', marginTop: 8 }}>
+                    {levelProgress.nextRequirement}
+                  </Text>
+                ) : null}
+              </InfoCard>
+
+              {earnedBadges.length > 0 ? (
+                <InfoCard icon="star" title="Achievements">
+                  <AchievementsStrip badges={earnedBadges} />
+                </InfoCard>
+              ) : null}
+
+              {credentials.length > 0 ? (
+                <InfoCard icon="shield" title="Seller credentials">
+                  <CredentialList rows={credentials} />
+                </InfoCard>
+              ) : null}
+
+              <View style={{ paddingHorizontal: 16, alignItems: 'center' }}>
+              <View style={{ width: '100%', maxWidth: CONTENT_MAX_WIDTH }}>
               <Card pad={0} variant="paper">
                 {(() => {
                   const bundlePct = profile.bundle_discount_pct ?? 0;
@@ -720,6 +685,8 @@ const handleShareProfile = useCallback(async () => {
                   ));
                 })()}
               </Card>
+              </View>
+              </View>
             </View>
           )}
           {activeTab === 'collections' && (
@@ -1016,68 +983,6 @@ function CompletionMeter({
           <Feather name="arrow-right" size={13} color={colors.purple} />
         </View>
       </View>
-    </Pressable>
-  );
-}
-
-// Small pill stating a seller-trust fact (rating, sales, tenure). Quiet by
-// default; `emphasized` switches to the purple-soft fill for states that
-// deserve attention (vacation mode).
-function TrustBadge({
-  icon,
-  label,
-  emphasized = false,
-}: {
-  icon: keyof typeof Feather.glyphMap;
-  label: string;
-  emphasized?: boolean;
-}) {
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 5,
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: radii.pill,
-        backgroundColor: emphasized ? colors.purpleSoft : colors.panel,
-      }}
-    >
-      <Feather name={icon} size={11} color={emphasized ? colors.purple : colors.mute} />
-      <Text
-        style={{
-          fontSize: 12,
-          fontWeight: '700',
-          color: emphasized ? colors.purple : colors.ink,
-          letterSpacing: -0.1,
-        }}
-      >
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-function Stat({ value, label, onPress }: { value: string; label: string; onPress?: () => void }) {
-  const body = (
-    <View style={{ alignItems: 'center' }}>
-      <Text
-        style={{ fontSize: 18, fontWeight: '800', color: colors.ink, letterSpacing: -0.2 }}
-      >
-        {value}
-      </Text>
-      <Text style={{ fontSize: 12, color: colors.mute, marginTop: 2 }}>{label}</Text>
-    </View>
-  );
-  if (!onPress) return <View style={{ flex: 1 }}>{body}</View>;
-  return (
-    <Pressable
-      onPress={onPress}
-      hitSlop={HIT_SLOP_8}
-      style={({ pressed }) => ({ flex: 1, opacity: pressed ? 0.6 : 1 })}
-    >
-      {body}
     </Pressable>
   );
 }

@@ -12,7 +12,14 @@ import path from 'node:path';
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['lib/**/*.test.ts', 'supabase/functions/**/*.test.ts'],
+    // components/ is included for PURE logic modules colocated with the UI they
+    // serve (e.g. components/profile/credentials.ts). Only *.test.ts matches, so
+    // no React Native component ever gets pulled into this node environment.
+    include: [
+      'lib/**/*.test.ts',
+      'components/**/*.test.ts',
+      'supabase/functions/**/*.test.ts',
+    ],
   },
   resolve: {
     alias: {

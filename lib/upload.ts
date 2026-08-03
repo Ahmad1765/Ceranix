@@ -12,6 +12,13 @@ export type LocalImage = { uri: string; base64?: string | null };
 const AVATAR_MAX_EDGE = 512;
 const AVATAR_QUALITY = 0.85;
 
+// Profile banners render full-bleed across the widest viewport we support, so
+// they need far more pixels than an avatar. 1280 covers a tablet/web layout at
+// 2x without paying for a full-size camera file, and 0.78 keeps gradients in
+// sky/skin tones from banding at that width.
+const BANNER_MAX_EDGE = 1280;
+const BANNER_QUALITY = 0.78;
+
 // Resize/compress ceiling for listing photos. Phone cameras hand us 3-12 MB
 // 3000px+ JPEGs; storing those raw is why the grid was slow to paint. 1440px
 // on the long edge at q0.7 is plenty for cards + the fullscreen viewer and
@@ -255,6 +262,15 @@ export async function uploadListingImages(
 
 export async function uploadAvatar(image: LocalImage, userId: string): Promise<string> {
   const compressed = await compressImage(image, AVATAR_MAX_EDGE, AVATAR_QUALITY);
+  return uploadOne('avatars', compressed, userId, 0);
+}
+
+// Banners share the `avatars` bucket on purpose. That bucket's write policy is
+// keyed on the first path segment being the caller's own user id, so writing
+// here needs no new bucket and no new storage policy — see the banner_url
+// migration for the full reasoning.
+export async function uploadBanner(image: LocalImage, userId: string): Promise<string> {
+  const compressed = await compressImage(image, BANNER_MAX_EDGE, BANNER_QUALITY);
   return uploadOne('avatars', compressed, userId, 0);
 }
 
