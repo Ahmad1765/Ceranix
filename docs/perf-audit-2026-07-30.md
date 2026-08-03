@@ -730,19 +730,204 @@ that transform flag is ever switched on.
 ```
 npx tsc --noEmit          → 0 errors
 npx expo lint             → 0 errors, 0 warnings
-npx vitest run            → 18 files, 163/163 passed
+npx vitest run            → 19 files, 172/172 passed
 npx expo export -p web    → exit 0
+npx react-compiler (sweep)→ 205 components compiled, 16 files bailing
 ```
 
-E2E, with the same stash-and-compare discipline as the earlier passes — the
-suite was run on the changed tree, the tree was reverted to the parent commit,
-re-exported, and the identical suite run again:
+E2E, with the same stash-and-compare discipline as the earlier passes — the tree
+was reverted to the parent commit, re-exported, and the identical suite run to
+establish the baseline:
 
 | | Passed | Failed | Skipped |
 |---|---|---|---|
 | Baseline (parent commit) | 124 | 32 | 6 |
-| With Pass 4 | 124 | 32 | 6 |
+| With Pass 4 | 126 | 30 | 6 |
 
-The failing **sets** were diffed, not just the counts: **byte-identical**. Zero
-new failures, zero disappeared. (The suite's 32 pre-existing failures are the
-long-standing ones documented above and are unrelated to this work.)
+The failing **sets** were diffed, not just the counts. **Zero new failures.**
+
+Two baseline failures did not recur — `network-failure.spec.ts:80` ("slow
+network (3s delay)") and `signed-in/saved-searches.spec.ts:158`. **Neither is
+claimed as a fix.** Both are timing-sensitive, the second is already recorded as
+flaky earlier in this document, and intermediate runs of the *same* tree scored
+124/32 and 126/30 — the counts move without the code moving. Zero-new is the
+only trustworthy signal a suite this red can produce.
+
+### Correctness audit of the rewrites (and three defects it caught)
+
+Every gate above was green *before* this audit, and the audit still found three
+real defects. Re-deriving each control-flow rewrite path-by-path against its
+original is what caught them; the gates could not have.
+
+1. **`isAbortError` silently stopped recognising cancellations.** It was written
+   as `e instanceof Error && e.name === 'AbortError'`, replacing hand-written
+   `e?.name === 'AbortError'` checks. Fetch aborts reject with a **DOMException**,
+   which is not reliably `instanceof Error`. The reachable case: supabase's
+   `timeoutFetch` aborts its *own* controller at 12s, so the caller's signal
+   reads un-aborted and the `instanceof` test misses — `product/[id].tsx` would
+   show "Could not load listing" where it previously stayed silent. Both helpers
+   now read `.name`/`.message` structurally; `lib/errors.test.ts` pins it,
+   including an explicit `expect(domExceptionLike instanceof Error).toBe(false)`.
+
+2. **`WardrobeGrid` would not have scrolled or virtualized at all.** Dropping the
+   parent `ScrollView` left the FlashList as one sibling among three in a
+   `flex: 1` column, and a flex child with no flex style sizes to its *content* —
+   unbounded height, no scrolling, every tile mounted. It now wraps itself in
+   `flex: 1`.
+
+3. **Paging could strand the follow button** — a defect *introduced by* the
+   pagination work. `useToggleFollowInList` captured the mask cache key including
+   the `ids` array; `ids` grows as pages load, and `onEndReached` fires exactly
+   where a reader taps Follow. A page landing mid-flight changed the active key,
+   leaving the optimistic write on an entry nothing read and snapping the button
+   back. It now writes through the `qk.followingMaskScope` prefix with
+   `setQueriesData`, which is correct regardless of paging.
+
+Two intentional non-equivalences, both strict improvements, recorded so they are
+not mistaken for drift: `errorMessage(e) || fallback` also falls back on an empty
+string (the old `e?.message ?? fallback` would show a blank toast), and
+`handleShareProfile` previously did `error.message` with no optional chaining,
+which would itself throw on a null rejection.
+
+
+---
+
+## Pass 5 (2026-08-02) — the first measurements, and what they overturned
+
+Every pass before this one reasoned about performance and verified with build
+gates. This one used Chrome's own metrics. Two harnesses, both kept in the
+session scratchpad rather than the repo:
+
+- **INP / long tasks** — drives scripted interactions, records
+  `PerformanceEventTiming` plus every long task, and takes a CDP CPU profile
+  over each click. Supports `CPU_THROTTLE` and signed-in storage state.
+- **LCP / CLS** — records the LCP element (with its URL and load/render split)
+  and every layout shift *with its `sources`*, i.e. which nodes moved.
+
+### The measurements immediately falsified two of my own hypotheses
+
+1. **"The reported INP of 1272ms must be a dev build."** Wrong: dev measured
+   168ms against production's 144ms. The real cause was ~4x CPU throttling —
+   reproduced by setting `Emulation.setCPUThrottlingRate: 4`, which matched the
+   reported distribution including a 616ms interaction to the millisecond.
+2. **"The Discover fix works / doesn't work."** A single 1x sample said 280 →
+   144ms; a single 4x sample said unchanged. Both were noise: product navigation
+   swung 144 → 216 → 1048ms across runs of identical code. Only repeated
+   **cold-load** sampling settled it (see below). Sampling must be cold, because
+   a second sheet open hits the Query cache and measures a different path.
+
+### Results
+
+| Metric | Before | After |
+|---|---|---|
+| Discover sheet open (median of 5 cold loads @4x) | 912ms | **656ms** |
+| — spread across those 5 | 816–1024ms | **640–664ms** |
+| CLS, signed out | 0.000 | **0.000** |
+| CLS, signed in | 0.030 | **0.000** |
+
+**Discover** — `DeferAfterPaint` mounts the sheet body one *painted* frame after
+the shell. Two nested `requestAnimationFrame`s, not one: a single rAF scheduled
+from an effect still runs before the next paint, landing the body in the very
+frame being kept clear. The 240ms slide covers the gap.
+
+**CLS** — the shift was the home screen's two cold-start banners deciding late.
+The follow CTA's condition is accidentally *true* while loading rather than
+merely unknown (`listings` is the stable empty array and `[].every(...)` is
+`true`), so it rendered on every visit and then vanished, dropping the grid 74px.
+
+Gating it on settled inputs alone was **not** enough, and measuring both audiences
+is what caught why: it merely moved the shift onto signed-out visitors. The real
+cause was structural — `app/_layout.tsx` did `if (!ready) return null` *above*
+the provider tree, so `AuthProvider` could not begin reading the session until
+the fonts resolved (~1.3s) and auth was guaranteed to settle after first paint.
+The gate now wraps only the `<Stack>`; providers mount immediately and auth
+overlaps the font load. That is also a startup win in its own right.
+
+---
+
+## Pass 5, part 2 — image payload, the largest finding in five passes
+
+`LCP 7.0s` reported, reproduced locally at 8.5s. The LCP element is a listing
+photo, and the image itself accounted for 8173ms of it. Auditing the feed's
+network traffic:
+
+**One feed screen requested 20.30 MB of images.** Largest single file: 6.0 MB.
+Natural dimensions up to **4284x5712 for a 194x258 tile — a 22x oversample.**
+
+Two distinct causes, and they need different fixes:
+
+1. **Legacy uploads.** `lib/upload.ts` already compresses to 1440px @ q0.7, and
+   the 1080–1103x1440 files match that. The 4284x5712 ones predate it. Not a
+   code bug — un-backfilled data.
+2. **Even correct uploads are ~8.7x oversampled.** A 1440px file (~260 KB) is
+   downloaded for a tile that wants 291px (~30 KB), because
+   `getOptimizedImageUrl` returns Supabase URLs unchanged while the transform
+   flag is off. `thumbWidthFor()` computes a width that is never applied. This
+   one is permanent and applies to every future upload.
+
+### Why not Supabase image transformations
+
+They are a **Pro-plan feature**, billed per 1,000 origin images. Verified live
+against this project on 2026-08-02:
+
+```
+ORIGINAL     HTTP 200  374 KB  image/jpeg
+TRANSFORMED  HTTP 403  {"error":"FeatureNotEnabled",
+                        "message":"feature not enabled for this tenant"}
+```
+
+⚠️ `EXPO_PUBLIC_SUPABASE_IMAGE_TRANSFORM=true` therefore **breaks every image in
+the app** on this project, because `lib/images.ts` rewrites every `.supabase.co`
+URL to that 403ing endpoint. The flag is set to `false` with that finding
+recorded inline. Turn it on only after the project is on Pro.
+
+### What was built instead: `listings.thumbnails`
+
+Sizes are generated once at upload rather than per request.
+
+| Piece | Where |
+|---|---|
+| `thumbnails text[]`, nullable, index-aligned with `images` | `supabase/migrations/20260802134206_add_listing_thumbnails.sql` |
+| 640px long edge @ q0.72 (~40–70 KB vs ~260 KB) | `lib/upload.ts` |
+| `cardImageUrl()` — thumb, else full, else empty | `lib/images.ts` |
+| Card + carousel read through it; hero/fullscreen keep full size | `components/ListingCard.tsx` |
+
+Decisions worth keeping:
+
+- **640 on the long edge**, so a portrait 3:4 photo is 480x640 — the 480px width
+  clears the widest realistic tile (a 4-column tablet grid wants 432px) while a
+  phone gets ~1.6x what it displays.
+- **The thumbnail is derived from the already-compressed 1440px copy**, not the
+  original, so a phone doesn't decode a 12 MP file twice.
+- **A failed thumbnail never fails a listing** — it falls back to the full-size
+  URL, which is exactly what pre-column rows already do.
+- **Index alignment is safe** because `listings.images` is written once at insert
+  and never mutated afterwards (the only later UPDATE is `is_sold`). Any future
+  image-editing flow must write both arrays together.
+- **Thumbnail deletion is a separate `storage.remove()` call whose error is
+  swallowed**, so the code does not depend on how the API reports
+  partially-missing prefixes — most `_thumb` paths won't exist for old rows.
+
+### ⚠️ Deploy ordering is now load-bearing
+
+`lib/listings.ts` names `thumbnails` in the feed column list. Until the migration
+is applied, PostgREST rejects the **entire** feed request with
+`42703 column listings.thumbnails does not exist` and the app renders zero
+listings. **Migration first, then the client build.**
+
+This was not theoretical — it happened during this pass. Every gate was green
+(tsc 0, lint 0, 184 tests, successful export) because none of them touch the live
+schema; the breakage was found only because the image audit reported
+`0 image requests`. Build gates cannot catch a schema/client mismatch.
+
+### Still open
+
+- **The 5x saving is unproven end to end.** `cardImageUrl` and `thumbPathFor`
+  have unit coverage, but thumbnail *generation* needs a real photo through
+  `expo-image-manipulator` (native) or canvas (web). The first listing created
+  after this ships should be checked for a populated `thumbnails` array and a
+  `_thumb` object in storage.
+- **Existing rows are unchanged** — all `thumbnails` are NULL, so LCP is
+  unmoved until content is re-uploaded or backfilled.
+- **`tests/e2e/tmp-dummy-shot.spec.ts`** is marked TEMP, asserts nothing, and
+  screenshots into a scratchpad path from a deleted session. It flakes. Delete it.

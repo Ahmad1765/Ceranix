@@ -114,6 +114,12 @@ export interface Listing {
   // compiler and let `listing.images.map()` white-screen the product page on
   // any such row. Keep it nullable so every read has to answer for it.
   images: string[] | null;
+  // Card-sized copies of `images`, index-aligned, written at upload time (see
+  // lib/upload.ts). Null on rows created before the column existed, and absent
+  // from any query that doesn't select it — read it through
+  // `cardImageUrl()` in lib/images.ts rather than indexing it directly, so the
+  // fallback to the full-size image stays in one place.
+  thumbnails?: string[] | null;
   is_sold: boolean;
   views: number;
   likes: number;

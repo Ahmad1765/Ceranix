@@ -11,7 +11,6 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Font from 'expo-font';
-import { Asset } from 'expo-asset';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Feather from '@expo/vector-icons/Feather';
 import { withFontDisplay } from '@/lib/fonts';
@@ -68,6 +67,13 @@ installAlertShim();
 // still downloading, which showed up as tofu boxes for every icon and as body
 // text flashing from the system serif to Inter. BLOCK keeps the glyphs
 // invisible until the real file lands. Web-only; native ignores the field.
+//
+// The sources below resolve to WOFF2 rather than TTF on web (2.6 MB -> 0.9 MB
+// across the app's ten families) — that swap happens in metro.config.js, not
+// here, because @expo/vector-icons re-loads the raw TTF from inside its own
+// icon component and rewriting the URI at this call site fetches both copies.
+// scripts/inject-font-preload.mjs preloads the same files from index.html, so
+// they download alongside the entry bundle instead of after it.
 const ICON_FONTS = withFontDisplay(
   { ...Ionicons.font, ...Feather.font },
   Font.FontDisplay.BLOCK,
@@ -133,17 +139,19 @@ function RootLayout() {
   useEffect(() => {
     // Gate first paint on the icon fonts. Note this is a best-effort gate, not
     // a guarantee: the `.finally` below releases it even when loadAsync
-    // *rejects*, and it does reject on slow links — Ionicons is 381 KB and
-    // FontFaceObserver gives it a fixed 6s. What actually stops boxes from
-    // being painted in that case is FontDisplay.BLOCK on ICON_FONTS, not this.
+    // *rejects*, and it does reject on slow links — FontFaceObserver gives each
+    // face a fixed 6s. What actually stops boxes from being painted in that
+    // case is FontDisplay.BLOCK on ICON_FONTS, not this.
     const iconFonts = Font.loadAsync(ICON_FONTS);
     const interFonts = Font.loadAsync(AESTHETIC_FONTS);
 
     if (Platform.OS === 'web') {
-      // Inter stays off the critical path — 5 weights at ~335 KB each is far
-      // too much to hold first paint on. It no longer *flashes* through the
-      // system serif on the way in, though: FontDisplay.BLOCK keeps that text
-      // invisible until Inter resolves rather than painting the wrong face.
+      // Inter stays off *this* gate — first paint should not wait on five text
+      // faces. It is no longer off the critical path entirely, though: as WOFF2
+      // the weights are ~115 KB rather than ~340 KB, and the three that carry
+      // real UI (400/600/700) are preloaded from index.html, so they resolve
+      // alongside the bundle instead of after it. FontDisplay.BLOCK still keeps
+      // that text invisible until it lands rather than flashing the wrong face.
       interFonts.catch(console.warn);
       iconFonts
         .catch(console.warn)
@@ -159,14 +167,13 @@ function RootLayout() {
     // the fact, so anything painted before Inter resolves keeps rendering in
     // the system font for the life of that view. Releasing the gate early
     // meant the whole app came up in Roboto on Android while web looked right.
-    Promise.all([
-      iconFonts,
-      interFonts,
-      Asset.loadAsync([
-        require('../assets/images/adaptive-icon.png'),
-        require('../assets/images/favicon.png'),
-      ]),
-    ])
+    //
+    // Nothing else belongs in this Promise.all. It used to also `Asset.loadAsync`
+    // adaptive-icon.png and favicon.png, which no component renders — the former
+    // is baked into the Android launcher icon by app.config.js at build time and
+    // the latter is browser chrome. Warming them held the splash screen open for
+    // two decodes whose results were never read.
+    Promise.all([iconFonts, interFonts])
       .catch(console.warn)
       .finally(() => {
         setReady(true);
@@ -176,8 +183,19 @@ function RootLayout() {
 
   // Preloader disabled — render nothing until boot assets are ready instead of
   // the branded loading screen.
-  if (!ready) return null;
-
+  //
+  // The gate is on the <Stack> below, NOT on this whole tree, so the providers
+  // mount immediately and their work overlaps the font load rather than queuing
+  // behind it. That matters for AuthProvider in particular: it reads the stored
+  // session in a mount effect, and while it sat under an early `return null`
+  // that read could not even begin until the fonts had resolved (~1.3s on web).
+  // Auth therefore always settled AFTER first paint, so anything keyed on
+  // `user` — the home screen's two cold-start banners — was guaranteed to
+  // decide late and shift the layout under the grid.
+  //
+  // Nothing renders text before `ready` either way: every provider below
+  // displays chrome only on demand (toast, guest gate, sheets), so this does
+  // not reintroduce the Android late-font repaint problem described above.
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <StatusBar style="dark" />
@@ -188,6 +206,7 @@ function RootLayout() {
         <GuestGateProvider>
         <SellSheetProvider>
         <DiscoverSheetProvider>
+        {!ready ? null : (
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
@@ -236,6 +255,7 @@ function RootLayout() {
             options={{ headerShown: false, presentation: 'modal' }}
           />
         </Stack>
+        )}
         <OfflineBanner />
         </DiscoverSheetProvider>
         </SellSheetProvider>

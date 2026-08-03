@@ -17,6 +17,12 @@ Run from top to bottom on a fresh project. Each later file assumes the earlier o
 8. `save_lists.sql` — Pinterest-style `save_lists` + `save_list_items` + `ensure_save_lists(uuid)` seeding RPC.
 9. `perf_cleanup.sql` — partial indexes for the active feed hot paths, policy rewrites that wrap `auth.uid()` in `(select …)` so it's evaluated once per query.
 10. `upsert_shipping_address.sql` — hardened upsert RPC for shipping addresses (derives owner from `auth.uid()`, locked search path, ordered to dodge the partial-unique-index collision).
+11. `migrations/20260802134206_add_listing_thumbnails.sql` — `listings.thumbnails`
+    (`text[]`, nullable), card-sized copies of `images` written at upload time.
+    **Apply before deploying any client that selects it** — the feed query lists
+    the column explicitly, and PostgREST rejects the whole request with
+    `42703 column listings.thumbnails does not exist` until it is present,
+    which takes the feed to zero rows.
 
 ## Conventions
 

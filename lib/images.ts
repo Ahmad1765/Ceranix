@@ -73,3 +73,26 @@ export function getOptimizedImageUrl(
 export function thumbWidthFor(displayPx: number): number {
   return Math.min(1600, Math.max(200, Math.round(displayPx * 1.5)));
 }
+
+/**
+ * The URL a *card-sized* surface should render for `listing.images[index]`.
+ *
+ * Prefers the stored thumbnail (listings.thumbnails, written at upload time by
+ * lib/upload.ts) and falls back to the full-size image. The fallback is the
+ * normal path for anything created before that column existed, and for any
+ * upload whose thumbnail generation failed — so it is a supported state, not an
+ * error case.
+ *
+ * Read thumbnails through this rather than indexing the array directly: it is
+ * absent entirely from queries that don't select the column, in which case
+ * every caller must still get a working image.
+ *
+ * Full-size surfaces — the product hero, the fullscreen viewer — must NOT use
+ * this. They want `listing.images[index]`.
+ */
+export function cardImageUrl(
+  listing: { images?: string[] | null; thumbnails?: string[] | null },
+  index = 0,
+): string {
+  return listing.thumbnails?.[index] || listing.images?.[index] || '';
+}

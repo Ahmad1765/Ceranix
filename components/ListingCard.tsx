@@ -17,7 +17,7 @@ import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
 import { router } from 'expo-router';
 import { PressableScale } from '@/components/PressableScale';
-import { getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
+import { cardImageUrl, getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
 import { peekLikedIds } from '@/lib/engagementCache';
 import { formatPrice } from '@/lib/currency';
 import { priceBreakdown } from '@/lib/fees';
@@ -70,6 +70,12 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
   const [carouselHydrated, setCarouselHydrated] = useState(false);
   // images is nullable in Postgres; `['']` keeps the carousel's single-slot
   // placeholder behaviour for rows with no photos.
+  //
+  // `images` is only used for its LENGTH and slide identity here — every actual
+  // source goes through cardImageUrl(), which prefers the card-sized copy in
+  // listings.thumbnails. A tile is ~194px wide; the full-size upload is 1440px
+  // (~260 KB) and legacy rows can be far larger, so this is the difference
+  // between ~40 KB and ~260 KB per visible card.
   const images = listing.images?.length ? listing.images : [''];
   const hasMultiple = images.length > 1;
 
@@ -237,8 +243,9 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
   }, [liked, likeBusy, listing.id, toast, userId, guestGate]);
 
   const srcWidth = thumbWidthFor(cardWidth || 200);
-  const currentUri = images[activeIndex] ?? images[0];
-  const currentSrc = getOptimizedImageUrl(currentUri, { width: srcWidth });
+  const currentSrc = getOptimizedImageUrl(cardImageUrl(listing, activeIndex) || cardImageUrl(listing, 0), {
+    width: srcWidth,
+  });
 
   const meta = [listing.size, conditionLabel(listing.condition)].filter(Boolean).join(' · ');
   const { item: itemPrice, total: totalPrice } = priceBreakdown(listing.price);
@@ -290,14 +297,14 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
             scrollEventThrottle={16}
             style={{ width: '100%', height: '100%' }}
           >
-            {images.map((uri, i) =>
+            {images.map((_uri, i) =>
               // Slide 0 and whatever slide is currently showing are always real
               // — the second clause matters for a recycled card parked
               // mid-carousel, which must never show an empty slot.
               i === 0 || i === activeIndex || carouselHydrated ? (
                 <Image
                   key={`${listing.id}-${i}`}
-                  source={{ uri: getOptimizedImageUrl(uri, { width: srcWidth }) }}
+                  source={{ uri: getOptimizedImageUrl(cardImageUrl(listing, i), { width: srcWidth }) }}
                   style={{ width: cardWidth || 200, height: '100%' }}
                   contentFit="cover"
                   cachePolicy="memory-disk"

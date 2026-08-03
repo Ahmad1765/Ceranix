@@ -332,10 +332,16 @@ function SellForm({ onClose }: { onClose: () => void }) {
     }
 
     setPublishing(true);
+    // Each upload returns the full-size URL plus a card-sized copy; the two
+    // arrays are written together and stay index-aligned (see the note on
+    // listings.thumbnails in the migration).
     let urls: string[] = [];
+    let thumbs: string[] = [];
     try {
       const chosen = slots.map(resolveImage);
-      urls = await uploadListingImages(chosen, user.id);
+      const uploaded = await uploadListingImages(chosen, user.id);
+      urls = uploaded.map((u) => u.url);
+      thumbs = uploaded.map((u) => u.thumbUrl);
 
       const { data, error } = await supabase
         .from('listings')
@@ -353,6 +359,7 @@ function SellForm({ onClose }: { onClose: () => void }) {
           condition,
           parcel_size: parcelSize,
           images: urls,
+          thumbnails: thumbs,
           is_sold: false,
           tags,
         })
@@ -394,6 +401,7 @@ function SellForm({ onClose }: { onClose: () => void }) {
         condition,
         parcel_size: parcelSize,
         images: urls,
+        thumbnails: thumbs,
         is_sold: false,
         views: 0,
         likes: 0,

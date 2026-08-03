@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
+import { cardImageUrl, getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
 
 const SUPABASE_PUBLIC =
   'https://abc.supabase.co/storage/v1/object/public/listing-images/a/photo.jpg';
@@ -76,5 +76,45 @@ describe('thumbWidthFor', () => {
 
   it('rounds to an integer', () => {
     expect(Number.isInteger(thumbWidthFor(333))).toBe(true);
+  });
+});
+
+describe('cardImageUrl', () => {
+  const FULL = 'https://abc.supabase.co/storage/v1/object/public/listing-images/a/p.jpg';
+  const THUMB = 'https://abc.supabase.co/storage/v1/object/public/listing-images/a/p_thumb.jpg';
+
+  it('prefers the thumbnail when one exists', () => {
+    expect(cardImageUrl({ images: [FULL], thumbnails: [THUMB] })).toBe(THUMB);
+  });
+
+  it('falls back to the full image when thumbnails is null (legacy row)', () => {
+    expect(cardImageUrl({ images: [FULL], thumbnails: null })).toBe(FULL);
+  });
+
+  it('falls back when the column was not selected at all', () => {
+    expect(cardImageUrl({ images: [FULL] })).toBe(FULL);
+  });
+
+  it('falls back per index when the arrays are ragged', () => {
+    // A thumbnail upload can fail for one photo and succeed for another, and a
+    // partially-written row must not blank out the card.
+    const listing = { images: [FULL, FULL, FULL], thumbnails: [THUMB] };
+    expect(cardImageUrl(listing, 0)).toBe(THUMB);
+    expect(cardImageUrl(listing, 1)).toBe(FULL);
+    expect(cardImageUrl(listing, 2)).toBe(FULL);
+  });
+
+  it('treats an empty-string thumbnail as missing rather than rendering nothing', () => {
+    expect(cardImageUrl({ images: [FULL], thumbnails: [''] })).toBe(FULL);
+  });
+
+  it('returns an empty string when the row has no photos at all', () => {
+    expect(cardImageUrl({ images: null, thumbnails: null })).toBe('');
+    expect(cardImageUrl({ images: [] }, 0)).toBe('');
+    expect(cardImageUrl({ images: [FULL] }, 5)).toBe('');
+  });
+
+  it('defaults to index 0', () => {
+    expect(cardImageUrl({ images: [FULL, 'other'], thumbnails: [THUMB, 'other_thumb'] })).toBe(THUMB);
   });
 });

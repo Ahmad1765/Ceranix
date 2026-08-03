@@ -21,6 +21,14 @@
 //
 // This is a web-only concern — `display` is documented `@platform web`, and
 // native ignores the field entirely. Applying it costs nothing on iOS/Android.
+//
+// ── Why the WOFF2 swap is not here ──────────────────────────────────────────
+//
+// The fonts these maps point at are served as WOFF2 on web (2.6 MB of TTF down
+// to 0.9 MB), but that redirect lives in metro.config.js, not in this file. It
+// has to: @expo/vector-icons' createIconSet closes over the raw TTF asset id
+// and re-loads it from its own componentDidMount, so rewriting the URI at the
+// `Font.loadAsync` call site downloads both copies. See metro.config.js.
 import * as Font from 'expo-font';
 
 /**

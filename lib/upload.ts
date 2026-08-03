@@ -20,6 +20,31 @@ const AVATAR_QUALITY = 0.85;
 const LISTING_MAX_EDGE = 1440;
 const LISTING_QUALITY = 0.7;
 
+// Card-sized copy stored alongside each listing photo (listings.thumbnails).
+//
+// The 1440px upload above is right for the product page's fullscreen viewer and
+// far too big for a grid tile: a card renders at ~194px wide on a phone, and
+// lib/images.thumbWidthFor asks for 1.5x that (291px). The widest realistic
+// tile is a 4-column tablet grid at ~288px, wanting 432px.
+//
+// 640 on the LONG edge covers both: a portrait 3:4 photo becomes 480x640, so
+// the width (480) clears the 432px worst case, while a phone gets ~1.6x the
+// pixels it displays. At q0.72 that lands around 40-70 KB versus ~260 KB for
+// the 1440px version — the ~5x saving this column exists for.
+//
+// Quality is a touch higher than the full-size 0.7 on purpose: JPEG artefacts
+// are proportionally more visible at small dimensions, and 0.02 costs very
+// little on an image this size.
+const THUMB_MAX_EDGE = 640;
+const THUMB_QUALITY = 0.72;
+
+/** One uploaded photo: the full-size URL plus its card-sized copy. */
+export type UploadedImage = {
+  url: string;
+  /** Card-sized copy. Falls back to `url` when thumbnail generation failed. */
+  thumbUrl: string;
+};
+
 // Read the intrinsic pixel size of an image so we only ever scale down.
 function getImageSize(uri: string): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
@@ -151,17 +176,22 @@ function inferExt(uri: string): string {
   return 'jpg';
 }
 
-async function uploadOne(
-  bucket: string,
-  image: LocalImage,
-  pathPrefix: string,
-  index: number,
-): Promise<string> {
+function randomId(): string {
+  return typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : Math.random().toString(36).substring(2) + Date.now().toString(36);
+}
+
+// Storage path for a thumbnail, derived from its full-size sibling's path.
+// Kept as one function so the upload side and the delete side cannot disagree
+// about the naming.
+export function thumbPathFor(fullPath: string): string {
+  const dot = fullPath.lastIndexOf('.');
+  return dot < 0 ? `${fullPath}_thumb` : `${fullPath.slice(0, dot)}_thumb${fullPath.slice(dot)}`;
+}
+
+async function uploadToPath(bucket: string, image: LocalImage, path: string): Promise<string> {
   const ab = await imageToArrayBuffer(image);
-  const ext = inferExt(image.uri);
-  const uniqueId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36);
-  const safePrefix = pathPrefix.replace(/\.\./g, '').replace(/^\/+|\/+$/g, '').replace(/\/+/g, '/');
-  const path = `${safePrefix ? safePrefix + '/' : ''}${uniqueId}.${ext}`;
   const { error } = await supabase.storage
     .from(bucket)
     .upload(path, ab, {
@@ -175,16 +205,51 @@ async function uploadOne(
   return data.publicUrl;
 }
 
+async function uploadOne(
+  bucket: string,
+  image: LocalImage,
+  pathPrefix: string,
+  index: number,
+): Promise<string> {
+  const ext = inferExt(image.uri);
+  const safePrefix = pathPrefix.replace(/\.\./g, '').replace(/^\/+|\/+$/g, '').replace(/\/+/g, '/');
+  const path = `${safePrefix ? safePrefix + '/' : ''}${randomId()}.${ext}`;
+  return uploadToPath(bucket, image, path);
+}
+
 export async function uploadListingImages(
   images: LocalImage[],
   sellerId: string,
-): Promise<string[]> {
+): Promise<UploadedImage[]> {
   const folder = `${sellerId}/${Date.now()}`;
-  const out: string[] = [];
+  const safeFolder = folder.replace(/\.\./g, '').replace(/^\/+|\/+$/g, '').replace(/\/+/g, '/');
+  const out: UploadedImage[] = [];
+
   for (let i = 0; i < images.length; i++) {
-    const compressed = await compressImage(images[i], LISTING_MAX_EDGE, LISTING_QUALITY);
-    out.push(await uploadOne('listing-images', compressed, folder, i));
+    const full = await compressImage(images[i], LISTING_MAX_EDGE, LISTING_QUALITY);
+    const ext = inferExt(full.uri);
+    const fullPath = `${safeFolder}/${randomId()}.${ext}`;
+    const url = await uploadToPath('listing-images', full, fullPath);
+
+    // The thumbnail is derived from the already-compressed 1440px copy rather
+    // than from the original: downscaling 1440 → 640 is visually identical to
+    // going straight from a 12 MP camera file, and it avoids decoding the
+    // original a second time on a phone that just spent memory on it.
+    //
+    // A thumbnail is an optimization, never a reason to fail a listing. If
+    // either the resize or its upload fails we fall back to the full-size URL,
+    // which is exactly what rows created before this existed already do.
+    let thumbUrl = url;
+    try {
+      const thumb = await compressImage(full, THUMB_MAX_EDGE, THUMB_QUALITY);
+      thumbUrl = await uploadToPath('listing-images', thumb, thumbPathFor(fullPath));
+    } catch (e) {
+      console.warn('[upload] thumbnail failed; card will use the full-size image', e);
+    }
+
+    out.push({ url, thumbUrl });
   }
+
   return out;
 }
 
@@ -207,6 +272,21 @@ export async function deleteListingImages(urls: string[]): Promise<void> {
     // best-effort cleanup. Letting it throw would mask the original DB error
     // shown to the user with a less actionable storage error.
     console.warn('[upload] deleteListingImages failed:', error.message, 'paths:', paths);
+  }
+
+  // Thumbnails go in a SEPARATE call whose failure is swallowed, deliberately.
+  //
+  // Most of these paths won't exist — every listing created before
+  // listings.thumbnails did has no `_thumb` sibling — and rather than depend on
+  // how storage.remove() reports partially-missing prefixes, this keeps the
+  // uncertainty off the path that actually matters. The full-size delete above
+  // has already reported its own result by this point.
+  const thumbPaths = paths.map(thumbPathFor);
+  const { error: thumbError } = await supabase.storage
+    .from('listing-images')
+    .remove(thumbPaths);
+  if (thumbError) {
+    console.warn('[upload] thumbnail cleanup skipped:', thumbError.message);
   }
 }
 

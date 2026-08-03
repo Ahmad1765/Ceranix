@@ -86,6 +86,41 @@ export function useDiscoverSheet(): DiscoverSheetApi {
   return ctx;
 }
 
+/**
+ * Renders `children` only once the browser has painted at least one frame
+ * without them.
+ *
+ * The Discover tab's press handler calls setVisible(true), and everything under
+ * the Modal used to mount in that same tick: SafeAreaProvider,
+ * GestureHandlerRootView, the shell, and the body — which additionally kicks off
+ * a listings query for the Topics covers. Nothing could paint until all of it
+ * finished, which measured as a 789ms long task and made this the app's worst
+ * interaction by a wide margin (280ms INP unthrottled, 824ms at 4x CPU).
+ *
+ * Two nested rAFs, not one: a single `requestAnimationFrame` scheduled from an
+ * effect still runs BEFORE the next paint, so the body would land in the very
+ * frame we are trying to keep clear. The second one fires after that frame has
+ * been painted.
+ *
+ * The sheet's own slide-up runs 240ms, so the body arrives well inside the
+ * entry animation — the user sees the sheet start moving on touch, which is the
+ * whole point, and never sees an empty sheet come to rest.
+ */
+function DeferAfterPaint({ children }: { children: ReactNode }) {
+  const [painted, setPainted] = useState(false);
+  useEffect(() => {
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => setPainted(true));
+    });
+    return () => {
+      cancelAnimationFrame(outer);
+      if (inner) cancelAnimationFrame(inner);
+    };
+  }, []);
+  return painted ? <>{children}</> : null;
+}
+
 export function DiscoverSheetProvider({ children }: { children: ReactNode }) {
   const [visible, setVisible] = useState(false);
   const open = useCallback(() => {
@@ -124,7 +159,13 @@ export function DiscoverSheetProvider({ children }: { children: ReactNode }) {
                 works on web/iOS and does nothing on Android. */}
             <GestureHandlerRootView style={{ flex: 1 }}>
               <SheetShell onClose={close} skin={DUMMY_SKIN ? DUMMY_SKIN_HANDLE : DEFAULT_HANDLE}>
-                {DUMMY_SKIN ? <DummySheetBody onClose={close} /> : <DiscoverSheetBody onClose={close} />}
+                {/* Body mounts one painted frame after the shell — see
+                    DeferAfterPaint. The shell is what slides up, so the tap
+                    gets a visible response immediately instead of waiting on
+                    the body's whole subtree and its listings query. */}
+                <DeferAfterPaint>
+                  {DUMMY_SKIN ? <DummySheetBody onClose={close} /> : <DiscoverSheetBody onClose={close} />}
+                </DeferAfterPaint>
               </SheetShell>
             </GestureHandlerRootView>
           </SafeAreaProvider>

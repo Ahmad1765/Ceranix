@@ -7,7 +7,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "build": "expo export -p web",
+    "fonts:web": "node scripts/build-web-fonts.mjs",
+    "build": "npm run fonts:web && expo export -p web && node scripts/inject-font-preload.mjs dist",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -80,7 +81,8 @@
     "serve": "^14.2.4",
     "tailwindcss": "3.4.17",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.9",
+    "wawoff2": "^2.0.1"
   },
   "overrides": {
     "@emnapi/core": "1.11.1",

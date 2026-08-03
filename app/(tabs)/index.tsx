@@ -61,7 +61,7 @@ const EMPTY_SAVED_SEARCHES: SavedSearch[] = [];
 const EMPTY_PRICE_DROPS: PriceDropListing[] = [];
 
 export default function HomeScreen() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const toast = useToast();
   const [activeChip, setActiveChip] = useState<string>(FOR_YOU);
   const [alertSheetOpen, setAlertSheetOpen] = useState(false);
@@ -277,9 +277,40 @@ export default function HomeScreen() {
     return rows;
   }, [searchedListings, filters]);
 
-  const showColdStartBanner = !user;
+  // Both banners are gated on their inputs having SETTLED, not merely on the
+  // current value. Without that gate each one renders during load and then
+  // vanishes, dropping everything below it by its own height — a measured 74px
+  // layout shift on every single visit, which is most of this screen's CLS.
+  //
+  // The follow CTA was the worse of the two, because its condition is
+  // accidentally true while loading rather than merely unknown:
+  // `listings` is the stable empty array until the feed resolves, and
+  // `[].every(...)` is `true`, so `isFallback` starts out true for everyone.
+  // `savedSearches.length === 0` is likewise true before that query lands.
+  //
+  // Both banners sit above the grid, so either one appearing or disappearing
+  // after first paint drops everything below it by ~74px. Both are therefore
+  // gated on their inputs having SETTLED rather than on the current value.
+  //
+  // This only works because AuthProvider now mounts alongside the font load
+  // rather than behind it (see app/_layout.tsx) — auth resolves before first
+  // paint, so `authLoading` is already false by the time this renders and the
+  // gate costs nothing visually. Gating on auth while the provider still sat
+  // behind the font gate simply moved the shift onto signed-out visitors, which
+  // was measured at the same 0.030.
+  //
+  // The follow CTA additionally needs its query inputs, because its condition
+  // is accidentally TRUE while loading rather than merely unknown: `listings`
+  // is the stable empty array until the feed resolves and `[].every(...)` is
+  // `true`, so `isFallback` starts true for everyone, and
+  // `savedSearches.length === 0` likewise. Ungated it rendered on every single
+  // visit and then vanished.
+  const authSettled = !authLoading;
+  const ctaInputsSettled = authSettled && !feedQ.isPending && !savedSearchesQ.isPending;
+
+  const showColdStartBanner = authSettled && !user;
   const showFollowCta =
-    !!user && savedSearches.length === 0 && isFallback;
+    ctaInputsSettled && !!user && savedSearches.length === 0 && isFallback;
 
   // Rails are browsing aids; while filtering we hide them so results stay the
   // sole focus.
