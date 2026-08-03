@@ -270,21 +270,31 @@ export async function uploadListingImages(
 /** A crop region in SOURCE pixel coordinates. */
 export type CropRect = { originX: number; originY: number; width: number; height: number };
 
-/**
- * Crop a picked image to `rect`, in the browser.
- *
- * Web-only on purpose: native gets a real crop UI from the OS via
- * expo-image-picker's `allowsEditing` + `aspect`, and its web build ignores both
- * (they aren't even read — see ExponentImagePicker.web.js), which is why web
- * needs its own cropper. Adding an untested native branch here would be
- * speculation; if native ever needs one, ImageManipulator's `.crop()` is the
- * counterpart.
- *
- * Returns the input unchanged on any failure — a crop is never a reason to lose
- * the user's photo.
- */
-export async function cropImageOnWeb(image: LocalImage, rect: CropRect): Promise<LocalImage> {
-  if (Platform.OS !== 'web') return image;
+// Native crop via expo-image-manipulator. Rect is in source pixels; the caller
+// has already clamped it to the image, but round defensively because a
+// sub-pixel origin makes the native module throw rather than nudge.
+async function cropNative(image: LocalImage, rect: CropRect): Promise<LocalImage> {
+  try {
+    const context = ImageManipulator.manipulate(image.uri).crop({
+      originX: Math.max(0, Math.round(rect.originX)),
+      originY: Math.max(0, Math.round(rect.originY)),
+      width: Math.max(1, Math.round(rect.width)),
+      height: Math.max(1, Math.round(rect.height)),
+    });
+    const rendered = await context.renderAsync();
+    const result = await rendered.saveAsync({
+      compress: BANNER_QUALITY,
+      format: SaveFormat.JPEG,
+      base64: true,
+    });
+    return { uri: result.uri, base64: result.base64 ?? null };
+  } catch (e) {
+    console.warn('[upload] native crop failed; using the uncropped image', e);
+    return image;
+  }
+}
+
+async function cropOnWeb(image: LocalImage, rect: CropRect): Promise<LocalImage> {
   if (typeof window === 'undefined' || typeof document === 'undefined') return image;
   try {
     const bitmap = await decodeInBrowser(image);
@@ -307,6 +317,22 @@ export async function cropImageOnWeb(image: LocalImage, rect: CropRect): Promise
   } catch {
     return image;
   }
+}
+
+/**
+ * Crop a picked image to `rect` (source pixels), on any platform.
+ *
+ * Every platform routes through the app's own <BannerCropper> rather than the
+ * OS picker's crop UI, because neither alternative is usable here: the web build
+ * of expo-image-picker ignores `allowsEditing`/`aspect` entirely, and on iOS
+ * `aspect` is Android-only — `allowsEditing` there yields a SQUARE crop, which
+ * is the wrong shape for a 16:9 banner.
+ *
+ * Returns the input unchanged on any failure — a crop is never a reason to lose
+ * the user's photo.
+ */
+export function cropImage(image: LocalImage, rect: CropRect): Promise<LocalImage> {
+  return Platform.OS === 'web' ? cropOnWeb(image, rect) : cropNative(image, rect);
 }
 
 export async function uploadAvatar(image: LocalImage, userId: string): Promise<string> {

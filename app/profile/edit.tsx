@@ -13,7 +13,7 @@ import { supabase } from '@/lib/supabase';
 import {
   uploadAvatar,
   uploadBanner,
-  cropImageOnWeb,
+  cropImage,
   type LocalImage,
   type CropRect,
 } from '@/lib/upload';
@@ -371,12 +371,11 @@ export default function ProfileEditScreen() {
     }
   }, [ensurePermission, toast]);
 
-  // 16:9 everywhere, because that is the ratio <ProfileBanner> renders at — any
-  // other crop would get cover-cropped a second time on the profile.
-  //
-  // Native gets the OS crop UI from `allowsEditing` + `aspect`. Web does NOT:
-  // expo-image-picker's web build ignores both options (it never reads them),
-  // so a web pick is handed to <BannerCropper> instead and framed there.
+  // `allowsEditing` is deliberately OFF on every platform: the pick goes to our
+  // own <BannerCropper>, which frames at exactly the ratio <ProfileBanner>
+  // renders at. Neither OS alternative works for a 16:9 banner — the web build
+  // of expo-image-picker ignores allowsEditing/aspect outright, and on iOS
+  // `aspect` is Android-only, so its editor would hand back a SQUARE crop.
   const pickBanner = useCallback(async () => {
     tap('light');
     const ok = await ensurePermission();
@@ -384,26 +383,19 @@ export default function ProfileEditScreen() {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: Platform.OS !== 'web',
-        aspect: [16, 9],
+        allowsEditing: false,
         quality: 0.85,
         base64: true,
       });
       if (result.canceled || !result.assets?.[0]) return;
       const asset = result.assets[0];
       if (!mounted.current) return;
-      if (Platform.OS === 'web') {
-        setCropSource({
-          uri: asset.uri,
-          base64: asset.base64 ?? null,
-          width: asset.width,
-          height: asset.height,
-        });
-        return;
-      }
-      setBannerUri(asset.uri);
-      setBannerBase64(asset.base64 ?? null);
-      setBannerRemoved(false);
+      setCropSource({
+        uri: asset.uri,
+        base64: asset.base64 ?? null,
+        width: asset.width,
+        height: asset.height,
+      });
     } catch {
       toast.show('Could not open photos', { variant: 'default', icon: 'alert-triangle' });
     }
@@ -412,13 +404,11 @@ export default function ProfileEditScreen() {
   const handleCropConfirm = useCallback(
     async (rect: CropRect) => {
       if (!cropSource) return;
-      const cropped = await cropImageOnWeb(
-        { uri: cropSource.uri, base64: cropSource.base64 },
-        rect,
-      );
+      const cropped = await cropImage({ uri: cropSource.uri, base64: cropSource.base64 }, rect);
       if (!mounted.current) return;
-      // cropImageOnWeb hands back a data: URI, which isLocalImage recognises, so
-      // the form goes dirty and the upload branch runs on save.
+      // cropImage hands back a data: URI on web and a file: URI on native, both
+      // of which isLocalImage recognises — so the form goes dirty and the upload
+      // branch runs on save.
       setBannerUri(cropped.uri);
       setBannerBase64(cropped.base64 ?? null);
       setBannerRemoved(false);

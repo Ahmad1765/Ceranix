@@ -23,7 +23,7 @@
 //      modal's window. Without a provider inside, useSafeAreaInsets() reports
 //      zeros on Android and content slides under the status/gesture bars.
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import {
   View,
   Pressable,
@@ -121,13 +121,59 @@ function DeferAfterPaint({ children }: { children: ReactNode }) {
   return painted ? <>{children}</> : null;
 }
 
+// Keeps the soft keyboard up across the sheet's mount, on mobile web only.
+//
+// Mobile browsers raise the on-screen keyboard only for a focus() that runs
+// inside the tap's own task, while the page still holds user activation. The
+// sheet's real search field can't satisfy that: it doesn't exist yet when the
+// tab is pressed, and by the time it mounts and useSheetSearchFocus runs, the
+// activation is spent — so the field focuses with the caret blinking and no
+// keyboard, which is the bug this fixes.
+//
+// So focus lands on this always-mounted field DURING the tap, which brings the
+// keyboard up, and the real field takes focus a frame later. Browsers keep the
+// keyboard raised when focus moves between text inputs, so the handover is
+// invisible.
+//
+// It must stay focusable to do that job: `display:none`, `visibility:hidden`,
+// `readOnly` and `disabled` all make focus() a no-op, which is why this is an
+// opacity-0 one-pixel field rather than a hidden one. It's removed from the
+// accessibility tree instead, since it is not a real control.
+function KeyboardPrimer({ inputRef }: { inputRef: RefObject<TextInput | null> }) {
+  if (Platform.OS !== 'web') return null;
+  return (
+    <TextInput
+      ref={inputRef}
+      // Not a control anyone should reach deliberately.
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: 1,
+        height: 1,
+        opacity: 0,
+        padding: 0,
+        borderWidth: 0,
+      }}
+      {...({ tabIndex: -1, 'aria-hidden': true } as any)}
+    />
+  );
+}
+
 export function DiscoverSheetProvider({ children }: { children: ReactNode }) {
   const [visible, setVisible] = useState(false);
+  // See <KeyboardPrimer/> below for why this exists.
+  const primerRef = useRef<TextInput>(null);
   const open = useCallback(() => {
     // Claim the skin's icon family before its icons mount — see
     // registerDummySkinFont. Synchronous, idempotent, and a no-op once the
     // DUMMY SKIN lines are removed. (DUMMY SKIN)
     if (DUMMY_SKIN) registerDummySkinFont();
+    // MUST stay synchronous, and MUST come before setVisible: it has to run
+    // inside the tap's own task to count as user-activated. See KeyboardPrimer.
+    if (Platform.OS === 'web') primerRef.current?.focus();
     setVisible(true);
   }, []);
   const close = useCallback(() => setVisible(false), []);
@@ -136,6 +182,7 @@ export function DiscoverSheetProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={api}>
       {children}
+      <KeyboardPrimer inputRef={primerRef} />
       <Modal
         visible={visible}
         animationType="slide"

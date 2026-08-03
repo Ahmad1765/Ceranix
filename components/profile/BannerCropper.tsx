@@ -31,12 +31,11 @@ type Props = {
 
 
 /**
- * Pick which part of a photo the banner shows.
+ * Pick which part of a photo the banner shows. Used on EVERY platform.
  *
- * This exists because expo-image-picker's WEB build silently ignores
- * `allowsEditing` and `aspect` — on web you get the raw image and `cover` picks
- * the crop for you. Native already gets the OS crop UI, so this only runs on
- * web (see the call site in app/profile/edit.tsx).
+ * Neither OS crop UI can do this job: expo-image-picker's web build ignores
+ * `allowsEditing`/`aspect` outright, and on iOS `aspect` is Android-only, so its
+ * editor returns a square crop — the wrong shape for a banner.
  *
  * The frame is locked to BANNER_ASPECT, the same ratio <ProfileBanner> renders
  * at, so what the seller frames here is exactly what appears on the profile.

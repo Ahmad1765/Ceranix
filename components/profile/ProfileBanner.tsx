@@ -1,4 +1,4 @@
-import { View, useWindowDimensions } from 'react-native';
+import { View, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
@@ -36,6 +36,12 @@ type Props = {
   verified?: boolean;
   /** Accessible description of whose profile this is. */
   label: string;
+  /**
+   * Tapping the banner. Only wired on your OWN profile, where it routes to the
+   * edit screen — the banner looks editable, so doing nothing on tap reads as
+   * broken rather than as "not a control".
+   */
+  onPress?: () => void;
 };
 
 /**
@@ -45,7 +51,14 @@ type Props = {
  * absolute positioning, so the following content flows naturally beneath it and
  * nothing has to know the banner's height to lay itself out.
  */
-export function ProfileBanner({ bannerUrl, avatarUrl, initial, verified, label }: Props) {
+export function ProfileBanner({
+  bannerUrl,
+  avatarUrl,
+  initial,
+  verified,
+  label,
+  onPress,
+}: Props) {
   const { width: viewportWidth } = useWindowDimensions();
   const { width, height } = bannerSizeFor(viewportWidth);
   const banner = bannerUrl ? getOptimizedImageUrl(bannerUrl, { width: 1080 }) : null;
@@ -56,14 +69,21 @@ export function ProfileBanner({ bannerUrl, avatarUrl, initial, verified, label }
     <View>
       {/* Purple-tint band doubles as both the no-banner fallback and the
           placeholder colour behind a still-loading photo. */}
-      <View
-        style={{
+      <Pressable
+        onPress={onPress}
+        // A plain View when there's nothing to do, so a visitor's banner isn't
+        // announced as a button.
+        disabled={!onPress}
+        accessibilityRole={onPress ? 'button' : undefined}
+        accessibilityLabel={onPress ? 'Change your banner' : undefined}
+        style={({ pressed }) => ({
           width,
           height,
           alignSelf: 'center',
           backgroundColor: colors.purpleSoft,
           overflow: 'hidden',
-        }}
+          opacity: onPress && pressed ? 0.85 : 1,
+        })}
       >
         {banner ? (
           <Image
@@ -77,7 +97,25 @@ export function ProfileBanner({ bannerUrl, avatarUrl, initial, verified, label }
             accessible={false}
           />
         ) : null}
-      </View>
+
+        {/* Only on your own profile, and only while there's no banner yet — an
+            empty purple band gives no hint that it can be filled. */}
+        {onPress && !banner ? (
+          <View
+            style={{
+              ...StyleSheet.absoluteFillObject,
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+            }}
+          >
+            <Feather name="image" size={18} color={colors.purple} />
+            <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.purple }}>
+              Add a banner
+            </Text>
+          </View>
+        ) : null}
+      </Pressable>
 
       <View style={{ alignItems: 'center', marginTop: -outer / 2 }}>
         <View

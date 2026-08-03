@@ -425,6 +425,7 @@ const handleShareProfile = useCallback(async () => {
             initial={initial}
             verified={profile.is_verified}
             label="Your profile photo"
+            onPress={() => router.push('/profile/edit')}
           />
 
           <ProfileIdentity
