@@ -1,4 +1,5 @@
-export { ProfileBanner, AVATAR_SIZE, bannerHeightFor } from './ProfileBanner';
+export { ProfileBanner, AVATAR_SIZE, bannerSizeFor, BANNER_ASPECT } from './ProfileBanner';
+export { BannerCropper, type CropSource } from './BannerCropper';
 export { ProfileIdentity } from './ProfileIdentity';
 export { StatsBar, type StatItem } from './StatsBar';
 export { InfoCard } from './InfoCard';

@@ -35,7 +35,7 @@ import {
   InfoCard,
   CredentialList,
   sellerCredentials,
-  bannerHeightFor,
+  bannerSizeFor,
   AVATAR_SIZE,
 } from '@/components/profile';
 
@@ -193,7 +193,13 @@ export default function UserProfileScreen() {
             <Feather name="chevron-left" size={26} color={colors.ink} />
           </Pressable>
         </View>
-        <View style={{ height: bannerHeightFor(viewportWidth), backgroundColor: colors.divider }} />
+        <View
+          style={{
+            ...bannerSizeFor(viewportWidth),
+            alignSelf: 'center',
+            backgroundColor: colors.divider,
+          }}
+        />
         <View style={{ alignItems: 'center', marginTop: -(AVATAR_SIZE + 8) / 2 }}>
           <View
             style={{

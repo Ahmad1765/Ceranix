@@ -10,7 +10,15 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/lib/auth';
 import { safeBack } from '@/lib/nav';
 import { supabase } from '@/lib/supabase';
-import { uploadAvatar, uploadBanner, type LocalImage } from '@/lib/upload';
+import {
+  uploadAvatar,
+  uploadBanner,
+  cropImageOnWeb,
+  type LocalImage,
+  type CropRect,
+} from '@/lib/upload';
+import { BannerCropper, BANNER_ASPECT, type CropSource } from '@/components/profile';
+import { CONTENT_MAX_WIDTH } from '@/lib/responsive';
 import { useToast } from '@/lib/toast';
 
 const PURPLE = '#6C47FF';
@@ -183,6 +191,10 @@ export default function ProfileEditScreen() {
   const [bannerUri, setBannerUri] = useState<string | null>(null);
   const [bannerBase64, setBannerBase64] = useState<string | null>(null);
   const [bannerRemoved, setBannerRemoved] = useState(false);
+  // A web pick waiting to be framed — see pickBanner.
+  const [cropSource, setCropSource] = useState<(CropSource & { base64: string | null }) | null>(
+    null,
+  );
 
   const [saving, setSaving] = useState(false);
   const [usernameError, setUsernameError] = useState<string | null>(null);
@@ -203,21 +215,29 @@ export default function ProfileEditScreen() {
     };
   }, []);
 
+  // Seed the form ONCE per profile row, not on every `profile` object identity.
+  //
+  // AuthProvider hands back a fresh object on each refresh (a token refresh, a
+  // refreshProfile() call), and re-running this on those would reset every
+  // field the user has already touched — including wiping a picked avatar or
+  // banner back to the stored URL, silently discarding the pick right before
+  // they hit save. Keyed on the row id, a refresh is a no-op.
+  const seededForId = useRef<string | null>(null);
   useEffect(() => {
-    if (profile) {
-      setUsername(profile.username ?? '');
-      setFullName(profile.full_name ?? '');
-      setBio(profile.bio ?? '');
-      setLocation(profile.location ?? '');
-      setAvatarUri(profile.avatar_url ?? null);
-      setAvatarBase64(null);
-      setAvatarRemoved(false);
-      setBannerUri(profile.banner_url ?? null);
-      setBannerBase64(null);
-      setBannerRemoved(false);
-      setUsernameError(null);
-      setUsernameStatus('idle');
-    }
+    if (!profile || seededForId.current === profile.id) return;
+    seededForId.current = profile.id;
+    setUsername(profile.username ?? '');
+    setFullName(profile.full_name ?? '');
+    setBio(profile.bio ?? '');
+    setLocation(profile.location ?? '');
+    setAvatarUri(profile.avatar_url ?? null);
+    setAvatarBase64(null);
+    setAvatarRemoved(false);
+    setBannerUri(profile.banner_url ?? null);
+    setBannerBase64(null);
+    setBannerRemoved(false);
+    setUsernameError(null);
+    setUsernameStatus('idle');
   }, [profile]);
 
   const initialSnapshot = useMemo(
@@ -234,9 +254,18 @@ export default function ProfileEditScreen() {
 
   // A picked image is still on the device; anything else is already a remote
   // URL we loaded from the profile and don't need to re-upload.
+  //
+  // `blob:` is the web case and it is load-bearing: expo-image-picker returns
+  // `URL.createObjectURL(file)` on web (see ExponentImagePicker.web.js), so
+  // without it a picked photo never counts as a change — the save button stays
+  // disabled and the upload branch never runs. Native returns file:/content:,
+  // and data: covers pickers that hand back an inline payload.
   const isLocalImage = (uri: string | null) =>
     !!uri &&
-    (uri.startsWith('file:') || uri.startsWith('content:') || uri.startsWith('data:'));
+    (uri.startsWith('file:') ||
+      uri.startsWith('content:') ||
+      uri.startsWith('data:') ||
+      uri.startsWith('blob:'));
 
   const hasNewLocalAvatar = isLocalImage(avatarUri);
   const hasNewLocalBanner = isLocalImage(bannerUri);
@@ -342,8 +371,12 @@ export default function ProfileEditScreen() {
     }
   }, [ensurePermission, toast]);
 
-  // 16:9 crop, matching the banner's render ratio closely enough that the
-  // seller's chosen framing survives the cover-fit on the profile screens.
+  // 16:9 everywhere, because that is the ratio <ProfileBanner> renders at — any
+  // other crop would get cover-cropped a second time on the profile.
+  //
+  // Native gets the OS crop UI from `allowsEditing` + `aspect`. Web does NOT:
+  // expo-image-picker's web build ignores both options (it never reads them),
+  // so a web pick is handed to <BannerCropper> instead and framed there.
   const pickBanner = useCallback(async () => {
     tap('light');
     const ok = await ensurePermission();
@@ -351,7 +384,7 @@ export default function ProfileEditScreen() {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: true,
+        allowsEditing: Platform.OS !== 'web',
         aspect: [16, 9],
         quality: 0.85,
         base64: true,
@@ -359,6 +392,15 @@ export default function ProfileEditScreen() {
       if (result.canceled || !result.assets?.[0]) return;
       const asset = result.assets[0];
       if (!mounted.current) return;
+      if (Platform.OS === 'web') {
+        setCropSource({
+          uri: asset.uri,
+          base64: asset.base64 ?? null,
+          width: asset.width,
+          height: asset.height,
+        });
+        return;
+      }
       setBannerUri(asset.uri);
       setBannerBase64(asset.base64 ?? null);
       setBannerRemoved(false);
@@ -366,6 +408,24 @@ export default function ProfileEditScreen() {
       toast.show('Could not open photos', { variant: 'default', icon: 'alert-triangle' });
     }
   }, [ensurePermission, toast]);
+
+  const handleCropConfirm = useCallback(
+    async (rect: CropRect) => {
+      if (!cropSource) return;
+      const cropped = await cropImageOnWeb(
+        { uri: cropSource.uri, base64: cropSource.base64 },
+        rect,
+      );
+      if (!mounted.current) return;
+      // cropImageOnWeb hands back a data: URI, which isLocalImage recognises, so
+      // the form goes dirty and the upload branch runs on save.
+      setBannerUri(cropped.uri);
+      setBannerBase64(cropped.base64 ?? null);
+      setBannerRemoved(false);
+      setCropSource(null);
+    },
+    [cropSource],
+  );
 
   const removeBanner = useCallback(() => {
     if (!bannerUri && !profile?.banner_url) return;
@@ -676,9 +736,14 @@ export default function ProfileEditScreen() {
               accessibilityLabel={bannerUri ? 'Change profile banner' : 'Add a profile banner'}
               style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
             >
+              {/* Same ratio the profile renders at, so this preview is honest
+                  about what will be visible rather than a squashed strip. */}
               <View
                 style={{
-                  height: 128,
+                  width: '100%',
+                  maxWidth: CONTENT_MAX_WIDTH,
+                  alignSelf: 'center',
+                  aspectRatio: BANNER_ASPECT,
                   borderRadius: 16,
                   overflow: 'hidden',
                   backgroundColor: 'rgba(108,71,255,0.10)',
@@ -1093,6 +1158,13 @@ export default function ProfileEditScreen() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      <BannerCropper
+        visible={!!cropSource}
+        source={cropSource}
+        onCancel={() => setCropSource(null)}
+        onConfirm={handleCropConfirm}
+      />
     </SafeAreaView>
   );
 }

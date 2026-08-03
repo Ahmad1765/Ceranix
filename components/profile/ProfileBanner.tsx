@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import { colors } from '@/lib/theme';
+import { CONTENT_MAX_WIDTH } from '@/lib/responsive';
 import { getOptimizedImageUrl } from '@/lib/images';
 
 export const AVATAR_SIZE = 96;
@@ -11,11 +12,20 @@ export const AVATAR_SIZE = 96;
 // image behind it.
 const RING = 4;
 
-// Banner geometry. The ratio follows the reference layout (a touch wider than
-// 2:1), but it is capped in absolute pixels: on a tablet the same ratio would
-// push the name and stats entirely below the fold.
-export function bannerHeightFor(viewportWidth: number): number {
-  return Math.round(Math.min(viewportWidth * 0.52, 260));
+// Banner geometry.
+//
+// 16:9 is not a look, it's a contract: it's the ratio the picker crops to, and
+// the banner renders `contentFit="cover"`, so any OTHER display ratio would
+// silently crop the seller's crop a second time. Keep these two in sync — if
+// this changes, change the picker's `aspect` and the web cropper's frame with it.
+export const BANNER_ASPECT = 16 / 9;
+
+// Width is clamped to the same column as the cards below. Left full-bleed, a
+// desktop viewport would make a 16:9 banner over 700px tall and push the whole
+// profile below the fold.
+export function bannerSizeFor(viewportWidth: number): { width: number; height: number } {
+  const width = Math.min(viewportWidth, CONTENT_MAX_WIDTH);
+  return { width, height: Math.round(width / BANNER_ASPECT) };
 }
 
 type Props = {
@@ -36,8 +46,8 @@ type Props = {
  * nothing has to know the banner's height to lay itself out.
  */
 export function ProfileBanner({ bannerUrl, avatarUrl, initial, verified, label }: Props) {
-  const { width } = useWindowDimensions();
-  const height = bannerHeightFor(width);
+  const { width: viewportWidth } = useWindowDimensions();
+  const { width, height } = bannerSizeFor(viewportWidth);
   const banner = bannerUrl ? getOptimizedImageUrl(bannerUrl, { width: 1080 }) : null;
   const avatar = avatarUrl ? getOptimizedImageUrl(avatarUrl, { width: 240 }) : null;
   const outer = AVATAR_SIZE + RING * 2;
@@ -46,7 +56,15 @@ export function ProfileBanner({ bannerUrl, avatarUrl, initial, verified, label }
     <View>
       {/* Purple-tint band doubles as both the no-banner fallback and the
           placeholder colour behind a still-loading photo. */}
-      <View style={{ height, backgroundColor: colors.purpleSoft, overflow: 'hidden' }}>
+      <View
+        style={{
+          width,
+          height,
+          alignSelf: 'center',
+          backgroundColor: colors.purpleSoft,
+          overflow: 'hidden',
+        }}
+      >
         {banner ? (
           <Image
             source={{ uri: banner }}

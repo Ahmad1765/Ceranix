@@ -98,6 +98,21 @@ async function compressNative(
 // URI; re-encodes to JPEG even when no resize is needed so large-but-small-
 // dimension photos still shrink. Falls back to the input on any failure (CORS,
 // tainted canvas, etc.) so the upload still succeeds.
+// Decode a picked image in the browser. Prefers the base64 payload the picker
+// hands back over its `blob:` URI, so the bitmap survives the object URL being
+// revoked.
+function decodeInBrowser(image: LocalImage): Promise<HTMLImageElement> {
+  const ct = image.uri ? inferContentType(image.uri) : 'image/jpeg';
+  const src = image.base64 ? `data:${ct};base64,${image.base64}` : image.uri;
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new window.Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('image load failed'));
+    img.src = src;
+  });
+}
+
 async function compressOnWeb(
   image: LocalImage,
   maxEdge: number,
@@ -106,15 +121,7 @@ async function compressOnWeb(
   if (Platform.OS !== 'web') return image;
   if (typeof window === 'undefined' || typeof document === 'undefined') return image;
   try {
-    const ct = image.uri ? inferContentType(image.uri) : 'image/jpeg';
-    const src = image.base64 ? `data:${ct};base64,${image.base64}` : image.uri;
-    const bitmap = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const img = new window.Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error('image load failed'));
-      img.src = src;
-    });
+    const bitmap = await decodeInBrowser(image);
     const longest = Math.max(bitmap.naturalWidth, bitmap.naturalHeight);
     const scale = longest > maxEdge ? maxEdge / longest : 1;
     const w = Math.round(bitmap.naturalWidth * scale);
@@ -258,6 +265,48 @@ export async function uploadListingImages(
   }
 
   return out;
+}
+
+/** A crop region in SOURCE pixel coordinates. */
+export type CropRect = { originX: number; originY: number; width: number; height: number };
+
+/**
+ * Crop a picked image to `rect`, in the browser.
+ *
+ * Web-only on purpose: native gets a real crop UI from the OS via
+ * expo-image-picker's `allowsEditing` + `aspect`, and its web build ignores both
+ * (they aren't even read — see ExponentImagePicker.web.js), which is why web
+ * needs its own cropper. Adding an untested native branch here would be
+ * speculation; if native ever needs one, ImageManipulator's `.crop()` is the
+ * counterpart.
+ *
+ * Returns the input unchanged on any failure — a crop is never a reason to lose
+ * the user's photo.
+ */
+export async function cropImageOnWeb(image: LocalImage, rect: CropRect): Promise<LocalImage> {
+  if (Platform.OS !== 'web') return image;
+  if (typeof window === 'undefined' || typeof document === 'undefined') return image;
+  try {
+    const bitmap = await decodeInBrowser(image);
+    // Clamp into the source so a rounding error at the edges can't ask the
+    // canvas for pixels that don't exist (which would letterbox with black).
+    const sw = Math.max(1, Math.min(Math.round(rect.width), bitmap.naturalWidth));
+    const sh = Math.max(1, Math.min(Math.round(rect.height), bitmap.naturalHeight));
+    const sx = Math.max(0, Math.min(Math.round(rect.originX), bitmap.naturalWidth - sw));
+    const sy = Math.max(0, Math.min(Math.round(rect.originY), bitmap.naturalHeight - sh));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = sw;
+    canvas.height = sh;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return image;
+    ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, sw, sh);
+    const dataUrl = canvas.toDataURL('image/jpeg', BANNER_QUALITY);
+    const comma = dataUrl.indexOf(',');
+    return { uri: dataUrl, base64: comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl };
+  } catch {
+    return image;
+  }
 }
 
 export async function uploadAvatar(image: LocalImage, userId: string): Promise<string> {
