@@ -14,9 +14,16 @@ import { useInboxQuery } from '@/lib/queries';
 import { colors, radii, shadow, type as typography } from '@/lib/theme';
 import { EmptyState } from '@/components/ui';
 import { InboxRow, InboxSkeleton } from '@/components/chat';
+import { ActivityFeed } from '@/components/activity';
 import { HIT_SLOP_8, useTabBarClearance } from '@/lib/responsive';
 
-type InboxTab = 'selling' | 'buying' | 'social' | 'support';
+type InboxTab = 'selling' | 'buying' | 'activity' | 'support';
+/**
+ * Every tab except Activity is backed by a conversation list. Activity renders
+ * <ActivityFeed> instead, so the conversation-shaped pieces below exclude it
+ * rather than carrying a branch that can never run.
+ */
+type ConversationTab = Exclude<InboxTab, 'activity'>;
 
 // Stable empty reference so the inbox fallback doesn't churn the pageData memo.
 const EMPTY_CONVERSATIONS: ConversationRow[] = [];
@@ -24,10 +31,14 @@ const EMPTY_CONVERSATIONS: ConversationRow[] = [];
 // Module-level so the FlatList doesn't see a new keyExtractor every render.
 const keyById = (item: ConversationRow) => item.id;
 
+// "Activity" took the slot that used to be a dead "Social" placeholder. It is
+// now the only way into the Activity feed — the bell that used to open /news
+// from the profile header is gone — so it sits inside the pager rather than
+// behind an icon.
 const INBOX_TABS: { value: InboxTab; label: string }[] = [
   { value: 'selling', label: 'Selling' },
   { value: 'buying', label: 'Buying' },
-  { value: 'social', label: 'Social' },
+  { value: 'activity', label: 'Activity' },
   { value: 'support', label: 'Support' },
 ];
 
@@ -134,7 +145,7 @@ function UnderlineTabs({
   );
 }
 
-function emptyStateFor(tab: InboxTab) {
+function emptyStateFor(tab: ConversationTab) {
   switch (tab) {
     case 'selling':
       return {
@@ -147,12 +158,6 @@ function emptyStateFor(tab: InboxTab) {
         icon: 'shopping-bag' as const,
         title: 'No conversations yet',
         description: 'Found something you love? Tap message on the listing.',
-      };
-    case 'social':
-      return {
-        icon: 'users' as const,
-        title: 'No social messages',
-        description: 'Messages from people you follow will show up here.',
       };
     case 'support':
       return {
@@ -199,7 +204,7 @@ function ConversationPage({
 }: {
   data: ConversationRow[];
   userId: string;
-  tab: InboxTab;
+  tab: ConversationTab;
   pageWidth: number;
   refreshing: boolean;
   onRefresh: () => void;
@@ -441,16 +446,16 @@ export default function InboxScreen() {
   }, [userId, inboxRefetch]);
 
   // Per-tab filtered data so the pager always has all four pages ready.
-  const pageData = useMemo<Record<InboxTab, ConversationRow[]>>(() => {
+  // Activity isn't in here — it renders <ActivityFeed>, not a conversation list.
+  const pageData = useMemo<Record<ConversationTab, ConversationRow[]>>(() => {
     const uid = user?.id;
     if (!uid) {
-      return { selling: [], buying: [], social: [], support: [] };
+      return { selling: [], buying: [], support: [] };
     }
     return {
       selling: conversations.filter((c) => c.seller_id === uid),
       buying: conversations.filter((c) => c.buyer_id === uid),
-      // Social and Support categories don't exist yet in the data model.
-      social: [],
+      // Support doesn't exist yet in the data model.
       support: [],
     };
   }, [conversations, user?.id]);
@@ -611,17 +616,28 @@ export default function InboxScreen() {
           )}
           scrollEventThrottle={16}
           onMomentumScrollEnd={onMomentumScrollEnd}
-          renderItem={({ item }) => (
-            <ConversationPage
-              data={pageData[item.value]}
-              userId={user.id}
-              tab={item.value}
-              pageWidth={pageWidth}
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              bottomInset={tabBarClearance}
-            />
-          )}
+          renderItem={({ item }) => {
+            // Activity is the odd page out: notifications and saved searches,
+            // not conversations. Same page geometry, different body.
+            if (item.value === 'activity') {
+              return (
+                <View style={{ width: pageWidth, flex: 1 }}>
+                  <ActivityFeed bottomInset={tabBarClearance} />
+                </View>
+              );
+            }
+            return (
+              <ConversationPage
+                data={pageData[item.value]}
+                userId={user.id}
+                tab={item.value}
+                pageWidth={pageWidth}
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                bottomInset={tabBarClearance}
+              />
+            );
+          }}
         />
       )}
 

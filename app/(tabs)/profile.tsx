@@ -29,7 +29,6 @@ import { colors, radii } from '@/lib/theme';
 import {
   useGridDimensions,
   useTabBarClearance,
-  HIT_SLOP_8,
   GRID_DRAW_DISTANCE,
   CONTENT_MAX_WIDTH,
 } from '@/lib/responsive';
@@ -388,32 +387,10 @@ const handleShareProfile = useCallback(async () => {
         // is a new component type each render and would remount the whole header.
         ListHeaderComponent={
       <>
-        {/* Top bar */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingHorizontal: 16,
-            paddingTop: 6,
-            paddingBottom: 8,
-          }}
-        >
-          <Text
-            style={{ fontSize: 18, fontWeight: '800', color: colors.ink, letterSpacing: -0.3 }}
-            numberOfLines={1}
-          >
-            @{profile.username}
-          </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18 }}>
-            <Pressable onPress={() => router.push('/news' as any)} hitSlop={HIT_SLOP_8}>
-              <Feather name="bell" size={22} color={colors.ink} />
-            </Pressable>
-            <Pressable onPress={() => router.push('/settings')} hitSlop={HIT_SLOP_8}>
-              <Feather name="menu" size={24} color={colors.ink} />
-            </Pressable>
-          </View>
-        </View>
+        {/* No top bar: the handle it repeated is already in the hero below
+            (ProfileIdentity), Settings is reachable from the Inbox header and
+            the Details tab, and Activity now lives as its own tab in the
+            Inbox — so the row was three redundant affordances above the fold. */}
 
         {/* Hero — banner, overlapping avatar, identity, stats. The level
             block, trust badges and achievements moved into the Details tab so
