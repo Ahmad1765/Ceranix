@@ -1,16 +1,25 @@
 import { describe, it, expect } from 'vitest';
-import { buyerProtectionFee, orderTotal, priceBreakdown, formatPrice } from '@/lib/fees';
+import {
+  BUYER_PROTECTION_FEE,
+  buyerProtectionFee,
+  orderTotal,
+  priceBreakdown,
+  formatPrice,
+} from '@/lib/fees';
 
 describe('buyerProtectionFee', () => {
-  it('is the fixed fee plus a percentage of the item price', () => {
-    // $1.00 → $0.70 + 5% = $0.75 (the canonical reference case).
-    expect(buyerProtectionFee(1)).toBe(0.75);
-    expect(buyerProtectionFee(10)).toBe(1.2);
-    expect(buyerProtectionFee(100)).toBe(5.7);
+  it('is a flat fee, identical at every price point', () => {
+    expect(buyerProtectionFee(500)).toBe(100);
+    expect(buyerProtectionFee(5_000)).toBe(100);
+    expect(buyerProtectionFee(50_000)).toBe(100);
+    expect(buyerProtectionFee(1)).toBe(100);
   });
 
-  it('rounds to whole cents', () => {
-    expect(buyerProtectionFee(3.33)).toBe(0.87);
+  it('never scales with the item price', () => {
+    // The regression this replaced: a percentage component made the fee on an
+    // expensive item many times the fee on a cheap one.
+    expect(buyerProtectionFee(100_000)).toBe(buyerProtectionFee(100));
+    expect(buyerProtectionFee(3.33)).toBe(BUYER_PROTECTION_FEE);
   });
 
   it('is zero for empty, zero, or invalid prices', () => {
@@ -22,14 +31,15 @@ describe('buyerProtectionFee', () => {
   });
 
   it('accepts numeric strings', () => {
-    expect(buyerProtectionFee('1')).toBe(0.75);
+    expect(buyerProtectionFee('1200')).toBe(100);
   });
 });
 
 describe('orderTotal', () => {
-  it('is item price plus buyer protection', () => {
-    expect(orderTotal(1)).toBe(1.75);
-    expect(orderTotal(25)).toBe(26.95);
+  it('is item price plus the flat buyer protection fee', () => {
+    expect(orderTotal(500)).toBe(600);
+    expect(orderTotal(5_000)).toBe(5_100);
+    expect(orderTotal(50_000)).toBe(50_100);
   });
 
   it('is zero for invalid prices', () => {
@@ -40,11 +50,15 @@ describe('orderTotal', () => {
 
 describe('priceBreakdown', () => {
   it('returns item, protection, and total that add up', () => {
-    const { item, protection, total } = priceBreakdown(1);
-    expect(item).toBe(1);
-    expect(protection).toBe(0.75);
-    expect(total).toBe(1.75);
-    expect(Math.round((item + protection) * 100) / 100).toBe(total);
+    const { item, protection, total } = priceBreakdown(2_499);
+    expect(item).toBe(2_499);
+    expect(protection).toBe(100);
+    expect(total).toBe(2_599);
+    expect(item + protection).toBe(total);
+  });
+
+  it('shows no protection line for a priceless row', () => {
+    expect(priceBreakdown(0)).toEqual({ item: 0, protection: 0, total: 0 });
   });
 });
 

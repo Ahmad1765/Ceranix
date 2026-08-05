@@ -10,7 +10,7 @@ import {
   subscribeToInbox,
   type ConversationRow,
 } from '@/lib/chat';
-import { useInboxQuery } from '@/lib/queries';
+import { useActivityUnreadCount, useInboxQuery } from '@/lib/queries';
 import { colors, radii, shadow, type as typography } from '@/lib/theme';
 import { EmptyState } from '@/components/ui';
 import { InboxRow, InboxSkeleton } from '@/components/chat';
@@ -65,16 +65,56 @@ function SignedOutState() {
   );
 }
 
+// Unread count on a tab label. Positioned absolutely off the label's trailing
+// edge rather than laid out beside it: four tabs already split the width evenly,
+// and an inline badge would push "Activity" into wrapping on a narrow phone.
+// Costs zero layout width, so it can't break the row at any viewport.
+function TabBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        left: '100%',
+        bottom: '58%',
+        marginLeft: 3,
+        minWidth: 16,
+        height: 16,
+        paddingHorizontal: 4,
+        borderRadius: 8,
+        backgroundColor: colors.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Text
+        style={{
+          fontFamily: typography.family.sansBold,
+          fontSize: 10,
+          lineHeight: 12,
+          color: colors.white,
+        }}
+      >
+        {count > 9 ? '9+' : count}
+      </Text>
+    </View>
+  );
+}
+
 function UnderlineTabs({
   value,
   onChange,
   scrollX,
   pageWidth,
+  badges,
 }: {
   value: InboxTab;
   onChange: (v: InboxTab) => void;
   scrollX: Animated.Value;
   pageWidth: number;
+  /** Unread counts per tab. Absent or 0 renders no badge. */
+  badges?: Partial<Record<InboxTab, number>>;
 }) {
   const tabWidth = pageWidth / TAB_COUNT;
   const underlineWidth = tabWidth * UNDERLINE_WIDTH_RATIO;
@@ -99,29 +139,39 @@ function UnderlineTabs({
       <View style={{ flexDirection: 'row' }}>
         {INBOX_TABS.map((t) => {
           const active = t.value === value;
+          const count = badges?.[t.value] ?? 0;
           return (
             <Pressable
               key={t.value}
               onPress={() => onChange(t.value)}
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
-              accessibilityLabel={t.label}
+              // The badge is a bare number on screen; spell it out for a screen
+              // reader or the tab just announces "Activity" either way.
+              accessibilityLabel={
+                count > 0 ? `${t.label}, ${count} new` : t.label
+              }
               style={{
                 flex: 1,
                 alignItems: 'center',
                 paddingVertical: 14,
               }}
             >
-              <Text
-                style={{
-                  fontFamily: active ? typography.family.sansBold : typography.family.sansMedium,
-                  fontSize: 15,
-                  color: active ? colors.ink : colors.muteSoft,
-                  letterSpacing: -0.1,
-                }}
-              >
-                {t.label}
-              </Text>
+              {/* Wrapper hugs the label so the badge can anchor to its
+                  trailing edge rather than the full-width tab cell. */}
+              <View>
+                <Text
+                  style={{
+                    fontFamily: active ? typography.family.sansBold : typography.family.sansMedium,
+                    fontSize: 15,
+                    color: active ? colors.ink : colors.muteSoft,
+                    letterSpacing: -0.1,
+                  }}
+                >
+                  {t.label}
+                </Text>
+                <TabBadge count={count} />
+              </View>
             </Pressable>
           );
         })}
@@ -383,6 +433,11 @@ export default function InboxScreen() {
   const refreshing = inboxQ.isRefetching;
   const { refetch: inboxRefetch, isStale: inboxStale } = inboxQ;
 
+  // Activity's unread count. Reads the same caches <ActivityFeed> renders from,
+  // so the badge and the list it points at can't drift apart.
+  const activityUnread = useActivityUnreadCount(userId);
+  const tabBadges = useMemo(() => ({ activity: activityUnread }), [activityUnread]);
+
   const pagerRef = useRef<FlatList<{ value: InboxTab; label: string }>>(null);
   // `useState(() => ...)` rather than the more familiar
   // `useRef(new Animated.Value(0)).current`, for two reasons:
@@ -586,6 +641,7 @@ export default function InboxScreen() {
         onChange={goToTab}
         scrollX={scrollX}
         pageWidth={pageWidth}
+        badges={tabBadges}
       />
 
       {/* Content */}

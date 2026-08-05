@@ -54,15 +54,6 @@ import { colors, radii, type } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { SearchLanding, type BrowseAction, type TopicAction } from './SearchLanding';
 import { useSheetSearchFocus } from './useSheetSearchFocus';
-import { DummySheetBody, registerDummySkinFont } from './DiscoverSheet.dummy'; // DUMMY SKIN
-
-// ── DUMMY SKIN (temporary) ──────────────────────────────────────────────────
-// Swaps the body below for a visual-only reskin matching the reference
-// screenshot. Revert with either:
-//   • flip this to false, or
-//   • delete these three "DUMMY SKIN" lines + components/discover/DiscoverSheet.dummy.tsx
-// The real DiscoverSheetBody underneath is unmodified.
-const DUMMY_SKIN = true;
 
 // Every navigation out of the sheet carries a monotonic `n`. Without it,
 // picking the same chip twice produces an identical URL, expo-router hands
@@ -167,10 +158,6 @@ export function DiscoverSheetProvider({ children }: { children: ReactNode }) {
   // See <KeyboardPrimer/> below for why this exists.
   const primerRef = useRef<TextInput>(null);
   const open = useCallback(() => {
-    // Claim the skin's icon family before its icons mount — see
-    // registerDummySkinFont. Synchronous, idempotent, and a no-op once the
-    // DUMMY SKIN lines are removed. (DUMMY SKIN)
-    if (DUMMY_SKIN) registerDummySkinFont();
     // MUST stay synchronous, and MUST come before setVisible: it has to run
     // inside the tap's own task to count as user-activated. See KeyboardPrimer.
     if (Platform.OS === 'web') primerRef.current?.focus();
@@ -205,13 +192,13 @@ export function DiscoverSheetProvider({ children }: { children: ReactNode }) {
                 below a root view of its own. Without this the drag-to-dismiss
                 works on web/iOS and does nothing on Android. */}
             <GestureHandlerRootView style={{ flex: 1 }}>
-              <SheetShell onClose={close} skin={DUMMY_SKIN ? DUMMY_SKIN_HANDLE : DEFAULT_HANDLE}>
+              <SheetShell onClose={close} skin={DEFAULT_HANDLE}>
                 {/* Body mounts one painted frame after the shell — see
                     DeferAfterPaint. The shell is what slides up, so the tap
                     gets a visible response immediately instead of waiting on
                     the body's whole subtree and its listings query. */}
                 <DeferAfterPaint>
-                  {DUMMY_SKIN ? <DummySheetBody onClose={close} /> : <DiscoverSheetBody onClose={close} />}
+                  <DiscoverSheetBody onClose={close} />
                 </DeferAfterPaint>
               </SheetShell>
             </GestureHandlerRootView>
@@ -248,16 +235,6 @@ const DEFAULT_HANDLE: SheetSkin = {
   handleColor: colors.hairline,
   padTop: 10,
   gap: 14,
-};
-
-// Mirrors the mock's .handle (70×5 #ececec) and its 16px/20px spacing.
-const DUMMY_SKIN_HANDLE: SheetSkin = {
-  radius: 22,
-  handleW: 70,
-  handleH: 5,
-  handleColor: '#ececec',
-  padTop: 16,
-  gap: 20,
 };
 
 // Dismiss on either a deliberate drag or a flick — requiring the full distance

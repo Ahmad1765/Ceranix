@@ -32,6 +32,7 @@ import {
 } from '@/lib/saves';
 import {
   deleteSavedSearch,
+  fetchNewMatchesCount,
   listSavedSearches,
   type SavedSearch,
 } from '@/lib/savedSearches';
@@ -87,6 +88,10 @@ export const qk = {
   priceDrops: (userId: string | null) => ['priceDrops', userId] as const,
   newFromFollowed: (userId: string | null) => ['newFromFollowed', userId] as const,
   savedSearches: (userId: string | null) => ['savedSearches', userId] as const,
+  // `ids` is part of the key so adding or deleting a saved search refetches
+  // the counts instead of serving a total that still includes the deleted row.
+  savedSearchMatches: (userId: string | null, ids: string) =>
+    ['savedSearchMatches', userId, ids] as const,
   savedListings: (userId: string | null) => ['savedListings', userId] as const,
   likedListings: (userId: string | null) => ['likedListings', userId] as const,
   saveLists: (userId: string | null) => ['saveLists', userId] as const,
@@ -282,6 +287,63 @@ export function useSavedSearchesQuery(userId: string | null) {
   });
 }
 
+export type SavedSearchMatches = {
+  /** New-match count per saved-search id. */
+  counts: Record<string, number>;
+  /** Their sum — what the Inbox's Activity badge shows. */
+  total: number;
+};
+
+const NO_MATCHES: SavedSearchMatches = { counts: {}, total: 0 };
+
+// Stable reference so the query key below doesn't churn while the searches
+// query is still loading.
+const EMPTY_SAVED_SEARCHES: SavedSearch[] = [];
+
+// How many listings have landed under each saved search since the user last
+// opened it. Split from useSavedSearchesQuery because Home only needs the rows,
+// while Activity needs the per-row "N new" numbers and the Inbox badge needs
+// their sum — and only these two should pay for N extra RPCs.
+export function useSavedSearchMatchesQuery(userId: string | null, searches: SavedSearch[]) {
+  const ids = searches.map((s) => s.id);
+  return useQuery({
+    queryKey: qk.savedSearchMatches(userId, ids.join(',')),
+    enabled: !!userId && ids.length > 0,
+    staleTime: 60_000,
+    queryFn: async (): Promise<SavedSearchMatches> => {
+      const pairs = await Promise.all(
+        ids.map(async (id) => {
+          try {
+            return [id, await fetchNewMatchesCount(id)] as const;
+          } catch (err) {
+            // A single failed count shouldn't blank the whole badge.
+            console.warn('[activity] new-match count failed for', id, err);
+            return [id, 0] as const;
+          }
+        }),
+      );
+      return {
+        counts: Object.fromEntries(pairs),
+        total: pairs.reduce((sum, [, n]) => sum + n, 0),
+      };
+    },
+  });
+}
+
+/**
+ * Unread total behind the Inbox's Activity tab badge.
+ *
+ * Reads through the same two caches the Activity feed itself renders from, so
+ * the badge can never disagree with the list underneath it. Clears on its own:
+ * opening a saved search routes through /discover?savedId=…, which stamps
+ * last_seen_at and invalidates these keys.
+ */
+export function useActivityUnreadCount(userId: string | null): number {
+  const searchesQ = useSavedSearchesQuery(userId);
+  const matchesQ = useSavedSearchMatchesQuery(userId, searchesQ.data ?? EMPTY_SAVED_SEARCHES);
+  return (matchesQ.data ?? NO_MATCHES).total;
+}
+
 export function useSavedListingsQuery(userId: string | null) {
   return useQuery({
     queryKey: qk.savedListings(userId),
@@ -308,6 +370,16 @@ export function useDeleteSavedSearch(userId: string | null) {
     },
     onError: (_err, _id, ctx) => {
       if (ctx?.prev) qc.setQueryData(key, ctx.prev);
+    },
+    // Refetch rather than trusting the optimistic write, because the Query
+    // cache is persisted to AsyncStorage on a 1s throttle while staleTime is
+    // 60s (see lib/queryClient.ts). A reload inside that window rehydrated the
+    // PRE-delete snapshot and then considered it fresh for a minute — so a
+    // deleted saved search reappeared and sat there. Invalidating forces the
+    // server's answer to be what gets persisted.
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: key });
+      qc.invalidateQueries({ queryKey: ['savedSearchMatches'] });
     },
   });
 }

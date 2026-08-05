@@ -141,6 +141,9 @@ export default function DiscoverScreen() {
 
   const { user } = useAuth();
   const toast = useToast();
+  // Declared up here (rather than beside onRefresh below) because the
+  // saved-search "mark seen" effect needs it.
+  const qc = useQueryClient();
   const [query, setQuery] = useState(initialQuery);
   // Search hub tab: Items keeps the classic feed + grid; Aesthetics / Brands /
   // Users are index-style panels. Query state is shared so a typed term
@@ -214,10 +217,18 @@ export default function DiscoverScreen() {
   }, [params.q, params.category, params.sub, params.tab, params.sort, params.n]);
 
   // When the screen mounts with a savedId param, mark that search seen so
-  // the "N new" badge clears once the user actually opens it.
+  // the "N new" badge clears once the user actually opens it. The counts are
+  // cached, so stamping last_seen_at isn't enough on its own — invalidate them
+  // too, or the Inbox's Activity badge keeps showing the pre-read total until
+  // its staleTime lapses.
   useEffect(() => {
-    if (savedId) touchSavedSearchSeen(savedId).catch(() => {});
-  }, [savedId]);
+    if (!savedId) return;
+    touchSavedSearchSeen(savedId)
+      .then(() => {
+        qc.invalidateQueries({ queryKey: ['savedSearchMatches'] });
+      })
+      .catch(() => {});
+  }, [savedId, qc]);
 
   const fade = useFadeIn(0, 320);
 
@@ -272,7 +283,6 @@ export default function DiscoverScreen() {
     }, [gridStale, gridRefetch, recStale, recRefetch, recentStale, recentRefetch]),
   );
 
-  const qc = useQueryClient();
   const onRefresh = useCallback(async () => {
     // The search-hub indexes are invalidated (not refetched): active tabs
     // refetch immediately, gated tabs pick up fresh data on next open.

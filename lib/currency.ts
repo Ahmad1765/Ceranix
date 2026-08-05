@@ -37,8 +37,8 @@ let upTo2Fmt: Formatter | null = null;
 
 // `whole: true` rounds to the nearest rupee and never shows decimals — used on
 // browsing surfaces (grid cards, product headline) where sub-rupee precision is
-// noise. Leave it off for the Buyer Protection breakdown, where the Rs 0.70 fee
-// and its total genuinely need the cents.
+// noise. Leave it off for the Buyer Protection breakdown, where a seller's
+// fractional asking price has to add up against the total shown beneath it.
 export function formatPrice(
   amount: number | string | null | undefined,
   opts?: { whole?: boolean },

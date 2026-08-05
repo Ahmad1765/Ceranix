@@ -12,8 +12,8 @@
 //   • a fixed backstop covers that case.
 // focus() on an already-focused input is a no-op, so both firing is harmless.
 //
-// Lives in its own file rather than in DiscoverSheet.tsx so the dummy skin can
-// use it too without the two modules importing each other.
+// Lives in its own file rather than in DiscoverSheet.tsx so any sheet body can
+// use it without the two modules importing each other.
 
 import { useEffect, type RefObject } from 'react';
 import { InteractionManager, Platform, type TextInput } from 'react-native';

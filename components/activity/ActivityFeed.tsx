@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { View, Pressable, ScrollView, ActivityIndicator, Alert, RefreshControl } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { router, useFocusEffect } from 'expo-router';
@@ -8,13 +8,17 @@ import { HIT_SLOP_8 } from '@/lib/responsive';
 import { Tabs, EmptyState } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import {
-  deleteSavedSearch,
-  fetchNewMatchesCount,
-  listSavedSearches,
-  type SavedSearch,
-} from '@/lib/savedSearches';
+  useDeleteSavedSearch,
+  useSavedSearchMatchesQuery,
+  useSavedSearchesQuery,
+} from '@/lib/queries';
+import { type SavedSearch } from '@/lib/savedSearches';
 
 type ActivityTab = 'following' | 'foryou' | 'searches';
+
+// Stable references so the query fallbacks below don't churn on every render.
+const EMPTY_SEARCHES: SavedSearch[] = [];
+const EMPTY_COUNTS: Record<string, number> = {};
 
 type Props = {
   /**
@@ -32,79 +36,39 @@ type Props = {
  * /news route (still linked from Discover's save-search flow) and the Activity
  * page of the Inbox pager, which is how you actually reach it now that the
  * profile's bell is gone.
+ *
+ * Both the rows and their "N new" counts come from shared React Query caches,
+ * which is also what the Inbox's Activity badge sums — so the badge and this
+ * list always read the same numbers.
  */
 export function ActivityFeed({ bottomInset = 24 }: Props) {
   const [activeTab, setActiveTab] = useState<ActivityTab>('following');
   const { user } = useAuth();
-  const [searches, setSearches] = useState<SavedSearch[]>([]);
-  const [matchCounts, setMatchCounts] = useState<Record<string, number>>({});
-  const matchCountsRef = useRef<Record<string, number>>(matchCounts);
-  useEffect(() => {
-    matchCountsRef.current = matchCounts;
-  }, [matchCounts]);
-  // Distinguish "we haven't fetched yet" from "we fetched and found nothing".
-  // Without this, the moment the user taps Saved we'd flash the empty state
-  // before the request even fires, because activeTab flips before useEffect
-  // runs and `loadingSearches` is still false.
-  const [searchesFetched, setSearchesFetched] = useState(false);
-  const [loadingSearches, setLoadingSearches] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  const userId = user?.id ?? null;
 
-  // Pull saved searches whenever the user lands on the Saved tab and is
-  // signed in. We hydrate the "new matches" counts in parallel — the badge
-  // is supplementary so a failure here just leaves the badge off.
-  const refreshSearches = useCallback(async () => {
-    if (!user?.id) {
-      setSearches([]);
-      setMatchCounts({});
-      setSearchesFetched(true);
-      return;
-    }
-    setLoadingSearches(true);
-    try {
-      const rows = await listSavedSearches(user.id);
-      setSearches(rows);
-      if (rows.length === 0) {
-        setMatchCounts({});
-        return;
-      }
-      const pairs = await Promise.all(
-        rows.map(async (s) => {
-          try {
-            return [s.id, await fetchNewMatchesCount(s.id)] as const;
-          } catch (err) {
-            console.warn('[activity] fetchNewMatchesCount failed for', s.id, err);
-            // Clear the count on failure instead of preserving a stale badge
-            return [s.id, 0] as const;
-          }
-        }),
-      );
-      setMatchCounts(Object.fromEntries(pairs));
-    } catch (e) {
-      console.warn('[activity] refreshSearches failed', e);
-    } finally {
-      setLoadingSearches(false);
-      setSearchesFetched(true);
-    }
-  }, [user?.id]);
+  const searchesQ = useSavedSearchesQuery(userId);
+  const searches = searchesQ.data ?? EMPTY_SEARCHES;
+  const matchesQ = useSavedSearchMatchesQuery(userId, searches);
+  const matchCounts = matchesQ.data?.counts ?? EMPTY_COUNTS;
+  const deleteSearch = useDeleteSavedSearch(userId);
 
+  const { refetch: searchesRefetch, isStale: searchesStale } = searchesQ;
+  const { refetch: matchesRefetch, isStale: matchesStale } = matchesQ;
+
+  // Revalidate on focus, but only what's actually stale — returning from a
+  // saved search that was just marked seen should drop its count, while idly
+  // re-focusing the Inbox shouldn't re-run N match RPCs.
   useFocusEffect(
     useCallback(() => {
-      if (activeTab !== 'searches') return;
-      refreshSearches();
-    }, [activeTab, refreshSearches]),
+      if (!userId) return;
+      if (searchesStale) searchesRefetch();
+      if (matchesStale) matchesRefetch();
+    }, [userId, searchesStale, searchesRefetch, matchesStale, matchesRefetch]),
   );
 
-  // Pull-to-refresh. Saved searches is the only data-backed tab, so that's what
-  // we re-pull; the spinner gives feedback on the other tabs regardless.
   const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await refreshSearches();
-    } finally {
-      setRefreshing(false);
-    }
-  }, [refreshSearches]);
+    await Promise.all([searchesRefetch(), matchesRefetch()]);
+  }, [searchesRefetch, matchesRefetch]);
 
   const applySearch = useCallback((s: SavedSearch) => {
     const params = new URLSearchParams();
@@ -114,27 +78,22 @@ export function ActivityFeed({ bottomInset = 24 }: Props) {
     router.push(`/discover?${params.toString()}` as any);
   }, []);
 
-  const confirmDelete = useCallback((s: SavedSearch) => {
-    // Alert.alert works on both native and web (shim installed in _layout).
-    Alert.alert('Delete saved search?', s.label ?? '', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          const ok = await deleteSavedSearch(s.id);
-          if (ok) {
-            setSearches((prev) => prev.filter((row) => row.id !== s.id));
-            setMatchCounts((prev) => {
-              const next = { ...prev };
-              delete next[s.id];
-              return next;
-            });
-          }
+  const confirmDelete = useCallback(
+    (s: SavedSearch) => {
+      // Alert.alert works on both native and web (shim installed in _layout).
+      Alert.alert('Delete saved search?', s.label ?? '', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          // The mutation drops the row from cache optimistically and rolls
+          // back if the server rejects.
+          onPress: () => deleteSearch.mutate(s.id),
         },
-      },
-    ]);
-  }, []);
+      ]);
+    },
+    [deleteSearch],
+  );
 
   return (
     <View style={{ flex: 1 }}>
@@ -159,7 +118,11 @@ export function ActivityFeed({ bottomInset = 24 }: Props) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: bottomInset }}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />
+          <RefreshControl
+            refreshing={searchesQ.isRefetching || matchesQ.isRefetching}
+            onRefresh={onRefresh}
+            tintColor={colors.purple}
+          />
         }
       >
         {activeTab === 'following' && (
@@ -189,7 +152,7 @@ export function ActivityFeed({ bottomInset = 24 }: Props) {
                   onPress: () => router.push('/auth/login' as any),
                 }}
               />
-            ) : !searchesFetched || (loadingSearches && searches.length === 0) ? (
+            ) : searchesQ.isLoading ? (
               <View style={{ paddingVertical: 32, alignItems: 'center' }}>
                 <ActivityIndicator color={colors.purple} />
               </View>
