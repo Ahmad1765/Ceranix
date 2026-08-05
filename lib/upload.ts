@@ -204,12 +204,28 @@ export function thumbPathFor(fullPath: string): string {
   return dot < 0 ? `${fullPath}_thumb` : `${fullPath.slice(0, dot)}_thumb${fullPath.slice(dot)}`;
 }
 
+// Browser/CDN cache lifetime for uploaded media, in seconds (1 year) plus
+// `immutable`, which tells the browser not to even revalidate.
+//
+// Supabase defaults this to 3600, so without it every viewer re-downloads every
+// photo once an hour — and images are the overwhelming majority of this
+// project's egress. Exhausting the free plan's 5 GB cached-egress quota is what
+// took the whole API offline with a 402 on 2026-08-05, so this is a cost
+// control, not a micro-optimization.
+//
+// Safe at this duration because every path here is a fresh `randomId()` and
+// uploads are `upsert: false` — a given URL's bytes can never change. Replacing
+// an avatar or a listing photo writes a NEW random path and the old object is
+// orphaned, so there is nothing for a stale cache entry to be wrong about.
+const MEDIA_CACHE_CONTROL = '31536000, immutable';
+
 async function uploadToPath(bucket: string, image: LocalImage, path: string): Promise<string> {
   const ab = await imageToArrayBuffer(image);
   const { error } = await supabase.storage
     .from(bucket)
     .upload(path, ab, {
       contentType: inferContentType(image.uri),
+      cacheControl: MEDIA_CACHE_CONTROL,
       upsert: false,
     });
   if (error) {

@@ -30,6 +30,10 @@
 //   --apply      actually write (default is a dry run that touches nothing)
 //   --limit N    process at most N listings — good for a cautious first pass
 //   --force      rebuild thumbnails even for rows that already have them
+//   --fix-cache  also re-upload each ORIGINAL so it picks up the 1-year
+//                cache-control (objects stored before lib/upload.ts set the
+//                header keep Supabase's 1-hour default, so browsers
+//                re-download them every hour)
 //
 // Safe to re-run: storage uploads use upsert, and rows that already have a
 // complete thumbnails array are skipped unless --force is passed.
@@ -56,10 +60,19 @@ const THUMB_MAX_EDGE = 640;
 const THUMB_QUALITY = 72;
 const BUCKET = 'listing-images';
 
+// Mirrors MEDIA_CACHE_CONTROL in lib/upload.ts. Supabase defaults this to 3600,
+// so omitting it would have every thumbnail this script writes re-downloaded by
+// every browser once an hour — quietly recreating the egress problem the
+// backfill exists to solve.
+const MEDIA_CACHE_CONTROL = '31536000, immutable';
+
 // ── CLI ─────────────────────────────────────────────────────────────────────
 const argv = process.argv.slice(2);
 const APPLY = argv.includes('--apply');
 const FORCE = argv.includes('--force');
+// Re-upload each ORIGINAL with the long cache-control too. Costs only ingress
+// (free) — the bytes are already in hand for the resize.
+const FIX_CACHE = argv.includes('--fix-cache');
 const LIMIT = (() => {
   const i = argv.indexOf('--limit');
   if (i < 0) return null;
@@ -211,6 +224,7 @@ if (todo.length === 0) {
 
 let madeCount = 0;
 let failCount = 0;
+let cacheFixed = 0;
 let bytesBefore = 0;
 let bytesAfter = 0;
 
@@ -258,11 +272,28 @@ for (const listing of todo) {
       if (APPLY) {
         const { error: upErr } = await sb.storage.from(BUCKET).upload(outPath, thumb, {
           contentType: 'image/jpeg',
+          cacheControl: MEDIA_CACHE_CONTROL,
           // upsert so a re-run repairs a partial pass instead of erroring on
           // objects it already wrote.
           upsert: true,
         });
         if (upErr) throw upErr;
+
+        // The ORIGINAL still carries whatever cache-control it was stored with
+        // — 3600 for everything uploaded before lib/upload.ts set the header.
+        // The product page serves originals, so leaving them revalidating
+        // hourly keeps a real slice of the egress. The bytes are already in
+        // hand and re-uploading is ingress (free), so fix it while we're here.
+        // Best-effort: failing here must not cost the thumbnail just written.
+        if (FIX_CACHE) {
+          const { error: reErr } = await sb.storage.from(BUCKET).upload(path, original, {
+            contentType: 'image/jpeg',
+            cacheControl: MEDIA_CACHE_CONTROL,
+            upsert: true,
+          });
+          if (reErr) console.log(`    ! cache-control refresh skipped: ${reErr.message}`);
+          else cacheFixed += 1;
+        }
       }
 
       const { data: pub } = sb.storage.from(BUCKET).getPublicUrl(outPath);
@@ -308,6 +339,7 @@ console.log('');
 console.log('─'.repeat(52));
 console.log(`  thumbnails generated : ${madeCount}`);
 if (failCount) console.log(`  failures             : ${failCount} (kept full-size URLs)`);
+if (FIX_CACHE) console.log(`  originals re-cached  : ${cacheFixed} (1h → 1y browser cache)`);
 console.log(`  per full grid render : ${fmtKB(bytesBefore)} → ${fmtKB(bytesAfter)}`);
 console.log(`  reduction            : ${factor}× smaller, ${fmtKB(saved)} saved`);
 console.log('─'.repeat(52));
