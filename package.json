@@ -8,6 +8,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "fonts:web": "node scripts/build-web-fonts.mjs",
+    "backfill:thumbnails": "node scripts/backfill-listing-thumbnails.mjs",
     "build": "npm run fonts:web && expo export -p web && node scripts/inject-font-preload.mjs dist",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
