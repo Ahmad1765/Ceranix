@@ -67,19 +67,42 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Stub Supabase auth / extension surface
-        # The image supplies the roles, pg_net and supabase_vault. What it does
-        # NOT supply is the `auth` and `storage` schemas — those are created by
-        # GoTrue and Storage migrations, not by Postgres itself — so the project
-        # SQL still needs the auth.uid()/auth.role() surface stubbed here.
-        #
-        # Everything below is written to be idempotent and image-agnostic: each
-        # piece is created only if absent, so this step still does the right
-        # thing if the base image changes.
+      - name: Report what the image already provides
+        # Worth printing: the previous stub assumed vanilla Postgres and tried to
+        # create things this image ships, then died on `permission denied for
+        # schema auth` because auth is owned by supabase_auth_admin, not
+        # postgres. Knowing what is already present is what makes the next step
+        # correct rather than guesswork.
         run: |
+          psql -v ON_ERROR_STOP=1 -c "
+            select
+              (select count(*) from pg_roles where rolname in ('anon','authenticated','service_role')) as supabase_roles,
+              to_regnamespace('auth')       is not null as auth_schema,
+              to_regnamespace('storage')    is not null as storage_schema,
+              to_regnamespace('extensions') is not null as extensions_schema,
+              to_regproc('auth.uid')        is not null as auth_uid,
+              to_regproc('auth.role')       is not null as auth_role,
+              to_regproc('auth.jwt')        is not null as auth_jwt,
+              to_regclass('auth.users')     is not null as auth_users,
+              to_regclass('storage.objects') is not null as storage_objects,
+              (select count(*) from pg_extension where extname in ('pgcrypto','uuid-ossp','pg_net','supabase_vault')) as exts;
+          "
+
+      - name: Stub only what is missing
+        # supabase/postgres already supplies the roles, the extensions, and the
+        # auth/storage schemas — and `postgres` cannot write into auth, which is
+        # owned by supabase_auth_admin. So create each object ONLY when it is
+        # genuinely absent, and never CREATE OR REPLACE over one the image owns.
+        #
+        # Each fallback is a shell-level conditional rather than SQL, because
+        # `CREATE ... IF NOT EXISTS` still requires schema privileges we do not
+        # hold on auth.
+        run: |
+          set -euo pipefail
+          q() { psql -tAq -c "$1"; }
+
+          # Roles: CREATE ROLE has no IF NOT EXISTS, so guard each one.
           psql -v ON_ERROR_STOP=1 <<'SQL'
-            -- Roles. Supplied by supabase/postgres, recreated defensively here
-            -- because CREATE ROLE has no IF NOT EXISTS.
             DO $do$
             BEGIN
               IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
@@ -93,35 +116,49 @@ jobs:
               END IF;
             END
             $do$;
-
             CREATE SCHEMA IF NOT EXISTS extensions;
             CREATE EXTENSION IF NOT EXISTS pgcrypto;
             CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
-            -- push_webhooks.sql reads vault.decrypted_secrets. The extension
-            -- creates the schema itself, so do not pre-create it.
-            CREATE EXTENSION IF NOT EXISTS supabase_vault;
-
-            CREATE SCHEMA IF NOT EXISTS auth;
-            CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS
-              $$ SELECT '00000000-0000-0000-0000-000000000000'::uuid $$;
-            CREATE OR REPLACE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS
-              $$ SELECT 'authenticated'::text $$;
-            CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS
-              $$ SELECT '{}'::jsonb $$;
-
-            CREATE TABLE IF NOT EXISTS auth.users (
-              id uuid primary key default uuid_generate_v4()
-            );
-
-            CREATE SCHEMA IF NOT EXISTS storage;
-            CREATE TABLE IF NOT EXISTS storage.objects (
-              id uuid primary key default uuid_generate_v4(),
-              bucket_id text,
-              name text,
-              owner uuid
-            );
           SQL
+
+          # auth.* — only if this image did not bring GoTrue's surface with it.
+          if [[ "$(q "select to_regnamespace('auth') is null")" == "t" ]]; then
+            echo "auth schema absent — stubbing"
+            psql -v ON_ERROR_STOP=1 <<'SQL'
+              CREATE SCHEMA auth;
+              CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS
+                $$ SELECT '00000000-0000-0000-0000-000000000000'::uuid $$;
+              CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS
+                $$ SELECT 'authenticated'::text $$;
+              CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS
+                $$ SELECT '{}'::jsonb $$;
+              CREATE TABLE auth.users (id uuid primary key default uuid_generate_v4());
+            SQL
+          else
+            echo "auth schema provided by the image — leaving it alone"
+            for fn in uid role jwt; do
+              if [[ "$(q "select to_regproc('auth.$fn') is null")" == "t" ]]; then
+                echo "::error::auth.$fn() missing and auth schema is not writable by $PGUSER"
+                exit 1
+              fi
+            done
+          fi
+
+          # storage.objects — same treatment.
+          if [[ "$(q "select to_regclass('storage.objects') is null")" == "t" ]]; then
+            echo "storage.objects absent — stubbing"
+            psql -v ON_ERROR_STOP=1 <<'SQL'
+              CREATE SCHEMA IF NOT EXISTS storage;
+              CREATE TABLE storage.objects (
+                id uuid primary key default uuid_generate_v4(),
+                bucket_id text,
+                name text,
+                owner uuid
+              );
+            SQL
+          else
+            echo "storage.objects provided by the image — leaving it alone"
+          fi
 
       - name: Apply migration SQL files in order
         run: |
