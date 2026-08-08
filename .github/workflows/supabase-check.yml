@@ -42,9 +42,14 @@ jobs:
         # Pinned to the 17.x line to match the live project (17.6.1.x).
         image: supabase/postgres:17.6.1.160
         env:
-          POSTGRES_USER: postgres
+          # POSTGRES_PASSWORD only. Setting POSTGRES_USER/POSTGRES_DB overrides
+          # this image's own bootstrap: its docker-entrypoint runs migrate.sh,
+          # which connects as `supabase_admin` — a role the default init
+          # sequence creates. Overriding the superuser skipped that and the
+          # container died with `role "supabase_admin" does not exist`.
+          # The image already defaults to user `postgres` / database `postgres`,
+          # which is what the PG* env below connects as.
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
         ports:
           - 5432:5432
         options: >-
