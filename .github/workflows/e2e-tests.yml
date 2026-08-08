@@ -76,6 +76,40 @@ jobs:
           # Full history so the merge job can fast-forward main → test.
           fetch-depth: 0
 
+      # Fail in seconds, not after a 7-minute doomed run.
+      #
+      # Without the secrets the bundle is built against the placeholder host and
+      # every data-dependent spec dies: the first run of this workflow produced
+      # 46 failures and 15 skips, none of which said anything about the app. One
+      # explicit message is far more actionable than that wall of red — and it
+      # is still LOUD, which is the whole point of this job.
+      - name: Require E2E secrets
+        shell: bash
+        run: |
+          missing=()
+          [[ "${EXPO_PUBLIC_SUPABASE_URL}" != "https://e2e.supabase.test" ]] || missing+=("EXPO_PUBLIC_SUPABASE_URL")
+          [[ "${EXPO_PUBLIC_SUPABASE_ANON_KEY}" != "e2e-anon-key" ]]        || missing+=("EXPO_PUBLIC_SUPABASE_ANON_KEY")
+          [[ -n "${E2E_USER_EMAIL}" ]]                                      || missing+=("E2E_USER_EMAIL")
+          [[ -n "${E2E_USER_PASSWORD}" ]]                                   || missing+=("E2E_USER_PASSWORD")
+
+          if (( ${#missing[@]} > 0 )); then
+            {
+              echo "## ❌ E2E secrets not configured"
+              echo ""
+              echo "This suite drives a real sign-in and reads live listings"
+              echo "(helpers/page.ts, auth.setup.ts). Without these it can only"
+              echo "produce failures and skips that say nothing about the app."
+              echo ""
+              echo "Missing repository secrets:"
+              for m in "${missing[@]}"; do echo "- \`$m\`"; done
+              echo ""
+              echo "Add them under **Settings → Secrets and variables → Actions**."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::Missing E2E secrets: ${missing[*]}"
+            exit 1
+          fi
+          echo "All E2E secrets present."
+
       - name: Setup project (Node + npm ci)
         uses: ./.github/actions/setup-project
 
