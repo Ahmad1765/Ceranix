@@ -228,14 +228,25 @@ jobs:
             exit 0
           fi
           
-          # Ensure setup.sql runs first if it exists
-          setup_file=$(echo "$files" | grep -m1 'setup\.sql$' || true)
-          if [[ -n "$setup_file" ]]; then
-            echo "::group::psql $setup_file"
-            psql -v ON_ERROR_STOP=1 -f "$setup_file"
+          # Explicit order for the loose supabase/*.sql mirrors. They carry no
+          # timestamps, so lexical order is arbitrary — and wrong: listings_tags
+          # .sql reads profiles.vacation_mode, a column profile_features.sql
+          # adds, but "l" sorts before "p". Everything under migrations/ IS
+          # timestamped and sorts correctly on its own, and sorts after every
+          # loose file, so only this prefix needs pinning.
+          #
+          # Add a file here only when a genuine cross-file dependency forces it.
+          FIRST=(
+            supabase/setup.sql            # base tables every other file extends
+            supabase/profile_features.sql # adds profiles.vacation_mode
+          )
+          for f in "${FIRST[@]}"; do
+            [[ -f "$f" ]] || continue
+            echo "::group::psql $f (pinned order)"
+            psql -v ON_ERROR_STOP=1 -f "$f"
             echo "::endgroup::"
-            files=$(echo "$files" | grep -v 'setup\.sql$') || true
-          fi
+            files=$(echo "$files" | grep -vxF "$f") || true
+          done
 
           for f in $files; do
             echo "::group::psql $f"
