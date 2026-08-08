@@ -67,6 +67,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # supabase/postgres deliberately does NOT make `postgres` a superuser —
+      # that mirrors hosted Supabase, where the real superuser is
+      # supabase_admin. In this throwaway CI container that distinction only
+      # gets in the way: `postgres` could not SET ROLE supabase_storage_admin,
+      # could not create storage.objects, and would not have owned it well
+      # enough to attach the project's policies afterwards.
+      #
+      # Elevating once, via the container's own superuser over its local socket,
+      # removes that whole class of failure. The container is destroyed at the
+      # end of the job and is never reachable from outside the runner.
+      - name: Grant the CI role superuser inside the container
+        run: |
+          set -euo pipefail
+          CID=$(docker ps --format '{{.ID}} {{.Image}}' | grep -m1 'supabase/postgres' | awk '{print $1}')
+          if [[ -z "${CID:-}" ]]; then
+            echo "::error::could not locate the postgres service container"
+            docker ps --format '{{.ID}} {{.Image}}'
+            exit 1
+          fi
+          echo "container: $CID"
+          docker exec "$CID" psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 \
+            -c "ALTER ROLE postgres SUPERUSER;"
+          psql -tAq -c "select rolsuper from pg_roles where rolname = current_user;"
+
       - name: Report what the image already provides
         # Worth printing: the previous stub assumed vanilla Postgres and tried to
         # create things this image ships, then died on `permission denied for
