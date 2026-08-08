@@ -215,41 +215,52 @@ jobs:
 
       - name: Apply migration SQL files in order
         run: |
+          set -euo pipefail
           shopt -s nullglob
-          # Concatenate so cross-file dependencies (table → trigger → policy)
-          # resolve in lexical order. Adjust if a project-specific order
-          # emerges.
-          files=$(find supabase -maxdepth 2 -type f -name '*.sql' \
-                   -not -path 'supabase/functions/*' \
-                   -not -path 'supabase/.temp/*' \
-                   | sort -V)
-          if [[ -z "$files" ]]; then
-            echo "No SQL files found."
-            exit 0
-          fi
-          
-          # Explicit order for the loose supabase/*.sql mirrors. They carry no
-          # timestamps, so lexical order is arbitrary — and wrong: listings_tags
-          # .sql reads profiles.vacation_mode, a column profile_features.sql
-          # adds, but "l" sorts before "p". Everything under migrations/ IS
-          # timestamped and sorts correctly on its own, and sorts after every
-          # loose file, so only this prefix needs pinning.
+
+          # Order matters in two dimensions, and a single lexical sort over the
+          # whole tree gets BOTH wrong:
           #
+          #  1. The loose supabase/*.sql mirrors describe the base schema; every
+          #     migration builds on them. But a flat sort interleaves the two,
+          #     because "supabase/migrations/…" sorts between "supabase/l…" and
+          #     "supabase/s…". That put five loose files (perf_cleanup,
+          #     save_lists, saved_searches, upsert_shipping_address, wardrobe)
+          #     AFTER the migrations that depend on them, and
+          #     20260611222839_advisor_quick_wins.sql failed with
+          #     `relation "public.save_lists" does not exist`.
+          #
+          #  2. Within the loose files, lexical order is arbitrary — they carry
+          #     no timestamps. listings_tags.sql reads profiles.vacation_mode,
+          #     a column profile_features.sql adds, but "l" sorts before "p".
+          #
+          # So: pinned prefix, then the remaining loose files, then migrations
+          # (which ARE timestamped and sort correctly among themselves).
+          run_sql() {
+            echo "::group::psql $1"
+            psql -v ON_ERROR_STOP=1 -f "$1"
+            echo "::endgroup::"
+          }
+
           # Add a file here only when a genuine cross-file dependency forces it.
-          FIRST=(
+          PINNED=(
             supabase/setup.sql            # base tables every other file extends
             supabase/profile_features.sql # adds profiles.vacation_mode
           )
-          for f in "${FIRST[@]}"; do
+
+          loose=$(find supabase -maxdepth 1 -type f -name '*.sql' | sort -V)
+          migrations=$(find supabase/migrations -maxdepth 1 -type f -name '*.sql' 2>/dev/null | sort -V)
+
+          if [[ -z "$loose$migrations" ]]; then
+            echo "No SQL files found."
+            exit 0
+          fi
+
+          for f in "${PINNED[@]}"; do
             [[ -f "$f" ]] || continue
-            echo "::group::psql $f (pinned order)"
-            psql -v ON_ERROR_STOP=1 -f "$f"
-            echo "::endgroup::"
-            files=$(echo "$files" | grep -vxF "$f") || true
+            run_sql "$f"
+            loose=$(echo "$loose" | grep -vxF "$f") || true
           done
 
-          for f in $files; do
-            echo "::group::psql $f"
-            psql -v ON_ERROR_STOP=1 -f "$f"
-            echo "::endgroup::"
-          done
+          for f in $loose;      do run_sql "$f"; done
+          for f in $migrations; do run_sql "$f"; done
