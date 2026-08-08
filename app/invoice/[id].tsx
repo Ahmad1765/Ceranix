@@ -14,6 +14,8 @@ import { useToast } from '@/lib/toast';
 import { safeBack } from '@/lib/nav';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { buyerProtectionFee, formatPrice } from '@/lib/fees';
+import { fetchOrderForListing, type Order } from '@/lib/payments';
+import { deriveInvoiceStatus, deriveInvoiceAmounts } from '@/lib/invoiceStatus';
 import type { Listing } from '@/types';
 
 function tap(style: 'light' | 'medium' = 'light') {
@@ -76,8 +78,8 @@ function displayName(
 export default function InvoiceScreen() {
   // `paid=1` is set on Stripe's success_url and `paid=0` on its cancel_url
   // (see supabase/functions/create-checkout-session). It is a HINT that the
-  // buyer just came back from checkout — never proof. The listing only becomes
-  // sold when the stripe-webhook fires, which races the redirect, so treat
+  // buyer just came back from checkout — never proof. The order row only
+  // appears once the stripe-webhook fires, which races the redirect, so treat
   // paid=1 as "go confirm" and keep deriving status from the row itself.
   // Anyone can type ?paid=1; that must not produce a Paid invoice.
   const { id, paid } = useLocalSearchParams<{ id: string; paid?: string }>();
@@ -86,6 +88,8 @@ export default function InvoiceScreen() {
   const cached = getCachedListing(id ? String(id) : null);
   const [listing, setListing] = useState<Listing | null>(cached);
   const [loading, setLoading] = useState(!cached);
+  // The payment record. null = this viewer has no order for this listing.
+  const [order, setOrder] = useState<Order | null>(null);
   // True while we're re-checking the row after a checkout return.
   const [confirming, setConfirming] = useState(false);
 
@@ -121,50 +125,51 @@ export default function InvoiceScreen() {
     };
   }, [id]);
 
-  // Returned from a successful checkout, but the row still reads unsold: the
-  // stripe-webhook that flips is_sold fires asynchronously and routinely loses
-  // the race against Stripe's redirect. Poll briefly so the buyer doesn't stare
-  // at "Pending" seconds after paying. This mirrors the loop the native
-  // checkout already runs in app/payment/[id].tsx.
+  // Load the payment record, then — if the buyer just came back from Stripe —
+  // poll briefly for it. The webhook that writes public.orders fires
+  // asynchronously and routinely loses the race against Stripe's redirect, so
+  // without the poll the buyer stares at "Pending" seconds after paying.
   //
-  // It cannot be used to fake a paid invoice: the status still comes from the
-  // fetched row, so a hand-typed ?paid=1 just polls, finds nothing, and settles
-  // back to Pending.
+  // A hand-typed ?paid=1 cannot fake a Paid invoice: status still comes from
+  // the fetched order, so the poll just finds nothing and settles on Pending.
   useEffect(() => {
-    if (paid !== '1' || !id) return;
-    if (!listing || listing.is_sold) {
-      setConfirming(false);
-      return;
-    }
+    if (!id) return;
     let active = true;
-    setConfirming(true);
+    const listingId = String(id);
+
+    const load = async () => {
+      try {
+        return await fetchOrderForListing(listingId);
+      } catch (e) {
+        console.warn('[invoice] order load failed', e);
+        return null;
+      }
+    };
+
     (async () => {
+      const first = await load();
+      if (!active) return;
+      setOrder(first);
+      if (paid !== '1' || first?.status === 'paid') return;
+
+      setConfirming(true);
       for (let i = 0; i < 10; i++) {
         await new Promise((r) => setTimeout(r, 2000));
         if (!active) return;
-        try {
-          const fresh = await fetchListingById(String(id));
-          if (!active) return;
-          if (fresh?.is_sold) {
-            setListing(fresh);
-            setConfirming(false);
-            return;
-          }
-        } catch {
-          // Ignore polling errors — we fall through to the Pending state.
+        const fresh = await load();
+        if (!active) return;
+        if (fresh) {
+          setOrder(fresh);
+          if (fresh.status === 'paid') break;
         }
       }
       if (active) setConfirming(false);
     })();
+
     return () => {
       active = false;
     };
-    // Only re-arm when the invoice's identity or its sold state changes.
-    // Depending on `listing` wholesale (as exhaustive-deps wants) would restart
-    // the poll on every refetch, since each fetch returns a new object — the
-    // loop would never make progress. id + is_sold are the only fields read.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paid, id, listing?.id, listing?.is_sold]);
+  }, [paid, id]);
 
   if (loading) {
     return (
@@ -232,9 +237,13 @@ export default function InvoiceScreen() {
     );
   }
 
-  const itemPrice = Number(listing.price ?? 0);
-  const fee = buyerProtectionFee(itemPrice);
-  const total = itemPrice + fee;
+  // Amounts and status both come from lib/invoiceStatus.ts so they are covered
+  // by lib/invoiceStatus.test.ts rather than living untestable in this screen.
+  const {
+    item: itemPrice,
+    fee,
+    total,
+  } = deriveInvoiceAmounts(order, listing.price, buyerProtectionFee);
   const seller = listing.seller;
   const invoiceNumber = deriveInvoiceNumber(listing.id);
   const issueDate = listing.created_at;
@@ -245,13 +254,7 @@ export default function InvoiceScreen() {
   const sellerHandle = displayHandle(seller?.username);
   const buyerName = displayName(profile?.full_name, profile?.username);
   const buyerHandle = displayHandle(profile?.username);
-  // Source of truth is the row, never the URL. `confirming` is a transient
-  // third state shown only while we re-check after a checkout return.
-  const status: 'paid' | 'pending' | 'confirming' = listing.is_sold
-    ? 'paid'
-    : confirming
-      ? 'confirming'
-      : 'pending';
+  const status = deriveInvoiceStatus(order, confirming);
   const heroImage = listing.images?.[0];
 
   const onShare = async () => {
@@ -638,6 +641,33 @@ export default function InvoiceScreen() {
               Confirming your payment…
             </Text>
           </View>
+        ) : status === 'refunded' ? (
+          // The listing sold to someone else and this payment was returned.
+          // Offering "Pay" here would take money for an item that is gone.
+          <View
+            accessibilityRole="text"
+            style={{
+              height: 64,
+              borderRadius: 999,
+              backgroundColor: colors.panel,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 10,
+            }}
+          >
+            <Feather name="rotate-ccw" size={16} color={colors.ink} />
+            <Text
+              style={{
+                fontSize: 15,
+                fontWeight: '800',
+                color: colors.ink,
+                letterSpacing: 0.2,
+              }}
+            >
+              Refunded to your card
+            </Text>
+          </View>
         ) : (
           <Pressable
             onPress={onPay}
@@ -704,9 +734,16 @@ function MetaRow({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
-function StatusPill({ status }: { status: 'paid' | 'pending' | 'confirming' }) {
+function StatusPill({
+  status,
+}: {
+  status: 'paid' | 'pending' | 'confirming' | 'refunded';
+}) {
   const paid = status === 'paid';
   const confirming = status === 'confirming';
+  const refunded = status === 'refunded';
+  const icon = paid ? 'check' : refunded ? 'rotate-ccw' : confirming ? 'loader' : 'clock';
+  const label = paid ? 'Paid' : refunded ? 'Refunded' : confirming ? 'Confirming' : 'Pending';
   return (
     <View
       style={{
@@ -730,11 +767,7 @@ function StatusPill({ status }: { status: 'paid' | 'pending' | 'confirming' }) {
           marginRight: 6,
         }}
       >
-        <Feather
-          name={paid ? 'check' : confirming ? 'loader' : 'clock'}
-          size={10}
-          color={colors.white}
-        />
+        <Feather name={icon} size={10} color={colors.white} />
       </View>
       <Text
         style={{
@@ -744,7 +777,7 @@ function StatusPill({ status }: { status: 'paid' | 'pending' | 'confirming' }) {
           letterSpacing: 0.2,
         }}
       >
-        {paid ? 'Paid' : confirming ? 'Confirming' : 'Pending'}
+        {label}
       </Text>
     </View>
   );

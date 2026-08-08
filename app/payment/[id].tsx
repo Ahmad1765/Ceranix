@@ -16,7 +16,12 @@ import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { safeBack } from '@/lib/nav';
 import { HIT_SLOP_8 } from '@/lib/responsive';
-import { createCheckoutSession, openCheckout, STRIPE_ENABLED } from '@/lib/payments';
+import {
+  createCheckoutSession,
+  fetchOrderForListing,
+  openCheckout,
+  STRIPE_ENABLED,
+} from '@/lib/payments';
 import { buyerProtectionFee, formatPrice } from '@/lib/fees';
 import { SlideToConfirm } from '@/components/SlideToConfirm';
 import type { Listing } from '@/types';
@@ -202,15 +207,18 @@ export default function PaymentScreen() {
       });
       await openCheckout(url);
       if (Platform.OS !== 'web') {
+        // Wait for the order the stripe-webhook writes — NOT for listings.is_sold,
+        // which the seller can toggle by hand and which would report "paid" for a
+        // checkout the buyer abandoned.
         let verified = false;
         for (let i = 0; i < 15; i++) {
           if (!mounted.current) return;
           await new Promise((r) => setTimeout(r, 2000));
           if (!mounted.current) return;
           try {
-            const updated = await fetchListingById(String(id));
+            const placed = await fetchOrderForListing(String(id));
             if (!mounted.current) return;
-            if (updated?.is_sold) {
+            if (placed?.status === 'paid') {
               verified = true;
               break;
             }
