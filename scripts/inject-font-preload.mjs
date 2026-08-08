@@ -72,16 +72,25 @@ function walk(dir, out = []) {
 }
 
 function main() {
-  if (!fs.existsSync(HTML)) {
+  // Read-and-catch rather than existsSync-then-read: checking first and acting
+  // second is a TOCTOU race, and "gone" reads the same as "never there".
+  let html;
+  try {
+    html = fs.readFileSync(HTML, 'utf8');
+  } catch {
     console.warn(`[font-preload] ${HTML} not found — skipping.`);
     return;
   }
-  if (!fs.existsSync(MANIFEST)) {
+
+  let manifest;
+  try {
+    manifest = fs.readFileSync(MANIFEST, 'utf8');
+  } catch {
     console.warn('[font-preload] no web-fonts manifest — run `npm run fonts:web` first. Skipping.');
     return;
   }
 
-  const { preload } = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
+  const { preload } = JSON.parse(manifest);
   if (!Array.isArray(preload) || preload.length === 0) {
     console.warn('[font-preload] manifest lists no fonts to preload — skipping.');
     return;
@@ -106,8 +115,6 @@ function main() {
     for (const m of missing) console.warn(`  ${m}`);
     return;
   }
-
-  let html = fs.readFileSync(HTML, 'utf8');
 
   const links = preload
     .map((name) => exported.get(name))

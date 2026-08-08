@@ -140,8 +140,16 @@ async function main() {
     const dest = path.join(OUT_DIR, file);
 
     // Skip identical rewrites so no-op runs leave mtimes (and Metro's watcher)
-    // alone.
-    if (!fs.existsSync(dest) || !fs.readFileSync(dest).equals(woff2)) {
+    // alone. Read-and-catch rather than existsSync-then-read: the two-step
+    // version is a TOCTOU race, and a missing file is the same answer as a
+    // different one.
+    let existing = null;
+    try {
+      existing = fs.readFileSync(dest);
+    } catch {
+      /* not written yet */
+    }
+    if (!existing || !existing.equals(woff2)) {
       fs.writeFileSync(dest, woff2);
     }
 

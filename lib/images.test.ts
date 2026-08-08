@@ -20,6 +20,11 @@ describe('getOptimizedImageUrl', () => {
     expect(getOptimizedImageUrl(url, { width: 300 })).toBe(url);
   });
 
+  it('leaves a host that merely embeds the Unsplash name untouched', () => {
+    const spoof = 'https://images.unsplash.com.evil.test/photo-1?a=b';
+    expect(getOptimizedImageUrl(spoof, { width: 600 })).toBe(spoof);
+  });
+
   it('rewrites Unsplash URLs with sizing + format params', () => {
     const out = new URL(getOptimizedImageUrl('https://images.unsplash.com/photo-1', { width: 600, quality: 80 }));
     expect(out.searchParams.get('w')).toBe('600');

@@ -27,9 +27,11 @@ export function getOptimizedImageUrl(
   // other URL the whole `new URL(...)` parse + reserialize was built and thrown
   // away. This runs once per image per render on a grid that recycles cards
   // while scrolling, so the parse is worth skipping. Two substring scans decide
-  // it, and every case below still reaches the same code it did before.
+  // it, and every case below still reaches the same code it did before. The
+  // Unsplash test is an origin prefix, not a bare `includes`, so a host like
+  // `images.unsplash.com.evil.test` can never reach the rewrite.
   if (
-    !url.includes('images.unsplash.com') &&
+    !url.startsWith('https://images.unsplash.com/') &&
     !(SUPABASE_TRANSFORM_ENABLED && url.includes('.supabase.co'))
   ) {
     return url;

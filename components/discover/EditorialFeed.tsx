@@ -165,7 +165,7 @@ function PromoCard({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${slide.eyebrow}. ${slide.title.replace('\n', ' ')}. Shop now`}
+      accessibilityLabel={`${slide.eyebrow}. ${slide.title.replace(/\n/g, ' ')}. Shop now`}
       style={({ pressed }) => ({
         width,
         transform: [{ scale: pressed ? 0.985 : 1 }],
