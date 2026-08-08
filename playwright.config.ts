@@ -93,9 +93,15 @@ export default defineConfig({
       testMatch: /(tab-navigation|discover|product-detail|responsive)\.spec\.ts$/,
     },
     // Small phone — catches narrow-column overflow on iPhone SE / older Androids.
+    //
+    // `devices['iPhone SE']` carries defaultBrowserType: 'webkit', and spreading
+    // it before `channel: 'chromium'` asked for a webkit browser on a Chromium
+    // channel — an impossible combination that failed at launch in ~8ms, so this
+    // project never ran a single assertion. Only the VIEWPORT/UA is wanted here;
+    // browserName is pinned to match every other project in this file.
     {
       name: 'chromium-iphone-se',
-      use: { ...devices['iPhone SE'], channel: 'chromium' },
+      use: { ...devices['iPhone SE'], browserName: 'chromium', channel: 'chromium' },
       testMatch: /(tab-navigation|responsive)\.spec\.ts$/,
     },
     // Tablet — landscape iPad-ish viewport. Layout shifts to 3+ columns here.

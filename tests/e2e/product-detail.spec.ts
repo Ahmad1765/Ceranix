@@ -30,19 +30,23 @@ test.describe('Product detail', () => {
     await page.goto(`/product/${listing!.id}`);
     await waitForAppReady(page);
 
-    // The inline offer field replaced the OfferSheet modal. Signed out, the
-    // guest gate must intercept before the field can expand.
+    // app/product/[id].tsx imports ProductActionBar.legacy, so "Make an offer"
+    // opens the OfferSheet modal — it is NOT the inline field. canOffer()
+    // (app/product/[id].tsx:531) fires the guest gate and returns false for a
+    // signed-out visitor, so the sheet must never mount.
+    //
+    // This previously asserted getByLabel('Offer amount'), which exists only in
+    // the non-imported components/product/ProductActionBar.tsx — so it could
+    // never match and failed on all four viewports. If the inline bar is ever
+    // restored, swap the second assertion for `not.toBeEditable()` on that label.
     const offer = page.getByRole('button', { name: 'Make an offer' });
     await expect(offer).toBeVisible({ timeout: 20_000 });
     await offer.click();
 
-    // Assert behaviour, not layout: the field is always mounted and merely
-    // faded out (Playwright counts opacity-0 as visible), and its width tracks
-    // the button size. The load-bearing property is that the field only becomes
-    // editable once expanded — so signed out it must stay non-editable while
-    // the guest gate takes over.
+    // The gate intercepted...
     await expect(page.getByText(/free account/i).first()).toBeVisible();
-    await expect(page.getByLabel('Offer amount')).not.toBeEditable();
+    // ...and the offer sheet stayed shut: its submit control never mounted.
+    await expect(page.getByRole('button', { name: 'Send price suggestion' })).toHaveCount(0);
   });
 
   test('unknown listing id renders the "Listing not available" empty state', async ({ page }) => {

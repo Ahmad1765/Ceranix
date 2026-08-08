@@ -72,32 +72,42 @@ test.describe('Network failures', () => {
     await page.goto('/');
     await waitForAppReady(page);
     await page.waitForTimeout(3000);
-    // Tab bar is still interactive even though the feed failed.
-    await page.getByText('Discover', { exact: true }).click();
-    await expect(discoverSearch(page)).toBeVisible();
+    // Tab bar is still interactive even though the feed failed. The dock is
+    // icon-only (components/AnimatedTabBar.tsx renders no Text for a tab), so
+    // tabs are reachable only through accessibilityRole/Label — getByText can
+    // never match one.
+    await page.getByRole('button', { name: 'Discover' }).click();
+    // The Discover TAB opens the search sheet in its landing state, whose box
+    // reads "Search Carrinex..." — discoverSearch() matches the per-tab copy on
+    // the Discover SCREEN ("Search items, brands, sellers", …), which this flow
+    // never reaches. The app was behaving correctly the whole time: the sheet
+    // opens fine with the REST route aborted, which is exactly what this test
+    // set out to prove.
+    await expect(page.getByPlaceholder(/^Search Carrinex/)).toBeVisible();
   });
 
-  test('slow network (3s delay) — header renders before the feed resolves', async ({
-    page,
-  }) => {
+  test('slow network — header renders before the feed resolves', async ({ page }) => {
+    // 15s is deliberately far longer than app boot. The previous version used a
+    // 3s delay and asserted the header appeared within 2500ms of page.goto —
+    // but that clock starts before the 4.8 MB web bundle is even parsed, so on
+    // a loaded machine it measured boot time, not feed-blocking, and flaked.
+    const FEED_DELAY_MS = 15_000;
     await page.route(REST_RE, async (route) => {
       const url = route.request().url();
       if (url.includes('/listings')) {
-        // 3-second delay, then pass through. The header should render
-        // immediately (it doesn't depend on the listing query).
-        await new Promise((r) => setTimeout(r, 3000));
+        await new Promise((r) => setTimeout(r, FEED_DELAY_MS));
       }
       return route.continue();
     });
-    const start = Date.now();
     await page.goto('/');
     await waitForAppReady(page);
-    // Header should be visible well before the 3s delay finishes.
-    await expect(page.getByPlaceholder('Search your feed')).toBeVisible({
-      timeout: 2500,
-    });
-    const elapsed = Date.now() - start;
-    expect(elapsed).toBeLessThan(5000);
+
+    // The causal property, not a wall-clock budget: the header is on screen
+    // while the listing query is demonstrably still in flight (no prices yet).
+    // With a 15s delay there is ample margin for a slow boot, so this stays
+    // true for the right reason.
+    await expect(page.getByPlaceholder('Search your feed')).toBeVisible();
+    await expect(priceText(page)).toHaveCount(0);
   });
 
   test('recovery: feed hydrates after the failing route is unrouted', async ({
@@ -117,8 +127,14 @@ test.describe('Network failures', () => {
     // tabs and coming back. If the query layer has a stale-while-error policy
     // this should produce live data.
     await page.unroute(REST_RE);
-    await page.getByText('Discover', { exact: true }).click();
-    await page.getByText('Home', { exact: true }).click();
+    // Nudge a refetch by leaving Home and returning. Use CHAT, not Discover:
+    // Discover no longer routes — it slides a full-screen sheet over the
+    // current screen (components/discover/DiscoverSheet.tsx), and that overlay
+    // then intercepts the click on Home, so the old Discover→Home round trip
+    // never actually left Home. Chat is a real route.
+    // Icon-only dock — address tabs by accessible role/name, not text.
+    await page.getByRole('button', { name: 'Chat' }).click();
+    await page.getByRole('button', { name: 'Home' }).click();
     await page.waitForTimeout(2500);
     // We accept either: real listings now visible, OR the empty state still
     // showing (the suite may run against a low-volume staging DB). What we

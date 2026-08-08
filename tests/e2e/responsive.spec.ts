@@ -47,11 +47,14 @@ test.describe('Responsive layout', () => {
   });
 
   test('bottom tab bar exposes all five tabs', async ({ page }) => {
-    // The tab labels are visible Text nodes in the bottom navigator. On very
-    // narrow viewports the labels may wrap or shrink, but they remain in the
-    // DOM and queryable by name.
+    // The dock is ICON-ONLY — components/AnimatedTabBar.tsx renders no Text for
+    // a tab ("No labels, no ghost word"). Each tab is a View carrying
+    // accessibilityRole="button" + accessibilityLabel={title}, so the name is
+    // reachable through the accessibility tree and NOT through getByText.
+    // tab-navigation.spec.ts already queries them this way; this spec was
+    // written against the older labelled bar and never updated.
     for (const label of ['Home', 'Discover', 'Sell', 'Chat', 'My profile']) {
-      await expect(page.getByText(label, { exact: true }).first()).toBeVisible();
+      await expect(page.getByRole('button', { name: label }).first()).toBeVisible();
     }
   });
 
@@ -60,16 +63,17 @@ test.describe('Responsive layout', () => {
     viewport,
   }) => {
     test.skip(!viewport || viewport.width > 480, 'phone-class viewports only');
-    // Bounding box of any tab label — the parent Pressable inherits at least
-    // this height. 40px is the WCAG 2.5.5 target-size lower bound we accept
-    // (Apple HIG asks for 44; we allow 40 to absorb font-metric drift).
-    const homeTab = page.getByText('Home', { exact: true }).first();
+    // Same icon-only dock as above: address the tab through its accessible
+    // role/name, not a Text node that does not exist. 40px is the WCAG 2.5.5
+    // target-size lower bound we accept (Apple HIG asks for 44; we allow 40 to
+    // absorb font-metric drift).
+    const homeTab = page.getByRole('button', { name: 'Home' }).first();
     const box = await homeTab.boundingBox();
     expect(box, 'Home tab not laid out').not.toBeNull();
     expect(box!.height).toBeGreaterThanOrEqual(20);
-    // Walk up to the nearest tappable ancestor and measure that instead — the
-    // Text node itself is usually ~16-20px, but the Pressable wrapping it is
-    // tall enough to meet the target.
+    // Walk up to the nearest ancestor that actually meets the target height —
+    // the tab View may itself already satisfy it, in which case the walk stops
+    // immediately.
     const tappableHeight = await homeTab.evaluate((el) => {
       let cur: HTMLElement | null = el as HTMLElement;
       while (cur) {

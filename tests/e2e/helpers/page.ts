@@ -170,6 +170,36 @@ export const AUTH_STORAGE_PATH = path.resolve(process.cwd(), 'playwright/.auth/u
 // Hit the real Supabase REST endpoint to grab a sample listing for tests that
 // need a real listing id (product detail, payment, invoice). Uses the URL +
 // anon key from .env.local — the same values the bundle was built with.
+// A listing whose is_sold flag is TRUE. Sellers set this by hand from the
+// product screen ("Mark as sold"), so it says nothing about payment — which is
+// exactly what the invoice screen must not confuse it with. Used to prove a
+// sold-but-unpaid listing never renders a Paid invoice.
+export async function fetchSoldListing(
+  _page: Page,
+): Promise<{ id: string; title: string } | null> {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return null;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10_000);
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/listings?select=id,title&is_sold=eq.true&order=created_at.desc&limit=1`,
+      {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        signal: controller.signal,
+      },
+    );
+    clearTimeout(timeoutId);
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Array<{ id: string; title: string }>;
+    return rows[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchAnyLiveListing(
   _page: Page,
 ): Promise<{ id: string; title: string; price: number; brand: string | null; seller_id: string | null } | null> {
