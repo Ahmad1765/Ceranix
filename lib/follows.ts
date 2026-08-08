@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { escapeSearchQuery } from '@/lib/search';
 
 export type FollowState = {
   followersCount: number;
@@ -210,7 +211,10 @@ export async function fetchFollowers(
 export async function searchUsers(query: string, limit = 20): Promise<FollowListRow[]> {
   const raw = query.trim().replace(/^@+/, '');
   if (!raw) return [];
-  const safe = raw.replace(/[(),]/g, ' ').replace(/[%_]/g, '\\$&').trim();
+  // Reuse lib/search.ts rather than re-implementing the escape inline: this
+  // copy had drifted, missing the backslash case, so a "\" typed here broke the
+  // wildcard escaping that the other copy handled.
+  const safe = escapeSearchQuery(raw);
   if (!safe) return [];
   const { data, error } = await supabase
     .from('profiles')

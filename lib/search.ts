@@ -14,6 +14,14 @@
 export function escapeSearchQuery(raw: string): string {
   return raw
     .replace(/[(),]/g, ' ')
+    // Backslash FIRST, and this ordering is load-bearing. It is the escape
+    // character itself, so a user-typed "\" left as-is would consume the
+    // backslash we add in the next step: "\%" would reach Postgres as an
+    // escaped backslash followed by a bare, still-active % wildcard. Escaping
+    // it here means a literal backslash matches a literal backslash.
+    // public.saved_search_new_matches does the same thing in the same order;
+    // these two must not disagree about what a search string means.
+    .replace(/\\/g, '\\\\')
     .replace(/[%_]/g, '\\$&')
     .trim();
 }

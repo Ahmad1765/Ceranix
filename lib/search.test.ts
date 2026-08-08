@@ -50,6 +50,21 @@ describe('escapeSearchQuery — LIKE wildcard escaping', () => {
     // A lone "%" would otherwise match every row.
     expect(escapeSearchQuery('%')).toBe('\\%');
   });
+
+  it('escapes the escape character itself', () => {
+    // Flagged by CodeQL as js/incomplete-sanitization. A user-typed backslash
+    // was passed through untouched, so it consumed the backslash added for the
+    // following wildcard: "\%" reached Postgres as an escaped backslash plus a
+    // still-active % that matches everything.
+    expect(escapeSearchQuery('\\')).toBe('\\\\');
+    expect(escapeSearchQuery('\\%')).toBe('\\\\\\%');
+    expect(escapeSearchQuery('a\\_b')).toBe('a\\\\\\_b');
+  });
+
+  it('leaves every wildcard in a long run escaped', () => {
+    // Global replace, not just the first occurrence.
+    expect(escapeSearchQuery('%%__')).toBe('\\%\\%\\_\\_');
+  });
 });
 
 describe('escapeSearchQuery — invariants (fuzz)', () => {

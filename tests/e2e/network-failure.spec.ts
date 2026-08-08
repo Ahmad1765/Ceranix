@@ -16,7 +16,6 @@ import {
   expect,
   waitForAppReady,
   priceText,
-  discoverSearch,
   SUPABASE_URL,
 } from './helpers/page';
 
