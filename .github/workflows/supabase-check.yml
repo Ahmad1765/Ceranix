@@ -156,32 +156,62 @@ jobs:
             done
           fi
 
-          # storage.objects — referenced by setup.sql, wardrobe.sql and the
-          # 20260727162650 advisor migration. The schema exists but the table does
-          # not, and the schema is owned by supabase_storage_admin, so borrow that
-          # role if plain CREATE is refused.
+          # storage.* — the image ships the schema but none of the objects the
+          # Storage service would normally create. This repo's SQL needs three:
+          #   storage.objects     (23 refs) tables + RLS policies
+          #   storage.foldername  ( 8 refs) used by every bucket policy
+          #   storage.buckets     ( 4 refs) setup.sql seeds two public buckets
+          # The role is superuser by now, so plain CREATE is enough.
+          psql -v ON_ERROR_STOP=1 -c "CREATE SCHEMA IF NOT EXISTS storage;"
+
           if [[ "$(q "select to_regclass('storage.objects') is null")" == "t" ]]; then
             echo "storage.objects absent — creating it"
-            psql -v ON_ERROR_STOP=1 -c "DO \$do\$ BEGIN
-              BEGIN
-                EXECUTE 'SET LOCAL ROLE supabase_storage_admin';
-              EXCEPTION WHEN OTHERS THEN
-                RAISE NOTICE 'could not SET ROLE supabase_storage_admin (%) — trying as current user', SQLERRM;
-              END;
-              CREATE SCHEMA IF NOT EXISTS storage;
-              CREATE TABLE IF NOT EXISTS storage.objects (
-                id uuid primary key default gen_random_uuid(),
-                bucket_id text,
-                name text,
-                owner uuid
-              );
-            END \$do\$;"
+            psql -v ON_ERROR_STOP=1 -c "CREATE TABLE storage.objects (
+              id uuid primary key default gen_random_uuid(),
+              bucket_id text,
+              name text,
+              owner uuid,
+              metadata jsonb,
+              created_at timestamptz default now()
+            );"
           else
-            echo "storage.objects provided by the image — not touching it"
+            echo "storage.objects provided by the image"
+          fi
+
+          # setup.sql does `insert ... on conflict (id) do update`, so id must
+          # carry a primary key, not merely be a column.
+          if [[ "$(q "select to_regclass('storage.buckets') is null")" == "t" ]]; then
+            echo "storage.buckets absent — creating it"
+            psql -v ON_ERROR_STOP=1 -c "CREATE TABLE storage.buckets (
+              id text primary key,
+              name text not null,
+              public boolean default false,
+              created_at timestamptz default now()
+            );"
+          else
+            echo "storage.buckets provided by the image"
+          fi
+
+          # Bucket policies read (storage.foldername(name))[1] to scope a path to
+          # its owning user id. Mirrors the real implementation: split on '/' and
+          # drop the filename, so element 1 is the first directory.
+          if [[ "$(q "select to_regproc('storage.foldername') is null")" == "t" ]]; then
+            echo "storage.foldername absent — creating it"
+            psql -v ON_ERROR_STOP=1 -c "CREATE FUNCTION storage.foldername(name text)
+              RETURNS text[] LANGUAGE sql IMMUTABLE AS \$\$
+                SELECT (string_to_array(name, '/'))[1 : greatest(array_length(string_to_array(name, '/'), 1) - 1, 0)]
+              \$\$;"
+          else
+            echo "storage.foldername provided by the image"
           fi
 
           echo "--- stub complete ---"
-          q "select to_regproc('auth.uid') is not null as auth_uid, to_regclass('storage.objects') is not null as storage_objects;"
+          psql -c "select
+            to_regproc('auth.uid')            is not null as auth_uid,
+            to_regclass('auth.users')         is not null as auth_users,
+            to_regclass('storage.objects')    is not null as storage_objects,
+            to_regclass('storage.buckets')    is not null as storage_buckets,
+            to_regproc('storage.foldername')  is not null as storage_foldername;"
 
       - name: Apply migration SQL files in order
         run: |
