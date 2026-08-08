@@ -162,7 +162,7 @@ declare
   preview text;
 begin
   if new.kind = 'offer' then
-    preview := 'Offer: $' || coalesce((new.metadata->>'amount'), '?');
+    preview := 'Offer: Rs ' || coalesce((new.metadata->>'amount'), '?');
   else
     preview := left(new.content, 140);
   end if;
