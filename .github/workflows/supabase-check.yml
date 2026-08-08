@@ -30,7 +30,17 @@ jobs:
     timeout-minutes: 10
     services:
       postgres:
-        image: postgres:16
+        # Supabase's own Postgres, not vanilla postgres:16.
+        #
+        # This job had been failing since at least 2026-07-13 with
+        # `role "anon" does not exist`, and roles were only the first wall:
+        # 20260729120100_push_webhooks.sql runs `create extension pg_net` and
+        # reads vault.decrypted_secrets. A missing role can be stubbed; a
+        # missing EXTENSION cannot. This image ships the Supabase roles, pg_net
+        # and supabase_vault, so the project's SQL can actually be applied.
+        #
+        # Pinned to the 17.x line to match the live project (17.6.1.x).
+        image: supabase/postgres:17.6.1.160
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -41,7 +51,8 @@ jobs:
           --health-cmd "pg_isready -U postgres"
           --health-interval 5s
           --health-timeout 5s
-          --health-retries 10
+          --health-retries 30
+          --health-start-period 30s
     env:
       PGPASSWORD: postgres
       PGHOST: localhost
@@ -52,14 +63,39 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Stub Supabase auth / extension surface
-        # Supabase schemas/functions (auth.uid(), pgcrypto, etc.) aren't in
-        # vanilla Postgres. This stub lets the project's SQL parse and run
-        # so syntax + dependency-order issues surface without us needing a
-        # full Supabase stack in CI.
+        # The image supplies the roles, pg_net and supabase_vault. What it does
+        # NOT supply is the `auth` and `storage` schemas — those are created by
+        # GoTrue and Storage migrations, not by Postgres itself — so the project
+        # SQL still needs the auth.uid()/auth.role() surface stubbed here.
+        #
+        # Everything below is written to be idempotent and image-agnostic: each
+        # piece is created only if absent, so this step still does the right
+        # thing if the base image changes.
         run: |
-          psql <<'SQL'
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+            -- Roles. Supplied by supabase/postgres, recreated defensively here
+            -- because CREATE ROLE has no IF NOT EXISTS.
+            DO $do$
+            BEGIN
+              IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+                CREATE ROLE anon NOLOGIN NOINHERIT;
+              END IF;
+              IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+                CREATE ROLE authenticated NOLOGIN NOINHERIT;
+              END IF;
+              IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+                CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS;
+              END IF;
+            END
+            $do$;
+
+            CREATE SCHEMA IF NOT EXISTS extensions;
             CREATE EXTENSION IF NOT EXISTS pgcrypto;
             CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+            -- push_webhooks.sql reads vault.decrypted_secrets. The extension
+            -- creates the schema itself, so do not pre-create it.
+            CREATE EXTENSION IF NOT EXISTS supabase_vault;
 
             CREATE SCHEMA IF NOT EXISTS auth;
             CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS
