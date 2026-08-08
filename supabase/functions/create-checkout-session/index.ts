@@ -25,6 +25,7 @@
 
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { resolveOfferCharge } from './pricing.ts';
 
 // CORS allowlist for WEB callers. Native apps send no Origin header and are
 // unaffected. If unset, browser calls get no CORS headers (and fail preflight)
@@ -33,7 +34,12 @@ const envOrigins = Deno.env.get('ALLOWED_ORIGINS') ?? '';
 if (!envOrigins) {
   console.warn('ALLOWED_ORIGINS not set — web (browser) checkout will fail CORS until you run: supabase secrets set ALLOWED_ORIGINS=...');
 }
-const ALLOWED_ORIGINS = envOrigins.split(',').map((o) => o.trim()).filter(Boolean);
+// Trailing slashes stripped so an entry written as "https://app.com/" still
+// matches both an Origin header and a URL.origin, neither of which ever has one.
+const ALLOWED_ORIGINS = envOrigins
+  .split(',')
+  .map((o) => o.trim().replace(/\/+$/, ''))
+  .filter(Boolean);
 
 function corsHeaders(origin: string | null): Record<string, string> {
   if (!origin || !ALLOWED_ORIGINS.includes(origin)) {
@@ -101,9 +107,36 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
     if (lErr) return json({ error: lErr.message }, 500, origin);
     if (!listing) return json({ error: 'Listing not found' }, 404, origin);
-    if (listing.is_sold) return json({ error: 'Listing already sold' }, 409, origin);
     if (listing.seller_id === buyerId) {
       return json({ error: 'You cannot buy your own listing' }, 400, origin);
+    }
+    // Seller's own "Mark as sold" toggle — an intent signal, not a money gate.
+    if (listing.is_sold) return json({ error: 'Listing already sold' }, 409, origin);
+
+    // The money gate: a paid order. listings.is_sold cannot serve this role —
+    // the seller can flip it back to false at will (app/product/[id].tsx), and
+    // the old code let that re-open checkout on an already-paid listing and
+    // charge the buyer a second time.
+    //
+    // Read with the service role: RLS hides OTHER buyers' orders from this
+    // caller, and "someone else already paid" is exactly what must be caught.
+    // Used for this one narrow read and nothing else. The partial unique index
+    // on orders(listing_id) where status='paid' is the real race backstop; this
+    // check just turns the common case into a clean 409 instead of a refund.
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!serviceKey) return json({ error: 'Server misconfigured' }, 500, origin);
+    const admin = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: paidOrders, error: poErr } = await admin
+      .from('orders')
+      .select('id')
+      .eq('listing_id', listingId)
+      .eq('status', 'paid')
+      .limit(1);
+    if (poErr) return json({ error: poErr.message }, 500, origin);
+    if (paidOrders?.length) {
+      return json({ error: 'Listing already sold' }, 409, origin);
     }
 
     // Resolve the charge amount server-side. Default: listing price.
@@ -115,7 +148,10 @@ Deno.serve(async (req: Request) => {
     if (wantsOfferPrice) {
       const { data: offers, error: oErr } = await sb
         .from('messages')
-        .select('id, metadata, conversations!inner(listing_id, buyer_id)')
+        // updated_at is when the offer was ACCEPTED (offer_status only moves via
+        // UPDATE, and trg_messages_touch stamps updated_at on each one) —
+        // resolveOfferCharge needs it to enforce the acceptance TTL.
+        .select('id, metadata, updated_at, conversations!inner(listing_id, buyer_id)')
         .eq('kind', 'offer')
         .eq('offer_status', 'accepted')
         .eq('conversations.listing_id', listingId)
@@ -123,18 +159,19 @@ Deno.serve(async (req: Request) => {
         .order('updated_at', { ascending: false })
         .limit(1);
       if (oErr) return json({ error: oErr.message }, 500, origin);
-      const offer = offers?.[0];
-      const offerDollars = Number(offer?.metadata?.amount);
-      if (!offer || !Number.isFinite(offerDollars) || offerDollars <= 0) {
-        return json({ error: 'No accepted offer found for this listing' }, 403, origin);
+      // All the money rules live in ./pricing.ts so they are unit-testable:
+      // hint must match the real offer, acceptance must be recent, and the
+      // charge never exceeds the current sticker price.
+      const resolved = resolveOfferCharge({
+        listingPrice: listing.price,
+        offer: offers?.[0],
+        clientHint: offerAmountHint,
+      });
+      if ('error' in resolved) {
+        return json({ error: resolved.error }, resolved.status, origin);
       }
-      // The client hint must match the real accepted offer; otherwise the UI
-      // is showing the buyer one price and charging another.
-      if (Math.abs(offerDollars - offerAmountHint) > 0.005) {
-        return json({ error: 'Offer amount mismatch' }, 409, origin);
-      }
-      chargeDollars = offerDollars;
-      offerMessageId = offer.id;
+      chargeDollars = resolved.amount;
+      offerMessageId = resolved.offerMessageId;
     }
 
     const priceCents = Math.round(chargeDollars * 100);
@@ -158,12 +195,16 @@ Deno.serve(async (req: Request) => {
       if (!isWeb && !isApp) {
         throw new Error('Invalid protocol');
       }
-      // For web URLs, ensure the hostname matches allowed origins (if configured)
-      if (isWeb && ALLOWED_ORIGINS.length > 0) {
-        const urlOrigin = `${successUrlObj.protocol}//${successUrlObj.hostname}`;
-        if (!ALLOWED_ORIGINS.some(o => o.includes(successUrlObj.hostname ?? ''))) {
-          throw new Error('Redirect origin not allowed');
-        }
+      // Exact origin match against the allow-list. The previous version built a
+      // `urlOrigin` it never used, then substring-matched the caller's hostname
+      // INTO each allow-list entry — which passes for any hostname that happens
+      // to be a substring of an allowed origin, i.e. an open redirect.
+      if (
+        isWeb &&
+        ALLOWED_ORIGINS.length > 0 &&
+        !ALLOWED_ORIGINS.includes(successUrlObj.origin)
+      ) {
+        throw new Error('Redirect origin not allowed');
       }
       cancelUrlObj = new URL(returnUrl);
     } catch {
@@ -183,14 +224,17 @@ Deno.serve(async (req: Request) => {
     params.append('line_items[0][price_data][currency]', 'pkr');
     params.append('line_items[0][price_data][unit_amount]', String(priceCents));
     params.append('line_items[0][price_data][product_data][name]', listing.title ?? 'Item');
-    // Validate image URL: must be HTTPS and from a trusted source (Supabase storage)
+    // Stripe fetches this URL server-side, so only ever hand it our own storage
+    // host. Derived from SUPABASE_URL so it cannot drift from the real project:
+    // the old hardcoded 'supabaseusercontent.com'/'your-cdn.com' pair never
+    // matched the actual '<ref>.supabase.co' storage host, so every checkout
+    // page silently shipped with no product image.
+    const storageHost = new URL(supabaseUrl).hostname;
     if (Array.isArray(listing.images) && listing.images[0]) {
       const imageUrl = String(listing.images[0]).trim();
       try {
         const imgObj = new URL(imageUrl);
-        const isTrustedSource = imgObj.hostname?.includes('supabaseusercontent.com') ||
-                               imgObj.hostname?.includes('your-cdn.com');
-        if (imgObj.protocol === 'https:' && isTrustedSource) {
+        if (imgObj.protocol === 'https:' && imgObj.hostname === storageHost) {
           params.append('line_items[0][price_data][product_data][images][0]', imageUrl);
         }
       } catch {
@@ -211,6 +255,11 @@ Deno.serve(async (req: Request) => {
     params.append('metadata[listing_id]', listing.id);
     params.append('metadata[buyer_id]', buyerId);
     params.append('metadata[seller_id]', listing.seller_id);
+    // The fee is charged as line_items[1], so amount_total arrives at the
+    // webhook already including it. Pass the split here rather than
+    // re-declaring BUYER_PROTECTION_FEE in a third place — the webhook records
+    // item and fee separately and never has to know the formula.
+    params.append('metadata[fee_cents]', String(feeCents));
     if (offerMessageId) params.append('metadata[offer_message_id]', offerMessageId);
     params.append('payment_method_types[0]', 'card');
 
