@@ -156,9 +156,16 @@ test.describe('Saved searches (signed in)', () => {
   });
 
   test('signed-out Saved tab shows the sign-in CTA', async ({ browser }) => {
-    // Spin up a fresh context with no storage state so we're guaranteed
-    // signed out for this assertion only.
-    const ctx = await browser.newContext();
+    // Spin up a context that is genuinely signed out for this assertion only.
+    //
+    // browser.newContext() with no arguments does NOT give you a clean slate
+    // here: it inherits this project's `storageState:
+    // playwright/.auth/user.json`, so the context still carried
+    // sb-<ref>-auth-token in localStorage and the page rendered the SIGNED-IN
+    // empty state ("No saved searches"). Passing an explicitly empty state is
+    // what actually signs out. This test had never once executed before —
+    // the describe is serial and an earlier failure always skipped it.
+    const ctx = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     const fresh = await ctx.newPage();
     await fresh.goto('/news');
     await waitForAppReady(fresh);

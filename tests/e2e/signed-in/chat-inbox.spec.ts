@@ -35,8 +35,20 @@ test.describe('Inbox (signed in)', () => {
   test('the default tab hydrates its content area', async ({ page }) => {
     // Either at least one timestamp ("now", "5m", "1h", "3d" …) for a real
     // conversation OR the empty state. Both confirm the FlatList hydrated.
+    //
+    // The empty-state copy is per-tab and lives in app/(tabs)/chat.tsx: the
+    // default tab is 'buying' ("No conversations yet"), with 'selling' and
+    // 'support' carrying their own wording. Match all three rather than the
+    // default alone, so changing the default tab doesn't silently break this.
+    // The previous pattern looked for "It's quiet here", copy that no longer
+    // exists anywhere in the app — it only ever passed on an account that
+    // happened to have conversations.
     await expect(
-      page.locator('text=/^now$|^\\d+[mhd]$|^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \\d{1,2}$|It\'s quiet here/').first(),
+      page
+        .locator(
+          "text=/^now$|^\\d+[mhd]$|^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \\d{1,2}$|No conversations yet|No buyer chats yet|No support threads/",
+        )
+        .first(),
     ).toBeVisible({ timeout: 20_000 });
   });
 
