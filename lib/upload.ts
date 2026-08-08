@@ -6,6 +6,11 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { supabase } from '@/lib/supabase';
 import { checkImageIntegrity } from '@/lib/imageIntegrity';
+import { mapWithConcurrency } from '@/lib/concurrency';
+
+// How many listing photos are processed at once. See the note in
+// uploadListingImages for why this is capped rather than unbounded.
+const MAX_CONCURRENT_PHOTO_UPLOADS = 3;
 
 export type LocalImage = { uri: string; base64?: string | null };
 
@@ -274,40 +279,49 @@ export async function uploadListingImages(
 ): Promise<UploadedImage[]> {
   const folder = `${sellerId}/${Date.now()}`;
   const safeFolder = folder.replace(/\.\./g, '').replace(/^\/+|\/+$/g, '').replace(/\/+/g, '/');
-  const out: UploadedImage[] = [];
   // Paths written so far, so a failure partway through a multi-photo listing
   // doesn't strand the ones that already landed. SellSheet's own cleanup can't
   // cover this: it only sees the returned urls, which never exist if we throw.
+  // Pushes from concurrent photos are safe — JS runs one at a time.
   const written: string[] = [];
 
+  let out: UploadedImage[];
   try {
-  for (let i = 0; i < images.length; i++) {
-    const full = await compressImage(images[i], LISTING_MAX_EDGE, LISTING_QUALITY);
-    const ext = inferExt(full.uri);
-    const fullPath = `${safeFolder}/${randomId()}.${ext}`;
-    const url = await uploadToPath('listing-images', full, fullPath);
-    written.push(fullPath);
-
-    // The thumbnail is derived from the already-compressed 1440px copy rather
-    // than from the original: downscaling 1440 → 640 is visually identical to
-    // going straight from a 12 MP camera file, and it avoids decoding the
-    // original a second time on a phone that just spent memory on it.
+    // Photos were uploaded strictly one after another: a 4-photo listing meant
+    // 8 sequential round trips, each waiting on the last. The work is
+    // network-bound, so overlapping it is close to a linear win.
     //
-    // A thumbnail is an optimization, never a reason to fail a listing. If
-    // either the resize or its upload fails we fall back to the full-size URL,
-    // which is exactly what rows created before this existed already do.
-    let thumbUrl = url;
-    try {
-      const thumbPath = thumbPathFor(fullPath);
-      const thumb = await compressImage(full, THUMB_MAX_EDGE, THUMB_QUALITY);
-      thumbUrl = await uploadToPath('listing-images', thumb, thumbPath);
-      written.push(thumbPath);
-    } catch (e) {
-      console.warn('[upload] thumbnail failed; card will use the full-size image', e);
-    }
+    // ponytail: fixed cap of 3. Each in-flight photo holds a decoded bitmap,
+    // and a 12 MP original is tens of MB, so unbounded parallelism would OOM a
+    // low-end phone on a 10-photo listing. If this ever needs tuning, make it
+    // adaptive on Platform/deviceYearClass rather than simply raising it.
+    out = await mapWithConcurrency(images, MAX_CONCURRENT_PHOTO_UPLOADS, async (image) => {
+      const full = await compressImage(image, LISTING_MAX_EDGE, LISTING_QUALITY);
+      const ext = inferExt(full.uri);
+      const fullPath = `${safeFolder}/${randomId()}.${ext}`;
+      const url = await uploadToPath('listing-images', full, fullPath);
+      written.push(fullPath);
 
-    out.push({ url, thumbUrl });
-  }
+      // The thumbnail is derived from the already-compressed 1440px copy rather
+      // than from the original: downscaling 1440 → 640 is visually identical to
+      // going straight from a 12 MP camera file, and it avoids decoding the
+      // original a second time on a phone that just spent memory on it.
+      //
+      // A thumbnail is an optimization, never a reason to fail a listing. If
+      // either the resize or its upload fails we fall back to the full-size URL,
+      // which is exactly what rows created before this existed already do.
+      let thumbUrl = url;
+      try {
+        const thumbPath = thumbPathFor(fullPath);
+        const thumb = await compressImage(full, THUMB_MAX_EDGE, THUMB_QUALITY);
+        thumbUrl = await uploadToPath('listing-images', thumb, thumbPath);
+        written.push(thumbPath);
+      } catch (e) {
+        console.warn('[upload] thumbnail failed; card will use the full-size image', e);
+      }
+
+      return { url, thumbUrl };
+    });
   } catch (e) {
     // Roll back whatever already reached storage, then re-throw so the caller
     // still fails and never inserts a listing row. Cleanup is best-effort: the
