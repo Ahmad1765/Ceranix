@@ -89,76 +89,75 @@ jobs:
           "
 
       - name: Stub only what is missing
-        # supabase/postgres already supplies the roles, the extensions, and the
-        # auth/storage schemas — and `postgres` cannot write into auth, which is
-        # owned by supabase_auth_admin. So create each object ONLY when it is
-        # genuinely absent, and never CREATE OR REPLACE over one the image owns.
+        # The probe above shows this image already supplies the three roles, the
+        # extensions, the auth schema with auth.uid()/auth.role()/auth.users, and
+        # the storage schema. The only real gap is storage.objects.
         #
-        # Each fallback is a shell-level conditional rather than SQL, because
-        # `CREATE ... IF NOT EXISTS` still requires schema privileges we do not
-        # hold on auth.
+        # Nothing here uses a heredoc: `run: |` keeps its own indentation, so a
+        # heredoc terminator that is not flush with the block base is still
+        # indented when bash sees it, and the previous version died with
+        # "here-document delimited by end-of-file". `psql -c` sidesteps that.
         run: |
           set -euo pipefail
           q() { psql -tAq -c "$1"; }
 
           # Roles: CREATE ROLE has no IF NOT EXISTS, so guard each one.
-          psql -v ON_ERROR_STOP=1 <<'SQL'
-            DO $do$
-            BEGIN
-              IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
-                CREATE ROLE anon NOLOGIN NOINHERIT;
-              END IF;
-              IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
-                CREATE ROLE authenticated NOLOGIN NOINHERIT;
-              END IF;
-              IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
-                CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS;
-              END IF;
-            END
-            $do$;
-            CREATE SCHEMA IF NOT EXISTS extensions;
-            CREATE EXTENSION IF NOT EXISTS pgcrypto;
-            CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-          SQL
+          psql -v ON_ERROR_STOP=1 -c "DO \$do\$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon NOLOGIN NOINHERIT; END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN CREATE ROLE authenticated NOLOGIN NOINHERIT; END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS; END IF;
+          END \$do\$;"
 
-          # auth.* — only if this image did not bring GoTrue's surface with it.
+          psql -v ON_ERROR_STOP=1 -c "CREATE SCHEMA IF NOT EXISTS extensions;"
+          psql -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
+          psql -v ON_ERROR_STOP=1 -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
+
+          # auth.* — only when the image did not bring GoTrue's surface with it.
+          # auth.jwt() is deliberately NOT required: no SQL in this repo calls it,
+          # and demanding it would fail against an image that ships the rest.
           if [[ "$(q "select to_regnamespace('auth') is null")" == "t" ]]; then
-            echo "auth schema absent — stubbing"
-            psql -v ON_ERROR_STOP=1 <<'SQL'
-              CREATE SCHEMA auth;
-              CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS
-                $$ SELECT '00000000-0000-0000-0000-000000000000'::uuid $$;
-              CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS
-                $$ SELECT 'authenticated'::text $$;
-              CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS
-                $$ SELECT '{}'::jsonb $$;
-              CREATE TABLE auth.users (id uuid primary key default uuid_generate_v4());
-            SQL
+            echo "auth schema absent — stubbing it"
+            psql -v ON_ERROR_STOP=1 -c "CREATE SCHEMA auth;"
+            psql -v ON_ERROR_STOP=1 -c "CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS \$\$ SELECT '00000000-0000-0000-0000-000000000000'::uuid \$\$;"
+            psql -v ON_ERROR_STOP=1 -c "CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS \$\$ SELECT 'authenticated'::text \$\$;"
+            psql -v ON_ERROR_STOP=1 -c "CREATE TABLE auth.users (id uuid primary key default uuid_generate_v4());"
           else
-            echo "auth schema provided by the image — leaving it alone"
-            for fn in uid role jwt; do
-              if [[ "$(q "select to_regproc('auth.$fn') is null")" == "t" ]]; then
-                echo "::error::auth.$fn() missing and auth schema is not writable by $PGUSER"
+            echo "auth schema provided by the image — not touching it"
+            for obj in "auth.uid|to_regproc" "auth.role|to_regproc" "auth.users|to_regclass"; do
+              name="${obj%%|*}"; fn="${obj##*|}"
+              if [[ "$(q "select ${fn}('${name}') is null")" == "t" ]]; then
+                echo "::error::${name} is missing and the auth schema is not writable by ${PGUSER} — base image changed, revisit this stub"
                 exit 1
               fi
             done
           fi
 
-          # storage.objects — same treatment.
+          # storage.objects — referenced by setup.sql, wardrobe.sql and the
+          # 20260727162650 advisor migration. The schema exists but the table does
+          # not, and the schema is owned by supabase_storage_admin, so borrow that
+          # role if plain CREATE is refused.
           if [[ "$(q "select to_regclass('storage.objects') is null")" == "t" ]]; then
-            echo "storage.objects absent — stubbing"
-            psql -v ON_ERROR_STOP=1 <<'SQL'
+            echo "storage.objects absent — creating it"
+            psql -v ON_ERROR_STOP=1 -c "DO \$do\$ BEGIN
+              BEGIN
+                EXECUTE 'SET LOCAL ROLE supabase_storage_admin';
+              EXCEPTION WHEN OTHERS THEN
+                RAISE NOTICE 'could not SET ROLE supabase_storage_admin (%) — trying as current user', SQLERRM;
+              END;
               CREATE SCHEMA IF NOT EXISTS storage;
-              CREATE TABLE storage.objects (
-                id uuid primary key default uuid_generate_v4(),
+              CREATE TABLE IF NOT EXISTS storage.objects (
+                id uuid primary key default gen_random_uuid(),
                 bucket_id text,
                 name text,
                 owner uuid
               );
-            SQL
+            END \$do\$;"
           else
-            echo "storage.objects provided by the image — leaving it alone"
+            echo "storage.objects provided by the image — not touching it"
           fi
+
+          echo "--- stub complete ---"
+          q "select to_regproc('auth.uid') is not null as auth_uid, to_regclass('storage.objects') is not null as storage_objects;"
 
       - name: Apply migration SQL files in order
         run: |
