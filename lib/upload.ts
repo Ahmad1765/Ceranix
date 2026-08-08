@@ -5,6 +5,7 @@ import { Platform, Image as RNImage } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { supabase } from '@/lib/supabase';
+import { checkImageIntegrity } from '@/lib/imageIntegrity';
 
 export type LocalImage = { uri: string; base64?: string | null };
 
@@ -221,10 +222,30 @@ const MEDIA_CACHE_CONTROL = '31536000, immutable';
 
 async function uploadToPath(bucket: string, image: LocalImage, path: string): Promise<string> {
   const ab = await imageToArrayBuffer(image);
+  const contentType = inferContentType(image.uri);
+
+  // Refuse incomplete bytes BEFORE anything is written.
+  //
+  // compressImage() falls back to the ORIGINAL image on any failure, which is
+  // right for a tainted canvas or a CORS refusal but also lets genuinely broken
+  // bytes through: a truncated file fails to decode, hits the same catch, and
+  // would be uploaded raw — after which a listing row is created pointing at an
+  // image that can never render. That is how the "Testtt" listing came to hold
+  // a JPEG with no FFD9 end marker.
+  //
+  // This is the one chokepoint every upload passes through (listings, avatars,
+  // banners, wardrobe), so one guard here covers all of them. Throwing aborts
+  // uploadListingImages before it returns, so SellSheet never reaches its
+  // insert.
+  const integrity = checkImageIntegrity(new Uint8Array(ab), contentType);
+  if (!integrity.ok) {
+    throw new Error(`That photo looks incomplete — ${integrity.reason}. Please pick it again.`);
+  }
+
   const { error } = await supabase.storage
     .from(bucket)
     .upload(path, ab, {
-      contentType: inferContentType(image.uri),
+      contentType,
       cacheControl: MEDIA_CACHE_CONTROL,
       upsert: false,
     });
@@ -254,12 +275,18 @@ export async function uploadListingImages(
   const folder = `${sellerId}/${Date.now()}`;
   const safeFolder = folder.replace(/\.\./g, '').replace(/^\/+|\/+$/g, '').replace(/\/+/g, '/');
   const out: UploadedImage[] = [];
+  // Paths written so far, so a failure partway through a multi-photo listing
+  // doesn't strand the ones that already landed. SellSheet's own cleanup can't
+  // cover this: it only sees the returned urls, which never exist if we throw.
+  const written: string[] = [];
 
+  try {
   for (let i = 0; i < images.length; i++) {
     const full = await compressImage(images[i], LISTING_MAX_EDGE, LISTING_QUALITY);
     const ext = inferExt(full.uri);
     const fullPath = `${safeFolder}/${randomId()}.${ext}`;
     const url = await uploadToPath('listing-images', full, fullPath);
+    written.push(fullPath);
 
     // The thumbnail is derived from the already-compressed 1440px copy rather
     // than from the original: downscaling 1440 → 640 is visually identical to
@@ -271,13 +298,28 @@ export async function uploadListingImages(
     // which is exactly what rows created before this existed already do.
     let thumbUrl = url;
     try {
+      const thumbPath = thumbPathFor(fullPath);
       const thumb = await compressImage(full, THUMB_MAX_EDGE, THUMB_QUALITY);
-      thumbUrl = await uploadToPath('listing-images', thumb, thumbPathFor(fullPath));
+      thumbUrl = await uploadToPath('listing-images', thumb, thumbPath);
+      written.push(thumbPath);
     } catch (e) {
       console.warn('[upload] thumbnail failed; card will use the full-size image', e);
     }
 
     out.push({ url, thumbUrl });
+  }
+  } catch (e) {
+    // Roll back whatever already reached storage, then re-throw so the caller
+    // still fails and never inserts a listing row. Cleanup is best-effort: the
+    // original error is the one worth surfacing.
+    if (written.length) {
+      try {
+        await supabase.storage.from('listing-images').remove(written);
+      } catch (cleanupErr) {
+        console.warn('[upload] partial-upload cleanup failed', cleanupErr);
+      }
+    }
+    throw e;
   }
 
   return out;
