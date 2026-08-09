@@ -1,0 +1,12 @@
+reviews:
+  path_excludes:
+    - "**/*.lock"
+    - "node_modules/**"
+    - "dist/**"
+    - "build/**"
+    - ".expo/**"
+    - "assets/**"
+    - "docs/**"
+    - ".github/**"
+    - "supabase/migrations/**"
+    - "package-lock.json"

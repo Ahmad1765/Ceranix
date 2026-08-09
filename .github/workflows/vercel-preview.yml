@@ -1,0 +1,101 @@
+name: Vercel preview
+
+# Preview deployments on every PR. Uses the Vercel CLI's prebuilt deploy
+# flow (`pull` → `build` → `deploy --prebuilt`) so the artifact uploaded is
+# byte-for-byte the artifact Vercel built — no chance of "works in CI, breaks
+# on Vercel" divergence.
+#
+# Required GitHub Action secrets:
+#   - VERCEL_TOKEN       (https://vercel.com/account/tokens)
+#   - VERCEL_ORG_ID      (from `.vercel/project.json` after `vercel link`)
+#   - VERCEL_PROJECT_ID  (same source)
+#
+# When VERCEL_TOKEN is empty the workflow skips cleanly so forks and
+# first-time setup don't see red Xs on PRs.
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  # One preview per PR ref. New pushes cancel the in-flight deploy.
+  group: vercel-preview-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || '' }}
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    name: Check Vercel secrets
+    runs-on: ubuntu-latest
+    outputs:
+      has-token: ${{ steps.check.outputs.has-token }}
+    steps:
+      - id: check
+        env:
+          TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          if [[ -n "${TOKEN}" ]] && [[ -n "${ORG_ID}" ]] && [[ -n "${PROJECT_ID}" ]]; then
+            echo "has-token=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-token=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Vercel deploy skipped::VERCEL_TOKEN, VERCEL_ORG_ID, and/or VERCEL_PROJECT_ID are not set. Add them under Settings → Secrets and variables → Actions to enable preview deploys."
+          fi
+
+  deploy:
+    name: Deploy preview
+    needs: preflight
+    if: needs.preflight.outputs.has-token == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-project
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel preview env
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel pull --yes --environment=preview
+
+      - name: Build with Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: vercel build
+
+      - name: Deploy prebuilt artifact
+        id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          url=$(vercel deploy --prebuilt)
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Preview: $url" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment preview URL on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const url = '${{ steps.deploy.outputs.url }}';
+            const marker = '<!-- vercel-preview-comment -->';
+            const body = `${marker}\n### Vercel preview\n\n[\`${url}\`](${url})\n\n_Updates automatically on every push to this PR._`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const { data: comments } = await github.rest.issues.listComments({ owner, repo, issue_number });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }

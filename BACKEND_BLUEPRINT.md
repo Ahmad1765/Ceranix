@@ -1,4 +1,4 @@
-# Ceranix — Backend Architecture Blueprint
+# Carrinex — Backend Architecture Blueprint
 
 > Stack: Expo Router (React Native) + Supabase (PostgreSQL + Auth + Storage + Realtime + Edge Functions)
 > Date: 2026-04-19 | Author: Architecture Plan
@@ -28,7 +28,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                     CERANIX MOBILE APP                           │
+│                     CARRINEX MOBILE APP                           │
 │              (Expo Router + React Native + NativeWind)           │
 └────────────────────────────┬────────────────────────────────────┘
                              │ HTTPS / WSS
@@ -1372,9 +1372,9 @@ Key integration test flows:
 
 | Environment | Supabase Project | Branch    | Purpose                   |
 | ----------- | ---------------- | --------- | ------------------------- |
-| Development | ceranix-dev      | `dev`     | Daily development         |
-| Staging     | ceranix-staging  | `staging` | QA testing before release |
-| Production  | ceranix-prod     | `main`    | Live users                |
+| Development | carrinex-dev     | `dev`     | Daily development         |
+| Staging     | carrinex-staging | `staging` | QA testing before release |
+| Production  | carrinex-prod    | `main`    | Live users                |
 
 ### 10.2 Migration Strategy
 

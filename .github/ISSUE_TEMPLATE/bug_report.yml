@@ -1,0 +1,68 @@
+name: Bug report
+description: Something in the app isn't working as expected.
+title: '[bug] '
+labels: [bug, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. The more specific you can be, the faster it gets fixed.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the behaviour you observed.
+      placeholder: e.g. "Tapping Follow on a product detail page shows 'Following' briefly, then reverts to 'Follow' on screen re-mount."
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+      placeholder: e.g. "Follow state should persist across screen mounts."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Sign in
+        2. Open a product
+        3. Tap Follow
+        4. Close the product, reopen it
+        5. Button reverts to Follow
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      multiple: true
+      options:
+        - Chrome web
+        - Safari web
+        - Firefox web
+        - iOS (Expo Go)
+        - iOS (native build)
+        - Android (Expo Go)
+        - Android (native build)
+    validations:
+      required: true
+
+  - type: input
+    id: app-version
+    attributes:
+      label: App version / commit
+      placeholder: e.g. "main @ 9a3f7bd" or "v1.0.0"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console / network logs
+      description: Paste anything from devtools that looks relevant. Redact secrets.
+      render: shell

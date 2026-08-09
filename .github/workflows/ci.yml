@@ -1,0 +1,212 @@
+name: CI
+
+# Runs on every PR against main + every push to main / Backend. Adding new
+# long-lived branches? Add them to the push.branches list below.
+on:
+  push:
+    branches: [main, Backend]
+  pull_request:
+    branches: [main, Backend]
+  workflow_dispatch:
+
+# Newer pushes on the same ref cancel the in-flight run. Saves minutes and
+# stops a stale build from racing a fresh one to the GH Status API.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least-privilege default. Individual jobs request more if they post a
+# comment / annotation.
+permissions:
+  contents: read
+
+jobs:
+  typecheck:
+    name: Typecheck (tsc --noEmit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-project
+      - name: TypeScript check
+        run: npm run typecheck
+
+  lint:
+    name: Lint (eslint)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Runs in parallel with typecheck + web-build. Fails only on ESLint
+    # *errors*; warnings are surfaced but non-blocking so the existing warning
+    # backlog doesn't gate PRs. Drive `--max-warnings` down over time to make
+    # the gate stricter as the backlog is burned down.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-project
+      - name: ESLint
+        run: npm run lint
+
+  unit-tests:
+    name: Unit tests (vitest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-project
+      - name: Vitest
+        run: npm test
+
+  web-build:
+    name: Web build (expo export)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Build runs in parallel with typecheck — they don't depend on each other.
+    # A typecheck failure shouldn't gate a build sanity check (and vice
+    # versa); we want to see both signals on the PR at once.
+    env:
+      # EXPO_PUBLIC_* are inlined into the web bundle. The Supabase client
+      # warns instead of throwing in non-__DEV__ builds when these are empty
+      # (see lib/supabase.ts), so the build still passes even if the secrets
+      # aren't configured — useful for forks and first-time CI runs.
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+      EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-project
+
+      - name: Warn on missing Supabase env
+        if: env.EXPO_PUBLIC_SUPABASE_URL == '' || env.EXPO_PUBLIC_SUPABASE_ANON_KEY == ''
+        run: |
+          echo "::warning title=Missing Supabase secrets::EXPO_PUBLIC_SUPABASE_URL and/or EXPO_PUBLIC_SUPABASE_ANON_KEY are not configured. The build will succeed but the resulting bundle won't talk to Supabase. Set them under Settings → Secrets and variables → Actions to fix."
+
+      - name: Build web bundle
+        run: npm run build
+
+      - name: Report bundle size
+        run: |
+          echo "## Web bundle" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| File | Size |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|------|-----:|" >> "$GITHUB_STEP_SUMMARY"
+          find dist -type f \( -name '*.js' -o -name '*.css' -o -name '*.html' \) | while read -r f; do
+            size=$(wc -c < "$f")
+            printf "%s\t%s\n" "${f#dist/}" "$size"
+          done \
+            | sort -k2 -rn \
+            | head -20 \
+            | awk -F'\t' '{
+                size=$2; unit="B";
+                if (size>=1024*1024) { size=size/1024/1024; unit="MB" }
+                else if (size>=1024) { size=size/1024; unit="kB" }
+                printf "| %s | %.1f %s |\n", $1, size, unit
+              }' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload web bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-bundle-${{ github.sha }}
+          path: dist
+          retention-days: 7
+          if-no-files-found: error
+
+  audit:
+    name: npm audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Gating. Any production advisory fails the job unless its GHSA id is in
+    # ALLOWED below, which exists only for advisories with no published fix.
+    # Everything else is expected to be resolved by a version bump or an
+    # `overrides` entry in package.json.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-project
+        with:
+          install: 'false'
+      - name: npm audit
+        shell: bash
+        run: |
+          set +e
+          npm audit --omit=dev --json > audit.json
+          status=$?
+
+          {
+            echo "## npm audit"
+            echo ""
+            if [[ $status -eq 0 ]]; then
+              echo "_No advisories at any severity._"
+            else
+              counts=$(node -e "
+                try {
+                  const a = JSON.parse(require('fs').readFileSync('audit.json','utf8'));
+                  const v = (a && a.metadata && a.metadata.vulnerabilities) || {};
+                  const parts = ['info','low','moderate','high','critical']
+                    .map(k => k + ': ' + (v[k] ?? 0));
+                  console.log(parts.join(' | '));
+                } catch (e) { console.log('audit.json unparseable: ' + e.message); }
+              ")
+              echo "**Severity counts:** $counts"
+              echo ""
+              echo '<details><summary>Raw advisories</summary>'
+              echo ''
+              echo '```json'
+              cat audit.json
+              echo '```'
+              echo ''
+              echo '</details>'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Advisories with no published fix at any version. Metro pins
+          # image-size and the maintainer has shipped no release outside the
+          # vulnerable `<=2.0.2` range, so there is nothing to override to.
+          # Both are build-time DoS parsers, not reachable at runtime. Drop
+          # these two lines the moment a patched image-size ships.
+          ALLOWED='GHSA-5p2g-fcmc-qvqq GHSA-w3rx-r6r6-pgpr'
+
+          remaining=$(ALLOWED="$ALLOWED" node -e "
+            const fs = require('fs');
+            let a;
+            try { a = JSON.parse(fs.readFileSync('audit.json', 'utf8')); }
+            catch (e) { console.error('unparseable: ' + e.message); process.exit(2); }
+            const allow = new Set((process.env.ALLOWED || '').split(/\s+/).filter(Boolean));
+            const ids = new Set();
+            for (const v of Object.values(a.vulnerabilities || {}))
+              for (const via of (v.via || []))
+                if (via && typeof via === 'object' && via.url) ids.add(via.url.split('/').pop());
+            for (const id of [...ids].sort()) if (!allow.has(id)) console.log(id);
+          ")
+
+          if [[ $? -ne 0 ]]; then
+            echo "::error::audit.json missing or unparseable — failing rather than passing blind."
+            exit 1
+          fi
+
+          if [[ -n "${remaining//[[:space:]]/}" ]]; then
+            echo "::error::Unallowlisted advisories present:"
+            printf '%s\n' "$remaining"
+            exit 1
+          fi
+
+          echo "No advisories outside the documented allowlist."
+
+  required-checks:
+    name: Required checks
+    runs-on: ubuntu-latest
+    needs: [typecheck, lint, unit-tests, web-build, audit]
+    if: always()
+    steps:
+      - name: Verify required jobs succeeded
+        run: |
+          echo "typecheck: ${{ needs.typecheck.result }}"
+          echo "lint: ${{ needs.lint.result }}"
+          echo "unit-tests: ${{ needs.unit-tests.result }}"
+          echo "web-build: ${{ needs.web-build.result }}"
+          echo "audit: ${{ needs.audit.result }}"
+          if [[ "${{ needs.typecheck.result }}" != "success" ]] || \
+             [[ "${{ needs.lint.result }}" != "success" ]] || \
+             [[ "${{ needs.unit-tests.result }}" != "success" ]] || \
+             [[ "${{ needs.web-build.result }}" != "success" ]] || \
+             [[ "${{ needs.audit.result }}" != "success" ]]; then
+            echo "::error::One or more required checks failed."
+            exit 1
+          fi

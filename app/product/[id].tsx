@@ -1,646 +1,603 @@
-import { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  Pressable,
-  Dimensions,
-  Alert,
-  Platform,
-  StyleSheet,
-  Modal,
-} from 'react-native';
+import { capture, buildListingViewedProps } from '@/lib/analytics';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { View, Pressable, Alert, Share, StyleSheet } from 'react-native';
+import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
-import { router, useLocalSearchParams } from 'expo-router';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { safeBack } from '@/lib/nav';
+import Feather from '@expo/vector-icons/Feather';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { BlurView } from 'expo-blur';
-import * as Haptics from 'expo-haptics';
 import { StatusBar } from 'expo-status-bar';
-import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   useAnimatedScrollHandler,
   useAnimatedReaction,
   runOnJS,
-  withSpring,
 } from 'react-native-reanimated';
 import type { Listing } from '@/types';
+import {
+  deleteListing,
+  fetchListingById,
+  isLiked,
+  setListingSold,
+  toggleLike,
+} from '@/lib/listings';
+import { useSellerOtherListingsQuery, useSimilarListingsQuery } from '@/lib/queries';
+import { confirm } from '@/lib/confirm';
+import { logListingView } from '@/lib/recommendations';
+import { getCachedListing } from '@/lib/listingCache';
+import { fetchFollowState, getCachedFollowState, toggleFollow } from '@/lib/follows';
+import { getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
+import { useAuth } from '@/lib/auth';
+import { useToast } from '@/lib/toast';
+import { AnimatedNumber } from '@/components/AnimatedNumber';
+import { SaveListSheet } from '@/components/SaveListSheet';
+import { isSaved as fetchIsSaved } from '@/lib/saves';
+import { FullscreenImageViewer } from '@/components/product/FullscreenImageViewer';
+import { ProductActionBar } from '@/components/product/ProductActionBar.legacy';
+import { OfferSheet } from '@/components/product/OfferSheet';
+import { PopIcon, type PopIconHandle } from '@/components/product/PopIcon';
+import { RelatedItemCard } from '@/components/product/RelatedItemCard';
+import { ProductSkeleton } from '@/components/product/ProductSkeleton';
+import { HeroPageDot } from '@/components/product/HeroPageDot';
+import { BundleSection } from '@/components/product/BundleSection';
+import { BundleProgressBar } from '@/components/product/BundleProgressBar';
+import { StarRating } from '@/components/product/bits';
+import { SafetyBanner } from '@/components/SafetyBanner';
+import {
+  IS_IOS,
+  HAIRLINE,
+  tap,
+  iosShadow,
+  width,
+  IMAGE_HEIGHT,
+  CONDITION_LABELS,
+  BRAND_PURPLE,
+  BRAND_INK,
+  INK_700,
+  TAG_BG,
+  TAG_BORDER,
+  FALLBACK_SELLER,
+  EMPTY_LISTINGS,
+  conditionLabel,
+  timeAgo,
+  listingToRelated,
+  CARD_GAP,
+  CARD_OUTER_PAD,
+} from '@/components/product/shared';
+import { categoryLabel, subcategoryLabel } from '@/lib/categories';
+import { itemColorLabel } from '@/lib/itemColors';
+import { ColorSwatch } from '@/components/ColorSwatch';
+import { BRAND, APP_URL } from '@/lib/brand';
+import { reportListing, REPORT_REASONS } from '@/lib/reports';
+import { useGuestGate } from '@/components/GuestGate';
+import { buyerProtectionFee, orderTotal, formatPrice } from '@/lib/fees';
+import { BuyerProtectionSheet } from '@/components/product/BuyerProtectionSheet';
+import { errorMessage, isAbortError } from '@/lib/errors';
 
 const AnimatedExpoImage = Animated.createAnimatedComponent(Image);
 
-const IS_IOS = Platform.OS === 'ios';
-const HAIRLINE = StyleSheet.hairlineWidth;
+// Item-description attribute list: subtle "gray-100" row dividers and a neutral
+// "gray-400" drill-down chevron, shared across the category + detail rows.
+const ROW_DIVIDER = 'rgba(15,15,15,0.06)';
+const CHEVRON_GRAY = '#9CA3AF';
 
-function tap(style: 'light' | 'medium' | 'selection' = 'selection') {
-  if (!IS_IOS) return;
-  if (style === 'selection') Haptics.selectionAsync();
-  else if (style === 'light') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-}
+// Lines of description shown before the "Read more" toggle collapses the rest.
+const DESC_CLAMP_LINES = 6;
 
-const iosShadow = IS_IOS
-  ? {
-      shadowColor: '#000',
-      shadowOpacity: 0.18,
-      shadowRadius: 10,
-      shadowOffset: { width: 0, height: 4 },
-    }
-  : { elevation: 3 };
+// Width of the label column in the details box. Values then start on a shared
+// left edge instead of hanging off each label's own width, which is what makes
+// the rows read as a table rather than a list of sentences. Sized off the
+// longest label ("Condition") at 15px semibold, plus breathing room.
+const LABEL_W = 104;
 
-const { width } = Dimensions.get('window');
-const IMAGE_HEIGHT = width * 1.45;
-
-function PinIcon({
-  size = 22,
-  color = '#111827',
-  filled = false,
-}: { size?: number; color?: string; filled?: boolean }) {
-  return (
-    <Svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill={filled ? color : 'none'}
-      stroke={color}
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      style={{ transform: [{ rotate: '45deg' }] }}
-    >
-      <Path d="M12 17v5" />
-      <Path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
-    </Svg>
-  );
-}
-
-const CONDITION_LABELS: Record<string, string> = {
-  new_with_tags: 'New with tags',
-  like_new: 'Like new',
-  good: 'Very good condition',
-  fair: 'Fair',
+type DetailRow = {
+  label: string;
+  value?: string | null;
+  /** Renders the value in brand purple — reserved for rows that navigate. */
+  link?: boolean;
+  onPress?: () => void;
+  trailing?: React.ReactNode;
 };
 
-const CATEGORY_LABELS: Record<string, string> = {
-  clothing: 'Clothing',
-  shoes: 'Shoes',
-  bags: 'Bags',
-  accessories: 'Accessories',
-  electronics: 'Electronics',
-  beauty: 'Beauty',
-  other: 'Other',
-};
-
-const ITEM_COLOR = { name: 'Marine blue', hex: '#1d4ed8' };
-
-const ITEM_TAGS = [
-  'arcteryx',
-  'jacket',
-  'gorpcore',
-  'midlayer',
-  'hiking',
-  'skiing',
-  'lightweight',
-  'breathable',
-];
-
-// Unified brand palette (matches home tabs + PromoBanner)
-const BRAND_PURPLE = '#6C47FF';
-const BRAND_LIME = '#c8e83a';
-const BRAND_DARK = '#111827';
-const TAG_BG = BRAND_LIME;
-const LINK_PURPLE = BRAND_PURPLE;
-const PLICK_LIME = BRAND_LIME;
-
-const REVIEWS_COUNT = 7;
-const TRANSACTIONS_COUNT = 12;
-const ITEMS_FOR_SALE = 9;
-const LISTING_ID = '91740406';
-const PIN_COUNT = 2;
-
-const MOCK_LISTING: Listing = {
-  id: '1',
-  seller_id: 'u1',
-  seller: {
-    id: 'u1',
-    username: 'mattsunil4048',
-    avatar_url: 'https://picsum.photos/seed/avatar1/100/100',
-    full_name: 'Matt Sunil',
-    bio: null,
-    location: 'Canada',
-    rating: 5,
-    total_sales: 12,
-    created_at: '',
-  },
-  title: 'Arcteryx Atom SL Hoody',
-  description: 'Great mid-layer jacket!\nSuper warm while hiking or skiing',
-  price: 202,
-  category: 'clothing',
-  gender: 'men',
-  brand: "Arc'teryx",
-  size: 'M',
-  condition: 'good',
-  images: [
-    'https://picsum.photos/seed/poc1/400/520',
-    'https://picsum.photos/seed/poc2/400/520',
-    'https://picsum.photos/seed/poc3/400/520',
-  ],
-  is_sold: false,
-  views: 120,
-  likes: 83,
-  created_at: '',
-};
-
-type RelatedItem = {
-  id: string;
-  images: string[];
-  brand: string;
-  meta: string;
-  price: number;
-  inclPrice: number;
-  likes: number;
-};
-
-const MEMBER_ITEMS: RelatedItem[] = [
-  {
-    id: 'm1',
-    images: [
-      'https://picsum.photos/seed/mi1/400/520',
-      'https://picsum.photos/seed/mi1b/400/520',
-      'https://picsum.photos/seed/mi1c/400/520',
-    ],
-    brand: 'Ralph Lauren',
-    meta: 'S · Very good',
-    price: 49,
-    inclPrice: 52.15,
-    likes: 7,
-  },
-  {
-    id: 'm2',
-    images: [
-      'https://picsum.photos/seed/mi2/400/520',
-      'https://picsum.photos/seed/mi2b/400/520',
-      'https://picsum.photos/seed/mi2c/400/520',
-    ],
-    brand: 'Carolina Herrera',
-    meta: 'S / 36 / 8 · New with tags',
-    price: 190,
-    inclPrice: 200.2,
-    likes: 8,
-  },
-  {
-    id: 'm3',
-    images: [
-      'https://picsum.photos/seed/mi3/400/520',
-      'https://picsum.photos/seed/mi3b/400/520',
-      'https://picsum.photos/seed/mi3c/400/520',
-    ],
-    brand: 'Hugo Boss',
-    meta: 'M · Good',
-    price: 35,
-    inclPrice: 37.65,
-    likes: 4,
-  },
-  {
-    id: 'm4',
-    images: [
-      'https://picsum.photos/seed/mi4/400/520',
-      'https://picsum.photos/seed/mi4b/400/520',
-      'https://picsum.photos/seed/mi4c/400/520',
-    ],
-    brand: 'Burberry',
-    meta: 'L · Very good',
-    price: 89,
-    inclPrice: 94.2,
-    likes: 12,
-  },
-];
-
-const SIMILAR_ITEMS: RelatedItem[] = [
-  {
-    id: 's1',
-    images: [
-      'https://picsum.photos/seed/si1/400/520',
-      'https://picsum.photos/seed/si1b/400/520',
-      'https://picsum.photos/seed/si1c/400/520',
-    ],
-    brand: "Arc'teryx",
-    meta: 'M · Very good',
-    price: 175,
-    inclPrice: 184.65,
-    likes: 23,
-  },
-  {
-    id: 's2',
-    images: [
-      'https://picsum.photos/seed/si2/400/520',
-      'https://picsum.photos/seed/si2b/400/520',
-      'https://picsum.photos/seed/si2c/400/520',
-    ],
-    brand: 'Patagonia',
-    meta: 'L · Like new',
-    price: 120,
-    inclPrice: 126.6,
-    likes: 15,
-  },
-  {
-    id: 's3',
-    images: [
-      'https://picsum.photos/seed/si3/400/520',
-      'https://picsum.photos/seed/si3b/400/520',
-      'https://picsum.photos/seed/si3c/400/520',
-    ],
-    brand: 'The North Face',
-    meta: 'M · Good',
-    price: 95,
-    inclPrice: 100.45,
-    likes: 9,
-  },
-  {
-    id: 's4',
-    images: [
-      'https://picsum.photos/seed/si4/400/520',
-      'https://picsum.photos/seed/si4b/400/520',
-      'https://picsum.photos/seed/si4c/400/520',
-    ],
-    brand: 'Stone Island',
-    meta: 'L · Very good',
-    price: 245,
-    inclPrice: 258.95,
-    likes: 31,
-  },
-];
-
-const TEAL = BRAND_PURPLE;
-const BUNDLE_BLUE = BRAND_PURPLE;
-
-type SaveList = { id: string; name: string; emoji: string; count: number };
-const SAVE_LISTS: SaveList[] = [
-  { id: 'liked', name: 'Liked items', emoji: '❤️', count: 47 },
-  { id: 'wishlist', name: 'Wishlist', emoji: '⭐', count: 12 },
-  { id: 'gifts', name: 'Gift ideas', emoji: '🎁', count: 5 },
-  { id: 'later', name: 'Saved for later', emoji: '🔖', count: 23 },
-];
-
-const BUNDLE_MILESTONES = [
-  { items: '1 item', discount: '0% off', active: false },
-  { items: '2 items', discount: '5% off', active: true },
-  { items: '3 items', discount: '10% off', active: true },
-  { items: '4 items', discount: '15% off', active: true },
-  { items: '5+ items', discount: '20% off', active: true },
-];
-
-const CARD_GAP = 8;
-const CARD_OUTER_PAD = 12;
-// Floor so 2*CARD_WIDTH + CARD_GAP can never exceed the row width due to
-// sub-pixel rounding — otherwise the second card wraps and the grid
-// collapses into a single column on certain devices/layout passes.
-const CARD_WIDTH = Math.floor((width - CARD_OUTER_PAD * 2 - CARD_GAP) / 2);
-const CARD_IMAGE_HEIGHT = Math.round(CARD_WIDTH * 1.25);
-
-/**
- * Pinch-to-zoom + pan + double-tap zoom for hero carousel images.
- * Reports zoom state up so parent can lock the horizontal pager.
- */
-function ZoomableImage({
-  uri,
-  imgWidth,
-  imgHeight,
-  sharedTag,
-  onZoomChange,
-}: {
-  uri: string;
-  imgWidth: number;
-  imgHeight: number;
-  sharedTag?: string;
-  onZoomChange?: (zoomed: boolean) => void;
-}) {
-  const scale = useSharedValue(1);
-  const savedScale = useSharedValue(1);
-  const tx = useSharedValue(0);
-  const ty = useSharedValue(0);
-  const savedTx = useSharedValue(0);
-  const savedTy = useSharedValue(0);
-
-  // Lock parent pager while zoomed
-  useAnimatedReaction(
-    () => scale.value > 1.04,
-    (zoomed, prev) => {
-      if (zoomed !== prev && onZoomChange) runOnJS(onZoomChange)(zoomed);
-    },
-    [onZoomChange]
-  );
-
-  const reset = () => {
-    'worklet';
-    scale.value = withSpring(1, { damping: 18, stiffness: 180 });
-    savedScale.value = 1;
-    tx.value = withSpring(0);
-    ty.value = withSpring(0);
-    savedTx.value = 0;
-    savedTy.value = 0;
-  };
-
-  const pinch = Gesture.Pinch()
-    .onUpdate((e) => {
-      scale.value = Math.max(1, Math.min(savedScale.value * e.scale, 4));
-    })
-    .onEnd(() => {
-      savedScale.value = scale.value;
-      if (scale.value < 1.05) reset();
-    });
-
-  // Single-finger pan only activates while zoomed; otherwise fails so the
-  // parent horizontal carousel keeps its swipe-to-page gesture.
-  const pan = Gesture.Pan()
-    .manualActivation(true)
-    .maxPointers(1)
-    .onTouchesMove((_, manager) => {
-      if (scale.value > 1.04) manager.activate();
-      else manager.fail();
-    })
-    .onUpdate((e) => {
-      tx.value = savedTx.value + e.translationX;
-      ty.value = savedTy.value + e.translationY;
-    })
-    .onEnd(() => {
-      savedTx.value = tx.value;
-      savedTy.value = ty.value;
-    });
-
-  const doubleTap = Gesture.Tap()
-    .numberOfTaps(2)
-    .maxDuration(280)
-    .onEnd(() => {
-      if (scale.value > 1.05) {
-        reset();
-      } else {
-        scale.value = withSpring(2.2, { damping: 18, stiffness: 180 });
-        savedScale.value = 2.2;
-      }
-    });
-
-  const composed = Gesture.Simultaneous(pinch, Gesture.Race(doubleTap, pan));
-
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: tx.value },
-      { translateY: ty.value },
-      { scale: scale.value },
-    ],
-  }));
-
-  return (
-    <GestureDetector gesture={composed}>
-      <Animated.View style={[{ width: imgWidth, height: imgHeight, overflow: 'hidden' }, animStyle]}>
-        <AnimatedExpoImage
-          source={{ uri }}
-          style={{ width: imgWidth, height: imgHeight }}
-          contentFit="cover"
-          sharedTransitionTag={sharedTag}
-        />
-      </Animated.View>
-    </GestureDetector>
-  );
-}
-
-function SaveListSheet({
-  visible,
-  onClose,
-  onSelect,
-  selectedId,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  onSelect: (id: string) => void;
-  selectedId: string | null;
-}) {
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-      <Pressable onPress={onClose} style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        {IS_IOS ? (
-          <BlurView intensity={28} tint="dark" style={StyleSheet.absoluteFill} />
-        ) : (
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)' }]} />
-        )}
-        <Pressable
-          onPress={() => {}}
-          style={{
-            width: width - 56,
-            maxWidth: 360,
-            backgroundColor: IS_IOS ? 'rgba(255,255,255,0.96)' : 'white',
-            borderRadius: 18,
-            paddingVertical: 6,
-            ...iosShadow,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 13,
-              fontWeight: '600',
-              color: '#6b7280',
-              textAlign: 'center',
-              paddingTop: 14,
-              paddingBottom: 10,
-              letterSpacing: 0.2,
-            }}
-          >
-            Save to list
-          </Text>
-          <View style={{ height: HAIRLINE, backgroundColor: '#e5e7eb', marginHorizontal: 12 }} />
-          {SAVE_LISTS.map((list, i) => {
-            const isLast = i === SAVE_LISTS.length - 1;
-            const isSelected = list.id === selectedId;
-            return (
-              <Pressable
-                key={list.id}
-                onPress={() => { tap('selection'); onSelect(list.id); onClose(); }}
-                style={({ pressed }) => ({
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingVertical: 14,
-                  paddingHorizontal: 18,
-                  borderBottomWidth: isLast ? 0 : HAIRLINE,
-                  borderBottomColor: '#e5e7eb',
-                  opacity: pressed ? 0.55 : 1,
-                })}
-              >
-                <Text style={{ fontSize: 22, marginRight: 12 }}>{list.emoji}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 16, fontWeight: '600', color: '#111827' }}>{list.name}</Text>
-                  <Text style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{list.count} items</Text>
-                </View>
-                {isSelected && <Ionicons name="checkmark-circle" size={22} color={BRAND_PURPLE} />}
-              </Pressable>
-            );
-          })}
-          <View style={{ height: HAIRLINE, backgroundColor: '#e5e7eb', marginHorizontal: 12 }} />
-          <Pressable
-            onPress={() => { tap('selection'); Alert.alert('New list', 'Create list flow…'); onClose(); }}
-            style={({ pressed }) => ({
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              paddingVertical: 14,
-              opacity: pressed ? 0.55 : 1,
-            })}
-          >
-            <Feather name="plus" size={18} color={BRAND_PURPLE} />
-            <Text style={{ fontSize: 15, fontWeight: '700', color: BRAND_PURPLE, marginLeft: 6 }}>
-              Create new list
-            </Text>
-          </Pressable>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
-}
-
-function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress: () => void }) {
-  const [activeIndex, setActiveIndex] = useState(0);
-  const hasMultiple = item.images.length > 1;
-  return (
-    <Pressable onPress={onPress} style={{ width: CARD_WIDTH, marginBottom: 18 }}>
-      <View
-        style={{
-          position: 'relative',
-          width: CARD_WIDTH,
-          height: CARD_IMAGE_HEIGHT,
-          borderRadius: 6,
-          overflow: 'hidden',
-          backgroundColor: '#f3f4f6',
-        }}
-      >
-        {hasMultiple ? (
-          <ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            nestedScrollEnabled
-            onScroll={(e) =>
-              setActiveIndex(Math.round(e.nativeEvent.contentOffset.x / CARD_WIDTH))
-            }
-            scrollEventThrottle={16}
-            disableIntervalMomentum
-          >
-            {item.images.map((uri, i) => (
-              <Image
-                key={i}
-                source={{ uri }}
-                style={{ width: CARD_WIDTH, height: CARD_IMAGE_HEIGHT }}
-                contentFit="cover"
-              />
-            ))}
-          </ScrollView>
-        ) : (
-          <Image
-            source={{ uri: item.images[0] }}
-            style={{ width: CARD_WIDTH, height: CARD_IMAGE_HEIGHT }}
-            contentFit="cover"
-          />
-        )}
-
-        {hasMultiple && (
-          <View
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              bottom: 6,
-              left: 0,
-              right: 0,
-              flexDirection: 'row',
-              justifyContent: 'center',
-              alignItems: 'center',
-              gap: 4,
-            }}
-          >
-            {item.images.map((_, i) => (
-              <View
-                key={i}
-                style={{
-                  width: 5,
-                  height: 5,
-                  borderRadius: 3,
-                  backgroundColor: i === activeIndex ? 'white' : 'rgba(255,255,255,0.55)',
-                }}
-              />
-            ))}
-          </View>
-        )}
-
-        <View
-          style={{
-            position: 'absolute',
-            bottom: 8,
-            right: 8,
-            backgroundColor: 'white',
-            borderRadius: 16,
-            paddingHorizontal: 9,
-            paddingVertical: 5,
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 4,
-            shadowColor: '#000',
-            shadowOpacity: 0.1,
-            shadowRadius: 4,
-            shadowOffset: { width: 0, height: 1 },
-            elevation: 2,
-          }}
-        >
-          <Feather name="heart" size={13} color="#374151" />
-          <Text style={{ fontSize: 12, fontWeight: '600', color: '#374151' }}>{item.likes}</Text>
-        </View>
-      </View>
-      <Text style={{ fontSize: 14, color: '#374151', marginTop: 8 }} numberOfLines={1}>
-        {item.brand}
-      </Text>
-      <Text style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }} numberOfLines={1}>
-        {item.meta}
-      </Text>
-      <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827', marginTop: 4 }}>
-        ${item.price.toFixed(2)}
-      </Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-        <Text style={{ fontSize: 13, color: TEAL }}>${item.inclPrice.toFixed(2)} incl.</Text>
-        <Ionicons name="shield-checkmark" size={13} color={TEAL} />
-      </View>
-    </Pressable>
-  );
-}
-
-function StarRating({ rating }: { rating: number }) {
-  const full = Math.round(rating);
-  return (
-    <View style={{ flexDirection: 'row', gap: 2 }}>
-      {Array.from({ length: 5 }).map((_, i) => (
-        <Ionicons
-          key={i}
-          name={i < full ? 'star' : 'star-outline'}
-          size={14}
-          color={i < full ? '#f59e0b' : '#d1d5db'}
-        />
-      ))}
-    </View>
-  );
-}
+// Error classification lives in lib/errors.ts, and the catch clauses below are
+// bare `catch (e) { failure = e; }` on purpose — see that file for why value
+// blocks (`?.`, `??`, `?:`, `&&`, `||`) must stay out of a try/catch here.
 
 export default function ProductScreen() {
   const { id } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
-  const [activeImage, setActiveImage] = useState(0);
+  const { user } = useAuth();
+  const toast = useToast();
+  const guestGate = useGuestGate();
+  const productIdParam = Array.isArray(id) ? id[0] : id;
+
+  const heroOffsetX = useSharedValue(0);
+  const heroScrollHandler = useAnimatedScrollHandler({
+    onScroll: (e) => {
+      heroOffsetX.value = e.contentOffset.x;
+    },
+  });
   const [liked, setLiked] = useState(false);
-  const [pinned, setPinned] = useState(false);
-  const [followed, setFollowed] = useState(false);
+  const [likeConfirmedFromServer, setLikeConfirmedFromServer] = useState(false);
+  const [likeBusy, setLikeBusy] = useState(false);
+  // Prime from cache so re-opens are instant — bypasses any wedged supabase
+  // client on web while we refetch in the background.
+  const cached = getCachedListing(productIdParam);
+  // Seed `followed` from the follow cache so a re-mount under a wedged
+  // supabase client doesn't blink the button back to "Follow" before the
+  // refetch resolves. The cache is updated on every successful fetchFollowState
+  // and toggleFollow.
+  // Split across two statements rather than written as
+  // `getCachedFollowState(...)?.isFollowing ?? false`. Optional member access
+  // directly on a CALL result trips a react-compiler@1.0.0 lowering bug
+  // ("Unexpected terminal kind `optional` for optional test block") which bails
+  // it out of this entire screen. Binding the call result first avoids it.
+  const cachedFollow = getCachedFollowState(user?.id ?? null, cached?.seller?.id);
+  const initialFollowed = cachedFollow ? cachedFollow.isFollowing : false;
+  const [followed, setFollowed] = useState(initialFollowed);
+  const [followBusy, setFollowBusy] = useState(false);
+  const [selectedBundleIds, setSelectedBundleIds] = useState<Set<string>>(new Set());
   const [showStickyHeader, setShowStickyHeader] = useState(false);
   const [relatedTab, setRelatedTab] = useState<'members' | 'similar'>('members');
-  const [heroPagerEnabled, setHeroPagerEnabled] = useState(true);
+  const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
   const [saveListVisible, setSaveListVisible] = useState(false);
-  const [savedToList, setSavedToList] = useState<string | null>(null);
-  const listing = MOCK_LISTING;
-  const productIdParam = Array.isArray(id) ? id[0] : id;
-  const sharedTagId = productIdParam ?? listing.id;
+  const [bpVisible, setBpVisible] = useState(false);
+  const [offerVisible, setOfferVisible] = useState(false);
+  // Imperative handles for the like/save pop — fired on tap so the bounce never
+  // rides an async state hydration.
+  const heartAnimRef = useRef<PopIconHandle>(null);
+  const saveAnimRef = useRef<PopIconHandle>(null);
+  const [descExpanded, setDescExpanded] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [listing, setListing] = useState<Listing | null>(
+    cached ? { ...cached, seller: cached.seller ?? (FALLBACK_SELLER as Listing['seller']) } : null,
+  );
+  const [loadingListing, setLoadingListing] = useState(!cached);
+  const [notFound, setNotFound] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
+
+  // The bundle section lives at the bottom of the page (inside the
+  // "Seller's items" tab); the teaser pill under the price jumps there.
+  const mainScrollRef = useRef<any>(null);
+
+  const retry = () => setRetryToken((n) => n + 1);
+
+  useEffect(() => {
+    let active = true;
+    if (!productIdParam) {
+      setLoadingListing(false);
+      setNotFound(true);
+      setLoadError(null);
+      return;
+    }
+    const haveCached = !!getCachedListing(productIdParam);
+    // Only show the blocking skeleton when we have nothing to render.
+    setLoadingListing(!haveCached);
+    setNotFound(false);
+    setLoadError(null);
+    const controller = new AbortController();
+    (async () => {
+      // The try body is deliberately just the await, and there is no `finally`
+      // — see the note on errorMessage/isCancellation above for why. The
+      // rewrite is behaviour-preserving: the old `finally` ran
+      // `if (active) setLoadingListing(false)` on every path including the
+      // early `return`s, which is exactly what the `if (!active) return` plus
+      // the trailing call below do.
+      //
+      // Supabase's client already enforces a 12s fetch ceiling via timeoutFetch
+      // in lib/supabase.ts, so no outer race is needed. The AbortController
+      // cancels the request when the effect re-runs (HMR, param change,
+      // unmount) so stale fetches don't resolve into state we no longer want.
+      let row: Awaited<ReturnType<typeof fetchListingById>> = null;
+      let failure: unknown = null;
+      try {
+        row = await fetchListingById(productIdParam, controller.signal);
+      } catch (e) {
+        failure = e;
+      }
+
+      if (!active) return;
+
+      if (failure !== null) {
+        if (!isAbortError(failure, controller.signal)) {
+          console.warn('[product] load failed', failure);
+          if (!haveCached) {
+            setLoadError(errorMessage(failure) || 'Could not load listing');
+          }
+        }
+      } else if (!row) {
+        if (!haveCached) setNotFound(true);
+      } else {
+        setListing({
+          ...row,
+          seller: row.seller ?? (FALLBACK_SELLER as Listing['seller']),
+        });
+        capture('listing_viewed', buildListingViewedProps(
+          { id: row.id, seller_id: row.seller_id, price: row.price, category: row.category },
+          'product_page',
+        ));
+      }
+
+      setLoadingListing(false);
+    })();
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [productIdParam, retryToken]);
+
+  // Feed the recommender: record that this user opened this listing. The RPC
+  // dedupes within 30 minutes and skips own listings, so no guards needed.
+  useEffect(() => {
+    if (productIdParam && user?.id) logListingView(productIdParam);
+  }, [productIdParam, user?.id]);
+
+  useEffect(() => {
+    let active = true;
+    if (!productIdParam || !user?.id) {
+      setLiked(false);
+      return;
+    }
+    isLiked(productIdParam, user.id)
+      .then((v) => {
+        if (active) {
+          setLiked(v);
+          setLikeConfirmedFromServer(v);
+        }
+      })
+      .catch((e) => {
+        console.warn('[product] isLiked failed', e);
+      });
+    return () => {
+      active = false;
+    };
+  }, [productIdParam, user?.id]);
+
+  // Hydrate the saved/bookmarked state for the bookmark pill. Returns true
+  // when the listing is in at least one of the user's save lists.
+  useEffect(() => {
+    let active = true;
+    if (!productIdParam || !user?.id) {
+      setSaved(false);
+      return;
+    }
+    fetchIsSaved(productIdParam, user.id).then((v) => {
+      if (active) setSaved(v);
+    });
+    return () => {
+      active = false;
+    };
+  }, [productIdParam, user?.id]);
+
+  // Real follow state — pulls from user_follows and the profile's denormalized
+  // counts. Re-fires on focus so a follow performed elsewhere (e.g. on the
+  // seller's user profile screen) is reflected when the user comes back to
+  // this product. On RPC failure we preserve whatever is on screen (the
+  // cached/optimistic value) instead of forcing the button back to "Follow".
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      const sellerId = listing?.seller?.id;
+      if (!sellerId || sellerId === user?.id) {
+        setFollowed(false);
+        return () => {
+          active = false;
+        };
+      }
+      // Re-seed from cache on focus in case another screen wrote a fresher
+      // state since this component last rendered.
+      const cachedState = getCachedFollowState(user?.id ?? null, sellerId);
+      if (cachedState) setFollowed(cachedState.isFollowing);
+      fetchFollowState(user?.id ?? null, sellerId)
+        .then((s) => {
+          // null = RPC failed; preserve current state rather than wipe it.
+          if (active && s) setFollowed(s.isFollowing);
+        })
+        .catch((e) => console.warn('[product] fetchFollowState', e?.message ?? e));
+      return () => {
+        active = false;
+      };
+    }, [listing?.seller?.id, user?.id]),
+  );
+
+  // Reset bundle selection whenever the viewed listing changes — selected
+  // IDs from a previous seller's items must not bleed into a new product page.
+  useEffect(() => {
+    setSelectedBundleIds(new Set());
+    setDescExpanded(false);
+  }, [listing?.id]);
+
+  // Other listings from this seller ("more from this seller") + "you might also
+  // like" — both are pure server reads keyed on the current listing, so React
+  // Query owns fetching/caching. They refetch automatically when the viewed
+  // listing changes.
+  const sellerItemsQ = useSellerOtherListingsQuery(
+    listing?.seller_id ?? null,
+    listing?.id ?? null,
+  );
+  const similarItemsQ = useSimilarListingsQuery(listing?.id ?? null);
+  const sellerItems = sellerItemsQ.data ?? EMPTY_LISTINGS;
+  const similarItems = similarItemsQ.data ?? EMPTY_LISTINGS;
+
+  // Shared by the heart's long-press and the bookmark button — both open the
+  // same SaveListSheet, so signed-out users must hit the identical guest-gate
+  // prompt regardless of which control they used.
+  const handleOpenSaveList = () => {
+    if (!user?.id) {
+      guestGate.prompt({
+        title: 'Save to a collection',
+        message: 'Create a free account to save items into collections you can come back to.',
+        icon: 'bookmark',
+        resume: productIdParam ? { kind: 'save', listingId: productIdParam } : undefined,
+      });
+      return;
+    }
+    tap('medium');
+    setSaveListVisible(true);
+  };
+
+  const handleHeartPress = async () => {
+    tap('light');
+    if (!user) {
+      guestGate.prompt({
+        title: 'Save your favourites',
+        message: 'Create a free account to like items and keep everything you love in one place.',
+        icon: 'heart',
+        resume: productIdParam ? { kind: 'like', listingId: productIdParam } : undefined,
+      });
+      return;
+    }
+    if (!productIdParam || likeBusy) return;
+    setLikeBusy(true);
+    const originalLiked = liked;
+    // Optimistic flip — animation runs immediately, even before the round-trip.
+    setLiked(!originalLiked);
+    // Instagram-style spring: the filled heart springs in (overshoot = pop) on
+    // like, and springs back out on un-like. Fired here, on the tap, so server
+    // hydration never triggers it.
+    heartAnimRef.current?.animateTo(!originalLiked);
+    setLikeConfirmedFromServer(false);
+    // No `finally` — see the errorMessage/isCancellation note at module scope.
+    // Equivalent here because neither branch returns or re-throws.
+    try {
+      const next = await toggleLike(productIdParam, user.id, originalLiked);
+      setLiked(next);
+      // No confirmation toast on like — the heart's own state change is feedback
+      // enough, and the pop-up read as noise when favouriting.
+      if (next) {
+        capture('listing_liked', { listing_id: productIdParam });
+      }
+    } catch {
+      // Revert optimistic flip.
+      setLiked(originalLiked);
+      toast.show('Could not update like', { variant: 'default', icon: 'alert-triangle' });
+    }
+    setLikeBusy(false);
+  };
+
+  // Owner-only actions. Both update local state optimistically so the UI
+  // doesn't lag behind the supabase round-trip, and roll back on failure.
+  const [ownerBusy, setOwnerBusy] = useState<'sold' | 'delete' | null>(null);
+
+  const handleToggleSold = async () => {
+    if (!listing || ownerBusy) return;
+    const next = !listing.is_sold;
+    const listingId = listing.id;
+    setOwnerBusy('sold');
+
+    // Ternary hoisted out and the try body reduced to the await — a conditional
+    // inside try/catch bails React Compiler out of this whole screen. See the
+    // module-scope note on errorMessage/isCancellation.
+    const applySold = (value: boolean) =>
+      setListing((prev) => (prev ? { ...prev, is_sold: value } : prev));
+    const successMessage = next ? 'Marked as sold' : 'Marked as available';
+
+    applySold(next); // optimistic
+
+    // null covers both "threw" and "server disagreed" — the response to each is
+    // the same rollback, exactly as the old catch/else pair did.
+    let committed: boolean | null = null;
+    try {
+      committed = await setListingSold(listingId, next);
+    } catch {
+      committed = null;
+    }
+
+    if (committed === next) {
+      toast.show(successMessage, { variant: 'success', icon: 'check' });
+    } else {
+      applySold(!next); // rollback
+      toast.show("Couldn't update the listing", {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
+    }
+    setOwnerBusy(null);
+  };
+
+  const handleDelete = async () => {
+    if (!listing || ownerBusy) return;
+    const ok = await confirm({
+      title: 'Delete listing?',
+      message: 'This permanently removes the listing. This cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
+    setOwnerBusy('delete');
+    const success = await deleteListing(listing.id);
+    if (!success) {
+      toast.show("Couldn't delete the listing", {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
+      setOwnerBusy(null);
+      return;
+    }
+    toast.show('Listing deleted', { variant: 'success', icon: 'check' });
+    safeBack();
+  };
+
+  const handleFollowPress = async () => {
+    tap('selection');
+    const sellerId = listing?.seller?.id;
+    if (!user) {
+      guestGate.prompt({
+        title: 'Follow sellers you love',
+        message: 'Create a free account to follow sellers and get their new drops in your feed.',
+        icon: 'user-plus',
+        resume: sellerId ? { kind: 'follow', sellerId } : undefined,
+      });
+      return;
+    }
+    if (!sellerId || sellerId === user.id || followBusy) return;
+    const userId = user.id;
+    setFollowBusy(true);
+    const optimistic = !followed;
+    setFollowed(optimistic); // optimistic flip
+
+    // Everything with a `?.`, `??` or `?:` in it is resolved BEFORE the try, and
+    // the try body is just the await — see the module-scope note on
+    // errorMessage/isCancellation. Value blocks inside a try/catch make React
+    // Compiler bail out of this entire screen.
+    const sellerHandle = listing?.seller?.username ?? 'seller';
+    const undoFollow = async () => {
+      setFollowed(false);
+      try {
+        await toggleFollow(userId, sellerId, true);
+      } catch {
+        setFollowed(true);
+        toast.show('Could not undo', { variant: 'default', icon: 'alert-triangle' });
+      }
+    };
+
+    let nowFollowing: boolean | null = null;
+    let failure: unknown = null;
+    try {
+      const next = await toggleFollow(userId, sellerId, followed);
+      nowFollowing = next.isFollowing;
+    } catch (e) {
+      failure = e;
+    }
+
+    if (nowFollowing === null) {
+      // Roll back optimistic state on failure.
+      setFollowed(!optimistic);
+      toast.show(errorMessage(failure) || 'Could not update follow', {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
+    } else {
+      setFollowed(nowFollowing);
+      if (nowFollowing) capture('seller_followed', { seller_id: sellerId });
+      toast.show(nowFollowing ? `Following @${sellerHandle}` : 'Unfollowed', {
+        variant: nowFollowing ? 'info' : 'default',
+        icon: nowFollowing ? 'user-check' : 'user-x',
+        action: nowFollowing ? { label: 'Undo', onPress: undoFollow } : undefined,
+      });
+    }
+    setFollowBusy(false);
+  };
+
+  const openChat = (mode: 'message' | 'offer') => {
+    tap('medium');
+    if (!user) {
+      guestGate.prompt({
+        title: 'Message the seller',
+        message: 'Create a free account to message sellers, make offers, and track your chats.',
+        icon: 'message-circle',
+      });
+      return;
+    }
+    if (!listing) return;
+    if (listing.seller_id === user.id) {
+      toast.show("That's your own listing", { variant: 'default', icon: 'info' });
+      return;
+    }
+    router.push({
+      pathname: '/conversation/new',
+      params: { listing: listing.id, mode },
+    } as any);
+  };
+
+  // Gates the action bar's inline offer field with the same rules openChat
+  // applies. Returns false — having already handled the refusal — when this
+  // buyer can't make an offer, which keeps the field from expanding.
+  const canOffer = () => {
+    if (!user) {
+      guestGate.prompt({
+        title: 'Make an offer',
+        message: 'Create a free account to send the seller a price suggestion.',
+        icon: 'tag',
+      });
+      return false;
+    }
+    if (!listing) return false;
+    if (listing.seller_id === user.id) {
+      toast.show("That's your own listing", { variant: 'default', icon: 'info' });
+      return false;
+    }
+    return true;
+  };
+
+  const submitOffer = (amount: number) => {
+    if (!listing) return;
+    router.push({
+      pathname: '/conversation/new',
+      params: { listing: listing.id, mode: 'offer', amount: amount.toFixed(2) },
+    } as any);
+  };
+
+  const shareListing = async () => {
+    if (!listing) return;
+    tap('light');
+    try {
+      const url = `${APP_URL}/product/${listing.id}`;
+      await Share.share({
+        message: `${listing.title} · ${formatPrice(listing.price)} on ${BRAND}\n${url}`,
+        url,
+      });
+    } catch {
+      // user dismissed the share sheet — nothing to report
+    }
+  };
+
+  const handleReport = () => {
+    tap('selection');
+    if (!user) {
+      toast.show('Sign in to report a listing', { variant: 'info', icon: 'log-in' });
+      router.push('/auth/login');
+      return;
+    }
+    if (!listing) return;
+    if (listing.seller_id === user.id) {
+      toast.show("You can't report your own listing", { variant: 'default', icon: 'info' });
+      return;
+    }
+    Alert.alert('Report listing', 'Why are you reporting this item?', [
+      ...REPORT_REASONS.map((r) => ({
+        text: r.label,
+        onPress: async () => {
+          const ok = await reportListing({
+            listingId: listing.id,
+            reporterId: user.id,
+            reportedUserId: listing.seller_id,
+            reason: r.id,
+          });
+          toast.show(ok ? 'Thanks — our team will review this.' : "Couldn't submit report", {
+            variant: ok ? 'success' : 'default',
+            icon: ok ? 'check' : 'alert-triangle',
+          });
+        },
+      })),
+      { text: 'Cancel', style: 'cancel' as const },
+    ]);
+  };
 
   // Vertical scroll-driven parallax + sticky-header toggle
   const scrollY = useSharedValue(0);
@@ -675,87 +632,194 @@ export default function ProductScreen() {
     };
   });
 
-  const originalPrice = Math.round(listing.price * 1.24);
-  const discountPct = Math.round((1 - listing.price / originalPrice) * 100);
-  const offerPrice = Math.floor(listing.price * 0.9);
-  const heartCount = liked ? listing.likes + 1 : listing.likes;
+  if (loadingListing && !listing) {
+    return <ProductSkeleton insetsTop={insets.top} />;
+  }
 
-  const metaLine = [
-    listing.gender === 'men' ? `Men's US ${listing.size} / EU 48-50 / 2` : listing.size,
-    CONDITION_LABELS[listing.condition] ?? listing.condition,
-    listing.seller.location ? `Located in ${listing.seller.location}` : null,
-  ]
-    .filter(Boolean)
-    .join(' • ');
+  if (loadError && !listing) {
+    return (
+      <View style={{ flex: 1, backgroundColor: 'white', paddingTop: insets.top }}>
+        <Pressable onPress={() => safeBack()} hitSlop={10} style={{ padding: 16 }}>
+          <Feather name="arrow-left" size={22} color="#0F0F0F" />
+        </Pressable>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
+          <Feather name="wifi-off" size={36} color="rgba(15,15,15,0.55)" />
+          <Text style={{ fontSize: 17, fontWeight: '800', color: '#0F0F0F', marginTop: 14, letterSpacing: -0.3 }}>
+            Couldn&apos;t load this listing
+          </Text>
+          <Text style={{ fontSize: 13, color: 'rgba(15,15,15,0.62)', marginTop: 6, textAlign: 'center', lineHeight: 19 }}>
+            {loadError === 'Request timed out'
+              ? 'The connection is slow right now. Try again in a moment.'
+              : 'Something went wrong. Check your connection and try again.'}
+          </Text>
+          <Pressable
+            onPress={() => { tap('light'); retry(); }}
+            style={({ pressed }) => ({
+              marginTop: 22,
+              height: 48,
+              borderRadius: 14,
+              paddingHorizontal: 28,
+              backgroundColor: BRAND_INK,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: pressed ? 0.85 : 1,
+            })}
+          >
+            <Feather name="refresh-cw" size={14} color="#fff" />
+            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14, marginLeft: 8 }}>
+              Retry
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  if (notFound || !listing) {
+    return (
+      <View style={{ flex: 1, backgroundColor: 'white', paddingTop: insets.top }}>
+        <Pressable onPress={() => safeBack()} hitSlop={10} style={{ padding: 16 }}>
+          <Feather name="arrow-left" size={22} color="#0F0F0F" />
+        </Pressable>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
+          <Feather name="alert-circle" size={42} color="rgba(15,15,15,0.55)" />
+          <Text style={{ fontSize: 17, fontWeight: '700', color: '#0F0F0F', marginTop: 14 }}>
+            Listing not available
+          </Text>
+          <Text style={{ fontSize: 14, color: 'rgba(15,15,15,0.62)', marginTop: 6, textAlign: 'center' }}>
+            It may have been removed or never existed.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  const baseLikes = listing.likes ?? 0;
+  const userLikedOnServer = listing.user_has_liked ?? false;
+  const heartDelta = likeConfirmedFromServer 
+    ? 0 
+    : (liked && !userLikedOnServer ? 1 : (!liked && userLikedOnServer ? -1 : 0));
+  const heartCount = Math.max(0, baseLikes + heartDelta);
+  const isOwnListing = !!user?.id && listing.seller_id === user.id;
+  // Buyer Protection math — item price plus a small protection fee. Computed
+  // from lib/fees so the number here matches the payment sheet, the invoice,
+  // and what the server actually charges.
+  const itemPrice = Number(listing.price ?? 0);
+  const bpFee = buyerProtectionFee(itemPrice);
+  const buyTotal = orderTotal(itemPrice);
+  const catSubLabel = listing.subcategory
+    ? subcategoryLabel(listing.category, listing.subcategory)
+    : '';
+  // `listings.images` is nullable in Postgres, so a row can arrive with no
+  // array at all. Normalize once here rather than guarding at each of the four
+  // read sites below.
+  const images = listing.images ?? [];
+  // Description paragraphs (sellers separate them with pipes). Hoisted so the
+  // details box can lead with the description and only draw the Category
+  // divider beneath it when there's actually a description above.
+  const descParas = String(listing.description ?? '')
+    .split('|')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const descFull = descParas.join('\n\n');
+  const descIsLong = descFull.length > 240 || descParas.length > 3;
+  const hasDescription = descParas.length > 0;
 
   return (
     <View style={{ flex: 1, backgroundColor: 'white' }}>
-      {/* Status-bar mode flips when sticky header takes over */}
-      <StatusBar style={showStickyHeader ? 'dark' : 'light'} animated />
+      {/* Product photos skew light (matte on white), so dark status-bar icons
+          stay legible over both the hero and the sticky header. */}
+      <StatusBar style="dark" animated />
 
       {/* Sticky header */}
       {showStickyHeader && (
         <View style={{
           position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100,
           backgroundColor: 'white',
-          borderBottomWidth: HAIRLINE, borderBottomColor: '#e5e7eb',
+          borderBottomWidth: HAIRLINE, borderBottomColor: 'rgba(15,15,15,0.08)',
           paddingTop: insets.top,
           flexDirection: 'row', alignItems: 'center',
           paddingHorizontal: 16, paddingBottom: 12,
           ...(IS_IOS && {
-            shadowColor: '#000',
-            shadowOpacity: 0.06,
-            shadowRadius: 8,
-            shadowOffset: { width: 0, height: 2 },
+            boxShadow: '0px 2px 8px rgba(0,0,0,0.06)',
           }),
         }}>
-          <Pressable onPress={() => { tap('selection'); router.back(); }} hitSlop={10} style={({ pressed }) => ({ marginRight: 12, opacity: pressed ? 0.5 : 1 })}>
-            <Feather name="arrow-left" size={22} color="#111827" />
+          <Pressable onPress={() => { tap('selection'); safeBack(); }} hitSlop={10} style={({ pressed }) => ({ marginRight: 12, opacity: pressed ? 0.5 : 1 })}>
+            <Feather name="arrow-left" size={22} color="#0F0F0F" />
           </Pressable>
-          <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: '#111827' }} numberOfLines={1}>
+          <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: '#0F0F0F' }} numberOfLines={1}>
             {listing.title}
           </Text>
-          <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>
-            ${listing.price}
+          <Text style={{ fontSize: 15, fontWeight: '700', color: '#0F0F0F' }}>
+            {formatPrice(listing.price, { whole: true })}
           </Text>
         </View>
       )}
 
       <Animated.ScrollView
+        ref={mainScrollRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}
         onScroll={scrollHandler}
         scrollEventThrottle={16}
+        // Let the hero photo bleed all the way to the top edge, under the
+        // status bar / notch. Without this, iOS auto-insets the first scroll
+        // view by the safe-area top and drops a white gap above the image.
+        contentInsetAdjustmentBehavior="never"
+        automaticallyAdjustContentInsets={false}
       >
         {/* ── Image carousel (full-bleed to top, Plick style) ── */}
         <View style={{ position: 'relative' }}>
           {/* Parallax/stretch layer wraps ONLY the carousel; floating UI is unaffected */}
           <Animated.View style={heroParallaxStyle}>
-            <ScrollView
+            <Animated.ScrollView
               horizontal
               pagingEnabled
-              scrollEnabled={heroPagerEnabled}
               showsHorizontalScrollIndicator={false}
               nestedScrollEnabled
-              onScroll={(e) => setActiveImage(Math.round(e.nativeEvent.contentOffset.x / width))}
+              onScroll={heroScrollHandler}
               scrollEventThrottle={16}
             >
-              {listing.images.map((uri, i) => (
-                <ZoomableImage
+              {/* An imageless row would collapse the hero to zero height and
+                  leave the floating like/save control sitting on the title, so
+                  hold the space with a neutral tile. */}
+              {images.length === 0 ? (
+                <View
+                  style={{
+                    width,
+                    height: IMAGE_HEIGHT,
+                    backgroundColor: '#F3F4F6',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Feather name="image" size={32} color="rgba(15,15,15,0.30)" />
+                </View>
+              ) : null}
+              {images.map((uri, i) => (
+                <Pressable
                   key={i}
-                  uri={uri}
-                  imgWidth={width}
-                  imgHeight={IMAGE_HEIGHT}
-                  sharedTag={i === 0 ? `product-image-${sharedTagId}` : undefined}
-                  onZoomChange={(zoomed) => setHeroPagerEnabled(!zoomed)}
-                />
+                  onPress={() => { tap('selection'); setFullscreenIndex(i); }}
+                  style={{ width, height: IMAGE_HEIGHT, backgroundColor: '#F3F4F6' }}
+                >
+                  <AnimatedExpoImage
+                    source={{ uri: getOptimizedImageUrl(uri, { width: thumbWidthFor(width), quality: 80 }) }}
+                    style={{ width, height: IMAGE_HEIGHT }}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                    recyclingKey={uri}
+                    transition={0}
+                    priority={i === 0 ? 'high' : 'normal'}
+                  />
+                </Pressable>
               ))}
-            </ScrollView>
+            </Animated.ScrollView>
           </Animated.View>
 
           {/* Back arrow — frosted glass on iOS so it stays visible over light photos */}
           <Pressable
-            onPress={() => { tap('selection'); router.back(); }}
+            onPress={() => { tap('selection'); safeBack(); }}
             hitSlop={12}
             style={({ pressed }) => ({
               position: 'absolute',
@@ -776,76 +840,90 @@ export default function ProductScreen() {
             ) : (
               <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255,255,255,0.85)' }]} />
             )}
-            <Feather name="arrow-left" size={22} color="#111827" />
+            <Feather name="arrow-left" size={22} color="#0F0F0F" />
           </Pressable>
 
-          {/* Right-side floating action stack (pin + heart) */}
+          {/* Floating actions — a stacked column of separate circular discs
+              (Mercari style): each an individual white circle with its icon over
+              a count, lifted on a soft shadow rather than joined into one pill. */}
           <View
             style={{
               position: 'absolute',
               right: 14,
-              bottom: 60,
+              bottom: 16,
               alignItems: 'center',
-              gap: 14,
+              gap: 12,
             }}
           >
+            {/* Like — heart over its count */}
             <Pressable
-              onPress={() => { tap('light'); setPinned(!pinned); }}
+              onPress={handleHeartPress}
+              onLongPress={handleOpenSaveList}
+              delayLongPress={350}
+              accessibilityRole="button"
+              accessibilityLabel={liked ? 'Unlike this item' : 'Like this item'}
+              accessibilityHint="Long press to save this item to a collection"
+              accessibilityState={{ selected: liked }}
               style={({ pressed }) => ({
-                width: 54,
-                height: 54,
-                borderRadius: 27,
-                overflow: 'hidden',
+                width: 52,
+                height: 52,
+                borderRadius: 26,
+                backgroundColor: 'white',
                 alignItems: 'center',
                 justifyContent: 'center',
-                transform: [{ scale: pressed ? 0.94 : 1 }],
-                ...iosShadow,
+                borderWidth: HAIRLINE,
+                borderColor: 'rgba(15,15,15,0.06)',
+                boxShadow: '0px 4px 14px rgba(0,0,0,0.12)',
+                transform: [{ scale: pressed ? 0.93 : 1 }],
               })}
             >
-              {IS_IOS ? (
-                <BlurView intensity={80} tint="systemUltraThinMaterialLight" style={StyleSheet.absoluteFill} />
-              ) : (
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'white' }]} />
-              )}
-              <PinIcon size={22} color="#111827" filled={pinned} />
-              <Text style={{ fontSize: 12, fontWeight: '600', color: '#111827', marginTop: -2 }}>
-                {PIN_COUNT + (pinned ? 1 : 0)}
-              </Text>
+              <PopIcon
+                ref={heartAnimRef}
+                name="heart"
+                active={liked}
+                size={20}
+                activeColor={BRAND_PURPLE}
+                inactiveColor={BRAND_INK}
+              />
+              <AnimatedNumber
+                value={heartCount}
+                height={13}
+                style={{ fontSize: 11, fontFamily: 'Inter_600SemiBold', color: 'rgba(15,15,15,0.55)', marginTop: 1 }}
+              />
             </Pressable>
 
+            {/* Save to collection */}
             <Pressable
-              onPress={() => { tap('light'); setLiked(!liked); }}
-              onLongPress={() => { tap('medium'); setSaveListVisible(true); }}
-              delayLongPress={350}
+              onPress={handleOpenSaveList}
+              accessibilityRole="button"
+              accessibilityLabel={saved ? 'Edit save lists' : 'Save to list'}
+              accessibilityState={{ selected: saved }}
               style={({ pressed }) => ({
-                width: 54,
-                height: 54,
-                borderRadius: 27,
-                overflow: 'hidden',
+                width: 52,
+                height: 52,
+                borderRadius: 26,
+                backgroundColor: 'white',
                 alignItems: 'center',
                 justifyContent: 'center',
-                transform: [{ scale: pressed ? 0.94 : 1 }],
-                ...iosShadow,
+                borderWidth: HAIRLINE,
+                borderColor: 'rgba(15,15,15,0.06)',
+                boxShadow: '0px 4px 14px rgba(0,0,0,0.12)',
+                transform: [{ scale: pressed ? 0.93 : 1 }],
               })}
             >
-              {IS_IOS ? (
-                <BlurView intensity={80} tint="systemUltraThinMaterialLight" style={StyleSheet.absoluteFill} />
-              ) : (
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'white' }]} />
-              )}
-              <Ionicons
-                name={liked ? 'heart' : 'heart-outline'}
-                size={22}
-                color={liked ? '#ef4444' : '#111827'}
+              <PopIcon
+                ref={saveAnimRef}
+                name="bookmark"
+                active={saved}
+                size={20}
+                activeColor={BRAND_PURPLE}
+                inactiveColor={BRAND_INK}
               />
-              <Text style={{ fontSize: 12, fontWeight: '600', color: '#111827', marginTop: -2 }}>
-                {heartCount}
-              </Text>
             </Pressable>
           </View>
 
-          {/* Pagination — Plick-style dashes */}
-          {listing.images.length > 1 && (
+          {/* Pagination dashes */}
+          {images.length > 1 && (
             <View
               style={{
                 position: 'absolute',
@@ -858,448 +936,907 @@ export default function ProductScreen() {
                 gap: 6,
               }}
             >
-              {listing.images.map((_, i) => (
-                <View
-                  key={i}
-                  style={{
-                    width: 28,
-                    height: 3,
-                    borderRadius: 2,
-                    backgroundColor: i === activeImage ? 'white' : '#111827',
-                  }}
-                />
+              {images.map((_, i) => (
+                <HeroPageDot key={i} index={i} offsetX={heroOffsetX} pageWidth={width} />
               ))}
             </View>
           )}
         </View>
 
-        {/* ── Plick-style heading section ── */}
-        <View style={{ backgroundColor: PLICK_LIME, paddingHorizontal: 20, paddingVertical: 16 }}>
-          <Text style={{ fontSize: 16, color: '#111827', textAlign: 'center' }}>
-            Get 10% off! Buy a bundle from the seller
-          </Text>
-        </View>
-
-        <View style={{ paddingHorizontal: 20, paddingTop: 18, paddingBottom: 18 }}>
-          <Text style={{ fontSize: 14, color: '#111827' }}>
-            Liked by{' '}
-            <Text style={{ fontWeight: '700' }}>@alice.333</Text>
-            {' '}and {heartCount - 1} others
-          </Text>
-
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'flex-start',
-              justifyContent: 'space-between',
-              marginTop: 14,
-            }}
-          >
-            <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={{ fontSize: 26, fontWeight: '800', color: '#111827' }}>
-                {listing.title}
-              </Text>
-              <Text style={{ fontSize: 16, color: '#111827', marginTop: 4 }}>
-                <Text style={{ fontWeight: '700' }}>Size </Text>
-                {listing.size}
+        {/* ── Title block (editorial) ── */}
+        <View style={{ paddingHorizontal: 20, paddingTop: 22, paddingBottom: 14 }}>
+          {heartCount > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 6 }}>
+              <Feather name="heart" size={12} color="rgba(15,15,15,0.55)" />
+              <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.55)', fontFamily: 'Inter_500Medium' }}>
+                Liked by <Text style={{ fontFamily: 'Inter_700Bold', color: BRAND_INK }}>{heartCount} {heartCount === 1 ? 'person' : 'people'}</Text>
               </Text>
             </View>
-            <Text style={{ fontSize: 22, fontWeight: '800', color: '#111827' }}>
-              ${listing.price}
+          )}
+
+          <Text
+            style={{
+              fontSize: 28,
+              fontFamily: 'Inter_700Bold',
+              color: BRAND_INK,
+              lineHeight: 33,
+              letterSpacing: -0.7,
+            }}
+            numberOfLines={2}
+          >
+            {listing.title}
+          </Text>
+
+          {/* Meta line — one subtle row (size · condition · brand · location)
+              instead of chunky pills, so the title/price read as a clean
+              editorial stack. Brand stays a tappable purple link into
+              Discover; condition is still surfaced as a primary factor. */}
+          {(() => {
+            const cond = conditionLabel(listing.condition);
+            const uploaded = listing.created_at ? timeAgo(listing.created_at) : '';
+            const segs = [
+              listing.size ? { text: `Size ${listing.size}` } : null,
+              cond ? { text: cond } : null,
+              listing.brand ? { text: listing.brand, link: true } : null,
+              listing.seller?.location ? { text: listing.seller.location } : null,
+              uploaded ? { text: `Uploaded ${uploaded}` } : null,
+            ].filter(Boolean) as { text: string; link?: boolean }[];
+            if (segs.length === 0) return null;
+            return (
+              <Text
+                numberOfLines={2}
+                style={{ marginTop: 10, fontSize: 14, lineHeight: 20, color: 'rgba(15,15,15,0.55)', fontFamily: 'Inter_500Medium' }}
+              >
+                {segs.map((s, i) => (
+                  <Text key={i}>
+                    {i > 0 ? <Text style={{ color: 'rgba(15,15,15,0.28)' }}>{' · '}</Text> : null}
+                    {s.link ? (
+                      <Text
+                        style={{
+                          color: BRAND_PURPLE,
+                          fontFamily: 'Inter_600SemiBold',
+                          textDecorationLine: 'underline',
+                        }}
+                        accessibilityRole="link"
+                        accessibilityLabel={`Shop more from ${s.text}`}
+                        onPress={() => {
+                          tap('selection');
+                          router.push(`/(tabs)/discover?q=${encodeURIComponent(listing.brand!)}` as any);
+                        }}
+                      >
+                        {s.text}
+                      </Text>
+                    ) : (
+                      s.text
+                    )}
+                  </Text>
+                ))}
+              </Text>
+            );
+          })()}
+
+          {/* Price — Mercari/Vinted pattern: the item price is the hero, and
+              Buyer Protection is surfaced beneath it as a small "+fee" line
+              rather than folded into a combined total. The buyer still pays
+              item + fee (the action bar shows the total on the Buy button); this
+              keeps the headline price honest to what's listed. The fee row taps
+              into the full breakdown sheet. */}
+          <View style={{ marginTop: 18 }}>
+            <Text
+              style={{
+                fontSize: 22,
+                fontFamily: 'Inter_700Bold',
+                color: BRAND_INK,
+                letterSpacing: -0.4,
+              }}
+            >
+              {formatPrice(itemPrice, { whole: true })}
             </Text>
+            {bpFee > 0 ? (
+              <Pressable
+                onPress={() => { tap('selection'); setBpVisible(true); }}
+                accessibilityRole="button"
+                accessibilityLabel={`Plus ${formatPrice(bpFee)} Buyer Protection fee. See the breakdown.`}
+                hitSlop={8}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 7,
+                  marginTop: 6,
+                  alignSelf: 'flex-start',
+                  minHeight: 28,
+                  opacity: pressed ? 0.6 : 1,
+                })}
+              >
+                <Text style={{ fontSize: 14, fontFamily: 'Inter_500Medium', color: 'rgba(15,15,15,0.55)' }}>
+                  +{formatPrice(bpFee)} Buyer Protection fee
+                </Text>
+                <Feather name="shield" size={15} color={BRAND_PURPLE} />
+              </Pressable>
+            ) : null}
           </View>
 
         </View>
+
+        {/* ── Bundle progress indicator — the bundle builder lives at the
+            bottom of the page, so without this it's invisible until a buyer
+            happens to scroll past everything. Drives its "add N more to save
+            X%" nudge off the same tier math as the builder, and jumps there
+            on tap. Shown only when there's something to bundle. ── */}
+        {!isOwnListing && sellerItems.length > 0 ? (
+          <BundleProgressBar
+            listing={listing}
+            sellerItems={sellerItems}
+            selectedIds={selectedBundleIds}
+            onPress={() => {
+              tap('selection');
+              setRelatedTab('members');
+              // Let the tab content mount, then jump to it.
+              requestAnimationFrame(() => mainScrollRef.current?.scrollToEnd({ animated: true }));
+            }}
+          />
+        ) : null}
 
         {/* ── Seller card ── */}
-        <View style={{ paddingHorizontal: 16, paddingVertical: 16, borderTopWidth: HAIRLINE, borderTopColor: '#e5e7eb' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-            {/* Avatar */}
-            <View style={{ width: 52, height: 52, borderRadius: 26, overflow: 'hidden', backgroundColor: '#e5e7eb', alignItems: 'center', justifyContent: 'center' }}>
-              {listing.seller.avatar_url ? (
-                <Image source={{ uri: listing.seller.avatar_url }} style={{ width: 52, height: 52 }} contentFit="cover" />
-              ) : (
-                <Feather name="user" size={24} color="#9ca3af" />
-              )}
-            </View>
-
-            {/* Seller info */}
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>
-                {listing.seller.username}
-              </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
-                <StarRating rating={listing.seller.rating} />
-                <Text style={{ fontSize: 13, color: '#374151' }}>{REVIEWS_COUNT} Reviews</Text>
-              </View>
-              <Text style={{ fontSize: 13, color: '#6b7280', marginTop: 3 }}>
-                {TRANSACTIONS_COUNT} Transactions{'  '}
-                <Text style={{ textDecorationLine: 'underline' }}>{ITEMS_FOR_SALE} items for sale</Text>
-              </Text>
-            </View>
-          </View>
-
-          {/* Follow + Message buttons */}
-          <View style={{ flexDirection: 'row', gap: 10 }}>
+        <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12 }}>
+          <View
+            style={{
+              backgroundColor: 'white',
+              borderRadius: 18,
+              borderWidth: HAIRLINE,
+              borderColor: 'rgba(15,15,15,0.12)',
+              padding: 14,
+            }}
+          >
             <Pressable
-              onPress={() => { tap('selection'); setFollowed(!followed); }}
+              onPress={() => router.push(`/user/${listing.seller.id}` as any)}
+              accessibilityRole="button"
+              accessibilityLabel={`View @${listing.seller.username}'s profile`}
               style={({ pressed }) => ({
-                flex: 1, borderRadius: 10, paddingVertical: 12, alignItems: 'center',
-                backgroundColor: followed ? '#f3f4f6' : BRAND_DARK,
-                borderWidth: followed ? HAIRLINE : 0, borderColor: '#d1d5db',
-                opacity: pressed ? 0.85 : 1,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 12,
+                opacity: pressed ? 0.7 : 1,
               })}
             >
-              <Text style={{ fontSize: 13, fontWeight: '700', color: followed ? BRAND_DARK : 'white', letterSpacing: 0.5 }}>
-                {followed ? 'FOLLOWING' : 'FOLLOW'}
-              </Text>
+              {/* Avatar with subtle ring */}
+              <View
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  padding: 2,
+                  backgroundColor: 'white',
+                  borderWidth: HAIRLINE,
+                  borderColor: 'rgba(15,15,15,0.08)',
+                }}
+              >
+                <View
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: 26,
+                    overflow: 'hidden',
+                    backgroundColor: 'rgba(15,15,15,0.08)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {listing.seller.avatar_url ? (
+                    <Image
+                      source={{ uri: getOptimizedImageUrl(listing.seller.avatar_url, { width: 120 }) }}
+                      style={{ width: 52, height: 52 }}
+                      contentFit="cover"
+                      cachePolicy="memory-disk"
+                      transition={150}
+                    />
+                  ) : (
+                    <Feather name="user" size={22} color="rgba(15,15,15,0.55)" />
+                  )}
+                </View>
+              </View>
+
+              {/* Seller info */}
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: '800', color: BRAND_INK }} numberOfLines={1}>
+                  @{listing.seller.username}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                  <StarRating rating={listing.seller.rating} />
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: BRAND_INK }}>
+                    {listing.seller.rating?.toFixed?.(1) ?? '—'}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.62)' }}>
+                    ({Math.round(listing.seller.rating ? Number(listing.seller.total_sales ?? 0) : 0)})
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.62)', marginTop: 3 }}>
+                  {Number(listing.seller.total_sales ?? 0)} sales · {sellerItems.length + 1} listed
+                </Text>
+              </View>
+              <Feather name="chevron-right" size={18} color="rgba(15,15,15,0.30)" />
             </Pressable>
-            <Pressable
-              onPress={() => { tap('medium'); Alert.alert('Message', 'Opening chat...'); }}
-              style={({ pressed }) => ({ flex: 1, borderRadius: 10, paddingVertical: 12, alignItems: 'center', backgroundColor: BRAND_PURPLE, opacity: pressed ? 0.85 : 1 })}
-            >
-              <Text style={{ fontSize: 13, fontWeight: '700', color: 'white', letterSpacing: 0.5 }}>
-                SEND A MESSAGE
-              </Text>
-            </Pressable>
+
+            {/* Follow + Message — hidden when viewing your own listing */}
+            {isOwnListing ? (
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+                <Pressable
+                  onPress={handleToggleSold}
+                  disabled={ownerBusy !== null}
+                  testID="owner-toggle-sold"
+                  style={({ pressed }) => ({
+                    flex: 1,
+                    borderRadius: 12,
+                    paddingVertical: 11,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexDirection: 'row',
+                    gap: 6,
+                    backgroundColor: listing.is_sold ? 'white' : BRAND_INK,
+                    borderWidth: listing.is_sold ? HAIRLINE : 0,
+                    borderColor: 'rgba(15,15,15,0.08)',
+                    opacity: ownerBusy === 'sold' ? 0.5 : pressed ? 0.88 : 1,
+                    transform: [{ scale: pressed ? 0.98 : 1 }],
+                  })}
+                >
+                  <Feather
+                    name={listing.is_sold ? 'rotate-ccw' : 'check'}
+                    size={14}
+                    color={listing.is_sold ? BRAND_INK : 'white'}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: '700',
+                      color: listing.is_sold ? BRAND_INK : 'white',
+                    }}
+                  >
+                    {listing.is_sold ? 'Mark available' : 'Mark as sold'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={handleDelete}
+                  disabled={ownerBusy !== null}
+                  testID="owner-delete"
+                  style={({ pressed }) => ({
+                    flex: 1,
+                    borderRadius: 12,
+                    paddingVertical: 11,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexDirection: 'row',
+                    gap: 6,
+                    backgroundColor: 'white',
+                    borderWidth: HAIRLINE,
+                    borderColor: 'rgba(15,15,15,0.08)',
+                    opacity: ownerBusy === 'delete' ? 0.5 : pressed ? 0.7 : 1,
+                    transform: [{ scale: pressed ? 0.98 : 1 }],
+                  })}
+                >
+                  <Feather name="trash-2" size={14} color={BRAND_INK} />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: BRAND_INK }}>
+                    Delete
+                  </Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+                <Pressable
+                  onPress={handleFollowPress}
+                  style={({ pressed }) => ({
+                    flex: 1,
+                    borderRadius: 12,
+                    paddingVertical: 11,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexDirection: 'row',
+                    gap: 6,
+                    backgroundColor: followed ? 'white' : BRAND_PURPLE,
+                    borderWidth: followed ? HAIRLINE : 0,
+                    borderColor: 'rgba(15,15,15,0.08)',
+                    opacity: pressed ? 0.88 : 1,
+                    transform: [{ scale: pressed ? 0.98 : 1 }],
+                  })}
+                >
+                  <Feather
+                    name={followed ? 'check' : 'plus'}
+                    size={14}
+                    color={followed ? BRAND_INK : 'white'}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: '700',
+                      color: followed ? BRAND_INK : 'white',
+                    }}
+                  >
+                    {followed ? 'Following' : 'Follow'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => openChat('message')}
+                  style={({ pressed }) => ({
+                    flex: 1,
+                    borderRadius: 12,
+                    paddingVertical: 11,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexDirection: 'row',
+                    gap: 6,
+                    backgroundColor: 'white',
+                    borderWidth: HAIRLINE,
+                    borderColor: 'rgba(15,15,15,0.08)',
+                    opacity: pressed ? 0.7 : 1,
+                    transform: [{ scale: pressed ? 0.98 : 1 }],
+                  })}
+                >
+                  <Feather name="message-circle" size={14} color={BRAND_INK} />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: BRAND_INK }}>
+                    Message
+                  </Text>
+                </Pressable>
+              </View>
+            )}
           </View>
         </View>
 
-        {/* ── Item description ── */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 20, paddingBottom: 8, borderTopWidth: HAIRLINE, borderTopColor: '#e5e7eb' }}>
-          <Text style={{ fontSize: 14, color: '#6b7280', marginBottom: 10 }}>
-            Item description
-          </Text>
-
-          <View style={{ borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 16, backgroundColor: 'white' }}>
-            {/* Description text */}
-            <Text style={{ fontSize: 16, color: '#111827', lineHeight: 24 }}>
-              {listing.description}
-            </Text>
-
-            {/* Show translation */}
-            <Pressable onPress={() => Alert.alert('Translation')} style={{ marginTop: 14, alignSelf: 'flex-start' }}>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: LINK_PURPLE }}>
-                Show translation
-              </Text>
-            </Pressable>
-
-            <View style={{ height: 1, backgroundColor: '#e5e7eb', marginVertical: 18 }} />
-
-            {/* Category */}
-            <Pressable onPress={() => {}} style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={{ fontSize: 16, color: '#111827', flex: 1 }}>
-                <Text style={{ fontWeight: '700' }}>Category </Text>
-                {CATEGORY_LABELS[listing.category] ?? listing.category}
-              </Text>
-              <Feather name="arrow-up-right" size={20} color="#111827" />
-            </Pressable>
-
-            <View style={{ height: 1, backgroundColor: '#e5e7eb', marginVertical: 16 }} />
-
-            {/* Size */}
-            <Text style={{ fontSize: 16, color: '#111827' }}>
-              <Text style={{ fontWeight: '700' }}>Size </Text>
-              {listing.size}
-            </Text>
-
-            <View style={{ height: 1, backgroundColor: '#e5e7eb', marginVertical: 16 }} />
-
-            {/* Condition */}
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={{ fontSize: 16, color: '#111827', flex: 1 }}>
-                <Text style={{ fontWeight: '700' }}>Condition </Text>
-                {CONDITION_LABELS[listing.condition] ?? listing.condition}
-              </Text>
-              <Pressable onPress={() => Alert.alert('Condition info', 'Details about condition grading')} hitSlop={8}>
-                <Feather name="info" size={20} color="#111827" />
-              </Pressable>
-            </View>
-
-            <View style={{ height: 1, backgroundColor: '#e5e7eb', marginVertical: 16 }} />
-
-            {/* Color */}
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={{ fontSize: 16, color: '#111827' }}>
-                <Text style={{ fontWeight: '700' }}>Color </Text>
-                {ITEM_COLOR.name}
-              </Text>
+        {/* ── Description + details ──
+            The description leads the box; the attribute rows follow beneath a
+            divider. */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 6 }}>
+          <View
+            style={{
+              backgroundColor: 'white',
+              borderRadius: 18,
+              borderWidth: HAIRLINE,
+              borderColor: 'rgba(15,15,15,0.08)',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Description — first in the box. numberOfLines maps to CSS
+                line-clamp on web and native truncation on device; a length/
+                paragraph heuristic decides whether the toggle is warranted, so
+                there's no measure-then-clamp flicker. */}
+            {hasDescription ? (
               <View
                 style={{
-                  width: 18,
-                  height: 18,
-                  borderRadius: 9,
-                  marginLeft: 8,
-                  backgroundColor: ITEM_COLOR.hex,
-                  borderWidth: 2,
-                  borderColor: '#e5e7eb',
+                  paddingHorizontal: 18,
+                  paddingTop: 18,
+                  paddingBottom: descIsLong ? 8 : 18,
                 }}
+              >
+                <Text
+                  numberOfLines={descIsLong && !descExpanded ? DESC_CLAMP_LINES : undefined}
+                  style={{
+                    fontSize: 15,
+                    color: INK_700,
+                    lineHeight: 24,
+                    fontFamily: 'Inter_400Regular',
+                  }}
+                >
+                  {descFull}
+                </Text>
+                {descIsLong ? (
+                  <Pressable
+                    onPress={() => { tap('selection'); setDescExpanded((v) => !v); }}
+                    hitSlop={10}
+                    accessibilityRole="button"
+                    accessibilityLabel={descExpanded ? 'Collapse description' : 'Expand full description'}
+                    style={({ pressed }) => ({
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                      minHeight: 44,
+                      opacity: pressed ? 0.6 : 1,
+                    })}
+                  >
+                    <Text style={{ fontSize: 13, fontFamily: 'Inter_600SemiBold', color: BRAND_PURPLE, letterSpacing: 0.2 }}>
+                      {descExpanded ? 'Show less' : 'Read more'}
+                    </Text>
+                    <Feather
+                      name={descExpanded ? 'chevron-up' : 'chevron-down'}
+                      size={16}
+                      color={BRAND_PURPLE}
+                    />
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : null}
+
+            {/* Category breadcrumb — category ▸ subcategory, each segment
+                searchable (taps into Discover filtered at that level). Draws a
+                top divider only when the description sits above it. */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 18,
+                paddingVertical: 16,
+                borderTopWidth: hasDescription ? HAIRLINE : 0,
+                borderTopColor: ROW_DIVIDER,
+              }}
+            >
+              <Text
+                style={{
+                  width: LABEL_W,
+                  fontFamily: 'Inter_600SemiBold',
+                  fontSize: 15,
+                  color: BRAND_INK,
+                  letterSpacing: 0.1,
+                }}
+              >
+                Category
+              </Text>
+              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                <Pressable
+                  onPress={() => {
+                    tap('selection');
+                    router.push(`/(tabs)/discover?category=${encodeURIComponent(listing.category)}` as any);
+                  }}
+                  style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+                >
+                  <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 15, color: INK_700 }}>
+                    {categoryLabel(listing.category)}
+                  </Text>
+                </Pressable>
+                {catSubLabel ? (
+                  <>
+                    <Feather
+                      name="chevron-right"
+                      size={14}
+                      color="rgba(15,15,15,0.30)"
+                      style={{ marginHorizontal: 3 }}
+                    />
+                    <Pressable
+                      onPress={() => {
+                        tap('selection');
+                        router.push(
+                          `/(tabs)/discover?category=${encodeURIComponent(listing.category)}&sub=${encodeURIComponent(listing.subcategory!)}` as any,
+                        );
+                      }}
+                      style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+                    >
+                      <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 15, color: INK_700 }}>
+                        {catSubLabel}
+                      </Text>
+                    </Pressable>
+                  </>
+                ) : null}
+              </View>
+              {/* marginLeft matches the detail rows' trailing wrapper, so every
+                  chevron in the box lands on the same right edge. */}
+              <Feather
+                name="chevron-right"
+                size={18}
+                color={CHEVRON_GRAY}
+                style={{ marginLeft: 10 }}
               />
             </View>
 
-            <View style={{ height: 1, backgroundColor: '#e5e7eb', marginVertical: 16 }} />
-
-            {/* Brand */}
-            <Pressable onPress={() => {}} style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={{ fontSize: 16, color: '#111827', flex: 1 }}>
-                <Text style={{ fontWeight: '700' }}>Brand </Text>
-                {listing.brand}
-              </Text>
-              <Feather name="arrow-up-right" size={20} color="#111827" />
-            </Pressable>
+            {/* Details rows */}
+            {(
+              [
+                {
+                  label: 'Brand',
+                  value: listing.brand,
+                  link: !!listing.brand,
+                  // Tap to search Discover for other items from this brand.
+                  onPress: listing.brand
+                    ? () => {
+                        tap('selection');
+                        router.push(`/(tabs)/discover?q=${encodeURIComponent(listing.brand!)}` as any);
+                      }
+                    : undefined,
+                  trailing: listing.brand ? <Feather name="chevron-right" size={18} color={CHEVRON_GRAY} /> : undefined,
+                },
+                {
+                  label: 'Size',
+                  value: listing.size,
+                },
+                {
+                  label: 'Condition',
+                  value: CONDITION_LABELS[listing.condition] ?? listing.condition,
+                  onPress: () =>
+                    Alert.alert(
+                      'Condition guide',
+                      'New with tags — Unworn, original tags still attached\n\n' +
+                        'Like new — Worn once or twice, no visible flaws\n\n' +
+                        'Very good — Gently used, only minor signs of wear\n\n' +
+                        'Fair — Noticeable wear, but still fully wearable',
+                    ),
+                  trailing: <Feather name="info" size={17} color="rgba(15,15,15,0.55)" />,
+                },
+                // Only shown when the seller set a real colour (legacy rows omit it).
+                ...(listing.color
+                  ? [
+                      {
+                        label: 'Color',
+                        value: itemColorLabel(listing.color),
+                        trailing: <ColorSwatch colorId={listing.color} size={18} />,
+                      },
+                    ]
+                  : []),
+                ...(listing.created_at
+                  ? [{ label: 'Uploaded', value: timeAgo(listing.created_at) }]
+                  : []),
+              ] as DetailRow[]
+            ).map((row) => {
+              return (
+                <Pressable
+                  key={row.label}
+                  onPress={row.onPress}
+                  disabled={!row.onPress}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: 18,
+                    paddingVertical: 16,
+                    borderTopWidth: HAIRLINE,
+                    borderTopColor: ROW_DIVIDER,
+                    // Actionable rows get a pressed wash (the native equivalent
+                    // of hover:bg-gray-50); static rows like Size stay flat.
+                    backgroundColor: pressed && row.onPress ? 'rgba(15,15,15,0.04)' : 'white',
+                  })}
+                >
+                  <Text
+                    style={{
+                      width: LABEL_W,
+                      fontSize: 15,
+                      fontFamily: 'Inter_600SemiBold',
+                      color: BRAND_INK,
+                      letterSpacing: 0.1,
+                    }}
+                  >
+                    {row.label}
+                  </Text>
+                  <Text
+                    style={{
+                      flex: 1,
+                      fontSize: 15,
+                      fontFamily: 'Inter_400Regular',
+                      color: row.link ? BRAND_PURPLE : INK_700,
+                    }}
+                    numberOfLines={1}
+                  >
+                    {row.value}
+                  </Text>
+                  {row.trailing ? <View style={{ marginLeft: 10 }}>{row.trailing}</View> : null}
+                </Pressable>
+              );
+            })}
           </View>
 
-          {/* Tags */}
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 16, gap: 8 }}>
-            {ITEM_TAGS.map((tag) => (
-              <View
-                key={tag}
-                style={{
-                  backgroundColor: TAG_BG,
-                  borderRadius: 999,
-                  paddingHorizontal: 14,
-                  paddingVertical: 7,
-                }}
-              >
-                <Text style={{ fontSize: 14, color: '#374151' }}>{tag}</Text>
-              </View>
-            ))}
-          </View>
+          {/* Tags — tap to search by tag */}
+          {listing.tags && listing.tags.length > 0 && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 16, gap: 8, paddingHorizontal: 4 }}>
+              {listing.tags.map((tag) => (
+                <Pressable
+                  key={tag}
+                  onPress={() => router.push(`/(tabs)/discover?q=${encodeURIComponent(tag)}` as any)}
+                  style={({ pressed }) => ({
+                    backgroundColor: TAG_BG,
+                    borderWidth: HAIRLINE,
+                    borderColor: TAG_BORDER,
+                    borderRadius: 999,
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    opacity: pressed ? 0.6 : 1,
+                  })}
+                >
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: 'rgba(15,15,15,0.62)',
+                      fontFamily: 'Inter_500Medium',
+                      letterSpacing: 0.1,
+                    }}
+                  >
+                    #{tag}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
 
-          {/* Contact / Share / Report */}
+          {/* Share left, Report centred, listing ID right. */}
           <View
             style={{
               flexDirection: 'row',
-              justifyContent: 'space-between',
               alignItems: 'center',
-              marginTop: 24,
-              paddingHorizontal: 8,
+              justifyContent: 'space-between',
+              marginTop: 22,
+              paddingHorizontal: 4,
             }}
           >
             <Pressable
-              onPress={() => Alert.alert('Contact')}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
-            >
-              <Feather name="message-circle" size={22} color="#111827" />
-              <Text style={{ fontSize: 16, color: '#111827' }}>Contact</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => Alert.alert('Share')}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
-            >
-              <Feather name="share-2" size={22} color="#111827" />
-              <Text style={{ fontSize: 16, color: '#111827' }}>Share</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => Alert.alert('Report')}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
-            >
-              <Feather name="alert-triangle" size={22} color="#111827" />
-              <Text style={{ fontSize: 16, color: '#111827' }}>Report</Text>
-            </Pressable>
-          </View>
-
-          {/* Listing meta */}
-          <Text style={{ fontSize: 12, color: '#9ca3af', marginTop: 16, paddingHorizontal: 8 }}>
-            Listing ID {LISTING_ID}
-          </Text>
-        </View>
-
-        {/* ── Carrinex Verified card ── */}
-        <View style={{ marginHorizontal: 16, marginBottom: 12, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 16 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <Ionicons name="checkmark-circle" size={28} color={BRAND_PURPLE} />
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>Carrinex Verified</Text>
-          </View>
-          <Text style={{ fontSize: 13, color: '#374151', lineHeight: 19 }}>
-            This item has been verified by our in-house team or a trusted partner.{' '}
-            <Text style={{ color: BRAND_PURPLE, fontWeight: '700' }} onPress={() => {}}>Learn More.</Text>
-          </Text>
-        </View>
-
-        {/* ── Purchase Protection card ── */}
-        <View style={{ marginHorizontal: 16, marginBottom: 16, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 16 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <Ionicons name="shield" size={26} color={BRAND_PURPLE} />
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>Carrinex Purchase Protection</Text>
-          </View>
-          <Text style={{ fontSize: 13, color: '#374151', lineHeight: 19, marginBottom: 14 }}>
-            We want you to feel safe buying and selling on Carrinex. Qualifying orders are covered by our Purchase Protection in the rare case something goes wrong.
-          </Text>
-          <Pressable style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }} onPress={() => {}}>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827' }}>How You're Protected</Text>
-            <Feather name="chevron-down" size={18} color="#6b7280" />
-          </Pressable>
-        </View>
-
-        {/* ── Member's items / Similar items tabs ── */}
-        <View style={{ borderTopWidth: HAIRLINE, borderTopColor: '#e5e7eb' }}>
-          <View style={{ flexDirection: 'row', borderBottomWidth: HAIRLINE, borderBottomColor: '#e5e7eb' }}>
-            <Pressable
-              onPress={() => { tap('selection'); setRelatedTab('members'); }}
-              style={{
-                flex: 1,
-                paddingVertical: 16,
+              onPress={shareListing}
+              accessibilityRole="button"
+              accessibilityLabel="Share this listing"
+              // The row is deliberately light, so the target is extended
+              // rather than padded — these sit ~28px tall on their own.
+              hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
                 alignItems: 'center',
-                borderBottomWidth: 3,
-                borderBottomColor: relatedTab === 'members' ? TEAL : 'transparent',
-                marginBottom: -1,
-              }}
+                gap: 8,
+                paddingVertical: 6,
+                opacity: pressed ? 0.6 : 1,
+              })}
             >
+              <Feather name="share-2" size={16} color={BRAND_INK} />
               <Text
                 style={{
-                  fontSize: 15,
-                  fontWeight: relatedTab === 'members' ? '700' : '400',
-                  color: relatedTab === 'members' ? '#111827' : '#6b7280',
+                  fontSize: 13,
+                  color: BRAND_INK,
+                  fontFamily: 'Inter_600SemiBold',
+                  letterSpacing: 0.2,
                 }}
               >
-                Member's items
+                Share
               </Text>
             </Pressable>
-            <Pressable
-              onPress={() => { tap('selection'); setRelatedTab('similar'); }}
+
+            {/* Taken out of the flow so it centres on the row itself (three
+                equal-flex columns didn't hold: the ID column, wider than
+                "Share", grew past its third and nudged Report left).
+                The −12 translate is optical centring: the flag + gap add 24px
+                of width entirely on the label's left, so geometric centring
+                parks the *word* "Report" ~12px right of true centre. Shift the
+                block back by half that so the label reads dead-centre. */}
+            <View
+              pointerEvents="box-none"
               style={{
-                flex: 1,
-                paddingVertical: 16,
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                top: 0,
+                bottom: 0,
                 alignItems: 'center',
-                borderBottomWidth: 3,
-                borderBottomColor: relatedTab === 'similar' ? TEAL : 'transparent',
-                marginBottom: -1,
+                justifyContent: 'center',
               }}
             >
-              <Text
-                style={{
-                  fontSize: 15,
-                  fontWeight: relatedTab === 'similar' ? '700' : '400',
-                  color: relatedTab === 'similar' ? '#111827' : '#6b7280',
-                }}
-              >
-                Similar items
-              </Text>
-            </Pressable>
-          </View>
-
-          {relatedTab === 'members' ? (
-            <View style={{ paddingTop: 18 }}>
-              {/* Bundle discounts title */}
-              <Text style={{ fontSize: 18, fontWeight: '600', lineHeight: 24, letterSpacing: -0.24, color: '#111827', paddingHorizontal: 16, marginBottom: 14 }}>
-                Bundle discounts from {listing.seller.username}
-              </Text>
-
-              {/* Bundle discount banner */}
-              <View style={{ marginHorizontal: 16, marginBottom: 20, backgroundColor: '#f1edff', borderRadius: 16, padding: 18 }}>
-                <Text style={{ fontSize: 16, color: '#111827', lineHeight: 24, marginBottom: 22 }}>
-                  Add items from this seller to your cart to unlock discounts—plus potential savings on shipping!
-                </Text>
-
-                {/* Progress track */}
-                <View style={{ height: 16, marginBottom: 14, position: 'relative' }}>
-                  {/* Gray track */}
-                  <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: '#dcd3ff', borderRadius: 99 }} />
-                  {/* Blue fill */}
-                  <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '25%' }}>
-                    <View style={{ flex: 1, backgroundColor: BUNDLE_BLUE, borderTopLeftRadius: 99, borderBottomLeftRadius: 99 }} />
-                    {/* Arrow tip */}
-                    <View style={{
-                      position: 'absolute', right: -11, top: 0,
-                      width: 0, height: 0,
-                      borderTopWidth: 8, borderBottomWidth: 8, borderLeftWidth: 12,
-                      borderTopColor: 'transparent', borderBottomColor: 'transparent',
-                      borderLeftColor: BUNDLE_BLUE,
-                    }} />
-                  </View>
-                </View>
-
-                {/* Milestones */}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  {BUNDLE_MILESTONES.map((m, i) => (
-                    <View key={i} style={{ alignItems: 'center' }}>
-                      <View style={{ width: 1.5, height: 10, backgroundColor: '#9ca3af', marginBottom: 6 }} />
-                      <Text style={{ fontSize: 13, color: '#111827', textAlign: 'center' }}>{m.items}</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '600', color: m.active ? BUNDLE_BLUE : '#6b7280', textAlign: 'center' }}>{m.discount}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-              <View
-                style={{
-                  width: '100%',
+              <Pressable
+                onPress={handleReport}
+                accessibilityRole="button"
+                accessibilityLabel="Report this listing"
+                hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+                style={({ pressed }) => ({
                   flexDirection: 'row',
-                  flexWrap: 'wrap',
-                  paddingHorizontal: CARD_OUTER_PAD,
-                  columnGap: CARD_GAP,
-                }}
+                  alignItems: 'center',
+                  gap: 8,
+                  paddingVertical: 6,
+                  transform: [{ translateX: -12 }],
+                  opacity: pressed ? 0.6 : 1,
+                })}
               >
-                {MEMBER_ITEMS.map((item) => (
-                  <RelatedItemCard key={item.id} item={item} onPress={() => router.push(`/product/${item.id}`)} />
-                ))}
-              </View>
+                <Feather name="flag" size={16} color="rgba(15,15,15,0.62)" />
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: 'rgba(15,15,15,0.62)',
+                    fontFamily: 'Inter_600SemiBold',
+                    letterSpacing: 0.2,
+                  }}
+                >
+                  Report
+                </Text>
+              </Pressable>
             </View>
+
+            <Text
+              style={{
+                fontSize: 12,
+                color: CHEVRON_GRAY,
+                letterSpacing: 0.4,
+                fontFamily: 'Inter_500Medium',
+              }}
+            >
+              ID · {listing.id.slice(0, 8)}
+            </Text>
+          </View>
+        </View>
+
+        {/* ── Shop & sell safely (reusable trust banner) ── */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 22, paddingBottom: 6 }}>
+          <SafetyBanner />
+        </View>
+
+        {/* ── Member's / Similar tabs (pill style) ── */}
+        <View style={{ marginTop: 22 }}>
+          <View style={{ flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 4 }}>
+            {(['members', 'similar'] as const).map((tab) => {
+              const active = relatedTab === tab;
+              return (
+                <Pressable
+                  key={tab}
+                  onPress={() => { tap('selection'); setRelatedTab(tab); }}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: 16,
+                    paddingVertical: 9,
+                    borderRadius: 999,
+                    backgroundColor: active ? BRAND_PURPLE : 'rgba(15,15,15,0.04)',
+                    transform: [{ scale: pressed ? 0.96 : 1 }],
+                  })}
+                >
+                  <Ionicons
+                    name={tab === 'members' ? 'person' : 'sparkles'}
+                    size={13}
+                    color={active ? 'white' : '#0F0F0F'}
+                    style={{ marginRight: 6 }}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: '700',
+                      color: active ? 'white' : '#0F0F0F',
+                    }}
+                  >
+                    {tab === 'members' ? "Seller's items" : 'Similar items'}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* TODO: replace MEMBER_ITEMS / SIMILAR_ITEMS with real Supabase queries
+              (seller_id eq for member items; brand+category match for similar). */}
+          {relatedTab === 'members' ? (
+            <BundleSection
+              listing={listing}
+              sellerItems={sellerItems}
+              selectedIds={selectedBundleIds}
+              onToggle={(id) => {
+                tap('selection');
+                setSelectedBundleIds((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(id)) next.delete(id);
+                  else next.add(id);
+                  return next;
+                });
+              }}
+              onSelectAll={() => {
+                tap('medium');
+                setSelectedBundleIds(new Set(sellerItems.map((s) => s.id)));
+              }}
+              onClearAll={() => {
+                tap('selection');
+                setSelectedBundleIds(new Set());
+              }}
+              onSendBundleOffer={(amount) => {
+                tap('medium');
+                if (!user) {
+                  guestGate.prompt({
+                    title: 'Send a bundle offer',
+                    message: 'Create a free account to bundle items and send the seller an offer.',
+                    icon: 'message-circle',
+                  });
+                  return;
+                }
+                if (listing.seller_id === user.id) {
+                  toast.show("That's your own listing", { variant: 'default', icon: 'info' });
+                  return;
+                }
+                router.push({
+                  pathname: '/conversation/new',
+                  params: {
+                    listing: listing.id,
+                    mode: 'offer',
+                    amount: amount.toFixed(2),
+                  },
+                } as any);
+              }}
+            />
           ) : (
             <View style={{ paddingTop: 18 }}>
-              <View
-                style={{
-                  width: '100%',
-                  flexDirection: 'row',
-                  flexWrap: 'wrap',
-                  paddingHorizontal: CARD_OUTER_PAD,
-                  columnGap: CARD_GAP,
-                }}
-              >
-                {SIMILAR_ITEMS.map((item) => (
-                  <RelatedItemCard key={item.id} item={item} onPress={() => router.push(`/product/${item.id}`)} />
-                ))}
-              </View>
+              {similarItems.length === 0 ? (
+                <View style={{ paddingHorizontal: 20, paddingVertical: 14 }}>
+                  <Text style={{ fontSize: 13, color: 'rgba(15,15,15,0.62)' }}>
+                    No similar items found yet — check back soon.
+                  </Text>
+                </View>
+              ) : (
+                <View
+                  style={{
+                    width: '100%',
+                    flexDirection: 'row',
+                    flexWrap: 'wrap',
+                    paddingHorizontal: CARD_OUTER_PAD,
+                    columnGap: CARD_GAP,
+                  }}
+                >
+                  {similarItems.map((row) => {
+                    const item = listingToRelated(row);
+                    return (
+                      <RelatedItemCard
+                        key={item.id}
+                        item={item}
+                        onPress={() => router.push(`/product/${item.id}`)}
+                      />
+                    );
+                  })}
+                </View>
+              )}
             </View>
           )}
         </View>
       </Animated.ScrollView>
 
-      {/* ── Fixed bottom bar ── */}
-      <View style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        backgroundColor: 'white',
-        borderTopWidth: HAIRLINE, borderTopColor: '#e5e7eb',
-        paddingHorizontal: 16, paddingTop: 12,
-        paddingBottom: insets.bottom || 16,
-        flexDirection: 'row', gap: 10,
-        ...(IS_IOS && {
-          shadowColor: '#000',
-          shadowOpacity: 0.05,
-          shadowRadius: 10,
-          shadowOffset: { width: 0, height: -2 },
-        }),
-      }}>
-        <Pressable
-          onPress={() => { tap('medium'); Alert.alert('Make an offer', `Suggest a price?`); }}
-          style={({ pressed }) => ({
-            flex: 1, borderWidth: 1, borderColor: '#d1d5db',
-            borderRadius: 10, paddingTop: 10, paddingBottom: 6, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center',
-            backgroundColor: 'white',
-            opacity: pressed ? 0.7 : 1,
-            transform: [{ scale: pressed ? 0.98 : 1 }],
-          })}
-        >
-          <Text style={{ fontSize: 13, fontWeight: '700', color: BRAND_DARK, textAlign: 'center', lineHeight: 16 }}>Make an{'\n'}offer</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => { tap('medium'); Alert.alert('Buy', 'Payment flow coming soon'); }}
-          style={({ pressed }) => ({
-            flex: 1, backgroundColor: '#22c55e', borderRadius: 10, paddingTop: 10, paddingBottom: 6, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center',
-            opacity: pressed ? 0.85 : 1,
-            transform: [{ scale: pressed ? 0.98 : 1 }],
-          })}
-        >
-          <Text style={{ fontSize: 14, fontWeight: '700', color: BRAND_DARK, letterSpacing: 0.3 }}>Buy</Text>
-        </Pressable>
-      </View>
+      {/* ── Fixed bottom bar — hidden when viewing your own listing ── */}
+      {!isOwnListing && (
+        <ProductActionBar
+          price={itemPrice}
+          buyTotal={buyTotal}
+          bpFee={bpFee}
+          bottomInset={insets.bottom}
+          onOfferPress={() => {
+            if (canOffer()) setOfferVisible(true);
+          }}
+          onBuyPress={() => {
+            tap('medium');
+            if (!user) {
+              guestGate.prompt({
+                title: 'Almost yours',
+                message: 'Create a free account to check out securely with buyer protection included.',
+                icon: 'shopping-bag',
+                cta: 'Create account & continue',
+              });
+              return;
+            }
+            if (!listing?.id) return;
+            if (listing.seller_id === user.id) {
+              toast.show("That's your own listing", { variant: 'default', icon: 'info' });
+              return;
+            }
+            router.push(`/payment/${listing.id}` as any);
+          }}
+        />
+      )}
 
-      {/* Long-press-on-Heart save-to-list menu */}
-      <SaveListSheet
-        visible={saveListVisible}
-        onClose={() => setSaveListVisible(false)}
-        onSelect={(listId) => { setSavedToList(listId); setLiked(true); }}
-        selectedId={savedToList}
+      {/* Save-to-list sheet — opens from the bookmark pill or by long-pressing
+          the heart. The listing is "saved" if it lives in any of the user's
+          lists; the sheet handles list creation + per-list toggling. */}
+      {user?.id ? (
+        <SaveListSheet
+          visible={saveListVisible}
+          userId={user.id}
+          listingId={listing.id}
+          onClose={() => setSaveListVisible(false)}
+          onChanged={(isSaved) => {
+            const wasSaved = saved;
+            setSaved(isSaved);
+            // Spring the bookmark only when the saved state actually flips.
+            if (isSaved !== wasSaved) saveAnimRef.current?.animateTo(isSaved);
+            if (isSaved) capture('listing_saved', { listing_id: productIdParam });
+          }}
+        />
+      ) : null}
+
+      {/* Offer sheet — opens from the action bar's "Offer" button */}
+      <OfferSheet
+        visible={offerVisible}
+        askingPrice={itemPrice}
+        onClose={() => setOfferVisible(false)}
+        onSubmit={(amount) => {
+          setOfferVisible(false);
+          submitOffer(amount);
+        }}
+      />
+
+      {/* Buyer Protection breakdown — opens from the price row */}
+      <BuyerProtectionSheet
+        visible={bpVisible}
+        itemPrice={itemPrice}
+        onClose={() => setBpVisible(false)}
+      />
+
+      {/* Fullscreen image viewer — opens on tap, swipe to navigate */}
+      <FullscreenImageViewer
+        visible={fullscreenIndex !== null}
+        images={images}
+        initialIndex={fullscreenIndex ?? 0}
+        onClose={() => setFullscreenIndex(null)}
       />
     </View>
   );

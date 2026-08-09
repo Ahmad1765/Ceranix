@@ -1,408 +1,921 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  RefreshControl,
-  Pressable,
-  ScrollView,
-  Animated,
-  Platform,
-} from 'react-native';
-import { Image } from 'expo-image';
+import { memo, useCallback, useDeferredValue, useMemo, useState } from 'react';
+import { Alert, View, Pressable, ScrollView, RefreshControl, Platform } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
+import { Text, TextInput } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
+import * as Haptics from 'expo-haptics';
+import { router, useFocusEffect } from 'expo-router';
+import { useAuth } from '@/lib/auth';
+import { colors, radii } from '@/lib/theme';
+import type { RecommendedListing } from '@/lib/recommendations';
+import type { PriceDropListing } from '@/lib/myFeed';
+import { PriceDropCard } from '@/components/PriceDropCard';
+import { type SavedSearch } from '@/lib/savedSearches';
 import { ListingCard } from '@/components/ListingCard';
-import { SkeletonCard } from '@/components/SkeletonCard';
-import { PromoBanner } from '@/components/PromoBanner';
-import type { Listing } from '@/types';
+import { DropAlertSheet } from '@/components/DropAlertSheet';
+import {
+  FeedFilterSheet,
+  EMPTY_FEED_FILTERS,
+  countActiveFilters,
+  type FeedFilters,
+} from '@/components/FeedFilterSheet';
+import {
+  useMyFeedListingsQuery,
+  useFeedListingsQuery,
+  usePriceDropsQuery,
+  useSavedSearchesQuery,
+  useSavedListingsQuery,
+  useDeleteSavedSearch,
+} from '@/lib/queries';
+import { useToast } from '@/lib/toast';
+import { useGridDimensions, useTabBarClearance, HIT_SLOP_8, GRID_DRAW_DISTANCE } from '@/lib/responsive';
+import type { Category, Listing } from '@/types';
 
-type TabName = 'For you' | 'Popular' | 'Following';
+const HORIZONTAL_PAD = 12;
+const GRID_GAP = 8;
+const FOR_YOU: 'for-you' = 'for-you';
+const TRENDING: 'trending' = 'trending';
+const SAVED: 'saved' = 'saved';
 
-function AnimatedTabPill({
-  tab,
-  isActive,
-  onPress,
-}: {
-  tab: TabName;
-  isActive: boolean;
-  onPress: () => void;
-}) {
-  // JS-driver anim for color (can't use native driver with backgroundColor)
-  const colorAnim = useRef(new Animated.Value(isActive ? 1 : 0)).current;
-  // Native-driver anim for scale (fast, jank-free)
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+// Mirrors the CHECK constraint on listings.category in setup.sql. Saved
+// searches may hold arbitrary strings (the UI also stores pseudo-categories
+// like "trending"), so any value not in this set is silently ignored when
+// filtering the visible grid.
+const VALID_CATEGORIES: ReadonlySet<Category> = new Set<Category>([
+  'clothing', 'shoes', 'bags', 'accessories', 'electronics', 'beauty', 'other',
+]);
+function isValidCategory(v: unknown): v is Category {
+  return typeof v === 'string' && VALID_CATEGORIES.has(v as Category);
+}
 
-  useEffect(() => {
-    Animated.timing(colorAnim, {
-      toValue: isActive ? 1 : 0,
-      duration: 250,
-      useNativeDriver: false,
-    }).start();
-  }, [isActive]);
+// Light tap on every interactive control on this screen. No-op on web, where
+// the Haptics API has nothing to drive.
+function haptic() {
+  if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+}
 
-  const backgroundColor = colorAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['#F2F2F2', '#6C47FF'],
+// Stable empty references so query fallbacks don't churn the useMemos below.
+const EMPTY_LISTINGS: Listing[] = [];
+const EMPTY_SAVED_SEARCHES: SavedSearch[] = [];
+const EMPTY_PRICE_DROPS: PriceDropListing[] = [];
+
+export default function HomeScreen() {
+  const { user, loading: authLoading } = useAuth();
+  const toast = useToast();
+  const [activeChip, setActiveChip] = useState<string>(FOR_YOU);
+  const [alertSheetOpen, setAlertSheetOpen] = useState(false);
+  // In-feed filter. Searches within the current view (For you / Saved / a saved
+  // search) by title or brand — Discover owns catalog-wide server search, so
+  // this stays an instant client-side refine over already-loaded rows.
+  const [query, setQuery] = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
+  // Structured filters (category / condition / price / sort) applied on top of
+  // the text query, over the already-loaded rows. Opened from the filter button
+  // beside the search field; the red badge shows how many constraints are on.
+  const [filters, setFilters] = useState<FeedFilters>(EMPTY_FEED_FILTERS);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const activeFilterCount = countActiveFilters(filters);
+
+  const { columns, cardWidth } = useGridDimensions({
+    min: 2,
+    max: 4,
+    thresholds: [560, 900, 1200],
+    horizontalPadding: HORIZONTAL_PAD,
+    gap: GRID_GAP,
   });
+  // Bottom padding that clears the floating tab bar overlaying the feed.
+  const tabClear = useTabBarClearance();
 
-  const textColor = colorAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['#374151', '#ffffff'],
-  });
+  // React Query owns all four reads (primary grid, two rails, saved searches,
+  // saved listings). staleTime reproduces the single old 'myfeed' freshness
+  // gate; each query now caches and revalidates independently.
+  const userId = user?.id ?? null;
+  const feedQ = useMyFeedListingsQuery(userId);
+  // Trending chip — likes-sorted, same source Discover's "popular" sort uses.
+  // Not gated on the chip being active so switching to it is instant.
+  const trendingQ = useFeedListingsQuery({ tab: 'popular', limit: 60 });
+  const priceDropsQ = usePriceDropsQuery(userId);
+  const savedSearchesQ = useSavedSearchesQuery(userId);
+  const savedListingsQ = useSavedListingsQuery(userId);
+  const deleteSavedSearchM = useDeleteSavedSearch(userId);
 
-  const iconName = tab === 'For you' ? 'sparkles' : tab === 'Popular' ? 'flame' : 'person';
+  const listings = feedQ.data ?? EMPTY_LISTINGS;
+  const loading = feedQ.isLoading;
+  // "Fallback" = nothing ranked for personal reasons (cold start). Anonymous
+  // users always get the trending fallback.
+  const isFallback =
+    !user ||
+    (listings as RecommendedListing[]).every(
+      (r) => !r.rec_reason || r.rec_reason === 'trending',
+    );
+  const trendingListings = trendingQ.data ?? EMPTY_LISTINGS;
+  const trendingLoading = trendingQ.isLoading;
+  // Stable empty reference, matching the three fallbacks around it — a fresh
+  // `[]` per render is a latent trap for any future useMemo keyed on this.
+  const priceDrops = priceDropsQ.data ?? EMPTY_PRICE_DROPS;
+  const savedSearches = savedSearchesQ.data ?? EMPTY_SAVED_SEARCHES;
+  const savedListings = savedListingsQ.data ?? EMPTY_LISTINGS;
+  const loadingSaved = savedListingsQ.isLoading;
+  const refreshing =
+    feedQ.isRefetching ||
+    trendingQ.isRefetching ||
+    priceDropsQ.isRefetching ||
+    savedSearchesQ.isRefetching ||
+    savedListingsQ.isRefetching;
+
+  // Stable refetch fns + isStale snapshots for the focus gate (see discover).
+  const { isStale: feedStale, refetch: feedRefetch } = feedQ;
+  const { isStale: trendingStale, refetch: trendingRefetch } = trendingQ;
+  const { isStale: dropsStale, refetch: dropsRefetch } = priceDropsQ;
+  const { isStale: searchesStale, refetch: searchesRefetch } = savedSearchesQ;
+  const { isStale: savedStale, refetch: savedRefetch } = savedListingsQ;
+
+  // Revalidate stale queries on focus — reuses fresh data so returning to this
+  // 5-fetch tab doesn't re-hit the network every time. The three user-scoped
+  // queries (drops/searches/saved) are gated on userId here too — refetch()
+  // ignores each query's own `enabled: !!userId`, so calling it unconditionally
+  // sends a null userId straight to Postgres and Supabase stringifies it into
+  // the literal text "null", which fails a uuid-column comparison every time.
+  useFocusEffect(
+    useCallback(() => {
+      if (feedStale) feedRefetch();
+      if (trendingStale) trendingRefetch();
+      if (userId && dropsStale) dropsRefetch();
+      if (userId && searchesStale) searchesRefetch();
+      if (userId && savedStale) savedRefetch();
+    }, [
+      feedStale, feedRefetch,
+      trendingStale, trendingRefetch,
+      dropsStale, dropsRefetch,
+      searchesStale, searchesRefetch,
+      savedStale, savedRefetch,
+      userId,
+    ]),
+  );
+
+  const onRefresh = useCallback(async () => {
+    await Promise.all([
+      feedRefetch(),
+      trendingRefetch(),
+      ...(userId ? [dropsRefetch(), searchesRefetch(), savedRefetch()] : []),
+    ]);
+  }, [feedRefetch, trendingRefetch, dropsRefetch, searchesRefetch, savedRefetch, userId]);
+
+  const onDeleteChip = useCallback(
+    (search: SavedSearch) => {
+      const label = search.label ?? 'Saved';
+      Alert.alert(
+        `Remove "${label}"?`,
+        'This feed will be removed from your list.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Remove',
+            style: 'destructive',
+            onPress: () => {
+              // The mutation drops the chip from cache optimistically and rolls
+              // back on failure.
+              if (activeChip === search.id) setActiveChip(FOR_YOU);
+              deleteSavedSearchM.mutate(search.id, {
+                onError: () =>
+                  toast.show('Could not remove that feed', {
+                    variant: 'info',
+                    icon: 'alert-circle',
+                  }),
+              });
+            },
+          },
+        ],
+      );
+    },
+    [activeChip, deleteSavedSearchM, toast],
+  );
+
+  const activeSavedSearch = useMemo(
+    () => savedSearches.find((s) => s.id === activeChip) ?? null,
+    [savedSearches, activeChip],
+  );
+
+  const showingSaved = activeChip === SAVED;
+  const showingTrending = activeChip === TRENDING;
+
+  // Client-side filter when a saved search chip is selected. Mirrors the
+  // discover screen's filter logic so the chip's params actually narrow the
+  // grid in-place rather than navigating away. When the "Saved" chip is
+  // active we swap the dataset entirely to the user's bookmarks; "Trending"
+  // swaps it to the likes-sorted grid.
+  const visibleListings = useMemo(() => {
+    if (showingSaved) return savedListings;
+    if (showingTrending) return trendingListings;
+    if (!activeSavedSearch) return listings;
+    let rows = listings;
+    if (isValidCategory(activeSavedSearch.category)) {
+      const cat = activeSavedSearch.category;
+      rows = rows.filter((l) => l.category === cat);
+    }
+    const q = activeSavedSearch.query?.trim().toLowerCase() ?? '';
+    if (q.length > 0) {
+      rows = rows.filter(
+        (l) =>
+          l.title.toLowerCase().includes(q) ||
+          (l.brand?.toLowerCase().includes(q) ?? false),
+      );
+    }
+    return rows;
+  }, [listings, savedListings, trendingListings, showingTrending, activeSavedSearch, showingSaved]);
+
+  // Instant local filter layered on top of the active view. Matches title and
+  // brand, the two fields a shopper scans for.
+  //
+  // The TextInput stays bound to `query` so keystrokes paint immediately, but
+  // everything derived from the text reads `deferredQuery` instead. Without the
+  // split, one keystroke synchronously re-ran the title/brand filter AND the
+  // sort (which copies the array) over the whole feed, rebuilt gridRows, and
+  // re-rendered the list plus the header — all on the UI thread, between the
+  // key press and the caret moving. useDeferredValue lets React paint the
+  // character first and recompute the results at lower priority, and it
+  // coalesces: typing quickly skips the intermediate filters entirely rather
+  // than running one per character.
+  const deferredQuery = useDeferredValue(query);
+  const trimmedQuery = deferredQuery.trim().toLowerCase();
+  const isSearching = trimmedQuery.length > 0;
+  const searchedListings = useMemo(() => {
+    if (!isSearching) return visibleListings;
+    return visibleListings.filter(
+      (l) =>
+        l.title.toLowerCase().includes(trimmedQuery) ||
+        (l.brand?.toLowerCase().includes(trimmedQuery) ?? false),
+    );
+  }, [visibleListings, isSearching, trimmedQuery]);
+
+  // Structured filters + sort, layered on top of the text search. Sorting
+  // copies before mutating so the source query cache is never reordered.
+  const filteredListings = useMemo(() => {
+    let rows = searchedListings;
+    if (filters.category) rows = rows.filter((l) => l.category === filters.category);
+    if (filters.conditions.length > 0)
+      rows = rows.filter((l) => filters.conditions.includes(l.condition));
+    if (filters.priceMin != null) rows = rows.filter((l) => l.price >= filters.priceMin!);
+    if (filters.priceMax != null) rows = rows.filter((l) => l.price <= filters.priceMax!);
+    switch (filters.sort) {
+      case 'newest':
+        rows = [...rows].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        );
+        break;
+      case 'price_asc':
+        rows = [...rows].sort((a, b) => a.price - b.price);
+        break;
+      case 'price_desc':
+        rows = [...rows].sort((a, b) => b.price - a.price);
+        break;
+      case 'popular':
+        rows = [...rows].sort((a, b) => (b.likes ?? 0) - (a.likes ?? 0));
+        break;
+    }
+    return rows;
+  }, [searchedListings, filters]);
+
+  // Both banners are gated on their inputs having SETTLED, not merely on the
+  // current value. Without that gate each one renders during load and then
+  // vanishes, dropping everything below it by its own height — a measured 74px
+  // layout shift on every single visit, which is most of this screen's CLS.
+  //
+  // The follow CTA was the worse of the two, because its condition is
+  // accidentally true while loading rather than merely unknown:
+  // `listings` is the stable empty array until the feed resolves, and
+  // `[].every(...)` is `true`, so `isFallback` starts out true for everyone.
+  // `savedSearches.length === 0` is likewise true before that query lands.
+  //
+  // Both banners sit above the grid, so either one appearing or disappearing
+  // after first paint drops everything below it by ~74px. Both are therefore
+  // gated on their inputs having SETTLED rather than on the current value.
+  //
+  // This only works because AuthProvider now mounts alongside the font load
+  // rather than behind it (see app/_layout.tsx) — auth resolves before first
+  // paint, so `authLoading` is already false by the time this renders and the
+  // gate costs nothing visually. Gating on auth while the provider still sat
+  // behind the font gate simply moved the shift onto signed-out visitors, which
+  // was measured at the same 0.030.
+  //
+  // The follow CTA additionally needs its query inputs, because its condition
+  // is accidentally TRUE while loading rather than merely unknown: `listings`
+  // is the stable empty array until the feed resolves and `[].every(...)` is
+  // `true`, so `isFallback` starts true for everyone, and
+  // `savedSearches.length === 0` likewise. Ungated it rendered on every single
+  // visit and then vanished.
+  const authSettled = !authLoading;
+  const ctaInputsSettled = authSettled && !feedQ.isPending && !savedSearchesQ.isPending;
+
+  const showColdStartBanner = authSettled && !user;
+  const showFollowCta =
+    ctaInputsSettled && !!user && savedSearches.length === 0 && isFallback;
+
+  // Rails are browsing aids; while filtering we hide them so results stay the
+  // sole focus.
+  const showRails =
+    activeChip === FOR_YOU && !showingSaved && !isSearching && activeFilterCount === 0;
+
+  const gridEmptyText = isSearching
+    ? `Nothing in ${showingSaved ? 'your saved items' : 'this feed'} matches “${deferredQuery.trim()}”.`
+    : activeFilterCount > 0
+      ? 'No items match these filters. Try loosening them.'
+      : showingSaved
+        ? 'No saved items yet. Tap the bookmark on any listing to save it.'
+        : showingTrending
+          ? 'Nothing trending right now.'
+          : 'Nothing matches this feed yet.';
+
+  // Chunk the flat listing array into grid rows. The FlashList below virtualizes
+  // ROWS (numColumns stays 1) rather than individual cards: it keeps the exact
+  // flex-row + fixed cardWidth layout this screen already had — so the grid is
+  // pixel-identical — while still mounting only the rows near the viewport
+  // instead of all ~60 listings at once.
+  const gridRows = useMemo(() => {
+    const out: Listing[][] = [];
+    for (let i = 0; i < filteredListings.length; i += columns) {
+      out.push(filteredListings.slice(i, i + columns));
+    }
+    return out;
+  }, [filteredListings, columns]);
+
+  const gridLoading = showingSaved ? loadingSaved : showingTrending ? trendingLoading : loading;
+
+  const renderRow = useCallback(
+    ({ item }: { item: Listing[] }) => (
+      <GridRow row={item} columns={columns} cardWidth={cardWidth} />
+    ),
+    [columns, cardWidth],
+  );
+
+  // Row identity is its first listing — stable across re-sorts and filters.
+  const rowKey = useCallback((row: Listing[]) => row[0]?.id ?? 'empty', []);
+
+  // NOTE: passed as an ELEMENT, never as an inline `() => <Header/>` component.
+  // An inline function creates a new component type every render, which makes
+  // React unmount and remount the header — that would blow away focus in the
+  // search field on every keystroke.
+  const listHeader = (
+    <>
+      {/* In-feed search — filters the active view (For you / Saved / a saved
+          search) by title or brand. Focus lifts the hairline to purple; the
+          border is always present so focusing never shifts layout. */}
+      <FeedSearch
+          value={query}
+          onChangeText={setQuery}
+          focused={searchFocused}
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setSearchFocused(false)}
+          resultCount={isSearching || activeFilterCount > 0 ? filteredListings.length : null}
+          filterCount={activeFilterCount}
+          onOpenFilter={() => setFilterOpen(true)}
+          savedActive={showingSaved}
+          onToggleSaved={() => setActiveChip(showingSaved ? FOR_YOU : SAVED)}
+        />
+
+        {showColdStartBanner ? (
+          <Pressable
+            onPress={() => {
+              haptic();
+              router.push('/auth/login');
+            }}
+            style={{
+              marginHorizontal: 16,
+              marginTop: 14,
+              padding: 14,
+              borderRadius: radii.md,
+              backgroundColor: colors.purpleSoft,
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}
+          >
+            <Feather name="user-plus" size={16} color={colors.purple} style={{ marginRight: 10 }} />
+            <Text style={{ flex: 1, color: colors.purple, fontSize: 13, fontWeight: '600' }}>
+              Sign in and like a few items to see this feed personalize itself.
+            </Text>
+          </Pressable>
+        ) : null}
+
+        {showFollowCta ? (
+          <Pressable
+            onPress={() => {
+              haptic();
+              router.push('/(tabs)/discover');
+            }}
+            style={{
+              marginHorizontal: 16,
+              marginTop: 14,
+              padding: 14,
+              borderRadius: radii.md,
+              backgroundColor: colors.purpleSoft,
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}
+          >
+            <Feather name="compass" size={16} color={colors.purple} style={{ marginRight: 10 }} />
+            <Text style={{ flex: 1, color: colors.purple, fontSize: 13, fontWeight: '600' }}>
+              Follow some sellers or like a few items to start personalizing your feed.
+            </Text>
+          </Pressable>
+        ) : null}
+
+        {/* Chip row: For you + Trending + Saved + saved searches + add */}
+        <ChipRow
+          savedSearches={savedSearches}
+          activeChip={activeChip}
+          onSelectChip={setActiveChip}
+          onDeleteChip={onDeleteChip}
+          onAdd={() => {
+            if (!user?.id) {
+              toast.show('Sign in to create drop alerts', { variant: 'info', icon: 'log-in' });
+              router.push('/auth/login');
+              return;
+            }
+            setAlertSheetOpen(true);
+          }}
+        />
+
+        {/* Price drops on items the user liked — a marketplace-only signal.
+            Strip renders only when there's at least one real drop. */}
+        {showRails && priceDrops.length > 0 ? (
+          <View style={{ marginBottom: 14 }}>
+            <RailHeader icon="trending-down" title="Price drops on your likes" />
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: HORIZONTAL_PAD, gap: GRID_GAP }}
+            >
+              {priceDrops.map((drop) => (
+                <PriceDropCard key={drop.id} listing={drop} width={130} />
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
+    </>
+  );
 
   return (
-    <Pressable
-      onPress={onPress}
-      onPressIn={() =>
-        Animated.spring(scaleAnim, { toValue: 0.93, useNativeDriver: true, speed: 30, bounciness: 4 }).start()
-      }
-      onPressOut={() =>
-        Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 6 }).start()
-      }
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
+      <FlashList
+        data={gridRows}
+        renderItem={renderRow}
+        keyExtractor={rowKey}
+        // Default is 250 — shorter than one grid row, so a flick outruns the
+        // buffer. See GRID_DRAW_DISTANCE in lib/responsive.ts for the geometry.
+        drawDistance={GRID_DRAW_DISTANCE}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={
+          <GridPlaceholder
+            loading={gridLoading}
+            columns={columns}
+            cardWidth={cardWidth}
+            emptyText={gridEmptyText}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />
+        }
+        contentContainerStyle={{ paddingBottom: tabClear }}
+      />
+
+      <FeedFilterSheet
+        visible={filterOpen}
+        initial={filters}
+        onApply={setFilters}
+        onClose={() => setFilterOpen(false)}
+      />
+
+      {user?.id ? (
+        <DropAlertSheet
+          visible={alertSheetOpen}
+          userId={user.id}
+          onClose={() => setAlertSheetOpen(false)}
+          onCreated={() => searchesRefetch()}
+        />
+      ) : null}
+    </SafeAreaView>
+  );
+}
+
+// Compact section header for the personal rails: icon chip + label, quieter
+// than the page title so the grid below stays the focal point.
+function RailHeader({ icon, title }: { icon: keyof typeof Feather.glyphMap; title: string }) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 16,
+        marginBottom: 10,
+      }}
     >
-      {/* Outer view handles scale (native driver) */}
-      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-        {/* Inner view handles background color (JS driver) */}
-        <Animated.View
+      <View
+        style={{
+          width: 24,
+          height: 24,
+          borderRadius: 12,
+          backgroundColor: colors.purpleSoft,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Feather name={icon} size={12} color={colors.purple} />
+      </View>
+      <Text style={{ fontSize: 14, fontWeight: '800', color: colors.ink, letterSpacing: -0.2 }}>
+        {title}
+      </Text>
+    </View>
+  );
+}
+
+// In-feed search field. Pill-shaped to match Discover's search vocabulary, but
+// scoped to an instant local filter rather than a server query. The hairline
+// border is always rendered (transparent → purple on focus) so the field never
+// reflows when focused, and a live result count reassures the user the filter
+// is working before they scan the grid.
+function FeedSearch({
+  value,
+  onChangeText,
+  focused,
+  onFocus,
+  onBlur,
+  resultCount,
+  filterCount,
+  onOpenFilter,
+  savedActive,
+  onToggleSaved,
+}: {
+  value: string;
+  onChangeText: (t: string) => void;
+  focused: boolean;
+  onFocus: () => void;
+  onBlur: () => void;
+  resultCount: number | null;
+  filterCount: number;
+  onOpenFilter: () => void;
+  savedActive: boolean;
+  onToggleSaved: () => void;
+}) {
+  const searching = value.trim().length > 0;
+  const hasFilters = filterCount > 0;
+  return (
+    <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View
           style={{
-            backgroundColor,
+            flex: 1,
             flexDirection: 'row',
             alignItems: 'center',
-            paddingHorizontal: 16,
-            paddingVertical: 8,
-            borderRadius: 999,
+            backgroundColor: colors.panel,
+            borderRadius: radii.pill,
+            paddingHorizontal: 14,
+            height: 44,
+            borderWidth: 1,
+            borderColor: focused ? colors.purple : 'transparent',
           }}
         >
-          <Ionicons
-            name={iconName as any}
-            size={14}
-            color={isActive ? '#ffffff' : '#374151'}
-            style={{ marginRight: 5 }}
+          <Feather name="search" size={17} color={focused ? colors.purple : colors.muteSoft} />
+          <TextInput
+            value={value}
+            onChangeText={onChangeText}
+            onFocus={onFocus}
+            onBlur={onBlur}
+            placeholder="Search your feed"
+            placeholderTextColor={colors.muteSoft}
+            style={
+              {
+                flex: 1,
+                marginLeft: 9,
+                fontSize: 14.5,
+                color: colors.ink,
+                padding: 0,
+                // RN-Web only: drop the browser's default focus ring — the purple
+                // border is our focus affordance.
+                outlineStyle: 'none',
+                outlineWidth: 0,
+              } as any
+            }
+            returnKeyType="search"
+            autoCorrect={false}
+            autoCapitalize="none"
+            accessibilityLabel="Search your feed"
           />
-          <Animated.Text style={{ fontSize: 14, fontWeight: '600', color: textColor }}>
-            {tab}
-          </Animated.Text>
-        </Animated.View>
-      </Animated.View>
+          {searching ? (
+            <Pressable
+              hitSlop={HIT_SLOP_8}
+              onPress={() => {
+                haptic();
+                onChangeText('');
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+            >
+              <Feather name="x" size={16} color={colors.muteSoft} />
+            </Pressable>
+          ) : null}
+        </View>
+
+        {/* Filter button — a count badge appears once constraints are applied. */}
+        <Pressable
+          onPress={() => {
+            haptic();
+            onOpenFilter();
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={
+            hasFilters ? `Filters, ${filterCount} active` : 'Open filters'
+          }
+          style={({ pressed }) => ({
+            width: 44,
+            height: 44,
+            borderRadius: radii.pill,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderWidth: 1,
+            borderColor: hasFilters ? colors.purple : colors.hairline,
+            backgroundColor: hasFilters ? colors.purpleSoft : colors.white,
+            transform: [{ scale: pressed ? 0.94 : 1 }],
+          })}
+        >
+          <Feather name="sliders" size={18} color={hasFilters ? colors.purple : colors.ink} />
+          {hasFilters ? (
+            <View
+              style={{
+                position: 'absolute',
+                top: -4,
+                right: -4,
+                minWidth: 19,
+                height: 19,
+                borderRadius: 10,
+                paddingHorizontal: 5,
+                backgroundColor: colors.purple,
+                borderWidth: 2,
+                borderColor: colors.white,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text style={{ fontSize: 10.5, fontWeight: '800', color: colors.white }}>
+                {filterCount}
+              </Text>
+            </View>
+          ) : null}
+        </Pressable>
+
+        {/* Saved toggle — icon-only, beside the filter button (Polymarket
+            reference). Replaces the old "Saved" text chip. */}
+        <Pressable
+          onPress={() => {
+            haptic();
+            onToggleSaved();
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={savedActive ? 'Showing saved items' : 'Show saved items'}
+          style={({ pressed }) => ({
+            width: 44,
+            height: 44,
+            borderRadius: radii.pill,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderWidth: 1,
+            borderColor: savedActive ? colors.purple : colors.hairline,
+            backgroundColor: savedActive ? colors.purpleSoft : colors.white,
+            transform: [{ scale: pressed ? 0.94 : 1 }],
+          })}
+        >
+          <Feather
+            name="bookmark"
+            size={18}
+            color={savedActive ? colors.purple : colors.ink}
+          />
+        </Pressable>
+      </View>
+      {searching && resultCount !== null && resultCount > 0 ? (
+        <Text
+          style={{
+            marginTop: 8,
+            marginLeft: 2,
+            fontSize: 12,
+            color: colors.muteSoft,
+            letterSpacing: -0.1,
+          }}
+        >
+          {resultCount} {resultCount === 1 ? 'result' : 'results'}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+function ChipRow({
+  savedSearches,
+  activeChip,
+  onSelectChip,
+  onDeleteChip,
+  onAdd,
+}: {
+  savedSearches: SavedSearch[];
+  activeChip: string;
+  onSelectChip: (id: string) => void;
+  onDeleteChip: (search: SavedSearch) => void;
+  onAdd: () => void;
+}) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingTop: 14, paddingBottom: 10 }}
+    >
+      <Chip
+        label="For you"
+        icon="zap"
+        active={activeChip === FOR_YOU}
+        onPress={() => onSelectChip(FOR_YOU)}
+      />
+      <Chip
+        label="Trending"
+        icon="trending-up"
+        active={activeChip === TRENDING}
+        onPress={() => onSelectChip(TRENDING)}
+      />
+      <AddChip onPress={onAdd} />
+      {savedSearches.map((s) => (
+        <Chip
+          key={s.id}
+          label={s.label ?? 'Saved'}
+          active={activeChip === s.id}
+          onPress={() => onSelectChip(s.id)}
+          onLongPress={() => onDeleteChip(s)}
+        />
+      ))}
+    </ScrollView>
+  );
+}
+
+function Chip({
+  label,
+  icon,
+  active,
+  onPress,
+  onLongPress,
+}: {
+  label: string;
+  icon?: keyof typeof Feather.glyphMap;
+  active: boolean;
+  onPress: () => void;
+  onLongPress?: () => void;
+}) {
+  // Same selected-fill / unselected-outline structure as Instagram's
+  // custom-feed tabs, tuned to Carrinex's whisper-border language: the
+  // outline is a soft hairline (not a hard black stroke), and the selected
+  // chip carries a solid slate fill with white text — weight stays a constant
+  // semibold so the active chip doesn't jump in width when selected.
+  const textColor = active ? colors.onSelected : colors.mute;
+  return (
+    <Pressable
+      onPress={() => {
+        haptic();
+        onPress();
+      }}
+      onLongPress={
+        onLongPress
+          ? () => {
+              haptic();
+              onLongPress();
+            }
+          : undefined
+      }
+      delayLongPress={350}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        paddingHorizontal: 14,
+        paddingVertical: 7,
+        borderRadius: radii.pill,
+        borderWidth: active ? 0 : 1,
+        borderColor: colors.hairline,
+        backgroundColor: active ? colors.selected : 'transparent',
+        opacity: pressed ? 0.7 : 1,
+      })}
+    >
+      {icon ? <Feather name={icon} size={13} color={textColor} /> : null}
+      <Text
+        style={{
+          fontSize: 13,
+          fontWeight: '600',
+          color: textColor,
+          letterSpacing: -0.1,
+        }}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }
 
-const SUGGESTED_USERS = [
-  { id: 'u1', display_name: 'dafneee', username: '@dafneee', avatar: 'https://picsum.photos/seed/dafne/80/80' },
-  { id: 'u2', display_name: 'T.Fashion', username: '@t.fashion', avatar: 'https://picsum.photos/seed/tfash/80/80' },
-  { id: 'u3', display_name: 'Thea settergren', username: '@theasettergren', avatar: 'https://picsum.photos/seed/thea/80/80' },
-  { id: 'u4', display_name: 'Leah Ferm', username: '@leah.ferm', avatar: 'https://picsum.photos/seed/leah/80/80' },
-  { id: 'u5', display_name: 'Edita Kondrat Art', username: '@editakondratjewelry', avatar: 'https://picsum.photos/seed/edita/80/80' },
-];
-
-const MOCK_LISTINGS: Listing[] = [
-  {
-    id: '7',
-    seller_id: 'u5',
-    seller: { id: 'u5', username: 'maryam_closet', avatar_url: null, full_name: 'Maryam', bio: null, location: 'Karachi', rating: 4.7, total_sales: 22, created_at: '' },
-    title: 'Superdry',
-    description: 'Barely worn, great condition.',
-    price: 499,
-    category: 'clothing',
-    gender: 'women',
-    brand: 'Superdry',
-    size: 'XS',
-    condition: 'like_new',
-    images: ['https://picsum.photos/seed/7/400/520', 'https://picsum.photos/seed/7b/400/520', 'https://picsum.photos/seed/7c/400/520'],
-    is_sold: false,
-    views: 55,
-    likes: 11,
-    created_at: '',
-  },
-  {
-    id: '1',
-    seller_id: 'u5',
-    seller: { id: 'u5', username: 'maryam_closet', avatar_url: null, full_name: 'Maryam', bio: null, location: 'Karachi', rating: 4.7, total_sales: 22, created_at: '' },
-    title: 'Superdry',
-    description: 'Barely worn, great condition.',
-    price: 649,
-    category: 'clothing',
-    gender: 'women',
-    brand: 'Superdry',
-    size: 'S',
-    condition: 'like_new',
-    images: ['https://picsum.photos/seed/17/400/520', 'https://picsum.photos/seed/17b/400/520', 'https://picsum.photos/seed/17c/400/520'],
-    is_sold: false,
-    views: 55,
-    likes: 11,
-    created_at: '',
-  },
-  {
-    id: '8',
-    seller_id: 'u6',
-    seller: { id: 'u6', username: 'junaid_fits', avatar_url: null, full_name: 'Junaid', bio: null, location: 'Lahore', rating: 4.3, total_sales: 5, created_at: '' },
-    title: 'Nudie',
-    description: 'Slim fit, authentic.',
-    price: 549,
-    category: 'clothing',
-    gender: 'men',
-    brand: 'Nudie',
-    size: '31/...',
-    condition: 'good',
-    images: ['https://picsum.photos/seed/8/400/520', 'https://picsum.photos/seed/8b/400/520', 'https://picsum.photos/seed/8c/400/520'],
-    is_sold: false,
-    views: 78,
-    likes: 14,
-    created_at: '',
-  },
-  {
-    id: '9',
-    seller_id: 'u6',
-    seller: { id: 'u6', username: 'junaid_fits', avatar_url: null, full_name: 'Junaid', bio: null, location: 'Lahore', rating: 4.3, total_sales: 5, created_at: '' },
-    title: 'Nudie Jeans',
-    description: 'Slim fit',
-    price: 549,
-    category: 'clothing',
-    gender: 'men',
-    brand: 'Nudie',
-    size: '31/...',
-    condition: 'good',
-    images: ['https://picsum.photos/seed/9/400/520', 'https://picsum.photos/seed/9b/400/520', 'https://picsum.photos/seed/9c/400/520'],
-    is_sold: false,
-    views: 78,
-    likes: 14,
-    created_at: '',
-  },
-  {
-    id: '10',
-    seller_id: 'u7',
-    seller: { id: 'u7', username: 'sara_style', avatar_url: null, full_name: 'Sara', bio: null, location: 'Stockholm', rating: 4.9, total_sales: 40, created_at: '' },
-    title: 'Acne Studios',
-    description: 'Barely used.',
-    price: 899,
-    category: 'clothing',
-    gender: 'women',
-    brand: 'Acne Studios',
-    size: 'M',
-    condition: 'like_new',
-    images: ['https://picsum.photos/seed/10/400/520', 'https://picsum.photos/seed/10b/400/520', 'https://picsum.photos/seed/10c/400/520'],
-    is_sold: false,
-    views: 120,
-    likes: 31,
-    created_at: '',
-  },
-  {
-    id: '11',
-    seller_id: 'u8',
-    seller: { id: 'u8', username: 'karl_fits', avatar_url: null, full_name: 'Karl', bio: null, location: 'Gothenburg', rating: 4.5, total_sales: 12, created_at: '' },
-    title: 'Carhartt WIP',
-    description: 'Great condition.',
-    price: 450,
-    category: 'clothing',
-    gender: 'men',
-    brand: 'Carhartt',
-    size: 'L',
-    condition: 'good',
-    images: ['https://picsum.photos/seed/21/400/520', 'https://picsum.photos/seed/21b/400/520', 'https://picsum.photos/seed/21c/400/520'],
-    is_sold: false,
-    views: 64,
-    likes: 9,
-    created_at: '',
-  },
-  {
-    id: '12',
-    seller_id: 'u9',
-    seller: { id: 'u9', username: 'lena_preloved', avatar_url: null, full_name: 'Lena', bio: null, location: 'Malmö', rating: 4.6, total_sales: 18, created_at: '' },
-    title: 'Weekday',
-    description: 'Worn twice.',
-    price: 299,
-    category: 'clothing',
-    gender: 'women',
-    brand: 'Weekday',
-    size: 'S',
-    condition: 'like_new',
-    images: ['https://picsum.photos/seed/33/400/520', 'https://picsum.photos/seed/33b/400/520', 'https://picsum.photos/seed/33c/400/520'],
-    is_sold: false,
-    views: 47,
-    likes: 7,
-    created_at: '',
-  },
-  {
-    id: '13',
-    seller_id: 'u10',
-    seller: { id: 'u10', username: 'oskar_shop', avatar_url: null, full_name: 'Oskar', bio: null, location: 'Uppsala', rating: 4.2, total_sales: 8, created_at: '' },
-    title: 'Tiger of Sweden',
-    description: 'Perfect condition.',
-    price: 750,
-    category: 'clothing',
-    gender: 'men',
-    brand: 'Tiger of Sweden',
-    size: '50',
-    condition: 'like_new',
-    images: ['https://picsum.photos/seed/44/400/520', 'https://picsum.photos/seed/44b/400/520', 'https://picsum.photos/seed/44c/400/520'],
-    is_sold: false,
-    views: 89,
-    likes: 20,
-    created_at: '',
-  },
-  {
-    id: '14',
-    seller_id: 'u11',
-    seller: { id: 'u11', username: 'maja_closet', avatar_url: null, full_name: 'Maja', bio: null, location: 'Lund', rating: 4.8, total_sales: 33, created_at: '' },
-    title: 'Filippa K',
-    description: 'Elegant, light wear.',
-    price: 620,
-    category: 'clothing',
-    gender: 'women',
-    brand: 'Filippa K',
-    size: 'XS',
-    condition: 'good',
-    images: ['https://picsum.photos/seed/55/400/520', 'https://picsum.photos/seed/55b/400/520', 'https://picsum.photos/seed/55c/400/520'],
-    is_sold: false,
-    views: 103,
-    likes: 27,
-    created_at: '',
-  },
-];
-
-const TABS: TabName[] = ['For you', 'Popular', 'Following'];
-
-// Prefetch all image URLs so they're in cache before user scrolls to them
-Image.prefetch(MOCK_LISTINGS.map(l => l.images[0]));
-
-export default function HomeScreen() {
-  const [activeTab, setActiveTab] = useState<TabName>('For you');
-  const [refreshing, setRefreshing] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    // Simulate a short data-fetch delay; replace with real Supabase call
-    const t = setTimeout(() => setLoading(false), 600);
-    return () => clearTimeout(t);
-  }, []);
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
-
-  const listings = activeTab === 'Popular'
-    ? [...MOCK_LISTINGS].sort((a, b) => b.likes - a.likes)
-    : MOCK_LISTINGS;
-
-  const renderItem = useCallback(
-    ({ item }: { item: Listing }) => <ListingCard listing={item} />,
-    []
-  );
-
-  const skeletonData = Array.from({ length: 9 }, (_, i) => ({ id: `sk-${i}` }));
-  const renderSkeleton = useCallback(
-    () => (
-      <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 12, marginBottom: 6 }}>
-        {[0,1,2].map(i => <SkeletonCard key={i} />)}
-      </View>
-    ),
-    []
-  );
-
+function AddChip({ onPress }: { onPress: () => void }) {
   return (
-    <SafeAreaView edges={['top']} className="flex-1 bg-white">
-      {/* Search Header */}
-      <View className="flex-row items-center px-4 pt-2 pb-3">
-        <View className="flex-1 flex-row items-center bg-[#F2F2F2] rounded-full px-4 py-[10px] mr-3">
-          <Feather name="search" size={18} color="#9ca3af" />
-          <Text className="ml-2.5 flex-1 text-[15px] text-gray-400">
-            What are you looking for today?
-          </Text>
-        </View>
-        <Pressable className="w-[42px] h-[42px] border border-gray-200 rounded-[10px] items-center justify-center bg-white">
-          <Feather name="sliders" size={18} color="#111827" />
-        </Pressable>
-      </View>
+    <Pressable
+      onPress={() => {
+        haptic();
+        onPress();
+      }}
+      accessibilityRole="button"
+      accessibilityLabel="Add a new feed"
+      style={({ pressed }) => ({
+        width: 34,
+        height: 34,
+        borderRadius: radii.pill,
+        borderWidth: 1,
+        borderColor: colors.hairline,
+        backgroundColor: 'transparent',
+        alignItems: 'center',
+        justifyContent: 'center',
+        opacity: pressed ? 0.7 : 1,
+      })}
+    >
+      <Feather name="plus" size={14} color={colors.ink} />
+    </Pressable>
+  );
+}
 
-      {/* Feed tabs */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        className="px-4"
-        style={{ flexGrow: 0 }}
-        contentContainerStyle={{ paddingBottom: 12, gap: 8 }}
-      >
-        {TABS.map((tab) => (
-          <AnimatedTabPill
-            key={tab}
-            tab={tab}
-            isActive={activeTab === tab}
-            onPress={() => setActiveTab(tab)}
+// One row of the virtualized grid. Layout is byte-for-byte what the old
+// non-virtualized <Grid> emitted per row — the horizontal padding moved from the
+// (now absent) wrapper onto each row, and the wrapper's `gap` became a
+// marginBottom, so spacing between rows is unchanged.
+const GridRow = memo(function GridRow({
+  row,
+  columns,
+  cardWidth,
+}: {
+  row: Listing[];
+  columns: number;
+  cardWidth: number;
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        gap: GRID_GAP,
+        paddingHorizontal: HORIZONTAL_PAD,
+        marginBottom: GRID_GAP,
+      }}
+    >
+      {row.map((listing) => (
+        <View key={listing.id} style={{ width: cardWidth }}>
+          <ListingCard listing={listing} width={cardWidth} />
+        </View>
+      ))}
+      {row.length < columns &&
+        Array.from({ length: columns - row.length }).map((_, i) => (
+          <View key={`pad-${i}`} style={{ width: cardWidth }} />
+        ))}
+    </View>
+  );
+});
+
+// Rendered by FlashList's ListEmptyComponent — covers both the loading skeleton
+// and the "nothing here" copy, which is exactly when the row list is empty.
+function GridPlaceholder({
+  loading,
+  columns,
+  cardWidth,
+  emptyText,
+}: {
+  loading: boolean;
+  columns: number;
+  cardWidth: number;
+  emptyText?: string;
+}) {
+  if (loading) {
+    return (
+      <View style={{ paddingHorizontal: HORIZONTAL_PAD, flexDirection: 'row', gap: GRID_GAP }}>
+        {Array.from({ length: columns }).map((_, i) => (
+          <View
+            key={i}
+            style={{
+              width: cardWidth,
+              aspectRatio: 1,
+              borderRadius: 12,
+              backgroundColor: 'rgba(15,15,15,0.06)',
+            }}
           />
         ))}
-      </ScrollView>
-
-      {/* Following view — always mounted, hidden when inactive */}
-      <ScrollView
-        style={{ flex: 1, display: activeTab === 'Following' ? 'flex' : 'none' }}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 32 }}
-      >
-        <Text className="text-center text-[15px] text-gray-800 leading-[22px] px-8 pt-6 pb-5">
-          {'Oops, you are not following anyone yet! 😭\nFollow other Carrinexers to get one step closer to your dream clothes! Here are some recommendations 🌀💛'}
-        </Text>
-        {SUGGESTED_USERS.map((user) => (
-          <View key={user.id} className="flex-row items-center px-4 py-3">
-            <Image
-              source={{ uri: user.avatar }}
-              style={{ width: 52, height: 52, borderRadius: 26 }}
-              className="bg-gray-200"
-              contentFit="cover"
-              cachePolicy="memory-disk"
-            />
-            <View className="flex-1 ml-3">
-              <Text className="text-[15px] font-bold text-gray-900">{user.display_name}</Text>
-              <Text className="text-[13px] text-gray-500 mt-0.5">{user.username}</Text>
-            </View>
-            <Pressable className="bg-black rounded-[10px] px-5 py-2 flex-row items-center">
-              <Feather name="plus" size={13} color="#fff" style={{ marginRight: 4 }} />
-              <Text className="text-white text-[13px] font-semibold">Follow</Text>
-            </Pressable>
-          </View>
-        ))}
-      </ScrollView>
-
-      {/* Product grid — always mounted, hidden when Following is active */}
-      <FlatList
-        key="feed-3"
-        style={{ flex: 1, display: activeTab !== 'Following' ? 'flex' : 'none' }}
-        data={loading ? [] : listings}
-        keyExtractor={(item) => item.id}
-        numColumns={3}
-        columnWrapperStyle={{ gap: 6, paddingHorizontal: 12 }}
-        showsVerticalScrollIndicator={false}
-        initialNumToRender={9}
-        maxToRenderPerBatch={9}
-        updateCellsBatchingPeriod={50}
-        windowSize={8}
-        removeClippedSubviews={Platform.OS !== 'web'}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6C47FF" />
-        }
-        ListHeaderComponent={
-          activeTab === 'For you' ? (
-            <View className="pb-4">
-              <PromoBanner onReadMore={() => {}} />
-            </View>
-          ) : (
-            <View className="pt-3 pb-2" />
-          )
-        }
-        ListEmptyComponent={loading ? (
-          <View>
-            {renderSkeleton()}
-            {renderSkeleton()}
-            {renderSkeleton()}
-          </View>
-        ) : null}
-        renderItem={renderItem}
-        contentContainerStyle={{ paddingBottom: 24 }}
-      />
-    </SafeAreaView>
+      </View>
+    );
+  }
+  return (
+    <View style={{ paddingHorizontal: 16, paddingTop: 40, alignItems: 'center' }}>
+      <Text style={{ fontSize: 13, color: colors.muteSoft, textAlign: 'center' }}>
+        {emptyText ?? 'Nothing matches this feed yet.'}
+      </Text>
+    </View>
   );
 }

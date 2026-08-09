@@ -1,0 +1,450 @@
+{
+  "url": "https://lekondo.com/",
+  "extractedAt": "2026-07-23T18:32:32.399Z",
+  "siteName": null,
+  "logo": null,
+  "favicons": [
+    {
+      "type": "icon",
+      "url": "https://lekondo.com/favicon-16x16.png",
+      "sizes": "16x16"
+    },
+    {
+      "type": "icon",
+      "url": "https://lekondo.com/favicon-32x32.png",
+      "sizes": "32x32"
+    },
+    {
+      "type": "apple-touch-icon",
+      "url": "https://lekondo.com/apple-touch-icon.png",
+      "sizes": null
+    },
+    {
+      "type": "apple-touch-icon",
+      "url": "https://lekondo.com/apple-touch-icon.png",
+      "sizes": null
+    },
+    {
+      "type": "favicon.ico",
+      "url": "https://lekondo.com/favicon.ico",
+      "sizes": null
+    }
+  ],
+  "colors": {
+    "semantic": {},
+    "palette": [
+      {
+        "color": "rgb(75, 85, 99)",
+        "normalized": "#4b5563",
+        "count": 33,
+        "confidence": "high",
+        "sources": [
+          "flex"
+        ],
+        "lch": "lch(35.78% 9.41 267.24)",
+        "oklch": "oklch(44.61% 0.026 256.8)"
+      },
+      {
+        "color": "rgb(243, 244, 246)",
+        "normalized": "#f3f4f6",
+        "count": 17,
+        "confidence": "medium",
+        "sources": [],
+        "lch": "lch(96.17% 1.08 271.27)",
+        "oklch": "oklch(96.7% 0.003 264.54)"
+      }
+    ],
+    "cssVariables": {
+      "--tw-ring-color": {
+        "value": "#3b82f680",
+        "lch": "lch(55.63% 66.77 285.23 / 0.5019607843137255)",
+        "oklch": "oklch(62.31% 0.188 259.81 / 0.5019607843137255)"
+      }
+    },
+    "_raw": [
+      {
+        "color": "rgb(0, 0, 0)",
+        "normalized": "#000000",
+        "count": 124
+      },
+      {
+        "color": "rgb(229, 231, 235)",
+        "normalized": "#e5e7eb",
+        "count": 187
+      },
+      {
+        "color": "rgb(255, 255, 255)",
+        "normalized": "#ffffff",
+        "count": 15
+      },
+      {
+        "color": "rgb(17, 24, 39)",
+        "normalized": "#111827",
+        "count": 17
+      },
+      {
+        "color": "rgb(75, 85, 99)",
+        "normalized": "#4b5563",
+        "count": 33
+      },
+      {
+        "color": "rgb(243, 244, 246)",
+        "normalized": "#f3f4f6",
+        "count": 17
+      }
+    ]
+  },
+  "typography": {
+    "styles": [
+      {
+        "context": "heading-1",
+        "family": "Outfit",
+        "fallbacks": null,
+        "size": "50px (3.13rem)",
+        "weight": 300,
+        "lineHeight": "1.05",
+        "spacing": "-0.4px",
+        "transform": null
+      },
+      {
+        "context": "heading-1",
+        "family": "Outfit",
+        "fallbacks": null,
+        "size": "23px (1.44rem)",
+        "weight": 300,
+        "lineHeight": "1.50",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "heading-1",
+        "family": "Outfit",
+        "fallbacks": null,
+        "size": "19px (1.19rem)",
+        "weight": 400,
+        "lineHeight": "1.50",
+        "spacing": "0.475px",
+        "transform": "uppercase"
+      },
+      {
+        "context": "button",
+        "family": "Outfit",
+        "fallbacks": null,
+        "size": "17px (1.06rem)",
+        "weight": 300,
+        "lineHeight": "1.00",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "heading-1",
+        "family": "Outfit",
+        "fallbacks": null,
+        "size": "17px (1.06rem)",
+        "weight": 300,
+        "lineHeight": "1.00",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "link",
+        "family": "Outfit",
+        "fallbacks": null,
+        "size": "17px (1.06rem)",
+        "weight": 300,
+        "lineHeight": "1.50",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "link",
+        "family": "Outfit",
+        "fallbacks": null,
+        "size": "16px (1.00rem)",
+        "weight": 400,
+        "lineHeight": "1.50",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "heading-1",
+        "family": "Outfit",
+        "fallbacks": null,
+        "size": "16px (1.00rem)",
+        "weight": 300,
+        "lineHeight": "1.05",
+        "spacing": "-0.4px",
+        "transform": null
+      },
+      {
+        "context": "heading-1",
+        "family": "Outfit",
+        "fallbacks": null,
+        "size": "16px (1.00rem)",
+        "weight": 300,
+        "lineHeight": "1.63",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "heading-1",
+        "family": "Outfit",
+        "fallbacks": null,
+        "size": "15px (0.94rem)",
+        "weight": 400,
+        "lineHeight": "1.50",
+        "spacing": "1.5px",
+        "transform": "uppercase"
+      },
+      {
+        "context": "caption",
+        "family": "Outfit",
+        "fallbacks": null,
+        "size": "14px (0.88rem)",
+        "weight": 300,
+        "lineHeight": "1.63",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "button",
+        "family": "Outfit",
+        "fallbacks": null,
+        "size": "13px (0.81rem)",
+        "weight": 300,
+        "lineHeight": "1.00",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "caption",
+        "family": "Outfit",
+        "fallbacks": null,
+        "size": "13px (0.81rem)",
+        "weight": 300,
+        "lineHeight": "1.00",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "caption",
+        "family": "Outfit",
+        "fallbacks": null,
+        "size": "13px (0.81rem)",
+        "weight": 400,
+        "lineHeight": "1.50",
+        "spacing": null,
+        "transform": null
+      },
+      {
+        "context": "link",
+        "family": "Outfit",
+        "fallbacks": null,
+        "size": "13px (0.81rem)",
+        "weight": 400,
+        "lineHeight": "1.50",
+        "spacing": null,
+        "transform": null
+      }
+    ],
+    "sources": {
+      "googleFonts": [],
+      "adobeFonts": false,
+      "variableFonts": false
+    }
+  },
+  "spacing": {
+    "scaleType": "8px",
+    "commonValues": [
+      {
+        "px": "1px",
+        "rem": "0.06rem",
+        "count": 3,
+        "numericValue": 1
+      },
+      {
+        "px": "4px",
+        "rem": "0.25rem",
+        "count": 17,
+        "numericValue": 4
+      },
+      {
+        "px": "8px",
+        "rem": "0.50rem",
+        "count": 1,
+        "numericValue": 8
+      },
+      {
+        "px": "12px",
+        "rem": "0.75rem",
+        "count": 14,
+        "numericValue": 12
+      },
+      {
+        "px": "16px",
+        "rem": "1.00rem",
+        "count": 14,
+        "numericValue": 16
+      },
+      {
+        "px": "20px",
+        "rem": "1.25rem",
+        "count": 1,
+        "numericValue": 20
+      },
+      {
+        "px": "24px",
+        "rem": "1.50rem",
+        "count": 7,
+        "numericValue": 24
+      },
+      {
+        "px": "32px",
+        "rem": "2.00rem",
+        "count": 5,
+        "numericValue": 32
+      },
+      {
+        "px": "40px",
+        "rem": "2.50rem",
+        "count": 3,
+        "numericValue": 40
+      },
+      {
+        "px": "64px",
+        "rem": "4.00rem",
+        "count": 16,
+        "numericValue": 64
+      },
+      {
+        "px": "96px",
+        "rem": "6.00rem",
+        "count": 1,
+        "numericValue": 96
+      }
+    ]
+  },
+  "borderRadius": {
+    "values": [
+      {
+        "value": "16px",
+        "count": 14,
+        "elements": [
+          "div"
+        ],
+        "confidence": "high",
+        "numericValue": 16
+      },
+      {
+        "value": "9999px",
+        "count": 6,
+        "elements": [
+          "div"
+        ],
+        "confidence": "medium",
+        "numericValue": 9999
+      }
+    ]
+  },
+  "borders": {
+    "combinations": [
+      {
+        "width": "1px",
+        "style": "solid",
+        "color": "rgb(243, 244, 246)",
+        "count": 6,
+        "elements": [
+          "div"
+        ],
+        "confidence": "medium"
+      }
+    ]
+  },
+  "shadows": [
+    {
+      "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(255, 255, 255) 0px 0px 0px 1px, rgba(0, 0, 0, 0.08) 0px 1px 3px 0px",
+      "count": 6,
+      "confidence": "high"
+    }
+  ],
+  "components": {
+    "buttons": [],
+    "inputs": {
+      "text": [],
+      "checkbox": [],
+      "radio": [],
+      "select": []
+    },
+    "links": [
+      {
+        "color": "rgb(75, 85, 99)",
+        "textDecoration": "none",
+        "fontWeight": "300",
+        "states": {
+          "default": {
+            "color": "rgb(75, 85, 99)",
+            "textDecoration": "none"
+          },
+          "hover": null
+        }
+      },
+      {
+        "color": "rgb(0, 0, 0)",
+        "textDecoration": "none",
+        "fontWeight": "400",
+        "states": {
+          "default": {
+            "color": "rgb(0, 0, 0)",
+            "textDecoration": "none"
+          },
+          "hover": null
+        }
+      }
+    ],
+    "badges": {
+      "all": [],
+      "byVariant": {
+        "error": [],
+        "warning": [],
+        "success": [],
+        "info": [],
+        "neutral": []
+      }
+    }
+  },
+  "breakpoints": [
+    {
+      "px": "640px"
+    },
+    {
+      "px": "768px"
+    },
+    {
+      "px": "1024px"
+    },
+    {
+      "px": "1280px"
+    },
+    {
+      "px": "1536px"
+    }
+  ],
+  "iconSystem": [],
+  "frameworks": [
+    {
+      "name": "Tailwind CSS",
+      "confidence": "high",
+      "evidence": "arbitrary values (e.g., top-[117px]), responsive/state modifiers"
+    },
+    {
+      "name": "PrimeReact/Vue/NG",
+      "confidence": "high",
+      "evidence": "65 Prime components"
+    },
+    {
+      "name": "Fluent UI",
+      "confidence": "high",
+      "evidence": "18 Fluent components"
+    }
+  ]
+}

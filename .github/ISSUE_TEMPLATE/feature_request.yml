@@ -1,0 +1,38 @@
+name: Feature request
+description: Propose a new capability or change to existing behaviour.
+title: '[feat] '
+labels: [enhancement, triage]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Start with the user need, not the implementation.
+      placeholder: e.g. "Sellers can't tell which of their listings are getting the most views, so they can't price competitively."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      placeholder: e.g. "Add a view counter to each listing card on the seller's profile."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      placeholder: What other approaches did you weigh against this one?
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - Small (one screen / day-scale)
+        - Medium (multiple screens / week-scale)
+        - Large (cross-cutting / month-scale)
+    validations:
+      required: true

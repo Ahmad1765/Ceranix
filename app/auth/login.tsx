@@ -1,92 +1,869 @@
-import { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  SafeAreaView,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
+import { useEffect, useState } from 'react';
+import { View, Pressable, Alert, KeyboardAvoidingView, Platform, ScrollView, Animated, Easing, useWindowDimensions } from 'react-native';
+import { Text, TextInput } from '@/lib/rnText';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import Feather from '@expo/vector-icons/Feather';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import * as Haptics from 'expo-haptics';
 import { supabase } from '@/lib/supabase';
+import { signInWithGoogle } from '@/lib/oauth';
+import { useToast } from '@/lib/toast';
+import { colors } from '@/lib/theme';
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+type Mode = 'signin' | 'signup';
+type Step = 'welcome' | 'form';
+
+function tap(style: 'light' | 'medium' = 'light') {
+  if (Platform.OS !== 'ios') return;
+  Haptics.impactAsync(
+    style === 'light'
+      ? Haptics.ImpactFeedbackStyle.Light
+      : Haptics.ImpactFeedbackStyle.Medium,
+  );
+}
+
+function PressableScale({
+  onPress,
+  disabled,
+  style,
+  children,
+}: {
+  onPress: () => void;
+  disabled?: boolean;
+  style?: any;
+  children: React.ReactNode;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => [
+        style,
+        { transform: [{ scale: pressed ? 0.975 : 1 }], opacity: disabled ? 0.55 : 1 },
+      ]}
+    >
+      {children}
+    </Pressable>
+  );
+}
 
 export default function LoginScreen() {
+  const toast = useToast();
+  const { height } = useWindowDimensions();
+  const [step, setStep] = useState<Step>('welcome');
+  const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isLogin, setIsLogin] = useState(true);
+  const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [emailFocused, setEmailFocused] = useState(false);
+  const [pwFocused, setPwFocused] = useState(false);
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [oauthLoading, setOauthLoading] = useState(false);
 
-  const handleAuth = async () => {
-    if (!email || !password) return;
+  const [stepAnim] = useState(() => new Animated.Value(0));
+  const [switchAnim] = useState(() => new Animated.Value(mode === 'signin' ? 0 : 1));
+
+  useEffect(() => {
+    Animated.timing(stepAnim, {
+      toValue: step === 'welcome' ? 0 : 1,
+      duration: 280,
+      easing: Easing.bezier(0.23, 1, 0.32, 1),
+      // MUST stay false: stepAnim is interpolated into `panelHeight` and applied
+      // as a `height` (see below). The native driver only supports transform and
+      // opacity, so driving a layout prop natively throws on iOS/Android — web
+      // never hit it because useNativeDriver is a no-op there.
+      useNativeDriver: false,
+    }).start();
+  }, [step, stepAnim]);
+
+  useEffect(() => {
+    Animated.timing(switchAnim, {
+      toValue: mode === 'signin' ? 0 : 1,
+      duration: 260,
+      easing: Easing.bezier(0.23, 1, 0.32, 1),
+      useNativeDriver: false,
+    }).start();
+  }, [mode, switchAnim]);
+
+  const welcomeHeight = Math.min(height * 0.5, 460);
+  const formHeight = Math.min(height * 0.28, 240);
+  const panelHeight = stepAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [welcomeHeight, formHeight],
+  });
+
+  const validate = (): { email?: string; password?: string } => {
+    const next: { email?: string; password?: string } = {};
+    if (!email) next.email = 'Email is required';
+    else if (!EMAIL_RE.test(email.trim())) next.email = 'Enter a valid email';
+    if (!password) next.password = 'Password is required';
+    else if (password.length < 8) next.password = 'Password must be at least 8 characters';
+    return next;
+  };
+
+  const handleSubmit = async () => {
+    const next = validate();
+    if (next.email || next.password) {
+      tap('medium');
+      setErrors(next);
+      return;
+    }
+    setErrors({});
+    tap('medium');
     setLoading(true);
     try {
-      if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (mode === 'signin') {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
         if (error) throw error;
+        toast.show('Welcome back', { variant: 'success', icon: 'check' });
+        if (router.canDismiss()) router.dismiss();
+        else router.replace('/(tabs)');
       } else {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { data, error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+        });
         if (error) throw error;
-        Alert.alert('Check your email', 'We sent a confirmation link.');
+        if (data.session) {
+          toast.show('Account created', { variant: 'success', icon: 'check' });
+          router.replace('/onboarding');
+        } else {
+          Alert.alert(
+            'Check your email',
+            'We sent a confirmation link. Verify it, then sign in.',
+            [{ text: 'Got it', onPress: () => setMode('signin') }],
+          );
+        }
       }
-      router.dismiss();
     } catch (e: any) {
-      Alert.alert('Error', e.message);
+      const raw = e?.message ?? '';
+      const friendly = /invalid login/i.test(raw)
+        ? 'Wrong email or password'
+        : /email not confirmed/i.test(raw)
+          ? 'Confirm your email first, then sign in'
+          : /already registered|already exists/i.test(raw)
+            ? 'That email already has an account — try signing in'
+            : raw || 'Something went wrong. Please try again.';
+      toast.show(friendly, { variant: 'default', icon: 'alert-triangle' });
     } finally {
       setLoading(false);
     }
   };
 
+  const handleForgot = async () => {
+    tap('light');
+    if (!EMAIL_RE.test(email.trim())) {
+      toast.show('Enter your email above first', { variant: 'info', icon: 'mail' });
+      return;
+    }
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+      if (error) throw error;
+      toast.show('Password reset link sent — check your inbox', {
+        variant: 'success',
+        icon: 'check',
+      });
+    } catch (e: any) {
+      toast.show(e?.message ?? 'Could not send reset email', {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
+    }
+  };
+
+  const goGuest = () => {
+    tap('light');
+    if (router.canDismiss()) router.dismiss();
+    else router.replace('/(tabs)');
+  };
+
+  const handleGoogle = async () => {
+    if (oauthLoading) return;
+    tap('light');
+    setOauthLoading(true);
+    const r = await signInWithGoogle();
+    setOauthLoading(false);
+    if (r.ok) {
+      toast.show('Welcome', { variant: 'success', icon: 'check' });
+      if (router.canDismiss()) router.dismiss();
+      else router.replace('/(tabs)');
+    } else if (!r.cancelled) {
+      toast.show(r.error ?? 'Google sign-in failed', { variant: 'default', icon: 'alert-triangle' });
+    }
+  };
+
+  const openForm = (m: Mode) => {
+    tap('light');
+    setMode(m);
+    setStep('form');
+  };
+
+  const backToWelcome = () => {
+    tap('light');
+    setStep('welcome');
+  };
+
+  const headline = step === 'welcome'
+    ? 'Your story\nstarts now.'
+    : mode === 'signup'
+      ? 'Make it\nyours.'
+      : 'Welcome\nback.';
+
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }} edges={['top']}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        className="flex-1 px-6 justify-center"
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
       >
-        <Text className="text-3xl font-bold text-gray-900 mb-1">Ceranix</Text>
-        <Text className="text-sm text-gray-500 mb-8">
-          {isLogin ? 'Sign in to your account' : 'Create your account'}
-        </Text>
-
-        <Text className="text-sm font-medium text-gray-700 mb-1">Email</Text>
-        <TextInput
-          className="border border-gray-200 rounded-xl px-3 py-3 text-sm text-gray-900 mb-4"
-          placeholder="you@example.com"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          value={email}
-          onChangeText={setEmail}
-        />
-
-        <Text className="text-sm font-medium text-gray-700 mb-1">Password</Text>
-        <TextInput
-          className="border border-gray-200 rounded-xl px-3 py-3 text-sm text-gray-900 mb-6"
-          placeholder="••••••••"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
-
-        <Pressable
-          onPress={handleAuth}
-          disabled={loading}
-          className="bg-brand-500 rounded-xl py-4 items-center mb-4"
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: 24 }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          bounces={false}
         >
-          <Text className="text-white font-bold text-base">
-            {loading ? 'Please wait...' : isLogin ? 'Sign In' : 'Create Account'}
-          </Text>
-        </Pressable>
+          {/* Top bar */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: 20,
+              paddingTop: 8,
+              paddingBottom: 8,
+            }}
+          >
+            {step === 'form' ? (
+              <Pressable
+                onPress={backToWelcome}
+                hitSlop={12}
+                style={({ pressed }) => ({
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: colors.white,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 1,
+                  borderColor: colors.hairline,
+                  transform: [{ scale: pressed ? 0.96 : 1 }],
+                })}
+              >
+                <Feather name="arrow-left" size={18} color={colors.ink} />
+              </Pressable>
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                <Text
+                  style={{
+                    fontSize: 22,
+                    fontWeight: '900',
+                    color: colors.ink,
+                    letterSpacing: -0.6,
+                  }}
+                >
+                  Carrinex
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 22,
+                    color: colors.primary,
+                    marginLeft: 2,
+                    fontWeight: '900',
+                  }}
+                >
+                  .
+                </Text>
+              </View>
+            )}
+            {router.canDismiss() && step === 'welcome' && (
+              <Pressable
+                onPress={() => router.dismiss()}
+                hitSlop={12}
+                style={({ pressed }) => ({
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: colors.white,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 1,
+                  borderColor: colors.hairline,
+                  transform: [{ scale: pressed ? 0.96 : 1 }],
+                })}
+              >
+                <Feather name="x" size={18} color={colors.ink} />
+              </Pressable>
+            )}
+          </View>
 
-        <Pressable onPress={() => setIsLogin(!isLogin)} className="items-center">
-          <Text className="text-sm text-gray-500">
-            {isLogin ? "Don't have an account? " : 'Already have an account? '}
-            <Text className="text-brand-500 font-semibold">
-              {isLogin ? 'Sign Up' : 'Sign In'}
-            </Text>
-          </Text>
-        </Pressable>
+          {/* Purple hero panel */}
+          <Animated.View
+            style={{
+              marginHorizontal: 16,
+              marginTop: 4,
+              height: panelHeight,
+              backgroundColor: colors.primary,
+              borderRadius: 32,
+              padding: 28,
+              justifyContent: 'space-between',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Subtle pattern dots — palette-compliant decoration */}
+            <View
+              style={{
+                position: 'absolute',
+                right: -40,
+                top: -40,
+                width: 220,
+                height: 220,
+                borderRadius: 110,
+                backgroundColor: 'rgba(255,255,255,0.08)',
+                pointerEvents: 'none',
+              }}
+            />
+            <View
+              style={{
+                position: 'absolute',
+                left: -60,
+                bottom: -80,
+                width: 200,
+                height: 200,
+                borderRadius: 100,
+                backgroundColor: 'rgba(255,255,255,0.06)',
+                pointerEvents: 'none',
+              }}
+            />
+
+            <View>
+              <View
+                style={{
+                  alignSelf: 'flex-start',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingHorizontal: 12,
+                  height: 28,
+                  borderRadius: 999,
+                  backgroundColor: 'rgba(255,255,255,0.16)',
+                  marginBottom: 18,
+                }}
+              >
+                <View
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 3,
+                    backgroundColor: colors.white,
+                    marginRight: 8,
+                  }}
+                />
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: '700',
+                    color: colors.white,
+                    letterSpacing: 1.4,
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  Carrinex
+                </Text>
+              </View>
+
+              <Text
+                style={{
+                  fontSize: step === 'welcome' ? 52 : 40,
+                  fontWeight: '900',
+                  color: colors.white,
+                  lineHeight: step === 'welcome' ? 54 : 42,
+                  letterSpacing: -1.8,
+                }}
+              >
+                {headline}
+              </Text>
+            </View>
+
+            {step === 'welcome' && (
+              <Text
+                style={{
+                  fontSize: 15,
+                  color: 'rgba(255,255,255,0.82)',
+                  lineHeight: 22,
+                  maxWidth: '88%',
+                }}
+              >
+                Buy and sell preloved fashion. Locally, beautifully, in a minute.
+              </Text>
+            )}
+          </Animated.View>
+
+          {/* Action area */}
+          <View style={{ paddingHorizontal: 20, paddingTop: 24 }}>
+            {step === 'welcome' ? (
+              <View style={{ gap: 12 }}>
+                <PressableScale onPress={goGuest} style={{}}>
+                  <View
+                    style={{
+                      height: 58,
+                      borderRadius: 18,
+                      backgroundColor: colors.white,
+                      borderWidth: 1.5,
+                      borderColor: colors.hairline,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      paddingHorizontal: 20,
+                    }}
+                  >
+                    <Feather name="user" size={18} color={colors.ink} />
+                    <Text
+                      style={{
+                        marginLeft: 10,
+                        fontSize: 16,
+                        fontWeight: '700',
+                        color: colors.ink,
+                        letterSpacing: 0.1,
+                      }}
+                    >
+                      Continue as guest
+                    </Text>
+                  </View>
+                </PressableScale>
+
+                <PressableScale onPress={() => openForm('signup')} style={{}}>
+                  <View
+                    style={{
+                      height: 58,
+                      borderRadius: 18,
+                      backgroundColor: colors.primary,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      paddingHorizontal: 20,
+                    }}
+                  >
+                    <Feather name="mail" size={18} color={colors.white} />
+                    <Text
+                      style={{
+                        marginLeft: 10,
+                        fontSize: 16,
+                        fontWeight: '800',
+                        color: colors.white,
+                        letterSpacing: 0.1,
+                      }}
+                    >
+                      Sign up with email
+                    </Text>
+                  </View>
+                </PressableScale>
+
+                {/* Divider */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 2 }}>
+                  <View style={{ flex: 1, height: 1, backgroundColor: colors.hairline }} />
+                  <Text
+                    style={{
+                      marginHorizontal: 12,
+                      fontSize: 12,
+                      fontWeight: '700',
+                      color: colors.muteSoft,
+                      letterSpacing: 0.6,
+                    }}
+                  >
+                    OR
+                  </Text>
+                  <View style={{ flex: 1, height: 1, backgroundColor: colors.hairline }} />
+                </View>
+
+                <PressableScale onPress={handleGoogle} disabled={oauthLoading} style={{}}>
+                  <View
+                    style={{
+                      height: 58,
+                      borderRadius: 18,
+                      backgroundColor: colors.white,
+                      borderWidth: 1.5,
+                      borderColor: colors.hairline,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      paddingHorizontal: 20,
+                    }}
+                  >
+                    <Ionicons name="logo-google" size={18} color={colors.ink} />
+                    <Text
+                      style={{
+                        marginLeft: 10,
+                        fontSize: 16,
+                        fontWeight: '700',
+                        color: colors.ink,
+                        letterSpacing: 0.1,
+                      }}
+                    >
+                      {oauthLoading ? 'Connecting…' : 'Continue with Google'}
+                    </Text>
+                  </View>
+                </PressableScale>
+
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    marginTop: 14,
+                  }}
+                >
+                  <Text style={{ fontSize: 14, color: colors.mute }}>
+                    Already have an account?
+                  </Text>
+                  <Pressable
+                    onPress={() => openForm('signin')}
+                    hitSlop={10}
+                    style={({ pressed }) => ({
+                      marginLeft: 6,
+                      opacity: pressed ? 0.6 : 1,
+                    })}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        fontWeight: '800',
+                        color: colors.ink,
+                        textDecorationLine: 'underline',
+                      }}
+                    >
+                      Log in
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <View>
+                <ModeSwitch
+                  mode={mode}
+                  onChange={setMode}
+                  switchAnim={switchAnim}
+                />
+
+                <View style={{ marginTop: 22 }}>
+                  <Field label="Email" icon="mail" focused={emailFocused} error={errors.email}>
+                    <TextInput
+                      placeholder="you@example.com"
+                      placeholderTextColor={colors.muteSoft}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      autoComplete="email"
+                      textContentType="emailAddress"
+                      accessibilityLabel="Email address"
+                      value={email}
+                      onChangeText={(t) => {
+                        setEmail(t);
+                        if (errors.email) setErrors((e) => ({ ...e, email: undefined }));
+                      }}
+                      onFocus={() => setEmailFocused(true)}
+                      onBlur={() => setEmailFocused(false)}
+                      style={{
+                        fontSize: 16,
+                        color: colors.ink,
+                        padding: 0,
+                        // RN-Web only — cast to bypass strict RN types
+                        outlineStyle: 'none',
+                        outlineWidth: 0,
+                      } as any}
+                    />
+                  </Field>
+
+                  <Field label="Password" icon="lock" focused={pwFocused} error={errors.password}>
+                    <View
+                      style={{ flexDirection: 'row', alignItems: 'center' }}
+                    >
+                      <TextInput
+                        placeholder="At least 8 characters"
+                        placeholderTextColor={colors.muteSoft}
+                        secureTextEntry={!showPw}
+                        autoCapitalize="none"
+                        autoComplete={mode === 'signup' ? 'password-new' : 'password'}
+                        textContentType={mode === 'signup' ? 'newPassword' : 'password'}
+                        accessibilityLabel="Password"
+                        value={password}
+                        onChangeText={(t) => {
+                          setPassword(t);
+                          if (errors.password) setErrors((e) => ({ ...e, password: undefined }));
+                        }}
+                        onFocus={() => setPwFocused(true)}
+                        onBlur={() => setPwFocused(false)}
+                        style={{
+                          flex: 1,
+                          fontSize: 16,
+                          color: colors.ink,
+                          padding: 0,
+                          // RN-Web only — cast to bypass strict RN types
+                          outlineStyle: 'none',
+                          outlineWidth: 0,
+                        } as any}
+                      />
+                      <Pressable
+                        onPress={() => setShowPw((v) => !v)}
+                        hitSlop={10}
+                        accessibilityRole="button"
+                        accessibilityLabel={showPw ? 'Hide password' : 'Show password'}
+                        style={{ marginLeft: 8 }}
+                      >
+                        <Feather
+                          name={showPw ? 'eye-off' : 'eye'}
+                          size={18}
+                          color={colors.mute}
+                        />
+                      </Pressable>
+                    </View>
+                  </Field>
+
+                  {mode === 'signin' && (
+                    <Pressable
+                      onPress={handleForgot}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel="Reset your password"
+                      style={({ pressed }) => ({
+                        alignSelf: 'flex-end',
+                        paddingVertical: 4,
+                        marginTop: -2,
+                        opacity: pressed ? 0.6 : 1,
+                      })}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>
+                        Forgot password?
+                      </Text>
+                    </Pressable>
+                  )}
+                </View>
+
+                <PressableScale
+                  onPress={handleSubmit}
+                  disabled={loading}
+                  style={{}}
+                >
+                  <View
+                    style={{
+                      marginTop: 8,
+                      height: 58,
+                      borderRadius: 18,
+                      backgroundColor: colors.primary,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 16,
+                        fontWeight: '800',
+                        color: colors.white,
+                        letterSpacing: 0.2,
+                      }}
+                    >
+                      {loading
+                        ? 'One moment…'
+                        : mode === 'signup'
+                          ? 'Create account'
+                          : 'Sign in'}
+                    </Text>
+                    <View
+                      style={{
+                        position: 'absolute',
+                        right: 12,
+                        width: 38,
+                        height: 38,
+                        borderRadius: 19,
+                        backgroundColor: 'rgba(255,255,255,0.18)',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Feather name="arrow-right" size={18} color={colors.white} />
+                    </View>
+                  </View>
+                </PressableScale>
+
+                <Text
+                  style={{
+                    marginTop: 16,
+                    textAlign: 'center',
+                    fontSize: 12,
+                    color: colors.mute,
+                    lineHeight: 17,
+                    paddingHorizontal: 16,
+                  }}
+                >
+                  {mode === 'signup'
+                    ? 'By creating an account you agree to our Terms and Privacy.'
+                    : 'By continuing you agree to our Terms and Privacy.'}
+                </Text>
+              </View>
+            )}
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+function ModeSwitch({
+  mode,
+  onChange,
+  switchAnim,
+}: {
+  mode: Mode;
+  onChange: (m: Mode) => void;
+  switchAnim: Animated.Value;
+}) {
+  const [trackWidth, setTrackWidth] = useState(0);
+  const PADDING = 4;
+  const pillWidth = trackWidth > 0 ? (trackWidth - PADDING * 2) / 2 : 0;
+
+  const translateX = switchAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, pillWidth],
+  });
+
+  const signinColor = switchAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [colors.white, colors.mute],
+  });
+  const signupColor = switchAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [colors.mute, colors.white],
+  });
+
+  return (
+    <View
+      onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
+      style={{
+        backgroundColor: colors.panel,
+        borderRadius: 999,
+        padding: PADDING,
+        flexDirection: 'row',
+        position: 'relative',
+        height: 52,
+      }}
+    >
+      {pillWidth > 0 && (
+        <Animated.View
+          style={{
+            position: 'absolute',
+            top: PADDING,
+            left: PADDING,
+            bottom: PADDING,
+            width: pillWidth,
+            backgroundColor: colors.ink,
+            borderRadius: 999,
+            transform: [{ translateX }],
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.12,
+            shadowRadius: 10,
+            elevation: 3,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+      {(['signin', 'signup'] as Mode[]).map((m) => {
+        const color = m === 'signin' ? signinColor : signupColor;
+        return (
+          <Pressable
+            key={m}
+            onPress={() => {
+              tap('light');
+              onChange(m);
+            }}
+            style={({ pressed }) => ({
+              flex: 1,
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: 44,
+              zIndex: 1,
+              transform: [{ scale: pressed ? 0.96 : 1 }],
+            })}
+          >
+            <Animated.Text
+              style={{
+                fontSize: 14,
+                fontFamily: 'Inter_700Bold',
+                fontWeight: '800',
+                color,
+                letterSpacing: 0.2,
+              }}
+            >
+              {m === 'signin' ? 'Sign in' : 'Sign up'}
+            </Animated.Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function Field({
+  label,
+  icon,
+  children,
+  focused,
+  error,
+}: {
+  label: string;
+  icon: keyof typeof Feather.glyphMap;
+  children: React.ReactNode;
+  focused: boolean;
+  error?: string;
+}) {
+  const DANGER = '#E5484D';
+  const borderColor = error ? DANGER : focused ? colors.primary : colors.hairline;
+  return (
+    <View style={{ marginBottom: 14 }}>
+      <Text
+        style={{
+          fontSize: 11,
+          fontWeight: '700',
+          color: error ? DANGER : focused ? colors.ink : colors.mute,
+          letterSpacing: 1.2,
+          textTransform: 'uppercase',
+          marginBottom: 8,
+          marginLeft: 4,
+        }}
+      >
+        {label}
+      </Text>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 16,
+          height: 56,
+          borderRadius: 18,
+          backgroundColor: colors.white,
+          borderWidth: error || focused ? 2 : 1,
+          borderColor,
+        }}
+      >
+        <Feather
+          name={icon}
+          size={18}
+          color={error ? DANGER : focused ? colors.primary : colors.mute}
+        />
+        <View style={{ flex: 1, marginLeft: 12 }}>{children}</View>
+      </View>
+      {error ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6, marginLeft: 4 }}>
+          <Feather name="alert-circle" size={12} color={DANGER} />
+          <Text style={{ fontSize: 12.5, color: DANGER, fontWeight: '600' }}>{error}</Text>
+        </View>
+      ) : null}
+    </View>
   );
 }

@@ -1,0 +1,39 @@
+# gitleaks allow-list — one fingerprint per line.
+# Format: <commit-sha>:<file-path>:<rule-id>:<start-line>
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# Supabase ANON key committed in .env.test (June 2026)
+# ─────────────────────────────────────────────────────────────────────────────
+# gitleaks fires its generic `jwt` rule on these because a Supabase anon key IS
+# a JWT. It is not a credential leak:
+#
+#   • The token's own payload decodes to `"role": "anon"` — NOT `service_role`.
+#     It carries exactly the permissions of a signed-out visitor and is subject
+#     to every RLS policy in the database.
+#   • It is PUBLIC BY DESIGN. The same value is embedded verbatim in every
+#     shipped client bundle (EXPO_PUBLIC_* is inlined at build time) and is
+#     served to anyone who loads the web app. Verified byte-identical to the key
+#     currently in .env.local.
+#   • Supabase documents the anon key as publishable.
+#
+# Ignoring beats rewriting history here: a force-push across ~100 commits to
+# scrub a value that is already public in every bundle would be pure risk for no
+# security gain. Rotating it would invalidate every deployed client for the same
+# non-benefit.
+#
+# .env.test is gitignored today (.gitignore `.env*`) and untracked; these are
+# historical commits only.
+#
+# WHAT WOULD NOT BELONG HERE: a `service_role` key, STRIPE_SECRET_KEY,
+# STRIPE_WEBHOOK_SECRET, SENTRY_AUTH_TOKEN, or any Supabase JWT whose payload
+# says anything other than "anon". Those bypass RLS or move money — if gitleaks
+# ever flags one, rotate it immediately and do not add a line to this file.
+# Always decode the payload's `role` claim before assuming a hit is benign.
+
+# .env.test line 14 — added by "feat: implement comprehensive e2e test suite…"
+535d69f0361cb116b73e7970bf9810f46b5564af:.env.test:jwt:14
+
+# .env.test line 6 — same key, after the file was reorganised by
+# "feat: implement saved searches system…". Listed so a scan over a wider commit
+# range than the current PR does not resurface it.
+17763df7eb3ad5ee1a526078db69b00310d452d3:.env.test:jwt:6

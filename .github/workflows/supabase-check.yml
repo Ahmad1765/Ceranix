@@ -1,0 +1,266 @@
+name: Supabase migrations
+
+# Validates that any SQL touched in a PR can be applied to a clean
+# Postgres before it gets merged. Catches typos, missing dependencies,
+# and policy-order mistakes before they hit production.
+#
+# Triggers only when SQL changes — keeps non-DB PRs fast.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/**/*.sql'
+  pull_request:
+    paths:
+      - 'supabase/**/*.sql'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apply-on-empty-postgres:
+    name: Apply SQL to ephemeral Postgres
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        # Supabase's own Postgres, not vanilla postgres:16.
+        #
+        # This job had been failing since at least 2026-07-13 with
+        # `role "anon" does not exist`, and roles were only the first wall:
+        # 20260729120100_push_webhooks.sql runs `create extension pg_net` and
+        # reads vault.decrypted_secrets. A missing role can be stubbed; a
+        # missing EXTENSION cannot. This image ships the Supabase roles, pg_net
+        # and supabase_vault, so the project's SQL can actually be applied.
+        #
+        # Pinned to the 17.x line to match the live project (17.6.1.x).
+        image: supabase/postgres:17.6.1.160
+        env:
+          # POSTGRES_PASSWORD only. Setting POSTGRES_USER/POSTGRES_DB overrides
+          # this image's own bootstrap: its docker-entrypoint runs migrate.sh,
+          # which connects as `supabase_admin` — a role the default init
+          # sequence creates. Overriding the superuser skipped that and the
+          # container died with `role "supabase_admin" does not exist`.
+          # The image already defaults to user `postgres` / database `postgres`,
+          # which is what the PG* env below connects as.
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 30
+          --health-start-period 30s
+    env:
+      PGPASSWORD: postgres
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGDATABASE: postgres
+    steps:
+      - uses: actions/checkout@v4
+
+      # supabase/postgres deliberately does NOT make `postgres` a superuser —
+      # that mirrors hosted Supabase, where the real superuser is
+      # supabase_admin. In this throwaway CI container that distinction only
+      # gets in the way: `postgres` could not SET ROLE supabase_storage_admin,
+      # could not create storage.objects, and would not have owned it well
+      # enough to attach the project's policies afterwards.
+      #
+      # Elevating once, via the container's own superuser over its local socket,
+      # removes that whole class of failure. The container is destroyed at the
+      # end of the job and is never reachable from outside the runner.
+      - name: Grant the CI role superuser inside the container
+        run: |
+          set -euo pipefail
+          CID=$(docker ps --format '{{.ID}} {{.Image}}' | grep -m1 'supabase/postgres' | awk '{print $1}')
+          if [[ -z "${CID:-}" ]]; then
+            echo "::error::could not locate the postgres service container"
+            docker ps --format '{{.ID}} {{.Image}}'
+            exit 1
+          fi
+          echo "container: $CID"
+          docker exec "$CID" psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 \
+            -c "ALTER ROLE postgres SUPERUSER;"
+          psql -tAq -c "select rolsuper from pg_roles where rolname = current_user;"
+
+      - name: Report what the image already provides
+        # Worth printing: the previous stub assumed vanilla Postgres and tried to
+        # create things this image ships, then died on `permission denied for
+        # schema auth` because auth is owned by supabase_auth_admin, not
+        # postgres. Knowing what is already present is what makes the next step
+        # correct rather than guesswork.
+        run: |
+          psql -v ON_ERROR_STOP=1 -c "
+            select
+              (select count(*) from pg_roles where rolname in ('anon','authenticated','service_role')) as supabase_roles,
+              to_regnamespace('auth')       is not null as auth_schema,
+              to_regnamespace('storage')    is not null as storage_schema,
+              to_regnamespace('extensions') is not null as extensions_schema,
+              to_regproc('auth.uid')        is not null as auth_uid,
+              to_regproc('auth.role')       is not null as auth_role,
+              to_regproc('auth.jwt')        is not null as auth_jwt,
+              to_regclass('auth.users')     is not null as auth_users,
+              to_regclass('storage.objects') is not null as storage_objects,
+              (select count(*) from pg_extension where extname in ('pgcrypto','uuid-ossp','pg_net','supabase_vault')) as exts;
+          "
+
+      - name: Stub only what is missing
+        # The probe above shows this image already supplies the three roles, the
+        # extensions, the auth schema with auth.uid()/auth.role()/auth.users, and
+        # the storage schema. The only real gap is storage.objects.
+        #
+        # Nothing here uses a heredoc: `run: |` keeps its own indentation, so a
+        # heredoc terminator that is not flush with the block base is still
+        # indented when bash sees it, and the previous version died with
+        # "here-document delimited by end-of-file". `psql -c` sidesteps that.
+        run: |
+          set -euo pipefail
+          q() { psql -tAq -c "$1"; }
+
+          # Roles: CREATE ROLE has no IF NOT EXISTS, so guard each one.
+          psql -v ON_ERROR_STOP=1 -c "DO \$do\$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon NOLOGIN NOINHERIT; END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN CREATE ROLE authenticated NOLOGIN NOINHERIT; END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS; END IF;
+          END \$do\$;"
+
+          psql -v ON_ERROR_STOP=1 -c "CREATE SCHEMA IF NOT EXISTS extensions;"
+          psql -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
+          psql -v ON_ERROR_STOP=1 -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
+
+          # auth.* — only when the image did not bring GoTrue's surface with it.
+          # auth.jwt() is deliberately NOT required: no SQL in this repo calls it,
+          # and demanding it would fail against an image that ships the rest.
+          if [[ "$(q "select to_regnamespace('auth') is null")" == "t" ]]; then
+            echo "auth schema absent — stubbing it"
+            psql -v ON_ERROR_STOP=1 -c "CREATE SCHEMA auth;"
+            psql -v ON_ERROR_STOP=1 -c "CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS \$\$ SELECT '00000000-0000-0000-0000-000000000000'::uuid \$\$;"
+            psql -v ON_ERROR_STOP=1 -c "CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS \$\$ SELECT 'authenticated'::text \$\$;"
+            psql -v ON_ERROR_STOP=1 -c "CREATE TABLE auth.users (id uuid primary key default uuid_generate_v4());"
+          else
+            echo "auth schema provided by the image — not touching it"
+            for obj in "auth.uid|to_regproc" "auth.role|to_regproc" "auth.users|to_regclass"; do
+              name="${obj%%|*}"; fn="${obj##*|}"
+              if [[ "$(q "select ${fn}('${name}') is null")" == "t" ]]; then
+                echo "::error::${name} is missing and the auth schema is not writable by ${PGUSER} — base image changed, revisit this stub"
+                exit 1
+              fi
+            done
+          fi
+
+          # storage.* — the image ships the schema but none of the objects the
+          # Storage service would normally create. This repo's SQL needs three:
+          #   storage.objects     (23 refs) tables + RLS policies
+          #   storage.foldername  ( 8 refs) used by every bucket policy
+          #   storage.buckets     ( 4 refs) setup.sql seeds two public buckets
+          # The role is superuser by now, so plain CREATE is enough.
+          psql -v ON_ERROR_STOP=1 -c "CREATE SCHEMA IF NOT EXISTS storage;"
+
+          if [[ "$(q "select to_regclass('storage.objects') is null")" == "t" ]]; then
+            echo "storage.objects absent — creating it"
+            psql -v ON_ERROR_STOP=1 -c "CREATE TABLE storage.objects (
+              id uuid primary key default gen_random_uuid(),
+              bucket_id text,
+              name text,
+              owner uuid,
+              metadata jsonb,
+              created_at timestamptz default now()
+            );"
+          else
+            echo "storage.objects provided by the image"
+          fi
+
+          # setup.sql does `insert ... on conflict (id) do update`, so id must
+          # carry a primary key, not merely be a column.
+          if [[ "$(q "select to_regclass('storage.buckets') is null")" == "t" ]]; then
+            echo "storage.buckets absent — creating it"
+            psql -v ON_ERROR_STOP=1 -c "CREATE TABLE storage.buckets (
+              id text primary key,
+              name text not null,
+              public boolean default false,
+              created_at timestamptz default now()
+            );"
+          else
+            echo "storage.buckets provided by the image"
+          fi
+
+          # Bucket policies read (storage.foldername(name))[1] to scope a path to
+          # its owning user id. Mirrors the real implementation: split on '/' and
+          # drop the filename, so element 1 is the first directory.
+          if [[ "$(q "select to_regproc('storage.foldername') is null")" == "t" ]]; then
+            echo "storage.foldername absent — creating it"
+            psql -v ON_ERROR_STOP=1 -c "CREATE FUNCTION storage.foldername(name text)
+              RETURNS text[] LANGUAGE sql IMMUTABLE AS \$\$
+                SELECT (string_to_array(name, '/'))[1 : greatest(array_length(string_to_array(name, '/'), 1) - 1, 0)]
+              \$\$;"
+          else
+            echo "storage.foldername provided by the image"
+          fi
+
+          echo "--- stub complete ---"
+          psql -c "select
+            to_regproc('auth.uid')            is not null as auth_uid,
+            to_regclass('auth.users')         is not null as auth_users,
+            to_regclass('storage.objects')    is not null as storage_objects,
+            to_regclass('storage.buckets')    is not null as storage_buckets,
+            to_regproc('storage.foldername')  is not null as storage_foldername;"
+
+      - name: Apply migration SQL files in order
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          # Order matters in two dimensions, and a single lexical sort over the
+          # whole tree gets BOTH wrong:
+          #
+          #  1. The loose supabase/*.sql mirrors describe the base schema; every
+          #     migration builds on them. But a flat sort interleaves the two,
+          #     because "supabase/migrations/…" sorts between "supabase/l…" and
+          #     "supabase/s…". That put five loose files (perf_cleanup,
+          #     save_lists, saved_searches, upsert_shipping_address, wardrobe)
+          #     AFTER the migrations that depend on them, and
+          #     20260611222839_advisor_quick_wins.sql failed with
+          #     `relation "public.save_lists" does not exist`.
+          #
+          #  2. Within the loose files, lexical order is arbitrary — they carry
+          #     no timestamps. listings_tags.sql reads profiles.vacation_mode,
+          #     a column profile_features.sql adds, but "l" sorts before "p".
+          #
+          # So: pinned prefix, then the remaining loose files, then migrations
+          # (which ARE timestamped and sort correctly among themselves).
+          run_sql() {
+            echo "::group::psql $1"
+            psql -v ON_ERROR_STOP=1 -f "$1"
+            echo "::endgroup::"
+          }
+
+          # Add a file here only when a genuine cross-file dependency forces it.
+          PINNED=(
+            supabase/setup.sql            # base tables every other file extends
+            supabase/profile_features.sql # adds profiles.vacation_mode
+          )
+
+          loose=$(find supabase -maxdepth 1 -type f -name '*.sql' | sort -V)
+          migrations=$(find supabase/migrations -maxdepth 1 -type f -name '*.sql' 2>/dev/null | sort -V)
+
+          if [[ -z "$loose$migrations" ]]; then
+            echo "No SQL files found."
+            exit 0
+          fi
+
+          for f in "${PINNED[@]}"; do
+            [[ -f "$f" ]] || continue
+            run_sql "$f"
+            loose=$(echo "$loose" | grep -vxF "$f") || true
+          done
+
+          for f in $loose;      do run_sql "$f"; done
+          for f in $migrations; do run_sql "$f"; done

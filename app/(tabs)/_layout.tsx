@@ -1,126 +1,55 @@
 import { Tabs } from 'expo-router';
-import { View, Text } from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AnimatedTabBar } from '../../components/AnimatedTabBar';
+import { useSellSheet } from '@/components/sell/SellSheet';
+import { useDiscoverSheet } from '@/components/discover/DiscoverSheet';
 
 export default function TabsLayout() {
-  const insets = useSafeAreaInsets();
+  const { open: openSellSheet } = useSellSheet();
+  const { open: openDiscoverSheet } = useDiscoverSheet();
 
   return (
     <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: '#000000',
-        tabBarInactiveTintColor: '#000000',
-        tabBarStyle: {
-          backgroundColor: '#ffffff',
-          borderTopWidth: 0,
-          elevation: 10,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.05,
-          shadowRadius: 4,
-          height: 65 + insets.bottom,
-          paddingBottom: 8 + insets.bottom,
-          paddingTop: 8,
-        },
-        tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: '500',
-        },
-      }}
+      tabBar={(props) => <AnimatedTabBar {...props} />}
+      screenOptions={{ headerShown: false }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ focused, color, size }) => (
-            <View className="items-center justify-center relative">
-              {focused && (
-                <View className="absolute bg-[#e4ff3a] rounded-full w-10 h-10 blur-xl opacity-80" style={{ shadowColor: '#e4ff3a', shadowOpacity: 1, shadowRadius: 15, elevation: 10 }} />
-              )}
-              <Feather name="home" size={24} color={focused ? "#000" : "#666"} style={{fontWeight: focused ? 'bold' : 'normal'}} />
-            </View>
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="nybegagnat"
-        options={{
-          title: 'Nybegagnat',
-          tabBarIcon: ({ focused, color, size }) => (
-            <View className="items-center justify-center relative">
-              {focused && (
-                <View className="absolute bg-[#e4ff3a] rounded-full w-10 h-10 blur-xl opacity-80" style={{ shadowColor: '#e4ff3a', shadowOpacity: 1, shadowRadius: 15, elevation: 10 }} />
-              )}
-              <View className="relative">
-                <Feather name="smartphone" size={24} color={focused ? "#000" : "#666"} />
-                <View className="absolute -top-1 -right-1 bg-white rounded-full">
-                  <Feather name="check-circle" size={12} color="#4f46e5" />
-                </View>
-              </View>
-            </View>
-          ),
-        }}
-      />
+      <Tabs.Screen name="index" options={{ title: 'Home' }} />
+      {/* Like the Sell tab below, Discover never switches to its flat tab
+          content on press — it slides the search sheet up over whatever
+          screen is active (components/discover/DiscoverSheet.tsx). Picking
+          anything in the sheet is what navigates here, carrying the intent as
+          params. app/(tabs)/discover.tsx stays the real screen behind it. */}
       <Tabs.Screen
         name="discover"
-        options={{
-          title: 'Discover',
-          tabBarIcon: ({ focused, color, size }) => (
-            <View className="items-center justify-center relative">
-              {focused && (
-                <View className="absolute bg-[#e4ff3a] rounded-full w-10 h-10 blur-xl opacity-80" style={{ shadowColor: '#e4ff3a', shadowOpacity: 1, shadowRadius: 15, elevation: 10 }} />
-              )}
-              <Feather name="search" size={24} color={focused ? "#000" : "#666"} strokeWidth={focused ? 3 : 2} />
-            </View>
-          ),
+        options={{ title: 'Discover' }}
+        listeners={{
+          tabPress: (e) => {
+            e.preventDefault();
+            openDiscoverSheet();
+          },
         }}
       />
+      {/* Wardrobe tab hidden 2026-07-04. Route file app/(tabs)/wardrobe.tsx is untouched.
+          To restore: swap options back to { title: 'Wardrobe' }. */}
+      <Tabs.Screen name="wardrobe" options={{ href: null }} />
+      {/* The Sell tab stays a real Tabs.Screen so it keeps its slot/icon in
+          AnimatedTabBar, but tapping it never switches to the flat tab
+          content — it opens the sell form as a Modal on top of whatever
+          screen is active (components/sell/SellSheet.tsx), the same way the
+          product page's "Offer" button opens OfferSheet. The tab's own
+          content (app/(tabs)/upload.tsx) is just a fallback for paths that
+          bypass this listener (deep link, back/forward). */}
       <Tabs.Screen
         name="upload"
-        options={{
-          title: 'Upload ad',
-          tabBarIcon: ({ focused, color, size }) => (
-            <View className="items-center justify-center relative">
-              {focused && (
-                <View className="absolute bg-[#e4ff3a] rounded-full w-10 h-10 blur-xl opacity-80" style={{ shadowColor: '#e4ff3a', shadowOpacity: 1, shadowRadius: 15, elevation: 10 }} />
-              )}
-              <Feather name="plus-circle" size={24} color={focused ? "#000" : "#666"} strokeWidth={focused ? 2 : 1.5} />
-            </View>
-          ),
+        options={{ title: 'Sell' }}
+        listeners={{
+          tabPress: (e) => {
+            e.preventDefault();
+            openSellSheet();
+          },
         }}
       />
-      <Tabs.Screen
-        name="chat"
-        options={{
-          title: 'Chat',
-          tabBarIcon: ({ focused, color, size }) => (
-            <View className="items-center justify-center relative">
-              {focused && (
-                <View className="absolute bg-[#e4ff3a] rounded-full w-10 h-10 blur-xl opacity-80" style={{ shadowColor: '#e4ff3a', shadowOpacity: 1, shadowRadius: 15, elevation: 10 }} />
-              )}
-              <Feather name="message-circle" size={24} color={focused ? "#000" : "#666"} strokeWidth={focused ? 2.5 : 2} />
-            </View>
-          ),
-        }}
-      />
-
-
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'My profile',
-          tabBarIcon: ({ focused, color, size }) => (
-            <View className="items-center justify-center relative">
-              {focused && (
-                <View className="absolute bg-[#e4ff3a] rounded-full w-10 h-10 blur-xl opacity-80" style={{ shadowColor: '#e4ff3a', shadowOpacity: 1, shadowRadius: 15, elevation: 10 }} />
-              )}
-              <Feather name="smile" size={24} color={focused ? "#000" : "#666"} strokeWidth={focused ? 2.5 : 2} />
-            </View>
-          ),
-        }}
-      />
+      <Tabs.Screen name="chat" options={{ title: 'Chat' }} />
+      <Tabs.Screen name="profile" options={{ title: 'My profile' }} />
     </Tabs>
   );
 }

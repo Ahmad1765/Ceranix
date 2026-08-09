@@ -1,0 +1,22 @@
+{
+  "dir": "web-fonts",
+  "redirects": {
+    "Ionicons.ttf": "Ionicons.woff2",
+    "Feather.ttf": "Feather.woff2",
+    "FontAwesome6_Solid.ttf": "FontAwesome6_Solid.woff2",
+    "FontAwesome6_Regular.ttf": "FontAwesome6_Regular.woff2",
+    "FontAwesome6_Brands.ttf": "FontAwesome6_Brands.woff2",
+    "Inter_400Regular.ttf": "Inter_400Regular.woff2",
+    "Inter_500Medium.ttf": "Inter_500Medium.woff2",
+    "Inter_600SemiBold.ttf": "Inter_600SemiBold.woff2",
+    "Inter_700Bold.ttf": "Inter_700Bold.woff2",
+    "Inter_700Bold_Italic.ttf": "Inter_700Bold_Italic.woff2"
+  },
+  "preload": [
+    "Ionicons.woff2",
+    "Feather.woff2",
+    "Inter_400Regular.woff2",
+    "Inter_600SemiBold.woff2",
+    "Inter_700Bold.woff2"
+  ]
+}

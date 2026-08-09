@@ -17,8 +17,19 @@ ios/
 # Environment variables
 .env
 .env.local
+.env.test
 .env.*.local
 *.env
+
+# Sentry — auth token for source map upload, written by @sentry/wizard.
+# NEVER commit this; it grants write access to your Sentry project.
+.env.sentry-build-plugin
+
+# Playwright (auth state, reports, artifacts)
+playwright/.auth/
+playwright-report/
+test-results/
+.last-run.json
 
 # Build output
 web-build/
@@ -45,3 +56,11 @@ Thumbs.db
 
 # Supabase
 supabase/.temp/
+
+#Reference for web design and animations
+References
+
+Testing for wardrobe
+brag-output
+.vercel
+.env*

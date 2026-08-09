@@ -1,3 +1,63 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Web only: kill focus outline on mouse click (:focus), but preserve
+   keyboard accessibility by rendering a clear ring on :focus-visible. */
+@layer base {
+  input,
+  textarea,
+  select,
+  button,
+  [role="button"],
+  [tabindex] {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Text fields ALWAYS match :focus-visible when focused (browser heuristic),
+     so a focus-visible outline rule renders a purple ring on every field the
+     user taps. That's the "purple border on inputs everywhere" bug. Text
+     inputs already signal focus via the caret and their own border color, so
+     never draw a browser outline ring on them. */
+  input:focus,
+  input:focus-visible,
+  textarea:focus,
+  textarea:focus-visible {
+    outline: none;
+    box-shadow: none;
+  }
+
+  /* Non-text controls: suppress the ring on mouse/touch, but keep it for
+     keyboard navigation so tab-through stays accessible. */
+  select:focus:not(:focus-visible),
+  button:focus:not(:focus-visible),
+  [role="button"]:focus:not(:focus-visible),
+  [tabindex]:focus:not(:focus-visible) {
+    outline: none;
+    box-shadow: none;
+  }
+
+  select:focus-visible,
+  button:focus-visible,
+  [role="button"]:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 2px solid #6C47FF;
+    outline-offset: 2px;
+  }
+
+  *::selection {
+    background-color: rgba(108, 71, 255, 0.25);
+  }
+
+  /* Squircle (superellipse) corners on the bottom tab dock — the edge eases
+     into the curve instead of a quarter-circle "kink". Progressive
+     enhancement: only browsers that support corner-shape get it; everyone
+     else keeps the normal rounded corner from the inline border-radius.
+     iOS gets the equivalent natively via borderCurve: 'continuous'. */
+  @supports (corner-shape: squircle) {
+    #tab-dock,
+    #tab-dock > * {
+      corner-shape: squircle;
+    }
+  }
+}

@@ -1,97 +1,69 @@
-import { useState } from 'react';
-import { View, Text, Pressable, SafeAreaView, ScrollView } from 'react-native';
-import { router } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { View, Pressable } from 'react-native';
+import { Text } from '@/lib/rnText';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Feather from '@expo/vector-icons/Feather';
+import { colors } from '@/lib/theme';
+import { HIT_SLOP_8 } from '@/lib/responsive';
+import { safeBack } from '@/lib/nav';
+import { ActivityFeed } from '@/components/activity';
 
-type NewsTab = 'Following' | 'For you' | 'Searches';
-const NEWS_TABS: NewsTab[] = ['Following', 'For you', 'Searches'];
-
-function FollowingEmpty() {
-  return (
-    <View className="flex-1 items-center justify-center py-24" />
-  );
-}
-
-function ForYouEmpty() {
-  return (
-    <View className="flex-1 items-center justify-center py-24">
-      <Feather name="bell" size={40} color="#d1d5db" />
-      <Text className="text-base font-semibold text-gray-700 mt-4">Nothing new yet</Text>
-      <Text className="text-sm text-gray-400 mt-1 text-center px-8">
-        We'll show you notifications about items and people you follow here
-      </Text>
-    </View>
-  );
-}
-
-function SearchesEmpty() {
-  return (
-    <View className="flex-1 items-center justify-center py-12 px-8">
-      <Text className="text-3xl font-bold text-gray-900 text-center mb-4">
-        No saved searches?
-      </Text>
-      <Text className="text-sm text-gray-500 text-center leading-5 mb-8">
-        Next time you search for something but can't quite find what you're looking for, you can save the search and it'll appear here.
-      </Text>
-      <Pressable
-        onPress={() => router.push('/search')}
-        className="w-full border border-gray-300 rounded-2xl py-4 items-center"
-      >
-        <Text className="text-base font-semibold text-gray-900">Search for ads</Text>
-      </Pressable>
-    </View>
-  );
-}
-
+/**
+ * Standalone Activity screen.
+ *
+ * The primary way in is now the Inbox's "Activity" tab — this route stays for
+ * the Discover save-search affordances that push straight here ("Saved — find
+ * it under Activity") and for deep links. The body itself is shared with the
+ * Inbox via <ActivityFeed>.
+ */
 export default function NewsScreen() {
-  const [activeTab, setActiveTab] = useState<NewsTab>('Following');
-
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      {/* Header */}
-      <View className="flex-row items-center px-4 pt-2 pb-1">
-        <Pressable onPress={() => router.back()} className="mr-4">
-          <Feather name="arrow-left" size={22} color="#374151" />
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
+      {/* Top bar */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: 14,
+          paddingTop: 6,
+          paddingBottom: 8,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.hairline,
+        }}
+      >
+        <Pressable
+          onPress={() => safeBack()}
+          hitSlop={HIT_SLOP_8}
+          style={({ pressed }) => ({
+            width: 38,
+            height: 38,
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: pressed ? 0.6 : 1,
+          })}
+        >
+          <Feather name="chevron-left" size={24} color={colors.ink} />
         </Pressable>
-        <Text className="text-base font-bold text-gray-900">News</Text>
+        <Text style={{ fontSize: 16, fontWeight: '800', color: colors.ink }}>Activity</Text>
+        <Pressable
+          disabled={true}
+          accessibilityRole="button"
+          accessibilityLabel="Mark all activity as read"
+          accessibilityState={{ disabled: true }}
+          hitSlop={HIT_SLOP_8}
+          style={() => ({
+            width: 38,
+            height: 38,
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: 0.25, // Disabled appearance
+          })}
+        >
+          <Feather name="check-square" size={18} color={colors.ink} />
+        </Pressable>
       </View>
 
-      {/* Tabs */}
-      <View className="flex-row border-b border-gray-100 px-4 mt-1">
-        {NEWS_TABS.map((tab) => (
-          <Pressable
-            key={tab}
-            onPress={() => setActiveTab(tab)}
-            className="mr-6 pb-2.5"
-          >
-            <Text
-              className={`text-sm font-semibold ${
-                activeTab === tab ? 'text-gray-900' : 'text-gray-400'
-              }`}
-            >
-              {tab}
-            </Text>
-            {activeTab === tab && (
-              <View
-                style={{
-                  position: 'absolute',
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  height: 2,
-                  backgroundColor: '#111827',
-                  borderRadius: 2,
-                }}
-              />
-            )}
-          </Pressable>
-        ))}
-      </View>
-
-      {/* Content */}
-      {activeTab === 'Following' && <FollowingEmpty />}
-      {activeTab === 'For you' && <ForYouEmpty />}
-      {activeTab === 'Searches' && <SearchesEmpty />}
+      <ActivityFeed />
     </SafeAreaView>
   );
 }

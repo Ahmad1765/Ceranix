@@ -1,15 +1,17 @@
-import { View, Text, Pressable, ScrollView } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { View, Pressable, ScrollView } from 'react-native';
+import { Text } from '@/lib/rnText';
+import Feather from '@expo/vector-icons/Feather';
 import { router } from 'expo-router';
+import { colors, radii } from '@/lib/theme';
 import type { Category } from '@/types';
 
-const CATEGORIES: { label: string; value: Category; icon: string }[] = [
-  { label: 'Clothing', value: 'clothing', icon: 'tag' },
-  { label: 'Shoes', value: 'shoes', icon: 'package' },
-  { label: 'Bags', value: 'bags', icon: 'shopping-bag' },
-  { label: 'Accessories', value: 'accessories', icon: 'watch' },
-  { label: 'Electronics', value: 'electronics', icon: 'smartphone' },
-  { label: 'Beauty', value: 'beauty', icon: 'star' },
+const CATEGORIES: { label: string; value: Category; icon: keyof typeof Feather.glyphMap; accent: string }[] = [
+  { label: 'Clothing', value: 'clothing', icon: 'shopping-bag', accent: colors.primarySoft },
+  { label: 'Shoes', value: 'shoes', icon: 'compass', accent: colors.panel },
+  { label: 'Bags', value: 'bags', icon: 'briefcase', accent: colors.primarySoft },
+  { label: 'Accessories', value: 'accessories', icon: 'watch', accent: colors.panel },
+  { label: 'Electronics', value: 'electronics', icon: 'monitor', accent: colors.primarySoft },
+  { label: 'Beauty', value: 'beauty', icon: 'droplet', accent: colors.panel },
 ];
 
 export function CategoryRow() {
@@ -17,19 +19,33 @@ export function CategoryRow() {
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      className="px-4"
-      contentContainerStyle={{ gap: 12 }}
+      contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}
     >
       {CATEGORIES.map((cat) => (
         <Pressable
           key={cat.value}
-          onPress={() => router.push({ pathname: '/search', params: { category: cat.value } })}
-          className="items-center"
+          onPress={() => router.push({ pathname: '/(tabs)/discover', params: { category: cat.value } })}
+          style={({ pressed }) => ({
+            alignItems: 'center',
+            opacity: pressed ? 0.7 : 1,
+            transform: [{ scale: pressed ? 0.97 : 1 }],
+          })}
         >
-          <View className="w-14 h-14 bg-orange-50 rounded-2xl items-center justify-center">
-            <Feather name={cat.icon as any} size={22} color="#f97316" />
+          <View
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: radii.xl,
+              backgroundColor: cat.accent,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Feather name={cat.icon} size={20} color={colors.ink} />
           </View>
-          <Text className="text-xs text-gray-600 mt-1.5">{cat.label}</Text>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.ink, marginTop: 6 }}>
+            {cat.label}
+          </Text>
         </Pressable>
       ))}
     </ScrollView>
