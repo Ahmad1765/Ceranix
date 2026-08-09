@@ -33,6 +33,20 @@ const INK_OVERLAY_LIGHT = "rgba(15,15,15,0.18)";
 const SLATE_SELECTED = "#f1f2f6";
 const BLACK = "#0F0F0F";
 
+// The one deliberate exception to the 3-color rule above.
+//
+// Every other "feedback" alias in this file collapses to purple or ink, because
+// colour-as-decoration is what the rule exists to stop. Destructive actions are
+// different: "Delete account" and "Remove payout method" are irreversible, and
+// rendering them in the same ink as "Change password" removes the only
+// pre-click signal that they are not the same kind of thing. That is an
+// accessibility and safety property, not a brand one, so it gets a real token
+// rather than being quietly folded into ink.
+//
+// Reserved for irreversible actions ONLY — never for validation errors, badges,
+// or emphasis. Those stay on purple/ink.
+const DANGER = "#EF4444";
+
 // ── Semantic colors ──────────────────────────────────────────────────────
 // Consumers should reach for these names; raw values stay above.
 // Legacy aliases (pink/coral/amber/lime/sky/red/green) are kept so older
@@ -96,6 +110,10 @@ export const colors = {
   redSoft: INK_HAIRLINE,
   green: PURPLE,
   greenSoft: PURPLE_TINT_18,
+
+  // Irreversible actions only — see the DANGER note above before reaching for
+  // this. NOT the same as `red`, which is an ink alias kept for older screens.
+  danger: DANGER,
 } as const;
 
 // Gradients are kept for API compatibility but collapse to flat purple so

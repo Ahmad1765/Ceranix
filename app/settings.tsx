@@ -1,11 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Pressable, ScrollView, Switch, Platform, Share, Linking, ActivityIndicator, Modal, KeyboardAvoidingView } from 'react-native';
-import { Text, TextInput } from '@/lib/rnText';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { View, Pressable, ScrollView, Platform, Share, Linking, ActivityIndicator } from 'react-native';
+import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
-import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
@@ -17,21 +15,25 @@ import {
 } from '@/lib/notifications';
 import { confirm } from '@/lib/confirm';
 import { safeBack } from '@/lib/nav';
+import { tap } from '@/lib/haptics';
+import { colors } from '@/lib/theme';
 import { isOptedOut, setAnalyticsOptOut } from '@/lib/analytics';
-import type {
-  DocumentKind,
-  PayoutKind,
-  PayoutMethod,
-  ShippingAddress,
-  Verification,
-} from '@/types';
-
-const LIME = '#6C47FF';
-const INK = '#0F0F0F';
-const MUTE = 'rgba(15,15,15,0.62)';
-const SOFT = '#FFFFFF';
-const HAIR = 'rgba(15,15,15,0.08)';
-const RED = '#EF4444';
+import {
+  SectionCard,
+  Row,
+  ToggleRow,
+  Divider,
+  SettingsHero,
+  SheetLabel,
+  BundleDiscountSheet,
+  AddressSheet,
+  PayoutSheet,
+  VerificationSheet,
+  type AddressForm,
+  type PayoutForm,
+  type VerifyForm,
+} from '@/components/settings';
+import type { PayoutMethod, ShippingAddress, Verification } from '@/types';
 
 const SUPPORT_EMAIL = 'support@carrinex.app';
 const TERMS_URL = 'https://carrinex.vercel.app/terms';
@@ -43,15 +45,6 @@ type Section = 'shop' | 'verify' | 'enhance' | 'account' | 'help';
 // before it's trusted as a section id.
 const SECTIONS: readonly Section[] = ['shop', 'verify', 'enhance', 'account', 'help'];
 type Busy = 'logout' | 'delete' | 'password' | null;
-
-function tap(style: 'light' | 'medium' = 'light') {
-  if (Platform.OS !== 'ios') return;
-  Haptics.impactAsync(
-    style === 'light'
-      ? Haptics.ImpactFeedbackStyle.Light
-      : Haptics.ImpactFeedbackStyle.Medium,
-  );
-}
 
 export default function SettingsScreen() {
   const { profile, user, session, signOut, refreshProfile } = useAuth();
@@ -414,9 +407,6 @@ export default function SettingsScreen() {
     toast.show('Coming soon', { variant: 'info', icon: 'clock' });
   }, [toast]);
 
-  const initial =
-    ((profile?.full_name || profile?.username || 'U').trim().charAt(0) || 'U').toUpperCase();
-
   // ---------- Modal save handlers ----------
   const saveAddress = useCallback(
     async (form: AddressForm): Promise<boolean> => {
@@ -540,7 +530,7 @@ export default function SettingsScreen() {
 
   // ---------- Render ----------
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: SOFT }}>
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
       {/* Header */}
       <View
         style={{
@@ -555,6 +545,8 @@ export default function SettingsScreen() {
         <Pressable
           onPress={() => safeBack()}
           hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
           style={{
             width: 38,
             height: 38,
@@ -563,16 +555,16 @@ export default function SettingsScreen() {
             alignItems: 'center',
             justifyContent: 'center',
             borderWidth: 1,
-            borderColor: HAIR,
+            borderColor: colors.hairline,
           }}
         >
-          <Feather name="arrow-left" size={18} color={INK} />
+          <Feather name="arrow-left" size={18} color={colors.ink} />
         </Pressable>
         <Text
           style={{
             fontSize: 13,
             fontWeight: '700',
-            color: INK,
+            color: colors.ink,
             letterSpacing: 1.4,
             textTransform: 'uppercase',
           }}
@@ -586,167 +578,15 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 60 }}
       >
-        {/* Hero */}
-        <Text
-          style={{
-            fontSize: 44,
-            fontWeight: '900',
-            color: INK,
-            lineHeight: 46,
-            letterSpacing: -1.5,
-            marginTop: 6,
+        <SettingsHero
+          profile={profile}
+          hasSession={!!session}
+          onEditProfile={() => {
+            tap('light');
+            router.push('/profile/edit');
           }}
-        >
-          Your{'\n'}settings.
-        </Text>
-        <View
-          style={{
-            marginTop: 12,
-            flexDirection: 'row',
-            alignItems: 'center',
-            marginBottom: 22,
-          }}
-        >
-          <View
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: 3,
-              backgroundColor: LIME,
-              marginRight: 10,
-            }}
-          />
-          <Text style={{ fontSize: 14, color: MUTE, lineHeight: 20, flex: 1 }}>
-            Manage your shop, account and how you appear on Carrinex.
-          </Text>
-        </View>
-
-        {/* Profile hero card */}
-        {profile ? (
-          <Pressable
-            onPress={() => {
-              tap('light');
-              router.push('/profile/edit');
-            }}
-            style={({ pressed }) => ({
-              backgroundColor: INK,
-              borderRadius: 24,
-              padding: 18,
-              flexDirection: 'row',
-              alignItems: 'center',
-              marginBottom: 20,
-              transform: [{ scale: pressed ? 0.99 : 1 }],
-            })}
-          >
-            <View
-              style={{
-                width: 56,
-                height: 56,
-                borderRadius: 28,
-                backgroundColor: LIME,
-                alignItems: 'center',
-                justifyContent: 'center',
-                overflow: 'hidden',
-                marginRight: 14,
-              }}
-            >
-              {profile.avatar_url ? (
-                <Image
-                  source={{ uri: profile.avatar_url }}
-                  style={{ width: 56, height: 56 }}
-                  contentFit="cover"
-                />
-              ) : (
-                <Text style={{ fontSize: 24, fontWeight: '900', color: '#FFFFFF' }}>{initial}</Text>
-              )}
-            </View>
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text
-                  style={{ fontSize: 17, fontWeight: '800', color: 'white' }}
-                  numberOfLines={1}
-                >
-                  {profile.full_name || profile.username}
-                </Text>
-                {profile.is_verified && (
-                  <View style={{ marginLeft: 6 }}>
-                    <Feather name="check-circle" size={14} color="#FFFFFF" />
-                  </View>
-                )}
-              </View>
-              <Text
-                style={{
-                  fontSize: 13,
-                  color: 'rgba(255,255,255,0.6)',
-                  marginTop: 2,
-                }}
-                numberOfLines={1}
-              >
-                @{profile.username} · Tap to edit profile
-              </Text>
-            </View>
-            <View
-              style={{
-                width: 38,
-                height: 38,
-                borderRadius: 19,
-                backgroundColor: LIME,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Feather name="edit-2" size={16} color="#FFFFFF" />
-            </View>
-          </Pressable>
-        ) : session ? (
-          <View
-            style={{
-              backgroundColor: 'white',
-              borderRadius: 20,
-              padding: 20,
-              marginBottom: 20,
-              alignItems: 'center',
-              borderWidth: 1.5,
-              borderColor: HAIR,
-            }}
-          >
-            <ActivityIndicator color={INK} />
-          </View>
-        ) : (
-          <Pressable
-            onPress={() => router.push('/auth/login')}
-            style={({ pressed }) => ({
-              backgroundColor: INK,
-              borderRadius: 20,
-              padding: 18,
-              marginBottom: 20,
-              flexDirection: 'row',
-              alignItems: 'center',
-              transform: [{ scale: pressed ? 0.99 : 1 }],
-            })}
-          >
-            <View
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 12,
-                backgroundColor: LIME,
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginRight: 14,
-              }}
-            >
-              <Feather name="log-in" size={18} color="#FFFFFF" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 15, fontWeight: '800', color: 'white' }}>Sign in</Text>
-              <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
-                Access your shop and listings
-              </Text>
-            </View>
-            <Feather name="arrow-right" size={18} color="white" />
-          </Pressable>
-        )}
+          onSignIn={() => router.push('/auth/login')}
+        />
 
         {/* Sections */}
         <SectionCard
@@ -912,19 +752,9 @@ export default function SettingsScreen() {
           {user?.email && (
             <>
               <View style={{ paddingVertical: 14 }}>
+                <SheetLabel>Email</SheetLabel>
                 <Text
-                  style={{
-                    fontSize: 11,
-                    fontWeight: '700',
-                    color: MUTE,
-                    letterSpacing: 1.2,
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  Email
-                </Text>
-                <Text
-                  style={{ fontSize: 14, fontWeight: '700', color: INK, marginTop: 4 }}
+                  style={{ fontSize: 14, fontWeight: '700', color: colors.ink, marginTop: 4 }}
                   numberOfLines={1}
                 >
                   {user.email}
@@ -986,10 +816,12 @@ export default function SettingsScreen() {
           <Pressable
             onPress={handleLogout}
             disabled={busy === 'logout'}
+            accessibilityRole="button"
+            accessibilityState={{ busy: busy === 'logout' }}
             style={({ pressed }) => ({
               height: 58,
               borderRadius: 16,
-              backgroundColor: INK,
+              backgroundColor: colors.ink,
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center',
@@ -1006,7 +838,7 @@ export default function SettingsScreen() {
                 top: 0,
                 bottom: 0,
                 width: 58,
-                backgroundColor: LIME,
+                backgroundColor: colors.primary,
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
@@ -1017,14 +849,7 @@ export default function SettingsScreen() {
                 <Feather name="log-out" size={18} color="#FFFFFF" />
               )}
             </View>
-            <Text
-              style={{
-                fontSize: 16,
-                fontWeight: '800',
-                color: 'white',
-                marginRight: 58,
-              }}
-            >
+            <Text style={{ fontSize: 16, fontWeight: '800', color: 'white', marginRight: 58 }}>
               {busy === 'logout' ? 'Signing out…' : 'Log out'}
             </Text>
           </Pressable>
@@ -1044,8 +869,8 @@ export default function SettingsScreen() {
         </Text>
       </ScrollView>
 
-      {/* Modals */}
-      <BundleDiscountModal
+      {/* Sheets */}
+      <BundleDiscountSheet
         visible={showBundle}
         currentPct={bundlePct}
         onClose={() => setShowBundle(false)}
@@ -1055,7 +880,7 @@ export default function SettingsScreen() {
         }}
       />
 
-      <AddressModal
+      <AddressSheet
         visible={showAddress}
         initial={address}
         onClose={() => setShowAddress(false)}
@@ -1073,7 +898,7 @@ export default function SettingsScreen() {
         }
       />
 
-      <PayoutModal
+      <PayoutSheet
         visible={showPayout}
         initial={payout}
         onClose={() => setShowPayout(false)}
@@ -1091,7 +916,7 @@ export default function SettingsScreen() {
         }
       />
 
-      <VerificationModal
+      <VerificationSheet
         visible={showVerify}
         initial={verification}
         onClose={() => setShowVerify(false)}
@@ -1102,958 +927,4 @@ export default function SettingsScreen() {
       />
     </SafeAreaView>
   );
-}
-
-// =============================================================================
-// Modal: Bundle discount picker
-// =============================================================================
-function BundleDiscountModal({
-  visible,
-  currentPct,
-  onClose,
-  onSave,
-}: {
-  visible: boolean;
-  currentPct: number;
-  onClose: () => void;
-  onSave: (pct: number) => Promise<void>;
-}) {
-  const [selected, setSelected] = useState<number>(currentPct);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (visible) {
-      setSelected(currentPct);
-      setSaving(false);
-    }
-  }, [visible, currentPct]);
-
-  const options = [0, 5, 10, 15, 20];
-
-  return (
-    <SheetModal visible={visible} onClose={onClose} title="Bundle discount">
-      <Text style={{ fontSize: 13, color: MUTE, lineHeight: 19, marginBottom: 16 }}>
-        Offer a discount when buyers purchase multiple items from your shop in one go.
-      </Text>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
-        {options.map((pct) => {
-          const active = selected === pct;
-          return (
-            <Pressable
-              key={pct}
-              onPress={() => {
-                tap('light');
-                setSelected(pct);
-              }}
-              style={({ pressed }) => ({
-                paddingHorizontal: 16,
-                paddingVertical: 12,
-                borderRadius: 999,
-                backgroundColor: active ? INK : 'white',
-                borderWidth: 1.5,
-                borderColor: active ? INK : HAIR,
-                opacity: pressed ? 0.85 : 1,
-              })}
-            >
-              <Text
-                style={{
-                  fontSize: 14,
-                  fontWeight: '800',
-                  color: active ? 'white' : INK,
-                }}
-              >
-                {pct === 0 ? 'Off' : `${pct}%`}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-      <SheetPrimary
-        label={saving ? 'Saving…' : selected === currentPct ? 'Done' : 'Save discount'}
-        loading={saving}
-        disabled={saving}
-        onPress={async () => {
-          if (selected === currentPct) {
-            onClose();
-            return;
-          }
-          setSaving(true);
-          await onSave(selected);
-          setSaving(false);
-        }}
-      />
-    </SheetModal>
-  );
-}
-
-// =============================================================================
-// Modal: Address
-// =============================================================================
-type AddressForm = {
-  recipient_name: string;
-  line1: string;
-  line2: string;
-  city: string;
-  state: string;
-  postal_code: string;
-  country: string;
-  phone: string;
-};
-
-function AddressModal({
-  visible,
-  initial,
-  onClose,
-  onSave,
-  onRemove,
-}: {
-  visible: boolean;
-  initial: ShippingAddress | null;
-  onClose: () => void;
-  onSave: (form: AddressForm) => Promise<void>;
-  onRemove?: () => Promise<void>;
-}) {
-  const [form, setForm] = useState<AddressForm>({
-    recipient_name: '',
-    line1: '',
-    line2: '',
-    city: '',
-    state: '',
-    postal_code: '',
-    country: '',
-    phone: '',
-  });
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (visible) {
-      setForm({
-        recipient_name: initial?.recipient_name ?? '',
-        line1: initial?.line1 ?? '',
-        line2: initial?.line2 ?? '',
-        city: initial?.city ?? '',
-        state: initial?.state ?? '',
-        postal_code: initial?.postal_code ?? '',
-        country: initial?.country ?? '',
-        phone: initial?.phone ?? '',
-      });
-      setSaving(false);
-    }
-  }, [visible, initial]);
-
-  const errors = useMemo(() => {
-    const e: Partial<Record<keyof AddressForm, string>> = {};
-    if (!form.recipient_name.trim()) e.recipient_name = 'Required';
-    if (!form.line1.trim()) e.line1 = 'Required';
-    if (!form.city.trim()) e.city = 'Required';
-    if (!form.postal_code.trim()) e.postal_code = 'Required';
-    if (!form.country.trim()) e.country = 'Required';
-    return e;
-  }, [form]);
-
-  const canSave = Object.keys(errors).length === 0;
-
-  return (
-    <SheetModal visible={visible} onClose={onClose} title="Shipping address">
-      <SheetField
-        label="Recipient name"
-        value={form.recipient_name}
-        onChangeText={(t) => setForm((s) => ({ ...s, recipient_name: t.slice(0, 80) }))}
-        error={errors.recipient_name}
-      />
-      <SheetField
-        label="Address line 1"
-        value={form.line1}
-        onChangeText={(t) => setForm((s) => ({ ...s, line1: t.slice(0, 120) }))}
-        error={errors.line1}
-      />
-      <SheetField
-        label="Address line 2 (optional)"
-        value={form.line2}
-        onChangeText={(t) => setForm((s) => ({ ...s, line2: t.slice(0, 120) }))}
-      />
-      <View style={{ flexDirection: 'row', gap: 12 }}>
-        <View style={{ flex: 1 }}>
-          <SheetField
-            label="City"
-            value={form.city}
-            onChangeText={(t) => setForm((s) => ({ ...s, city: t.slice(0, 60) }))}
-            error={errors.city}
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <SheetField
-            label="State / region"
-            value={form.state}
-            onChangeText={(t) => setForm((s) => ({ ...s, state: t.slice(0, 60) }))}
-          />
-        </View>
-      </View>
-      <View style={{ flexDirection: 'row', gap: 12 }}>
-        <View style={{ flex: 1 }}>
-          <SheetField
-            label="Postal code"
-            value={form.postal_code}
-            onChangeText={(t) => setForm((s) => ({ ...s, postal_code: t.slice(0, 20) }))}
-            error={errors.postal_code}
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <SheetField
-            label="Country"
-            value={form.country}
-            onChangeText={(t) => setForm((s) => ({ ...s, country: t.slice(0, 60) }))}
-            error={errors.country}
-          />
-        </View>
-      </View>
-      <SheetField
-        label="Phone (optional)"
-        value={form.phone}
-        keyboardType="phone-pad"
-        onChangeText={(t) => setForm((s) => ({ ...s, phone: t.slice(0, 30) }))}
-      />
-
-      <SheetPrimary
-        label={saving ? 'Saving…' : initial ? 'Update address' : 'Save address'}
-        loading={saving}
-        disabled={!canSave || saving}
-        onPress={async () => {
-          if (!canSave) return;
-          setSaving(true);
-          await onSave(form);
-          setSaving(false);
-        }}
-      />
-      {onRemove && (
-        <Pressable
-          onPress={async () => {
-            setSaving(true);
-            await onRemove();
-            setSaving(false);
-          }}
-          disabled={saving}
-          style={{ alignItems: 'center', paddingVertical: 14, marginTop: 4 }}
-        >
-          <Text style={{ color: RED, fontWeight: '700', fontSize: 13 }}>Remove address</Text>
-        </Pressable>
-      )}
-    </SheetModal>
-  );
-}
-
-// =============================================================================
-// Modal: Payout
-// =============================================================================
-type PayoutForm = {
-  kind: PayoutKind;
-  label: string;
-  account_last4: string;
-};
-
-function PayoutModal({
-  visible,
-  initial,
-  onClose,
-  onSave,
-  onRemove,
-}: {
-  visible: boolean;
-  initial: PayoutMethod | null;
-  onClose: () => void;
-  onSave: (form: PayoutForm) => Promise<void>;
-  onRemove?: () => Promise<void>;
-}) {
-  const [form, setForm] = useState<PayoutForm>({ kind: 'bank', label: '', account_last4: '' });
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (visible) {
-      setForm({
-        kind: initial?.kind ?? 'bank',
-        label: initial?.label ?? '',
-        account_last4: initial?.account_last4 ?? '',
-      });
-      setSaving(false);
-    }
-  }, [visible, initial]);
-
-  const last4Valid = /^[0-9]{4}$/.test(form.account_last4);
-  const labelValid = form.label.trim().length >= 2;
-  const canSave = last4Valid && labelValid;
-
-  return (
-    <SheetModal visible={visible} onClose={onClose} title="Payout method">
-      <Text style={{ fontSize: 13, color: MUTE, lineHeight: 19, marginBottom: 16 }}>
-        Add where you want your earnings sent. We never store full account numbers — only the last 4
-        digits for your reference.
-      </Text>
-
-      <View style={{ marginBottom: 14 }}>
-        <Text
-          style={{
-            fontSize: 11,
-            fontWeight: '700',
-            color: MUTE,
-            letterSpacing: 1.2,
-            textTransform: 'uppercase',
-            marginBottom: 8,
-            marginLeft: 4,
-          }}
-        >
-          Type
-        </Text>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          {(['bank', 'wallet'] as const).map((k) => {
-            const active = form.kind === k;
-            return (
-              <Pressable
-                key={k}
-                onPress={() => {
-                  tap('light');
-                  setForm((s) => ({ ...s, kind: k }));
-                }}
-                style={({ pressed }) => ({
-                  flex: 1,
-                  paddingVertical: 12,
-                  borderRadius: 14,
-                  alignItems: 'center',
-                  backgroundColor: active ? INK : 'white',
-                  borderWidth: 1.5,
-                  borderColor: active ? INK : HAIR,
-                  opacity: pressed ? 0.85 : 1,
-                })}
-              >
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: '800',
-                    color: active ? 'white' : INK,
-                    textTransform: 'capitalize',
-                  }}
-                >
-                  {k}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
-
-      <SheetField
-        label={form.kind === 'bank' ? 'Bank label' : 'Wallet label'}
-        value={form.label}
-        placeholder={form.kind === 'bank' ? 'HBL · Main account' : 'JazzCash'}
-        onChangeText={(t) => setForm((s) => ({ ...s, label: t.slice(0, 60) }))}
-        error={!labelValid && form.label.length > 0 ? 'At least 2 characters' : undefined}
-      />
-      <SheetField
-        label="Last 4 digits"
-        value={form.account_last4}
-        placeholder="1234"
-        keyboardType="number-pad"
-        onChangeText={(t) =>
-          setForm((s) => ({ ...s, account_last4: t.replace(/[^0-9]/g, '').slice(0, 4) }))
-        }
-        error={!last4Valid && form.account_last4.length > 0 ? 'Must be 4 digits' : undefined}
-      />
-
-      <SheetPrimary
-        label={saving ? 'Saving…' : initial ? 'Update payout' : 'Save payout'}
-        loading={saving}
-        disabled={!canSave || saving}
-        onPress={async () => {
-          if (!canSave) return;
-          setSaving(true);
-          await onSave(form);
-          setSaving(false);
-        }}
-      />
-      {onRemove && (
-        <Pressable
-          onPress={async () => {
-            setSaving(true);
-            await onRemove();
-            setSaving(false);
-          }}
-          disabled={saving}
-          style={{ alignItems: 'center', paddingVertical: 14, marginTop: 4 }}
-        >
-          <Text style={{ color: RED, fontWeight: '700', fontSize: 13 }}>Remove payout method</Text>
-        </Pressable>
-      )}
-    </SheetModal>
-  );
-}
-
-// =============================================================================
-// Modal: Verification
-// =============================================================================
-type VerifyForm = {
-  legal_name: string;
-  document_kind: DocumentKind;
-  document_number_last4: string;
-};
-
-function VerificationModal({
-  visible,
-  initial,
-  onClose,
-  onSave,
-}: {
-  visible: boolean;
-  initial: Verification | null;
-  onClose: () => void;
-  onSave: (form: VerifyForm) => Promise<void>;
-}) {
-  const [form, setForm] = useState<VerifyForm>({
-    legal_name: '',
-    document_kind: 'national_id',
-    document_number_last4: '',
-  });
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (visible) {
-      setForm({
-        legal_name: initial?.legal_name ?? '',
-        document_kind: (initial?.document_kind as DocumentKind) ?? 'national_id',
-        document_number_last4: initial?.document_number_last4 ?? '',
-      });
-      setSaving(false);
-    }
-  }, [visible, initial]);
-
-  const nameValid = form.legal_name.trim().length >= 2;
-  const last4Valid =
-    form.document_number_last4.length === 0 || /^[A-Za-z0-9]{2,6}$/.test(form.document_number_last4);
-  const canSave = nameValid && last4Valid && initial?.status !== 'approved';
-
-  const KIND_LABELS: Record<DocumentKind, string> = {
-    passport: 'Passport',
-    national_id: 'National ID',
-    drivers_license: "Driver's license",
-  };
-
-  return (
-    <SheetModal visible={visible} onClose={onClose} title="Identity verification">
-      {initial?.status === 'approved' ? (
-        <View style={{ alignItems: 'center', paddingVertical: 18 }}>
-          <View
-            style={{
-              width: 56,
-              height: 56,
-              borderRadius: 28,
-              backgroundColor: LIME,
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: 12,
-            }}
-          >
-            <Feather name="check" size={24} color="#FFFFFF" />
-          </View>
-          <Text style={{ fontSize: 16, fontWeight: '800', color: INK }}>You&apos;re verified</Text>
-          <Text style={{ fontSize: 13, color: MUTE, marginTop: 4 }}>
-            Approved on {initial.reviewed_at?.slice(0, 10) ?? '—'}
-          </Text>
-        </View>
-      ) : (
-        <>
-          <Text style={{ fontSize: 13, color: MUTE, lineHeight: 19, marginBottom: 16 }}>
-            Submit your details to verify your identity. We typically review within 2–3 business days.
-          </Text>
-          {initial?.status === 'submitted' && (
-            <View
-              style={{
-                backgroundColor: SOFT,
-                borderRadius: 14,
-                padding: 12,
-                marginBottom: 14,
-                flexDirection: 'row',
-                alignItems: 'center',
-              }}
-            >
-              <Feather name="clock" size={14} color={INK} style={{ marginRight: 8 }} />
-              <Text style={{ fontSize: 12, color: INK, fontWeight: '700' }}>
-                Already submitted — under review
-              </Text>
-            </View>
-          )}
-
-          <SheetField
-            label="Legal name (as on document)"
-            value={form.legal_name}
-            onChangeText={(t) => setForm((s) => ({ ...s, legal_name: t.slice(0, 100) }))}
-            error={!nameValid && form.legal_name.length > 0 ? 'At least 2 characters' : undefined}
-          />
-
-          <Text
-            style={{
-              fontSize: 11,
-              fontWeight: '700',
-              color: MUTE,
-              letterSpacing: 1.2,
-              textTransform: 'uppercase',
-              marginBottom: 8,
-              marginLeft: 4,
-            }}
-          >
-            Document type
-          </Text>
-          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-            {(Object.keys(KIND_LABELS) as DocumentKind[]).map((k) => {
-              const active = form.document_kind === k;
-              return (
-                <Pressable
-                  key={k}
-                  onPress={() => {
-                    tap('light');
-                    setForm((s) => ({ ...s, document_kind: k }));
-                  }}
-                  style={({ pressed }) => ({
-                    paddingHorizontal: 14,
-                    paddingVertical: 10,
-                    borderRadius: 999,
-                    backgroundColor: active ? INK : 'white',
-                    borderWidth: 1.5,
-                    borderColor: active ? INK : HAIR,
-                    opacity: pressed ? 0.85 : 1,
-                  })}
-                >
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      fontWeight: '800',
-                      color: active ? 'white' : INK,
-                    }}
-                  >
-                    {KIND_LABELS[k]}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <SheetField
-            label="Last 4 characters of document (optional)"
-            value={form.document_number_last4}
-            onChangeText={(t) =>
-              setForm((s) => ({
-                ...s,
-                document_number_last4: t.replace(/[^A-Za-z0-9]/g, '').slice(0, 6),
-              }))
-            }
-            error={!last4Valid && form.document_number_last4.length > 0 ? '2–6 characters' : undefined}
-          />
-
-          <SheetPrimary
-            label={saving ? 'Submitting…' : initial ? 'Resubmit' : 'Submit for review'}
-            loading={saving}
-            disabled={!canSave || saving}
-            onPress={async () => {
-              if (!canSave) return;
-              setSaving(true);
-              await onSave(form);
-              setSaving(false);
-            }}
-          />
-        </>
-      )}
-    </SheetModal>
-  );
-}
-
-// =============================================================================
-// Shared modal shell + primitives
-// =============================================================================
-function SheetModal({
-  visible,
-  onClose,
-  title,
-  children,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-      statusBarTranslucent
-    >
-      <View style={{ flex: 1, backgroundColor: 'rgba(15,15,15,0.55)', justifyContent: 'flex-end' }}>
-        <Pressable style={{ flex: 1 }} onPress={onClose} />
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-        >
-          <View
-            style={{
-              backgroundColor: SOFT,
-              borderTopLeftRadius: 28,
-              borderTopRightRadius: 28,
-              paddingTop: 12,
-              paddingHorizontal: 20,
-              paddingBottom: Platform.OS === 'ios' ? 32 : 20,
-              maxHeight: '88%',
-            }}
-          >
-            {/* Handle */}
-            <View
-              style={{
-                alignSelf: 'center',
-                width: 40,
-                height: 4,
-                borderRadius: 2,
-                backgroundColor: HAIR,
-                marginBottom: 12,
-              }}
-            />
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: 14,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 22,
-                  fontWeight: '900',
-                  color: INK,
-                  letterSpacing: -0.6,
-                }}
-              >
-                {title}
-              </Text>
-              <Pressable
-                onPress={onClose}
-                hitSlop={12}
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 17,
-                  backgroundColor: 'white',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderWidth: 1,
-                  borderColor: HAIR,
-                }}
-              >
-                <Feather name="x" size={16} color={INK} />
-              </Pressable>
-            </View>
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ paddingBottom: 8 }}
-            >
-              {children}
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
-      </View>
-    </Modal>
-  );
-}
-
-function SheetField({
-  label,
-  value,
-  onChangeText,
-  error,
-  placeholder,
-  keyboardType,
-}: {
-  label: string;
-  value: string;
-  onChangeText: (t: string) => void;
-  error?: string;
-  placeholder?: string;
-  keyboardType?: 'default' | 'number-pad' | 'phone-pad' | 'email-address';
-}) {
-  const [focused, setFocused] = useState(false);
-  const borderColor = error ? RED : focused ? INK : HAIR;
-  return (
-    <View style={{ marginBottom: 12 }}>
-      <Text
-        style={{
-          fontSize: 11,
-          fontWeight: '700',
-          color: error ? RED : focused ? INK : MUTE,
-          letterSpacing: 1.2,
-          textTransform: 'uppercase',
-          marginBottom: 6,
-          marginLeft: 4,
-        }}
-      >
-        {label}
-      </Text>
-      <View
-        style={{
-          backgroundColor: 'white',
-          borderRadius: 14,
-          borderWidth: 1.5,
-          borderColor,
-          paddingHorizontal: 14,
-          minHeight: 48,
-          justifyContent: 'center',
-        }}
-      >
-        <TextInput
-          value={value}
-          onChangeText={onChangeText}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          placeholder={placeholder}
-          placeholderTextColor="rgba(15,15,15,0.55)"
-          keyboardType={keyboardType}
-          style={{ fontSize: 15, color: INK, padding: 0 }}
-        />
-      </View>
-      {error && (
-        <Text style={{ fontSize: 11, color: RED, marginTop: 4, marginLeft: 4, fontWeight: '600' }}>
-          {error}
-        </Text>
-      )}
-    </View>
-  );
-}
-
-function SheetPrimary({
-  label,
-  onPress,
-  loading,
-  disabled,
-}: {
-  label: string;
-  onPress: () => void;
-  loading?: boolean;
-  disabled?: boolean;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      style={({ pressed }) => ({
-        height: 54,
-        borderRadius: 16,
-        backgroundColor: disabled ? INK : LIME,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: 6,
-        opacity: disabled ? 0.45 : 1,
-        transform: [{ scale: pressed && !disabled ? 0.985 : 1 }],
-      })}
-    >
-      {loading ? (
-        <ActivityIndicator color="#FFFFFF" />
-      ) : (
-        <Text style={{ fontSize: 15, fontWeight: '800', color: '#FFFFFF', letterSpacing: 0.2 }}>
-          {label}
-        </Text>
-      )}
-    </Pressable>
-  );
-}
-
-// =============================================================================
-// Settings row primitives
-// =============================================================================
-function SectionCard({
-  icon,
-  title,
-  subtitle,
-  expanded,
-  onToggle,
-  children,
-}: {
-  icon: keyof typeof Feather.glyphMap;
-  title: string;
-  subtitle: string;
-  expanded: boolean;
-  onToggle: () => void;
-  children?: React.ReactNode;
-}) {
-  return (
-    <View
-      style={{
-        backgroundColor: 'white',
-        borderRadius: 20,
-        borderWidth: 1.5,
-        borderColor: expanded ? INK : HAIR,
-        marginBottom: 12,
-        overflow: 'hidden',
-      }}
-    >
-      <Pressable
-        onPress={onToggle}
-        style={({ pressed }) => ({
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingHorizontal: 16,
-          paddingVertical: 16,
-          opacity: pressed ? 0.85 : 1,
-        })}
-      >
-        <View
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: 12,
-            backgroundColor: expanded ? LIME : SOFT,
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginRight: 14,
-          }}
-        >
-          <Feather name={icon} size={18} color={expanded ? '#FFFFFF' : INK} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 15, fontWeight: '800', color: INK, letterSpacing: -0.2 }}>
-            {title}
-          </Text>
-          <Text style={{ fontSize: 12, color: MUTE, marginTop: 2 }} numberOfLines={1}>
-            {subtitle}
-          </Text>
-        </View>
-        <View
-          style={{
-            width: 28,
-            height: 28,
-            borderRadius: 14,
-            backgroundColor: SOFT,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Feather name={expanded ? 'minus' : 'plus'} size={14} color={INK} />
-        </View>
-      </Pressable>
-      {expanded && (
-        <View
-          style={{
-            paddingHorizontal: 16,
-            paddingBottom: 4,
-            borderTopWidth: 1,
-            borderTopColor: HAIR,
-          }}
-        >
-          {children}
-        </View>
-      )}
-    </View>
-  );
-}
-
-function Row({
-  label,
-  desc,
-  onPress,
-  chevron,
-  destructive,
-  disabled,
-  loading,
-  badge,
-}: {
-  label: string;
-  desc?: string;
-  onPress?: () => void;
-  chevron?: boolean;
-  destructive?: boolean;
-  disabled?: boolean;
-  loading?: boolean;
-  badge?: string;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      style={({ pressed }) => ({
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 14,
-        opacity: disabled ? 0.5 : pressed ? 0.6 : 1,
-      })}
-    >
-      <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Text
-            style={{
-              fontSize: 14,
-              fontWeight: '700',
-              color: destructive ? RED : INK,
-            }}
-          >
-            {label}
-          </Text>
-          {badge && (
-            <View
-              style={{
-                marginLeft: 8,
-                paddingHorizontal: 8,
-                paddingVertical: 2,
-                borderRadius: 999,
-                backgroundColor: LIME,
-              }}
-            >
-              <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFFFFF', letterSpacing: 0.4 }}>
-                {badge.toUpperCase()}
-              </Text>
-            </View>
-          )}
-        </View>
-        {desc && <Text style={{ fontSize: 12, color: MUTE, marginTop: 3 }}>{desc}</Text>}
-      </View>
-      {loading ? (
-        <ActivityIndicator size="small" color={destructive ? RED : MUTE} />
-      ) : chevron ? (
-        <Feather name="chevron-right" size={16} color={destructive ? RED : MUTE} />
-      ) : null}
-    </Pressable>
-  );
-}
-
-function ToggleRow({
-  label,
-  desc,
-  value,
-  onValueChange,
-  disabled,
-}: {
-  label: string;
-  desc?: string;
-  value: boolean;
-  onValueChange: (v: boolean) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 14 }}>
-      <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 14, fontWeight: '700', color: INK }}>{label}</Text>
-        {desc && <Text style={{ fontSize: 12, color: MUTE, marginTop: 3 }}>{desc}</Text>}
-      </View>
-      <Switch
-        value={value}
-        onValueChange={(v) => {
-          tap('light');
-          onValueChange(v);
-        }}
-        disabled={disabled}
-        trackColor={{ false: 'rgba(15,15,15,0.12)', true: LIME }}
-        thumbColor={value ? '#FFFFFF' : '#FFFFFF'}
-        ios_backgroundColor="rgba(15,15,15,0.12)"
-      />
-    </View>
-  );
-}
-
-function Divider() {
-  return <View style={{ height: 1, backgroundColor: HAIR }} />;
 }
