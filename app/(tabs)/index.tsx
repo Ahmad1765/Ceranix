@@ -1,11 +1,11 @@
-import { memo, useCallback, useDeferredValue, useMemo, useState } from 'react';
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, View, Pressable, ScrollView, RefreshControl, Platform } from 'react-native';
-import { FlashList } from '@shopify/flash-list';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { Text, TextInput } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/lib/auth';
 import { colors, radii } from '@/lib/theme';
 import type { RecommendedListing } from '@/lib/recommendations';
@@ -19,6 +19,7 @@ import {
   EMPTY_FEED_FILTERS,
   countActiveFilters,
   type FeedFilters,
+  type FeedSort,
 } from '@/components/FeedFilterSheet';
 import {
   useMyFeedListingsQuery,
@@ -49,6 +50,10 @@ function isValidCategory(v: unknown): v is Category {
   return typeof v === 'string' && VALID_CATEGORIES.has(v as Category);
 }
 
+// Sorts the Discover sheet can hand this feed via `?sort=`. A param off a link
+// is untrusted, so it's matched against the real union rather than cast.
+const FEED_SORTS: FeedSort[] = ['relevance', 'newest', 'price_asc', 'price_desc', 'popular'];
+
 // Light tap on every interactive control on this screen. No-op on web, where
 // the Haptics API has nothing to drive.
 function haptic() {
@@ -76,6 +81,54 @@ export default function HomeScreen() {
   const [filters, setFilters] = useState<FeedFilters>(EMPTY_FEED_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
   const activeFilterCount = countActiveFilters(filters);
+
+  // Grid ref — switching feeds has to put you back at the top of the new one.
+  const listRef = useRef<FlashListRef<Listing[]>>(null);
+  const scrollToTop = useCallback(() => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, []);
+
+  // Intent handed over by the Discover sheet: a sort chip (New / Trending /
+  // Lowest price) or a topic tile. Both apply here, on the feed the user is
+  // already looking at, rather than pushing the Discover screen — that screen
+  // is not a destination the tab bar can reach (the Discover tab opens the
+  // sheet), so landing on it was a dead end. `n` is the sheet's nonce: it makes
+  // re-picking a chip you'd since cleared a distinct navigation, so this effect
+  // re-runs, and on its own it's the sheet's "All items" reset.
+  const params = useLocalSearchParams<{ sort?: string; category?: string; n?: string }>();
+  useEffect(() => {
+    const sort = FEED_SORTS.find((s) => s === params.sort);
+    const category = isValidCategory(params.category) ? params.category : null;
+    if (!sort && !category && !params.n) return;
+    // The pick browses the whole feed, so it clears whatever was narrowing it —
+    // the same reset the Discover screen's own copy of these chips does.
+    setQuery('');
+    // "Trending" is already a chip on this feed, and a better one: it swaps in
+    // the server's likes-ranked catalog rather than re-ranking your For You
+    // rows by like count. Reuse it instead of approximating it with a sort.
+    const trending = sort === 'popular';
+    setActiveChip(trending ? TRENDING : FOR_YOU);
+    // ponytail: a topic filters the rows already loaded (same as the filter
+    // sheet's own category control). Push it into the query if the catalog ever
+    // outgrows one page — the 60-row window would start hiding real matches.
+    setFilters({
+      ...EMPTY_FEED_FILTERS,
+      category,
+      sort: !sort || trending ? 'relevance' : sort,
+    });
+    scrollToTop();
+  }, [params.sort, params.category, params.n, scrollToTop]);
+
+  // Chip taps keep the scroll offset otherwise, which lands you mid-grid in a
+  // list that looks unchanged — on a small catalog the feeds hold the same
+  // items in a different order, so a swap you can't see reads as a dead chip.
+  const selectChip = useCallback(
+    (chip: string) => {
+      setActiveChip(chip);
+      scrollToTop();
+    },
+    [scrollToTop],
+  );
 
   const { columns, cardWidth } = useGridDimensions({
     min: 2,
@@ -371,7 +424,7 @@ export default function HomeScreen() {
           filterCount={activeFilterCount}
           onOpenFilter={() => setFilterOpen(true)}
           savedActive={showingSaved}
-          onToggleSaved={() => setActiveChip(showingSaved ? FOR_YOU : SAVED)}
+          onToggleSaved={() => selectChip(showingSaved ? FOR_YOU : SAVED)}
         />
 
         {showColdStartBanner ? (
@@ -424,7 +477,7 @@ export default function HomeScreen() {
         <ChipRow
           savedSearches={savedSearches}
           activeChip={activeChip}
-          onSelectChip={setActiveChip}
+          onSelectChip={selectChip}
           onDeleteChip={onDeleteChip}
           onAdd={() => {
             if (!user?.id) {
@@ -458,6 +511,7 @@ export default function HomeScreen() {
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
       <FlashList
+        ref={listRef}
         data={gridRows}
         renderItem={renderRow}
         keyExtractor={rowKey}

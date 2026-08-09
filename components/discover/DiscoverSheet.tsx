@@ -414,14 +414,21 @@ function DiscoverSheetBody({ onClose }: { onClose: () => void }) {
         go(`/discover?tab=${action.tab}`);
         return;
       }
-      go(`/discover?sort=${action.sort}`);
+      // Sorts land on the home feed, not the Discover screen: the feed is the
+      // grid the user already browses and it owns all three orderings
+      // (FeedFilterSheet). Discover stays the destination only for the hub
+      // panels below, which exist nowhere else.
+      go(`/?sort=${action.sort}`);
     },
     [go, onClose],
   );
 
   const onTopic = useCallback(
     (action: TopicAction) => {
-      go(action.kind === 'all' ? '/discover' : `/discover?category=${action.category}`);
+      // Same destination as the sorts above, for the same reason: a topic is a
+      // grid intent, and the feed is the grid. "All items" carries no param at
+      // all — the nonce alone is what tells the feed to reset.
+      go(action.kind === 'all' ? '/' : `/?category=${action.category}`);
     },
     [go],
   );
