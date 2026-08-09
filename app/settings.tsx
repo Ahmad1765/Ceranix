@@ -597,9 +597,14 @@ export default function SettingsScreen() {
           onToggle={() => toggleSection('shop')}
         >
           <Row
-            label="My shop"
-            desc="View purchased & sold items, payouts"
-            onPress={() => router.push('/(tabs)/profile')}
+            // Deliberately NOT "Purchases & sales" — that is this section's own
+            // title, and two identical strings in one view make every text
+            // locator in tests/e2e/signed-in/settings.spec.ts ambiguous.
+            label="Order history"
+            desc="Your orders, invoices & payouts"
+            // Used to push /(tabs)/profile, whose matching row pushed back here
+            // — the two bounced forever and neither showed an order.
+            onPress={() => router.push('/orders' as any)}
             chevron
           />
           <Divider />

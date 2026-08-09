@@ -9,9 +9,11 @@ describe('routeForNotificationData', () => {
     });
   });
 
-  it('routes an order to the listing', () => {
+  it('routes an order to its invoice, not the public listing', () => {
+    // A "Sold!" / payment-confirmation tap is about the transaction. It used to
+    // open /product/[id], which is the marketing page for the item.
     expect(routeForNotificationData({ type: 'order', listingId: 'l1' })).toEqual({
-      pathname: '/product/[id]',
+      pathname: '/invoice/[id]',
       params: { id: 'l1' },
     });
   });

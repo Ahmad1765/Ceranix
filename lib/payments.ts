@@ -1,5 +1,8 @@
 import { Linking, Platform } from "react-native";
 import { supabase } from "@/lib/supabase";
+// Type-only in the other direction (lib/orders.ts imports `type MyOrder` from
+// here), so this pair does not form a runtime cycle.
+import { normalizeMyOrder } from "@/lib/orders";
 
 // Server returns the hosted Stripe Checkout URL for a given listing.
 type SessionResponse = { url: string; sessionId: string };
@@ -40,6 +43,53 @@ export async function fetchOrderForListing(
     .maybeSingle();
   if (error) throw new Error(error.message);
   return (data as Order) ?? null;
+}
+
+// An order joined to the item it paid for, as the order history needs it.
+// `buyer_id` / `seller_id` come along so the caller can tell which side of the
+// sale the viewer was on — the same row is a purchase for one party and a sale
+// for the other.
+export type MyOrder = Order & {
+  listing_id: string;
+  buyer_id: string;
+  seller_id: string;
+  listing: {
+    id: string;
+    title: string | null;
+    images: string[] | null;
+    price: number | string | null;
+  } | null;
+};
+
+// The embed as PostgREST may actually hand it back — see the normalization in
+// fetchMyOrders below.
+type MyOrderRow = Omit<MyOrder, "listing"> & {
+  listing: MyOrder["listing"] | MyOrder["listing"][];
+};
+
+/**
+ * Every order the caller is a party to, newest first.
+ *
+ * RLS ("Buyers and sellers can view own orders") is what actually restricts the
+ * rows; the explicit .or() is here so the query uses orders_buyer_idx /
+ * orders_seller_idx rather than filtering after a scan.
+ *
+ * Throws rather than returning [] so React Query can retry and the screen can
+ * tell "no purchases yet" apart from "we failed to load your purchases" — the
+ * two must not render the same way on a screen about money.
+ */
+export async function fetchMyOrders(userId: string): Promise<MyOrder[]> {
+  const { data, error } = await supabase
+    .from("orders")
+    .select(
+      "id, status, amount_cents, fee_cents, currency, created_at, listing_id, buyer_id, seller_id, listing:listings(id, title, images, price)",
+    )
+    .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  // normalizeMyOrder lives in lib/orders.ts so it is reachable by a test — see
+  // the note there for why the embed shape can't just be asserted.
+  return ((data ?? []) as unknown as MyOrderRow[]).map(normalizeMyOrder) as MyOrder[];
 }
 
 // Stripe is "enabled" only when a publishable key has been set. Until then

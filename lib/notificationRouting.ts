@@ -27,9 +27,14 @@ export function routeForNotificationData(data: unknown): NotificationRoute | nul
         : null;
     }
     case 'order': {
+      // Both order pushes ("Sold!" to the seller, the payment confirmation to
+      // the buyer) are about a completed transaction, so they land on the
+      // invoice rather than the public listing page — /invoice/[id] is keyed by
+      // the listing id and shows the parties, amounts and status. Sending them
+      // to /product/[id] answered a question neither party had just asked.
       const listingId = id(d.listingId);
       return listingId
-        ? { pathname: '/product/[id]', params: { id: listingId } }
+        ? { pathname: '/invoice/[id]', params: { id: listingId } }
         : null;
     }
     default:

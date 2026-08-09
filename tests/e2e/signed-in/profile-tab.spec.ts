@@ -39,8 +39,11 @@ test.describe('Profile tab (signed in)', () => {
     await page.getByText('Details', { exact: true }).click();
     await expect(page.getByText('About me')).toBeVisible();
     await expect(page.getByText('Seller level')).toBeVisible();
-    // The rows that used to live behind the "Shop" tab.
-    await expect(page.getByText('My shop')).toBeVisible();
+    // The rows that used to live behind the "Shop" tab. "My shop" was renamed
+    // to "Purchases & sales" when it stopped bouncing to /settings and started
+    // opening the order history at /orders.
+    await expect(page.getByText('Purchases & sales', { exact: true })).toBeVisible();
+    await expect(page.getByText('Ratings & reviews', { exact: true })).toBeVisible();
     await expect(page.getByText('Bundle discount')).toBeVisible();
     await expect(page.getByText('Vacation mode')).toBeVisible();
     await expect(page.getByText('Share your profile')).toBeVisible();

@@ -39,6 +39,9 @@ test.describe("Settings (signed in)", () => {
     // Every label below also appears as a subtitle / description elsewhere,
     // so we use exact: true to avoid strict-mode hits.
     await expect(
+      page.getByText("Order history", { exact: true }),
+    ).toBeVisible();
+    await expect(
       page.getByText("Bundle discount", { exact: true }),
     ).toBeVisible();
     await expect(

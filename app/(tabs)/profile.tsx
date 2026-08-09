@@ -63,7 +63,7 @@ type ShopItem = {
   title: string;
   subtitle: string;
   badge?: string;
-  action: 'shop' | 'bundle' | 'vacation' | 'share';
+  action: 'shop' | 'ratings' | 'bundle' | 'vacation' | 'share';
 };
 
 const HORIZONTAL_PAD = 12;
@@ -431,7 +431,12 @@ const handleShareProfile = useCallback(async () => {
           <StatsBar
             items={[
               { key: 'items', value: sellingCount, label: 'Items' },
-              { key: 'sold', value: soldCount, label: 'Sold' },
+              {
+                key: 'sold',
+                value: soldCount,
+                label: 'Sold',
+                onPress: () => router.push('/orders?side=sold' as Href),
+              },
               {
                 key: 'followers',
                 value: profile.followers_count ?? 0,
@@ -605,9 +610,16 @@ const handleShareProfile = useCallback(async () => {
                   const items: ShopItem[] = [
                     {
                       icon: 'shopping-bag',
-                      title: 'My shop',
-                      subtitle: 'Purchases, sales & payouts',
+                      title: 'Purchases & sales',
+                      subtitle: 'Your orders, invoices & payouts',
                       action: 'shop',
+                    },
+                    {
+                      icon: 'star',
+                      title: 'Ratings & reviews',
+                      subtitle: 'How buyers have rated your sales',
+                      badge: rating > 0 ? rating.toFixed(1) : undefined,
+                      action: 'ratings',
                     },
                     {
                       icon: 'percent',
@@ -641,7 +653,16 @@ const handleShareProfile = useCallback(async () => {
                         badge={item.badge}
                         badgeTone="mute"
                         onPress={() => {
-                          if (item.action === 'bundle') {
+                          if (item.action === 'shop') {
+                            // Used to push /settings, whose matching row pushed
+                            // back here — the two bounced forever and neither
+                            // showed an order.
+                            router.push('/orders' as any);
+                          } else if (item.action === 'ratings') {
+                            // /ratings shipped registered but unreachable —
+                            // nothing in the app linked to it.
+                            router.push('/ratings' as any);
+                          } else if (item.action === 'bundle') {
                             router.push('/settings?open=bundle' as any);
                           } else if (item.action === 'share') {
                             handleShareProfile();

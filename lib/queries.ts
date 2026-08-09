@@ -72,6 +72,7 @@ import {
   type BrandIndexEntry,
 } from '@/lib/searchIndex';
 import { listConversations, type ConversationRow } from '@/lib/chat';
+import { fetchMyOrders, type MyOrder } from '@/lib/payments';
 import type { User as Profile, Listing } from '@/types';
 import {
   fetchDeck,
@@ -121,6 +122,7 @@ export const qk = {
   saveLists: (userId: string | null) => ['saveLists', userId] as const,
   listingsInList: (listId: string | null) => ['listingsInList', listId] as const,
   inbox: (userId: string | null) => ['inbox', userId] as const,
+  myOrders: (userId: string | null) => ['myOrders', userId] as const,
   sellerOtherListings: (sellerId: string | null, excludeId: string | null) =>
     ['sellerOtherListings', sellerId, excludeId] as const,
   similarListings: (listingId: string | null) => ['similarListings', listingId] as const,
@@ -426,6 +428,19 @@ export function useInboxQuery(userId: string | null) {
     queryKey: qk.inbox(userId),
     enabled: !!userId,
     queryFn: (): Promise<ConversationRow[]> => listConversations(userId as string),
+  });
+}
+
+// Order history — both sides of every sale the viewer is a party to. Kept at a
+// short staleTime because the row a buyer just created by paying is the whole
+// reason they open this screen, and the stripe-webhook writes it asynchronously
+// after the redirect.
+export function useMyOrdersQuery(userId: string | null) {
+  return useQuery({
+    queryKey: qk.myOrders(userId),
+    enabled: !!userId,
+    staleTime: 15_000,
+    queryFn: (): Promise<MyOrder[]> => fetchMyOrders(userId as string),
   });
 }
 

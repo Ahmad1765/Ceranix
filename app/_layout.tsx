@@ -247,6 +247,10 @@ function RootLayout() {
             options={{ headerShown: false }}
           />
           <Stack.Screen
+            name="orders"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
             name="invoice/[id]"
             options={{ headerShown: false }}
           />
