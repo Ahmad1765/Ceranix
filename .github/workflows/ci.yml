@@ -110,14 +110,13 @@ jobs:
           if-no-files-found: error
 
   audit:
-    name: npm audit (informational)
+    name: npm audit
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # Purely informational — we want visibility on advisories without
-    # failing CI for transient ones we haven't triaged yet. The step always
-    # exits 0; findings (if any) land in the job summary and can be
-    # triaged at leisure. Promote to a gating check by changing the final
-    # `exit 0` to `exit $status` once the noisy advisories are resolved.
+    # Gating. Any production advisory fails the job unless its GHSA id is in
+    # ALLOWED below, which exists only for advisories with no published fix.
+    # Everything else is expected to be resolved by a version bump or an
+    # `overrides` entry in package.json.
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-project
@@ -157,14 +156,43 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-          # Never fail the job — this check is informational. Findings are
-          # visible in the summary and via Dependabot security alerts.
-          exit 0
+          # Advisories with no published fix at any version. Metro pins
+          # image-size and the maintainer has shipped no release outside the
+          # vulnerable `<=2.0.2` range, so there is nothing to override to.
+          # Both are build-time DoS parsers, not reachable at runtime. Drop
+          # these two lines the moment a patched image-size ships.
+          ALLOWED='GHSA-5p2g-fcmc-qvqq GHSA-w3rx-r6r6-pgpr'
+
+          remaining=$(ALLOWED="$ALLOWED" node -e "
+            const fs = require('fs');
+            let a;
+            try { a = JSON.parse(fs.readFileSync('audit.json', 'utf8')); }
+            catch (e) { console.error('unparseable: ' + e.message); process.exit(2); }
+            const allow = new Set((process.env.ALLOWED || '').split(/\s+/).filter(Boolean));
+            const ids = new Set();
+            for (const v of Object.values(a.vulnerabilities || {}))
+              for (const via of (v.via || []))
+                if (via && typeof via === 'object' && via.url) ids.add(via.url.split('/').pop());
+            for (const id of [...ids].sort()) if (!allow.has(id)) console.log(id);
+          ")
+
+          if [[ $? -ne 0 ]]; then
+            echo "::error::audit.json missing or unparseable — failing rather than passing blind."
+            exit 1
+          fi
+
+          if [[ -n "${remaining//[[:space:]]/}" ]]; then
+            echo "::error::Unallowlisted advisories present:"
+            printf '%s\n' "$remaining"
+            exit 1
+          fi
+
+          echo "No advisories outside the documented allowlist."
 
   required-checks:
     name: Required checks
     runs-on: ubuntu-latest
-    needs: [typecheck, lint, unit-tests, web-build]
+    needs: [typecheck, lint, unit-tests, web-build, audit]
     if: always()
     steps:
       - name: Verify required jobs succeeded
@@ -173,10 +201,12 @@ jobs:
           echo "lint: ${{ needs.lint.result }}"
           echo "unit-tests: ${{ needs.unit-tests.result }}"
           echo "web-build: ${{ needs.web-build.result }}"
+          echo "audit: ${{ needs.audit.result }}"
           if [[ "${{ needs.typecheck.result }}" != "success" ]] || \
              [[ "${{ needs.lint.result }}" != "success" ]] || \
              [[ "${{ needs.unit-tests.result }}" != "success" ]] || \
-             [[ "${{ needs.web-build.result }}" != "success" ]]; then
+             [[ "${{ needs.web-build.result }}" != "success" ]] || \
+             [[ "${{ needs.audit.result }}" != "success" ]]; then
             echo "::error::One or more required checks failed."
             exit 1
           fi
