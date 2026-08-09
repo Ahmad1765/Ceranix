@@ -8,9 +8,11 @@ import {
   useMutation,
   useQuery,
   useQueryClient,
+  type QueryClient,
 } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import {
+  deleteListing,
   fetchFollowingListingsResult,
   fetchLikedListings,
   fetchListings,
@@ -18,9 +20,24 @@ import {
   fetchSellerOtherListings,
   fetchSimilarListings,
   fetchUserListings,
+  setListingSold,
+  toggleLike,
+  SELECT_LISTING_WITH_SELLER,
   type FeedTab,
   type SortKey,
 } from '@/lib/listings';
+// Keys + write-through adapters for the two caches that used to be hand-rolled.
+// They own their keys so the import graph stays acyclic (this file → listings.ts
+// → listingCache.ts), and the non-hook call sites keep writing through them.
+import { listingKey } from '@/lib/listingCache';
+import {
+  ENGAGEMENT_TTL_MS,
+  fetchLikedIds,
+  fetchSavedIds,
+  likedIdsKey,
+  savedIdsKey,
+  updateLikedCache,
+} from '@/lib/engagementCache';
 import { fetchRecommendations, fetchRecentlyViewed } from '@/lib/recommendations';
 import { fetchNewFromFollowed, fetchPriceDrops, type PriceDropListing } from '@/lib/myFeed';
 import {
@@ -72,6 +89,13 @@ import {
 export const qk = {
   profile: (id: string) => ['profile', id] as const,
   userListings: (id: string) => ['userListings', id] as const,
+  // The detail row for one listing, and the two batched engagement sets. These
+  // three are re-exported from the adapter modules that define them rather than
+  // declared here — see the import block above for why — so that `qk` stays the
+  // one place to read every cache key in the app.
+  listing: listingKey,
+  likedIds: likedIdsKey,
+  savedIds: savedIdsKey,
   followState: (viewerId: string | null, targetId: string) =>
     ['followState', viewerId, targetId] as const,
   feedListings: (
@@ -175,6 +199,200 @@ export function useSuggestedFollowsQuery(userId: string | null, enabled = true) 
     queryKey: qk.suggestedFollows(userId),
     enabled,
     queryFn: () => fetchSuggestedFollows(userId, 12),
+  });
+}
+
+// ── Product detail ──────────────────────────────────────────────────────────
+
+// Deliberately module-private, and deliberately NOT exported from lib/listings.ts
+// where every other read lives. It is the queryFn below and nothing else: four
+// screens used to import an exported `fetchListingById` and wrap it in their own
+// load effect, which is how the app ended up with four copies of the same abort
+// flag, cache seed, and dead 25s timeout race. Fetching one listing outside
+// React Query is now impossible by construction.
+//
+// Throws on a request failure, returns null for a row that genuinely isn't
+// there — the distinction the callers' "not found" states are built on, and the
+// reason a missing listing doesn't burn the retry budget.
+async function fetchListingRow(id: string, signal?: AbortSignal): Promise<Listing | null> {
+  // abortSignal() lives on the filter builder — it must be chained before the
+  // terminal modifier (.maybeSingle), otherwise it's missing from the type.
+  const filter = supabase.from('listings').select(SELECT_LISTING_WITH_SELLER).eq('id', id);
+  const query = signal ? filter.abortSignal(signal) : filter;
+  const { data, error } = await query.maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data as unknown as Listing) ?? null;
+}
+
+/**
+ * One listing row. Replaces the hand-rolled load effect that four screens each
+ * ran (module cache seed → abort flag → `active` guard → separate
+ * loading/notFound/error state): React Query owns the fetch, the abort on
+ * unmount, the retry/backoff, and the "reuse if fresh" gate.
+ *
+ * `null` data is a real answer — the row does not exist — and never retries,
+ * because fetchListingRow only throws on an actual request failure.
+ *
+ * `select` is where callers normalize the row (e.g. substituting a fallback
+ * seller). It belongs on the READ side, not in the queryFn: this cache entry is
+ * also seeded by feed fetches through lib/listingCache, so normalizing on write
+ * would leave the shape dependent on which writer got there first. Pass a
+ * module-scope function — React Query re-runs select when its identity changes.
+ */
+export function useListingQuery<T = Listing | null>(
+  id: string | null | undefined,
+  select?: (row: Listing | null) => T,
+) {
+  return useQuery<Listing | null, Error, T>({
+    queryKey: qk.listing(id ?? ''),
+    enabled: !!id,
+    queryFn: ({ signal }) => fetchListingRow(id as string, signal),
+    select,
+  });
+}
+
+// The viewer's liked / saved listing ids, as arrays (see lib/engagementCache for
+// why never Sets). One query per user per 30s answers the heart and bookmark on
+// every card and every product page.
+export function useLikedIdsQuery(userId: string | null) {
+  return useQuery({
+    queryKey: qk.likedIds(userId ?? ''),
+    enabled: !!userId,
+    staleTime: ENGAGEMENT_TTL_MS,
+    queryFn: (): Promise<string[]> => fetchLikedIds(userId as string),
+  });
+}
+
+export function useSavedIdsQuery(userId: string | null) {
+  return useQuery({
+    queryKey: qk.savedIds(userId ?? ''),
+    enabled: !!userId,
+    staleTime: ENGAGEMENT_TTL_MS,
+    queryFn: (): Promise<string[]> => fetchSavedIds(userId as string),
+  });
+}
+
+// Patch fields on a cached listing row, preserving its timestamp.
+//
+// The timestamp matters: rows seeded from a feed are deliberately stamped stale
+// (lib/listingCache) so the detail screen refetches the full row on mount. A
+// plain setQueryData would stamp them fresh and suppress that fetch, leaving a
+// product page with no description.
+function patchListing(qc: QueryClient, listingId: string, patch: Partial<Listing>): void {
+  const state = qc.getQueryState<Listing>(qk.listing(listingId));
+  if (!state || !state.data) return;
+  qc.setQueryData<Listing>(
+    qk.listing(listingId),
+    { ...state.data, ...patch },
+    { updatedAt: state.dataUpdatedAt },
+  );
+}
+
+/**
+ * Like / unlike, with the heart AND the like count moving together.
+ *
+ * They used to be two unsynchronised sources on the product screen — a `liked`
+ * boolean and the row's `likes` column — reconciled by a `heartDelta` expression
+ * that leaned on `listing.user_has_liked`, a field no query in the app actually
+ * populates. The visible symptom was un-liking an item you had liked leaving the
+ * count one too high until the next refetch. One optimistic write to both fixes
+ * it by construction.
+ *
+ * Note the asymmetry in toggleLike: it swallows its own errors and returns the
+ * PREVIOUS value on failure, so a result equal to what we started with is a
+ * failure, not a no-op. It also writes the ids cache itself on success — hence
+ * only the optimistic write and the rollbacks live here.
+ */
+export function useToggleLike(userId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ listingId, currentlyLiked }: { listingId: string; currentlyLiked: boolean }) =>
+      toggleLike(listingId, userId as string, currentlyLiked),
+    onMutate: async ({ listingId, currentlyLiked }) => {
+      const next = !currentlyLiked;
+      await qc.cancelQueries({ queryKey: qk.likedIds(userId ?? '') });
+      // Bound to a variable before the optional read. Optional member access
+      // directly on a CALL result trips a react-compiler@1.0.0 lowering bug
+      // ("Unexpected terminal kind `optional` for optional test block") which
+      // bails it out of the enclosing hook.
+      const prevRow = qc.getQueryData<Listing>(qk.listing(listingId));
+      const prevLikes = prevRow ? prevRow.likes : undefined;
+      updateLikedCache(userId as string, listingId, next);
+      const bumped = Math.max(0, Number(prevLikes ?? 0) + (next ? 1 : -1));
+      patchListing(qc, listingId, { likes: bumped });
+      return { prevLikes, next };
+    },
+    onError: (_e, { listingId, currentlyLiked }, ctx) => {
+      updateLikedCache(userId as string, listingId, currentlyLiked);
+      if (ctx) patchListing(qc, listingId, { likes: ctx.prevLikes });
+    },
+    onSuccess: (committed, { listingId, currentlyLiked }, ctx) => {
+      if (committed !== currentlyLiked) return;
+      // Server disagreed — same rollback as onError.
+      updateLikedCache(userId as string, listingId, currentlyLiked);
+      if (ctx) patchListing(qc, listingId, { likes: ctx.prevLikes });
+    },
+  });
+}
+
+/** Owner action: flip `is_sold`, optimistically, rolling back on refusal. */
+export function useSetListingSold(listingId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (nextSold: boolean) => setListingSold(listingId as string, nextSold),
+    onMutate: async (nextSold) => {
+      const key = qk.listing(listingId ?? '');
+      await qc.cancelQueries({ queryKey: key });
+      const prev = qc.getQueryData<Listing>(key);
+      patchListing(qc, listingId as string, { is_sold: nextSold });
+      return { prev };
+    },
+    onError: (_e, _nextSold, ctx) => {
+      if (ctx?.prev) patchListing(qc, listingId as string, { is_sold: ctx.prev.is_sold });
+    },
+    // setListingSold never throws: it returns the value it managed to commit,
+    // which is the PREVIOUS one when the update failed.
+    onSuccess: (committed, nextSold, ctx) => {
+      if (committed === nextSold) return;
+      if (ctx?.prev) patchListing(qc, listingId as string, { is_sold: ctx.prev.is_sold });
+    },
+  });
+}
+
+/**
+ * Owner action: hard-delete. Returns false rather than throwing on refusal.
+ *
+ * `sellerId` exists only to invalidate the two caches where a deleted row is
+ * visible IMMEDIATELY rather than eventually — see onSuccess.
+ */
+export function useDeleteListing(sellerId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (listingId: string) => deleteListing(listingId),
+    onSuccess: (ok, listingId) => {
+      if (!ok) return;
+      // Remove outright rather than invalidate. The Query cache is persisted to
+      // AsyncStorage on a 1s throttle while staleTime is 60s, so a merely
+      // invalidated entry can rehydrate PRE-delete and then be treated as fresh
+      // for a minute — the bug that used to resurrect deleted saved searches
+      // (see useDeleteSavedSearch below).
+      qc.removeQueries({ queryKey: qk.listing(listingId) });
+
+      // The seller's own grid, which backs both app/(tabs)/profile.tsx and
+      // app/user/[id].tsx — i.e. exactly where safeBack() lands the owner after
+      // a delete, so a ghost row there is on screen instantly.
+      if (sellerId) qc.invalidateQueries({ queryKey: qk.userListings(sellerId) });
+      // The bundle rail, by prefix rather than by key: it is keyed on
+      // (sellerId, excludeId), so every one of this seller's OTHER product pages
+      // holds its own entry that would keep offering the deleted item to bundle.
+      qc.invalidateQueries({ queryKey: ['sellerOtherListings'] });
+
+      // The broad feeds (homeFeed / myFeedListings / feedListings /
+      // similarListings) are deliberately left to age out on their own 60s
+      // staleTime. A deleted row surviving one of those for under a minute
+      // renders a card that routes to "Listing not available" — the behaviour
+      // that already shipped, and not worth an eight-key invalidation sweep.
+    },
   });
 }
 

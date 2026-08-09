@@ -10,8 +10,7 @@ import { getOptimizedImageUrl } from '@/lib/images';
 import * as Haptics from 'expo-haptics';
 import { colors } from '@/lib/theme';
 import { SafetyBanner } from '@/components/SafetyBanner';
-import { fetchListingById } from '@/lib/listings';
-import { getCachedListing } from '@/lib/listingCache';
+import { useListingQuery } from '@/lib/queries';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { safeBack } from '@/lib/nav';
@@ -24,7 +23,6 @@ import {
 } from '@/lib/payments';
 import { buyerProtectionFee, formatPrice } from '@/lib/fees';
 import { SlideToConfirm } from '@/components/SlideToConfirm';
-import type { Listing } from '@/types';
 
 function tap(style: 'light' | 'medium' = 'light') {
   if (Platform.OS !== 'ios') return;
@@ -52,9 +50,16 @@ export default function PaymentScreen() {
   const { user, loading: authLoading } = useAuth();
 
   const toast = useToast();
-  const cached = getCachedListing(id ? String(id) : null);
-  const [listing, setListing] = useState<Listing | null>(cached);
-  const [loading, setLoading] = useState(!cached);
+  // React Query owns the fetch, the abort on unmount, and the retry/backoff.
+  // The row a buyer tapped through from a feed or a product page is already in
+  // the cache (lib/listingCache seeds it), so checkout paints on the first frame
+  // and revalidates behind it — and now survives a cold launch too.
+  //
+  // Retries are deliberately left at the app default rather than capped: on a
+  // checkout screen, recovering from a transient blip matters more than failing
+  // fast, and the old code had no retry at all — one blip was a dead end.
+  const listingQ = useListingQuery(id ? String(id) : null);
+  const listing = listingQ.data ?? null;
   const [paying, setPaying] = useState(false);
   const demoTimerRef = useRef<any>(null);
   const mounted = useRef(true);
@@ -75,36 +80,6 @@ export default function PaymentScreen() {
     return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
   })();
 
-  useEffect(() => {
-    let active = true;
-    if (!id) {
-      setLoading(false);
-      return;
-    }
-    const haveCached = !!getCachedListing(String(id));
-    setLoading(!haveCached);
-    (async () => {
-      try {
-        const res = await Promise.race([
-          fetchListingById(String(id)),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('Request timed out')), 25_000),
-          ),
-        ]);
-        if (active && res) setListing(res);
-        else if (active && !haveCached) setListing(null);
-      } catch (e) {
-        console.warn('[payment] load failed', e);
-        if (active && !haveCached) setListing(null);
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [id]);
-
   // Wait for auth to settle before judging `user` — the same order
   // components/RequireAuth uses. This screen hand-rolls that guard, and
   // omitting the loading check is what sent signed-in buyers to /auth/login.
@@ -122,7 +97,10 @@ export default function PaymentScreen() {
     return <Redirect href="/auth/login" />;
   }
 
-  if (loading) {
+  // Still in flight with nothing cached to show. A missing `id` disables the
+  // query, so it never lands here — it falls through to "Item unavailable",
+  // which is what the old `if (!id) setLoading(false)` produced.
+  if (!listing && id && listingQ.isPending) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -132,6 +110,8 @@ export default function PaymentScreen() {
     );
   }
 
+  // A failed request and a row that genuinely doesn't exist land here alike —
+  // as they always have on this screen, which has no separate error branch.
   if (!listing) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }}>

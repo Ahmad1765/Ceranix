@@ -7,13 +7,12 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import Feather from '@expo/vector-icons/Feather';
 import { Image } from 'expo-image';
 import { useAuth } from '@/lib/auth';
-import { fetchListingById } from '@/lib/listings';
+import { useListingQuery } from '@/lib/queries';
 import { getOrCreateConversation, sendMessage, sendOffer } from '@/lib/chat';
 import { getOptimizedImageUrl } from '@/lib/images';
 import { formatPrice, CURRENCY_SYMBOL } from '@/lib/currency';
 import { useToast } from '@/lib/toast';
 import { captureError } from '@/lib/sentry';
-import type { Listing } from '@/types';
 
 type Mode = 'message' | 'offer';
 
@@ -53,8 +52,11 @@ export default function NewConversationScreen() {
   const { width: winWidth, height: winHeight } = useWindowDimensions();
   const compact = winHeight < 700 || winWidth < 360;
 
-  const [listing, setListing] = useState<Listing | null>(null);
-  const [loading, setLoading] = useState(true);
+  // The item being messaged/offered on. Shared cache with the product screen the
+  // buyer just came from, so the compose sheet opens on a populated hero rather
+  // than a spinner.
+  const listingQ = useListingQuery(listingId || null);
+  const listing = listingQ.data ?? null;
   const [mode, setMode] = useState<Mode>(initialMode);
   const [message, setMessage] = useState('');
   const [amount, setAmount] = useState(initialAmount);
@@ -83,31 +85,15 @@ export default function NewConversationScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Keep reporting a failed listing load to Sentry. React Query owns the retry
+  // and the UI state now, but it does not report anywhere, and this screen sits
+  // in the offer path — a silent failure here is a buyer who can't make an
+  // offer and nobody knowing about it. Fires once per settled error, not once
+  // per attempt, since `error` is only populated after the retries are spent.
+  const loadError = listingQ.error;
   useEffect(() => {
-    let cancelled = false;
-    if (!listingId) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    fetchListingById(listingId)
-      .then((row) => {
-        if (cancelled) return;
-        setListing(row);
-      })
-      .catch((err) => {
-        captureError(err, { fn: 'conversationNew.fetchListing' });
-        if (cancelled) return;
-        setListing(null);
-      })
-      .finally(() => {
-        if (cancelled) return;
-        setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [listingId]);
+    if (loadError) captureError(loadError, { fn: 'conversationNew.fetchListing' });
+  }, [loadError]);
 
   const offerSuggestions = useMemo(() => {
     if (!listing || listing.price <= 0) return [];
@@ -195,7 +181,10 @@ export default function NewConversationScreen() {
     }
   };
 
-  if (loading) {
+  // Still in flight with nothing cached. A missing listing param disables the
+  // query, so it falls straight through to "Listing unavailable" below — what
+  // the old `if (!listingId) setLoading(false)` produced.
+  if (!listing && listingId && listingQ.isPending) {
     return (
       <SafeAreaView
         edges={['top']}

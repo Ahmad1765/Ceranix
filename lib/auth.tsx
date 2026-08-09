@@ -10,6 +10,7 @@ import {
 } from 'react';
 import type { Session, User as AuthUser } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { queryClient } from '@/lib/queryClient';
 import { setSentryUser } from '@/lib/sentry';
 import { identify, resetIdentity } from '@/lib/analytics';
 import { registerForPush, unregisterThisDevice } from '@/lib/notifications';
@@ -170,6 +171,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.warn('[auth] signOut error', e);
     }
+    // Drop every cached query, and with it the persisted AsyncStorage copy that
+    // would otherwise rehydrate one account's data into the next session.
+    //
+    // Deliberately AFTER the auth call, not before: clearing wakes mounted
+    // observers, and doing that while the old token is still valid just refetches
+    // the departing user's rows straight back into the cache. By this point
+    // `session` is already null, so every user-scoped query is disabled and only
+    // the public ones refetch — which is correct, since a signed-out feed is a
+    // different feed.
+    queryClient.clear();
   }, []);
 
   const value = useMemo<AuthState>(

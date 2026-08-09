@@ -19,23 +19,26 @@ import Animated, {
 } from 'react-native-reanimated';
 import type { Listing } from '@/types';
 import {
-  deleteListing,
-  fetchListingById,
-  isLiked,
-  setListingSold,
-  toggleLike,
-} from '@/lib/listings';
-import { useSellerOtherListingsQuery, useSimilarListingsQuery } from '@/lib/queries';
+  useDeleteListing,
+  useFollowStateQuery,
+  useLikedIdsQuery,
+  useListingQuery,
+  useSavedIdsQuery,
+  useSellerOtherListingsQuery,
+  useSetListingSold,
+  useSimilarListingsQuery,
+  useToggleFollow,
+  useToggleLike,
+} from '@/lib/queries';
 import { confirm } from '@/lib/confirm';
 import { logListingView } from '@/lib/recommendations';
-import { getCachedListing } from '@/lib/listingCache';
-import { fetchFollowState, getCachedFollowState, toggleFollow } from '@/lib/follows';
+import { updateSavedCache } from '@/lib/engagementCache';
+import type { FollowState } from '@/lib/follows';
 import { getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { AnimatedNumber } from '@/components/AnimatedNumber';
 import { SaveListSheet } from '@/components/SaveListSheet';
-import { isSaved as fetchIsSaved } from '@/lib/saves';
 import { FullscreenImageViewer } from '@/components/product/FullscreenImageViewer';
 import { ProductActionBar } from '@/components/product/ProductActionBar.legacy';
 import { OfferSheet } from '@/components/product/OfferSheet';
@@ -76,9 +79,20 @@ import { reportListing, REPORT_REASONS } from '@/lib/reports';
 import { useGuestGate } from '@/components/GuestGate';
 import { buyerProtectionFee, orderTotal, formatPrice } from '@/lib/fees';
 import { BuyerProtectionSheet } from '@/components/product/BuyerProtectionSheet';
-import { errorMessage, isAbortError } from '@/lib/errors';
+import { errorMessage } from '@/lib/errors';
 
 const AnimatedExpoImage = Animated.createAnimatedComponent(Image);
+
+// Read-side normalization for useListingQuery. `listings.seller` is a nullable
+// embed but the render dereferences `listing.seller.id` directly, so a
+// seller-less row must never reach it.
+//
+// Declared at module scope, not inline: React Query re-runs `select` whenever
+// its identity changes, so an inline arrow would recompute — and hand back a new
+// object identity — on every render, churning the memo inputs of every child
+// that takes `listing` as a prop.
+const withFallbackSeller = (row: Listing | null): Listing | null =>
+  row ? { ...row, seller: row.seller ?? (FALLBACK_SELLER as Listing['seller']) } : null;
 
 // Item-description attribute list: subtle "gray-100" row dividers and a neutral
 // "gray-400" drill-down chevron, shared across the category + detail rows.
@@ -121,25 +135,6 @@ export default function ProductScreen() {
       heroOffsetX.value = e.contentOffset.x;
     },
   });
-  const [liked, setLiked] = useState(false);
-  const [likeConfirmedFromServer, setLikeConfirmedFromServer] = useState(false);
-  const [likeBusy, setLikeBusy] = useState(false);
-  // Prime from cache so re-opens are instant — bypasses any wedged supabase
-  // client on web while we refetch in the background.
-  const cached = getCachedListing(productIdParam);
-  // Seed `followed` from the follow cache so a re-mount under a wedged
-  // supabase client doesn't blink the button back to "Follow" before the
-  // refetch resolves. The cache is updated on every successful fetchFollowState
-  // and toggleFollow.
-  // Split across two statements rather than written as
-  // `getCachedFollowState(...)?.isFollowing ?? false`. Optional member access
-  // directly on a CALL result trips a react-compiler@1.0.0 lowering bug
-  // ("Unexpected terminal kind `optional` for optional test block") which bails
-  // it out of this entire screen. Binding the call result first avoids it.
-  const cachedFollow = getCachedFollowState(user?.id ?? null, cached?.seller?.id);
-  const initialFollowed = cachedFollow ? cachedFollow.isFollowing : false;
-  const [followed, setFollowed] = useState(initialFollowed);
-  const [followBusy, setFollowBusy] = useState(false);
   const [selectedBundleIds, setSelectedBundleIds] = useState<Set<string>>(new Set());
   const [showStickyHeader, setShowStickyHeader] = useState(false);
   const [relatedTab, setRelatedTab] = useState<'members' | 'similar'>('members');
@@ -152,84 +147,37 @@ export default function ProductScreen() {
   const heartAnimRef = useRef<PopIconHandle>(null);
   const saveAnimRef = useRef<PopIconHandle>(null);
   const [descExpanded, setDescExpanded] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [listing, setListing] = useState<Listing | null>(
-    cached ? { ...cached, seller: cached.seller ?? (FALLBACK_SELLER as Listing['seller']) } : null,
-  );
-  const [loadingListing, setLoadingListing] = useState(!cached);
-  const [notFound, setNotFound] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [retryToken, setRetryToken] = useState(0);
+
+  // The listing itself. React Query owns the fetch, the abort on unmount, the
+  // retry/backoff and the "reuse if fresh" gate; a row seeded by whatever feed
+  // the shopper tapped through (lib/listingCache) paints on the first frame and
+  // refetches behind it, which is what the old module cache existed to do.
+  const listingQ = useListingQuery(productIdParam, withFallbackSeller);
+  const listing = listingQ.data ?? null;
+
+  // The viewer's liked / saved sets, batched app-wide: one query per user per
+  // 30s answers this page and every card in every grid.
+  const likedIds = useLikedIdsQuery(user?.id ?? null).data;
+  const savedIds = useSavedIdsQuery(user?.id ?? null).data;
+  const liked = !!productIdParam && !!likedIds && likedIds.includes(productIdParam);
+  const saved = !!productIdParam && !!savedIds && savedIds.includes(productIdParam);
+
+  const toggleLikeM = useToggleLike(user?.id ?? null);
+  const likeBusy = toggleLikeM.isPending;
+
+  const sellerId = listing?.seller?.id ?? '';
+  const isOwnListing = !!user?.id && listing?.seller_id === user.id;
+  // Passing '' for your own listing keeps the query disabled — you can't follow
+  // yourself, and the RPC is granted to `authenticated` only.
+  const followStateQ = useFollowStateQuery(user?.id ?? null, isOwnListing ? '' : sellerId);
+  const followState = followStateQ.data;
+  const followed = followState ? followState.isFollowing : false;
+  const toggleFollowM = useToggleFollow(user?.id ?? null, sellerId);
+  const followBusy = toggleFollowM.isPending;
 
   // The bundle section lives at the bottom of the page (inside the
   // "Seller's items" tab); the teaser pill under the price jumps there.
   const mainScrollRef = useRef<any>(null);
-
-  const retry = () => setRetryToken((n) => n + 1);
-
-  useEffect(() => {
-    let active = true;
-    if (!productIdParam) {
-      setLoadingListing(false);
-      setNotFound(true);
-      setLoadError(null);
-      return;
-    }
-    const haveCached = !!getCachedListing(productIdParam);
-    // Only show the blocking skeleton when we have nothing to render.
-    setLoadingListing(!haveCached);
-    setNotFound(false);
-    setLoadError(null);
-    const controller = new AbortController();
-    (async () => {
-      // The try body is deliberately just the await, and there is no `finally`
-      // — see the note on errorMessage/isCancellation above for why. The
-      // rewrite is behaviour-preserving: the old `finally` ran
-      // `if (active) setLoadingListing(false)` on every path including the
-      // early `return`s, which is exactly what the `if (!active) return` plus
-      // the trailing call below do.
-      //
-      // Supabase's client already enforces a 12s fetch ceiling via timeoutFetch
-      // in lib/supabase.ts, so no outer race is needed. The AbortController
-      // cancels the request when the effect re-runs (HMR, param change,
-      // unmount) so stale fetches don't resolve into state we no longer want.
-      let row: Awaited<ReturnType<typeof fetchListingById>> = null;
-      let failure: unknown = null;
-      try {
-        row = await fetchListingById(productIdParam, controller.signal);
-      } catch (e) {
-        failure = e;
-      }
-
-      if (!active) return;
-
-      if (failure !== null) {
-        if (!isAbortError(failure, controller.signal)) {
-          console.warn('[product] load failed', failure);
-          if (!haveCached) {
-            setLoadError(errorMessage(failure) || 'Could not load listing');
-          }
-        }
-      } else if (!row) {
-        if (!haveCached) setNotFound(true);
-      } else {
-        setListing({
-          ...row,
-          seller: row.seller ?? (FALLBACK_SELLER as Listing['seller']),
-        });
-        capture('listing_viewed', buildListingViewedProps(
-          { id: row.id, seller_id: row.seller_id, price: row.price, category: row.category },
-          'product_page',
-        ));
-      }
-
-      setLoadingListing(false);
-    })();
-    return () => {
-      active = false;
-      controller.abort();
-    };
-  }, [productIdParam, retryToken]);
 
   // Feed the recommender: record that this user opened this listing. The RPC
   // dedupes within 30 minutes and skips own listings, so no guards needed.
@@ -237,72 +185,35 @@ export default function ProductScreen() {
     if (productIdParam && user?.id) logListingView(productIdParam);
   }, [productIdParam, user?.id]);
 
+  // Analytics, once per resolved listing. This used to ride inside the load
+  // effect, which meant it only fired on a network response — a page served
+  // from cache was never counted as viewed.
+  const viewedId = listing?.id;
+  const viewedSellerId = listing?.seller_id;
+  const viewedPrice = listing?.price;
+  const viewedCategory = listing?.category;
   useEffect(() => {
-    let active = true;
-    if (!productIdParam || !user?.id) {
-      setLiked(false);
-      return;
-    }
-    isLiked(productIdParam, user.id)
-      .then((v) => {
-        if (active) {
-          setLiked(v);
-          setLikeConfirmedFromServer(v);
-        }
-      })
-      .catch((e) => {
-        console.warn('[product] isLiked failed', e);
-      });
-    return () => {
-      active = false;
-    };
-  }, [productIdParam, user?.id]);
+    if (!viewedId) return;
+    capture('listing_viewed', buildListingViewedProps(
+      {
+        id: viewedId,
+        seller_id: viewedSellerId ?? '',
+        price: Number(viewedPrice ?? 0),
+        category: viewedCategory ?? '',
+      },
+      'product_page',
+    ));
+  }, [viewedId, viewedSellerId, viewedPrice, viewedCategory]);
 
-  // Hydrate the saved/bookmarked state for the bookmark pill. Returns true
-  // when the listing is in at least one of the user's save lists.
-  useEffect(() => {
-    let active = true;
-    if (!productIdParam || !user?.id) {
-      setSaved(false);
-      return;
-    }
-    fetchIsSaved(productIdParam, user.id).then((v) => {
-      if (active) setSaved(v);
-    });
-    return () => {
-      active = false;
-    };
-  }, [productIdParam, user?.id]);
-
-  // Real follow state — pulls from user_follows and the profile's denormalized
-  // counts. Re-fires on focus so a follow performed elsewhere (e.g. on the
-  // seller's user profile screen) is reflected when the user comes back to
-  // this product. On RPC failure we preserve whatever is on screen (the
-  // cached/optimistic value) instead of forcing the button back to "Follow".
+  // Re-check the follow state on focus: a follow performed elsewhere (e.g. on
+  // the seller's own profile screen) has to be reflected when the shopper comes
+  // back here. refetchOnWindowFocus is off app-wide (lib/queryClient.ts), so
+  // this is the explicit equivalent. `refetch` is referentially stable.
+  const refetchFollow = followStateQ.refetch;
   useFocusEffect(
     useCallback(() => {
-      let active = true;
-      const sellerId = listing?.seller?.id;
-      if (!sellerId || sellerId === user?.id) {
-        setFollowed(false);
-        return () => {
-          active = false;
-        };
-      }
-      // Re-seed from cache on focus in case another screen wrote a fresher
-      // state since this component last rendered.
-      const cachedState = getCachedFollowState(user?.id ?? null, sellerId);
-      if (cachedState) setFollowed(cachedState.isFollowing);
-      fetchFollowState(user?.id ?? null, sellerId)
-        .then((s) => {
-          // null = RPC failed; preserve current state rather than wipe it.
-          if (active && s) setFollowed(s.isFollowing);
-        })
-        .catch((e) => console.warn('[product] fetchFollowState', e?.message ?? e));
-      return () => {
-        active = false;
-      };
-    }, [listing?.seller?.id, user?.id]),
+      if (sellerId && !isOwnListing) refetchFollow();
+    }, [sellerId, isOwnListing, refetchFollow]),
   );
 
   // Reset bundle selection whenever the viewed listing changes — selected
@@ -313,14 +224,17 @@ export default function ProductScreen() {
   }, [listing?.id]);
 
   // Other listings from this seller ("more from this seller") + "you might also
-  // like" — both are pure server reads keyed on the current listing, so React
-  // Query owns fetching/caching. They refetch automatically when the viewed
-  // listing changes.
+  // like" — both are pure server reads, so React Query owns fetching/caching.
+  //
+  // Similar items key off the ROUTE PARAM, not the loaded row: the RPC only
+  // needs the id, so keying on `listing?.id` made it wait for the listing fetch
+  // to land first — a serial waterfall for no reason. Seller items genuinely
+  // depend on `seller_id` and stay dependent.
   const sellerItemsQ = useSellerOtherListingsQuery(
     listing?.seller_id ?? null,
     listing?.id ?? null,
   );
-  const similarItemsQ = useSimilarListingsQuery(listing?.id ?? null);
+  const similarItemsQ = useSimilarListingsQuery(productIdParam ?? null);
   const sellerItems = sellerItemsQ.data ?? EMPTY_LISTINGS;
   const similarItems = similarItemsQ.data ?? EMPTY_LISTINGS;
 
@@ -353,57 +267,63 @@ export default function ProductScreen() {
       return;
     }
     if (!productIdParam || likeBusy) return;
-    setLikeBusy(true);
-    const originalLiked = liked;
-    // Optimistic flip — animation runs immediately, even before the round-trip.
-    setLiked(!originalLiked);
+    const wasLiked = liked;
     // Instagram-style spring: the filled heart springs in (overshoot = pop) on
     // like, and springs back out on un-like. Fired here, on the tap, so server
-    // hydration never triggers it.
-    heartAnimRef.current?.animateTo(!originalLiked);
-    setLikeConfirmedFromServer(false);
-    // No `finally` — see the errorMessage/isCancellation note at module scope.
-    // Equivalent here because neither branch returns or re-throws.
+    // hydration never triggers it. The optimistic flip of the icon itself — and
+    // of the count — is the mutation's onMutate.
+    heartAnimRef.current?.animateTo(!wasLiked);
+
+    // Try body is just the await, no `finally`, no value blocks — see the
+    // react-compiler note at module scope.
+    let committed: boolean | null = null;
+    let failure: unknown = null;
     try {
-      const next = await toggleLike(productIdParam, user.id, originalLiked);
-      setLiked(next);
+      committed = await toggleLikeM.mutateAsync({
+        listingId: productIdParam,
+        currentlyLiked: wasLiked,
+      });
+    } catch (e) {
+      failure = e;
+    }
+
+    // toggleLike swallows its own errors and hands back the PREVIOUS value when
+    // the write failed, so "unchanged" is a failure rather than a no-op. The
+    // cache rollback already happened inside the mutation; only the spring and
+    // the toast are left.
+    if (failure !== null || committed === wasLiked) {
+      heartAnimRef.current?.animateTo(wasLiked);
+      toast.show('Could not update like', { variant: 'default', icon: 'alert-triangle' });
+    } else if (committed) {
       // No confirmation toast on like — the heart's own state change is feedback
       // enough, and the pop-up read as noise when favouriting.
-      if (next) {
-        capture('listing_liked', { listing_id: productIdParam });
-      }
-    } catch {
-      // Revert optimistic flip.
-      setLiked(originalLiked);
-      toast.show('Could not update like', { variant: 'default', icon: 'alert-triangle' });
+      capture('listing_liked', { listing_id: productIdParam });
     }
-    setLikeBusy(false);
   };
 
-  // Owner-only actions. Both update local state optimistically so the UI
-  // doesn't lag behind the supabase round-trip, and roll back on failure.
-  const [ownerBusy, setOwnerBusy] = useState<'sold' | 'delete' | null>(null);
+  // Owner-only actions. Both write the listing cache optimistically so the UI
+  // doesn't lag behind the supabase round-trip, and roll back on failure — the
+  // rollback now lives inside the mutation, so what's left here is the toast.
+  const setSoldM = useSetListingSold(listing?.id ?? null);
+  const deleteM = useDeleteListing(listing?.seller_id ?? null);
+  const soldBusy = setSoldM.isPending;
+  const deleteBusy = deleteM.isPending;
+  const ownerBusy = soldBusy || deleteBusy;
 
   const handleToggleSold = async () => {
     if (!listing || ownerBusy) return;
     const next = !listing.is_sold;
-    const listingId = listing.id;
-    setOwnerBusy('sold');
 
     // Ternary hoisted out and the try body reduced to the await — a conditional
     // inside try/catch bails React Compiler out of this whole screen. See the
     // module-scope note on errorMessage/isCancellation.
-    const applySold = (value: boolean) =>
-      setListing((prev) => (prev ? { ...prev, is_sold: value } : prev));
     const successMessage = next ? 'Marked as sold' : 'Marked as available';
 
-    applySold(next); // optimistic
-
     // null covers both "threw" and "server disagreed" — the response to each is
-    // the same rollback, exactly as the old catch/else pair did.
+    // the same, exactly as the old catch/else pair did.
     let committed: boolean | null = null;
     try {
-      committed = await setListingSold(listingId, next);
+      committed = await setSoldM.mutateAsync(next);
     } catch {
       committed = null;
     }
@@ -411,13 +331,11 @@ export default function ProductScreen() {
     if (committed === next) {
       toast.show(successMessage, { variant: 'success', icon: 'check' });
     } else {
-      applySold(!next); // rollback
       toast.show("Couldn't update the listing", {
         variant: 'default',
         icon: 'alert-triangle',
       });
     }
-    setOwnerBusy(null);
   };
 
   const handleDelete = async () => {
@@ -429,14 +347,19 @@ export default function ProductScreen() {
       destructive: true,
     });
     if (!ok) return;
-    setOwnerBusy('delete');
-    const success = await deleteListing(listing.id);
+
+    let success = false;
+    try {
+      success = await deleteM.mutateAsync(listing.id);
+    } catch {
+      success = false;
+    }
+
     if (!success) {
       toast.show("Couldn't delete the listing", {
         variant: 'default',
         icon: 'alert-triangle',
       });
-      setOwnerBusy(null);
       return;
     }
     toast.show('Listing deleted', { variant: 'success', icon: 'check' });
@@ -445,7 +368,6 @@ export default function ProductScreen() {
 
   const handleFollowPress = async () => {
     tap('selection');
-    const sellerId = listing?.seller?.id;
     if (!user) {
       guestGate.prompt({
         title: 'Follow sellers you love',
@@ -456,44 +378,38 @@ export default function ProductScreen() {
       return;
     }
     if (!sellerId || sellerId === user.id || followBusy) return;
-    const userId = user.id;
-    setFollowBusy(true);
-    const optimistic = !followed;
-    setFollowed(optimistic); // optimistic flip
 
     // Everything with a `?.`, `??` or `?:` in it is resolved BEFORE the try, and
     // the try body is just the await — see the module-scope note on
     // errorMessage/isCancellation. Value blocks inside a try/catch make React
     // Compiler bail out of this entire screen.
     const sellerHandle = listing?.seller?.username ?? 'seller';
+    const wasFollowing = followed;
     const undoFollow = async () => {
-      setFollowed(false);
       try {
-        await toggleFollow(userId, sellerId, true);
+        await toggleFollowM.mutateAsync({ currentlyFollowing: true });
       } catch {
-        setFollowed(true);
         toast.show('Could not undo', { variant: 'default', icon: 'alert-triangle' });
       }
     };
 
-    let nowFollowing: boolean | null = null;
+    // The optimistic flip and its rollback are the mutation's onMutate/onError;
+    // it also reconciles against the counts the RPC returns.
+    let next: FollowState | null = null;
     let failure: unknown = null;
     try {
-      const next = await toggleFollow(userId, sellerId, followed);
-      nowFollowing = next.isFollowing;
+      next = await toggleFollowM.mutateAsync({ currentlyFollowing: wasFollowing });
     } catch (e) {
       failure = e;
     }
 
-    if (nowFollowing === null) {
-      // Roll back optimistic state on failure.
-      setFollowed(!optimistic);
+    if (next === null) {
       toast.show(errorMessage(failure) || 'Could not update follow', {
         variant: 'default',
         icon: 'alert-triangle',
       });
     } else {
-      setFollowed(nowFollowing);
+      const nowFollowing = next.isFollowing;
       if (nowFollowing) capture('seller_followed', { seller_id: sellerId });
       toast.show(nowFollowing ? `Following @${sellerHandle}` : 'Unfollowed', {
         variant: nowFollowing ? 'info' : 'default',
@@ -501,7 +417,6 @@ export default function ProductScreen() {
         action: nowFollowing ? { label: 'Undo', onPress: undoFollow } : undefined,
       });
     }
-    setFollowBusy(false);
   };
 
   const openChat = (mode: 'message' | 'offer') => {
@@ -632,11 +547,35 @@ export default function ProductScreen() {
     };
   });
 
-  if (loadingListing && !listing) {
-    return <ProductSkeleton insetsTop={insets.top} />;
+  // Order matters. "Not available" covers both a missing route param and a
+  // resolved-but-null row (useListingQuery's queryFn returns null only for a row
+  // that genuinely isn't there, and never retries it). Then a hard failure with
+  // nothing cached to fall back on. Anything left without data is still in
+  // flight — including a cached-but-stale row, which renders below rather than
+  // flashing a skeleton over itself.
+  const notFound = !productIdParam || (listingQ.isSuccess && !listing);
+  const loadErrorText = listingQ.error ? errorMessage(listingQ.error) : '';
+
+  if (notFound) {
+    return (
+      <View style={{ flex: 1, backgroundColor: 'white', paddingTop: insets.top }}>
+        <Pressable onPress={() => safeBack()} hitSlop={10} style={{ padding: 16 }}>
+          <Feather name="arrow-left" size={22} color="#0F0F0F" />
+        </Pressable>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
+          <Feather name="alert-circle" size={42} color="rgba(15,15,15,0.55)" />
+          <Text style={{ fontSize: 17, fontWeight: '700', color: '#0F0F0F', marginTop: 14 }}>
+            Listing not available
+          </Text>
+          <Text style={{ fontSize: 14, color: 'rgba(15,15,15,0.62)', marginTop: 6, textAlign: 'center' }}>
+            It may have been removed or never existed.
+          </Text>
+        </View>
+      </View>
+    );
   }
 
-  if (loadError && !listing) {
+  if (listingQ.isError && !listing) {
     return (
       <View style={{ flex: 1, backgroundColor: 'white', paddingTop: insets.top }}>
         <Pressable onPress={() => safeBack()} hitSlop={10} style={{ padding: 16 }}>
@@ -648,12 +587,12 @@ export default function ProductScreen() {
             Couldn&apos;t load this listing
           </Text>
           <Text style={{ fontSize: 13, color: 'rgba(15,15,15,0.62)', marginTop: 6, textAlign: 'center', lineHeight: 19 }}>
-            {loadError === 'Request timed out'
+            {loadErrorText === 'Request timed out'
               ? 'The connection is slow right now. Try again in a moment.'
               : 'Something went wrong. Check your connection and try again.'}
           </Text>
           <Pressable
-            onPress={() => { tap('light'); retry(); }}
+            onPress={() => { tap('light'); listingQ.refetch(); }}
             style={({ pressed }) => ({
               marginTop: 22,
               height: 48,
@@ -676,32 +615,15 @@ export default function ProductScreen() {
     );
   }
 
-  if (notFound || !listing) {
-    return (
-      <View style={{ flex: 1, backgroundColor: 'white', paddingTop: insets.top }}>
-        <Pressable onPress={() => safeBack()} hitSlop={10} style={{ padding: 16 }}>
-          <Feather name="arrow-left" size={22} color="#0F0F0F" />
-        </Pressable>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
-          <Feather name="alert-circle" size={42} color="rgba(15,15,15,0.55)" />
-          <Text style={{ fontSize: 17, fontWeight: '700', color: '#0F0F0F', marginTop: 14 }}>
-            Listing not available
-          </Text>
-          <Text style={{ fontSize: 14, color: 'rgba(15,15,15,0.62)', marginTop: 6, textAlign: 'center' }}>
-            It may have been removed or never existed.
-          </Text>
-        </View>
-      </View>
-    );
+  if (!listing) {
+    return <ProductSkeleton insetsTop={insets.top} />;
   }
 
-  const baseLikes = listing.likes ?? 0;
-  const userLikedOnServer = listing.user_has_liked ?? false;
-  const heartDelta = likeConfirmedFromServer 
-    ? 0 
-    : (liked && !userLikedOnServer ? 1 : (!liked && userLikedOnServer ? -1 : 0));
-  const heartCount = Math.max(0, baseLikes + heartDelta);
-  const isOwnListing = !!user?.id && listing.seller_id === user.id;
+  // Straight off the row. The old `heartDelta` expression existed because the
+  // heart and the count were two unsynchronised sources reconciled against
+  // `listing.user_has_liked` — a field no query in this app populates, which is
+  // why un-liking left the count one too high. useToggleLike now writes both.
+  const heartCount = Math.max(0, Number(listing.likes ?? 0));
   // Buyer Protection math — item price plus a small protection fee. Computed
   // from lib/fees so the number here matches the payment sheet, the invoice,
   // and what the server actually charges.
@@ -1162,7 +1084,7 @@ export default function ProductScreen() {
               <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
                 <Pressable
                   onPress={handleToggleSold}
-                  disabled={ownerBusy !== null}
+                  disabled={ownerBusy}
                   testID="owner-toggle-sold"
                   style={({ pressed }) => ({
                     flex: 1,
@@ -1175,7 +1097,7 @@ export default function ProductScreen() {
                     backgroundColor: listing.is_sold ? 'white' : BRAND_INK,
                     borderWidth: listing.is_sold ? HAIRLINE : 0,
                     borderColor: 'rgba(15,15,15,0.08)',
-                    opacity: ownerBusy === 'sold' ? 0.5 : pressed ? 0.88 : 1,
+                    opacity: soldBusy ? 0.5 : pressed ? 0.88 : 1,
                     transform: [{ scale: pressed ? 0.98 : 1 }],
                   })}
                 >
@@ -1196,7 +1118,7 @@ export default function ProductScreen() {
                 </Pressable>
                 <Pressable
                   onPress={handleDelete}
-                  disabled={ownerBusy !== null}
+                  disabled={ownerBusy}
                   testID="owner-delete"
                   style={({ pressed }) => ({
                     flex: 1,
@@ -1209,7 +1131,7 @@ export default function ProductScreen() {
                     backgroundColor: 'white',
                     borderWidth: HAIRLINE,
                     borderColor: 'rgba(15,15,15,0.08)',
-                    opacity: ownerBusy === 'delete' ? 0.5 : pressed ? 0.7 : 1,
+                    opacity: deleteBusy ? 0.5 : pressed ? 0.7 : 1,
                     transform: [{ scale: pressed ? 0.98 : 1 }],
                   })}
                 >
@@ -1680,8 +1602,6 @@ export default function ProductScreen() {
             })}
           </View>
 
-          {/* TODO: replace MEMBER_ITEMS / SIMILAR_ITEMS with real Supabase queries
-              (seller_id eq for member items; brand+category match for similar). */}
           {relatedTab === 'members' ? (
             <BundleSection
               listing={listing}
@@ -1805,7 +1725,11 @@ export default function ProductScreen() {
           onClose={() => setSaveListVisible(false)}
           onChanged={(isSaved) => {
             const wasSaved = saved;
-            setSaved(isSaved);
+            // The sheet's add/remove already invalidated the saved-ids query, so
+            // `saved` re-derives on its own once the refetch lands. Write it
+            // through first so the bookmark flips on close rather than a round
+            // trip later; the refetch then reconciles.
+            updateSavedCache(user.id, listing.id, isSaved);
             // Spring the bookmark only when the saved state actually flips.
             if (isSaved !== wasSaved) saveAnimRef.current?.animateTo(isSaved);
             if (isSaved) capture('listing_saved', { listing_id: productIdParam });

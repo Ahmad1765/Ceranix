@@ -7,8 +7,7 @@ import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
 import { colors } from '@/lib/theme';
-import { fetchListingById } from '@/lib/listings';
-import { getCachedListing } from '@/lib/listingCache';
+import { useListingQuery } from '@/lib/queries';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { safeBack } from '@/lib/nav';
@@ -16,7 +15,6 @@ import { HIT_SLOP_8 } from '@/lib/responsive';
 import { buyerProtectionFee, formatPrice } from '@/lib/fees';
 import { fetchOrderForListing, type Order } from '@/lib/payments';
 import { deriveInvoiceStatus, deriveInvoiceAmounts } from '@/lib/invoiceStatus';
-import type { Listing } from '@/types';
 
 function tap(style: 'light' | 'medium' = 'light') {
   if (Platform.OS !== 'ios') return;
@@ -85,45 +83,19 @@ export default function InvoiceScreen() {
   const { id, paid } = useLocalSearchParams<{ id: string; paid?: string }>();
   const { profile } = useAuth();
   const toast = useToast();
-  const cached = getCachedListing(id ? String(id) : null);
-  const [listing, setListing] = useState<Listing | null>(cached);
-  const [loading, setLoading] = useState(!cached);
+  // The listed item. React Query owns the fetch, the abort on unmount and the
+  // retry/backoff; a row already in the cache (lib/listingCache) paints on the
+  // first frame and revalidates behind it.
+  //
+  // This is only the ITEM. Status and amounts still come from the order row
+  // below — public.orders is the sole record of a real payment, and nothing on
+  // this screen may infer money from the listing.
+  const listingQ = useListingQuery(id ? String(id) : null);
+  const listing = listingQ.data ?? null;
   // The payment record. null = this viewer has no order for this listing.
   const [order, setOrder] = useState<Order | null>(null);
   // True while we're re-checking the row after a checkout return.
   const [confirming, setConfirming] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    if (!id) {
-      setLoading(false);
-      return;
-    }
-    const haveCached = !!getCachedListing(String(id));
-    setLoading(!haveCached);
-    (async () => {
-      let timeoutId: ReturnType<typeof setTimeout> | undefined;
-      try {
-        const res = await Promise.race([
-          fetchListingById(String(id)),
-          new Promise<never>((_, reject) => {
-            timeoutId = setTimeout(() => reject(new Error('Request timed out')), 25_000);
-          }),
-        ]);
-        if (active && res) setListing(res);
-        else if (active && !haveCached) setListing(null);
-      } catch (e) {
-        console.warn('[invoice] load failed', e);
-        if (active && !haveCached) setListing(null);
-      } finally {
-        if (active) setLoading(false);
-        if (timeoutId) clearTimeout(timeoutId);
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [id]);
 
   // Load the payment record, then — if the buyer just came back from Stripe —
   // poll briefly for it. The webhook that writes public.orders fires
@@ -171,7 +143,10 @@ export default function InvoiceScreen() {
     };
   }, [paid, id]);
 
-  if (loading) {
+  // Still in flight with nothing cached to show. A missing `id` disables the
+  // query, so it never lands here — it falls through to "Invoice not found",
+  // which is what the old `if (!id) setLoading(false)` produced.
+  if (!listing && id && listingQ.isPending) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -181,6 +156,8 @@ export default function InvoiceScreen() {
     );
   }
 
+  // A failed request and a row that genuinely doesn't exist land here alike —
+  // as they always have on this screen, which has no separate error branch.
   if (!listing) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }}>

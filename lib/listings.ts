@@ -200,28 +200,13 @@ export async function searchListings(opts: {
   }
 }
 
-export async function fetchListingById(
-  id: string,
-  signal?: AbortSignal,
-): Promise<Listing | null> {
-  // abortSignal() lives on the filter builder — must be chained before the
-  // terminal modifier (.maybeSingle), otherwise it's missing from the type.
-  const filter = supabase
-    .from('listings')
-    .select(SELECT_WITH_SELLER)
-    .eq('id', id);
-  const query = signal ? filter.abortSignal(signal) : filter;
-  const { data, error } = await query.maybeSingle();
-  if (error) {
-    // Throw so callers can distinguish "genuinely not found" (returns null)
-    // from "request failed" (throws — usually transient, worth retrying).
-    // Caller decides whether to log; cancellations should be silent.
-    throw new Error(error.message);
-  }
-  const row = (data as unknown as Listing) ?? null;
-  if (row) putCachedListing(row);
-  return row;
-}
+// Single-listing reads are NOT exported from here. They live in the queryFn of
+// useListingQuery (lib/queries.ts), which is the only way to fetch one — four
+// screens each hand-rolled their own load effect around the old
+// `fetchListingById`, complete with duplicated abort flags, cache seeding, and a
+// 25s Promise.race that could never fire (lib/supabase.ts already aborts every
+// request at 12s). The column list they shared is exported instead.
+export const SELECT_LISTING_WITH_SELLER = SELECT_WITH_SELLER;
 
 export async function fetchUserListings(sellerId: string): Promise<Listing[]> {
   const { data, error } = await supabase

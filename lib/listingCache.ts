@@ -1,62 +1,48 @@
-import type { Listing } from '@/types';
-import { markFresh } from '@/lib/freshness';
-
-// Module-level cache that survives across screen mounts within one app
-// session. The Supabase web client occasionally wedges (stuck token
-// refresh, stalled fetch) — when that happens, navigating to a listing
-// we've already seen still renders instantly off this cache, instead of
-// stranding the user on a skeleton until they refresh the browser.
+// Listing rows used to live in a hand-rolled, session-only Map in this file.
+// They now live in the TanStack Query cache under ['listing', id]; what remains
+// here is the WRITE-THROUGH half of that move, so the non-hook producers keep
+// seeding it unchanged — lib/listings.ts, lib/myFeed.ts, lib/recommendations.ts
+// and components/sell/SellSheet.tsx.
 //
-// Capped at MAX_CACHE_SIZE entries to prevent unbounded memory growth in
-// long sessions. Uses insertion-order eviction (oldest first) via Map's
-// built-in iterator order.
+// There is deliberately no reader. Every screen that used to seed itself from a
+// `getCachedListing()` call now mounts useListingQuery (lib/queries.ts), which
+// reads this same entry and gets the fetch, retry and revalidation with it.
+//
+// The key lives here rather than in lib/queries.ts to keep the import graph
+// acyclic: lib/queries.ts imports lib/listings.ts, which imports this file.
+//
+// Three things the Map could not do now come for free: entries survive a cold
+// launch (the cache is persisted to AsyncStorage), gcTime replaces the manual
+// 200-entry LRU eviction, and a mounted useListingQuery repaints when a write
+// lands instead of waiting for its own fetch.
 
-const MAX_CACHE_SIZE = 200;
-const cache = new Map<string, Listing>();
+import type { Listing } from '@/types';
+import { queryClient } from '@/lib/queryClient';
 
-// Feed-level snapshot, keyed by tab. Lets the home feed re-render its last
-// good rows immediately on mount/tab-switch while a fresh fetch runs in the
-// background — so a wedged fetch never blanks the screen mid-session.
-const feedSnapshots = new Map<string, Listing[]>();
+export const listingKey = (id: string) => ['listing', id] as const;
 
-export function getCachedListing(id: string | undefined | null): Listing | null {
-  if (!id) return null;
-  return cache.get(id) ?? null;
-}
-
+// Seeded rows are stamped as ALREADY STALE (updatedAt: 0) on purpose.
+//
+// Feed queries select a slim column set — no `description`, and only the handful
+// of seller fields a card renders — while the product screen needs the full row.
+// Seeding at the current time would mark that thin row fresh for the whole
+// staleTime window and suppress the detail fetch, leaving a product page with no
+// description for a minute. A zero timestamp paints instantly AND refetches on
+// mount, which is exactly what the old Map plus an unconditional useEffect did.
+//
+// The authoritative full row never comes through here — useListingQuery's own
+// queryFn returns it and React Query stamps it fresh — so every write on this
+// path is a seed by definition.
+//
+// ponytail: a seeded row is persisted alongside the feed row it came from, so a
+// feed load writes each listing to disk twice. Cheap at current feed sizes; if
+// AsyncStorage write time ever shows up in a profile, exclude ['listing', …]
+// from shouldDehydrateQuery in lib/queryClient.ts.
 export function putCachedListing(listing: Listing | null | undefined): void {
   if (!listing?.id) return;
-  // Promote to newest position by deleting first (Map preserves insertion order).
-  cache.delete(listing.id);
-  cache.set(listing.id, listing);
-  // Evict oldest entries when we exceed the cap.
-  if (cache.size > MAX_CACHE_SIZE) {
-    const excess = cache.size - MAX_CACHE_SIZE;
-    let removed = 0;
-    for (const key of cache.keys()) {
-      if (removed >= excess) break;
-      cache.delete(key);
-      removed++;
-    }
-  }
+  queryClient.setQueryData<Listing>(listingKey(listing.id), listing, { updatedAt: 0 });
 }
 
 export function putCachedListings(listings: Iterable<Listing>): void {
   for (const l of listings) putCachedListing(l);
-}
-
-export function clearListingCache(): void {
-  cache.clear();
-  feedSnapshots.clear();
-}
-
-export function getFeedSnapshot(tab: string): Listing[] | null {
-  return feedSnapshots.get(tab) ?? null;
-}
-
-export function putFeedSnapshot(tab: string, rows: Listing[]): void {
-  feedSnapshots.set(tab, rows);
-  // Stamp freshness so the home feed's focus refetch can reuse these rows
-  // instead of re-hitting the network on every tab switch.
-  markFresh(`feed:${tab}`);
 }
