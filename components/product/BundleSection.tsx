@@ -3,7 +3,7 @@ import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
 import { router } from 'expo-router';
-import { getOptimizedImageUrl } from '@/lib/images';
+import { cardImageUrl, getOptimizedImageUrl } from '@/lib/images';
 import { formatPrice } from '@/lib/currency';
 import type { Listing } from '@/types';
 import {
@@ -76,8 +76,9 @@ export function BundleSection({
         ? brands.join(' · ').toUpperCase()
         : `${brands.slice(0, 3).join(' · ').toUpperCase()} + MORE`;
 
+  // Collage tiles are ~176px wide — thumbnails, not the 1440px originals.
   const collageImages = [listing, ...sellerItems]
-    .map((l) => l.images?.[0])
+    .map((l) => cardImageUrl(l))
     .filter((u): u is string => typeof u === 'string' && u.length > 0)
     .slice(0, 5);
   const extraCount = Math.max(0, 1 + sellerItems.length - collageImages.length);

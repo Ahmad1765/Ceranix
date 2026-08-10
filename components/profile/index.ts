@@ -1,4 +1,10 @@
-export { ProfileBanner, AVATAR_SIZE, bannerSizeFor, BANNER_ASPECT } from './ProfileBanner';
+export {
+  ProfileBanner,
+  AVATAR_SIZE,
+  bannerSizeFor,
+  BANNER_ASPECT,
+  type BannerAction,
+} from './ProfileBanner';
 export { BannerCropper, type CropSource } from './BannerCropper';
 export { ProfileIdentity } from './ProfileIdentity';
 export { StatsBar, type StatItem } from './StatsBar';

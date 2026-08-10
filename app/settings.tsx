@@ -34,11 +34,11 @@ import {
   type VerifyForm,
 } from '@/components/settings';
 import type { PayoutMethod, ShippingAddress, Verification } from '@/types';
+import { APP_URL } from '@/lib/brand';
 
 const SUPPORT_EMAIL = 'support@carrinex.app';
-const TERMS_URL = 'https://carrinex.vercel.app/terms';
-const PRIVACY_URL = 'https://carrinex.vercel.app/privacy';
-const APP_URL_BASE = 'https://carrinex.vercel.app';
+const TERMS_URL = `${APP_URL}/terms`;
+const PRIVACY_URL = `${APP_URL}/privacy`;
 
 type Section = 'shop' | 'verify' | 'enhance' | 'account' | 'help';
 // Runtime mirror of Section, so an `?open=` deep-link param can be validated
@@ -304,7 +304,7 @@ export default function SettingsScreen() {
       tap('light');
       await Share.share({
         message: `Check out @${profile.username ?? 'this seller'} on Carrinex`,
-        url: `${APP_URL_BASE}/user/${profile.id}`,
+        url: `${APP_URL}/user/${profile.id}`,
       });
     } catch {
       toast.show('Share failed', { variant: 'default', icon: 'alert-triangle' });

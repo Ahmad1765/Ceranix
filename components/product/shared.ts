@@ -4,6 +4,7 @@
 // brand palette, and the listing→related-card mapping.
 import { Dimensions, Platform, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { cardImageUrl } from '@/lib/images';
 import type { Listing } from '@/types';
 
 export const IS_IOS = Platform.OS === 'ios';
@@ -126,9 +127,14 @@ export function timeAgo(iso: string): string {
 
 export function listingToRelated(row: Listing): RelatedItem {
   const meta = [row.size, conditionLabel(row.condition)].filter(Boolean).join(' · ');
+  // Every surface a RelatedItem reaches — the related rail, the bundle picker,
+  // the locked-in base card — is a ~171px tile, so they get the stored
+  // thumbnails (640px long edge) rather than the 1440px originals. Mapped by
+  // index because `thumbnails` can be shorter than `images` on a row whose
+  // thumbnail generation partly failed; cardImageUrl falls back per index.
   return {
     id: row.id,
-    images: row.images && row.images.length > 0 ? row.images : [],
+    images: (row.images ?? []).map((_, i) => cardImageUrl(row, i)),
     brand: row.brand || row.title,
     meta: meta || row.category,
     price: Number(row.price ?? 0),

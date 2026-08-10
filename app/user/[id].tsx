@@ -1,7 +1,7 @@
 import { capture } from '@/lib/analytics';
-import { memo, useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { View, Pressable, RefreshControl, Alert, Share, useWindowDimensions } from 'react-native';
-import { FlashList } from '@shopify/flash-list';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -26,6 +26,7 @@ import {
   CONTENT_MAX_WIDTH,
 } from '@/lib/responsive';
 import { useFadeIn } from '@/lib/motion';
+import { APP_URL, BRAND } from '@/lib/brand';
 import type { Listing } from '@/types';
 import { Button, EmptyState, Tabs } from '@/components/ui';
 import {
@@ -58,6 +59,18 @@ export default function UserProfileScreen() {
 
   const fade = useFadeIn(0, 320);
   const { width: viewportWidth } = useWindowDimensions();
+
+  // The info disc switches to the Details tab, which sits a full screen below
+  // the banner — without the scroll it looks like the tap did nothing. The
+  // offset is measured rather than guessed because the header's height varies
+  // with the viewport (banner is 16:9) and with whether the identity block
+  // renders a level chip or follow buttons.
+  const listRef = useRef<FlashListRef<Listing[]>>(null);
+  const tabsY = useRef(0);
+  const showDetails = () => {
+    setActiveTab('details');
+    listRef.current?.scrollToOffset({ offset: Math.max(tabsY.current - 8, 0), animated: true });
+  };
 
   const { columns, cardWidth: cardW } = useGridDimensions({
     min: 2,
@@ -112,20 +125,20 @@ export default function UserProfileScreen() {
     );
   };
 
+  const handleShare = async () => {
+    if (!profile) return;
+    const url = `${APP_URL}/user/${profile.id}`;
+    try {
+      await Share.share({ message: `Check out @${profile.username} on ${BRAND}\n${url}`, url });
+    } catch {
+      // user dismissed the sheet — nothing to report
+    }
+  };
+
+  // Sharing has its own control on the banner now, so this is the report path.
   const handleMore = () => {
     if (!profile) return;
-    const url = `https://carrinex.vercel.app/user/${profile.id}`;
     Alert.alert(`@${profile.username}`, undefined, [
-      {
-        text: 'Share profile',
-        onPress: async () => {
-          try {
-            await Share.share({ message: `Check out @${profile.username} on Carrinex\n${url}`, url });
-          } catch {
-            // user dismissed the sheet — nothing to report
-          }
-        },
-      },
       {
         text: 'Report user',
         style: 'destructive',
@@ -315,6 +328,7 @@ export default function UserProfileScreen() {
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
       <FlashList
+        ref={listRef}
         data={gridRows}
         renderItem={renderRow}
         keyExtractor={rowKey}
@@ -385,6 +399,30 @@ export default function UserProfileScreen() {
             initial={initial}
             verified={profile.is_verified}
             label={`${displayName}'s profile photo`}
+            // Info / like / share, foodpanda-style. All three already existed
+            // on this screen (the Details tab, follow, the share sheet) — these
+            // just lift them above the fold. The heart IS follow: a second,
+            // separate "favourite seller" would be a whole table for the same
+            // gesture.
+            actions={[
+              {
+                icon: 'information-circle-outline',
+                label: 'Seller details',
+                onPress: showDetails,
+                active: activeTab === 'details',
+              },
+              ...(isSelf
+                ? []
+                : [
+                    {
+                      icon: followed ? ('heart' as const) : ('heart-outline' as const),
+                      label: followed ? `Unfollow @${profile.username}` : `Follow @${profile.username}`,
+                      onPress: handleFollowToggle,
+                      active: followed,
+                    },
+                  ]),
+              { icon: 'share-outline', label: 'Share profile', onPress: handleShare },
+            ]}
           />
 
           <ProfileIdentity
@@ -452,7 +490,12 @@ export default function UserProfileScreen() {
 
         {/* Tabs — clamped to the same column as the cards above, so the labels
             don't drift apart on a wide viewport. */}
-        <View style={{ marginTop: 22, alignItems: 'center' }}>
+        <View
+          style={{ marginTop: 22, alignItems: 'center' }}
+          onLayout={(e) => {
+            tabsY.current = e.nativeEvent.layout.y;
+          }}
+        >
           <View style={{ width: '100%', maxWidth: CONTENT_MAX_WIDTH }}>
             <Tabs
               variant="underline"

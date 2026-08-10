@@ -42,7 +42,10 @@ export function dayLabel(iso: string): string {
   const today = startOfDay(new Date());
   const day = startOfDay(d);
   if (day === today) return 'Today';
-  if (day === today - DAY_MS) return 'Yesterday';
+  // startOfDay of "24h ago", not "midnight minus 24h" — on a DST changeover the
+  // latter lands at 23:00 or 01:00 of the previous day and never matches, so
+  // "Yesterday" silently degraded to a bare date twice a year.
+  if (day === startOfDay(new Date(today - DAY_MS))) return 'Yesterday';
   const sameYear = d.getFullYear() === new Date().getFullYear();
   return d.toLocaleDateString(
     [],

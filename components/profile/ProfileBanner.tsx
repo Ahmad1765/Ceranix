@@ -2,7 +2,8 @@ import { View, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
-import { colors } from '@/lib/theme';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { colors, shadow } from '@/lib/theme';
 import { CONTENT_MAX_WIDTH } from '@/lib/responsive';
 import { getOptimizedImageUrl } from '@/lib/images';
 
@@ -28,6 +29,19 @@ export function bannerSizeFor(viewportWidth: number): { width: number; height: n
   return { width, height: Math.round(width / BANNER_ASPECT) };
 }
 
+/**
+ * A circular control floating on the banner. Ionicons rather than Feather
+ * because the heart needs a FILLED twin of its outline to read as "followed" —
+ * Feather is outline-only.
+ */
+export type BannerAction = {
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  label: string;
+  onPress: () => void;
+  /** Tints the glyph purple — the on state of a toggle. */
+  active?: boolean;
+};
+
 type Props = {
   bannerUrl?: string | null;
   avatarUrl?: string | null;
@@ -42,6 +56,8 @@ type Props = {
    * broken rather than as "not a control".
    */
   onPress?: () => void;
+  /** Floating discs on the banner's top-right corner. */
+  actions?: BannerAction[];
 };
 
 /**
@@ -58,6 +74,7 @@ export function ProfileBanner({
   verified,
   label,
   onPress,
+  actions,
 }: Props) {
   const { width: viewportWidth } = useWindowDimensions();
   const { width, height } = bannerSizeFor(viewportWidth);
@@ -116,6 +133,54 @@ export function ProfileBanner({
           </View>
         ) : null}
       </Pressable>
+
+      {/* Floating actions. A SIBLING of the banner rather than a child: the
+          banner is itself a Pressable on your own profile, and nesting these
+          inside it would route their taps to "edit banner". The outer row is
+          clamped to the banner's own width so the discs stay on the photo on a
+          desktop viewport instead of drifting to the window edge. */}
+      {actions?.length ? (
+        <View
+          pointerEvents="box-none"
+          style={{ position: 'absolute', top: 10, left: 0, right: 0, alignItems: 'center' }}
+        >
+          <View
+            // box-none here too, or this full-width strip would eat taps meant
+            // for the banner beneath it (your own profile routes those to edit).
+            pointerEvents="box-none"
+            style={{
+              width,
+              flexDirection: 'row',
+              justifyContent: 'flex-end',
+              gap: 10,
+              paddingHorizontal: 12,
+            }}
+          >
+            {actions.map((a) => (
+              <Pressable
+                key={a.label}
+                onPress={a.onPress}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={a.label}
+                accessibilityState={{ selected: !!a.active }}
+                style={({ pressed }) => ({
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: colors.white,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: pressed ? 0.75 : 1,
+                  ...shadow.md,
+                })}
+              >
+                <Ionicons name={a.icon} size={19} color={a.active ? colors.purple : colors.ink} />
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      ) : null}
 
       <View style={{ alignItems: 'center', marginTop: -outer / 2 }}>
         <View

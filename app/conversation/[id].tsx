@@ -10,6 +10,8 @@ import {
   ActivityIndicator,
   Modal,
   Alert,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
 import * as Clipboard from 'expo-clipboard';
@@ -451,13 +453,26 @@ export default function ConversationScreen() {
     });
   }, [conversationId]);
 
-  useEffect(() => {
-    if (messages.length === 0) return;
-    const t = setTimeout(() => {
-      listRef.current?.scrollToEnd({ animated: true });
-    }, 60);
-    return () => clearTimeout(t);
-  }, [messages.length]);
+  // Auto-follow the bottom, but only while the thread is already parked there.
+  //
+  // This used to be an unconditional `onContentSizeChange -> scrollToEnd`, plus
+  // a scroll-to-end on every message count change. In a virtualized list the
+  // content size changes *while you scroll* — rows mount and get measured — so
+  // every drag upward immediately snapped back down. The thread was
+  // unscrollable past the first screen.
+  //
+  // `pinnedRef` holds the last observed distance-to-bottom, which is always
+  // read *before* the growth that triggers the follow, so an arriving message
+  // still scrolls into view when you were at the bottom, and doesn't when you
+  // were reading history.
+  const pinnedRef = useRef(true);
+  const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    pinnedRef.current = contentSize.height - (contentOffset.y + layoutMeasurement.height) < 60;
+  }, []);
+  const followEnd = useCallback(() => {
+    if (pinnedRef.current) listRef.current?.scrollToEnd({ animated: false });
+  }, []);
 
   const other = useMemo(() => (user && conv ? otherParticipant(conv, user.id) : null), [user, conv]);
   const isSeller = !!user && !!conv && conv.seller_id === user.id;
@@ -577,6 +592,9 @@ export default function ConversationScreen() {
       created_at: new Date().toISOString(),
       pending: true,
     };
+    // Sending is an explicit "I'm done reading history" — follow your own
+    // message down even if you'd scrolled up before typing it.
+    pinnedRef.current = true;
     setMessages((prev) => [...prev, temp]);
     setInput('');
     deliver(text, temp.id);
@@ -598,6 +616,7 @@ export default function ConversationScreen() {
       try {
         const saved = await sendOffer({ conversationId, senderId: user.id, amount, note });
         if (saved) {
+          pinnedRef.current = true;
           setMessages((prev) => (prev.some((m) => m.id === saved.id) ? prev : [...prev, saved]));
           setOfferVisible(false);
           toast.show('Offer sent', { variant: 'success', icon: 'check' });
@@ -840,7 +859,9 @@ export default function ConversationScreen() {
         // where a conversation belongs, instead of stranding two bubbles under
         // the header. Once the content overflows, this is a no-op.
         contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end', paddingBottom: 12 }}
-        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
+        onContentSizeChange={followEnd}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={<SafetyNote onPress={explainCoverage} />}

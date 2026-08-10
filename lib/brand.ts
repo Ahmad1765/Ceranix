@@ -5,4 +5,4 @@
 export const BRAND = 'Carrinex';
 
 // Public web base (deep links / share URLs).
-export const APP_URL = 'https://carrinex.vercel.app';
+export const APP_URL = 'https://ceranix.vercel.app';
