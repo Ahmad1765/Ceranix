@@ -151,7 +151,6 @@ function OfferBubble({
   return (
     <View
       style={{
-        maxWidth: '86%',
         minWidth: 172,
         backgroundColor: colors.primarySoft,
         borderWidth: 1,
@@ -356,7 +355,6 @@ function TextBubble({
   return (
     <View
       style={{
-        maxWidth: '78%',
         paddingHorizontal: 14,
         paddingVertical: 9,
         backgroundColor: mine ? colors.primary : colors.white,
@@ -479,7 +477,16 @@ function MessageRowImpl(props: MessageRowProps) {
         accessibilityLabel={canReact ? 'Message. Long press to react' : undefined}
         // No pressed styling: the bubble isn't a button, and flashing it on
         // every tap-through would be noise.
-        style={{ alignItems: mine ? 'flex-end' : 'flex-start' }}
+        //
+        // The width cap lives here, not on the bubble: this is the outermost
+        // node with a definite-width parent, so the percentage has something
+        // real to resolve against. On the bubble it resolved against a
+        // shrink-wrapped parent, which on web collapses to min-content — one
+        // character per line.
+        style={{
+          maxWidth: msg.kind === 'offer' ? '86%' : '78%',
+          alignItems: mine ? 'flex-end' : 'flex-start',
+        }}
       >
         {msg.kind === 'offer' ? <OfferBubble {...props} /> : <TextBubble {...props} />}
         <ReactionChip reactions={reactions} mine={mine} />

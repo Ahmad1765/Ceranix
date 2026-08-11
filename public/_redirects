@@ -1,0 +1,4 @@
+# expo-router ships a single-page app (web.output defaults to "single"), so any
+# deep link has to be served index.html and routed on the client. Pages serves a
+# real file when one exists, and only falls through to this rule when none does.
+/*  /index.html  200

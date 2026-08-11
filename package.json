@@ -10,6 +10,7 @@
     "fonts:web": "node scripts/build-web-fonts.mjs",
     "backfill:thumbnails": "node scripts/backfill-listing-thumbnails.mjs",
     "build": "npm run fonts:web && expo export -p web && node scripts/inject-font-preload.mjs dist",
+    "deploy": "npm run build && wrangler pages deploy dist --project-name=ceranix",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -83,7 +84,8 @@
     "tailwindcss": "3.4.17",
     "typescript": "^5.9.3",
     "vitest": "^4.1.9",
-    "wawoff2": "^2.0.1"
+    "wawoff2": "^2.0.1",
+    "wrangler": "^4.120.1"
   },
   "overrides": {
     "@emnapi/core": "1.11.1",

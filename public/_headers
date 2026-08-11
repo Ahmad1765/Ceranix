@@ -1,0 +1,21 @@
+# Cloudflare Pages header rules — the port of vercel.json's `headers` block.
+# Every matching rule is applied in order, so the broad security block comes
+# first and the per-asset cache rules override it below.
+
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+
+# Content-addressed by Metro — the hash changes when the bytes do, so these can
+# be cached forever. This is what keeps a repeat visit off the slow path.
+/_expo/static/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# The one file that must never be cached: it names the current bundle hash.
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
