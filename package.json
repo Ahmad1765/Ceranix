@@ -10,7 +10,7 @@
     "fonts:web": "node scripts/build-web-fonts.mjs",
     "backfill:thumbnails": "node scripts/backfill-listing-thumbnails.mjs",
     "build": "npm run fonts:web && expo export -p web && node scripts/inject-font-preload.mjs dist",
-    "deploy": "npm run build && wrangler pages deploy dist --project-name=ceranix",
+    "deploy": "npm run build && wrangler pages deploy dist --project-name=ceranix --branch=main",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
