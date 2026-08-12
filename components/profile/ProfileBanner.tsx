@@ -58,6 +58,8 @@ type Props = {
   onPress?: () => void;
   /** Floating discs on the banner's top-right corner. */
   actions?: BannerAction[];
+  /** Back arrow, floated on the banner's top-LEFT. Omit and there is none. */
+  onBack?: () => void;
 };
 
 /**
@@ -75,12 +77,21 @@ export function ProfileBanner({
   label,
   onPress,
   actions,
+  onBack,
 }: Props) {
   const { width: viewportWidth } = useWindowDimensions();
   const { width, height } = bannerSizeFor(viewportWidth);
   const banner = bannerUrl ? getOptimizedImageUrl(bannerUrl, { width: 1080 }) : null;
   const avatar = avatarUrl ? getOptimizedImageUrl(avatarUrl, { width: 240 }) : null;
   const outer = AVATAR_SIZE + RING * 2;
+
+  // Back rides in the same floating row as the actions, pinned left by an auto
+  // margin. One row of discs on the photo instead of a white nav strip stacked
+  // above it — the banner is the first thing on the screen either way.
+  const discs: (BannerAction & { leading?: boolean })[] = [
+    ...(onBack ? [{ icon: 'chevron-back' as const, label: 'Go back', onPress: onBack, leading: true }] : []),
+    ...(actions ?? []),
+  ];
 
   return (
     <View>
@@ -139,7 +150,7 @@ export function ProfileBanner({
           inside it would route their taps to "edit banner". The outer row is
           clamped to the banner's own width so the discs stay on the photo on a
           desktop viewport instead of drifting to the window edge. */}
-      {actions?.length ? (
+      {discs.length ? (
         <View
           pointerEvents="box-none"
           style={{ position: 'absolute', top: 10, left: 0, right: 0, alignItems: 'center' }}
@@ -156,7 +167,7 @@ export function ProfileBanner({
               paddingHorizontal: 12,
             }}
           >
-            {actions.map((a) => (
+            {discs.map((a) => (
               <Pressable
                 key={a.label}
                 onPress={a.onPress}
@@ -172,6 +183,7 @@ export function ProfileBanner({
                   alignItems: 'center',
                   justifyContent: 'center',
                   opacity: pressed ? 0.75 : 1,
+                  marginRight: a.leading ? 'auto' : 0,
                   ...shadow.md,
                 })}
               >

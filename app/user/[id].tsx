@@ -342,56 +342,6 @@ export default function UserProfileScreen() {
         // is a new component type each render and would remount the whole header.
         ListHeaderComponent={
       <>
-        {/* Top bar. Kept above the banner rather than floating on top of it:
-            these are real navigation controls, and a photo can't guarantee the
-            contrast they need. */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingHorizontal: 14,
-            paddingTop: 6,
-            paddingBottom: 8,
-          }}
-        >
-          <Pressable
-            onPress={() => safeBack()}
-            hitSlop={HIT_SLOP_8}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-            style={({ pressed }) => ({
-              width: 38,
-              height: 38,
-              borderRadius: 19,
-              alignItems: 'center',
-              justifyContent: 'center',
-              opacity: pressed ? 0.6 : 1,
-            })}
-          >
-            <Feather name="chevron-left" size={24} color={colors.ink} />
-          </Pressable>
-          <Text style={{ fontSize: 15, fontWeight: '800', color: colors.ink }} numberOfLines={1}>
-            @{profile.username}
-          </Text>
-          <Pressable
-            onPress={handleMore}
-            hitSlop={HIT_SLOP_8}
-            accessibilityRole="button"
-            accessibilityLabel="More options"
-            style={({ pressed }) => ({
-              width: 38,
-              height: 38,
-              borderRadius: 19,
-              alignItems: 'center',
-              justifyContent: 'center',
-              opacity: pressed ? 0.6 : 1,
-            })}
-          >
-            <Feather name="more-horizontal" size={20} color={colors.ink} />
-          </Pressable>
-        </View>
-
         <Animated.View style={fade}>
           <ProfileBanner
             bannerUrl={profile.banner_url}
@@ -399,6 +349,7 @@ export default function UserProfileScreen() {
             initial={initial}
             verified={profile.is_verified}
             label={`${displayName}'s profile photo`}
+            onBack={() => safeBack()}
             // Info / like / share, foodpanda-style. All three already existed
             // on this screen (the Details tab, follow, the share sheet) — these
             // just lift them above the fold. The heart IS follow: a second,
@@ -420,6 +371,9 @@ export default function UserProfileScreen() {
                       onPress: handleFollowToggle,
                       active: followed,
                     },
+                    // Reporting yourself isn't a thing, so this rides the same
+                    // visitor-only gate as follow.
+                    { icon: 'ellipsis-horizontal' as const, label: 'More options', onPress: handleMore },
                   ]),
               { icon: 'share-outline', label: 'Share profile', onPress: handleShare },
             ]}

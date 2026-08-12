@@ -67,30 +67,29 @@ export function ProductActionBar({
         </Text>
       </View>
 
-      <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+      <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+        {/* Equal halves, both 48h/10r: one outlined, one filled. Same silhouette
+            twice so neither reads as the "small" option — the fill alone carries
+            the hierarchy. No icon: the label already says what it does. */}
         <Pressable
           onPress={onOfferPress}
           accessibilityRole="button"
           accessibilityLabel="Make an offer"
           accessibilityHint="Opens a sheet to send the seller a price suggestion"
           style={({ pressed }) => ({
-            paddingHorizontal: 18,
-            height: 52,
-            minWidth: 88,
-            borderRadius: 14,
-            borderWidth: HAIRLINE,
-            borderColor: 'rgba(15,15,15,0.14)',
+            flex: 1,
+            height: 48,
+            borderRadius: 10,
+            borderWidth: 1,
+            borderColor: BRAND_INK,
             alignItems: 'center',
             justifyContent: 'center',
-            flexDirection: 'row',
-            gap: 6,
             backgroundColor: 'white',
             opacity: pressed ? 0.7 : 1,
             transform: [{ scale: pressed ? 0.98 : 1 }],
           })}
         >
-          <Feather name="tag" size={15} color={BRAND_INK} />
-          <Text style={{ fontSize: 13, fontWeight: '700', color: BRAND_INK }}>Offer</Text>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: BRAND_INK }}>Make an offer</Text>
         </Pressable>
         <Pressable
           onPress={onBuyPress}
@@ -99,19 +98,21 @@ export function ProductActionBar({
           accessibilityHint="Proceeds to secure checkout"
           style={({ pressed }) => ({
             flex: 1,
-            height: 52,
+            height: 48,
             backgroundColor: BRAND_INK,
-            borderRadius: 14,
-            paddingHorizontal: 16,
+            borderRadius: 10,
+            // Matches the outlined twin's 1px border so both buttons occupy the
+            // same box — without it the filled one sits 2px shorter.
+            borderWidth: 1,
+            borderColor: BRAND_INK,
             alignItems: 'center',
             justifyContent: 'center',
-            flexDirection: 'row',
             opacity: pressed ? 0.9 : 1,
             transform: [{ scale: pressed ? 0.98 : 1 }],
           })}
         >
           <Text style={{ fontSize: 15, fontWeight: '800', color: 'white', letterSpacing: 0.2 }}>
-            Buy now · {bpFee > 0 ? formatPrice(buyTotal) : formatPrice(price)}
+            Buy now
           </Text>
         </Pressable>
       </View>
