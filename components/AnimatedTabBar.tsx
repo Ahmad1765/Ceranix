@@ -100,17 +100,40 @@ const FADE_OUT = { duration: 180 } as const;
 
 const HAPTICS = Platform.OS !== 'web';
 
+// Background warm-up. Every tab is mounted ahead of time so switching is a
+// visibility toggle rather than a lazy mount — the behaviour every big social
+// app has, and the reason their tab bars feel instant.
+//
+// Staggered rather than all-at-once: four screens mounted in one JS task is the
+// same stall, just moved to startup. One every WARM_STEP lets the feed finish
+// its first paint and its images in between.
+// ponytail: fixed delays, tuned by hand. If a slow device shows the warm-up
+// fighting first paint, gate the first one on InteractionManager instead.
+const WARM_DELAY = 1200; // after the first screen has settled
+const WARM_STEP = 350; // between each subsequent screen
+
 const ICONS: Record<
   string,
   { outline: keyof typeof Ionicons.glyphMap; filled: keyof typeof Ionicons.glyphMap }
 > = {
   index: { outline: 'home-outline', filled: 'home' },
-  discover: { outline: 'search-outline', filled: 'search' },
+  // Compass, not a magnifier: this tab opens the browse sheet, and a compass is
+  // the "wander" glyph in every app in this category.
+  discover: { outline: 'compass-outline', filled: 'compass' },
   wardrobe: { outline: 'shirt-outline', filled: 'shirt' },
-  upload: { outline: 'add-circle-outline', filled: 'add-circle' },
-  chat: { outline: 'chatbubble-outline', filled: 'chatbubble' },
+  // Unused — Sell renders as the pill below — but kept so ICONS stays total
+  // over the route list and the `?? ICONS.index` fallback never fires for it.
+  upload: { outline: 'add', filled: 'add' },
+  // Tailless box rather than `chatbubble`: reads as an inbox, and sits squarer
+  // next to the house and the compass.
+  chat: { outline: 'chatbox-outline', filled: 'chatbox' },
   profile: { outline: 'person-outline', filled: 'person' },
 };
+
+// Sell renders as a filled pill instead of the outline/filled glyph pair — it's
+// the one tab that is an ACTION rather than a place. A rounded rectangle, not a
+// circle, so it doesn't read as a sixth icon.
+const PILL = { width: 42, height: 30, radius: 9 } as const;
 
 type ItemLayout = { x: number; width: number };
 
@@ -203,11 +226,39 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
     const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
     if (!focused && !event.defaultPrevented) {
       if (HAPTICS) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      // Dev-only switch timing. Two rAFs lands after the commit that follows
+      // navigate(), so this is press -> new screen on screen. Delete once the
+      // tab-switch cost is understood; it costs nothing in a release build.
+      const t0 = __DEV__ ? Date.now() : 0;
       navigation.navigate(route.name);
+      if (__DEV__) {
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() =>
+            console.log(`[tab] ${route.name} ${Date.now() - t0}ms`),
+          ),
+        );
+      }
     }
     // Hand the disc back to `activeIdx`. If the press navigated, that value is
     // already the new tab; if it was preventDefault-ed, the disc springs home.
     previewIdx.value = NO_PREVIEW;
+  };
+
+  // Mount the tab under the finger BEFORE the finger lifts.
+  //
+  // Tab screens are lazy: the first press on one mounts its whole tree — five
+  // queries and a FlashList on Home — synchronously, inside the same JS task
+  // that handles the release. That single blocking mount is what reads as "the
+  // tab bar is laggy". Preloading on touch-DOWN moves it ~100-250ms earlier, so
+  // it overlaps the press instead of stalling the transition.
+  //
+  // Touch-down only, never on drag preview: preloading every tab a finger
+  // slides over would mount four screens mid-gesture, which is the jank this is
+  // meant to remove.
+  const preload = (pos: number) => {
+    const route = routes[pos];
+    if (!route || route.key === activeKey) return;
+    navigation.preload(route.name);
   };
 
   // Latest-ref indirection, so `selectAt` is stable forever and the memoized
@@ -218,10 +269,25 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
   // The initial value is already correct, and a gesture cannot fire before the
   // first effect flush.
   const selectRef = useRef(select);
+  const preloadRef = useRef(preload);
   useEffect(() => {
     selectRef.current = select;
+    preloadRef.current = preload;
   });
   const selectAt = useCallback((pos: number) => selectRef.current(pos), []);
+  const preloadAt = useCallback((pos: number) => preloadRef.current(pos), []);
+
+  // Warm every other tab once, shortly after mount. `preload()` skips whichever
+  // route is focused, so this never touches the screen the user is looking at.
+  const warmed = useRef(false);
+  useEffect(() => {
+    if (warmed.current || count === 0) return;
+    warmed.current = true;
+    const timers = Array.from({ length: count }, (_, i) =>
+      setTimeout(() => preloadAt(i), WARM_DELAY + i * WARM_STEP),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [count, preloadAt]);
 
   // ---- gesture (worklets only) ----
   // Memoized because a new Gesture object detaches and re-attaches the native
@@ -263,7 +329,9 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
       .onBegin((e) => {
         committed.value = false;
         pressV.value = withTiming(0.9, { duration: 110 });
-        previewIdx.value = resolveIndex(e);
+        const pos = resolveIndex(e);
+        previewIdx.value = pos;
+        runOnJS(preloadAt)(pos);
       })
       .onUpdate((e) => {
         const pos = resolveIndex(e);
@@ -290,7 +358,7 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
       });
 
     return Gesture.Race(pan, tap);
-  }, [count, committed, containerRef, layouts, pressV, previewIdx, selectAt]);
+  }, [count, committed, containerRef, layouts, pressV, previewIdx, selectAt, preloadAt]);
 
   const discStyle = useAnimatedStyle(() => ({
     opacity: mount.value,
@@ -453,14 +521,33 @@ function TabItem({
       accessibilityState={{ selected }}
       style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
     >
-      <Animated.View style={[{ width: ICON, height: ICON }, wrapStyle]}>
-        <Animated.View style={[StyleSheet.absoluteFill, outlineStyle]}>
-          <Ionicons name={icon.outline} size={ICON} color={INACTIVE} />
+      {routeName === 'upload' ? (
+        <Animated.View
+          style={[
+            {
+              width: PILL.width,
+              height: PILL.height,
+              borderRadius: PILL.radius,
+              borderCurve: 'continuous',
+              backgroundColor: colors.purple,
+              alignItems: 'center',
+              justifyContent: 'center',
+            },
+            wrapStyle,
+          ]}
+        >
+          <Ionicons name="add" size={22} color={colors.white} />
         </Animated.View>
-        <Animated.View style={[StyleSheet.absoluteFill, filledStyle]}>
-          <Ionicons name={icon.filled} size={ICON} color={ACCENT} />
+      ) : (
+        <Animated.View style={[{ width: ICON, height: ICON }, wrapStyle]}>
+          <Animated.View style={[StyleSheet.absoluteFill, outlineStyle]}>
+            <Ionicons name={icon.outline} size={ICON} color={INACTIVE} />
+          </Animated.View>
+          <Animated.View style={[StyleSheet.absoluteFill, filledStyle]}>
+            <Ionicons name={icon.filled} size={ICON} color={ACCENT} />
+          </Animated.View>
         </Animated.View>
-      </Animated.View>
+      )}
     </View>
   );
 }

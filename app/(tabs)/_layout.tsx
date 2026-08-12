@@ -10,7 +10,12 @@ export default function TabsLayout() {
   return (
     <Tabs
       tabBar={(props) => <AnimatedTabBar {...props} />}
-      screenOptions={{ headerShown: false }}
+      // freezeOnBlur: a blurred tab stops re-rendering entirely. Chat holds a
+      // realtime inbox subscription and every screen holds React Query
+      // subscriptions, so without this a cache write re-renders four off-screen
+      // trees while the visible one is scrolling. Native-only — the web build
+      // of react-native-screens just toggles `display: none` and ignores it.
+      screenOptions={{ headerShown: false, freezeOnBlur: true }}
     >
       <Tabs.Screen name="index" options={{ title: 'Home' }} />
       {/* Like the Sell tab below, Discover never switches to its flat tab
