@@ -403,6 +403,23 @@ const handleShareProfile = useCallback(async () => {
             verified={profile.is_verified}
             label="Your profile photo"
             onPress={() => router.push('/profile/edit')}
+            actions={[
+              {
+                icon: 'share-outline',
+                label: 'Share profile',
+                onPress: handleShareProfile,
+              },
+              {
+                icon: 'create-outline',
+                label: 'Edit profile',
+                onPress: () => router.push('/profile/edit'),
+              },
+              {
+                icon: 'settings-outline',
+                label: 'Settings',
+                onPress: () => router.push('/settings'),
+              },
+            ]}
           />
 
           <ProfileIdentity
@@ -417,13 +434,20 @@ const handleShareProfile = useCallback(async () => {
               <View style={{ flex: 1 }}>
                 <Button
                   label="Edit profile"
+                  icon="edit-2"
                   variant="ghost"
                   full
                   onPress={() => router.push('/profile/edit')}
                 />
               </View>
               <View style={{ flex: 1 }}>
-                <Button label="Share profile" variant="primary" full onPress={handleShareProfile} />
+                <Button
+                  label="Share profile"
+                  icon="share-2"
+                  variant="primary"
+                  full
+                  onPress={handleShareProfile}
+                />
               </View>
             </View>
           </ProfileIdentity>
