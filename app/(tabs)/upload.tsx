@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Redirect } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import { useAuth } from '@/lib/auth';
 import { useSellSheet } from '@/components/sell/SellSheet';
 
@@ -14,11 +15,12 @@ import { useSellSheet } from '@/components/sell/SellSheet';
 export default function UploadTabFallback() {
   const { session, loading } = useAuth();
   const { open } = useSellSheet();
+  const isFocused = useIsFocused();
 
   useEffect(() => {
-    if (loading || !session) return;
+    if (loading || !session || !isFocused) return;
     open();
-  }, [loading, session, open]);
+  }, [loading, session, open, isFocused]);
 
   if (loading) return null;
   return <Redirect href={session ? '/(tabs)' : '/auth/login'} />;

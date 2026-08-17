@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, FlatList, Pressable, RefreshControl, Animated, Platform, useWindowDimensions, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
+import { View, FlatList, Pressable, RefreshControl, Animated, Platform, useWindowDimensions, NativeSyntheticEvent, NativeScrollEvent, LayoutChangeEvent } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -248,6 +248,7 @@ function ConversationPage({
   userId,
   tab,
   pageWidth,
+  pageHeight,
   refreshing,
   onRefresh,
   bottomInset,
@@ -256,6 +257,7 @@ function ConversationPage({
   userId: string;
   tab: ConversationTab;
   pageWidth: number;
+  pageHeight: number;
   refreshing: boolean;
   onRefresh: () => void;
   bottomInset: number;
@@ -266,8 +268,9 @@ function ConversationPage({
     [userId],
   );
   return (
-    <View style={{ width: pageWidth, flex: 1 }}>
+    <View style={{ width: pageWidth, height: pageHeight }}>
       <FlatList
+        style={{ flex: 1 }}
         data={data}
         keyExtractor={keyById}
         renderItem={renderItem}
@@ -425,6 +428,11 @@ export default function InboxScreen() {
   const tabBarClearance = useTabBarClearance();
   const [activeTab, setActiveTab] = useState<InboxTab>('buying');
   const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [pagerHeight, setPagerHeight] = useState(0);
+
+  const onPagerLayout = useCallback((e: LayoutChangeEvent) => {
+    setPagerHeight(e.nativeEvent.layout.height);
+  }, []);
 
   const userId = user?.id ?? null;
   const inboxQ = useInboxQuery(userId);
@@ -644,58 +652,65 @@ export default function InboxScreen() {
         badges={tabBadges}
       />
 
-      {/* Content */}
-      {authLoading || (loading && conversations.length === 0) ? (
-        // Skeleton rows rather than a centred spinner: the list geometry is
-        // already on screen, so nothing jumps when the data lands.
-        <InboxSkeleton />
-      ) : !user ? (
-        <SignedOutState />
-      ) : (
-        <Animated.FlatList
-          ref={pagerRef as any}
-          data={INBOX_TABS}
-          keyExtractor={(t) => t.value}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          bounces={false}
-          initialScrollIndex={initialScrollIndex >= 0 ? initialScrollIndex : 1}
-          getItemLayout={(_, index) => ({
-            length: pageWidth,
-            offset: pageWidth * index,
-            index,
-          })}
-          onScroll={Animated.event(
-            [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-            { useNativeDriver: Platform.OS !== 'web' },
-          )}
-          scrollEventThrottle={16}
-          onMomentumScrollEnd={onMomentumScrollEnd}
-          renderItem={({ item }) => {
-            // Activity is the odd page out: notifications and saved searches,
-            // not conversations. Same page geometry, different body.
-            if (item.value === 'activity') {
+      {/* Content — the measuring wrapper gives us a concrete pixel height
+          for each pager page. On web, flex-based height propagation through
+          a horizontal FlatList's content container is broken, so the inner
+          vertical FlatLists need an explicit height to scroll. */}
+      <View style={{ flex: 1 }} onLayout={onPagerLayout}>
+        {authLoading || (loading && conversations.length === 0) ? (
+          // Skeleton rows rather than a centred spinner: the list geometry is
+          // already on screen, so nothing jumps when the data lands.
+          <InboxSkeleton />
+        ) : !user ? (
+          <SignedOutState />
+        ) : (
+          <Animated.FlatList
+            ref={pagerRef as any}
+            data={INBOX_TABS}
+            keyExtractor={(t) => t.value}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            bounces={false}
+            style={{ flex: 1 }}
+            initialScrollIndex={initialScrollIndex >= 0 ? initialScrollIndex : 1}
+            getItemLayout={(_, index) => ({
+              length: pageWidth,
+              offset: pageWidth * index,
+              index,
+            })}
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+              { useNativeDriver: Platform.OS !== 'web' },
+            )}
+            scrollEventThrottle={16}
+            onMomentumScrollEnd={onMomentumScrollEnd}
+            renderItem={({ item }) => {
+              // Activity is the odd page out: notifications and saved searches,
+              // not conversations. Same page geometry, different body.
+              if (item.value === 'activity') {
+                return (
+                  <View style={{ width: pageWidth, height: pagerHeight }}>
+                    <ActivityFeed bottomInset={tabBarClearance} />
+                  </View>
+                );
+              }
               return (
-                <View style={{ width: pageWidth, flex: 1 }}>
-                  <ActivityFeed bottomInset={tabBarClearance} />
-                </View>
+                <ConversationPage
+                  data={pageData[item.value]}
+                  userId={user.id}
+                  tab={item.value}
+                  pageWidth={pageWidth}
+                  pageHeight={pagerHeight}
+                  refreshing={refreshing}
+                  onRefresh={onRefresh}
+                  bottomInset={tabBarClearance}
+                />
               );
-            }
-            return (
-              <ConversationPage
-                data={pageData[item.value]}
-                userId={user.id}
-                tab={item.value}
-                pageWidth={pageWidth}
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                bottomInset={tabBarClearance}
-              />
-            );
-          }}
-        />
-      )}
+            }}
+          />
+        )}
+      </View>
 
       {/* Push notification banner — sits above the tab bar */}
       {!bannerDismissed && user && (

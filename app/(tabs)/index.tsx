@@ -7,7 +7,7 @@ import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/lib/auth';
-import { colors, radii } from '@/lib/theme';
+import { colors, radii, type as typography } from '@/lib/theme';
 import type { RecommendedListing } from '@/lib/recommendations';
 import type { PriceDropListing } from '@/lib/myFeed';
 import { PriceDropCard } from '@/components/PriceDropCard';
@@ -625,7 +625,7 @@ function FeedSearch({
             flex: 1,
             flexDirection: 'row',
             alignItems: 'center',
-            backgroundColor: colors.panel,
+            backgroundColor: 'rgb(241, 242, 246)',
             borderRadius: radii.pill,
             paddingHorizontal: 14,
             height: 44,
@@ -645,7 +645,9 @@ function FeedSearch({
               {
                 flex: 1,
                 marginLeft: 9,
-                fontSize: 14.5,
+                fontFamily: typography.family.sansSemibold,
+                fontSize: 13,
+                letterSpacing: -0.1,
                 color: colors.ink,
                 padding: 0,
                 // RN-Web only: drop the browser's default focus ring — the purple
