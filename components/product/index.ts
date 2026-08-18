@@ -6,3 +6,6 @@ export { CheckoutSheet } from './CheckoutSheet';
 export type { CheckoutSheetProps, CheckoutProduct, FulfillmentMethod, PaymentMethodType } from './CheckoutSheet';
 export { OfferSheet } from './OfferSheet';
 export type { OfferSheetProps } from './OfferSheet';
+export { ProductCard } from './ProductCard';
+export type { ProductCardProps, ProductCardData } from './ProductCard';
+

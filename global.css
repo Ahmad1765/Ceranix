@@ -37,27 +37,17 @@
     box-shadow: none;
   }
 
-  select:focus-visible,
-  button:focus-visible,
-  [role="button"]:focus-visible,
-  [tabindex]:focus-visible {
+  select:focus-visible:not(.no-ring),
+  button:focus-visible:not(.no-ring),
+  [role="button"]:focus-visible:not(.no-ring),
+  [tabindex]:focus-visible:not(.no-ring) {
     outline: 2px solid #6C47FF;
     outline-offset: 2px;
   }
 
+
   *::selection {
     background-color: rgba(108, 71, 255, 0.25);
   }
-
-  /* Squircle (superellipse) corners on the bottom tab dock — the edge eases
-     into the curve instead of a quarter-circle "kink". Progressive
-     enhancement: only browsers that support corner-shape get it; everyone
-     else keeps the normal rounded corner from the inline border-radius.
-     iOS gets the equivalent natively via borderCurve: 'continuous'. */
-  @supports (corner-shape: squircle) {
-    #tab-dock,
-    #tab-dock > * {
-      corner-shape: squircle;
-    }
-  }
 }
+

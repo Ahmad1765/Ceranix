@@ -1,13 +1,12 @@
 import { capture, buildListingViewedProps } from '@/lib/analytics';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Pressable, Alert, Share, StyleSheet } from 'react-native';
+import { View, Pressable, Alert, Share } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { safeBack } from '@/lib/nav';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { BlurView } from 'expo-blur';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -34,28 +33,29 @@ import { confirm } from '@/lib/confirm';
 import { logListingView } from '@/lib/recommendations';
 import { updateSavedCache } from '@/lib/engagementCache';
 import type { FollowState } from '@/lib/follows';
-import { getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
+import { getOptimizedImageUrl } from '@/lib/images';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { AnimatedNumber } from '@/components/AnimatedNumber';
 import { SaveListSheet } from '@/components/SaveListSheet';
 import { FullscreenImageViewer } from '@/components/product/FullscreenImageViewer';
-import { ProductActionBar } from '@/components/product/ProductActionBar.legacy';
+import { FloatingHeader } from '@/components/navigation/FloatingHeader';
+import { ImageCarousel } from '@/components/product/ImageCarousel';
+import { ProductActionBar } from '@/components/product/ProductActionBar';
+import { CheckoutSheet } from '@/components/product/CheckoutSheet';
 import { OfferSheet } from '@/components/product/OfferSheet';
 import { PopIcon, type PopIconHandle } from '@/components/product/PopIcon';
 import { RelatedItemCard } from '@/components/product/RelatedItemCard';
 import { ProductSkeleton } from '@/components/product/ProductSkeleton';
-import { HeroPageDot } from '@/components/product/HeroPageDot';
 import { BundleSection } from '@/components/product/BundleSection';
+import { colors } from '@/lib/theme';
+
 import { BundleProgressBar } from '@/components/product/BundleProgressBar';
 import { StarRating } from '@/components/product/bits';
 import { SafetyBanner } from '@/components/SafetyBanner';
 import {
-  IS_IOS,
   HAIRLINE,
   tap,
-  iosShadow,
-  width,
   IMAGE_HEIGHT,
   CONDITION_LABELS,
   BRAND_PURPLE,
@@ -80,8 +80,6 @@ import { useGuestGate } from '@/components/GuestGate';
 import { buyerProtectionFee, orderTotal, formatPrice } from '@/lib/fees';
 import { BuyerProtectionSheet } from '@/components/product/BuyerProtectionSheet';
 import { errorMessage } from '@/lib/errors';
-
-const AnimatedExpoImage = Animated.createAnimatedComponent(Image);
 
 // Read-side normalization for useListingQuery. `listings.seller` is a nullable
 // embed but the render dereferences `listing.seller.id` directly, so a
@@ -129,19 +127,15 @@ export default function ProductScreen() {
   const guestGate = useGuestGate();
   const productIdParam = Array.isArray(id) ? id[0] : id;
 
-  const heroOffsetX = useSharedValue(0);
-  const heroScrollHandler = useAnimatedScrollHandler({
-    onScroll: (e) => {
-      heroOffsetX.value = e.contentOffset.x;
-    },
-  });
   const [selectedBundleIds, setSelectedBundleIds] = useState<Set<string>>(new Set());
   const [showStickyHeader, setShowStickyHeader] = useState(false);
   const [relatedTab, setRelatedTab] = useState<'members' | 'similar'>('members');
   const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
+
   const [saveListVisible, setSaveListVisible] = useState(false);
   const [bpVisible, setBpVisible] = useState(false);
   const [offerVisible, setOfferVisible] = useState(false);
+  const [checkoutVisible, setCheckoutVisible] = useState(false);
   // Imperative handles for the like/save pop — fired on tap so the bounce never
   // rides an async state hydration.
   const heartAnimRef = useRef<PopIconHandle>(null);
@@ -654,35 +648,37 @@ export default function ProductScreen() {
           stay legible over both the hero and the sticky header. */}
       <StatusBar style="dark" animated />
 
-      {/* Sticky header */}
-      {showStickyHeader && (
-        <View style={{
-          position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100,
-          backgroundColor: 'white',
-          borderBottomWidth: HAIRLINE, borderBottomColor: 'rgba(15,15,15,0.08)',
-          paddingTop: insets.top,
-          flexDirection: 'row', alignItems: 'center',
-          paddingHorizontal: 16, paddingBottom: 12,
-          ...(IS_IOS && {
-            boxShadow: '0px 2px 8px rgba(0,0,0,0.06)',
-          }),
-        }}>
-          <Pressable onPress={() => { tap('selection'); safeBack(); }} hitSlop={10} style={({ pressed }) => ({ marginRight: 12, opacity: pressed ? 0.5 : 1 })}>
-            <Feather name="arrow-left" size={22} color="#0F0F0F" />
-          </Pressable>
-          <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: '#0F0F0F' }} numberOfLines={1}>
-            {listing.title}
-          </Text>
-          <Text style={{ fontSize: 15, fontWeight: '700', color: '#0F0F0F' }}>
-            {formatPrice(listing.price, { whole: true })}
-          </Text>
-        </View>
-      )}
+      {/* 1. Floating Top Navigation Bar (Z: 30) */}
+      <FloatingHeader
+        onBack={() => safeBack()}
+        title={showStickyHeader ? listing.title : undefined}
+        subtitle={showStickyHeader ? formatPrice(listing.price, { whole: true }) : undefined}
+        transparent={!showStickyHeader}
+        rightActions={[
+          {
+            icon: 'share-2',
+            onPress: shareListing,
+            accessibilityLabel: 'Share listing',
+          },
+          {
+            icon: 'bookmark',
+            onPress: handleOpenSaveList,
+            active: saved,
+            activeColor: colors.purple,
+            accessibilityLabel: 'Save listing',
+          },
+          {
+            icon: 'flag',
+            onPress: handleReport,
+            accessibilityLabel: 'Report listing',
+          },
+        ]}
+      />
 
       <Animated.ScrollView
         ref={mainScrollRef}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 16) + 120 }}
         onScroll={scrollHandler}
         scrollEventThrottle={16}
         // Let the hero photo bleed all the way to the top edge, under the
@@ -691,83 +687,21 @@ export default function ProductScreen() {
         contentInsetAdjustmentBehavior="never"
         automaticallyAdjustContentInsets={false}
       >
-        {/* ── Image carousel (full-bleed to top, Plick style) ── */}
+        {/* ── Image carousel (4:5 Aspect Ratio with gesture swipe & zoom) ── */}
         <View style={{ position: 'relative' }}>
           {/* Parallax/stretch layer wraps ONLY the carousel; floating UI is unaffected */}
           <Animated.View style={heroParallaxStyle}>
-            <Animated.ScrollView
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              nestedScrollEnabled
-              onScroll={heroScrollHandler}
-              scrollEventThrottle={16}
-            >
-              {/* An imageless row would collapse the hero to zero height and
-                  leave the floating like/save control sitting on the title, so
-                  hold the space with a neutral tile. */}
-              {images.length === 0 ? (
-                <View
-                  style={{
-                    width,
-                    height: IMAGE_HEIGHT,
-                    backgroundColor: '#F3F4F6',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Feather name="image" size={32} color="rgba(15,15,15,0.30)" />
-                </View>
-              ) : null}
-              {images.map((uri, i) => (
-                <Pressable
-                  key={i}
-                  onPress={() => { tap('selection'); setFullscreenIndex(i); }}
-                  style={{ width, height: IMAGE_HEIGHT, backgroundColor: '#F3F4F6' }}
-                >
-                  <AnimatedExpoImage
-                    source={{ uri: getOptimizedImageUrl(uri, { width: thumbWidthFor(width), quality: 80 }) }}
-                    style={{ width, height: IMAGE_HEIGHT }}
-                    contentFit="cover"
-                    cachePolicy="memory-disk"
-                    recyclingKey={uri}
-                    transition={0}
-                    priority={i === 0 ? 'high' : 'normal'}
-                  />
-                </Pressable>
-              ))}
-            </Animated.ScrollView>
+            <ImageCarousel
+              images={images}
+              aspectRatio="4:5"
+              onImagePress={(i) => {
+                tap('selection');
+                setFullscreenIndex(i);
+              }}
+            />
           </Animated.View>
 
-          {/* Back arrow — frosted glass on iOS so it stays visible over light photos */}
-          <Pressable
-            onPress={() => { tap('selection'); safeBack(); }}
-            hitSlop={12}
-            style={({ pressed }) => ({
-              position: 'absolute',
-              top: insets.top + 10,
-              left: 16,
-              width: 38,
-              height: 38,
-              borderRadius: 19,
-              overflow: 'hidden',
-              alignItems: 'center',
-              justifyContent: 'center',
-              opacity: pressed ? 0.7 : 1,
-              ...iosShadow,
-            })}
-          >
-            {IS_IOS ? (
-              <BlurView intensity={70} tint="systemUltraThinMaterialLight" style={StyleSheet.absoluteFill} />
-            ) : (
-              <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255,255,255,0.85)' }]} />
-            )}
-            <Feather name="arrow-left" size={22} color="#0F0F0F" />
-          </Pressable>
-
-          {/* Floating actions — a stacked column of separate circular discs
-              (Mercari style): each an individual white circle with its icon over
-              a count, lifted on a soft shadow rather than joined into one pill. */}
+          {/* Floating actions — a stacked column of separate circular discs (Mercari style) */}
           <View
             style={{
               position: 'absolute',
@@ -775,6 +709,7 @@ export default function ProductScreen() {
               bottom: 16,
               alignItems: 'center',
               gap: 12,
+              zIndex: 10,
             }}
           >
             {/* Like — heart over its count */}
@@ -843,29 +778,10 @@ export default function ProductScreen() {
               />
             </Pressable>
           </View>
-
-          {/* Pagination dashes */}
-          {images.length > 1 && (
-            <View
-              style={{
-                position: 'absolute',
-                bottom: 18,
-                left: 0,
-                right: 0,
-                flexDirection: 'row',
-                justifyContent: 'center',
-                alignItems: 'center',
-                gap: 6,
-              }}
-            >
-              {images.map((_, i) => (
-                <HeroPageDot key={i} index={i} offsetX={heroOffsetX} pageWidth={width} />
-              ))}
-            </View>
-          )}
         </View>
 
         {/* ── Title block (editorial) ── */}
+
         <View style={{ paddingHorizontal: 20, paddingTop: 22, paddingBottom: 14 }}>
           {heartCount > 0 && (
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 6 }}>
@@ -1683,36 +1599,55 @@ export default function ProductScreen() {
         </View>
       </Animated.ScrollView>
 
-      {/* ── Fixed bottom bar — hidden when viewing your own listing ── */}
-      {!isOwnListing && (
-        <ProductActionBar
-          price={itemPrice}
-          buyTotal={buyTotal}
-          bpFee={bpFee}
-          bottomInset={insets.bottom}
-          onOfferPress={() => {
-            if (canOffer()) setOfferVisible(true);
-          }}
-          onBuyPress={() => {
-            tap('medium');
-            if (!user) {
-              guestGate.prompt({
-                title: 'Almost yours',
-                message: 'Create a free account to check out securely with buyer protection included.',
-                icon: 'shopping-bag',
-                cta: 'Create account & continue',
-              });
-              return;
-            }
-            if (!listing?.id) return;
-            if (listing.seller_id === user.id) {
-              toast.show("That's your own listing", { variant: 'default', icon: 'info' });
-              return;
-            }
-            router.push(`/payment/${listing.id}` as any);
-          }}
-        />
-      )}
+      {/* ── Fixed bottom bar — sticky thumb zone (Z: 50) ── */}
+      <ProductActionBar
+        price={itemPrice}
+        buyTotal={buyTotal}
+        bottomInset={insets.bottom}
+        isOwner={isOwnListing}
+        onChatPress={() => openChat('message')}
+        onOfferPress={() => {
+          if (canOffer()) setOfferVisible(true);
+        }}
+        onBuyPress={() => {
+          tap('medium');
+          if (!user) {
+            guestGate.prompt({
+              title: 'Almost yours',
+              message: 'Create a free account to check out securely with buyer protection included.',
+              icon: 'shopping-bag',
+              cta: 'Create account & continue',
+            });
+            return;
+          }
+          if (!listing?.id) return;
+          if (listing.seller_id === user.id) {
+            toast.show("That's your own listing", { variant: 'default', icon: 'info' });
+            return;
+          }
+          setCheckoutVisible(true);
+        }}
+      />
+
+      {/* 1-Step Zero-Navigation Checkout Sheet (Buyer Path) */}
+      <CheckoutSheet
+        visible={checkoutVisible}
+        product={{
+          id: listing.id,
+          title: listing.title,
+          price: itemPrice,
+          imageUrl: images[0],
+          sellerName: listing.seller?.username || 'Seller',
+          shippingFee: 4.99,
+          buyerProtectionFee: bpFee,
+        }}
+        onClose={() => setCheckoutVisible(false)}
+        onConfirmPay={() => {
+          setCheckoutVisible(false);
+          router.push(`/payment/${listing.id}` as any);
+        }}
+      />
+
 
       {/* Save-to-list sheet — opens from the bookmark pill or by long-pressing
           the heart. The listing is "saved" if it lives in any of the user's

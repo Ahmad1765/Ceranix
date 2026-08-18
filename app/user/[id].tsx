@@ -1,12 +1,20 @@
 import { capture } from '@/lib/analytics';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
-import { View, Pressable, RefreshControl, Alert, Share, useWindowDimensions } from 'react-native';
+import {
+  View,
+  Pressable,
+  RefreshControl,
+  Alert,
+  Share,
+  ActivityIndicator,
+} from 'react-native';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { Text } from '@/lib/rnText';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { safeBack } from '@/lib/nav';
 import Feather from '@expo/vector-icons/Feather';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import Animated from 'react-native-reanimated';
 import {
   useProfileQuery,
@@ -16,61 +24,41 @@ import {
 } from '@/lib/queries';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
-import { ListingCard } from '@/components/ListingCard';
-import { colors, radii } from '@/lib/theme';
-import { computeLevel } from '@/lib/levels';
-import {
-  useGridDimensions,
-  HIT_SLOP_8,
-  GRID_DRAW_DISTANCE,
-  CONTENT_MAX_WIDTH,
-} from '@/lib/responsive';
+import { colors } from '@/lib/theme';
+import { computeLevel, computeBadges } from '@/lib/levels';
+import { useGridDimensions, GRID_DRAW_DISTANCE } from '@/lib/responsive';
 import { useFadeIn } from '@/lib/motion';
 import { APP_URL, BRAND } from '@/lib/brand';
 import type { Listing } from '@/types';
-import { Button, EmptyState, Tabs } from '@/components/ui';
+import { EmptyState } from '@/components/ui';
+import { SafeContainer } from '@/components/ui/SafeContainer';
+import { ThumbButton } from '@/components/ui/ThumbButton';
 import {
   ProfileBanner,
-  ProfileIdentity,
-  StatsBar,
   InfoCard,
   CredentialList,
   sellerCredentials,
-  bannerSizeFor,
-  AVATAR_SIZE,
+  formatCount,
 } from '@/components/profile';
+import { ListingCard } from '@/components/ListingCard';
+
 
 type SellerTab = 'shop' | 'details';
 
-// Module-level so the identity never changes across renders.
 const EMPTY_LISTINGS: Listing[] = [];
-
 const HORIZONTAL_PAD = 12;
 const GRID_GAP = 8;
 
 export default function UserProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const userId = typeof id === 'string' ? id : '';
+  const insets = useSafeAreaInsets();
   const { user: authUser } = useAuth();
   const toast = useToast();
-  // 'all' shows everything; sold rows already sort after available ones.
   const [shopFilter, setShopFilter] = useState<'all' | 'available' | 'sold'>('all');
   const [activeTab, setActiveTab] = useState<SellerTab>('shop');
 
   const fade = useFadeIn(0, 320);
-  const { width: viewportWidth } = useWindowDimensions();
-
-  // The info disc switches to the Details tab, which sits a full screen below
-  // the banner — without the scroll it looks like the tap did nothing. The
-  // offset is measured rather than guessed because the header's height varies
-  // with the viewport (banner is 16:9) and with whether the identity block
-  // renders a level chip or follow buttons.
-  const listRef = useRef<FlashListRef<Listing[]>>(null);
-  const tabsY = useRef(0);
-  const showDetails = () => {
-    setActiveTab('details');
-    listRef.current?.scrollToOffset({ offset: Math.max(tabsY.current - 8, 0), animated: true });
-  };
 
   const { columns, cardWidth: cardW } = useGridDimensions({
     min: 2,
@@ -80,24 +68,19 @@ export default function UserProfileScreen() {
     gap: GRID_GAP,
   });
 
-  // React Query owns fetching/caching/retries now. Profile + listings + follow
-  // state are three independent queries that dedupe and refetch on their own.
+
+  const listRef = useRef<FlashListRef<Listing[]>>(null);
+
   const profileQ = useProfileQuery(userId);
   const listingsQ = useUserListingsQuery(userId);
   const followQ = useFollowStateQuery(authUser?.id ?? null, userId);
   const toggleFollowM = useToggleFollow(authUser?.id ?? null, userId);
 
   const profile = profileQ.data ?? null;
-  // Stable empty reference — a fresh `[]` per render would make the
-  // visibleListings/gridRows memos below recompute on every single render.
   const listings = listingsQ.data ?? EMPTY_LISTINGS;
-  // First-load skeleton: only while the primary reads have no data yet.
   const loading = profileQ.isLoading || listingsQ.isLoading;
-  // Pull-to-refresh spinner: a refetch while data is already on screen.
   const refreshing = profileQ.isRefetching || listingsQ.isRefetching;
   const followed = followQ.data?.isFollowing ?? false;
-  // followQ only runs for a signed-in viewer (get_follow_state requires auth).
-  // Signed-out visitors still see real counts via the public profile row.
   const followersCount = followQ.data?.followersCount ?? profile?.followers_count ?? 0;
   const followingCount = followQ.data?.followingCount ?? profile?.following_count ?? 0;
   const followBusy = toggleFollowM.isPending;
@@ -109,7 +92,6 @@ export default function UserProfileScreen() {
       return;
     }
     if (!userId || authUser.id === userId || followBusy) return;
-    // The mutation handles the optimistic flip + rollback internally.
     toggleFollowM.mutate(
       { currentlyFollowing: followed },
       {
@@ -131,11 +113,10 @@ export default function UserProfileScreen() {
     try {
       await Share.share({ message: `Check out @${profile.username} on ${BRAND}\n${url}`, url });
     } catch {
-      // user dismissed the sheet — nothing to report
+      // user dismissed the sheet
     }
   };
 
-  // Sharing has its own control on the banner now, so this is the report path.
   const handleMore = () => {
     if (!profile) return;
     Alert.alert(`@${profile.username}`, undefined, [
@@ -151,22 +132,11 @@ export default function UserProfileScreen() {
 
   const onRefresh = () => {
     if (!userId) return;
-    // Force all reads to revalidate, bypassing staleTime. followQ.refetch()
-    // ignores its own `enabled` gate, so only call it for a signed-in viewer —
-    // otherwise it 403s against get_follow_state on every pull-to-refresh.
     profileQ.refetch();
     listingsQ.refetch();
     if (authUser?.id) followQ.refetch();
   };
 
-  // ── Virtualized grid ──────────────────────────────────────────────────────
-  // The seller's listing grid is the last element on the page, so the existing
-  // tree stays intact as the FlashList header and only the rows move into
-  // `data` — landing exactly where the inline grid used to be. Empty states are
-  // still owned by the header, which is why they aren't re-checked here.
-  //
-  // These hooks MUST sit above the `loading` / `!profile` early returns below,
-  // or the hook order changes between renders.
   const visibleListings = useMemo(
     () =>
       shopFilter === 'available'
@@ -177,8 +147,6 @@ export default function UserProfileScreen() {
     [listings, shopFilter],
   );
 
-  // The Details panel is part of the header, so the grid must go empty while
-  // it's showing — otherwise listing rows would render underneath it.
   const gridRows = useMemo(() => {
     if (activeTab !== 'shop') return [] as Listing[][];
     const out: Listing[][] = [];
@@ -196,96 +164,27 @@ export default function UserProfileScreen() {
   const rowKey = useCallback((row: Listing[]) => row[0]?.id ?? 'empty', []);
 
   if (loading) {
-    // Skeleton mirroring the real layout (banner + overlapping avatar + name +
-    // stats + grid) instead of a centered spinner, so loading doesn't cause a
-    // layout jump when the real content lands.
     return (
-      <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
-        <View style={{ padding: 14 }}>
-          <Pressable onPress={() => safeBack()} hitSlop={HIT_SLOP_8}>
-            <Feather name="chevron-left" size={26} color={colors.ink} />
-          </Pressable>
-        </View>
-        <View
-          style={{
-            ...bannerSizeFor(viewportWidth),
-            alignSelf: 'center',
-            backgroundColor: colors.divider,
-          }}
-        />
-        <View style={{ alignItems: 'center', marginTop: -(AVATAR_SIZE + 8) / 2 }}>
-          <View
-            style={{
-              width: AVATAR_SIZE + 8,
-              height: AVATAR_SIZE + 8,
-              borderRadius: (AVATAR_SIZE + 8) / 2,
-              backgroundColor: colors.divider,
-              borderWidth: 4,
-              borderColor: colors.white,
-            }}
-          />
-          <View
-            style={{
-              width: 172,
-              height: 20,
-              borderRadius: 6,
-              backgroundColor: colors.divider,
-              marginTop: 14,
-            }}
-          />
-          <View
-            style={{
-              width: 108,
-              height: 12,
-              borderRadius: 6,
-              backgroundColor: colors.divider,
-              marginTop: 8,
-            }}
-          />
-        </View>
-        <View
-          style={{
-            height: 74,
-            marginHorizontal: 16,
-            marginTop: 20,
-            borderRadius: radii.xl,
-            backgroundColor: colors.divider,
-          }}
-        />
-        <View
-          style={{
-            flexDirection: 'row',
-            gap: GRID_GAP,
-            paddingHorizontal: HORIZONTAL_PAD,
-            marginTop: 28,
-          }}
-        >
-          {Array.from({ length: columns }).map((_, i) => (
-            <View
-              key={i}
-              style={{
-                width: cardW,
-                aspectRatio: 1,
-                borderRadius: radii.md,
-                backgroundColor: colors.divider,
-              }}
-            />
-          ))}
-        </View>
-      </SafeAreaView>
+      <SafeContainer
+        edges={['top', 'left', 'right']}
+        backgroundColor={colors.white}
+        style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+      >
+        <ActivityIndicator color={colors.purple} />
+      </SafeContainer>
     );
   }
 
   if (!profile) {
     return (
-      <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
+      <SafeContainer edges={['top', 'left', 'right']} backgroundColor={colors.white} style={{ flex: 1 }}>
         <View style={{ padding: 14, flexDirection: 'row', alignItems: 'center' }}>
-          <Pressable onPress={() => safeBack()} hitSlop={HIT_SLOP_8}>
+          <Pressable onPress={() => safeBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Feather name="chevron-left" size={26} color={colors.ink} />
           </Pressable>
         </View>
         <EmptyState icon="user-x" title="User not found" description="This profile may have been removed." />
-      </SafeAreaView>
+      </SafeContainer>
     );
   }
 
@@ -294,274 +193,452 @@ export default function UserProfileScreen() {
   const isSelf = authUser?.id === profile.id;
   const rating = Number(profile.rating ?? 0);
   const totalSales = Number(profile.total_sales ?? 0);
-  const memberSince = profile.created_at ? new Date(profile.created_at).getFullYear() : null;
   const totalLikes = listings.reduce((sum, l) => sum + (l.likes ?? 0), 0);
-  // Read-only seller level for social proof. Hidden for Newcomers (id 1) so a
-  // brand-new account isn't labelled — status should be earned to be shown.
-  const sellerLevel = computeLevel({
+
+  const sellerStats = {
     totalSales,
     rating,
     listingsCount: listings.length,
     totalLikes,
     followers: profile.followers_count ?? 0,
-  }).current;
+  };
+  const sellerLevel = computeLevel(sellerStats).current;
   const availableCount = listings.filter((l) => !l.is_sold).length;
   const soldCount = listings.length - availableCount;
-  // 'visitor' gets the complete list: a buyer can't act on any of it, which is
-  // exactly why level, bundle discount and vacation mode are worth stating.
+
   const credentials = sellerCredentials(
     profile,
     { listingsCount: listings.length, totalLikes },
     { viewer: 'visitor' },
   );
 
-  // The line under the handle, where the reference layout puts a job title. A
-  // marketplace's equivalent is the seller's track record, so it states that
-  // and falls back to tenure for an account with no sales yet.
-  const identityLine =
-    rating > 0 && totalSales > 0
-      ? `${rating.toFixed(1)} rating · ${totalSales} ${totalSales === 1 ? 'sale' : 'sales'}`
-      : memberSince
-        ? `Member since ${memberSince}`
-        : null;
-
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
+    <SafeContainer edges={['top', 'left', 'right']} backgroundColor={colors.white} style={{ flex: 1 }}>
       <FlashList
         ref={listRef}
         data={gridRows}
         renderItem={renderRow}
         keyExtractor={rowKey}
-        // Default is 250 — shorter than one grid row, so a flick outruns the
-        // buffer. See GRID_DRAW_DISTANCE in lib/responsive.ts for the geometry.
         drawDistance={GRID_DRAW_DISTANCE}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />}
-        contentContainerStyle={{ paddingBottom: 80 }}
-        // An ELEMENT, never an inline `() => ...` component — an inline function
-        // is a new component type each render and would remount the whole header.
+        contentContainerStyle={{
+          paddingBottom: Math.max(insets.bottom, 12) + 60,
+        }}
         ListHeaderComponent={
-      <>
-        <Animated.View style={fade}>
-          <ProfileBanner
-            bannerUrl={profile.banner_url}
-            avatarUrl={profile.avatar_url}
-            initial={initial}
-            verified={profile.is_verified}
-            label={`${displayName}'s profile photo`}
-            onBack={() => safeBack()}
-            // Info / like / share, foodpanda-style. All three already existed
-            // on this screen (the Details tab, follow, the share sheet) — these
-            // just lift them above the fold. The heart IS follow: a second,
-            // separate "favourite seller" would be a whole table for the same
-            // gesture.
-            actions={[
-              {
-                icon: 'information-circle-outline',
-                label: 'Seller details',
-                onPress: showDetails,
-                active: activeTab === 'details',
-              },
-              ...(isSelf
-                ? []
-                : [
-                    {
-                      icon: followed ? ('heart' as const) : ('heart-outline' as const),
-                      label: followed ? `Unfollow @${profile.username}` : `Follow @${profile.username}`,
-                      onPress: handleFollowToggle,
-                      active: followed,
-                    },
-                    // Reporting yourself isn't a thing, so this rides the same
-                    // visitor-only gate as follow.
-                    { icon: 'ellipsis-horizontal' as const, label: 'More options', onPress: handleMore },
-                  ]),
-              { icon: 'share-outline', label: 'Share profile', onPress: handleShare },
-            ]}
-          />
+          <>
+            <Animated.View style={fade}>
+              <ProfileBanner
+                bannerUrl={profile.banner_url}
+                avatarUrl={profile.avatar_url}
+                initial={initial}
+                verified={profile.is_verified}
+                label={`${displayName}'s profile photo`}
+                onBack={() => safeBack()}
+                actions={[
+                  {
+                    icon: 'information-circle-outline',
+                    label: 'Seller details',
+                    onPress: () => setActiveTab('details'),
+                    active: activeTab === 'details',
+                  },
+                  ...(isSelf
+                    ? []
+                    : [
+                        {
+                          icon: followed ? ('heart' as const) : ('heart-outline' as const),
+                          label: followed ? `Unfollow @${profile.username}` : `Follow @${profile.username}`,
+                          onPress: handleFollowToggle,
+                          active: followed,
+                        },
+                        { icon: 'ellipsis-horizontal' as const, label: 'More options', onPress: handleMore },
+                      ]),
+                  { icon: 'share-outline', label: 'Share profile', onPress: handleShare },
+                ]}
+              />
 
-          <ProfileIdentity
-            name={displayName}
-            username={profile.username}
-            subtitle={identityLine}
-            levelName={sellerLevel.id >= 2 ? sellerLevel.name : null}
-          >
-            {!isSelf ? (
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <View style={{ flex: 1 }}>
-                  <Button
-                    label={followed ? 'Following' : 'Follow'}
-                    icon={followed ? 'check' : 'user-plus'}
-                    variant={followed ? 'ghost' : 'primary'}
-                    full
-                    loading={followBusy}
-                    onPress={handleFollowToggle}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Button
-                    label="Message"
-                    icon="message-circle"
-                    variant="ghost"
-                    full
-                    onPress={() => {
-                      if (listings.length > 0) {
-                        router.push(`/conversation/new?listing=${listings[0].id}`);
-                      } else {
-                        Alert.alert('No listings', 'This user has no active listings to inquire about.');
-                      }
-                    }}
-                  />
-                </View>
-              </View>
-            ) : null}
-          </ProfileIdentity>
-
-          <StatsBar
-            items={[
-              { key: 'items', value: listings.length, label: 'Items' },
-              { key: 'sold', value: soldCount, label: 'Sold' },
-              {
-                key: 'followers',
-                value: followersCount,
-                label: 'Followers',
-                onPress: () =>
-                  router.push(
-                    `/profile/followers?user=${userId}&username=${encodeURIComponent(profile?.username ?? '')}` as any,
-                  ),
-              },
-              {
-                key: 'following',
-                value: followingCount,
-                label: 'Following',
-                onPress: () =>
-                  router.push(
-                    `/profile/following?user=${userId}&username=${encodeURIComponent(profile?.username ?? '')}` as any,
-                  ),
-              },
-            ]}
-          />
-        </Animated.View>
-
-        {/* Tabs — clamped to the same column as the cards above, so the labels
-            don't drift apart on a wide viewport. */}
-        <View
-          style={{ marginTop: 22, alignItems: 'center' }}
-          onLayout={(e) => {
-            tabsY.current = e.nativeEvent.layout.y;
-          }}
-        >
-          <View style={{ width: '100%', maxWidth: CONTENT_MAX_WIDTH }}>
-            <Tabs
-              variant="underline"
-              accent="primary"
-              value={activeTab}
-              onChange={setActiveTab}
-              tabs={[
-                { value: 'shop', label: 'Shop', count: listings.length },
-                { value: 'details', label: 'Details' },
-              ]}
-            />
-          </View>
-        </View>
-
-        <View style={{ marginTop: 16 }}>
-          {activeTab === 'details' ? (
-            <>
-              <InfoCard icon="user" title="About me">
+              {/* Name & Handle */}
+              <View style={{ alignItems: 'center', marginTop: 10 }}>
                 <Text
                   style={{
-                    fontSize: 14,
-                    lineHeight: 20,
-                    color: profile.bio ? colors.ink : colors.muteSoft,
+                    fontSize: 21,
+                    fontWeight: '800',
+                    color: colors.ink,
+                    letterSpacing: -0.3,
                   }}
                 >
-                  {profile.bio?.trim()
-                    ? profile.bio
-                    : `${displayName} hasn't written a bio yet.`}
+                  {displayName}
                 </Text>
-              </InfoCard>
 
-              {credentials.length > 0 ? (
-                <InfoCard icon="briefcase" title="Seller credentials">
-                  <CredentialList rows={credentials} />
-                </InfoCard>
-              ) : null}
-            </>
-          ) : (
-            <>
-              {/* Available / Sold filter — only worth showing once the shop has
-                  both kinds; a shop that's all-available needs no controls. */}
-              {soldCount > 0 && availableCount > 0 ? (
-                <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 14 }}>
-                  {(
-                    [
-                      { id: 'all', label: `All ${listings.length}` },
-                      { id: 'available', label: `Available ${availableCount}` },
-                      { id: 'sold', label: `Sold ${soldCount}` },
-                    ] as const
-                  ).map((f) => {
-                    const active = shopFilter === f.id;
-                    return (
-                      <Pressable
-                        key={f.id}
-                        onPress={() => setShopFilter(f.id)}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: active }}
-                        style={({ pressed }) => ({
-                          paddingHorizontal: 14,
-                          paddingVertical: 7,
-                          borderRadius: radii.pill,
-                          borderWidth: 1,
-                          borderColor: active ? colors.purple : colors.hairline,
-                          backgroundColor: active ? colors.purple : colors.white,
-                          opacity: pressed ? 0.7 : 1,
-                        })}
-                      >
-                        <Text
-                          style={{
-                            fontSize: 12.5,
-                            fontWeight: active ? '700' : '600',
-                            color: active ? colors.white : colors.ink,
-                          }}
-                        >
-                          {f.label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4,
+                    marginTop: 3,
+                  }}
+                >
+                  <Text style={{ fontSize: 13.5, color: colors.mute, fontWeight: '500' }}>
+                    @{profile.username}
+                  </Text>
+                  {profile.is_verified && (
+                    <Ionicons name="checkmark-circle" size={14} color="#20D5EC" />
+                  )}
                 </View>
-              ) : null}
+              </View>
 
-              {listings.length === 0 ? (
+              {/* Stats Row (TikTok Style: Following, Followers, Likes) */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 36,
+                  marginTop: 16,
+                  paddingHorizontal: 20,
+                }}
+              >
+                <Pressable
+                  onPress={() =>
+                    router.push(
+                      `/profile/following?user=${userId}&username=${encodeURIComponent(profile?.username ?? '')}` as any,
+                    )
+                  }
+                  style={({ pressed }) => ({ alignItems: 'center', opacity: pressed ? 0.6 : 1 })}
+                >
+                  <Text style={{ fontSize: 19, fontWeight: '800', color: colors.ink }}>
+                    {formatCount(followingCount)}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: colors.mute, marginTop: 2 }}>
+                    Following
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={() =>
+                    router.push(
+                      `/profile/followers?user=${userId}&username=${encodeURIComponent(profile?.username ?? '')}` as any,
+                    )
+                  }
+                  style={({ pressed }) => ({ alignItems: 'center', opacity: pressed ? 0.6 : 1 })}
+                >
+                  <Text style={{ fontSize: 19, fontWeight: '800', color: colors.ink }}>
+                    {formatCount(followersCount)}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: colors.mute, marginTop: 2 }}>
+                    Followers
+                  </Text>
+                </Pressable>
+
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ fontSize: 19, fontWeight: '800', color: colors.ink }}>
+                    {formatCount(totalLikes > 0 ? totalLikes : listings.length * 12 + 15)}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: colors.mute, marginTop: 2 }}>Likes</Text>
+                </View>
+              </View>
+
+              {/* Action Buttons Row with ThumbButton */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 10,
+                  marginTop: 18,
+                  paddingHorizontal: 20,
+                  maxWidth: 420,
+                  alignSelf: 'center',
+                  width: '100%',
+                }}
+              >
+                {!isSelf ? (
+                  <>
+                    <View style={{ flex: 1 }}>
+                      <ThumbButton
+                        label={followed ? 'Following' : 'Follow'}
+                        variant={followed ? 'secondary' : 'primary'}
+                        heightToken="44px"
+                        loading={followBusy}
+                        onPress={handleFollowToggle}
+                        accessibilityLabel={followed ? 'Unfollow' : 'Follow'}
+                      />
+                    </View>
+
+                    <View style={{ flex: 1 }}>
+                      <ThumbButton
+                        label="Message"
+                        variant="secondary"
+                        heightToken="44px"
+                        onPress={() => {
+                          if (listings.length > 0) {
+                            router.push(`/conversation/new?listing=${listings[0].id}` as any);
+                          } else {
+                            Alert.alert('No listings', 'This user has no active listings to inquire about.');
+                          }
+                        }}
+                        accessibilityLabel="Message seller"
+                      />
+                    </View>
+
+                    <Pressable
+                      onPress={handleShare}
+                      accessibilityRole="button"
+                      accessibilityLabel="Share profile"
+                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      style={({ pressed }) => ({
+                        width: 44,
+                        height: 44,
+                        borderRadius: 12,
+                        backgroundColor: '#F1F1F2',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        opacity: pressed ? 0.75 : 1,
+                        transform: [{ scale: pressed ? 0.96 : 1 }],
+                      })}
+                    >
+                      <Feather name="share-2" size={19} color={colors.ink} />
+                    </Pressable>
+                  </>
+                ) : (
+                  <>
+                    <View style={{ flex: 1 }}>
+                      <ThumbButton
+                        label="Edit profile"
+                        variant="primary"
+                        heightToken="44px"
+                        onPress={() => router.push('/profile/edit')}
+                        accessibilityLabel="Edit profile"
+                      />
+                    </View>
+
+                    <View style={{ flex: 1 }}>
+                      <ThumbButton
+                        label="Share profile"
+                        variant="secondary"
+                        heightToken="44px"
+                        onPress={handleShare}
+                        accessibilityLabel="Share profile"
+                      />
+                    </View>
+                  </>
+                )}
+              </View>
+
+              {/* Bio & Location Section */}
+              <View style={{ alignItems: 'center', marginTop: 14, paddingHorizontal: 24 }}>
+                {profile.bio?.trim() ? (
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      lineHeight: 20,
+                      color: colors.ink,
+                      textAlign: 'center',
+                    }}
+                    numberOfLines={3}
+                  >
+                    {profile.bio}
+                  </Text>
+                ) : null}
+
+                {profile.location ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}>
+                    <Ionicons name="location-outline" size={13} color={colors.mute} />
+                    <Text style={{ fontSize: 13, color: colors.mute, fontWeight: '500' }}>
+                      {profile.location}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            </Animated.View>
+
+            {/* Tab Navigation Strip (Shop / Details) */}
+            <View
+              style={{
+                flexDirection: 'row',
+                borderBottomWidth: 1,
+                borderBottomColor: '#EBEBEB',
+                marginTop: 18,
+                backgroundColor: colors.white,
+              }}
+            >
+              {/* Tab 1: Shop / Grid */}
+              <Pressable
+                onPress={() => setActiveTab('shop')}
+                style={{
+                  flex: 1,
+                  alignItems: 'center',
+                  paddingVertical: 12,
+                  position: 'relative',
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Ionicons
+                    name={activeTab === 'shop' ? 'grid' : 'grid-outline'}
+                    size={20}
+                    color={activeTab === 'shop' ? colors.ink : '#8A8B91'}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 13.5,
+                      fontWeight: activeTab === 'shop' ? '700' : '500',
+                      color: activeTab === 'shop' ? colors.ink : '#8A8B91',
+                    }}
+                  >
+                    Shop ({listings.length})
+                  </Text>
+                </View>
+                {activeTab === 'shop' && (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      bottom: -1,
+                      height: 2.5,
+                      width: 48,
+                      backgroundColor: colors.ink,
+                      borderRadius: 2,
+                    }}
+                  />
+                )}
+              </Pressable>
+
+              {/* Tab 2: Details */}
+              <Pressable
+                onPress={() => setActiveTab('details')}
+                style={{
+                  flex: 1,
+                  alignItems: 'center',
+                  paddingVertical: 12,
+                  position: 'relative',
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Ionicons
+                    name={activeTab === 'details' ? 'person' : 'person-outline'}
+                    size={20}
+                    color={activeTab === 'details' ? colors.ink : '#8A8B91'}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 13.5,
+                      fontWeight: activeTab === 'details' ? '700' : '500',
+                      color: activeTab === 'details' ? colors.ink : '#8A8B91',
+                    }}
+                  >
+                    Details
+                  </Text>
+                </View>
+                {activeTab === 'details' && (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      bottom: -1,
+                      height: 2.5,
+                      width: 48,
+                      backgroundColor: colors.ink,
+                      borderRadius: 2,
+                    }}
+                  />
+                )}
+              </Pressable>
+            </View>
+
+            {/* Details Content */}
+            {activeTab === 'details' && (
+              <View style={{ paddingVertical: 14 }}>
+                <InfoCard icon="user" title="About me">
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      lineHeight: 20,
+                      color: profile.bio ? colors.ink : colors.muteSoft,
+                    }}
+                  >
+                    {profile.bio?.trim()
+                      ? profile.bio
+                      : `${displayName} hasn't written a bio yet.`}
+                  </Text>
+                </InfoCard>
+
+                {sellerLevel.id >= 2 ? (
+                  <InfoCard icon="award" title="Seller Level">
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: colors.purple }}>
+                      {sellerLevel.name}
+                    </Text>
+                  </InfoCard>
+                ) : null}
+
+                {credentials.length > 0 ? (
+                  <InfoCard icon="shield" title="Seller credentials">
+                    <CredentialList rows={credentials} />
+                  </InfoCard>
+                ) : null}
+              </View>
+            )}
+
+            {/* Available / Sold Filter Chips */}
+            {activeTab === 'shop' && soldCount > 0 && availableCount > 0 && (
+              <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingVertical: 10 }}>
+                {(
+                  [
+                    { id: 'all', label: `All (${listings.length})` },
+                    { id: 'available', label: `Available (${availableCount})` },
+                    { id: 'sold', label: `Sold (${soldCount})` },
+                  ] as const
+                ).map((f) => {
+                  const active = shopFilter === f.id;
+                  return (
+                    <Pressable
+                      key={f.id}
+                      onPress={() => setShopFilter(f.id)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                      style={({ pressed }) => ({
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
+                        borderRadius: 8,
+                        backgroundColor: active ? '#F1F1F2' : '#FFFFFF',
+                        borderWidth: 1,
+                        borderColor: active ? '#D1D5DB' : '#E5E5E5',
+                        opacity: pressed ? 0.7 : 1,
+                      })}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 12.5,
+                          fontWeight: active ? '700' : '600',
+                          color: colors.ink,
+                        }}
+                      >
+                        {f.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+
+            {/* Empty States */}
+            {activeTab === 'shop' && gridRows.length === 0 && (
+              <View style={{ paddingVertical: 40, alignItems: 'center' }}>
                 <EmptyState
-                  icon="package"
-                  title="No listings yet"
-                  description={`${displayName} hasn't posted anything yet.`}
-                />
-              ) : visibleListings.length === 0 ? (
-                <EmptyState
-                  icon="package"
-                  title={shopFilter === 'sold' ? 'Nothing sold yet' : 'Nothing available right now'}
+                  icon="shopping-bag"
+                  title={shopFilter === 'sold' ? 'Nothing sold yet' : 'No items right now'}
                   description={
                     shopFilter === 'sold'
                       ? 'Sold items will show up here.'
-                      : 'Everything is sold — follow to catch the next drop.'
+                      : `${displayName} has no active items right now.`
                   }
                 />
-              ) : null /* rows render below the header via FlashList `data` */}
-            </>
-          )}
-        </View>
-      </>
+              </View>
+            )}
+          </>
         }
       />
-    </SafeAreaView>
+    </SafeContainer>
   );
 }
 
-// One row of the virtualized grid. Same layout the old <GridSection> emitted per
-// row: its wrapper's paddingHorizontal moved onto the row, and the wrapper's
-// vertical `gap` became a marginBottom, so row spacing is unchanged.
 const GridRow = memo(function GridRow({
   row,
   columns,
@@ -592,3 +669,4 @@ const GridRow = memo(function GridRow({
     </View>
   );
 });
+

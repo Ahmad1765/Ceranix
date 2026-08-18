@@ -7,13 +7,11 @@ import {
   ActivityIndicator,
   RefreshControl,
   Share,
-  useWindowDimensions,
   Linking,
-  Platform,
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { Text } from '@/lib/rnText';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect, Href } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -37,11 +35,17 @@ import {
   type SaveList,
 } from '@/lib/saves';
 import { colors, radii } from '@/lib/theme';
-import { useTabBarClearance, GRID_DRAW_DISTANCE, CONTENT_MAX_WIDTH } from '@/lib/responsive';
+import { useTabBarClearance, useGridDimensions, GRID_DRAW_DISTANCE, CONTENT_MAX_WIDTH } from '@/lib/responsive';
+
+
 import { useFadeIn } from '@/lib/motion';
 import type { Listing } from '@/types';
 import { useToast } from '@/lib/toast';
 import { Card, ListRow, EmptyState } from '@/components/ui';
+import { SafeContainer } from '@/components/ui/SafeContainer';
+import { ThumbButton } from '@/components/ui/ThumbButton';
+import { ListingCard } from '@/components/ListingCard';
+
 import {
   LEVELS,
   computeLevel,
@@ -58,7 +62,6 @@ import {
   sellerCredentials,
   formatCount,
 } from '@/components/profile';
-import { TikTokListingCard } from '@/components/profile/TikTokListingCard';
 
 type ProfileTab = 'selling' | 'liked' | 'collections' | 'details';
 
@@ -70,13 +73,15 @@ type ShopItem = {
   action: 'shop' | 'ratings' | 'bundle' | 'vacation' | 'share';
 };
 
-const GRID_GAP = 1.5;
+const HORIZONTAL_PAD = 12;
+const GRID_GAP = 8;
 
 // Stable empty references so query fallbacks don't churn the useMemos below.
 const EMPTY_LISTINGS: Listing[] = [];
 const EMPTY_SAVE_LISTS: SaveList[] = [];
 
 function ProfileScreenInner() {
+  const insets = useSafeAreaInsets();
   const { profile, refreshProfile } = useAuth();
   const profileId = profile?.id ?? null;
   const profileUsername = profile?.username ?? null;
@@ -88,12 +93,15 @@ function ProfileScreenInner() {
 
   const heroFade = useFadeIn(0, 320);
   const tabClear = useTabBarClearance();
-  const { width: windowWidth } = useWindowDimensions();
 
-  // 3-column dense TikTok grid dimensions
-  const containerWidth = Math.min(windowWidth, CONTENT_MAX_WIDTH);
-  const columns = 3;
-  const cardW = Math.floor((containerWidth - (columns - 1) * GRID_GAP) / columns);
+  const { columns, cardWidth: cardW } = useGridDimensions({
+    min: 2,
+    max: 4,
+    thresholds: [560, 900, 1200],
+    horizontalPadding: HORIZONTAL_PAD,
+    gap: GRID_GAP,
+  });
+
 
   const userId = profile?.id ?? null;
   const queryClient = useQueryClient();
@@ -284,14 +292,16 @@ function ProfileScreenInner() {
 
   if (!profile) {
     return (
-      <SafeAreaView
+      <SafeContainer
         edges={['top']}
-        style={{ flex: 1, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' }}
+        backgroundColor={colors.white}
+        style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
       >
         <ActivityIndicator color={colors.purple} />
-      </SafeAreaView>
+      </SafeContainer>
     );
   }
+
 
   const sellingCount = selling.length;
   const displayName = profile.full_name || profile.username;
@@ -321,7 +331,7 @@ function ProfileScreenInner() {
     (profile as any).website || (profile.username ? `ceranix.com/@${profile.username}` : null);
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
+    <SafeContainer edges={['top', 'left', 'right']} backgroundColor={colors.white} style={{ flex: 1 }}>
       <FlashList
         data={gridRows}
         renderItem={renderRow}
@@ -331,12 +341,15 @@ function ProfileScreenInner() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />
         }
-        contentContainerStyle={{ paddingBottom: tabClear }}
+        contentContainerStyle={{
+          paddingBottom: Math.max(insets.bottom, 12) + tabClear + 16,
+        }}
         ListHeaderComponent={
           <>
             {/* Banner & Avatar with Change Photo Button */}
             <Animated.View style={heroFade}>
               <ProfileBanner
+
                 bannerUrl={profile.banner_url}
                 avatarUrl={profile.avatar_url}
                 initial={initial}
@@ -435,77 +448,60 @@ function ProfileScreenInner() {
                 </View>
               </View>
 
-              {/* Action Buttons Row (TikTok Style: Edit profile, Share profile, Dropdown) */}
+              {/* Action Buttons Row (TikTok Style: Edit profile, Share profile, Settings) */}
               <View
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: 6,
-                  marginTop: 16,
-                  width: '75%',
-                  maxWidth: 380,
+                  gap: 10,
+                  marginTop: 18,
+                  paddingHorizontal: 20,
+                  maxWidth: 420,
                   alignSelf: 'center',
+                  width: '100%',
                 }}
               >
-                <Pressable
-                  onPress={() => router.push('/profile/edit')}
-                  accessibilityRole="button"
-                  accessibilityLabel="Edit profile"
-                  style={({ pressed }) => ({
-                    flex: 1,
-                    height: 44,
-                    borderRadius: 8,
-                    backgroundColor: colors.purple,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    opacity: pressed ? 0.85 : 1,
-                    transform: [{ scale: pressed ? 0.98 : 1 }],
-                  })}
-                >
-                  <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '700' }}>
-                    Edit profile
-                  </Text>
-                </Pressable>
+                <View style={{ flex: 1 }}>
+                  <ThumbButton
+                    label="Edit profile"
+                    variant="primary"
+                    heightToken="44px"
+                    onPress={() => router.push('/profile/edit')}
+                    accessibilityLabel="Edit profile"
+                  />
+                </View>
 
-                <Pressable
-                  onPress={handleShareProfile}
-                  accessibilityRole="button"
-                  accessibilityLabel="Share profile"
-                  style={({ pressed }) => ({
-                    flex: 1,
-                    height: 44,
-                    borderRadius: 8,
-                    backgroundColor: '#F1F1F2',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    opacity: pressed ? 0.75 : 1,
-                    transform: [{ scale: pressed ? 0.98 : 1 }],
-                  })}
-                >
-                  <Text style={{ color: colors.ink, fontSize: 15, fontWeight: '700' }}>
-                    Share profile
-                  </Text>
-                </Pressable>
+                <View style={{ flex: 1 }}>
+                  <ThumbButton
+                    label="Share profile"
+                    variant="secondary"
+                    heightToken="44px"
+                    onPress={handleShareProfile}
+                    accessibilityLabel="Share profile"
+                  />
+                </View>
 
                 <Pressable
                   onPress={() => router.push('/settings')}
                   accessibilityRole="button"
                   accessibilityLabel="Settings"
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                   style={({ pressed }) => ({
                     width: 44,
                     height: 44,
-                    borderRadius: 8,
+                    borderRadius: 12,
                     backgroundColor: '#F1F1F2',
                     alignItems: 'center',
                     justifyContent: 'center',
                     opacity: pressed ? 0.75 : 1,
-                    transform: [{ scale: pressed ? 0.98 : 1 }],
+                    transform: [{ scale: pressed ? 0.96 : 1 }],
                   })}
                 >
-                  <Ionicons name="caret-down" size={14} color={colors.ink} />
+                  <Feather name="settings" size={19} color={colors.ink} />
                 </Pressable>
               </View>
+
 
               {/* Bio & Link Section */}
               <View style={{ alignItems: 'center', marginTop: 14, paddingHorizontal: 24 }}>
@@ -956,9 +952,10 @@ function ProfileScreenInner() {
         }
       />
       {promptElement}
-    </SafeAreaView>
+    </SafeContainer>
   );
 }
+
 
 function ProgressBar({ fraction }: { fraction: number }) {
   const pct = Math.max(0, Math.min(1, fraction)) * 100;
@@ -1037,20 +1034,23 @@ const GridRow = memo(function GridRow({
       style={{
         flexDirection: 'row',
         gap: GRID_GAP,
+        paddingHorizontal: HORIZONTAL_PAD,
         marginBottom: GRID_GAP,
-        justifyContent: 'flex-start',
       }}
     >
       {row.map((listing) => (
-        <TikTokListingCard key={listing.id} listing={listing} width={cardW} />
+        <View key={listing.id} style={{ width: cardW }}>
+          <ListingCard listing={listing} width={cardW} />
+        </View>
       ))}
       {row.length < columns &&
         Array.from({ length: columns - row.length }).map((_, i) => (
-          <View key={`pad-${i}`} style={{ width: cardW, aspectRatio: 3 / 4 }} />
+          <View key={`pad-${i}`} style={{ width: cardW }} />
         ))}
     </View>
   );
 });
+
 
 export default function ProfileScreen() {
   return (

@@ -19,6 +19,8 @@ export interface SafeContainerProps {
   edges?: SafeEdge[];
   /** Container layout mode: standard View, ScrollView, or KeyboardAvoiding */
   mode?: 'view' | 'scroll' | 'keyboard-avoiding';
+  /** If true in keyboard-avoiding mode, disables the inner ScrollView wrapper (useful for FlatList/FlashList) */
+  noScroll?: boolean;
   /** Optional sticky footer element locked into the bottom thumb zone */
   stickyFooter?: React.ReactNode;
   /** Extra bottom clearance (useful when sticky bars or floating tabs are present) */
@@ -44,6 +46,7 @@ export function SafeContainer({
   children,
   edges = ['top', 'bottom', 'left', 'right'],
   mode = 'view',
+  noScroll = false,
   stickyFooter,
   extraBottomPadding = 0,
   backgroundColor = colors.bg,
@@ -146,11 +149,11 @@ export function SafeContainer({
     );
   }
 
-  // Keyboard Avoiding Mode (for forms, authentication, checkout flows)
+  // Keyboard Avoiding Mode (for forms, chat threads, authentication, checkout flows)
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       className={className}
       style={[
         styles.fill,
@@ -163,22 +166,27 @@ export function SafeContainer({
         style,
       ]}
     >
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={[
-          styles.grow,
-          {
-            paddingBottom: edges.includes('bottom')
-              ? Math.max(insets.bottom, 16) + (stickyFooter ? 80 : 0) + extraBottomPadding
-              : (stickyFooter ? 80 : 0) + extraBottomPadding,
-          },
-          contentContainerStyle,
-        ]}
-        {...scrollViewProps}
-      >
-        {children}
-      </ScrollView>
+      {noScroll ? (
+        children
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={[
+            styles.grow,
+            {
+              paddingBottom: edges.includes('bottom')
+                ? Math.max(insets.bottom, 16) + (stickyFooter ? 80 : 0) + extraBottomPadding
+                : (stickyFooter ? 80 : 0) + extraBottomPadding,
+            },
+            contentContainerStyle,
+          ]}
+          {...scrollViewProps}
+        >
+          {children}
+        </ScrollView>
+      )}
+
 
       {stickyFooter && (
         <View

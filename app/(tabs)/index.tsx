@@ -2,7 +2,7 @@ import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useSta
 import { Alert, View, Pressable, ScrollView, RefreshControl, Platform } from 'react-native';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { Text, TextInput } from '@/lib/rnText';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -14,6 +14,10 @@ import { PriceDropCard } from '@/components/PriceDropCard';
 import { type SavedSearch } from '@/lib/savedSearches';
 import { ListingCard } from '@/components/ListingCard';
 import { DropAlertSheet } from '@/components/DropAlertSheet';
+
+
+
+
 import {
   FeedFilterSheet,
   EMPTY_FEED_FILTERS,
@@ -66,6 +70,7 @@ const EMPTY_SAVED_SEARCHES: SavedSearch[] = [];
 const EMPTY_PRICE_DROPS: PriceDropListing[] = [];
 
 export default function HomeScreen() {
+  const insets = useSafeAreaInsets();
   const { user, loading: authLoading } = useAuth();
   const toast = useToast();
   const [activeChip, setActiveChip] = useState<string>(FOR_YOU);
@@ -126,9 +131,28 @@ export default function HomeScreen() {
     (chip: string) => {
       setActiveChip(chip);
       scrollToTop();
+      requestAnimationFrame(() => {
+        listRef.current?.scrollToOffset({ offset: 0, animated: false });
+      });
     },
     [scrollToTop],
   );
+
+  // Guarantee list resets to top whenever activeChip changes, including after
+  // FlashList layout settles for the new dataset.
+  useEffect(() => {
+    scrollToTop();
+    const frame = requestAnimationFrame(() => {
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+    });
+    const timer = setTimeout(() => {
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+    }, 50);
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(timer);
+    };
+  }, [activeChip, scrollToTop]);
 
   const { columns, cardWidth } = useGridDimensions({
     min: 2,
@@ -324,7 +348,9 @@ export default function HomeScreen() {
         rows = [...rows].sort((a, b) => b.price - a.price);
         break;
       case 'popular':
-        rows = [...rows].sort((a, b) => (b.likes ?? 0) - (a.likes ?? 0));
+        rows = [...rows].sort(
+          (a, b) => (b.likes ?? 0) - (a.likes ?? 0) || (b.views ?? 0) - (a.views ?? 0),
+        );
         break;
     }
     return rows;
@@ -513,6 +539,7 @@ export default function HomeScreen() {
       <FlashList
         ref={listRef}
         data={gridRows}
+        extraData={activeChip}
         renderItem={renderRow}
         keyExtractor={rowKey}
         // Default is 250 — shorter than one grid row, so a flick outruns the
@@ -533,7 +560,7 @@ export default function HomeScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purple} />
         }
-        contentContainerStyle={{ paddingBottom: tabClear }}
+        contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 12) + tabClear + 16 }}
       />
 
       <FeedFilterSheet
@@ -826,11 +853,6 @@ function Chip({
   onPress: () => void;
   onLongPress?: () => void;
 }) {
-  // Same selected-fill / unselected-outline structure as Instagram's
-  // custom-feed tabs, tuned to Carrinex's whisper-border language: the
-  // outline is a soft hairline (not a hard black stroke), and the selected
-  // chip carries a solid slate fill with white text — weight stays a constant
-  // semibold so the active chip doesn't jump in width when selected.
   const textColor = active ? colors.onSelected : colors.mute;
   return (
     <Pressable
@@ -902,10 +924,7 @@ function AddChip({ onPress }: { onPress: () => void }) {
   );
 }
 
-// One row of the virtualized grid. Layout is byte-for-byte what the old
-// non-virtualized <Grid> emitted per row — the horizontal padding moved from the
-// (now absent) wrapper onto each row, and the wrapper's `gap` became a
-// marginBottom, so spacing between rows is unchanged.
+// One row of the virtualized grid.
 const GridRow = memo(function GridRow({
   row,
   columns,
@@ -936,6 +955,9 @@ const GridRow = memo(function GridRow({
     </View>
   );
 });
+
+
+
 
 // Rendered by FlashList's ListEmptyComponent — covers both the loading skeleton
 // and the "nothing here" copy, which is exactly when the row list is empty.

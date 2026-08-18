@@ -50,8 +50,8 @@ export async function fetchRecommendations(limit = 24): Promise<RecommendedListi
 
   if (rows.length < limit) {
     const seen = new Set(rows.map((r) => r.id));
-    const popular = await fetchListings({ tab: 'popular', limit });
-    for (const p of popular) {
+    const fallback = await fetchListings({ tab: 'for_you', limit });
+    for (const p of fallback) {
       if (rows.length >= limit) break;
       if (seen.has(p.id)) continue;
       seen.add(p.id);

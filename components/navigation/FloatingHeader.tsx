@@ -16,6 +16,7 @@ import { colors, radii, type } from '@/lib/theme';
 export interface FloatingHeaderProps {
   title?: string;
   subtitle?: string;
+  centerElement?: React.ReactNode;
   onBack?: () => void;
   backIcon?: keyof typeof Feather.glyphMap;
   showBack?: boolean;
@@ -43,6 +44,7 @@ export interface FloatingHeaderProps {
 export function FloatingHeader({
   title,
   subtitle,
+  centerElement,
   onBack,
   backIcon = 'arrow-left',
   showBack = true,
@@ -89,25 +91,32 @@ export function FloatingHeader({
           ) : null}
         </View>
 
-        {/* Center: Title / Subtitle with safe truncation */}
+        {/* Center: Title / Subtitle or Custom Search Pill */}
         <View style={styles.centerSlot}>
-          {title && (
-            <Text
-              style={[styles.title, { fontFamily: type.family.sansBold }]}
-              numberOfLines={1}
-            >
-              {title}
-            </Text>
-          )}
-          {subtitle && (
-            <Text style={styles.subtitle} numberOfLines={1}>
-              {subtitle}
-            </Text>
+          {centerElement ? (
+            centerElement
+          ) : (
+            <>
+              {title && (
+                <Text
+                  style={[styles.title, { fontFamily: type.family.sansBold }]}
+                  numberOfLines={1}
+                >
+                  {title}
+                </Text>
+              )}
+              {subtitle && (
+                <Text style={styles.subtitle} numberOfLines={1}>
+                  {subtitle}
+                </Text>
+              )}
+            </>
           )}
         </View>
 
         {/* Trailing Right: 44x44px Contextual Actions (Share, Bookmark, Filter) */}
         <View style={styles.rightSlot}>
+
           {rightActions.map((action, idx) => (
             <Pressable
               key={idx}

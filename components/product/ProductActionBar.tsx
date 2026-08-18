@@ -9,14 +9,15 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
-import { ThumbButton } from '@/components/ui/ThumbButton';
-import { colors, radii } from '@/lib/theme';
+import { Text } from '@/lib/rnText';
 import { formatPrice } from '@/lib/currency';
 
 export interface ProductActionBarProps {
   price?: number;
   buyTotal?: number;
+  bpFee?: number;
   bottomInset?: number;
+  onOfferPress?: () => void;
   onOfferOpen?: () => boolean | void;
   onSubmitOffer?: (amount: number) => void;
   onBuyPress?: () => void;
@@ -27,15 +28,14 @@ export interface ProductActionBarProps {
   style?: ViewStyle;
 }
 
-/**
- * Mobile-First Sticky Product Action Bar (Z: 50).
- * Locked inside the thumb zone with dynamic safe area bottom clearance.
- * Features a 48x48px Chat action and balanced Make Offer / Buy Now split pills.
- */
+const BRAND_INK = '#0F0F0F';
+
 export function ProductActionBar({
   price,
   buyTotal,
+  bpFee,
   bottomInset,
+  onOfferPress,
   onOfferOpen,
   onSubmitOffer,
   onBuyPress,
@@ -48,25 +48,26 @@ export function ProductActionBar({
   const insets = useSafeAreaInsets();
   const safeBottom = bottomInset !== undefined ? bottomInset : insets.bottom;
 
-  const handleChat = () => {
+  const handleOffer = () => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     }
-    onChatPress?.();
-  };
-
-  const handleOffer = () => {
+    if (onOfferPress) {
+      onOfferPress();
+      return;
+    }
     const allowed = onOfferOpen ? onOfferOpen() : true;
     if (allowed !== false && onSubmitOffer) {
-      // Offer trigger handled by parent sheet
+      // Offer trigger
     }
   };
 
-  const formattedPrice = buyTotal
-    ? formatPrice(buyTotal)
-    : price
-    ? formatPrice(price)
-    : '';
+  const handleBuy = () => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    }
+    onBuyPress?.();
+  };
 
   return (
     <View
@@ -74,57 +75,65 @@ export function ProductActionBar({
       style={[
         styles.container,
         {
-          paddingBottom: Math.max(safeBottom, 12) + 6,
+          paddingBottom: Math.max(safeBottom, 16),
         },
         style,
       ]}
     >
+      {/* Secure checkout · Buyer Protection included trust line */}
+      <View
+        accessibilityRole="text"
+        style={styles.trustRow}
+      >
+        <Feather name="lock" size={12} color="rgba(15,15,15,0.62)" />
+        <Text style={styles.trustText}>
+          Secure checkout · Buyer Protection included
+        </Text>
+      </View>
+
       <View style={styles.actionRow}>
-        {/* Compact 48x48px Chat Icon Button */}
-        {onChatPress && !isOwner && (
+        {/* Equal halves, both 48h/10r: one outlined, one filled */}
+        {!isOwner && (
           <Pressable
-            onPress={handleChat}
+            onPress={handleOffer}
             disabled={disabled}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Make an offer"
+            accessibilityHint="Opens a sheet to send the seller a price suggestion"
             style={({ pressed }) => [
-              styles.chatButton,
+              styles.offerButton,
               {
-                opacity: pressed ? 0.75 : 1,
-                transform: [{ scale: pressed ? 0.94 : 1 }],
+                opacity: pressed ? 0.7 : 1,
+                transform: [{ scale: pressed ? 0.98 : 1 }],
               },
             ]}
-            accessibilityRole="button"
-            accessibilityLabel="Chat with seller"
           >
-            <Feather name="message-circle" size={22} color={colors.ink} />
+            <Text style={styles.offerButtonText}>Make an offer</Text>
           </Pressable>
         )}
 
-        {/* Split Action: "Make Offer" (Secondary Pill) */}
-        {!isOwner && (
-          <View style={styles.buttonFlex}>
-            <ThumbButton
-              label="Make Offer"
-              variant="secondary"
-              heightToken="48px"
-              disabled={disabled}
-              onPress={handleOffer}
-              accessibilityLabel="Make an offer on this item"
-            />
-          </View>
-        )}
-
-        {/* Split Action: "Buy Now" / "Edit Listing" (Primary Pill) */}
-        <View style={styles.buyButtonFlex}>
-          <ThumbButton
-            label={isOwner ? 'Edit Listing' : formattedPrice ? `Buy · ${formattedPrice}` : 'Buy Now'}
-            variant="primary"
-            heightToken="48px"
-            disabled={disabled}
-            onPress={onBuyPress}
-            accessibilityLabel={isOwner ? 'Edit listing' : 'Buy now'}
-          />
-        </View>
+        <Pressable
+          onPress={handleBuy}
+          disabled={disabled}
+          accessibilityRole="button"
+          accessibilityLabel={
+            isOwner
+              ? 'Edit listing'
+              : `Buy now for ${buyTotal ? formatPrice(buyTotal) : price ? formatPrice(price) : ''}, Buyer Protection included`
+          }
+          accessibilityHint="Proceeds to secure checkout"
+          style={({ pressed }) => [
+            styles.buyButton,
+            {
+              opacity: pressed ? 0.85 : 1,
+              transform: [{ scale: pressed ? 0.98 : 1 }],
+            },
+          ]}
+        >
+          <Text style={styles.buyButtonText}>
+            {isOwner ? 'Edit listing' : 'Buy now'}
+          </Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -137,46 +146,75 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.96)',
+    backgroundColor: '#FFFFFF',
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.hairline,
-    paddingTop: 12,
+    borderTopColor: 'rgba(15, 15, 15, 0.08)',
     paddingHorizontal: 16,
+    paddingTop: 12,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.06,
-        shadowRadius: 12,
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
       },
       android: {
-        elevation: 8,
+        elevation: 6,
       },
       default: {
-        boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.08)',
+        boxShadow: '0px -4px 10px rgba(0, 0, 0, 0.05)',
       },
     }),
+  },
+  trustRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginBottom: 10,
+  },
+  trustText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: 'rgba(15, 15, 15, 0.62)',
+    fontFamily: 'Inter_500Medium',
   },
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
+    gap: 12,
   },
-  chatButton: {
-    width: 48,
+  offerButton: {
+    flex: 1,
     height: 48,
-    borderRadius: radii.pill,
-    backgroundColor: colors.panel,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.hairline,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: BRAND_INK,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  offerButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: BRAND_INK,
+    fontFamily: 'Inter_700Bold',
+  },
+  buyButton: {
+    flex: 1,
+    height: 48,
+    backgroundColor: BRAND_INK,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: BRAND_INK,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonFlex: {
-    flex: 1,
-  },
-  buyButtonFlex: {
-    flex: 1.15,
+  buyButtonText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    fontFamily: 'Inter_700Bold',
+    letterSpacing: 0.2,
   },
 });

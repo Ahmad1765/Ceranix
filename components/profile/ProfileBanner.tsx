@@ -1,4 +1,4 @@
-import { View, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, Pressable, StyleSheet, useWindowDimensions, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
@@ -81,8 +81,9 @@ export function ProfileBanner({
 }: Props) {
   const { width: viewportWidth } = useWindowDimensions();
   const { width, height } = bannerSizeFor(viewportWidth);
-  const banner = bannerUrl ? getOptimizedImageUrl(bannerUrl, { width: 1080 }) : null;
-  const avatar = avatarUrl ? getOptimizedImageUrl(avatarUrl, { width: 240 }) : null;
+  const bannerWidth = Math.min(750, Math.max(360, Math.round(width * 1.5)));
+  const banner = bannerUrl ? getOptimizedImageUrl(bannerUrl, { width: bannerWidth, quality: 75 }) : null;
+  const avatar = avatarUrl ? getOptimizedImageUrl(avatarUrl, { width: 192, quality: 80 }) : null;
   const outer = AVATAR_SIZE + RING * 2;
 
   // Back rides in the same floating row as the actions, pinned left by an auto
@@ -118,13 +119,16 @@ export function ProfileBanner({
             source={{ uri: banner }}
             style={{ width: '100%', height: '100%' }}
             contentFit="cover"
-            transition={180}
+            priority="high"
+            recyclingKey={bannerUrl ?? undefined}
+            transition={Platform.OS === 'web' ? 0 : 120}
             cachePolicy="memory-disk"
             // Decorative: the identity below carries the meaning, and a banner
             // photo has no alt text a seller ever supplies.
             accessible={false}
           />
         ) : null}
+
 
         {/* Only on your own profile, and only while there's no banner yet — an
             empty purple band gives no hint that it can be filled. */}
@@ -221,11 +225,14 @@ export function ProfileBanner({
                 source={{ uri: avatar }}
                 style={{ width: '100%', height: '100%' }}
                 contentFit="cover"
-                transition={180}
+                priority="high"
+                recyclingKey={avatarUrl ?? undefined}
+                transition={Platform.OS === 'web' ? 0 : 120}
                 cachePolicy="memory-disk"
                 accessibilityLabel={label}
               />
             ) : (
+
               <Text style={{ fontSize: 32, fontWeight: '900', color: colors.purple }}>
                 {initial}
               </Text>

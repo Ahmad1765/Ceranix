@@ -4,12 +4,12 @@ import {
   View,
   FlatList,
   Keyboard,
-  KeyboardAvoidingView,
   Platform,
   Pressable,
   ActivityIndicator,
   Modal,
   Alert,
+  StyleSheet,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
@@ -17,7 +17,7 @@ import { Text, TextInput } from '@/lib/rnText';
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, router } from 'expo-router';
 import { safeBack } from '@/lib/nav';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
 import { useAuth } from '@/lib/auth';
 import {
@@ -42,8 +42,8 @@ import { qk } from '@/lib/queries';
 import { useToast } from '@/lib/toast';
 import { captureError } from '@/lib/sentry';
 import { colors, radii, type as typography } from '@/lib/theme';
-import { formatPrice, CURRENCY_SYMBOL } from '@/lib/currency';
-import { Button, EmptyState } from '@/components/ui';
+import { formatPrice } from '@/lib/currency';
+import { Button, EmptyState, SafeContainer, ThumbButton } from '@/components/ui';
 import { explainCoverage } from '@/components/SafetyBanner';
 import { reportListing, REPORT_REASONS } from '@/lib/reports';
 import { HIT_SLOP_8 } from '@/lib/responsive';
@@ -54,7 +54,7 @@ import {
   ChatActionSheet,
   Composer,
   DateDivider,
-  ListingBar,
+  ListingThumb,
   listingStatus,
   MessageRow,
   ReactionPicker,
@@ -66,28 +66,16 @@ import {
   type ThreadRow,
 } from '@/components/chat';
 
-/** Breathing room under the composer at rest. The dock is white on a white
- *  page, so there's no edge to see — the gap only reads as deliberate once
- *  it's clearly bigger than the row's own 8px padding. Phones with a home
- *  indicator already pay more than this via the safe-area inset. */
-const DOCK_GAP = 32;
+/** Breathing room under composer when keyboard is up */
+const DOCK_GAP_KEYBOARD = 6;
 
-/** With the keyboard up the screen is short and the keyboard's own top edge
- *  supplies the boundary, so a hair of separation is enough. */
-const DOCK_GAP_KEYBOARD = 8;
-
-/** One shared empty array so an unreacted message keeps a stable prop identity
- *  and never re-renders its row for nothing. */
+/** One shared empty array so an unreacted message keeps a stable prop identity */
 const EMPTY_REACTIONS: string[] = [];
 
-// Is the software keyboard up? The bottom dock pads itself by the safe-area
-// inset at rest, but once the keyboard covers that area the padding has to
-// collapse or the composer floats above the keyboard with a gap.
+// Is the software keyboard up?
 function useKeyboardVisible(): boolean {
   const [visible, setVisible] = useState(false);
   useEffect(() => {
-    // iOS gets the `will` events so the dock moves with the keyboard rather
-    // than snapping after it lands. Android only emits `did`.
     const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const show = Keyboard.addListener(showEvt, () => setVisible(true));
@@ -138,13 +126,9 @@ function OfferSheet({
   const handleSubmit = async () => {
     if (!valid) return;
     setSending(true);
-    // No `finally` — see lib/errors.ts. Equivalent: the catch neither returns
-    // nor re-throws, so control always reaches the call below.
     try {
       await onSubmit(parsed, note);
     } catch (e) {
-      // The parent already surfaces toast/Alert on failure. Swallow here so
-      // the rejection doesn't bubble as an unhandled promise.
       console.warn('[OfferSheet] submit failed', e);
     }
     setSending(false);
@@ -153,154 +137,115 @@ function OfferSheet({
   return (
     <Modal
       visible={visible}
-      animationType="slide"
       transparent
+      animationType="fade"
       onRequestClose={onClose}
-      statusBarTranslucent
-      navigationBarTranslucent
     >
-      <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: colors.overlay }}>
-        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+      <Pressable
+        onPress={onClose}
+        style={{
+          flex: 1,
+          backgroundColor: 'rgba(0,0,0,0.45)',
+          justifyContent: 'flex-end',
+        }}
+      >
+        <View style={{ width: '100%', maxWidth: 520, alignSelf: 'center' }}>
           <Pressable
-            onPress={() => {}}
+            onPress={(e) => e.stopPropagation()}
             style={{
               backgroundColor: colors.white,
-              borderTopLeftRadius: radii['4xl'],
-              borderTopRightRadius: radii['4xl'],
+              borderTopLeftRadius: radii.xl,
+              borderTopRightRadius: radii.xl,
               paddingHorizontal: 20,
-              paddingTop: 12,
-              paddingBottom: 28,
+              paddingTop: 20,
+              paddingBottom: 34,
             }}
           >
             <View
               style={{
-                alignSelf: 'center',
-                width: 44,
-                height: 5,
-                borderRadius: 3,
-                backgroundColor: colors.hairline,
-                marginBottom: 16,
-              }}
-            />
-            <Text
-              style={{
-                fontFamily: typography.family.sansBold,
-                fontSize: 20,
-                color: colors.ink,
-                letterSpacing: -0.3,
-              }}
-            >
-              Make an offer
-            </Text>
-            {listingPrice && (
-              <Text
-                style={{
-                  fontFamily: typography.family.sans,
-                  fontSize: 13,
-                  color: colors.mute,
-                  marginTop: 4,
-                }}
-              >
-                Listed at{' '}
-                <Text style={{ fontFamily: typography.family.sansBold, color: colors.ink }}>
-                  {formatPrice(listingPrice)}
-                </Text>
-              </Text>
-            )}
-
-            <View
-              style={{
-                marginTop: 18,
-                paddingHorizontal: 16,
-                paddingVertical: 14,
-                backgroundColor: colors.primarySoft,
-                borderRadius: radii.xl,
                 flexDirection: 'row',
                 alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 16,
               }}
             >
-              <Text
-                style={{
-                  fontFamily: typography.family.sansBold,
-                  fontSize: 22,
-                  color: colors.primary,
-                  marginRight: 8,
-                }}
-              >
-                {CURRENCY_SYMBOL}
+              <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink }}>
+                Make an offer
               </Text>
-              <TextInput
-                placeholder="0"
-                value={amount}
-                onChangeText={(t) => setAmount(t.replace(/[^0-9]/g, ''))}
-                keyboardType="number-pad"
-                style={{
-                  fontFamily: typography.family.sansBold,
-                  fontSize: 28,
-                  color: colors.ink,
-                  flex: 1,
-                  padding: 0,
-                }}
-                placeholderTextColor={colors.muteSoft}
-                autoFocus
-              />
+              <Pressable
+                onPress={onClose}
+                hitSlop={HIT_SLOP_8}
+                accessibilityRole="button"
+                accessibilityLabel="Close offer sheet"
+              >
+                <Feather name="x" size={20} color={colors.mute} />
+              </Pressable>
             </View>
 
-            {suggestions.length > 0 && (
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-                {suggestions.map((v) => {
-                  const selected = parsed === v;
-                  return (
-                    <Pressable
-                      key={v}
-                      onPress={() => setAmount(String(v))}
-                      style={({ pressed }) => ({
-                        flex: 1,
-                        paddingVertical: 10,
-                        borderRadius: radii.pill,
-                        backgroundColor: selected ? colors.ink : colors.panel,
-                        alignItems: 'center',
-                        opacity: pressed ? 0.75 : 1,
-                      })}
-                    >
-                      <Text
-                        style={{
-                          fontFamily: typography.family.sansBold,
-                          fontSize: 13,
-                          color: selected ? colors.white : colors.ink,
-                        }}
-                      >
-                        {formatPrice(v)}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            )}
+            {listingPrice ? (
+              <Text style={{ fontSize: 13, color: colors.mute, marginBottom: 12 }}>
+                Asking price: {formatPrice(listingPrice)}
+              </Text>
+            ) : null}
 
-            <Text
-              style={{
-                fontFamily: typography.family.sansBold,
-                fontSize: 11,
-                color: colors.mute,
-                marginTop: 18,
-                marginBottom: 6,
-                letterSpacing: 0.6,
-              }}
-            >
-              NOTE (OPTIONAL)
-            </Text>
+            {suggestions.length > 0 ? (
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+                {suggestions.map((s) => (
+                  <Pressable
+                    key={s}
+                    onPress={() => setAmount(String(s))}
+                    style={{
+                      flex: 1,
+                      paddingVertical: 9,
+                      borderRadius: radii.md,
+                      backgroundColor: colors.panel,
+                      alignItems: 'center',
+                      borderWidth: 1,
+                      borderColor: amount === String(s) ? colors.purple : colors.hairline,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: '700',
+                        color: amount === String(s) ? colors.purple : colors.ink,
+                      }}
+                    >
+                      {formatPrice(s)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+
             <TextInput
-              placeholder="Add a quick note to the seller"
+              value={amount}
+              onChangeText={setAmount}
+              placeholder="Enter offer amount"
+              keyboardType="numeric"
+              style={{
+                fontSize: 16,
+                fontWeight: '700',
+                color: colors.ink,
+                backgroundColor: colors.panel,
+                borderRadius: radii.md,
+                paddingHorizontal: 14,
+                paddingVertical: 12,
+                marginBottom: 10,
+              }}
+              placeholderTextColor={colors.muteSoft}
+            />
+
+            <TextInput
               value={note}
               onChangeText={setNote}
+              placeholder="Add a message for the seller (optional)"
               multiline
               style={{
-                fontFamily: typography.family.sans,
                 fontSize: 14,
                 color: colors.ink,
                 backgroundColor: colors.panel,
-                borderRadius: radii.lg,
+                borderRadius: radii.md,
                 paddingHorizontal: 14,
                 paddingVertical: 12,
                 minHeight: 60,
@@ -338,17 +283,6 @@ export default function ConversationScreen() {
   const listRef = useRef<FlatList<ThreadRow>>(null);
 
   const [conv, setConv] = useState<ConversationRow | null>(null);
-  // Narrowed once and used by every memoized callback below instead of
-  // `conv?.listing_id` / `conv?.listing?.price` inline.
-  //
-  // React Compiler will not compile a component whose manual memoization it
-  // can't preserve, and a body that reads `conv.listing_id` under a dep list
-  // saying `conv?.listing_id` made it infer the whole `conv` object as the true
-  // dependency ("Inferred less specific property than source") — four separate
-  // times, which bailed out this entire screen. Depending on primitives makes
-  // the inferred and declared dependencies agree, and is also strictly more
-  // precise: these callbacks no longer churn when an unrelated field of `conv`
-  // changes (e.g. last_message on every incoming realtime event).
   const convListingId = conv?.listing_id ?? null;
   const convListingPrice = conv?.listing?.price ?? null;
   const convListingSold = conv?.listing?.is_sold ?? false;
@@ -367,11 +301,6 @@ export default function ConversationScreen() {
     let cancelled = false;
     setLoading(true);
     (async () => {
-      // The `finally` this replaces ran `if (!cancelled) setLoading(false)` on
-      // every path, including the early `return` — which is exactly what the
-      // `if (cancelled) return` plus the trailing call below do. Rewritten
-      // because React Compiler cannot lower a finalizer and bails out of the
-      // whole screen over one; see lib/errors.ts.
       let loaded:
         | [Awaited<ReturnType<typeof getConversation>>, ChatMessage[], MessageReaction[]]
         | null = null;
@@ -398,10 +327,6 @@ export default function ConversationScreen() {
     };
   }, [conversationId]);
 
-  // Contextual soft-ask. Opening a conversation is the one moment where "let us
-  // notify you" is self-evidently useful, so this is where the OS dialog is
-  // spent — never on cold launch, and at most once ever (the helper keeps its
-  // own AsyncStorage flag and bails unless the status is still undetermined).
   useEffect(() => {
     if (!user?.id || !conversationId) return;
     maybeSoftAskForPush(user.id).catch(() => {});
@@ -421,13 +346,6 @@ export default function ConversationScreen() {
     return unsub;
   }, [conversationId]);
 
-  // Mark read on open, and again whenever a message arrives while the thread is
-  // on screen — otherwise reading a live conversation would leave the dot
-  // behind the moment they sent something after you opened it. Keyed on the
-  // message count so it re-stamps per message rather than per render.
-  //
-  // The inbox is invalidated rather than patched: it's a different screen with
-  // its own query, and it re-reads on focus anyway.
   useEffect(() => {
     if (!conversationId || !user?.id) return;
     markConversationRead(conversationId).then(() => {
@@ -439,8 +357,6 @@ export default function ConversationScreen() {
     if (!conversationId) return;
     return subscribeToReactions(conversationId, (event) => {
       setReactions((prev) => {
-        // Both branches drop the sender's existing row first — one reaction per
-        // person per message, so an emoji swap is a replace, not an append.
         if (event.type === 'cleared') {
           return prev.filter(
             (r) => !(r.message_id === event.messageId && r.user_id === event.userId),
@@ -453,18 +369,6 @@ export default function ConversationScreen() {
     });
   }, [conversationId]);
 
-  // Auto-follow the bottom, but only while the thread is already parked there.
-  //
-  // This used to be an unconditional `onContentSizeChange -> scrollToEnd`, plus
-  // a scroll-to-end on every message count change. In a virtualized list the
-  // content size changes *while you scroll* — rows mount and get measured — so
-  // every drag upward immediately snapped back down. The thread was
-  // unscrollable past the first screen.
-  //
-  // `pinnedRef` holds the last observed distance-to-bottom, which is always
-  // read *before* the growth that triggers the follow, so an arriving message
-  // still scrolls into view when you were at the bottom, and doesn't when you
-  // were reading history.
   const pinnedRef = useRef(true);
   const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
@@ -478,8 +382,6 @@ export default function ConversationScreen() {
   const isSeller = !!user && !!conv && conv.seller_id === user.id;
   const rows = useMemo(() => buildThreadRows(messages), [messages]);
 
-  // Indexed once per reaction change rather than filtered inside every row —
-  // and the array identity per message stays stable, so MessageRow's memo holds.
   const byMessage = useMemo(() => {
     const map = new Map<string, string[]>();
     reactions.forEach((r) => {
@@ -496,9 +398,6 @@ export default function ConversationScreen() {
     [reactions, user?.id],
   );
 
-  // Optimistic, then persisted: a reaction is a one-tap gesture and waiting a
-  // round-trip to see it makes the whole thread feel remote. On failure the
-  // realtime feed and the next fetch both correct it.
   const handleReact = useCallback(
     async (emoji: string) => {
       const msg = pressed?.msg;
@@ -512,7 +411,6 @@ export default function ConversationScreen() {
         return removing ? rest : [...rest, { message_id: msg.id, user_id: user.id, emoji }];
       });
 
-      // A clear is a NULL emoji, not a delete — see subscribeToReactions.
       const ok = await setReaction({
         messageId: msg.id,
         userId: user.id,
@@ -537,17 +435,10 @@ export default function ConversationScreen() {
     toast.show('Copied', { variant: 'success', icon: 'check' });
   }, [pressed?.msg, toast]);
 
-  // One send path for both the first attempt and any retry, so a retried
-  // message goes through exactly the same dedupe as the original.
   const deliver = useCallback(
     async (text: string, tempId: string) => {
       if (!user || !conversationId) return;
 
-      // The old shape used `throw new Error('insert returned no row')` inside
-      // the try to funnel "no row" into its own catch. React Compiler can't
-      // lower a ThrowStatement inside a try/catch and bailed out of this whole
-      // screen over it. Branching on the result instead is equivalent — both
-      // paths always led to the same failure handling.
       let saved: ChatMessage | null = null;
       let failure: unknown = null;
       try {
@@ -559,16 +450,12 @@ export default function ConversationScreen() {
       const delivered = saved;
       if (delivered) {
         setMessages((prev) => {
-          // Realtime may have already inserted the saved message — dedupe.
           if (prev.some((m) => m.id === delivered.id)) return prev.filter((m) => m.id !== tempId);
           return prev.map((m) => (m.id === tempId ? delivered : m));
         });
         return;
       }
 
-      // Threw, or the insert returned no row — same outcome for the sender. The
-      // message stays in the thread carrying a "Tap to retry" stamp instead of
-      // vanishing behind an alert, so nothing typed is ever lost.
       console.warn('[conversation] send failed', failure ?? 'insert returned no row');
       setMessages((prev) =>
         prev.map((m) => (m.id === tempId ? { ...m, pending: false, failed: true } : m)),
@@ -592,8 +479,6 @@ export default function ConversationScreen() {
       created_at: new Date().toISOString(),
       pending: true,
     };
-    // Sending is an explicit "I'm done reading history" — follow your own
-    // message down even if you'd scrolled up before typing it.
     pinnedRef.current = true;
     setMessages((prev) => [...prev, temp]);
     setInput('');
@@ -622,7 +507,6 @@ export default function ConversationScreen() {
           toast.show('Offer sent', { variant: 'success', icon: 'check' });
           capture('offer_made', { listing_id: convListingId, amount });
         } else {
-          // Sheet stays open so the user can retry without retyping.
           Alert.alert('Could not send offer', 'Please try again.');
         }
       } catch (e: any) {
@@ -713,7 +597,7 @@ export default function ConversationScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
+      <SafeContainer edges={['top', 'left', 'right']} backgroundColor={colors.white} style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6 }}>
           <Pressable
             onPress={() => safeBack()}
@@ -728,13 +612,13 @@ export default function ConversationScreen() {
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={colors.primary} />
         </View>
-      </SafeAreaView>
+      </SafeContainer>
     );
   }
 
   if (!conv) {
     return (
-      <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
+      <SafeContainer edges={['top', 'left', 'right']} backgroundColor={colors.white} style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6 }}>
           <Pressable
             onPress={() => safeBack()}
@@ -751,7 +635,7 @@ export default function ConversationScreen() {
           title="Conversation unavailable"
           description="This thread may have been removed."
         />
-      </SafeAreaView>
+      </SafeContainer>
     );
   }
 
@@ -759,7 +643,7 @@ export default function ConversationScreen() {
     ? getOptimizedImageUrl(other.avatar_url, { width: 120 })
     : null;
   const listingThumb = conv.listing?.images?.[0]
-    ? getOptimizedImageUrl(conv.listing.images[0], { width: 200 })
+    ? getOptimizedImageUrl(conv.listing.images[0], { width: 120 })
     : null;
   const status = listingStatus(conv.listing);
   const canOffer = !isSeller && !!conv.listing_id && status === 'active';
@@ -840,24 +724,103 @@ export default function ConversationScreen() {
   ];
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
-      <ThreadHeader
-        name={senderName}
-        subtitle={other?.username ? `@${other.username}` : null}
-        avatar={otherAvatar}
-        onBack={() => safeBack()}
-        onPressIdentity={other?.id ? () => router.push(`/user/${other.id}` as any) : undefined}
-        onOverflow={() => setOverflowOpen(true)}
-      />
+    <SafeContainer
+      mode="keyboard-avoiding"
+      noScroll
+      edges={['top', 'left', 'right']}
+      backgroundColor={colors.white}
+      style={{ flex: 1 }}
+    >
+      {/* Sticky Context Header (Z: 30) */}
+      <View
+        style={{
+          zIndex: 30,
+          backgroundColor: colors.white,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: colors.hairline,
+        }}
+      >
+        <ThreadHeader
+          name={senderName}
+          subtitle={other?.username ? `@${other.username}` : null}
+          avatar={otherAvatar}
+          onBack={() => safeBack()}
+          onPressIdentity={other?.id ? () => router.push(`/user/${other.id}` as any) : undefined}
+          onOverflow={() => setOverflowOpen(true)}
+        />
 
+        {/* Sticky Product Context Bar */}
+        {conv.listing_id && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Open listing ${conv.listing?.title ?? 'Listing'}`}
+            onPress={openListing}
+            style={({ pressed }) => ({
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+              paddingHorizontal: 16,
+              paddingVertical: 10,
+              borderTopWidth: StyleSheet.hairlineWidth,
+              borderTopColor: colors.hairline,
+              backgroundColor: pressed ? '#F8F8FA' : colors.white,
+            })}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+              <ListingThumb uri={listingThumb} width={44} height={44} status={status} radius={radii.sm} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    fontFamily: typography.family.sansBold,
+                    fontSize: 13.5,
+                    color: colors.ink,
+                  }}
+                >
+                  {conv.listing?.title ?? 'Listing removed'}
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    fontFamily: typography.family.sans,
+                    fontSize: 12,
+                    color: colors.mute,
+                    marginTop: 2,
+                  }}
+                >
+                  {status === 'removed'
+                    ? 'No longer available'
+                    : conv.listing?.price != null
+                      ? formatPrice(conv.listing.price)
+                      : '—'}
+                </Text>
+              </View>
+            </View>
+
+            {!isSeller && status === 'active' && convListingId ? (
+              <View style={{ width: 94 }}>
+                <ThumbButton
+                  label="Buy Now"
+                  variant="primary"
+                  size="sm"
+                  onPress={() => router.push(`/payment/${convListingId}` as any)}
+                  accessibilityLabel="Buy now"
+                />
+              </View>
+            ) : (
+              <Feather name="chevron-right" size={18} color={colors.muteSoft} />
+            )}
+          </Pressable>
+        )}
+      </View>
+
+      {/* Message Thread Surface */}
       <FlatList
         ref={listRef}
         data={rows}
         keyExtractor={(row) => row.key}
         renderItem={renderRow}
-        // flexGrow + flex-end pins a short thread to the bottom of the screen,
-        // where a conversation belongs, instead of stranding two bubbles under
-        // the header. Once the content overflows, this is a no-op.
         contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end', paddingBottom: 12 }}
         onContentSizeChange={followEnd}
         onScroll={onScroll}
@@ -881,40 +844,22 @@ export default function ConversationScreen() {
         }
       />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={0}
+      {/* Native iMessage-Style Composer Dock */}
+      <View
+        style={{
+          borderTopWidth: 1,
+          borderTopColor: colors.hairline,
+          backgroundColor: colors.white,
+          paddingBottom: keyboardUp ? DOCK_GAP_KEYBOARD : Math.max(insets.bottom, 12),
+        }}
       >
-        <View
-          style={{
-            borderTopWidth: 1,
-            borderTopColor: colors.hairline,
-            backgroundColor: colors.white,
-            // The composer never sits flush against the bottom edge — it reads
-            // as cut off, and on a gesture-bar phone the send button lands in
-            // the swipe-up zone. The safe-area inset already buys that gap
-            // where there is one; DOCK_GAP is the floor everywhere else (web,
-            // older Android, and whenever the keyboard has eaten the inset).
-            paddingBottom: keyboardUp ? DOCK_GAP_KEYBOARD : Math.max(insets.bottom, DOCK_GAP),
-          }}
-        >
-          {conv.listing_id && (
-            <ListingBar
-              title={conv.listing?.title ?? 'Listing removed'}
-              price={conv.listing?.price ?? null}
-              thumb={listingThumb}
-              status={status}
-              onPress={openListing}
-            />
-          )}
-          <Composer
-            value={input}
-            onChangeText={setInput}
-            onSend={handleSend}
-            onPlus={() => setPlusOpen(true)}
-          />
-        </View>
-      </KeyboardAvoidingView>
+        <Composer
+          value={input}
+          onChangeText={setInput}
+          onSend={handleSend}
+          onPlus={() => setPlusOpen(true)}
+        />
+      </View>
 
       <ReactionPicker
         anchor={pressed?.anchor ?? null}
@@ -954,6 +899,6 @@ export default function ConversationScreen() {
         onClose={() => setOfferVisible(false)}
         onSubmit={handleSendOffer}
       />
-    </SafeAreaView>
+    </SafeContainer>
   );
 }

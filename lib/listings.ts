@@ -5,6 +5,7 @@ import { getLikedIds, updateLikedCache } from '@/lib/engagementCache';
 import { captureError } from '@/lib/sentry';
 import { escapeSearchQuery } from '@/lib/search';
 import { enqueueOfflineAction, isNetworkError } from '@/lib/offlineSync';
+import { queryClient } from '@/lib/queryClient';
 
 const SELECT_WITH_SELLER = '*, seller:profiles!listings_seller_id_fkey(*)';
 
@@ -14,7 +15,7 @@ const SELECT_WITH_SELLER = '*, seller:profiles!listings_seller_id_fkey(*)';
 // the DB query itself runs in <1ms (verified). Inner join so vacation_mode
 // filter applies; every listing has a seller so no rows are lost.
 const FEED_LISTING_COLS =
-  'id, seller_id, title, brand, size, price, category, subcategory, color, gender, condition, images, thumbnails, is_sold, likes, tags, created_at';
+  'id, seller_id, title, brand, size, price, category, subcategory, color, gender, condition, images, thumbnails, is_sold, views, likes, tags, created_at';
 const FEED_SELLER_COLS = 'id, username, full_name, avatar_url, is_verified, vacation_mode';
 const SELECT_FEED = `${FEED_LISTING_COLS}, seller:profiles!listings_seller_id_fkey!inner(${FEED_SELLER_COLS})`;
 
@@ -55,7 +56,10 @@ export async function fetchListingsResult(
   } else if (sort === 'price_desc') {
     query = query.order('price', { ascending: false }).order('created_at', { ascending: false });
   } else if (sort === 'popular' || (!sort && tab === 'popular')) {
-    query = query.order('likes', { ascending: false }).order('created_at', { ascending: false });
+    query = query
+      .order('likes', { ascending: false, nullsFirst: false })
+      .order('views', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false });
   } else {
     // 'newest' or the for_you default.
     query = query.order('created_at', { ascending: false });
@@ -423,6 +427,9 @@ export async function toggleLike(
       return currentlyLiked;
     }
     updateLikedCache(userId, listingId, false);
+    queryClient.invalidateQueries({ queryKey: ['feedListings'] });
+    queryClient.invalidateQueries({ queryKey: ['myFeedListings'] });
+    queryClient.invalidateQueries({ queryKey: ['recommendations'] });
     return false;
   }
   const { error } = await supabase
@@ -442,5 +449,8 @@ export async function toggleLike(
     return currentlyLiked;
   }
   updateLikedCache(userId, listingId, true);
+  queryClient.invalidateQueries({ queryKey: ['feedListings'] });
+  queryClient.invalidateQueries({ queryKey: ['myFeedListings'] });
+  queryClient.invalidateQueries({ queryKey: ['recommendations'] });
   return true;
 }
