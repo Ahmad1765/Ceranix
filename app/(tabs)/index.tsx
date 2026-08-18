@@ -124,36 +124,6 @@ export default function HomeScreen() {
     scrollToTop();
   }, [params.sort, params.category, params.n, scrollToTop]);
 
-  // Chip taps keep the scroll offset otherwise, which lands you mid-grid in a
-  // list that looks unchanged — on a small catalog the feeds hold the same
-  // items in a different order, so a swap you can't see reads as a dead chip.
-  const selectChip = useCallback(
-    (chip: string) => {
-      setActiveChip(chip);
-      scrollToTop();
-      requestAnimationFrame(() => {
-        listRef.current?.scrollToOffset({ offset: 0, animated: false });
-      });
-    },
-    [scrollToTop],
-  );
-
-  // Guarantee list resets to top whenever activeChip changes, including after
-  // FlashList layout settles for the new dataset.
-  useEffect(() => {
-    scrollToTop();
-    const frame = requestAnimationFrame(() => {
-      listRef.current?.scrollToOffset({ offset: 0, animated: false });
-    });
-    const timer = setTimeout(() => {
-      listRef.current?.scrollToOffset({ offset: 0, animated: false });
-    }, 50);
-    return () => {
-      cancelAnimationFrame(frame);
-      clearTimeout(timer);
-    };
-  }, [activeChip, scrollToTop]);
-
   const { columns, cardWidth } = useGridDimensions({
     min: 2,
     max: 4,
@@ -207,6 +177,42 @@ export default function HomeScreen() {
   const { isStale: dropsStale, refetch: dropsRefetch } = priceDropsQ;
   const { isStale: searchesStale, refetch: searchesRefetch } = savedSearchesQ;
   const { isStale: savedStale, refetch: savedRefetch } = savedListingsQ;
+
+  // Chip taps keep the scroll offset otherwise, which lands you mid-grid in a
+  // list that looks unchanged — on a small catalog the feeds hold the same
+  // items in a different order, so a swap you can't see reads as a dead chip.
+  // We also refresh the target feed on chip selection so it loads latest ranking.
+  const selectChip = useCallback(
+    (chip: string) => {
+      setActiveChip(chip);
+      if (chip === TRENDING) {
+        trendingRefetch();
+      } else if (chip === FOR_YOU) {
+        feedRefetch();
+      }
+      scrollToTop();
+      requestAnimationFrame(() => {
+        listRef.current?.scrollToOffset({ offset: 0, animated: false });
+      });
+    },
+    [scrollToTop, trendingRefetch, feedRefetch],
+  );
+
+  // Guarantee list resets to top whenever activeChip changes, including after
+  // FlashList layout settles for the new dataset.
+  useEffect(() => {
+    scrollToTop();
+    const frame = requestAnimationFrame(() => {
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+    });
+    const timer = setTimeout(() => {
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+    }, 50);
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(timer);
+    };
+  }, [activeChip, scrollToTop]);
 
   // Revalidate stale queries on focus — reuses fresh data so returning to this
   // 5-fetch tab doesn't re-hit the network every time. The three user-scoped

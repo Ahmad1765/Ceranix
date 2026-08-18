@@ -5,7 +5,6 @@ import { getLikedIds, updateLikedCache } from '@/lib/engagementCache';
 import { captureError } from '@/lib/sentry';
 import { escapeSearchQuery } from '@/lib/search';
 import { enqueueOfflineAction, isNetworkError } from '@/lib/offlineSync';
-import { queryClient } from '@/lib/queryClient';
 
 const SELECT_WITH_SELLER = '*, seller:profiles!listings_seller_id_fkey(*)';
 
@@ -427,9 +426,6 @@ export async function toggleLike(
       return currentlyLiked;
     }
     updateLikedCache(userId, listingId, false);
-    queryClient.invalidateQueries({ queryKey: ['feedListings'] });
-    queryClient.invalidateQueries({ queryKey: ['myFeedListings'] });
-    queryClient.invalidateQueries({ queryKey: ['recommendations'] });
     return false;
   }
   const { error } = await supabase
@@ -449,8 +445,5 @@ export async function toggleLike(
     return currentlyLiked;
   }
   updateLikedCache(userId, listingId, true);
-  queryClient.invalidateQueries({ queryKey: ['feedListings'] });
-  queryClient.invalidateQueries({ queryKey: ['myFeedListings'] });
-  queryClient.invalidateQueries({ queryKey: ['recommendations'] });
   return true;
 }
