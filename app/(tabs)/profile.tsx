@@ -9,6 +9,7 @@ import {
   Share,
   useWindowDimensions,
   Linking,
+  Platform,
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { Text } from '@/lib/rnText';
@@ -439,16 +440,18 @@ function ProfileScreenInner() {
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
-                  gap: 8,
+                  justifyContent: 'center',
+                  gap: 6,
                   marginTop: 16,
-                  paddingHorizontal: 20,
-                  width: '100%',
-                  maxWidth: CONTENT_MAX_WIDTH,
+                  width: '75%',
+                  maxWidth: 380,
                   alignSelf: 'center',
                 }}
               >
                 <Pressable
                   onPress={() => router.push('/profile/edit')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Edit profile"
                   style={({ pressed }) => ({
                     flex: 1,
                     height: 44,
@@ -457,6 +460,7 @@ function ProfileScreenInner() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     opacity: pressed ? 0.85 : 1,
+                    transform: [{ scale: pressed ? 0.98 : 1 }],
                   })}
                 >
                   <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '700' }}>
@@ -466,6 +470,8 @@ function ProfileScreenInner() {
 
                 <Pressable
                   onPress={handleShareProfile}
+                  accessibilityRole="button"
+                  accessibilityLabel="Share profile"
                   style={({ pressed }) => ({
                     flex: 1,
                     height: 44,
@@ -474,6 +480,7 @@ function ProfileScreenInner() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     opacity: pressed ? 0.75 : 1,
+                    transform: [{ scale: pressed ? 0.98 : 1 }],
                   })}
                 >
                   <Text style={{ color: colors.ink, fontSize: 15, fontWeight: '700' }}>
@@ -483,6 +490,8 @@ function ProfileScreenInner() {
 
                 <Pressable
                   onPress={() => router.push('/settings')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Settings"
                   style={({ pressed }) => ({
                     width: 44,
                     height: 44,
@@ -491,9 +500,10 @@ function ProfileScreenInner() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     opacity: pressed ? 0.75 : 1,
+                    transform: [{ scale: pressed ? 0.98 : 1 }],
                   })}
                 >
-                  <Ionicons name="chevron-down" size={18} color={colors.ink} />
+                  <Ionicons name="caret-down" size={14} color={colors.ink} />
                 </Pressable>
               </View>
 
