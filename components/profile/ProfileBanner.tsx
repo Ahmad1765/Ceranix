@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { colors, shadow } from '@/lib/theme';
+import { colors, radii, shadow } from '@/lib/theme';
 import { CONTENT_MAX_WIDTH } from '@/lib/responsive';
 import { getOptimizedImageUrl } from '@/lib/images';
 
@@ -254,6 +254,38 @@ export function ProfileBanner({
             </View>
           ) : null}
         </View>
+
+        {/* "Change photo" — only on the owner's profile */}
+        {onPress ? (
+          <Pressable
+            onPress={onPress}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel="Change profile photo"
+            style={({ pressed }) => ({
+              marginTop: 8,
+              paddingHorizontal: 12,
+              paddingVertical: 5,
+              borderRadius: radii.pill,
+              backgroundColor: colors.purpleSoft,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 5,
+              opacity: pressed ? 0.7 : 1,
+            })}
+          >
+            <Feather name="camera" size={12} color={colors.purple} />
+            <Text
+              style={{
+                fontSize: 12.5,
+                fontWeight: '700',
+                color: colors.purple,
+              }}
+            >
+              Change photo
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
     </View>
   );

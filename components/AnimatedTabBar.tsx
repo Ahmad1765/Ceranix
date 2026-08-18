@@ -529,7 +529,7 @@ function TabItem({
               height: PILL.height,
               borderRadius: PILL.radius,
               borderCurve: 'continuous',
-              backgroundColor: colors.purple,
+              backgroundColor: colors.ink,
               alignItems: 'center',
               justifyContent: 'center',
             },

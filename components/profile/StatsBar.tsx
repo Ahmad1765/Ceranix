@@ -17,8 +17,19 @@ export type StatItem = {
  *
  * Columns are evenly weighted (`flex: 1`) rather than content-sized, so a
  * seller with "12K" followers and "3" items still gets an even rhythm.
+ *
+ * `variant`:
+ * - `'card'` (default) — bordered card with shadow, used on public profiles.
+ * - `'flat'` — borderless, no shadow, plain TikTok-style row.
  */
-export function StatsBar({ items }: { items: StatItem[] }) {
+export function StatsBar({
+  items,
+  variant = 'card',
+}: {
+  items: StatItem[];
+  variant?: 'card' | 'flat';
+}) {
+  const isFlat = variant === 'flat';
   return (
     // Clamped and centred so four columns don't stretch across a desktop
     // viewport. A no-op on any phone, where the width is already under the cap.
@@ -31,10 +42,14 @@ export function StatsBar({ items }: { items: StatItem[] }) {
           alignItems: 'stretch',
           paddingVertical: 14,
           backgroundColor: colors.white,
-          borderRadius: radii.xl,
-          borderWidth: 1,
-          borderColor: colors.hairline,
-          ...shadow.sm,
+          ...(isFlat
+            ? {}
+            : {
+                borderRadius: radii.xl,
+                borderWidth: 1,
+                borderColor: colors.hairline,
+                ...shadow.sm,
+              }),
         }}
       >
         {items.map((item, i) => (
