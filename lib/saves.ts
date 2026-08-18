@@ -17,6 +17,7 @@ import {
   invalidateSavedCache,
   updateSavedCache,
 } from '@/lib/engagementCache';
+import { enqueueOfflineAction, isNetworkError } from '@/lib/offlineSync';
 
 const LISTING_COLUMNS =
   'id, seller_id, title, brand, size, price, category, gender, condition, images, is_sold, likes, tags, created_at';
@@ -148,12 +149,29 @@ export async function getListsContaining(
   return new Set(((data ?? []) as { list_id: string }[]).map((r) => r.list_id));
 }
 
-export async function addToList(listId: string, listingId: string): Promise<boolean> {
+export async function addToList(
+  listId: string,
+  listingId: string,
+  userId?: string,
+): Promise<boolean> {
   const { error } = await supabase
     .from('save_list_items')
     .insert({ list_id: listId, listing_id: listingId });
   // 23505 = already in the list. Treat as success.
   if (error && error.code !== '23505') {
+    if (isNetworkError(error)) {
+      if (userId) {
+        await enqueueOfflineAction({
+          type: 'save_list_item',
+          userId,
+          listId,
+          listingId,
+          op: 'add',
+        });
+      }
+      invalidateSavedCache();
+      return true;
+    }
     console.warn('[saves] addToList', error.message);
     return false;
   }
@@ -163,13 +181,30 @@ export async function addToList(listId: string, listingId: string): Promise<bool
   return true;
 }
 
-export async function removeFromList(listId: string, listingId: string): Promise<boolean> {
+export async function removeFromList(
+  listId: string,
+  listingId: string,
+  userId?: string,
+): Promise<boolean> {
   const { error } = await supabase
     .from('save_list_items')
     .delete()
     .eq('list_id', listId)
     .eq('listing_id', listingId);
   if (error) {
+    if (isNetworkError(error)) {
+      if (userId) {
+        await enqueueOfflineAction({
+          type: 'save_list_item',
+          userId,
+          listId,
+          listingId,
+          op: 'remove',
+        });
+      }
+      invalidateSavedCache();
+      return true;
+    }
     console.warn('[saves] removeFromList', error.message);
     return false;
   }
@@ -188,20 +223,23 @@ export async function isSaved(listingId: string, userId: string): Promise<boolea
 // Returns or lazily creates the user's default list ID. The DB seed
 // function is idempotent so this safe-creates on first save.
 export async function getOrCreateDefaultList(userId: string): Promise<string | null> {
-  const { data } = await supabase
+  const { data, error: readErr } = await supabase
     .from('save_lists')
     .select('id')
     .eq('user_id', userId)
     .eq('is_default', true)
     .maybeSingle();
   if (data?.id) return data.id;
+  if (readErr && isNetworkError(readErr)) return null;
+
   await ensureSaveLists(userId);
-  const { data: again } = await supabase
+  const { data: again, error: againErr } = await supabase
     .from('save_lists')
     .select('id')
     .eq('user_id', userId)
     .eq('is_default', true)
     .maybeSingle();
+  if (againErr && isNetworkError(againErr)) return null;
   return again?.id ?? null;
 }
 
@@ -215,23 +253,66 @@ export async function toggleSave(
   if (currentlySaved) {
     // Pull out of every list the user has it in. Mirrors how the icon
     // reads — once tapped-off, the listing is no longer "saved" anywhere.
-    const lists = await getListsContaining(userId, listingId);
-    if (lists.size === 0) return false;
-    const { error } = await supabase
-      .from('save_list_items')
-      .delete()
-      .in('list_id', Array.from(lists))
-      .eq('listing_id', listingId);
-    if (error) {
-      console.warn('[saves] toggleSave remove', error.message);
+    try {
+      const lists = await getListsContaining(userId, listingId);
+      if (lists.size > 0) {
+        const { error } = await supabase
+          .from('save_list_items')
+          .delete()
+          .in('list_id', Array.from(lists))
+          .eq('listing_id', listingId);
+        if (error && isNetworkError(error)) {
+          await enqueueOfflineAction({
+            type: 'save_toggle',
+            userId,
+            listingId,
+            targetSaved: false,
+          });
+          updateSavedCache(userId, listingId, false);
+          return false;
+        }
+      } else {
+        // If lists were empty due to network or offline, queue the remove action
+        await enqueueOfflineAction({
+          type: 'save_toggle',
+          userId,
+          listingId,
+          targetSaved: false,
+        });
+      }
+    } catch (e) {
+      if (isNetworkError(e)) {
+        await enqueueOfflineAction({
+          type: 'save_toggle',
+          userId,
+          listingId,
+          targetSaved: false,
+        });
+        updateSavedCache(userId, listingId, false);
+        return false;
+      }
+      console.warn('[saves] toggleSave remove', e);
       return currentlySaved;
     }
     updateSavedCache(userId, listingId, false);
     return false;
   }
+
+  // Saving
   const listId = await getOrCreateDefaultList(userId);
-  if (!listId) return currentlySaved;
-  const ok = await addToList(listId, listingId);
+  if (!listId) {
+    // Default list couldn't be fetched (likely offline); queue the action
+    await enqueueOfflineAction({
+      type: 'save_toggle',
+      userId,
+      listingId,
+      targetSaved: true,
+    });
+    updateSavedCache(userId, listingId, true);
+    return true;
+  }
+
+  const ok = await addToList(listId, listingId, userId);
   if (ok) updateSavedCache(userId, listingId, true);
   return ok ? true : currentlySaved;
 }

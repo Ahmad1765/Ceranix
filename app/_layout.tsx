@@ -22,6 +22,7 @@ import { Inter_700Bold_Italic } from '@expo-google-fonts/inter/700Bold_Italic';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { queryClient, persistOptions } from '@/lib/queryClient';
 import { initOnlineManager } from '@/lib/offline';
+import { initOfflineSync } from '@/lib/offlineSync';
 import { attachResponseListener, configureNotifications } from '@/lib/notifications';
 import { AuthProvider } from '@/lib/auth';
 import { ToastProvider } from '@/lib/toast';
@@ -46,6 +47,8 @@ initAnalytics();
 // Bridge device connectivity into TanStack Query so fetches pause offline and
 // auto-resume on reconnect (rather than hanging on unreachable requests).
 initOnlineManager();
+// Start persistent offline action queue sync listener (likes, saves).
+initOfflineSync();
 // Foreground presentation + the Android notification channel. Never prompts for
 // permission — that happens contextually (first conversation) or from Settings.
 // No-ops on web.

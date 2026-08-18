@@ -103,8 +103,8 @@ export function SaveListSheet({
     );
     tap('selection');
     const ok = isIn
-      ? await removeFromList(list.id, listingId)
-      : await addToList(list.id, listingId);
+      ? await removeFromList(list.id, listingId, userId)
+      : await addToList(list.id, listingId, userId);
     if (!ok) {
       // Rollback
       setContainedIn(containedIn);
@@ -128,7 +128,7 @@ export function SaveListSheet({
     if (!created) return;
     // New list starts empty; immediately add this listing to it — matches
     // the user's intent ("create a list to put this in").
-    const ok = await addToList(created.id, listingId);
+    const ok = await addToList(created.id, listingId, userId);
     setLists((prev) => [
       ...prev,
       { ...created, item_count: ok ? 1 : 0 },

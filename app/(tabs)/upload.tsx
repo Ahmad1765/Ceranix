@@ -1,27 +1,20 @@
 import { useEffect } from 'react';
-import { Redirect } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
-import { useAuth } from '@/lib/auth';
 import { useSellSheet } from '@/components/sell/SellSheet';
 
-// The Sell tab no longer renders here — it opens the sell form as a Modal
-// (see components/sell/SellSheet.tsx) over whatever screen is active, the
-// same way the product page's "Offer" button opens OfferSheet. The
-// AnimatedTabBar intercepts the tab's tabPress and calls useSellSheet().open()
-// directly, but this route must still exist for `Tabs.Screen name="upload"`
-// to register. Anything that reaches this file directly (a raw deep link,
-// back/forward, programmatic navigation.navigate('upload')) opens the same
-// sheet here and bounces back to a real tab.
+// The Sell tab opens the sell form as a Modal (see components/sell/SellSheet.tsx)
+// over whatever screen is active. The AnimatedTabBar intercepts the tab's
+// tabPress and calls useSellSheet().open() directly, but this route still
+// registers so deep links and programmatic navigation open the sheet.
 export default function UploadTabFallback() {
-  const { session, loading } = useAuth();
   const { open } = useSellSheet();
   const isFocused = useIsFocused();
 
   useEffect(() => {
-    if (loading || !session || !isFocused) return;
+    if (!isFocused) return;
     open();
-  }, [loading, session, open, isFocused]);
+  }, [open, isFocused]);
 
-  if (loading) return null;
-  return <Redirect href={session ? '/(tabs)' : '/auth/login'} />;
+  return null;
 }
+

@@ -1,9 +1,10 @@
 import { supabase } from '@/lib/supabase';
 import type { Listing } from '@/types';
-import { putCachedListing, putCachedListings } from '@/lib/listingCache';
+import { putCachedListings } from '@/lib/listingCache';
 import { getLikedIds, updateLikedCache } from '@/lib/engagementCache';
 import { captureError } from '@/lib/sentry';
 import { escapeSearchQuery } from '@/lib/search';
+import { enqueueOfflineAction, isNetworkError } from '@/lib/offlineSync';
 
 const SELECT_WITH_SELLER = '*, seller:profiles!listings_seller_id_fkey(*)';
 
@@ -409,6 +410,15 @@ export async function toggleLike(
       .eq('user_id', userId)
       .eq('listing_id', listingId);
     if (error) {
+      if (isNetworkError(error)) {
+        await enqueueOfflineAction({
+          type: 'like_toggle',
+          userId,
+          listingId,
+          targetLiked: false,
+        });
+        return false;
+      }
       console.warn('[listings] unlike', error.message);
       return currentlyLiked;
     }
@@ -419,6 +429,15 @@ export async function toggleLike(
     .from('listing_likes')
     .insert({ user_id: userId, listing_id: listingId });
   if (error && error.code !== '23505') {
+    if (isNetworkError(error)) {
+      await enqueueOfflineAction({
+        type: 'like_toggle',
+        userId,
+        listingId,
+        targetLiked: true,
+      });
+      return true;
+    }
     console.warn('[listings] like', error.message);
     return currentlyLiked;
   }

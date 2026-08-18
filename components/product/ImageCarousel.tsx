@@ -1,0 +1,242 @@
+import React, { useState, useRef, useCallback } from 'react';
+import {
+  View,
+  ScrollView,
+  Dimensions,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+  StyleSheet,
+  ViewStyle,
+} from 'react-native';
+import { Image } from 'expo-image';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+} from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Text } from '@/lib/rnText';
+import { colors, radii } from '@/lib/theme';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+export interface ImageCarouselProps {
+  images: string[];
+  aspectRatio?: '1:1' | '4:5';
+  onImagePress?: (index: number) => void;
+  className?: string;
+  style?: ViewStyle;
+}
+
+/**
+ * Mobile-Native Image Carousel.
+ * Full-bleed swipeable gallery with momentum pagination,
+ * dynamic active indicator dots, and gesture zoom support.
+ */
+export function ImageCarousel({
+  images,
+  aspectRatio = '4:5',
+  onImagePress,
+  className = '',
+  style,
+}: ImageCarouselProps) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [carouselWidth, setCarouselWidth] = useState(SCREEN_WIDTH);
+  const scrollRef = useRef<ScrollView>(null);
+
+  // Height based on aspect ratio
+  const carouselHeight = aspectRatio === '1:1' ? carouselWidth : carouselWidth * 1.25;
+
+  const validImages = images && images.length > 0
+    ? images
+    : ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&auto=format&fit=crop&q=80'];
+
+  const handleScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const offsetX = event.nativeEvent.contentOffset.x;
+      const index = Math.round(offsetX / carouselWidth);
+      if (index !== activeIndex && index >= 0 && index < validImages.length) {
+        setActiveIndex(index);
+      }
+    },
+    [activeIndex, carouselWidth, validImages.length]
+  );
+
+  return (
+    <View
+      className={className}
+      style={[styles.container, { height: carouselHeight }, style]}
+      onLayout={(e) => {
+        const w = e.nativeEvent.layout.width;
+        if (w > 0 && w !== carouselWidth) {
+          setCarouselWidth(w);
+        }
+      }}
+    >
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        decelerationRate="fast"
+        bounces={validImages.length > 1}
+        style={styles.scroll}
+      >
+        {validImages.map((uri, index) => (
+          <CarouselSlide
+            key={index}
+            uri={uri}
+            width={carouselWidth}
+            height={carouselHeight}
+            onPress={() => onImagePress?.(index)}
+          />
+        ))}
+      </ScrollView>
+
+      {/* Floating Counter Pill (Top Right) */}
+      {validImages.length > 1 && (
+        <View style={styles.counterBadge}>
+          <Text style={styles.counterText}>
+            {activeIndex + 1} / {validImages.length}
+          </Text>
+        </View>
+      )}
+
+      {/* Active Pagination Indicator Dots (Bottom Center) */}
+      {validImages.length > 1 && (
+        <View style={styles.paginationContainer} pointerEvents="none">
+          {validImages.map((_, index) => {
+            const isActive = index === activeIndex;
+            return (
+              <View
+                key={index}
+                style={[
+                  styles.dot,
+                  isActive ? styles.dotActive : styles.dotInactive,
+                ]}
+              />
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function CarouselSlide({
+  uri,
+  width,
+  height,
+  onPress,
+}: {
+  uri: string;
+  width: number;
+  height: number;
+  onPress?: () => void;
+}) {
+  const scale = useSharedValue(1);
+
+  // Double-tap to zoom micro-interaction
+  const doubleTapGesture = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd(() => {
+      if (scale.value > 1.2) {
+        scale.value = withSpring(1, { damping: 15, stiffness: 200 });
+      } else {
+        scale.value = withSpring(1.8, { damping: 15, stiffness: 200 });
+      }
+    });
+
+  const singleTapGesture = Gesture.Tap()
+    .numberOfTaps(1)
+    .onEnd(() => {
+      if (onPress) onPress();
+    });
+
+  const gesture = Gesture.Exclusive(doubleTapGesture, singleTapGesture);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: scale.value }],
+    };
+  });
+
+  return (
+    <GestureDetector gesture={gesture}>
+      <View style={[styles.slide, { width, height }]}>
+        <Animated.View style={[{ width, height }, animatedStyle]}>
+          <Image
+            source={{ uri }}
+            contentFit="cover"
+            transition={200}
+            cachePolicy="memory-disk"
+            style={styles.image}
+          />
+        </Animated.View>
+      </View>
+    </GestureDetector>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    width: '100%',
+    backgroundColor: colors.panel,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  scroll: {
+    flex: 1,
+  },
+  slide: {
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+  },
+  counterBadge: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: radii.pill,
+    backgroundColor: 'rgba(15, 15, 15, 0.65)',
+    zIndex: 10,
+  },
+  counterText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.white,
+    letterSpacing: 0.2,
+  },
+  paginationContainer: {
+    position: 'absolute',
+    bottom: 14,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    zIndex: 10,
+  },
+  dot: {
+    height: 6,
+    borderRadius: 3,
+    transitionProperty: 'all',
+  },
+  dotActive: {
+    width: 20,
+    backgroundColor: colors.primary,
+  },
+  dotInactive: {
+    width: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+  },
+});

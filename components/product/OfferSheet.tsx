@@ -1,318 +1,289 @@
-// RETAINED FOR BACK-OUT — no longer mounted. As of 2026-07-15 the product page
-// takes offers inline in the action bar (components/product/ProductActionBar).
-// This sheet is kept intact so that change can be reverted; see the header in
-// ProductActionBar.legacy.tsx. Note app/conversation/[id].tsx defines its own,
-// separate OfferSheet — that one is live and unrelated to this file.
-//
-// Bottom-sheet "price suggestion" surface for the product page. Replaces the
-// old flow that jumped straight into a chat thread — the buyer now proposes a
-// number here, and only on submit do we hand off to /conversation/new with the
-// amount pre-filled (same backend path the bundle offer uses).
-//
-// Slides up from the bottom. Mounting is cheap; the sheet only does work while
-// `visible` is true.
-
-import { useEffect, useMemo, useState } from 'react';
-import { View, Pressable, Modal, StyleSheet, KeyboardAvoidingView } from 'react-native';
-import { Text, TextInput } from '@/lib/rnText';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-  runOnJS,
-} from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { BlurView } from 'expo-blur';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { useState, useMemo } from 'react';
 import {
-  IS_IOS,
-  SCREEN_HEIGHT,
-  tap,
-  BRAND_PURPLE,
-  BRAND_PURPLE_SOFT,
-  BRAND_INK,
-} from './shared';
+  View,
+  Pressable,
+  Platform,
+  StyleSheet,
+} from 'react-native';
+import Feather from '@expo/vector-icons/Feather';
+import * as Haptics from 'expo-haptics';
+import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
+import { ThumbButton } from '@/components/ui/ThumbButton';
+import { Text, TextInput } from '@/lib/rnText';
+import { colors, radii, type } from '@/lib/theme';
 import { formatPrice, CURRENCY_SYMBOL } from '@/lib/currency';
 
-// Discount presets the buyer can tap to pre-fill a sensible offer instead of
-// typing from scratch. Ordered gentlest-first.
-const QUICK_OFFERS = [0.1, 0.15, 0.2] as const;
-
-function roundOffer(n: number) {
-  // Nudge to a whole dollar — cleaner than "127.5" and reads like a real offer.
-  return Math.max(1, Math.round(n));
-}
-
-export function OfferSheet({
-  visible,
-  askingPrice,
-  onClose,
-  onSubmit,
-}: {
+export interface OfferSheetProps {
   visible: boolean;
   askingPrice: number;
   onClose: () => void;
-  // Fires with the chosen amount (whole units) once the buyer commits.
   onSubmit: (amount: number) => void;
-}) {
-  const insets = useSafeAreaInsets();
-  const [amount, setAmount] = useState('');
+  loading?: boolean;
+}
 
-  // Drag-to-dismiss offset. Reset to resting position each time the sheet
-  // opens; cleared field on close.
-  const translateY = useSharedValue(0);
+const DISCOUNT_TIERS = [0.10, 0.15, 0.20] as const;
 
-  useEffect(() => {
-    if (visible) translateY.value = 0;
-    else setAmount('');
-  }, [visible, translateY]);
+/**
+ * Mobile-First Quick Offer Bottom Sheet.
+ * Displays smart discount calculation chips (-10%, -15%, -20%)
+ * and an interactive numeric keypad for instant zero-navigation negotiation.
+ */
+export function OfferSheet({
+  visible,
+  askingPrice = 0,
+  onClose,
+  onSubmit,
+  loading = false,
+}: OfferSheetProps) {
+  const [customAmount, setCustomAmount] = useState('');
+  const [selectedTier, setSelectedTier] = useState<number | null>(null);
 
-  // Downward pan on the sheet. `activeOffsetY(12)` means a tap or a small
-  // wobble never hijacks the gesture — only a deliberate drag down engages,
-  // so the input and buttons stay tappable. Release past the threshold (or
-  // with a flick) animates it off-screen and closes; otherwise it springs back.
-  const pan = Gesture.Pan()
-    .activeOffsetY(12)
-    .onUpdate((e) => {
-      translateY.value = Math.max(0, e.translationY);
-    })
-    .onEnd((e) => {
-      if (translateY.value > 120 || e.velocityY > 800) {
-        translateY.value = withTiming(SCREEN_HEIGHT, { duration: 220 }, (done) => {
-          if (done) runOnJS(onClose)();
-        });
-      } else {
-        translateY.value = withSpring(0, { damping: 22, stiffness: 220 });
-      }
+  // Compute preset discount offer amounts rounded to nearest whole dollar
+  const presets = useMemo(() => {
+    return DISCOUNT_TIERS.map((rate) => {
+      const discounted = Math.max(1, Math.round(askingPrice * (1 - rate)));
+      return {
+        percent: Math.round(rate * 100),
+        amount: discounted,
+      };
     });
+  }, [askingPrice]);
 
-  const sheetStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
-  }));
-
-  const parsed = useMemo(() => {
-    const n = parseFloat(amount.replace(/[^0-9.]/g, ''));
-    return Number.isFinite(n) ? n : 0;
-  }, [amount]);
-
-  const valid = parsed > 0;
-  // Gentle nudge, never a hard block — sellers can still receive a high offer.
-  const overAsking = parsed > askingPrice && askingPrice > 0;
-
-  const applyQuick = (pct: number) => {
-    tap('selection');
-    setAmount(String(roundOffer(askingPrice * (1 - pct))));
+  const handleSelectTier = (tierIndex: number, amount: number) => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
+    setSelectedTier(tierIndex);
+    setCustomAmount(String(amount));
   };
 
+  const handleCustomChange = (text: string) => {
+    const numericOnly = text.replace(/[^0-9]/g, '');
+    setCustomAmount(numericOnly);
+    setSelectedTier(null);
+  };
+
+  const parsedAmount = parseInt(customAmount, 10) || 0;
+  const isValidOffer = parsedAmount > 0 && parsedAmount < askingPrice;
+
   const handleSubmit = () => {
-    if (!valid) return;
-    tap('medium');
-    onSubmit(roundOffer(parsed));
+    if (!isValidOffer) return;
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    }
+    onSubmit(parsedAmount);
   };
 
   return (
-    <Modal
+    <BottomSheetModal
       visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-      // Android edge-to-edge (mandatory from Expo SDK 54) needs both flags, or
-      // the modal window stops at the navigation bar: the backdrop leaves an
-      // opaque strip and the sheet's insets.bottom padding double-counts.
-      statusBarTranslucent
-      navigationBarTranslucent
+      onClose={onClose}
+      title="Make an Offer"
+      subtitle="Direct binding offer to the seller"
+      snapHeightRatio={0.62}
+      scrollable
+      footer={
+        <View style={styles.footerInner}>
+          <ThumbButton
+            label={
+              parsedAmount > 0
+                ? `Send Binding Offer · ${formatPrice(parsedAmount)}`
+                : 'Send Binding Offer'
+            }
+            variant="primary"
+            heightToken="48px"
+            disabled={!isValidOffer || loading}
+            loading={loading}
+            icon="tag"
+            onPress={handleSubmit}
+            accessibilityLabel="Send binding offer"
+          />
+        </View>
+      }
     >
-      {/* Backdrop — tap outside to dismiss */}
-      <Pressable onPress={onClose} style={{ flex: 1, justifyContent: 'flex-end' }}>
-        {IS_IOS ? (
-          <BlurView intensity={22} tint="dark" style={StyleSheet.absoluteFill} />
-        ) : (
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} />
-        )}
+      <View style={styles.content}>
+        {/* Asking Price Banner */}
+        <View style={styles.askingRow}>
+          <Text style={styles.askingLabel}>Listed asking price</Text>
+          <Text style={[styles.askingValue, { fontFamily: type.family.sansBold }]}>
+            {formatPrice(askingPrice)}
+          </Text>
+        </View>
 
-        <KeyboardAvoidingView behavior={IS_IOS ? 'padding' : undefined}>
-          {/* Drag-to-dismiss surface. The inner Pressable swallows taps so a
-              press inside the sheet doesn't fall through to the backdrop. */}
-          <GestureDetector gesture={pan}>
-            <Animated.View
-              style={[
-                {
-                  backgroundColor: 'white',
-                  borderTopLeftRadius: 28,
-                  borderTopRightRadius: 28,
-                  paddingHorizontal: 24,
-                  paddingTop: 10,
-                  paddingBottom: (insets.bottom || 16) + 12,
-                },
-                sheetStyle,
-              ]}
-            >
-              <Pressable onPress={() => {}}>
-            {/* Grab handle */}
-            <View
-              style={{
-                alignSelf: 'center',
-                width: 40,
-                height: 5,
-                borderRadius: 3,
-                backgroundColor: 'rgba(15,15,15,0.14)',
-                marginBottom: 20,
-              }}
-            />
-
-            {/* Icon badge */}
-            <View
-              style={{
-                alignSelf: 'center',
-                width: 62,
-                height: 62,
-                borderRadius: 20,
-                backgroundColor: BRAND_PURPLE,
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: 16,
-              }}
-            >
-              <Text style={{ fontSize: 22, fontFamily: 'Inter_700Bold', color: 'white' }}>
-                {CURRENCY_SYMBOL}
-              </Text>
-            </View>
-
-            <Text
-              style={{
-                fontSize: 24,
-                fontFamily: 'Inter_700Bold',
-                color: BRAND_INK,
-                textAlign: 'center',
-                letterSpacing: -0.4,
-                marginBottom: 22,
-              }}
-            >
-              Send a price suggestion
-            </Text>
-
-            {/* Amount input */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'flex-end',
-                justifyContent: 'center',
-                borderBottomWidth: 2,
-                borderBottomColor: BRAND_PURPLE,
-                paddingBottom: 8,
-                marginBottom: 18,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 26,
-                  fontFamily: 'Inter_700Bold',
-                  color: 'rgba(15,15,15,0.28)',
-                  marginRight: 6,
-                  marginBottom: 6,
-                }}
+        {/* 1-Tap Smart Offer Preset Chips */}
+        <View style={styles.presetsRow}>
+          {presets.map((tier, idx) => {
+            const isSelected = selectedTier === idx;
+            return (
+              <Pressable
+                key={tier.percent}
+                onPress={() => handleSelectTier(idx, tier.amount)}
+                style={[
+                  styles.presetChip,
+                  isSelected && styles.presetChipSelected,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`-${tier.percent}%: ${formatPrice(tier.amount)}`}
               >
-                {CURRENCY_SYMBOL}
-              </Text>
-              <TextInput
-                value={amount}
-                onChangeText={(t) => setAmount(t.replace(/[^0-9]/g, ''))}
-                keyboardType="number-pad"
-                placeholder={String(roundOffer(askingPrice))}
-                placeholderTextColor="rgba(15,15,15,0.28)"
-                autoFocus
-                maxLength={7}
-                style={{
-                  minWidth: 90,
-                  fontSize: 46,
-                  fontFamily: 'Inter_700Bold',
-                  color: BRAND_INK,
-                  textAlign: 'center',
-                  padding: 0,
-                }}
-              />
-            </View>
-
-            {/* Quick-offer chips — one-tap common discounts off the asking price */}
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'center',
-                gap: 8,
-                marginBottom: 18,
-              }}
-            >
-              {QUICK_OFFERS.map((pct) => {
-                const value = roundOffer(askingPrice * (1 - pct));
-                const active = parsed === value;
-                return (
-                  <Pressable
-                    key={pct}
-                    onPress={() => applyQuick(pct)}
-                    style={({ pressed }) => ({
-                      paddingHorizontal: 14,
-                      paddingVertical: 9,
-                      borderRadius: 999,
-                      backgroundColor: active ? BRAND_PURPLE : BRAND_PURPLE_SOFT,
-                      opacity: pressed ? 0.7 : 1,
-                    })}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        fontFamily: 'Inter_700Bold',
-                        color: active ? 'white' : BRAND_PURPLE,
-                      }}
-                    >
-                      {Math.round(pct * 100)}% off · {formatPrice(value)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            <Text
-              style={{
-                fontSize: 13,
-                fontFamily: 'Inter_500Medium',
-                color: overAsking ? BRAND_PURPLE : 'rgba(15,15,15,0.55)',
-                textAlign: 'center',
-                lineHeight: 19,
-                marginBottom: 20,
-                paddingHorizontal: 8,
-              }}
-            >
-              {overAsking
-                ? "That's above the asking price — you can offer less."
-                : 'Enter the price you want to pay. Shipping and buyer protection are added at checkout.'}
-            </Text>
-
-            {/* Submit */}
-            <Pressable
-              onPress={handleSubmit}
-              disabled={!valid}
-              accessibilityRole="button"
-              accessibilityLabel="Send price suggestion"
-              style={({ pressed }) => ({
-                height: 54,
-                borderRadius: 16,
-                backgroundColor: BRAND_INK,
-                alignItems: 'center',
-                justifyContent: 'center',
-                opacity: !valid ? 0.35 : pressed ? 0.9 : 1,
-                transform: [{ scale: pressed && valid ? 0.99 : 1 }],
-              })}
-            >
-              <Text style={{ fontSize: 16, fontFamily: 'Inter_700Bold', color: 'white', letterSpacing: 0.2 }}>
-                Send price suggestion
-              </Text>
-            </Pressable>
+                <Text
+                  style={[
+                    styles.presetPercent,
+                    {
+                      color: isSelected ? colors.primary : colors.mute,
+                      fontFamily: type.family.sansBold,
+                    },
+                  ]}
+                >
+                  -{tier.percent}%
+                </Text>
+                <Text
+                  style={[
+                    styles.presetAmount,
+                    {
+                      color: isSelected ? colors.primary : colors.ink,
+                      fontFamily: type.family.sansBold,
+                    },
+                  ]}
+                >
+                  {formatPrice(tier.amount)}
+                </Text>
               </Pressable>
-            </Animated.View>
-          </GestureDetector>
-        </KeyboardAvoidingView>
-      </Pressable>
-    </Modal>
+            );
+          })}
+        </View>
+
+        {/* Custom Input Field */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.inputPrefix}>{CURRENCY_SYMBOL}</Text>
+          <TextInput
+            value={customAmount}
+            onChangeText={handleCustomChange}
+            placeholder={String(askingPrice)}
+            placeholderTextColor={colors.mute}
+            keyboardType="number-pad"
+            style={[styles.input, { fontFamily: type.family.sansBold }]}
+            maxLength={6}
+            returnKeyType="done"
+          />
+          {customAmount.length > 0 && (
+            <Pressable
+              onPress={() => {
+                setCustomAmount('');
+                setSelectedTier(null);
+              }}
+              hitSlop={8}
+              style={styles.clearButton}
+            >
+              <Feather name="x" size={16} color={colors.mute} />
+            </Pressable>
+          )}
+        </View>
+
+        {/* Informational Guidance */}
+        <View style={styles.infoBox}>
+          <Feather name="info" size={14} color={colors.primary} />
+          <Text style={styles.infoText}>
+            Offers are valid for 24 hours. The seller can accept, counter, or decline.
+          </Text>
+        </View>
+      </View>
+    </BottomSheetModal>
   );
 }
+
+const styles = StyleSheet.create({
+  content: {
+    gap: 16,
+  },
+  askingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    backgroundColor: colors.panel,
+    borderRadius: radii.xl,
+  },
+  askingLabel: {
+    fontSize: 13,
+    color: colors.mute,
+  },
+  askingValue: {
+    fontSize: 15,
+    color: colors.ink,
+  },
+  presetsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  presetChip: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: radii.xl,
+    borderWidth: 1.5,
+    borderColor: colors.hairline,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  presetChipSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+  },
+  presetPercent: {
+    fontSize: 11,
+    letterSpacing: 0.2,
+  },
+  presetAmount: {
+    fontSize: 14,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 56,
+    borderRadius: radii['2xl'],
+    borderWidth: 1.5,
+    borderColor: colors.hairline,
+    backgroundColor: colors.white,
+    paddingHorizontal: 16,
+  },
+  inputPrefix: {
+    fontSize: 20,
+    color: colors.ink,
+    fontFamily: type.family.sansBold,
+    marginRight: 8,
+  },
+  input: {
+    flex: 1,
+    fontSize: 22,
+    color: colors.ink,
+    padding: 0,
+  },
+  clearButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.panel,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 10,
+    backgroundColor: 'rgba(108, 71, 255, 0.06)',
+    borderRadius: radii.lg,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 11,
+    color: colors.mute,
+    lineHeight: 15,
+  },
+  footerInner: {
+    width: '100%',
+    paddingBottom: 4,
+  },
+});

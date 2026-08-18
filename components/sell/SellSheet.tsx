@@ -11,10 +11,11 @@ import {
 import { capture } from '@/lib/analytics';
 import { View, Pressable, ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, useWindowDimensions, Modal } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
-import { SafeAreaProvider, SafeAreaView, initialWindowMetrics } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView, initialWindowMetrics, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import Feather from '@expo/vector-icons/Feather';
+import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { uploadListingImages, deleteListingImages } from '@/lib/upload';
@@ -80,20 +81,15 @@ export function useSellSheet(): SellSheetApi {
 }
 
 export function SellSheetProvider({ children }: { children: ReactNode }) {
-  const { session } = useAuth();
   const [visible, setVisible] = useState(false);
 
   const open = useCallback(() => {
-    if (!session) {
-      router.push('/auth/login');
-      return;
-    }
     setVisible(true);
-  }, [session]);
+  }, []);
 
   const close = useCallback(() => setVisible(false), []);
 
-  const api = useMemo(() => ({ open }), [open]);
+  const api = useMemo(() => ({ open, close }), [open, close]);
 
   return (
     <Ctx.Provider value={api}>
@@ -158,9 +154,17 @@ function RowField({
   placeholder: string;
   onPress: () => void;
 }) {
+  const handlePress = () => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
+    onPress();
+  };
+
   return (
     <Pressable
-      onPress={onPress}
+      onPress={handlePress}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       accessibilityRole="button"
       style={({ pressed }) => ({
         flexDirection: 'row',
@@ -168,6 +172,7 @@ function RowField({
         justifyContent: 'space-between',
         paddingHorizontal: 20,
         paddingVertical: 15,
+        minHeight: 50,
         borderBottomWidth: 1,
         borderBottomColor: colors.hairline,
         backgroundColor: pressed ? colors.panel : colors.white,
@@ -186,6 +191,7 @@ function RowField({
     </Pressable>
   );
 }
+
 
 function UnderlineField({
   label,
@@ -435,6 +441,15 @@ function SellForm({ onClose }: { onClose: () => void }) {
       ? ''
       : categoryLabel(category);
 
+  const insets = useSafeAreaInsets();
+
+  const handlePickImages = async () => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
+    await pickImages();
+  };
+
   return (
     <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-white">
       {/* Header */}
@@ -451,22 +466,28 @@ function SellForm({ onClose }: { onClose: () => void }) {
       >
         <Pressable
           onPress={onClose}
-          hitSlop={12}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           accessibilityRole="button"
           accessibilityLabel="Close"
-          style={({ pressed }) => ({ opacity: pressed ? 0.55 : 1 })}
+          style={({ pressed }) => ({
+            minWidth: 44,
+            minHeight: 44,
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: pressed ? 0.55 : 1,
+          })}
         >
           <Feather name="x" size={22} color={colors.ink} />
         </Pressable>
         <Text style={{ fontSize: 16, fontFamily: DISPLAY_BOLD, color: colors.ink }}>Sell an item</Text>
-        <View style={{ width: 22 }} />
+        <View style={{ width: 44 }} />
       </View>
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingBottom: 32 }}
+          contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 24) + 32 }}
         >
           {/* Photos */}
           <SectionHeader>Photos</SectionHeader>
@@ -485,7 +506,8 @@ function SellForm({ onClose }: { onClose: () => void }) {
             >
               {slots.length === 0 ? (
                 <Pressable
-                  onPress={pickImages}
+                  onPress={handlePickImages}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   accessibilityRole="button"
                   style={({ pressed }) => ({
                     flexDirection: 'row',
@@ -493,6 +515,7 @@ function SellForm({ onClose }: { onClose: () => void }) {
                     gap: 8,
                     paddingHorizontal: 22,
                     paddingVertical: 13,
+                    minHeight: 48,
                     borderRadius: radii.pill,
                     borderWidth: 1.5,
                     borderColor: SELL_TEAL,
@@ -533,14 +556,19 @@ function SellForm({ onClose }: { onClose: () => void }) {
                         </View>
                       )}
                       <Pressable
-                        onPress={() => setSlots((prev) => prev.filter((s) => s.id !== slot.id))}
-                        hitSlop={8}
+                        onPress={() => {
+                          if (Platform.OS !== 'web') {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                          }
+                          setSlots((prev) => prev.filter((s) => s.id !== slot.id));
+                        }}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                         style={({ pressed }) => ({
                           position: 'absolute',
                           top: 5,
                           right: 5,
-                          width: 22,
-                          height: 22,
+                          width: 24,
+                          height: 24,
                           borderRadius: 999,
                           backgroundColor: 'rgba(15,15,15,0.78)',
                           alignItems: 'center',
@@ -548,13 +576,14 @@ function SellForm({ onClose }: { onClose: () => void }) {
                           opacity: pressed ? 0.7 : 1,
                         })}
                       >
-                        <Feather name="x" size={12} color={colors.white} />
+                        <Feather name="x" size={13} color={colors.white} />
                       </Pressable>
                     </View>
                   ))}
                   {slots.length < MAX_IMAGES && (
                     <Pressable
-                      onPress={pickImages}
+                      onPress={handlePickImages}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       style={({ pressed }) => ({
                         width: tile,
                         height: tile,
@@ -609,16 +638,20 @@ function SellForm({ onClose }: { onClose: () => void }) {
             <View style={{ paddingHorizontal: 20, paddingTop: 10 }}>
               <Pressable
                 onPress={() => {
+                  if (Platform.OS !== 'web') {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  }
                   setCategory(suggestion!.category);
                   setSubcategory(suggestion!.sub.id);
                 }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 style={({ pressed }) => ({
                   flexDirection: 'row',
                   alignItems: 'center',
                   gap: 6,
                   alignSelf: 'flex-start',
                   paddingHorizontal: 12,
-                  paddingVertical: 7,
+                  paddingVertical: 8,
                   borderRadius: radii.pill,
                   backgroundColor: SELL_TEAL_SOFT,
                   opacity: pressed ? 0.7 : 1,
@@ -690,7 +723,12 @@ function SellForm({ onClose }: { onClose: () => void }) {
             {/* Upload — scrolls with the rest of the form, right after the
                 safety banner, instead of sitting in a sticky footer. */}
             <Pressable
-              onPress={handlePublish}
+              onPress={() => {
+                if (Platform.OS !== 'web') {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                }
+                handlePublish();
+              }}
               disabled={publishing || !canPublish}
               accessibilityRole="button"
               accessibilityLabel={publishing ? 'Uploading listing' : 'Upload listing'}
@@ -724,6 +762,7 @@ function SellForm({ onClose }: { onClose: () => void }) {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
 
       {/* Sheets */}
       <CategorySheet
