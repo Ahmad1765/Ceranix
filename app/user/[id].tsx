@@ -25,14 +25,13 @@ import {
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { colors } from '@/lib/theme';
-import { computeLevel, computeBadges } from '@/lib/levels';
+import { computeLevel } from '@/lib/levels';
 import { useGridDimensions, GRID_DRAW_DISTANCE } from '@/lib/responsive';
 import { useFadeIn } from '@/lib/motion';
 import { APP_URL, BRAND } from '@/lib/brand';
 import type { Listing } from '@/types';
 import { EmptyState } from '@/components/ui';
 import { SafeContainer } from '@/components/ui/SafeContainer';
-import { ThumbButton } from '@/components/ui/ThumbButton';
 import {
   ProfileBanner,
   InfoCard,
@@ -293,7 +292,7 @@ export default function UserProfileScreen() {
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: 36,
+                  gap: 20,
                   marginTop: 16,
                   paddingHorizontal: 20,
                 }}
@@ -306,13 +305,15 @@ export default function UserProfileScreen() {
                   }
                   style={({ pressed }) => ({ alignItems: 'center', opacity: pressed ? 0.6 : 1 })}
                 >
-                  <Text style={{ fontSize: 19, fontWeight: '800', color: colors.ink }}>
+                  <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink }}>
                     {formatCount(followingCount)}
                   </Text>
-                  <Text style={{ fontSize: 12, color: colors.mute, marginTop: 2 }}>
+                  <Text style={{ fontSize: 12, color: colors.mute, marginTop: 1 }}>
                     Following
                   </Text>
                 </Pressable>
+
+                <View style={{ width: 1, height: 16, backgroundColor: '#EBEBEB' }} />
 
                 <Pressable
                   onPress={() =>
@@ -322,64 +323,90 @@ export default function UserProfileScreen() {
                   }
                   style={({ pressed }) => ({ alignItems: 'center', opacity: pressed ? 0.6 : 1 })}
                 >
-                  <Text style={{ fontSize: 19, fontWeight: '800', color: colors.ink }}>
+                  <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink }}>
                     {formatCount(followersCount)}
                   </Text>
-                  <Text style={{ fontSize: 12, color: colors.mute, marginTop: 2 }}>
+                  <Text style={{ fontSize: 12, color: colors.mute, marginTop: 1 }}>
                     Followers
                   </Text>
                 </Pressable>
 
+                <View style={{ width: 1, height: 16, backgroundColor: '#EBEBEB' }} />
+
                 <View style={{ alignItems: 'center' }}>
-                  <Text style={{ fontSize: 19, fontWeight: '800', color: colors.ink }}>
+                  <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink }}>
                     {formatCount(totalLikes > 0 ? totalLikes : listings.length * 12 + 15)}
                   </Text>
-                  <Text style={{ fontSize: 12, color: colors.mute, marginTop: 2 }}>Likes</Text>
+                  <Text style={{ fontSize: 12, color: colors.mute, marginTop: 1 }}>Likes</Text>
                 </View>
               </View>
 
-              {/* Action Buttons Row with ThumbButton */}
+              {/* Action Buttons Row (TikTok Style: Follow/Message/More) */}
               <View
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: 10,
-                  marginTop: 18,
+                  gap: 8,
+                  marginTop: 15,
                   paddingHorizontal: 20,
-                  maxWidth: 420,
                   alignSelf: 'center',
-                  width: '100%',
                 }}
               >
                 {!isSelf ? (
                   <>
-                    <View style={{ flex: 1 }}>
-                      <ThumbButton
-                        label={followed ? 'Following' : 'Follow'}
-                        variant={followed ? 'secondary' : 'primary'}
-                        heightToken="44px"
-                        loading={followBusy}
-                        onPress={handleFollowToggle}
-                        accessibilityLabel={followed ? 'Unfollow' : 'Follow'}
-                      />
-                    </View>
-
-                    <View style={{ flex: 1 }}>
-                      <ThumbButton
-                        label="Message"
-                        variant="secondary"
-                        heightToken="44px"
-                        onPress={() => {
-                          if (listings.length > 0) {
-                            router.push(`/conversation/new?listing=${listings[0].id}` as any);
-                          } else {
-                            Alert.alert('No listings', 'This user has no active listings to inquire about.');
-                          }
+                    <Pressable
+                      onPress={handleFollowToggle}
+                      disabled={followBusy}
+                      accessibilityRole="button"
+                      accessibilityLabel={followed ? 'Unfollow' : 'Follow'}
+                      style={({ pressed }) => ({
+                        height: 36,
+                        paddingHorizontal: 26,
+                        borderRadius: 20,
+                        backgroundColor: followed ? '#F1F1F2' : colors.primary,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        opacity: pressed || followBusy ? 0.75 : 1,
+                        transform: [{ scale: pressed ? 0.97 : 1 }],
+                      })}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 14.5,
+                          fontWeight: '600',
+                          color: followed ? '#161823' : '#FFFFFF',
                         }}
-                        accessibilityLabel="Message seller"
-                      />
-                    </View>
+                      >
+                        {followed ? 'Following' : 'Follow'}
+                      </Text>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={() => {
+                        if (listings.length > 0) {
+                          router.push(`/conversation/new?listing=${listings[0].id}` as any);
+                        } else {
+                          Alert.alert('No listings', 'This user has no active listings to inquire about.');
+                        }
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Message seller"
+                      style={({ pressed }) => ({
+                        height: 36,
+                        paddingHorizontal: 22,
+                        borderRadius: 20,
+                        backgroundColor: '#F1F1F2',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        opacity: pressed ? 0.75 : 1,
+                        transform: [{ scale: pressed ? 0.97 : 1 }],
+                      })}
+                    >
+                      <Text style={{ fontSize: 14.5, fontWeight: '600', color: '#161823' }}>
+                        Message
+                      </Text>
+                    </Pressable>
 
                     <Pressable
                       onPress={handleShare}
@@ -387,9 +414,9 @@ export default function UserProfileScreen() {
                       accessibilityLabel="Share profile"
                       hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                       style={({ pressed }) => ({
-                        width: 44,
-                        height: 44,
-                        borderRadius: 12,
+                        width: 36,
+                        height: 36,
+                        borderRadius: 18,
                         backgroundColor: '#F1F1F2',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -397,30 +424,50 @@ export default function UserProfileScreen() {
                         transform: [{ scale: pressed ? 0.96 : 1 }],
                       })}
                     >
-                      <Feather name="share-2" size={19} color={colors.ink} />
+                      <Ionicons name="caret-down" size={13} color="#161823" />
                     </Pressable>
                   </>
                 ) : (
                   <>
-                    <View style={{ flex: 1 }}>
-                      <ThumbButton
-                        label="Edit profile"
-                        variant="primary"
-                        heightToken="44px"
-                        onPress={() => router.push('/profile/edit')}
-                        accessibilityLabel="Edit profile"
-                      />
-                    </View>
+                    <Pressable
+                      onPress={() => router.push('/profile/edit')}
+                      accessibilityRole="button"
+                      accessibilityLabel="Edit profile"
+                      style={({ pressed }) => ({
+                        height: 36,
+                        paddingHorizontal: 20,
+                        borderRadius: 20,
+                        backgroundColor: '#F1F1F2',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        opacity: pressed ? 0.75 : 1,
+                        transform: [{ scale: pressed ? 0.97 : 1 }],
+                      })}
+                    >
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: '#161823' }}>
+                        Edit profile
+                      </Text>
+                    </Pressable>
 
-                    <View style={{ flex: 1 }}>
-                      <ThumbButton
-                        label="Share profile"
-                        variant="secondary"
-                        heightToken="44px"
-                        onPress={handleShare}
-                        accessibilityLabel="Share profile"
-                      />
-                    </View>
+                    <Pressable
+                      onPress={handleShare}
+                      accessibilityRole="button"
+                      accessibilityLabel="Share profile"
+                      style={({ pressed }) => ({
+                        height: 36,
+                        paddingHorizontal: 20,
+                        borderRadius: 20,
+                        backgroundColor: '#F1F1F2',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        opacity: pressed ? 0.75 : 1,
+                        transform: [{ scale: pressed ? 0.97 : 1 }],
+                      })}
+                    >
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: '#161823' }}>
+                        Share profile
+                      </Text>
+                    </Pressable>
                   </>
                 )}
               </View>
@@ -439,6 +486,33 @@ export default function UserProfileScreen() {
                   >
                     {profile.bio}
                   </Text>
+                ) : isSelf ? (
+                  <Pressable
+                    onPress={() => router.push('/profile/edit')}
+                    accessibilityRole="button"
+                    accessibilityLabel="Add bio"
+                    style={({ pressed }) => ({
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: '#F1F1F2',
+                      paddingHorizontal: 14,
+                      paddingVertical: 7,
+                      borderRadius: 9999,
+                      gap: 6,
+                      opacity: pressed ? 0.75 : 1,
+                      transform: [{ scale: pressed ? 0.98 : 1 }],
+                    })}
+                  >
+                    <Feather name="plus" size={13} color={colors.ink} />
+                    <Text style={{ fontSize: 13.5, fontWeight: '700', color: colors.ink }}>
+                      Add bio
+                    </Text>
+                    <Text style={{ fontSize: 12, color: colors.mute }}>·</Text>
+                    <Ionicons name="heart-outline" size={14} color="#FE2C55" />
+                    <Text style={{ fontSize: 13, color: '#73747B', fontWeight: '400' }}>
+                      My hobbies are...
+                    </Text>
+                  </Pressable>
                 ) : null}
 
                 {profile.location ? (

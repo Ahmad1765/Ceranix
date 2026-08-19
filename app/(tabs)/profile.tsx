@@ -411,7 +411,7 @@ function ProfileScreenInner() {
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: 36,
+                  gap: 20,
                   marginTop: 16,
                   paddingHorizontal: 20,
                 }}
@@ -420,31 +420,35 @@ function ProfileScreenInner() {
                   onPress={() => router.push('/profile/following' as Href)}
                   style={({ pressed }) => ({ alignItems: 'center', opacity: pressed ? 0.6 : 1 })}
                 >
-                  <Text style={{ fontSize: 19, fontWeight: '800', color: colors.ink }}>
+                  <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink }}>
                     {formatCount(profile.following_count ?? 0)}
                   </Text>
-                  <Text style={{ fontSize: 12, color: colors.mute, marginTop: 2 }}>
+                  <Text style={{ fontSize: 12, color: colors.mute, marginTop: 1 }}>
                     Following
                   </Text>
                 </Pressable>
+
+                <View style={{ width: 1, height: 16, backgroundColor: '#EBEBEB' }} />
 
                 <Pressable
                   onPress={() => router.push('/profile/followers' as Href)}
                   style={({ pressed }) => ({ alignItems: 'center', opacity: pressed ? 0.6 : 1 })}
                 >
-                  <Text style={{ fontSize: 19, fontWeight: '800', color: colors.ink }}>
+                  <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink }}>
                     {formatCount(profile.followers_count ?? 0)}
                   </Text>
-                  <Text style={{ fontSize: 12, color: colors.mute, marginTop: 2 }}>
+                  <Text style={{ fontSize: 12, color: colors.mute, marginTop: 1 }}>
                     Followers
                   </Text>
                 </Pressable>
 
+                <View style={{ width: 1, height: 16, backgroundColor: '#EBEBEB' }} />
+
                 <View style={{ alignItems: 'center' }}>
-                  <Text style={{ fontSize: 19, fontWeight: '800', color: colors.ink }}>
+                  <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink }}>
                     {formatCount(shopLikes > 0 ? shopLikes : sellingCount * 12 + 15)}
                   </Text>
-                  <Text style={{ fontSize: 12, color: colors.mute, marginTop: 2 }}>Likes</Text>
+                  <Text style={{ fontSize: 12, color: colors.mute, marginTop: 1 }}>Likes</Text>
                 </View>
               </View>
 
@@ -454,33 +458,51 @@ function ProfileScreenInner() {
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: 10,
-                  marginTop: 18,
+                  gap: 8,
+                  marginTop: 15,
                   paddingHorizontal: 20,
-                  maxWidth: 420,
                   alignSelf: 'center',
-                  width: '100%',
                 }}
               >
-                <View style={{ flex: 1 }}>
-                  <ThumbButton
-                    label="Edit profile"
-                    variant="primary"
-                    heightToken="44px"
-                    onPress={() => router.push('/profile/edit')}
-                    accessibilityLabel="Edit profile"
-                  />
-                </View>
+                <Pressable
+                  onPress={() => router.push('/profile/edit')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Edit profile"
+                  style={({ pressed }) => ({
+                    height: 36,
+                    paddingHorizontal: 20,
+                    borderRadius: 20,
+                    backgroundColor: '#F1F1F2',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: pressed ? 0.75 : 1,
+                    transform: [{ scale: pressed ? 0.97 : 1 }],
+                  })}
+                >
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#161823' }}>
+                    Edit profile
+                  </Text>
+                </Pressable>
 
-                <View style={{ flex: 1 }}>
-                  <ThumbButton
-                    label="Share profile"
-                    variant="secondary"
-                    heightToken="44px"
-                    onPress={handleShareProfile}
-                    accessibilityLabel="Share profile"
-                  />
-                </View>
+                <Pressable
+                  onPress={handleShareProfile}
+                  accessibilityRole="button"
+                  accessibilityLabel="Share profile"
+                  style={({ pressed }) => ({
+                    height: 36,
+                    paddingHorizontal: 20,
+                    borderRadius: 20,
+                    backgroundColor: '#F1F1F2',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: pressed ? 0.75 : 1,
+                    transform: [{ scale: pressed ? 0.97 : 1 }],
+                  })}
+                >
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#161823' }}>
+                    Share profile
+                  </Text>
+                </Pressable>
 
                 <Pressable
                   onPress={() => router.push('/settings')}
@@ -488,9 +510,9 @@ function ProfileScreenInner() {
                   accessibilityLabel="Settings"
                   hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                   style={({ pressed }) => ({
-                    width: 44,
-                    height: 44,
-                    borderRadius: 12,
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
                     backgroundColor: '#F1F1F2',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -498,7 +520,7 @@ function ProfileScreenInner() {
                     transform: [{ scale: pressed ? 0.96 : 1 }],
                   })}
                 >
-                  <Feather name="settings" size={19} color={colors.ink} />
+                  <Feather name="settings" size={16} color="#161823" />
                 </Pressable>
               </View>
 
@@ -506,18 +528,50 @@ function ProfileScreenInner() {
               {/* Bio & Link Section */}
               <View style={{ alignItems: 'center', marginTop: 14, paddingHorizontal: 24 }}>
                 {profile.bio?.trim() ? (
-                  <Text
-                    style={{
-                      fontSize: 14,
-                      lineHeight: 20,
-                      color: colors.ink,
-                      textAlign: 'center',
-                    }}
-                    numberOfLines={3}
+                  <Pressable
+                    onPress={() => router.push('/profile/edit')}
+                    style={({ pressed }) => ({ opacity: pressed ? 0.75 : 1 })}
                   >
-                    {profile.bio}
-                  </Text>
-                ) : null}
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        lineHeight: 20,
+                        color: colors.ink,
+                        textAlign: 'center',
+                      }}
+                      numberOfLines={3}
+                    >
+                      {profile.bio}
+                    </Text>
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    onPress={() => router.push('/profile/edit')}
+                    accessibilityRole="button"
+                    accessibilityLabel="Add bio"
+                    style={({ pressed }) => ({
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: '#F1F1F2',
+                      paddingHorizontal: 14,
+                      paddingVertical: 7,
+                      borderRadius: 9999,
+                      gap: 6,
+                      opacity: pressed ? 0.75 : 1,
+                      transform: [{ scale: pressed ? 0.98 : 1 }],
+                    })}
+                  >
+                    <Feather name="plus" size={13} color={colors.ink} />
+                    <Text style={{ fontSize: 13.5, fontWeight: '700', color: colors.ink }}>
+                      Add bio
+                    </Text>
+                    <Text style={{ fontSize: 12, color: colors.mute }}>·</Text>
+                    <Ionicons name="heart-outline" size={14} color="#FE2C55" />
+                    <Text style={{ fontSize: 13, color: '#73747B', fontWeight: '400' }}>
+                      My hobbies are...
+                    </Text>
+                  </Pressable>
+                )}
 
                 {websiteLink ? (
                   <Pressable
