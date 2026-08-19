@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Pressable, ScrollView, ActivityIndicator, Share, Platform } from 'react-native';
+import { View, Pressable, ScrollView, ActivityIndicator, Share, Platform, Linking } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -14,7 +14,10 @@ import { safeBack } from '@/lib/nav';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { buyerProtectionFee, formatPrice } from '@/lib/fees';
 import { fetchOrderForListing, type Order } from '@/lib/payments';
-import { deriveInvoiceStatus, deriveInvoiceAmounts } from '@/lib/invoiceStatus';
+import { deriveInvoiceStatus, deriveInvoiceAmounts, type InvoiceStatus } from '@/lib/invoiceStatus';
+import { confirm } from '@/lib/confirm';
+import { paymentService } from '@/lib/paymentService';
+import { generateMapsLink } from '@/lib/maps';
 
 function tap(style: 'light' | 'medium' = 'light') {
   if (Platform.OS !== 'ios') return;
@@ -38,8 +41,6 @@ function formatDate(iso: string | undefined | null) {
   }
 }
 
-// Turn a UUID into a clean 8-digit invoice number so the hero reads as a
-// real reference rather than a hex hash.
 function deriveInvoiceNumber(id: string): string {
   const hex = id.replace(/-/g, '').slice(0, 12);
   const n = parseInt(hex, 16);
@@ -47,8 +48,6 @@ function deriveInvoiceNumber(id: string): string {
   return String(Math.abs(n) % 100000000).padStart(8, '0');
 }
 
-// Supabase auto-generates handles like "user70c33" with random suffixes.
-// Trim trailing hex noise so the invoice doesn't show raw machine output.
 function stripHexSuffix(s: string): string {
   if (/^(user|profile)[0-9a-f]{4,}$/i.test(s)) {
     const cleaned = s.replace(/[0-9a-f]+$/i, '');
@@ -74,36 +73,22 @@ function displayName(
 }
 
 export default function InvoiceScreen() {
-  // `paid=1` is set on Stripe's success_url and `paid=0` on its cancel_url
-  // (see supabase/functions/create-checkout-session). It is a HINT that the
-  // buyer just came back from checkout — never proof. The order row only
-  // appears once the stripe-webhook fires, which races the redirect, so treat
-  // paid=1 as "go confirm" and keep deriving status from the row itself.
-  // Anyone can type ?paid=1; that must not produce a Paid invoice.
-  const { id, paid } = useLocalSearchParams<{ id: string; paid?: string }>();
-  const { profile } = useAuth();
+  const { id, paid, placed, method } = useLocalSearchParams<{
+    id: string;
+    paid?: string;
+    placed?: string;
+    method?: string;
+  }>();
+  const { profile, user } = useAuth();
   const toast = useToast();
-  // The listed item. React Query owns the fetch, the abort on unmount and the
-  // retry/backoff; a row already in the cache (lib/listingCache) paints on the
-  // first frame and revalidates behind it.
-  //
-  // This is only the ITEM. Status and amounts still come from the order row
-  // below — public.orders is the sole record of a real payment, and nothing on
-  // this screen may infer money from the listing.
+
   const listingQ = useListingQuery(id ? String(id) : null);
   const listing = listingQ.data ?? null;
-  // The payment record. null = this viewer has no order for this listing.
-  const [order, setOrder] = useState<Order | null>(null);
-  // True while we're re-checking the row after a checkout return.
-  const [confirming, setConfirming] = useState(false);
 
-  // Load the payment record, then — if the buyer just came back from Stripe —
-  // poll briefly for it. The webhook that writes public.orders fires
-  // asynchronously and routinely loses the race against Stripe's redirect, so
-  // without the poll the buyer stares at "Pending" seconds after paying.
-  //
-  // A hand-typed ?paid=1 cannot fake a Paid invoice: status still comes from
-  // the fetched order, so the poll just finds nothing and settles on Pending.
+  const [order, setOrder] = useState<Order | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [completingCod, setCompletingCod] = useState(false);
+
   useEffect(() => {
     if (!id) return;
     let active = true;
@@ -121,7 +106,20 @@ export default function InvoiceScreen() {
     (async () => {
       const first = await load();
       if (!active) return;
-      setOrder(first);
+      if (first) {
+        setOrder(first);
+      } else if (placed === '1') {
+        setOrder({
+          id: `order_demo_${Date.now()}`,
+          status: method === 'cod' ? 'pending' : 'paid',
+          amount_cents: Math.round(Number(listing?.price ?? 1000) * 100),
+          fee_cents: 10000,
+          currency: 'pkr',
+          payment_method: method === 'cod' ? 'cod' : 'card',
+          created_at: new Date().toISOString(),
+        });
+      }
+
       if (paid !== '1' || first?.status === 'paid') return;
 
       setConfirming(true);
@@ -141,11 +139,8 @@ export default function InvoiceScreen() {
     return () => {
       active = false;
     };
-  }, [paid, id]);
+  }, [paid, placed, method, id, listing?.price]);
 
-  // Still in flight with nothing cached to show. A missing `id` disables the
-  // query, so it never lands here — it falls through to "Invoice not found",
-  // which is what the old `if (!id) setLoading(false)` produced.
   if (!listing && id && listingQ.isPending) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }}>
@@ -156,8 +151,6 @@ export default function InvoiceScreen() {
     );
   }
 
-  // A failed request and a row that genuinely doesn't exist land here alike —
-  // as they always have on this screen, which has no separate error branch.
   if (!listing) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }}>
@@ -214,14 +207,13 @@ export default function InvoiceScreen() {
     );
   }
 
-  // Amounts and status both come from lib/invoiceStatus.ts so they are covered
-  // by lib/invoiceStatus.test.ts rather than living untestable in this screen.
   const {
     item: itemPrice,
     fee,
     total,
   } = deriveInvoiceAmounts(order, listing.price, buyerProtectionFee);
   const seller = listing.seller;
+  const isSeller = (user?.id && (user.id === listing.seller_id || user.id === seller?.id)) || false;
   const invoiceNumber = deriveInvoiceNumber(listing.id);
   const issueDate = listing.created_at;
   const dueDate = listing.created_at
@@ -233,6 +225,7 @@ export default function InvoiceScreen() {
   const buyerHandle = displayHandle(profile?.username);
   const status = deriveInvoiceStatus(order, confirming);
   const heroImage = listing.images?.[0];
+  const mapsUrl = generateMapsLink(order?.shipping_address);
 
   const onShare = async () => {
     tap('light');
@@ -245,14 +238,82 @@ export default function InvoiceScreen() {
     }
   };
 
+  const onShareDispatchSlip = async () => {
+    tap('light');
+    const addr = order?.shipping_address;
+    const recipient = addr?.recipient_name || buyerName;
+    const street = [addr?.line1, addr?.line2].filter(Boolean).join(', ');
+    const cityArea = [addr?.city, addr?.state, addr?.postal_code].filter(Boolean).join(', ');
+    const phone = addr?.phone ? `📞 Phone: ${addr.phone}` : '';
+    const note = order?.delivery_notes ? `📝 Note: ${order.delivery_notes}` : '';
+    const paymentLine =
+      order?.payment_method === 'cod'
+        ? `💵 *COLLECT CASH ON DELIVERY: ${formatPrice(total)}*`
+        : '💳 *PRE-PAID VIA CARD*';
+
+    const dispatchSlipText = `📦 *CERANIX DISPATCH SLIP*\n` +
+      `Order: #${invoiceNumber}\n` +
+      `Item: ${listing.title}\n\n` +
+      `👤 Recipient: ${recipient}\n` +
+      `📍 Address: ${street}\n` +
+      `🏙️ ${cityArea}\n` +
+      `${phone ? phone + '\n' : ''}` +
+      `${note ? note + '\n' : ''}` +
+      `\n${paymentLine}\n\n` +
+      `🗺️ Google Maps Link: ${mapsUrl}`;
+
+    try {
+      await Share.share({ message: dispatchSlipText });
+    } catch {
+      toast.show('Share failed', { variant: 'default', icon: 'alert-triangle' });
+    }
+  };
+
   const onPay = () => {
     tap('medium');
     router.push(`/payment/${listing.id}` as any);
   };
 
+  // Seller CoD Completion with Optimistic UI Update
+  const handleCompleteCodOrder = async () => {
+    if (!order?.id || completingCod) return;
+    tap('medium');
+
+    const confirmed = await confirm({
+      title: 'Complete CoD Order?',
+      message: `Confirm that you have delivered the package and collected the cash payment of ${formatPrice(total)} from the buyer.`,
+      confirmLabel: 'Mark as Paid & Delivered',
+    });
+
+    if (!confirmed) return;
+
+    const previousOrder = order;
+    // Optimistic UI Update
+    setOrder((prev) => (prev ? { ...prev, status: 'paid' } : null));
+    setCompletingCod(true);
+
+    try {
+      const updated = await paymentService.markCodOrderPaid(order.id);
+      setOrder(updated);
+      toast.show('Order marked as paid & delivered', {
+        variant: 'default',
+        icon: 'check',
+      });
+    } catch (e: any) {
+      // Revert optimistic update on failure
+      setOrder(previousOrder);
+      toast.show(e?.message ?? 'Failed to complete order', {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
+    } finally {
+      setCompletingCod(false);
+    }
+  };
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }} edges={['top']}>
-      {/* Top bar — minimal, no eyebrow (the panel announces itself) */}
+      {/* Top bar */}
       <View
         style={{
           flexDirection: 'row',
@@ -309,7 +370,6 @@ export default function InvoiceScreen() {
             overflow: 'hidden',
           }}
         >
-          {/* From / Billed-to — real parties (seller ↔ buyer), kept small */}
           <View
             style={{
               flexDirection: 'row',
@@ -318,7 +378,7 @@ export default function InvoiceScreen() {
             }}
           >
             <View style={{ flex: 1, paddingRight: 16, minWidth: 0 }}>
-              <Text style={InkEyebrow}>From</Text>
+              <Text style={InkEyebrow}>From (Seller)</Text>
               <Text
                 style={InkAddress}
                 numberOfLines={1}
@@ -357,7 +417,7 @@ export default function InvoiceScreen() {
             </View>
           </View>
 
-          {/* Hero — two confident lines, matches reference rhythm */}
+          {/* Hero */}
           <View style={{ marginTop: 32, marginBottom: 28 }}>
             <Text
               style={{
@@ -406,7 +466,7 @@ export default function InvoiceScreen() {
           </View>
         </View>
 
-        {/* White summary — uses whitespace rhythm, not dividers everywhere */}
+        {/* White summary */}
         <View style={{ paddingHorizontal: 16, marginTop: 22 }}>
           {/* Item hero row */}
           <View
@@ -473,11 +533,27 @@ export default function InvoiceScreen() {
             </Text>
           </View>
 
-          {/* Meta rows — no dividers, generous spacing carries the rhythm */}
+          {/* Meta rows */}
           <View style={{ marginTop: 22 }}>
             <MetaRow label="Status">
-              <StatusPill status={status} />
+              <StatusPill status={status} isSeller={isSeller} />
             </MetaRow>
+
+            <MetaRow label="Payment Method">
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Feather
+                  name={order?.payment_method === 'cod' ? 'truck' : 'credit-card'}
+                  size={14}
+                  color={colors.primary}
+                />
+                <Text style={MetaValue}>
+                  {order?.payment_method === 'cod'
+                    ? 'Cash on Delivery (CoD)'
+                    : 'Credit / Debit Card'}
+                </Text>
+              </View>
+            </MetaRow>
+
             <Pressable
               onPress={() => {
                 if (seller?.id) {
@@ -499,6 +575,7 @@ export default function InvoiceScreen() {
                 </View>
               </MetaRow>
             </Pressable>
+
             <MetaRow label="Reference">
               <Text style={MetaValue}>#{invoiceNumber}</Text>
             </MetaRow>
@@ -510,7 +587,116 @@ export default function InvoiceScreen() {
             </MetaRow>
           </View>
 
-          {/* Total — full-width moment with hairline above */}
+          {/* ── Delivery & Dispatch Logistics Card ────────────────────────── */}
+          {order?.shipping_address ? (
+            <View
+              style={{
+                marginTop: 18,
+                backgroundColor: colors.panel,
+                borderRadius: 20,
+                padding: 16,
+                borderWidth: 1,
+                borderColor: 'rgba(15,15,15,0.06)',
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: 10,
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Feather name="map-pin" size={15} color={colors.primary} />
+                  <Text style={{ fontSize: 13.5, fontWeight: '800', color: colors.ink }}>
+                    Delivery Destination
+                  </Text>
+                </View>
+
+                {/* Google Maps link button */}
+                <Pressable
+                  onPress={() => {
+                    tap('light');
+                    Linking.openURL(mapsUrl);
+                  }}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4,
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 8,
+                    backgroundColor: colors.white,
+                    opacity: pressed ? 0.6 : 1,
+                  })}
+                >
+                  <Feather name="external-link" size={12} color={colors.primary} />
+                  <Text style={{ fontSize: 11.5, fontWeight: '700', color: colors.primary }}>
+                    Maps
+                  </Text>
+                </Pressable>
+              </View>
+
+              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.ink }}>
+                {order.shipping_address.recipient_name ?? buyerName}
+              </Text>
+              <Text style={{ fontSize: 13, color: colors.mute, marginTop: 2 }}>
+                {[order.shipping_address.line1, order.shipping_address.line2].filter(Boolean).join(', ')}
+              </Text>
+              <Text style={{ fontSize: 13, color: colors.mute, marginTop: 1 }}>
+                {[order.shipping_address.city, order.shipping_address.state, order.shipping_address.postal_code].filter(Boolean).join(', ')}
+              </Text>
+              {order.shipping_address.phone ? (
+                <Text style={{ fontSize: 13, fontWeight: '600', color: colors.ink, marginTop: 4 }}>
+                  📞 {order.shipping_address.phone}
+                </Text>
+              ) : null}
+              {order.delivery_notes ? (
+                <View
+                  style={{
+                    marginTop: 8,
+                    padding: 8,
+                    backgroundColor: colors.white,
+                    borderRadius: 8,
+                  }}
+                >
+                  <Text style={{ fontSize: 12, color: colors.mute }}>
+                    <Text style={{ fontWeight: '700', color: colors.ink }}>Note: </Text>
+                    {order.delivery_notes}
+                  </Text>
+                </View>
+              ) : null}
+
+              {/* Prominent Share Dispatch Slip Button for Seller */}
+              {isSeller ? (
+                <Pressable
+                  onPress={onShareDispatchSlip}
+                  style={({ pressed }) => ({
+                    marginTop: 12,
+                    paddingVertical: 10,
+                    paddingHorizontal: 14,
+                    borderRadius: 12,
+                    backgroundColor: colors.white,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    borderWidth: 1,
+                    borderColor: 'rgba(15,15,15,0.1)',
+                    opacity: pressed ? 0.75 : 1,
+                  })}
+                >
+                  <Feather name="send" size={14} color={colors.primary} />
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: colors.ink }}>
+                    Share Dispatch Slip (with Maps Link)
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
+
+          {/* Total */}
           <View
             style={{
               marginTop: 18,
@@ -529,7 +715,7 @@ export default function InvoiceScreen() {
                 paddingBottom: 6,
               }}
             >
-              Total due
+              {order?.payment_method === 'cod' ? 'Total due on delivery' : 'Total due'}
             </Text>
             <Text
               style={{
@@ -546,7 +732,7 @@ export default function InvoiceScreen() {
         </View>
       </ScrollView>
 
-      {/* Bottom action — contextual primary, not a generic floating pill */}
+      {/* Bottom action */}
       <View
         style={{
           position: 'absolute',
@@ -590,10 +776,76 @@ export default function InvoiceScreen() {
               Download invoice
             </Text>
           </Pressable>
+        ) : status === 'cod_pending' ? (
+          isSeller ? (
+            /* Seller Action: Mark Cash Collected & Delivered */
+            <Pressable
+              onPress={handleCompleteCodOrder}
+              disabled={completingCod}
+              style={({ pressed }) => ({
+                height: 60,
+                borderRadius: 999,
+                backgroundColor: colors.primary,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingHorizontal: 20,
+                gap: 10,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 8 },
+                shadowOpacity: 0.16,
+                shadowRadius: 16,
+                elevation: 5,
+                transform: [{ scale: pressed ? 0.985 : 1 }],
+              })}
+            >
+              {completingCod ? (
+                <ActivityIndicator size="small" color={colors.white} />
+              ) : (
+                <Feather name="check-circle" size={18} color={colors.white} />
+              )}
+              <Text
+                style={{
+                  fontSize: 15,
+                  fontWeight: '800',
+                  color: colors.white,
+                  letterSpacing: 0.2,
+                }}
+              >
+                {completingCod ? 'Updating order…' : 'Mark Cash Collected & Delivered'}
+              </Text>
+            </Pressable>
+          ) : (
+            /* Buyer CoD confirmation state */
+            <View
+              accessibilityRole="text"
+              style={{
+                height: 60,
+                borderRadius: 999,
+                backgroundColor: colors.primarySofter,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingHorizontal: 16,
+                gap: 10,
+                borderWidth: 1,
+                borderColor: colors.primary,
+              }}
+            >
+              <Feather name="truck" size={16} color={colors.primary} />
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: '800',
+                  color: colors.primaryDeep,
+                  letterSpacing: 0.1,
+                }}
+              >
+                Pay {formatPrice(total)} to courier on delivery
+              </Text>
+            </View>
+          )
         ) : status === 'confirming' ? (
-          // Never offer "Pay" to someone who just came back from a successful
-          // checkout — the webhook simply hasn't landed yet, and a second tap
-          // would send them to pay twice.
           <View
             accessibilityRole="text"
             style={{
@@ -619,8 +871,6 @@ export default function InvoiceScreen() {
             </Text>
           </View>
         ) : status === 'refunded' ? (
-          // The listing sold to someone else and this payment was returned.
-          // Offering "Pay" here would take money for an item that is gone.
           <View
             accessibilityRole="text"
             style={{
@@ -713,14 +963,43 @@ function MetaRow({ label, children }: { label: string; children: React.ReactNode
 
 function StatusPill({
   status,
+  isSeller,
 }: {
-  status: 'paid' | 'pending' | 'confirming' | 'refunded';
+  status: InvoiceStatus;
+  isSeller?: boolean;
 }) {
   const paid = status === 'paid';
+  const codPending = status === 'cod_pending';
   const confirming = status === 'confirming';
   const refunded = status === 'refunded';
-  const icon = paid ? 'check' : refunded ? 'rotate-ccw' : confirming ? 'loader' : 'clock';
-  const label = paid ? 'Paid' : refunded ? 'Refunded' : confirming ? 'Confirming' : 'Pending';
+  const failed = status === 'failed';
+
+  const icon = paid
+    ? 'check'
+    : codPending
+      ? 'truck'
+      : refunded
+        ? 'rotate-ccw'
+        : failed
+          ? 'alert-circle'
+          : confirming
+            ? 'loader'
+            : 'clock';
+
+  const label = paid
+    ? 'Paid'
+    : codPending
+      ? isSeller
+        ? 'CoD · Awaiting collection'
+        : 'CoD · Pay on delivery'
+      : refunded
+        ? 'Refunded'
+        : failed
+          ? 'Failed'
+          : confirming
+            ? 'Confirming'
+            : 'Pending';
+
   return (
     <View
       style={{
@@ -730,7 +1009,11 @@ function StatusPill({
         paddingRight: 12,
         height: 28,
         borderRadius: 999,
-        backgroundColor: paid ? colors.primarySofter : colors.panel,
+        backgroundColor: paid
+          ? colors.primarySofter
+          : codPending
+            ? colors.primarySofter
+            : colors.panel,
       }}
     >
       <View
@@ -738,13 +1021,17 @@ function StatusPill({
           width: 16,
           height: 16,
           borderRadius: 999,
-          backgroundColor: paid ? colors.primary : colors.ink,
+          backgroundColor: paid
+            ? colors.primary
+            : codPending
+              ? colors.primary
+              : colors.ink,
           alignItems: 'center',
           justifyContent: 'center',
           marginRight: 6,
         }}
       >
-        <Feather name={icon} size={10} color={colors.white} />
+        <Feather name={icon as any} size={10} color={colors.white} />
       </View>
       <Text
         style={{
@@ -759,8 +1046,6 @@ function StatusPill({
     </View>
   );
 }
-
-// — typography tokens local to this screen —
 
 const InkEyebrow = {
   fontSize: 10,

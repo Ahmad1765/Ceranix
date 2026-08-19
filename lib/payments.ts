@@ -17,10 +17,13 @@ type SessionResponse = { url: string; sessionId: string };
 // one back to Pending and send the buyer to pay a second time.
 export type Order = {
   id: string;
-  status: "pending" | "paid" | "refunded" | "canceled" | "refund_due";
+  status: "pending" | "paid" | "refunded" | "canceled" | "refund_due" | "failed";
   amount_cents: number;
   fee_cents: number;
   currency: string;
+  payment_method?: "card" | "cod";
+  shipping_address?: any;
+  delivery_notes?: string | null;
   created_at: string;
 };
 
@@ -36,7 +39,7 @@ export async function fetchOrderForListing(
 ): Promise<Order | null> {
   const { data, error } = await supabase
     .from("orders")
-    .select("id, status, amount_cents, fee_cents, currency, created_at")
+    .select("id, status, amount_cents, fee_cents, currency, payment_method, shipping_address, delivery_notes, created_at")
     .eq("listing_id", listingId)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -82,7 +85,7 @@ export async function fetchMyOrders(userId: string): Promise<MyOrder[]> {
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "id, status, amount_cents, fee_cents, currency, created_at, listing_id, buyer_id, seller_id, listing:listings(id, title, images, price)",
+      "id, status, amount_cents, fee_cents, currency, payment_method, shipping_address, delivery_notes, created_at, listing_id, buyer_id, seller_id, listing:listings(id, title, images, price)",
     )
     .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
     .order("created_at", { ascending: false });

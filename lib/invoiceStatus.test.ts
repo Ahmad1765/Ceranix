@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { deriveInvoiceStatus, deriveInvoiceAmounts } from '@/lib/invoiceStatus';
 import { buyerProtectionFee } from '@/lib/fees';
 
-const order = (status: string) => ({ status }) as any;
+const order = (status: string, payment_method?: string) => ({ status, payment_method }) as any;
 
 describe('deriveInvoiceStatus', () => {
   it('shows Paid only for a paid order', () => {
@@ -15,23 +15,27 @@ describe('deriveInvoiceStatus', () => {
   });
 
   it('never shows Paid for a non-paid order, whatever the state', () => {
-    // The regression this guards: a seller flipping listings.is_sold used to
-    // render "Paid" + a Download CTA for a payment that never happened.
-    for (const s of ['pending', 'canceled', 'refunded', 'refund_due']) {
+    for (const s of ['pending', 'canceled', 'refunded', 'refund_due', 'failed']) {
       expect(deriveInvoiceStatus(order(s), false)).not.toBe('paid');
     }
     expect(deriveInvoiceStatus(null, true)).not.toBe('paid');
   });
 
+  it('shows cod_pending for an active Cash on Delivery order', () => {
+    expect(deriveInvoiceStatus(order('pending', 'cod'), false)).toBe('cod_pending');
+  });
+
   it('shows Refunded — not Pending — for a returned payment', () => {
-    // Falling back to Pending would show a Pay button for an item that has
-    // already gone to another buyer, taking their money a second time.
     expect(deriveInvoiceStatus(order('refunded'), false)).toBe('refunded');
     expect(deriveInvoiceStatus(order('refund_due'), false)).toBe('refunded');
   });
 
   it('keeps Refunded even while a confirm poll is running', () => {
     expect(deriveInvoiceStatus(order('refund_due'), true)).toBe('refunded');
+  });
+
+  it('shows failed for a failed payment', () => {
+    expect(deriveInvoiceStatus(order('failed'), false)).toBe('failed');
   });
 
   it('shows Confirming only while re-checking with no settled order', () => {
@@ -56,8 +60,6 @@ describe('deriveInvoiceAmounts', () => {
   });
 
   it('reflects an accepted-offer price, which listing.price does not', () => {
-    // Buyer paid an accepted offer of Rs 300 on a Rs 8,000 listing. The invoice
-    // must show 300, not 8000 — the old code read listing.price and lied.
     const a = deriveInvoiceAmounts(
       { amount_cents: 30_000, fee_cents: 10_000 } as any,
       8000,

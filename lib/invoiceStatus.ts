@@ -6,7 +6,13 @@
 
 import type { Order } from '@/lib/payments';
 
-export type InvoiceStatus = 'paid' | 'pending' | 'confirming' | 'refunded';
+export type InvoiceStatus =
+  | 'paid'
+  | 'pending'
+  | 'confirming'
+  | 'refunded'
+  | 'cod_pending'
+  | 'failed';
 
 /**
  * Derive the invoice status.
@@ -17,15 +23,18 @@ export type InvoiceStatus = 'paid' | 'pending' | 'confirming' | 'refunded';
  *    flip a real one back to Pending and send the buyer to pay twice.
  *  - A refunded / refund_due order must NOT fall back to Pending, which would
  *    offer a Pay button for an item that already went to someone else.
+ *  - `cod_pending` is an active Cash on Delivery order awaiting delivery & collection.
  *  - `confirming` is transient, shown only while re-checking after a checkout
  *    return. It is never derived from the URL.
  */
 export function deriveInvoiceStatus(
-  order: Pick<Order, 'status'> | null | undefined,
+  order: Pick<Order, 'status' | 'payment_method'> | null | undefined,
   confirming: boolean,
 ): InvoiceStatus {
   if (order?.status === 'paid') return 'paid';
   if (order?.status === 'refunded' || order?.status === 'refund_due') return 'refunded';
+  if (order?.status === 'failed') return 'failed';
+  if (order?.payment_method === 'cod' && order?.status === 'pending') return 'cod_pending';
   if (confirming) return 'confirming';
   return 'pending';
 }

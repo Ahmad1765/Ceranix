@@ -62,7 +62,7 @@ function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
   // opens can't disagree about what was charged — the order row carries minor
   // units and an accepted-offer price that listing.price does not reflect.
   const { total } = deriveInvoiceAmounts(order, order.listing?.price, buyerProtectionFee);
-  const badge = orderBadge(order.status, side);
+  const badge = orderBadge(order.status, side, order.payment_method);
   const tone = toneStyle(badge.tone);
   const image = order.listing?.images?.[0];
 

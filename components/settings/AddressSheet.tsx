@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { View } from 'react-native';
+import { View, Pressable, ActivityIndicator, ScrollView } from 'react-native';
+import { Text } from '@/lib/rnText';
+import Feather from '@expo/vector-icons/Feather';
+import { colors } from '@/lib/theme';
+import { useAuth } from '@/lib/auth';
+import { useToast } from '@/lib/toast';
+import { tap } from '@/lib/haptics';
+import { getCurrentLocationAddress, POPULAR_CITIES } from '@/lib/location';
 import type { ShippingAddress } from '@/types';
 import { SheetModal, SheetField, SheetPrimary, SheetDestructive } from './Sheet';
 
@@ -21,7 +28,7 @@ const EMPTY: AddressForm = {
   city: '',
   state: '',
   postal_code: '',
-  country: '',
+  country: 'Pakistan',
   phone: '',
 };
 
@@ -38,61 +45,246 @@ export function AddressSheet({
   onSave: (form: AddressForm) => Promise<void>;
   onRemove?: () => Promise<void>;
 }) {
+  const { profile } = useAuth();
+  const toast = useToast();
+
   const [form, setForm] = useState<AddressForm>(EMPTY);
   const [saving, setSaving] = useState(false);
+  const [locating, setLocating] = useState(false);
 
   useEffect(() => {
     if (visible) {
+      const defaultName =
+        initial?.recipient_name ||
+        profile?.full_name ||
+        (profile?.username ? `@${profile.username}` : '');
+
+      let initCity = initial?.city ?? '';
+      let initCountry = initial?.country ?? 'Pakistan';
+      if (initCity.includes(',')) {
+        const parts = initCity.split(',').map((p) => p.trim());
+        initCity = parts[0];
+        if (parts[1]) initCountry = parts[1];
+      }
+
+      let initLine2 = initial?.line2 ?? '';
+      if (initLine2.trim() === (initial?.line1 ?? '').trim()) {
+        initLine2 = '';
+      }
+
       setForm({
-        recipient_name: initial?.recipient_name ?? '',
+        recipient_name: defaultName,
         line1: initial?.line1 ?? '',
-        line2: initial?.line2 ?? '',
-        city: initial?.city ?? '',
+        line2: initLine2,
+        city: initCity,
         state: initial?.state ?? '',
         postal_code: initial?.postal_code ?? '',
-        country: initial?.country ?? '',
+        country: initCountry,
         phone: initial?.phone ?? '',
       });
       setSaving(false);
+      setLocating(false);
     }
-  }, [visible, initial]);
+  }, [visible, initial, profile]);
 
   const errors = useMemo(() => {
     const e: Partial<Record<keyof AddressForm, string>> = {};
-    if (!form.recipient_name.trim()) e.recipient_name = 'Required';
-    if (!form.line1.trim()) e.line1 = 'Required';
-    if (!form.city.trim()) e.city = 'Required';
-    if (!form.postal_code.trim()) e.postal_code = 'Required';
-    if (!form.country.trim()) e.country = 'Required';
+    if (!form.recipient_name.trim()) e.recipient_name = 'Recipient name is required';
+    if (!form.line1.trim()) e.line1 = 'Street address is required';
+    if (!form.city.trim()) e.city = 'City is required';
+    if (!form.postal_code.trim()) e.postal_code = 'Postal code is required';
+    if (!form.country.trim()) e.country = 'Country is required';
     return e;
   }, [form]);
 
   const canSave = Object.keys(errors).length === 0;
-  const set = (patch: Partial<AddressForm>) => setForm((s) => ({ ...s, ...patch }));
+
+  const set = (patch: Partial<AddressForm>) => {
+    // Smart cleaning: if city contains comma (e.g. "Lahore, Pakistan"), split cleanly
+    if (typeof patch.city === 'string' && patch.city.includes(',')) {
+      const parts = patch.city.split(',').map((p) => p.trim());
+      patch.city = parts[0];
+      if (parts[1] && !form.country) {
+        patch.country = parts[1];
+      }
+    }
+    setForm((s) => ({ ...s, ...patch }));
+  };
+
+  // Location Auto-detect / Location Adder
+  const handleUseCurrentLocation = async () => {
+    if (locating) return;
+    tap('medium');
+    setLocating(true);
+
+    try {
+      const loc = await getCurrentLocationAddress();
+      setForm((s) => ({
+        ...s,
+        line1: loc.line1 || s.line1,
+        city: loc.city || s.city,
+        state: loc.state || s.state,
+        postal_code: loc.postal_code || s.postal_code,
+        country: loc.country || s.country || 'Pakistan',
+      }));
+
+      toast.show('Address auto-filled from your location', {
+        variant: 'default',
+        icon: 'check',
+      });
+    } catch (e: any) {
+      toast.show(e?.message ?? 'Could not detect location', {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
+    } finally {
+      setLocating(false);
+    }
+  };
+
+  // Quick city selector helper
+  const handleSelectCity = (cityName: string) => {
+    tap('light');
+    let state = form.state;
+    if (['Lahore', 'Faisalabad', 'Multan', 'Rawalpindi', 'Gujranwala', 'Sialkot'].includes(cityName)) {
+      state = 'Punjab';
+    } else if (['Karachi', 'Hyderabad', 'Sukkur'].includes(cityName)) {
+      state = 'Sindh';
+    } else if (['Islamabad'].includes(cityName)) {
+      state = 'Islamabad Capital Territory';
+    } else if (['Peshawar'].includes(cityName)) {
+      state = 'Khyber Pakhtunkhwa';
+    } else if (['Quetta'].includes(cityName)) {
+      state = 'Balochistan';
+    }
+
+    setForm((s) => ({
+      ...s,
+      city: cityName,
+      state: state || s.state,
+      country: s.country || 'Pakistan',
+    }));
+  };
 
   return (
     <SheetModal visible={visible} onClose={onClose} title="Shipping address">
+      {/* ── Location Adder Action ────────────────────────────────────────── */}
+      <View
+        style={{
+          marginBottom: 16,
+          backgroundColor: colors.panel,
+          borderRadius: 16,
+          padding: 12,
+        }}
+      >
+        <Pressable
+          onPress={handleUseCurrentLocation}
+          disabled={locating}
+          style={({ pressed }) => ({
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: locating ? colors.primarySofter : colors.white,
+            borderRadius: 12,
+            paddingVertical: 11,
+            paddingHorizontal: 14,
+            borderWidth: 1,
+            borderColor: colors.primarySofter,
+            gap: 8,
+            opacity: pressed ? 0.8 : 1,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.05,
+            shadowRadius: 2,
+          })}
+        >
+          {locating ? (
+            <>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={{ fontSize: 13.5, fontWeight: '700', color: colors.primary }}>
+                Detecting your location…
+              </Text>
+            </>
+          ) : (
+            <>
+              <Feather name="navigation" size={15} color={colors.primary} />
+              <Text style={{ fontSize: 13.5, fontWeight: '700', color: colors.primary }}>
+                Use Current Location (GPS Auto-fill)
+              </Text>
+            </>
+          )}
+        </Pressable>
+
+        {/* Quick city suggestions */}
+        <View style={{ marginTop: 10 }}>
+          <Text style={{ fontSize: 11, color: colors.mute, fontWeight: '600', marginBottom: 6 }}>
+            QUICK CITY SELECT:
+          </Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 6 }}
+          >
+            {POPULAR_CITIES.map((c) => {
+              const isSelected = form.city.toLowerCase() === c.toLowerCase();
+              return (
+                <Pressable
+                  key={c}
+                  onPress={() => handleSelectCity(c)}
+                  style={{
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    borderRadius: 8,
+                    backgroundColor: isSelected ? colors.primary : colors.white,
+                    borderWidth: 1,
+                    borderColor: isSelected ? colors.primary : 'rgba(0,0,0,0.08)',
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: isSelected ? '800' : '600',
+                      color: isSelected ? colors.white : colors.ink,
+                    }}
+                  >
+                    {c}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </View>
+
+      {/* ── Form Fields ─────────────────────────────────────────────────── */}
       <SheetField
         label="Recipient name"
+        placeholder="Full name of person receiving the package"
         value={form.recipient_name}
         onChangeText={(t) => set({ recipient_name: t.slice(0, 80) })}
         error={errors.recipient_name}
       />
+
       <SheetField
-        label="Address line 1"
+        label="Address line 1 (Street / House / Block)"
+        placeholder="e.g. House #12, Street 4, Block C, Nishat Colony"
         value={form.line1}
         onChangeText={(t) => set({ line1: t.slice(0, 120) })}
         error={errors.line1}
       />
+
       <SheetField
-        label="Address line 2 (optional)"
+        label="Address line 2 (Optional landmark / suite)"
+        placeholder="e.g. Near Shell pump, Flat 3B"
         value={form.line2}
         onChangeText={(t) => set({ line2: t.slice(0, 120) })}
       />
+
       <View style={{ flexDirection: 'row', gap: 12 }}>
         <View style={{ flex: 1 }}>
           <SheetField
             label="City"
+            placeholder="e.g. Lahore"
             value={form.city}
             onChangeText={(t) => set({ city: t.slice(0, 60) })}
             error={errors.city}
@@ -101,16 +293,20 @@ export function AddressSheet({
         <View style={{ flex: 1 }}>
           <SheetField
             label="State / region"
+            placeholder="e.g. Punjab"
             value={form.state}
             onChangeText={(t) => set({ state: t.slice(0, 60) })}
           />
         </View>
       </View>
+
       <View style={{ flexDirection: 'row', gap: 12 }}>
         <View style={{ flex: 1 }}>
           <SheetField
             label="Postal code"
+            placeholder="e.g. 54000"
             value={form.postal_code}
+            keyboardType="number-pad"
             onChangeText={(t) => set({ postal_code: t.slice(0, 20) })}
             error={errors.postal_code}
           />
@@ -118,14 +314,17 @@ export function AddressSheet({
         <View style={{ flex: 1 }}>
           <SheetField
             label="Country"
+            placeholder="e.g. Pakistan"
             value={form.country}
             onChangeText={(t) => set({ country: t.slice(0, 60) })}
             error={errors.country}
           />
         </View>
       </View>
+
       <SheetField
-        label="Phone (optional)"
+        label="Phone (for courier delivery)"
+        placeholder="e.g. 03254864702"
         value={form.phone}
         keyboardType="phone-pad"
         onChangeText={(t) => set({ phone: t.slice(0, 30) })}
@@ -142,6 +341,7 @@ export function AddressSheet({
           setSaving(false);
         }}
       />
+
       {onRemove && (
         <SheetDestructive
           label="Remove address"

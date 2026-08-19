@@ -60,10 +60,12 @@ export type OrderTone = 'positive' | 'neutral' | 'warn';
  *    won (see orders_one_paid_per_listing_idx). Their money is coming back, so
  *    it must not read as either a successful purchase OR a plain refund they
  *    asked for.
+ *  - 'pending' with payment_method 'cod' is an active Cash on Delivery order awaiting delivery.
  */
 export function orderBadge(
   status: MyOrder['status'],
   side: OrderSide,
+  paymentMethod?: MyOrder['payment_method'] | string,
 ): { label: string; tone: OrderTone } {
   switch (status) {
     case 'paid':
@@ -74,16 +76,17 @@ export function orderBadge(
       return { label: 'Refund on the way', tone: 'warn' };
     case 'canceled':
       return { label: 'Canceled', tone: 'neutral' };
+    case 'failed':
+      return { label: 'Payment failed', tone: 'warn' };
     case 'pending':
+      if (paymentMethod === 'cod') {
+        return {
+          label: side === 'bought' ? 'CoD · Pay on delivery' : 'CoD · Awaiting delivery',
+          tone: 'warn',
+        };
+      }
       return { label: 'Awaiting payment', tone: 'warn' };
     default: {
-      // Exhaustiveness guard. `pending` is an explicit case above so that this
-      // branch types as `never`: adding a status to Order['status'] without
-      // deciding what it says here becomes a compile error rather than a row
-      // that silently reads "Awaiting payment". On a screen about money, a
-      // confidently wrong label is worse than a build that won't ship — and the
-      // behavioural test below can't catch it, since it enumerates the statuses
-      // it already knows about.
       const unexpected: never = status;
       console.warn('[orders] unhandled order status', unexpected);
       return { label: 'Awaiting payment', tone: 'warn' };

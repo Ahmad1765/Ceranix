@@ -38,18 +38,35 @@ export function SheetModal({
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <View style={{ flex: 1, backgroundColor: 'rgba(15,15,15,0.55)', justifyContent: 'flex-end' }}>
-        <Pressable style={{ flex: 1 }} onPress={onClose} accessibilityLabel="Close" />
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: 'rgba(15,15,15,0.55)',
+          justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end',
+          alignItems: 'center',
+          paddingHorizontal: Platform.OS === 'web' ? 16 : 0,
+        }}
+      >
+        <Pressable style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }} onPress={onClose} accessibilityLabel="Close" />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ width: '100%', maxWidth: 520, maxHeight: '90%' }}
+        >
           <View
             style={{
               backgroundColor: colors.white,
+              borderRadius: Platform.OS === 'web' ? 24 : 0,
               borderTopLeftRadius: 28,
               borderTopRightRadius: 28,
-              paddingTop: 12,
+              paddingTop: 16,
               paddingHorizontal: 20,
               paddingBottom: Platform.OS === 'ios' ? 32 : 20,
-              maxHeight: '88%',
+              maxHeight: '100%',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 10 },
+              shadowOpacity: 0.15,
+              shadowRadius: 24,
+              elevation: 8,
             }}
           >
             {/* Handle */}

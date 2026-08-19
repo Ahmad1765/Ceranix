@@ -12,6 +12,7 @@ const row = (over: Partial<MyOrder>): MyOrder =>
     amount_cents: 500000,
     fee_cents: 10000,
     currency: 'pkr',
+    payment_method: 'card',
     created_at: '2026-08-01T00:00:00Z',
     listing_id: 'l1',
     buyer_id: ME,
@@ -56,14 +57,9 @@ describe('normalizeMyOrder', () => {
   const listing = { id: 'l1', title: 'Wool coat', images: ['a.jpg'], price: 4200 };
 
   it('accepts the embed as an object, an array, or absent', () => {
-    // PostgREST returns a to-one embed as an object, but has handed back a
-    // single-element array for this shape elsewhere in the codebase. Both must
-    // resolve to the item, or every row renders "Item no longer listed" with
-    // the wrong total.
     expect(normalizeMyOrder({ listing }).listing).toEqual(listing);
     expect(normalizeMyOrder({ listing: [listing] }).listing).toEqual(listing);
     expect(normalizeMyOrder({ listing: null }).listing).toBeNull();
-    // A deleted listing arrives as an empty array rather than null.
     expect(normalizeMyOrder({ listing: [] }).listing).toBeNull();
   });
 });
@@ -75,19 +71,33 @@ describe('orderBadge', () => {
   });
 
   it('never lets a non-paid order look like a completed purchase', () => {
-    // The regression this guards: an abandoned or refunded checkout sitting in
-    // someone's history badged the same as money that actually moved.
-    for (const s of ['pending', 'canceled', 'refunded', 'refund_due'] as const) {
+    for (const s of ['pending', 'canceled', 'refunded', 'refund_due', 'failed'] as const) {
       expect(orderBadge(s, 'bought').tone).not.toBe('positive');
       expect(orderBadge(s, 'sold').tone).not.toBe('positive');
     }
   });
 
   it('distinguishes a losing-race refund from a plain refund', () => {
-    // refund_due means the buyer paid for an item another buyer had already
-    // won. "Refunded" would imply it is already settled and done.
     expect(orderBadge('refund_due', 'bought').label).not.toBe(
       orderBadge('refunded', 'bought').label,
     );
+  });
+
+  it('handles Cash on Delivery (CoD) pending badges for buyer and seller', () => {
+    expect(orderBadge('pending', 'bought', 'cod')).toEqual({
+      label: 'CoD · Pay on delivery',
+      tone: 'warn',
+    });
+    expect(orderBadge('pending', 'sold', 'cod')).toEqual({
+      label: 'CoD · Awaiting delivery',
+      tone: 'warn',
+    });
+  });
+
+  it('handles failed order status badge', () => {
+    expect(orderBadge('failed', 'bought')).toEqual({
+      label: 'Payment failed',
+      tone: 'warn',
+    });
   });
 });

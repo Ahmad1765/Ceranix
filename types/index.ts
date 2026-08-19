@@ -47,25 +47,38 @@ export interface ShippingAddress {
   country: string;
   phone: string | null;
   is_default: boolean;
+  coordinates?: { lat: number; lng: number } | null;
+  delivery_instructions?: string | null;
   created_at: string;
   updated_at: string;
 }
 
-export type OrderStatus = 'pending' | 'paid' | 'refunded' | 'canceled';
+export type PaymentMethod = 'card' | 'cod';
 
-// Written exclusively by the stripe-webhook edge function after a verified
-// checkout.session.completed event; clients can only read their own rows.
+export type OrderStatus =
+  | 'pending'
+  | 'paid'
+  | 'refunded'
+  | 'canceled'
+  | 'refund_due'
+  | 'failed';
+
+// A row of public.orders — record of payments and Cash on Delivery orders.
 export interface Order {
   id: string;
   listing_id: string;
   buyer_id: string;
   seller_id: string;
   amount_cents: number;
+  fee_cents: number;
   currency: string;
-  stripe_session_id: string;
-  stripe_payment_intent: string | null;
-  offer_message_id: string | null;
+  stripe_session_id?: string | null;
+  stripe_payment_intent?: string | null;
+  offer_message_id?: string | null;
+  payment_method?: PaymentMethod;
   status: OrderStatus;
+  shipping_address?: ShippingAddress | null;
+  delivery_notes?: string | null;
   created_at: string;
 }
 

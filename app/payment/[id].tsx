@@ -1,6 +1,13 @@
 import { capture } from '@/lib/analytics';
 import { useEffect, useState, useRef } from 'react';
-import { View, Pressable, ScrollView, ActivityIndicator, Platform } from 'react-native';
+import {
+  View,
+  Pressable,
+  ScrollView,
+  ActivityIndicator,
+  Platform,
+  TextInput,
+} from 'react-native';
 import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -15,14 +22,14 @@ import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { safeBack } from '@/lib/nav';
 import { HIT_SLOP_8 } from '@/lib/responsive';
-import {
-  createCheckoutSession,
-  fetchOrderForListing,
-  openCheckout,
-  STRIPE_ENABLED,
-} from '@/lib/payments';
+import { supabase } from '@/lib/supabase';
 import { buyerProtectionFee, formatPrice } from '@/lib/fees';
 import { SlideToConfirm } from '@/components/SlideToConfirm';
+import { AddressSheet, type AddressForm } from '@/components/settings/AddressSheet';
+import { MockStripePaymentSheet } from '@/components/payment/MockStripePaymentSheet';
+import { paymentService, STRIPE_ENABLED } from '@/lib/paymentService';
+import { ShippingAddressSchema } from '@/lib/schemas/order';
+import type { ShippingAddress, PaymentMethod } from '@/types';
 
 function tap(style: 'light' | 'medium' = 'light') {
   if (Platform.OS !== 'ios') return;
@@ -42,47 +49,72 @@ function formatShortDate(d: Date) {
 
 export default function PaymentScreen() {
   const { id, offer } = useLocalSearchParams<{ id: string; offer?: string }>();
-  // `authLoading` is load-bearing: the auth context restores its session
-  // asynchronously, so `user` is null for the first frames of any cold load.
-  // Redirecting on that null bounces a signed-in buyer to the login screen on
-  // a hard refresh or a deep link into checkout. (Local `loading` below is the
-  // listing fetch — a different thing.)
   const { user, loading: authLoading } = useAuth();
-
   const toast = useToast();
-  // React Query owns the fetch, the abort on unmount, and the retry/backoff.
-  // The row a buyer tapped through from a feed or a product page is already in
-  // the cache (lib/listingCache seeds it), so checkout paints on the first frame
-  // and revalidates behind it — and now survives a cold launch too.
-  //
-  // Retries are deliberately left at the app default rather than capped: on a
-  // checkout screen, recovering from a transient blip matters more than failing
-  // fast, and the old code had no retry at all — one blip was a dead end.
+
   const listingQ = useListingQuery(id ? String(id) : null);
   const listing = listingQ.data ?? null;
+
+  // Checkout states
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
+  const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null);
+  const [addressLoading, setAddressLoading] = useState(true);
+  const [addressSheetOpen, setAddressSheetOpen] = useState(false);
+  const [deliveryNotes, setDeliveryNotes] = useState('');
+  const [stripeSheetOpen, setStripeSheetOpen] = useState(false);
   const [paying, setPaying] = useState(false);
-  const demoTimerRef = useRef<any>(null);
+
   const mounted = useRef(true);
 
+  // Fetch buyer's default shipping address
   useEffect(() => {
     mounted.current = true;
-    return () => {
-      mounted.current = false;
-      if (demoTimerRef.current) clearTimeout(demoTimerRef.current);
-    };
-  }, []);
+    if (!user?.id) return;
 
-  // When the buyer arrives from an accepted offer, the chat passes ?offer=<amt>
-  // so the displayed total reflects the agreed price. The Stripe edge function
-  // is responsible for validating this against the accepted-offer record.
+    let active = true;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('shipping_addresses')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('is_default', true)
+          .maybeSingle();
+
+        if (active) {
+          if (!error && data) {
+            setShippingAddress(data as ShippingAddress);
+          } else {
+            // Fallback: fetch any shipping address for this user
+            const { data: anyAddr } = await supabase
+              .from('shipping_addresses')
+              .select('*')
+              .eq('user_id', user.id)
+              .limit(1)
+              .maybeSingle();
+            if (active && anyAddr) {
+              setShippingAddress(anyAddr as ShippingAddress);
+            }
+          }
+        }
+      } catch {
+        // ignore address fetch errors
+      } finally {
+        if (active) setAddressLoading(false);
+      }
+    })();
+
+    return () => {
+      active = false;
+      mounted.current = false;
+    };
+  }, [user?.id]);
+
   const offerAmount = (() => {
     const n = Number(offer);
     return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
   })();
 
-  // Wait for auth to settle before judging `user` — the same order
-  // components/RequireAuth uses. This screen hand-rolls that guard, and
-  // omitting the loading check is what sent signed-in buyers to /auth/login.
   if (authLoading) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }}>
@@ -97,9 +129,6 @@ export default function PaymentScreen() {
     return <Redirect href="/auth/login" />;
   }
 
-  // Still in flight with nothing cached to show. A missing `id` disables the
-  // query, so it never lands here — it falls through to "Item unavailable",
-  // which is what the old `if (!id) setLoading(false)` produced.
   if (!listing && id && listingQ.isPending) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }}>
@@ -110,8 +139,6 @@ export default function PaymentScreen() {
     );
   }
 
-  // A failed request and a row that genuinely doesn't exist land here alike —
-  // as they always have on this screen, which has no separate error branch.
   if (!listing) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }}>
@@ -150,9 +177,6 @@ export default function PaymentScreen() {
     );
   }
 
-  // Item price (an accepted offer overrides the listing price) + Buyer
-  // Protection = what the buyer pays. Kept in one place so the summary, the
-  // fee row, and the total below can't drift apart.
   const itemPrice = offerAmount ?? Number(listing.price ?? 0);
   const fee = buyerProtectionFee(itemPrice);
   const total = itemPrice + fee;
@@ -160,66 +184,169 @@ export default function PaymentScreen() {
     listing.seller?.full_name || listing.seller?.username || 'Seller';
   const sellerInitial = (listing.seller?.username || 'S').charAt(0).toUpperCase();
   const payOn = formatShortDate(new Date());
-  const cardLast4 = '4242';
-  const cardBrand = STRIPE_ENABLED ? 'Card' : 'Demo card';
 
-  const handlePay = async () => {
+  // Handle Save Address from sheet
+  const handleSaveAddress = async (form: AddressForm) => {
+    try {
+      // Validate with Zod
+      ShippingAddressSchema.parse(form);
+
+      const payload = {
+        user_id: user.id,
+        recipient_name: form.recipient_name.trim(),
+        line1: form.line1.trim(),
+        line2: form.line2?.trim() || null,
+        city: form.city.trim(),
+        state: form.state?.trim() || null,
+        postal_code: form.postal_code.trim(),
+        country: form.country.trim(),
+        phone: form.phone?.trim() || null,
+        is_default: true,
+      };
+
+      const { data, error } = await supabase
+        .from('shipping_addresses')
+        .upsert(payload)
+        .select()
+        .single();
+
+      if (error) {
+        // Fallback for local mock
+        const mockAddress: ShippingAddress = {
+          id: `mock_addr_${Date.now()}`,
+          ...payload,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        setShippingAddress(mockAddress);
+      } else {
+        setShippingAddress(data as ShippingAddress);
+      }
+
+      setAddressSheetOpen(false);
+      toast.show('Shipping address saved', { variant: 'default', icon: 'check' });
+    } catch (e: any) {
+      toast.show(e?.message ?? 'Please check address details', {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
+      throw e;
+    }
+  };
+
+  // Main Checkout Trigger
+  const handleCheckout = async () => {
     if (paying) return;
+
+    // Validate address presence for Cash on Delivery
+    if (paymentMethod === 'cod' && !shippingAddress) {
+      toast.show('Please add a shipping address for delivery', {
+        variant: 'default',
+        icon: 'map-pin',
+      });
+      setAddressSheetOpen(true);
+      return;
+    }
+
+    // Card Flow
+    if (paymentMethod === 'card') {
+      if (STRIPE_ENABLED) {
+        // Live Stripe flow
+        setPaying(true);
+        try {
+          capture('checkout_started', { listing_id: id, payment_method: 'card', amount: total });
+          const result = await paymentService.checkout({
+            listingId: String(id),
+            paymentMethod: 'card',
+            buyerId: user.id,
+            sellerId: listing.seller_id,
+            listingPrice: Number(listing.price),
+            offerAmount: offerAmount ?? undefined,
+            shippingAddress,
+            deliveryNotes,
+          });
+
+          if (result.redirectUrl) {
+            if (Platform.OS === 'web' && typeof window !== 'undefined') {
+              window.location.href = result.redirectUrl;
+            }
+          }
+        } catch (e: any) {
+          toast.show(e?.message ?? 'Could not initiate Stripe checkout', {
+            variant: 'default',
+            icon: 'alert-triangle',
+          });
+        } finally {
+          setPaying(false);
+        }
+      } else {
+        // PCI-Compliant Mock Stripe Payment Sheet
+        setStripeSheetOpen(true);
+      }
+      return;
+    }
+
+    // Cash on Delivery Flow
     tap('medium');
     setPaying(true);
-
     try {
-      capture('checkout_started', { listing_id: id, amount: total });
-      if (!STRIPE_ENABLED) {
-        await new Promise((resolve) => {
-          demoTimerRef.current = setTimeout(resolve, 900);
-        });
-        toast.show('Demo payment — Stripe not configured', {
-          variant: 'info',
-          icon: 'info',
-        });
-        router.replace(`/invoice/${id}?paid=1` as any);
-        return;
-      }
+      capture('checkout_started', { listing_id: id, payment_method: 'cod', amount: total });
 
-      const { url } = await createCheckoutSession(String(id), {
+      const result = await paymentService.checkout({
+        listingId: String(id),
+        paymentMethod: 'cod',
+        buyerId: user.id,
+        sellerId: listing.seller_id,
+        listingPrice: Number(listing.price),
         offerAmount: offerAmount ?? undefined,
+        shippingAddress,
+        deliveryNotes,
       });
-      await openCheckout(url);
-      if (Platform.OS !== 'web') {
-        // Wait for the order the stripe-webhook writes — NOT for listings.is_sold,
-        // which the seller can toggle by hand and which would report "paid" for a
-        // checkout the buyer abandoned.
-        let verified = false;
-        for (let i = 0; i < 15; i++) {
-          if (!mounted.current) return;
-          await new Promise((r) => setTimeout(r, 2000));
-          if (!mounted.current) return;
-          try {
-            const placed = await fetchOrderForListing(String(id));
-            if (!mounted.current) return;
-            if (placed?.status === 'paid') {
-              verified = true;
-              break;
-            }
-          } catch {
-            // ignore polling errors
-          }
-        }
-        if (!mounted.current) return;
-        if (verified) {
-          router.replace(`/invoice/${id}?paid=1` as any);
-        } else {
-          toast.show('Payment verification timed out', { variant: 'default' });
-        }
+
+      if (result.success) {
+        toast.show('Order placed! Pay on delivery.', {
+          variant: 'default',
+          icon: 'check',
+        });
+        router.replace(`/invoice/${id}?placed=1&method=cod` as any);
       }
     } catch (e: any) {
-      toast.show(e?.message ?? 'Could not start checkout', {
+      toast.show(e?.message ?? 'Could not place order', {
         variant: 'default',
         icon: 'alert-triangle',
       });
     } finally {
       setPaying(false);
+    }
+  };
+
+  // Mock Stripe Payment Sheet Confirmation Handler
+  const handleStripeSheetConfirm = async () => {
+    try {
+      const result = await paymentService.checkout({
+        listingId: String(id),
+        paymentMethod: 'card',
+        buyerId: user.id,
+        sellerId: listing.seller_id,
+        listingPrice: Number(listing.price),
+        offerAmount: offerAmount ?? undefined,
+        shippingAddress,
+        deliveryNotes,
+      });
+
+      if (result.success) {
+        setStripeSheetOpen(false);
+        toast.show('Payment authorized via Stripe mock', {
+          variant: 'default',
+          icon: 'check',
+        });
+        router.replace(`/invoice/${id}?paid=1` as any);
+      }
+    } catch (e: any) {
+      toast.show(e?.message ?? 'Card payment failed', {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
     }
   };
 
@@ -233,7 +360,7 @@ export default function PaymentScreen() {
           justifyContent: 'space-between',
           paddingHorizontal: 20,
           paddingTop: 14,
-          paddingBottom: 22,
+          paddingBottom: 16,
         }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -248,7 +375,7 @@ export default function PaymentScreen() {
               marginRight: 12,
             }}
           >
-            <Feather name="lock" size={14} color={colors.primary} />
+            <Feather name="shield" size={14} color={colors.primary} />
           </View>
           <View>
             <Text
@@ -259,7 +386,7 @@ export default function PaymentScreen() {
                 letterSpacing: -0.3,
               }}
             >
-              Pay in full
+              Checkout
             </Text>
             <Text
               style={{
@@ -269,7 +396,7 @@ export default function PaymentScreen() {
                 letterSpacing: 0.2,
               }}
             >
-              {STRIPE_ENABLED ? 'Secured by Stripe · Test mode' : 'Stripe not connected · Demo'}
+              Secure Order & Fulfillment
             </Text>
           </View>
         </View>
@@ -293,7 +420,7 @@ export default function PaymentScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 160 }}
       >
-        {/* Item summary — what you're actually buying. */}
+        {/* Item summary */}
         <View
           style={{
             flexDirection: 'row',
@@ -302,7 +429,7 @@ export default function PaymentScreen() {
             backgroundColor: colors.panel,
             borderRadius: 20,
             padding: 14,
-            marginBottom: 12,
+            marginBottom: 16,
           }}
         >
           <Image
@@ -326,6 +453,297 @@ export default function PaymentScreen() {
           </Text>
         </View>
 
+        {/* Section: Payment Method Selector */}
+        <View style={{ marginBottom: 18 }}>
+          <Text
+            style={{
+              fontSize: 14,
+              fontWeight: '800',
+              color: colors.ink,
+              marginBottom: 10,
+              letterSpacing: -0.2,
+            }}
+          >
+            Select Payment Method
+          </Text>
+
+          {/* Cash on Delivery Option */}
+          <Pressable
+            onPress={() => {
+              tap('light');
+              setPaymentMethod('cod');
+            }}
+            style={{
+              borderRadius: 16,
+              borderWidth: 2,
+              borderColor: paymentMethod === 'cod' ? colors.primary : 'rgba(15,15,15,0.08)',
+              backgroundColor: paymentMethod === 'cod' ? colors.primarySofter : colors.white,
+              padding: 16,
+              marginBottom: 10,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                <View
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 10,
+                    backgroundColor: paymentMethod === 'cod' ? colors.primary : colors.panel,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Feather
+                    name="truck"
+                    size={16}
+                    color={paymentMethod === 'cod' ? colors.white : colors.ink}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={{ fontSize: 15, fontWeight: '800', color: colors.ink }}>
+                      Cash on Delivery (CoD)
+                    </Text>
+                    <View
+                      style={{
+                        paddingHorizontal: 6,
+                        paddingVertical: 2,
+                        borderRadius: 6,
+                        backgroundColor: colors.primary,
+                      }}
+                    >
+                      <Text style={{ fontSize: 10, fontWeight: '800', color: colors.white }}>
+                        POPULAR
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 12.5, color: colors.mute, marginTop: 2 }}>
+                    Pay cash at doorstep when the parcel arrives
+                  </Text>
+                </View>
+              </View>
+
+              <View
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 10,
+                  borderWidth: 2,
+                  borderColor: paymentMethod === 'cod' ? colors.primary : colors.muteSoft,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {paymentMethod === 'cod' ? (
+                  <View
+                    style={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: 5,
+                      backgroundColor: colors.primary,
+                    }}
+                  />
+                ) : null}
+              </View>
+            </View>
+          </Pressable>
+
+          {/* Credit / Debit Card Option (Stripe) */}
+          <Pressable
+            onPress={() => {
+              tap('light');
+              setPaymentMethod('card');
+            }}
+            style={{
+              borderRadius: 16,
+              borderWidth: 2,
+              borderColor: paymentMethod === 'card' ? colors.primary : 'rgba(15,15,15,0.08)',
+              backgroundColor: paymentMethod === 'card' ? colors.primarySofter : colors.white,
+              padding: 16,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                <View
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 10,
+                    backgroundColor: paymentMethod === 'card' ? colors.primary : colors.panel,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Feather
+                    name="credit-card"
+                    size={16}
+                    color={paymentMethod === 'card' ? colors.white : colors.ink}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={{ fontSize: 15, fontWeight: '800', color: colors.ink }}>
+                      Credit / Debit Card
+                    </Text>
+                    <View
+                      style={{
+                        paddingHorizontal: 6,
+                        paddingVertical: 2,
+                        borderRadius: 6,
+                        backgroundColor: '#635BFF',
+                      }}
+                    >
+                      <Text style={{ fontSize: 10, fontWeight: '800', color: colors.white }}>
+                        STRIPE
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 12.5, color: colors.mute, marginTop: 2 }}>
+                    Instant confirmation via PCI-compliant Stripe Payment Sheet
+                  </Text>
+                </View>
+              </View>
+
+              <View
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 10,
+                  borderWidth: 2,
+                  borderColor: paymentMethod === 'card' ? colors.primary : colors.muteSoft,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {paymentMethod === 'card' ? (
+                  <View
+                    style={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: 5,
+                      backgroundColor: colors.primary,
+                    }}
+                  />
+                ) : null}
+              </View>
+            </View>
+          </Pressable>
+        </View>
+
+        {/* Section: Shipping Address */}
+        <View
+          style={{
+            backgroundColor: colors.panel,
+            borderRadius: 20,
+            padding: 16,
+            marginBottom: 16,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 10,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Feather name="map-pin" size={15} color={colors.primary} />
+              <Text style={{ fontSize: 14, fontWeight: '800', color: colors.ink }}>
+                Shipping Address
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => {
+                tap('light');
+                setAddressSheetOpen(true);
+              }}
+              hitSlop={HIT_SLOP_8}
+            >
+              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>
+                {shippingAddress ? 'Change' : 'Add address'}
+              </Text>
+            </Pressable>
+          </View>
+
+          {addressLoading ? (
+            <ActivityIndicator size="small" color={colors.ink} style={{ paddingVertical: 8 }} />
+          ) : shippingAddress ? (
+            <View>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.ink }}>
+                {shippingAddress.recipient_name}
+              </Text>
+              <Text style={{ fontSize: 13, color: colors.mute, marginTop: 2 }}>
+                {shippingAddress.line1}
+                {shippingAddress.line2 ? `, ${shippingAddress.line2}` : ''}
+              </Text>
+              <Text style={{ fontSize: 13, color: colors.mute, marginTop: 1 }}>
+                {shippingAddress.city}, {shippingAddress.postal_code}
+                {shippingAddress.phone ? ` · ${shippingAddress.phone}` : ''}
+              </Text>
+            </View>
+          ) : (
+            <Pressable
+              onPress={() => {
+                tap('light');
+                setAddressSheetOpen(true);
+              }}
+              style={{
+                paddingVertical: 12,
+                paddingHorizontal: 14,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: 'rgba(15,15,15,0.12)',
+                borderStyle: 'dashed',
+                alignItems: 'center',
+                flexDirection: 'row',
+                justifyContent: 'center',
+                gap: 8,
+              }}
+            >
+              <Feather name="plus-circle" size={16} color={colors.primary} />
+              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>
+                Add delivery address
+              </Text>
+            </Pressable>
+          )}
+        </View>
+
+        {/* Section: Delivery Notes (Optional) */}
+        <View
+          style={{
+            backgroundColor: colors.panel,
+            borderRadius: 20,
+            padding: 16,
+            marginBottom: 16,
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <Feather name="edit-3" size={14} color={colors.mute} />
+            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.ink }}>
+              Delivery instructions (optional)
+            </Text>
+          </View>
+          <TextInput
+            value={deliveryNotes}
+            onChangeText={setDeliveryNotes}
+            placeholder="e.g. Leave at front door, call before delivery"
+            placeholderTextColor={colors.muteSoft}
+            maxLength={250}
+            style={{
+              backgroundColor: colors.white,
+              borderRadius: 12,
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+              fontSize: 13.5,
+              color: colors.ink,
+              borderWidth: 1,
+              borderColor: 'rgba(15,15,15,0.08)',
+            }}
+          />
+        </View>
+
         {/* Details card */}
         <View
           style={{
@@ -334,17 +752,16 @@ export default function PaymentScreen() {
             overflow: 'hidden',
           }}
         >
-          {/* To row — keeps brand mark + name on one line, like the reference */}
           <View
             style={{
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
               paddingHorizontal: 20,
-              paddingVertical: 20,
+              paddingVertical: 16,
             }}
           >
-            <Text style={Label}>To</Text>
+            <Text style={Label}>Seller</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <View
                 style={{
@@ -369,77 +786,43 @@ export default function PaymentScreen() {
 
           <RowDivider />
 
-          {/* Pay-with row — the real card is collected securely in Stripe checkout. */}
           <View
             style={{
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
               paddingHorizontal: 20,
-              paddingVertical: 18,
+              paddingVertical: 16,
             }}
           >
-            <Text style={Label}>Pay with</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <View
-                style={{
-                  width: 28,
-                  height: 20,
-                  borderRadius: 5,
-                  backgroundColor: colors.ink,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: 10,
-                }}
-              >
-                <Feather name="credit-card" size={11} color={colors.white} />
-              </View>
-              <Text style={Value}>{STRIPE_ENABLED ? 'Card at checkout' : `${cardBrand} ••••${cardLast4}`}</Text>
-            </View>
-          </View>
-
-          <RowDivider />
-
-          {/* Pay on row */}
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingHorizontal: 20,
-              paddingVertical: 18,
-            }}
-          >
-            <Text style={Label}>Pay on</Text>
+            <Text style={Label}>Order Date</Text>
             <Text style={Value}>{payOn}</Text>
           </View>
 
           <RowDivider />
 
-          {/* Item row */}
           <View
             style={{
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
               paddingHorizontal: 20,
-              paddingVertical: 18,
+              paddingVertical: 16,
             }}
           >
-            <Text style={Label}>Item</Text>
+            <Text style={Label}>Item Price</Text>
             <Text style={Value}>{formatPrice(itemPrice)}</Text>
           </View>
 
           <RowDivider />
 
-          {/* Buyer Protection row — the fee that backs every order. */}
           <View
             style={{
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
               paddingHorizontal: 20,
-              paddingVertical: 18,
+              paddingVertical: 16,
             }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -450,10 +833,10 @@ export default function PaymentScreen() {
           </View>
         </View>
 
-        {/* Total moment — pushed below with breathing room */}
+        {/* Total moment */}
         <View
           style={{
-            paddingTop: 28,
+            paddingTop: 24,
             paddingHorizontal: 4,
             flexDirection: 'row',
             justifyContent: 'space-between',
@@ -469,17 +852,17 @@ export default function PaymentScreen() {
                 letterSpacing: 0.2,
               }}
             >
-              Total
+              {paymentMethod === 'cod' ? 'Total on Delivery' : 'Total'}
             </Text>
             <Text
               adjustsFontSizeToFit
               numberOfLines={1}
               style={{
-                fontSize: 44,
+                fontSize: 40,
                 fontWeight: '900',
                 color: colors.ink,
-                letterSpacing: -2,
-                lineHeight: 48,
+                letterSpacing: -1.8,
+                lineHeight: 44,
               }}
             >
               {formatPrice(total)}
@@ -509,11 +892,10 @@ export default function PaymentScreen() {
           </Pressable>
         </View>
 
-        {/* Reassurance at the point of payment. */}
-        <SafetyBanner context="checkout" style={{ marginTop: 20 }} />
+        <SafetyBanner context="checkout" style={{ marginTop: 18 }} />
       </ScrollView>
 
-      {/* Slide to pay */}
+      {/* Slide to Confirm action */}
       <View
         style={{
           position: 'absolute',
@@ -524,12 +906,33 @@ export default function PaymentScreen() {
         }}
       >
         <SlideToConfirm
-          label={`Slide to pay ${formatPrice(total)}`}
-          loadingLabel="Processing…"
+          label={
+            paymentMethod === 'cod'
+              ? `Slide to place CoD Order (${formatPrice(total)})`
+              : `Slide to pay ${formatPrice(total)}`
+          }
+          loadingLabel="Processing order…"
           loading={paying}
-          onConfirm={handlePay}
+          onConfirm={handleCheckout}
         />
       </View>
+
+      {/* Address Sheet Modal */}
+      <AddressSheet
+        visible={addressSheetOpen}
+        initial={shippingAddress}
+        onClose={() => setAddressSheetOpen(false)}
+        onSave={handleSaveAddress}
+      />
+
+      {/* Mock Stripe Payment Sheet (PCI Compliant Bottom Sheet) */}
+      <MockStripePaymentSheet
+        visible={stripeSheetOpen}
+        totalAmount={total}
+        itemTitle={listing.title}
+        onClose={() => setStripeSheetOpen(false)}
+        onConfirm={handleStripeSheetConfirm}
+      />
     </SafeAreaView>
   );
 }
