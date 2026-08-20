@@ -77,7 +77,7 @@ export interface Order {
   offer_message_id?: string | null;
   payment_method?: PaymentMethod;
   status: OrderStatus;
-  shipping_address?: ShippingAddress | null;
+  shipping_address?: Partial<ShippingAddress> | Record<string, any> | null;
   delivery_notes?: string | null;
   created_at: string;
 }

@@ -38,6 +38,10 @@ describe('deriveInvoiceStatus', () => {
     expect(deriveInvoiceStatus(order('failed'), false)).toBe('failed');
   });
 
+  it('shows canceled for a canceled order', () => {
+    expect(deriveInvoiceStatus(order('canceled'), false)).toBe('canceled');
+  });
+
   it('shows Confirming only while re-checking with no settled order', () => {
     expect(deriveInvoiceStatus(null, true)).toBe('confirming');
     expect(deriveInvoiceStatus(order('pending'), true)).toBe('confirming');

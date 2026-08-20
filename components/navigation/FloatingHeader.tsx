@@ -139,7 +139,7 @@ export function FloatingHeader({
                     : colors.ink
                 }
               />
-              {action.badge !== undefined && (
+              {action.badge !== undefined && action.badge !== 0 && (
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>{action.badge}</Text>
                 </View>

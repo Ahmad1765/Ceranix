@@ -75,8 +75,13 @@ export function SafeContainer({
         className={className}
         style={[
           styles.fill,
-          { backgroundColor },
-          edgePadding,
+          {
+            backgroundColor,
+            paddingTop: edgePadding.paddingTop,
+            paddingLeft: edgePadding.paddingLeft,
+            paddingRight: edgePadding.paddingRight,
+            paddingBottom: stickyFooter ? 80 : edgePadding.paddingBottom,
+          },
           style,
         ]}
       >

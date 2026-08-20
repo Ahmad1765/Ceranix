@@ -424,7 +424,7 @@ export default function UserProfileScreen() {
                         transform: [{ scale: pressed ? 0.96 : 1 }],
                       })}
                     >
-                      <Ionicons name="caret-down" size={13} color="#161823" />
+                      <Feather name="share-2" size={15} color="#161823" />
                     </Pressable>
                   </>
                 ) : (

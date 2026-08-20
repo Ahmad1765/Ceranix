@@ -7,6 +7,8 @@ import {
   ActivityIndicator,
   Platform,
   TextInput,
+  Linking,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -27,7 +29,7 @@ import { buyerProtectionFee, formatPrice } from '@/lib/fees';
 import { SlideToConfirm } from '@/components/SlideToConfirm';
 import { AddressSheet, type AddressForm } from '@/components/settings/AddressSheet';
 import { MockStripePaymentSheet } from '@/components/payment/MockStripePaymentSheet';
-import { paymentService, STRIPE_ENABLED } from '@/lib/paymentService';
+import { paymentService, STRIPE_ENABLED, normalizeAddressInput } from '@/lib/paymentService';
 import { ShippingAddressSchema } from '@/lib/schemas/order';
 import type { ShippingAddress, PaymentMethod } from '@/types';
 
@@ -48,7 +50,12 @@ function formatShortDate(d: Date) {
 }
 
 export default function PaymentScreen() {
-  const { id, offer } = useLocalSearchParams<{ id: string; offer?: string }>();
+  const { id, offer, paymentMethod: paramPaymentMethod } = useLocalSearchParams<{
+    id: string;
+    offer?: string;
+    paymentMethod?: string;
+    fulfillment?: string;
+  }>();
   const { user, loading: authLoading } = useAuth();
   const toast = useToast();
 
@@ -56,7 +63,9 @@ export default function PaymentScreen() {
   const listing = listingQ.data ?? null;
 
   // Checkout states
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(
+    paramPaymentMethod === 'card' ? 'card' : 'cod',
+  );
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null);
   const [addressLoading, setAddressLoading] = useState(true);
   const [addressSheetOpen, setAddressSheetOpen] = useState(false);
@@ -64,12 +73,12 @@ export default function PaymentScreen() {
   const [stripeSheetOpen, setStripeSheetOpen] = useState(false);
   const [paying, setPaying] = useState(false);
 
-  const mounted = useRef(true);
-
   // Fetch buyer's default shipping address
   useEffect(() => {
-    mounted.current = true;
-    if (!user?.id) return;
+    if (!user?.id) {
+      setAddressLoading(false);
+      return;
+    }
 
     let active = true;
     (async () => {
@@ -106,7 +115,6 @@ export default function PaymentScreen() {
 
     return () => {
       active = false;
-      mounted.current = false;
     };
   }, [user?.id]);
 
@@ -188,27 +196,25 @@ export default function PaymentScreen() {
   // Handle Save Address from sheet
   const handleSaveAddress = async (form: AddressForm) => {
     try {
-      // Validate with Zod
-      ShippingAddressSchema.parse(form);
+      const normalized = normalizeAddressInput(form);
+      const validated = ShippingAddressSchema.parse(normalized);
 
       const payload = {
         user_id: user.id,
-        recipient_name: form.recipient_name.trim(),
-        line1: form.line1.trim(),
-        line2: form.line2?.trim() || null,
-        city: form.city.trim(),
-        state: form.state?.trim() || null,
-        postal_code: form.postal_code.trim(),
-        country: form.country.trim(),
-        phone: form.phone?.trim() || null,
+        recipient_name: validated.recipientName.trim(),
+        line1: validated.line1.trim(),
+        line2: validated.line2?.trim() || null,
+        city: validated.city.trim(),
+        state: validated.state?.trim() || null,
+        postal_code: validated.postalCode.trim(),
+        country: validated.country.trim(),
+        phone: validated.phone?.trim() || null,
         is_default: true,
       };
 
-      const { data, error } = await supabase
-        .from('shipping_addresses')
-        .upsert(payload)
-        .select()
-        .single();
+      const { data, error } = await supabase.rpc('upsert_shipping_address_with_default', {
+        p_payload: payload,
+      });
 
       if (error) {
         // Fallback for local mock
@@ -269,7 +275,14 @@ export default function PaymentScreen() {
           if (result.redirectUrl) {
             if (Platform.OS === 'web' && typeof window !== 'undefined') {
               window.location.href = result.redirectUrl;
+            } else {
+              await Linking.openURL(result.redirectUrl);
             }
+          } else {
+            toast.show('No checkout URL received', {
+              variant: 'default',
+              icon: 'alert-triangle',
+            });
           }
         } catch (e: any) {
           toast.show(e?.message ?? 'Could not initiate Stripe checkout', {
@@ -416,10 +429,15 @@ export default function PaymentScreen() {
         </Pressable>
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 160 }}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
       >
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 160 }}
+        >
         {/* Item summary */}
         <View
           style={{
@@ -728,6 +746,7 @@ export default function PaymentScreen() {
           <TextInput
             value={deliveryNotes}
             onChangeText={setDeliveryNotes}
+            accessibilityLabel="Delivery instructions"
             placeholder="e.g. Leave at front door, call before delivery"
             placeholderTextColor={colors.muteSoft}
             maxLength={250}
@@ -894,6 +913,7 @@ export default function PaymentScreen() {
 
         <SafetyBanner context="checkout" style={{ marginTop: 18 }} />
       </ScrollView>
+    </KeyboardAvoidingView>
 
       {/* Slide to Confirm action */}
       <View

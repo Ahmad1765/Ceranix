@@ -56,8 +56,10 @@ export function SheetModal({
             style={{
               backgroundColor: colors.white,
               borderRadius: Platform.OS === 'web' ? 24 : 0,
-              borderTopLeftRadius: 28,
-              borderTopRightRadius: 28,
+              ...(Platform.OS !== 'web' && {
+                borderTopLeftRadius: 28,
+                borderTopRightRadius: 28,
+              }),
               paddingTop: 16,
               paddingHorizontal: 20,
               paddingBottom: Platform.OS === 'ios' ? 32 : 20,

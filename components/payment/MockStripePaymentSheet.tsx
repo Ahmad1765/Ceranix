@@ -29,7 +29,6 @@ export function MockStripePaymentSheet({
   onConfirm,
   loading = false,
 }: MockStripePaymentSheetProps) {
-  const [selectedMethod, setSelectedMethod] = useState<'card' | 'wallet'>('card');
   const [submitting, setSubmitting] = useState(false);
 
   const isBusy = loading || submitting;
@@ -39,8 +38,9 @@ export function MockStripePaymentSheet({
     setSubmitting(true);
     try {
       await onConfirm();
-    } finally {
+    } catch (err) {
       setSubmitting(false);
+      throw err;
     }
   };
 
@@ -220,18 +220,17 @@ export function MockStripePaymentSheet({
             ) : null}
           </View>
 
-          {/* Payment Method Selector inside Stripe Sheet */}
+          {/* Payment Method - Credit Card */}
           <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
-            <Pressable
-              onPress={() => setSelectedMethod('card')}
+            <View
               style={{
                 flex: 1,
                 paddingVertical: 12,
                 paddingHorizontal: 12,
                 borderRadius: 12,
                 borderWidth: 1.5,
-                borderColor: selectedMethod === 'card' ? '#635BFF' : 'rgba(0,0,0,0.08)',
-                backgroundColor: selectedMethod === 'card' ? '#F4F3FF' : colors.white,
+                borderColor: '#635BFF',
+                backgroundColor: '#F4F3FF',
                 alignItems: 'center',
                 flexDirection: 'row',
                 justifyContent: 'center',
@@ -241,50 +240,18 @@ export function MockStripePaymentSheet({
               <Feather
                 name="credit-card"
                 size={16}
-                color={selectedMethod === 'card' ? '#635BFF' : colors.mute}
+                color="#635BFF"
               />
               <Text
                 style={{
                   fontSize: 13,
                   fontWeight: '700',
-                  color: selectedMethod === 'card' ? '#635BFF' : colors.ink,
+                  color: '#635BFF',
                 }}
               >
-                Credit Card
+                Credit / Debit Card
               </Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => setSelectedMethod('wallet')}
-              style={{
-                flex: 1,
-                paddingVertical: 12,
-                paddingHorizontal: 12,
-                borderRadius: 12,
-                borderWidth: 1.5,
-                borderColor: selectedMethod === 'wallet' ? '#635BFF' : 'rgba(0,0,0,0.08)',
-                backgroundColor: selectedMethod === 'wallet' ? '#F4F3FF' : colors.white,
-                alignItems: 'center',
-                flexDirection: 'row',
-                justifyContent: 'center',
-                gap: 8,
-              }}
-            >
-              <Feather
-                name="smartphone"
-                size={16}
-                color={selectedMethod === 'wallet' ? '#635BFF' : colors.mute}
-              />
-              <Text
-                style={{
-                  fontSize: 13,
-                  fontWeight: '700',
-                  color: selectedMethod === 'wallet' ? '#635BFF' : colors.ink,
-                }}
-              >
-                1-Tap Wallet
-              </Text>
-            </Pressable>
+            </View>
           </View>
 
           {/* Mock Test Card Banner */}

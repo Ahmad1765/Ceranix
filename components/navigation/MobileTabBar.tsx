@@ -305,9 +305,11 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: -20, // Elevate above tab dock
   },
   fabContainer: {
-    marginTop: -20, // Elevate above tab dock
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   fabButton: {
     width: 56,

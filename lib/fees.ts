@@ -20,6 +20,13 @@
 /** The flat Buyer Protection fee, in PKR. */
 export const BUYER_PROTECTION_FEE = 100;
 
+/** Default shipping fee in PKR (free / zero-fee basis). */
+export const DEFAULT_SHIPPING_FEE = 0;
+
+export function shippingFee(itemPrice?: number | string | null | undefined): number {
+  return DEFAULT_SHIPPING_FEE;
+}
+
 function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }

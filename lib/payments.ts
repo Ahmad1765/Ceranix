@@ -22,9 +22,12 @@ export type Order = {
   fee_cents: number;
   currency: string;
   payment_method?: "card" | "cod";
-  shipping_address?: any;
+  shipping_address?: Record<string, any> | null;
   delivery_notes?: string | null;
   created_at: string;
+  listing_id?: string;
+  buyer_id?: string;
+  seller_id?: string;
 };
 
 /**

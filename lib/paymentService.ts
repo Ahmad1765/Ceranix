@@ -37,8 +37,16 @@ export interface PaymentProvider {
   processCheckout(request: CheckoutRequest): Promise<CheckoutResult>;
 }
 
+export function isDemoMode(): boolean {
+  return (
+    process.env.EXPO_PUBLIC_DEMO_MODE === 'true' ||
+    process.env.NODE_ENV === 'test' ||
+    !process.env.EXPO_PUBLIC_SUPABASE_URL
+  );
+}
+
 // ── Helper to normalize address shape for Zod validation ──────────────────────
-function normalizeAddressInput(input: any): any {
+export function normalizeAddressInput(input: any): any {
   if (!input || typeof input !== 'object') return null;
   return {
     recipientName: input.recipientName ?? input.recipient_name ?? '',
@@ -46,11 +54,27 @@ function normalizeAddressInput(input: any): any {
     line1: input.line1 ?? '',
     line2: input.line2 ?? null,
     city: input.city ?? '',
-    state: input.state ?? 'Punjab',
+    state: input.state ?? '',
     postalCode: input.postalCode ?? input.postal_code ?? '',
-    country: input.country ?? 'Pakistan',
+    country: input.country ?? '',
     deliveryInstructions: input.deliveryInstructions ?? input.delivery_notes ?? null,
     coordinates: input.coordinates ?? null,
+  };
+}
+
+export function toSnakeCaseAddress(addr: ValidatedShippingAddress | null | undefined): Record<string, any> | null {
+  if (!addr) return null;
+  return {
+    recipient_name: addr.recipientName,
+    phone: addr.phone,
+    line1: addr.line1,
+    line2: addr.line2 ?? null,
+    city: addr.city,
+    state: addr.state,
+    postal_code: addr.postalCode,
+    country: addr.country,
+    delivery_notes: addr.deliveryInstructions ?? null,
+    coordinates: addr.coordinates ?? null,
   };
 }
 
@@ -68,6 +92,7 @@ export class CodPaymentProvider implements PaymentProvider {
     const validatedAddress: ValidatedShippingAddress = ShippingAddressSchema.parse(normalized);
 
     // 2. Execute atomic Postgres RPC: process_checkout
+    let rpcError: Error | null = null;
     try {
       const { data, error } = await supabase.rpc('process_checkout', {
         p_listing_id: request.listingId,
@@ -96,16 +121,19 @@ export class CodPaymentProvider implements PaymentProvider {
         };
       }
 
-      if (error && error.message && !error.message.includes('function') && !error.message.includes('schema')) {
-        throw new Error(error.message);
+      if (error) {
+        rpcError = new Error(error.message);
       }
     } catch (e: any) {
-      if (e?.message && (e.message.includes('sold') || e.message.includes('own listing') || e.message.includes('Authentication'))) {
-        throw e;
-      }
+      rpcError = e instanceof Error ? e : new Error(String(e));
     }
 
-    // 3. Demo / Mock fallback (when running without live Supabase RPC)
+    if (!isDemoMode()) {
+      if (rpcError) throw rpcError;
+      throw new Error('Checkout failed: could not create order');
+    }
+
+    // 3. Demo / Mock fallback (when running in demo mode)
     const itemPrice = request.offerAmount ?? request.listingPrice ?? 1000;
     const amountCents = Math.round(itemPrice * 100);
     const feeCents = Math.round(BUYER_PROTECTION_FEE * 100);
@@ -124,7 +152,7 @@ export class CodPaymentProvider implements PaymentProvider {
       offer_message_id: null,
       payment_method: 'cod',
       status: 'pending',
-      shipping_address: validatedAddress as any,
+      shipping_address: toSnakeCaseAddress(validatedAddress),
       delivery_notes: request.deliveryNotes ?? validatedAddress.deliveryInstructions ?? null,
       created_at: new Date().toISOString(),
     };
@@ -191,6 +219,7 @@ export class StripePaymentProvider implements PaymentProvider {
 
     // Try executing atomic process_checkout on backend for card
     let backendOrder: Order | null = null;
+    let cardRpcError: Error | null = null;
     try {
       const normalized = request.shippingAddress ? normalizeAddressInput(request.shippingAddress) : null;
       const validatedAddress = normalized ? ShippingAddressSchema.parse(normalized) : null;
@@ -206,14 +235,24 @@ export class StripePaymentProvider implements PaymentProvider {
 
       if (!error && data) {
         backendOrder = data as Order;
+      } else if (error) {
+        cardRpcError = new Error(error.message);
       }
-    } catch {
-      // ignore in demo fallback
+    } catch (e: any) {
+      cardRpcError = e instanceof Error ? e : new Error(String(e));
+    }
+
+    if (!backendOrder && !isDemoMode()) {
+      if (cardRpcError) throw cardRpcError;
+      throw new Error('Checkout failed: could not create order');
     }
 
     const mockSessionId = backendOrder?.stripe_session_id || `cs_test_mock_${Date.now()}`;
     const mockPaymentIntent = backendOrder?.stripe_payment_intent || `pi_test_mock_${Date.now()}`;
     const mockOrderId = backendOrder?.id || `order_mock_${Date.now()}`;
+
+    const normalizedReqAddr = request.shippingAddress ? normalizeAddressInput(request.shippingAddress) : null;
+    const validatedReqAddr = normalizedReqAddr ? ShippingAddressSchema.parse(normalizedReqAddr) : null;
 
     const mockOrder: Order = backendOrder || {
       id: mockOrderId,
@@ -228,7 +267,7 @@ export class StripePaymentProvider implements PaymentProvider {
       offer_message_id: null,
       payment_method: 'card',
       status: 'paid',
-      shipping_address: request.shippingAddress as any,
+      shipping_address: toSnakeCaseAddress(validatedReqAddr),
       delivery_notes: request.deliveryNotes ?? null,
       created_at: new Date().toISOString(),
     };
@@ -291,39 +330,34 @@ export class PaymentService {
    * Seller action to mark a Cash on Delivery order as collected and paid.
    */
   async markCodOrderPaid(orderId: string): Promise<Order> {
-    try {
-      const { data, error } = await supabase.rpc('complete_cod_order', {
-        p_order_id: orderId,
-      });
+    const { data, error } = await supabase.rpc('complete_cod_order', {
+      p_order_id: orderId,
+    });
 
-      if (!error && data) {
-        capture('cod_order_completed', { order_id: orderId });
-        return data as Order;
-      }
-
-      if (error && !error.message.includes('function') && !error.message.includes('schema')) {
-        throw new Error(error.message);
-      }
-    } catch (e: any) {
-      if (e?.message && (e.message.includes('seller') || e.message.includes('Cash on Delivery') || e.message.includes('Authentication'))) {
-        throw e;
-      }
+    if (error) {
+      if (!isDemoMode()) throw new Error(error.message);
+      // Fallback for mock demo mode only when RPC is unavailable
+      capture('cod_order_completed', { order_id: orderId, demo_mode: true });
+      return {
+        id: orderId,
+        listing_id: 'mock-listing',
+        buyer_id: 'mock-buyer',
+        seller_id: 'mock-seller',
+        amount_cents: 100000,
+        fee_cents: 10000,
+        currency: 'pkr',
+        payment_method: 'cod',
+        status: 'paid',
+        created_at: new Date().toISOString(),
+      };
     }
 
-    // Fallback for mock demo mode
-    capture('cod_order_completed', { order_id: orderId, demo_mode: true });
-    return {
-      id: orderId,
-      listing_id: 'mock-listing',
-      buyer_id: 'mock-buyer',
-      seller_id: 'mock-seller',
-      amount_cents: 100000,
-      fee_cents: 10000,
-      currency: 'pkr',
-      payment_method: 'cod',
-      status: 'paid',
-      created_at: new Date().toISOString(),
-    };
+    if (data) {
+      capture('cod_order_completed', { order_id: orderId });
+      return data as Order;
+    }
+
+    throw new Error('Failed to complete order');
   }
 }
 

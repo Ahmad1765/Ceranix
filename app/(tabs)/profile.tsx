@@ -446,7 +446,7 @@ function ProfileScreenInner() {
 
                 <View style={{ alignItems: 'center' }}>
                   <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink }}>
-                    {formatCount(shopLikes > 0 ? shopLikes : sellingCount * 12 + 15)}
+                    {formatCount(shopLikes)}
                   </Text>
                   <Text style={{ fontSize: 12, color: colors.mute, marginTop: 1 }}>Likes</Text>
                 </View>
@@ -617,6 +617,9 @@ function ProfileScreenInner() {
               {/* Tab 1: Video Grid / Selling */}
               <Pressable
                 onPress={() => setActiveTab('selling')}
+                accessibilityRole="tab"
+                accessibilityLabel="Selling"
+                accessibilityState={{ selected: activeTab === 'selling' }}
                 style={{
                   flex: 1,
                   alignItems: 'center',
@@ -653,6 +656,9 @@ function ProfileScreenInner() {
               {/* Tab 2: Liked / Sparkle */}
               <Pressable
                 onPress={() => setActiveTab('liked')}
+                accessibilityRole="tab"
+                accessibilityLabel="Liked"
+                accessibilityState={{ selected: activeTab === 'liked' }}
                 style={{
                   flex: 1,
                   alignItems: 'center',
@@ -682,6 +688,9 @@ function ProfileScreenInner() {
               {/* Tab 3: Saved / Collections / Repost */}
               <Pressable
                 onPress={() => setActiveTab('collections')}
+                accessibilityRole="tab"
+                accessibilityLabel="Collections"
+                accessibilityState={{ selected: activeTab === 'collections' }}
                 style={{
                   flex: 1,
                   alignItems: 'center',
@@ -711,6 +720,9 @@ function ProfileScreenInner() {
               {/* Tab 4: Details / Credentials */}
               <Pressable
                 onPress={() => setActiveTab('details')}
+                accessibilityRole="tab"
+                accessibilityLabel="Details"
+                accessibilityState={{ selected: activeTab === 'details' }}
                 style={{
                   flex: 1,
                   alignItems: 'center',
@@ -769,11 +781,11 @@ function ProfileScreenInner() {
                     All Items
                   </Text>
                   <Text style={{ fontSize: 12, color: colors.mute, fontWeight: '600' }}>
-                    {sellingCount}
+                    {activeTab === 'collections' ? savedItems.length : sellingCount}
                   </Text>
                 </Pressable>
 
-                {saveLists.map((list) => (
+                {activeTab === 'collections' && saveLists.map((list) => (
                   <Pressable
                     key={list.id}
                     onPress={() => setActiveListId(list.id)}
@@ -968,39 +980,51 @@ function ProfileScreenInner() {
             )}
 
             {/* Empty state for lists */}
-            {gridListings.length === 0 && activeTab !== 'details' && (
-              <View style={{ paddingVertical: 40, alignItems: 'center' }}>
-                <EmptyState
-                  icon={
-                    activeTab === 'liked'
-                      ? 'heart'
-                      : activeTab === 'collections'
-                        ? 'bookmark'
-                        : 'shopping-bag'
-                  }
-                  title={
-                    activeTab === 'liked'
-                      ? 'No liked items'
-                      : activeTab === 'collections'
-                        ? 'No saved items'
-                        : 'Your shop is empty'
-                  }
-                  description={
-                    activeTab === 'selling'
-                      ? 'Post your first item — takes less than a minute.'
-                      : 'Items you interact with will show up here.'
-                  }
-                  cta={
-                    activeTab === 'selling'
-                      ? {
-                          label: 'Post an item',
-                          icon: 'plus',
-                          onPress: () => openSellSheet(),
-                        }
-                      : undefined
-                  }
-                />
-              </View>
+            {activeTab !== 'details' && (
+              (activeTab === 'selling'
+                ? loadingSelling
+                : activeTab === 'liked'
+                  ? loadingLiked
+                  : activeTab === 'collections'
+                    ? (activeListId ? loadingListListings : loadingSaved)
+                    : false) ? (
+                <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                  <ActivityIndicator color={colors.purple} />
+                </View>
+              ) : gridListings.length === 0 ? (
+                <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                  <EmptyState
+                    icon={
+                      activeTab === 'liked'
+                        ? 'heart'
+                        : activeTab === 'collections'
+                          ? 'bookmark'
+                          : 'shopping-bag'
+                    }
+                    title={
+                      activeTab === 'liked'
+                        ? 'No liked items'
+                        : activeTab === 'collections'
+                          ? 'No saved items'
+                          : 'Your shop is empty'
+                    }
+                    description={
+                      activeTab === 'selling'
+                        ? 'Post your first item — takes less than a minute.'
+                        : 'Items you interact with will show up here.'
+                    }
+                    cta={
+                      activeTab === 'selling'
+                        ? {
+                            label: 'Post an item',
+                            icon: 'plus',
+                            onPress: () => openSellSheet(),
+                          }
+                        : undefined
+                    }
+                  />
+                </View>
+              ) : null
             )}
           </>
         }

@@ -17,10 +17,15 @@ interface Props {
 export const TikTokListingCard = memo(function TikTokListingCard({ listing, width }: Props) {
   const rawUrl = cardImageUrl(listing);
   const imageUrl = getOptimizedImageUrl(rawUrl, { width: Math.round(width * 1.5), quality: 75 });
+  const soldText = listing.is_sold ? ', Sold' : '';
+  const priceText = listing.price != null ? `, ${formatPrice(listing.price)}` : '';
+  const accessibilityLabel = `${listing.title || 'Listing'}${priceText}${soldText}`;
 
   return (
     <Pressable
       onPress={() => router.push(`/product/${listing.id}`)}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       style={({ pressed }) => ({
         width,
         aspectRatio: 3 / 4,

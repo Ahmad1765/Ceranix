@@ -131,6 +131,9 @@ describe('Offline Action Sync Queue', () => {
       expect(isNetworkError(new Error('Failed to fetch'))).toBe(true);
       expect(isNetworkError(new Error('Device is offline'))).toBe(true);
       expect(isNetworkError(new Error('Connection timeout'))).toBe(true);
+      expect(isNetworkError({ message: 'Network request failed' })).toBe(true);
+      expect(isNetworkError({ message: 'Failed to fetch', code: 'PGRST' })).toBe(true);
+      expect(isNetworkError({ message: 'Invalid credentials' })).toBe(false);
       expect(isNetworkError(new Error('Invalid credentials'))).toBe(false);
       expect(isNetworkError(null)).toBe(false);
     });

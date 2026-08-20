@@ -161,77 +161,80 @@ export function BottomSheetModal({
 
 
         {/* Bottom Sheet Container (Z: 110) */}
-        <GestureDetector gesture={panGesture}>
-          <Animated.View
-            style={[
-              styles.sheet,
-              {
-                height: sheetHeight,
-                paddingBottom: Math.max(insets.bottom, 16),
-              },
-              sheetAnimatedStyle,
-              style,
-            ]}
-          >
-            {/* Ergonomic Drag Indicator Pill */}
-            <View style={styles.dragHandleContainer}>
-              <View style={styles.dragHandle} />
-            </View>
-
-            {/* Header with Title & 44x44 Dismiss Button */}
-            {(title || subtitle || headerRight) && (
-              <View style={styles.header}>
-                <View style={styles.headerTextContainer}>
-                  {title && (
-                    <Text
-                      style={[
-                        styles.headerTitle,
-                        { fontFamily: type.family.sansBold },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {title}
-                    </Text>
-                  )}
-                  {subtitle && (
-                    <Text style={styles.headerSubtitle} numberOfLines={1}>
-                      {subtitle}
-                    </Text>
-                  )}
-                </View>
-
-                <View style={styles.headerActions}>
-                  {headerRight}
-                  <Pressable
-                    onPress={onClose}
-                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                    style={styles.closeButton}
-                    accessibilityRole="button"
-                    accessibilityLabel="Close"
-                  >
-                    <Feather name="x" size={20} color={colors.ink} />
-                  </Pressable>
-                </View>
+        <Animated.View
+          style={[
+            styles.sheet,
+            {
+              height: sheetHeight,
+              paddingBottom: Math.max(insets.bottom, 16),
+            },
+            sheetAnimatedStyle,
+            style,
+          ]}
+        >
+          {/* Ergonomic Drag Indicator Pill & Header with Pan Gesture */}
+          <GestureDetector gesture={panGesture}>
+            <View>
+              <View style={styles.dragHandleContainer}>
+                <View style={styles.dragHandle} />
               </View>
-            )}
 
-            {/* Dynamic Body Content */}
-            <ContentWrapper
-              {...(scrollable
-                ? {
-                    showsVerticalScrollIndicator: false,
-                    keyboardShouldPersistTaps: 'handled' as const,
-                    contentContainerStyle: styles.scrollContent,
-                  }
-                : { style: styles.staticContent })}
-            >
-              {children}
-            </ContentWrapper>
+              {/* Header with Title & 44x44 Dismiss Button */}
+              {(title || subtitle || headerRight) && (
+                <View style={styles.header}>
+                  <View style={styles.headerTextContainer}>
+                    {title && (
+                      <Text
+                        style={[
+                          styles.headerTitle,
+                          { fontFamily: type.family.sansBold },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {title}
+                      </Text>
+                    )}
+                    {subtitle && (
+                      <Text style={styles.headerSubtitle} numberOfLines={1}>
+                        {subtitle}
+                      </Text>
+                    )}
+                  </View>
 
-            {/* Thumb-Zone Pinned Footer (Z: 120 inside sheet) */}
-            {footer && <View style={styles.footerContainer}>{footer}</View>}
-          </Animated.View>
-        </GestureDetector>
+                  <View style={styles.headerActions}>
+                    {headerRight}
+                    <Pressable
+                      onPress={onClose}
+                      hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                      style={styles.closeButton}
+                      accessibilityRole="button"
+                      accessibilityLabel="Close"
+                    >
+                      <Feather name="x" size={20} color={colors.ink} />
+                    </Pressable>
+                  </View>
+                </View>
+              )}
+            </View>
+          </GestureDetector>
+
+          {/* Dynamic Body Content */}
+          <ContentWrapper
+            {...(scrollable
+              ? {
+                  style: { flex: 1 },
+                  showsVerticalScrollIndicator: false,
+                  keyboardShouldPersistTaps: 'handled' as const,
+                  contentContainerStyle: styles.scrollContent,
+                }
+              : { style: styles.staticContent })}
+          >
+            {children}
+          </ContentWrapper>
+
+          {/* Thumb-Zone Pinned Footer (Z: 120 inside sheet) */}
+          {footer && <View style={styles.footerContainer}>{footer}</View>}
+        </Animated.View>
       </GestureHandlerRootView>
     </Modal>
   );

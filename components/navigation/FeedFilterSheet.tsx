@@ -83,12 +83,14 @@ export function FeedFilterSheet({
   resultCount,
 }: FeedFilterSheetProps) {
   const [filters, setFilters] = useState<FeedFilters>(initial);
+  const prevVisibleRef = React.useRef(visible);
 
-  // Sync with initial whenever visible flips true
+  // Sync with initial only when visible transitions from false to true
   React.useEffect(() => {
-    if (visible) {
+    if (!prevVisibleRef.current && visible) {
       setFilters(initial);
     }
+    prevVisibleRef.current = visible;
   }, [visible, initial]);
 
   const activeCount = useMemo(() => {
@@ -152,7 +154,20 @@ export function FeedFilterSheet({
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     }
-    onApply(filters);
+    let appliedFilters = filters;
+    if (
+      filters.priceMin != null &&
+      filters.priceMax != null &&
+      filters.priceMin > filters.priceMax
+    ) {
+      appliedFilters = {
+        ...filters,
+        priceMin: filters.priceMax,
+        priceMax: filters.priceMin,
+      };
+      setFilters(appliedFilters);
+    }
+    onApply(appliedFilters);
     onClose();
   };
 

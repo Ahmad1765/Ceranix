@@ -196,7 +196,7 @@ export function ThumbButton({
               {label}
             </Text>
 
-            {badge !== undefined && (
+            {badge !== undefined && badge !== null && badge !== 0 && badge !== '' && (
               <View
                 style={[
                   styles.badgeContainer,

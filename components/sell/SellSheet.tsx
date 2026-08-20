@@ -70,22 +70,27 @@ type ActiveSheet =
   | 'price' | 'parcel' | null;
 
 // ── Context ──────────────────────────────────────────────────────────────
-type SellSheetApi = { open: () => void };
+type SellSheetApi = { open: () => void; close: () => void };
 const Ctx = createContext<SellSheetApi | undefined>(undefined);
 
 export function useSellSheet(): SellSheetApi {
   const ctx = useContext(Ctx);
   // Soft fallback outside the provider: keep old behaviour (route to auth).
-  if (!ctx) return { open: () => router.push('/auth/login') };
+  if (!ctx) return { open: () => router.push('/auth/login'), close: () => {} };
   return ctx;
 }
 
 export function SellSheetProvider({ children }: { children: ReactNode }) {
   const [visible, setVisible] = useState(false);
+  const { user } = useAuth();
 
   const open = useCallback(() => {
+    if (!user) {
+      router.push('/auth/login');
+      return;
+    }
     setVisible(true);
-  }, []);
+  }, [user]);
 
   const close = useCallback(() => setVisible(false), []);
 

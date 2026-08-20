@@ -52,7 +52,13 @@ export const ProductCard = memo(function ProductCard({
   aspectRatio = '4:5',
   style,
 }: ProductCardProps) {
-  const [liked, setLiked] = useState(!!item.isLiked);
+  const [pendingLiked, setPendingLiked] = useState<boolean | null>(null);
+
+  React.useEffect(() => {
+    setPendingLiked(null);
+  }, [item.id]);
+
+  const isLiked = pendingLiked ?? !!item.isLiked;
 
   // Reanimated press scale physics
   const scale = useSharedValue(1);
@@ -84,8 +90,8 @@ export const ProductCard = memo(function ProductCard({
 
   const handleLikePress = (e: any) => {
     e?.stopPropagation?.();
-    const nextLiked = !liked;
-    setLiked(nextLiked);
+    const nextLiked = !isLiked;
+    setPendingLiked(nextLiked);
 
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -133,7 +139,7 @@ export const ProductCard = memo(function ProductCard({
         <Pressable
           onPress={handleLikePress}
           className="no-ring"
-          accessibilityLabel={liked ? 'Unlike item' : 'Like item'}
+          accessibilityLabel={isLiked ? 'Unlike item' : 'Like item'}
           style={({ pressed }) => [
             styles.likeButtonWrapper,
             {
@@ -160,7 +166,7 @@ export const ProductCard = memo(function ProductCard({
             <Feather
               name="heart"
               size={18}
-              color={liked ? colors.purple : colors.ink}
+              color={isLiked ? colors.purple : colors.ink}
             />
           </Animated.View>
         </Pressable>

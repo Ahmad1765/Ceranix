@@ -162,7 +162,7 @@ export function OfferSheet({
             placeholderTextColor={colors.mute}
             keyboardType="number-pad"
             style={[styles.input, { fontFamily: type.family.sansBold }]}
-            maxLength={6}
+            maxLength={Math.max(10, String(askingPrice || 0).length + 2)}
             returnKeyType="done"
           />
           {customAmount.length > 0 && (

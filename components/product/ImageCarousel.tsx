@@ -15,6 +15,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Feather from '@expo/vector-icons/Feather';
 import { Text } from '@/lib/rnText';
 import { colors, radii } from '@/lib/theme';
 
@@ -47,9 +48,22 @@ export function ImageCarousel({
   // Height based on aspect ratio
   const carouselHeight = aspectRatio === '1:1' ? carouselWidth : carouselWidth * 1.25;
 
-  const validImages = images && images.length > 0
-    ? images
-    : ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&auto=format&fit=crop&q=80'];
+  const validImages = (images || []).filter(Boolean);
+
+  if (validImages.length === 0) {
+    return (
+      <View
+        className={className}
+        style={[
+          styles.container,
+          { height: carouselHeight, alignItems: 'center', justifyContent: 'center' },
+          style,
+        ]}
+      >
+        <Feather name="image" size={36} color={colors.mute} />
+      </View>
+    );
+  }
 
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {

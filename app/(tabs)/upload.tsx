@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useIsFocused } from '@react-navigation/native';
+import { router } from 'expo-router';
 import { useSellSheet } from '@/components/sell/SellSheet';
 
 // The Sell tab opens the sell form as a Modal (see components/sell/SellSheet.tsx)
@@ -13,6 +14,7 @@ export default function UploadTabFallback() {
   useEffect(() => {
     if (!isFocused) return;
     open();
+    router.navigate('/(tabs)');
   }, [open, isFocused]);
 
   return null;

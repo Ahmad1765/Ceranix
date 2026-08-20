@@ -21,7 +21,11 @@ export function generateMapsLink(
     typeof lat === 'number' &&
     typeof lng === 'number' &&
     Number.isFinite(lat) &&
-    Number.isFinite(lng)
+    Number.isFinite(lng) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lng >= -180 &&
+    lng <= 180
   ) {
     return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
   }
@@ -39,7 +43,7 @@ export function generateMapsLink(
     return 'https://www.google.com/maps';
   }
 
-  const parts = [line1, line2, city, state, postalCode, country || 'Pakistan']
+  const parts = [line1, line2, city, state, postalCode, country]
     .map((p) => (typeof p === 'string' ? p.trim() : ''))
     .filter(Boolean);
 

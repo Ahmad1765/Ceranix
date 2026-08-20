@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { View, Pressable, ScrollView, ActivityIndicator, Share, Platform, Linking } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -89,6 +89,9 @@ export default function InvoiceScreen() {
   const [confirming, setConfirming] = useState(false);
   const [completingCod, setCompletingCod] = useState(false);
 
+  const priceRef = useRef(listing?.price);
+  priceRef.current = listing?.price;
+
   useEffect(() => {
     if (!id) return;
     let active = true;
@@ -111,8 +114,11 @@ export default function InvoiceScreen() {
       } else if (placed === '1') {
         setOrder({
           id: `order_demo_${Date.now()}`,
+          listing_id: String(listingId),
+          buyer_id: user?.id ?? 'buyer_demo',
+          seller_id: listing?.seller_id ?? listing?.seller?.id ?? 'seller_demo',
           status: method === 'cod' ? 'pending' : 'paid',
-          amount_cents: Math.round(Number(listing?.price ?? 1000) * 100),
+          amount_cents: Math.round(Number(priceRef.current ?? 1000) * 100),
           fee_cents: 10000,
           currency: 'pkr',
           payment_method: method === 'cod' ? 'cod' : 'card',
@@ -139,7 +145,7 @@ export default function InvoiceScreen() {
     return () => {
       active = false;
     };
-  }, [paid, placed, method, id, listing?.price]);
+  }, [paid, placed, method, id]);
 
   if (!listing && id && listingQ.isPending) {
     return (
@@ -251,16 +257,22 @@ export default function InvoiceScreen() {
         ? `💵 *COLLECT CASH ON DELIVERY: ${formatPrice(total)}*`
         : '💳 *PRE-PAID VIA CARD*';
 
-    const dispatchSlipText = `📦 *CERANIX DISPATCH SLIP*\n` +
-      `Order: #${invoiceNumber}\n` +
-      `Item: ${listing.title}\n\n` +
-      `👤 Recipient: ${recipient}\n` +
-      `📍 Address: ${street}\n` +
-      `🏙️ ${cityArea}\n` +
-      `${phone ? phone + '\n' : ''}` +
-      `${note ? note + '\n' : ''}` +
-      `\n${paymentLine}\n\n` +
-      `🗺️ Google Maps Link: ${mapsUrl}`;
+    const lines: string[] = [
+      `📦 *CERANIX DISPATCH SLIP*`,
+      `Order: #${invoiceNumber}`,
+      `Item: ${listing.title}`,
+      '',
+      `👤 Recipient: ${recipient}`,
+      ...(street ? [`📍 Address: ${street}`] : []),
+      ...(cityArea ? [`🏙️ ${cityArea}`] : []),
+      ...(phone ? [phone] : []),
+      ...(note ? [note] : []),
+      '',
+      paymentLine,
+      ...(mapsUrl ? ['', `🗺️ Google Maps Link: ${mapsUrl}`] : []),
+    ];
+
+    const dispatchSlipText = lines.join('\n');
 
     try {
       await Share.share({ message: dispatchSlipText });
@@ -615,27 +627,31 @@ export default function InvoiceScreen() {
                 </View>
 
                 {/* Google Maps link button */}
-                <Pressable
-                  onPress={() => {
-                    tap('light');
-                    Linking.openURL(mapsUrl);
-                  }}
-                  style={({ pressed }) => ({
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 4,
-                    paddingHorizontal: 8,
-                    paddingVertical: 4,
-                    borderRadius: 8,
-                    backgroundColor: colors.white,
-                    opacity: pressed ? 0.6 : 1,
-                  })}
-                >
-                  <Feather name="external-link" size={12} color={colors.primary} />
-                  <Text style={{ fontSize: 11.5, fontWeight: '700', color: colors.primary }}>
-                    Maps
-                  </Text>
-                </Pressable>
+                {Boolean(mapsUrl) && (
+                  <Pressable
+                    onPress={() => {
+                      tap('light');
+                      Linking.openURL(mapsUrl).catch((err) => {
+                        console.warn('[invoice] openURL failed', err);
+                      });
+                    }}
+                    style={({ pressed }) => ({
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      borderRadius: 8,
+                      backgroundColor: colors.white,
+                      opacity: pressed ? 0.6 : 1,
+                    })}
+                  >
+                    <Feather name="external-link" size={12} color={colors.primary} />
+                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: colors.primary }}>
+                      Maps
+                    </Text>
+                  </Pressable>
+                )}
               </View>
 
               <Text style={{ fontSize: 14, fontWeight: '700', color: colors.ink }}>
@@ -895,6 +911,31 @@ export default function InvoiceScreen() {
               Refunded to your card
             </Text>
           </View>
+        ) : status === 'canceled' ? (
+          <View
+            accessibilityRole="text"
+            style={{
+              height: 64,
+              borderRadius: 999,
+              backgroundColor: colors.panel,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 10,
+            }}
+          >
+            <Feather name="x-circle" size={16} color={colors.ink} />
+            <Text
+              style={{
+                fontSize: 15,
+                fontWeight: '800',
+                color: colors.ink,
+                letterSpacing: 0.2,
+              }}
+            >
+              Order canceled
+            </Text>
+          </View>
         ) : (
           <Pressable
             onPress={onPay}
@@ -972,6 +1013,7 @@ function StatusPill({
   const codPending = status === 'cod_pending';
   const confirming = status === 'confirming';
   const refunded = status === 'refunded';
+  const canceled = status === 'canceled';
   const failed = status === 'failed';
 
   const icon = paid
@@ -980,11 +1022,13 @@ function StatusPill({
       ? 'truck'
       : refunded
         ? 'rotate-ccw'
-        : failed
-          ? 'alert-circle'
-          : confirming
-            ? 'loader'
-            : 'clock';
+        : canceled
+          ? 'x-circle'
+          : failed
+            ? 'alert-circle'
+            : confirming
+              ? 'loader'
+              : 'clock';
 
   const label = paid
     ? 'Paid'
@@ -994,11 +1038,13 @@ function StatusPill({
         : 'CoD · Pay on delivery'
       : refunded
         ? 'Refunded'
-        : failed
-          ? 'Failed'
-          : confirming
-            ? 'Confirming'
-            : 'Pending';
+        : canceled
+          ? 'Canceled'
+          : failed
+            ? 'Failed'
+            : confirming
+              ? 'Confirming'
+              : 'Pending';
 
   return (
     <View

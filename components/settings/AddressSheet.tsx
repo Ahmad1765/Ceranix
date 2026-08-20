@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { View, Pressable, ActivityIndicator, ScrollView } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
@@ -51,9 +51,10 @@ export function AddressSheet({
   const [form, setForm] = useState<AddressForm>(EMPTY);
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
+  const prevVisibleRef = useRef(visible);
 
   useEffect(() => {
-    if (visible) {
+    if (!prevVisibleRef.current && visible) {
       const defaultName =
         initial?.recipient_name ||
         profile?.full_name ||
@@ -85,6 +86,7 @@ export function AddressSheet({
       setSaving(false);
       setLocating(false);
     }
+    prevVisibleRef.current = visible;
   }, [visible, initial, profile]);
 
   const errors = useMemo(() => {
@@ -100,15 +102,16 @@ export function AddressSheet({
   const canSave = Object.keys(errors).length === 0;
 
   const set = (patch: Partial<AddressForm>) => {
+    const nextPatch = { ...patch };
     // Smart cleaning: if city contains comma (e.g. "Lahore, Pakistan"), split cleanly
-    if (typeof patch.city === 'string' && patch.city.includes(',')) {
-      const parts = patch.city.split(',').map((p) => p.trim());
-      patch.city = parts[0];
-      if (parts[1] && !form.country) {
-        patch.country = parts[1];
+    if (typeof nextPatch.city === 'string' && nextPatch.city.includes(',')) {
+      const parts = nextPatch.city.split(',').map((p) => p.trim());
+      nextPatch.city = parts[0];
+      if (parts[1]) {
+        nextPatch.country = parts[1];
       }
     }
-    setForm((s) => ({ ...s, ...patch }));
+    setForm((s) => ({ ...s, ...nextPatch }));
   };
 
   // Location Auto-detect / Location Adder

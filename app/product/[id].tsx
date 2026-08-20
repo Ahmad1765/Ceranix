@@ -77,7 +77,8 @@ import { ColorSwatch } from '@/components/ColorSwatch';
 import { BRAND, APP_URL } from '@/lib/brand';
 import { reportListing, REPORT_REASONS } from '@/lib/reports';
 import { useGuestGate } from '@/components/GuestGate';
-import { buyerProtectionFee, orderTotal, formatPrice } from '@/lib/fees';
+import { buyerProtectionFee, orderTotal, formatPrice, DEFAULT_SHIPPING_FEE } from '@/lib/fees';
+import { useSellSheet } from '@/components/sell/SellSheet';
 import { BuyerProtectionSheet } from '@/components/product/BuyerProtectionSheet';
 import { errorMessage } from '@/lib/errors';
 
@@ -125,6 +126,7 @@ export default function ProductScreen() {
   const { user } = useAuth();
   const toast = useToast();
   const guestGate = useGuestGate();
+  const { open: openSellSheet } = useSellSheet();
   const productIdParam = Array.isArray(id) ? id[0] : id;
 
   const [selectedBundleIds, setSelectedBundleIds] = useState<Set<string>>(new Set());
@@ -1611,6 +1613,10 @@ export default function ProductScreen() {
         }}
         onBuyPress={() => {
           tap('medium');
+          if (isOwnListing) {
+            openSellSheet();
+            return;
+          }
           if (!user) {
             guestGate.prompt({
               title: 'Almost yours',
@@ -1621,10 +1627,6 @@ export default function ProductScreen() {
             return;
           }
           if (!listing?.id) return;
-          if (listing.seller_id === user.id) {
-            toast.show("That's your own listing", { variant: 'default', icon: 'info' });
-            return;
-          }
           setCheckoutVisible(true);
         }}
       />
@@ -1638,13 +1640,19 @@ export default function ProductScreen() {
           price: itemPrice,
           imageUrl: images[0],
           sellerName: listing.seller?.username || 'Seller',
-          shippingFee: 4.99,
+          shippingFee: DEFAULT_SHIPPING_FEE,
           buyerProtectionFee: bpFee,
         }}
         onClose={() => setCheckoutVisible(false)}
-        onConfirmPay={() => {
+        onConfirmPay={({ fulfillment, paymentMethod }) => {
           setCheckoutVisible(false);
-          router.push(`/payment/${listing.id}` as any);
+          router.push({
+            pathname: `/payment/${listing.id}`,
+            params: {
+              fulfillment,
+              paymentMethod,
+            },
+          } as any);
         }}
       />
 

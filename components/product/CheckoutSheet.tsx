@@ -12,10 +12,10 @@ import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { ThumbButton } from '@/components/ui/ThumbButton';
 import { Text } from '@/lib/rnText';
 import { colors, radii, type } from '@/lib/theme';
-import { formatPrice } from '@/lib/currency';
+import { buyerProtectionFee, orderTotal, formatPrice } from '@/lib/fees';
 
 export type FulfillmentMethod = 'delivery' | 'handshake';
-export type PaymentMethodType = 'apple_pay' | 'card' | 'wallet';
+export type PaymentMethodType = 'card' | 'cod';
 
 export interface CheckoutProduct {
   id: string;
@@ -52,16 +52,13 @@ export function CheckoutSheet({
   loading = false,
 }: CheckoutSheetProps) {
   const [fulfillment, setFulfillment] = useState<FulfillmentMethod>('delivery');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType>(
-    Platform.OS === 'ios' ? 'apple_pay' : 'card'
-  );
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType>('cod');
 
   const itemPrice = product?.price || 0;
-  const shippingFee = fulfillment === 'delivery' ? product?.shippingFee ?? 4.99 : 0;
-  // Standard 5% + $0.70 Buyer Protection calculation
+  const shippingFee = fulfillment === 'delivery' ? (product?.shippingFee ?? 0) : 0;
   const protectionFee =
-    product?.buyerProtectionFee ?? Math.round((itemPrice * 0.05 + 0.7) * 100) / 100;
-  const totalAmount = itemPrice + shippingFee + protectionFee;
+    product?.buyerProtectionFee ?? buyerProtectionFee(itemPrice);
+  const totalAmount = orderTotal(itemPrice) + shippingFee;
 
   const handleFulfillmentChange = (method: FulfillmentMethod) => {
     if (Platform.OS !== 'web') {
@@ -110,21 +107,32 @@ export function CheckoutSheet({
       <View style={styles.content}>
         {/* 1. Compact Product Summary (Mini-Image + Title + Price) */}
         <View style={styles.productCard}>
-          <Image
-            source={{
-              uri:
-                product?.imageUrl ||
-                'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=200&auto=format&fit=crop&q=80',
-            }}
-            contentFit="cover"
-            style={styles.productThumb}
-          />
+          {product?.imageUrl ? (
+            <Image
+              source={{ uri: product.imageUrl }}
+              contentFit="cover"
+              style={styles.productThumb}
+            />
+          ) : (
+            <View
+              style={[
+                styles.productThumb,
+                {
+                  backgroundColor: colors.panel,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                },
+              ]}
+            >
+              <Feather name="image" size={24} color={colors.mute} />
+            </View>
+          )}
           <View style={styles.productDetails}>
             <Text
               style={[styles.productTitle, { fontFamily: type.family.sansBold }]}
               numberOfLines={2}
             >
-              {product?.title || 'Luxury Fashion Piece'}
+              {product?.title}
             </Text>
             {product?.sellerName && (
               <Text style={styles.sellerName} numberOfLines={1}>
@@ -233,28 +241,19 @@ export function CheckoutSheet({
             Payment Method
           </Text>
           <View style={styles.paymentList}>
-            {Platform.OS === 'ios' && (
-              <PaymentRow
-                title="Apple Pay"
-                subtitle="One-touch biometric payment"
-                icon="smartphone"
-                selected={paymentMethod === 'apple_pay'}
-                onSelect={() => handlePaymentChange('apple_pay')}
-              />
-            )}
+            <PaymentRow
+              title="Cash on Delivery (CoD)"
+              subtitle="Pay with cash when package arrives"
+              icon="truck"
+              selected={paymentMethod === 'cod'}
+              onSelect={() => handlePaymentChange('cod')}
+            />
             <PaymentRow
               title="Debit / Credit Card"
-              subtitle="Visa, Mastercard, Amex"
+              subtitle="Visa, Mastercard via Stripe"
               icon="credit-card"
               selected={paymentMethod === 'card'}
               onSelect={() => handlePaymentChange('card')}
-            />
-            <PaymentRow
-              title="Ceranix Wallet"
-              subtitle="Available balance: $0.00"
-              icon="pocket"
-              selected={paymentMethod === 'wallet'}
-              onSelect={() => handlePaymentChange('wallet')}
             />
           </View>
         </View>

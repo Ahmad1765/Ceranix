@@ -135,7 +135,15 @@ export async function enqueueOfflineAction(
  */
 export function isNetworkError(err: unknown): boolean {
   if (!err) return false;
-  const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  let rawMsg = '';
+  if (err instanceof Error) {
+    rawMsg = err.message;
+  } else if (typeof err === 'object' && err !== null && 'message' in err && typeof (err as any).message === 'string') {
+    rawMsg = (err as any).message;
+  } else {
+    rawMsg = String(err);
+  }
+  const msg = rawMsg.toLowerCase();
   return (
     msg.includes('network') ||
     msg.includes('offline') ||
@@ -209,15 +217,17 @@ export async function executeOfflineAction(action: OfflineAction): Promise<{ ok:
           defaultListId = listAgain?.id ?? null;
         }
 
-        if (defaultListId) {
-          const { error: insertErr } = await supabase
-            .from('save_list_items')
-            .insert({ list_id: defaultListId, listing_id: action.listingId });
-          if (insertErr && insertErr.code !== '23505') {
-            if (isNetworkError(insertErr)) return { ok: false, retry: true };
-            console.warn('[offlineSync] save insert error:', insertErr.message);
-            return { ok: false, retry: false };
-          }
+        if (!defaultListId) {
+          return { ok: false, retry: true };
+        }
+
+        const { error: insertErr } = await supabase
+          .from('save_list_items')
+          .insert({ list_id: defaultListId, listing_id: action.listingId });
+        if (insertErr && insertErr.code !== '23505') {
+          if (isNetworkError(insertErr)) return { ok: false, retry: true };
+          console.warn('[offlineSync] save insert error:', insertErr.message);
+          return { ok: false, retry: false };
         }
       } else {
         // Remove from all lists for this user
@@ -290,14 +300,42 @@ export async function flushOfflineSyncQueue(): Promise<{ syncedCount: number; er
   let errors = 0;
 
   try {
-    const queue = await getOfflineQueue();
-    if (queue.length === 0) {
+    const initialQueue = await getOfflineQueue();
+    if (initialQueue.length === 0) {
       isFlushing = false;
       return { syncedCount: 0, errors: 0 };
     }
 
-    const coalesced = coalesceActions(queue);
-    const remaining: OfflineAction[] = [];
+    let currentUserId: string | null = null;
+    let authChecked = false;
+    try {
+      if (supabase?.auth?.getSession) {
+        authChecked = true;
+        const { data: sessionData } = await supabase.auth.getSession();
+        currentUserId = sessionData?.session?.user?.id ?? null;
+      }
+    } catch {
+      currentUserId = null;
+    }
+
+    // Filter to only actions for the authenticated user, retain other users' actions
+    const toProcess: OfflineAction[] = [];
+    const otherUserActions: OfflineAction[] = [];
+    for (const act of initialQueue) {
+      if (!authChecked || (currentUserId && act.userId === currentUserId)) {
+        toProcess.push(act);
+      } else {
+        otherUserActions.push(act);
+      }
+    }
+
+    if (toProcess.length === 0) {
+      isFlushing = false;
+      return { syncedCount: 0, errors: 0 };
+    }
+
+    const coalesced = coalesceActions(toProcess);
+    const retryActions: OfflineAction[] = [];
 
     for (const action of coalesced) {
       const result = await executeOfflineAction(action);
@@ -305,7 +343,7 @@ export async function flushOfflineSyncQueue(): Promise<{ syncedCount: number; er
         syncedCount++;
       } else if (result.retry) {
         // Keep in queue for next connectivity window
-        remaining.push(action);
+        retryActions.push(action);
         errors++;
       } else {
         // Fatal non-retryable error (e.g. row deleted or auth denied), drop it
@@ -313,7 +351,12 @@ export async function flushOfflineSyncQueue(): Promise<{ syncedCount: number; er
       }
     }
 
-    await saveOfflineQueue(remaining);
+    // Re-read latest queue to preserve concurrent additions during flush
+    const latestQueue = await getOfflineQueue();
+    const initialIds = new Set(initialQueue.map((a) => a.id));
+    const concurrentActions = latestQueue.filter((a) => !initialIds.has(a.id));
+
+    await saveOfflineQueue([...otherUserActions, ...retryActions, ...concurrentActions]);
   } catch (err) {
     console.warn('[offlineSync] flushOfflineSyncQueue error:', err);
   } finally {
@@ -328,16 +371,30 @@ export async function flushOfflineSyncQueue(): Promise<{ syncedCount: number; er
  * Automatically flushes the queue whenever the device transitions to online.
  */
 export function initOfflineSync(): () => void {
-  // Attempt immediate flush on startup if online
-  NetInfo.fetch().then((state) => {
-    if (!deriveOffline(state as ConnectivitySnapshot)) {
-      flushOfflineSyncQueue();
+  const triggerFlush = async () => {
+    try {
+      if (supabase?.auth?.getSession) {
+        const { data } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+        if (!data?.session?.user?.id) return;
+      }
+      await flushOfflineSyncQueue().catch(() => {});
+    } catch {
+      // ignore
     }
-  });
+  };
+
+  // Attempt immediate flush on startup if online
+  NetInfo.fetch()
+    .then((state) => {
+      if (!deriveOffline(state as ConnectivitySnapshot)) {
+        triggerFlush();
+      }
+    })
+    .catch(() => {});
 
   const unsubscribe = NetInfo.addEventListener((state) => {
     if (!deriveOffline(state as ConnectivitySnapshot)) {
-      flushOfflineSyncQueue();
+      triggerFlush();
     }
   });
 

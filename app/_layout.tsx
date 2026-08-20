@@ -47,8 +47,6 @@ initAnalytics();
 // Bridge device connectivity into TanStack Query so fetches pause offline and
 // auto-resume on reconnect (rather than hanging on unreachable requests).
 initOnlineManager();
-// Start persistent offline action queue sync listener (likes, saves).
-initOfflineSync();
 // Foreground presentation + the Android notification channel. Never prompts for
 // permission — that happens contextually (first conversation) or from Settings.
 // No-ops on web.
@@ -138,6 +136,11 @@ function RootLayout() {
   // routing a tap needs a mounted navigator; this also covers the cold-start
   // case where the tap is what launched the app.
   useEffect(() => attachResponseListener(), []);
+
+  // Start persistent offline action queue sync listener (likes, saves).
+  useEffect(() => {
+    return initOfflineSync();
+  }, []);
 
   useEffect(() => {
     // Gate first paint on the icon fonts. Note this is a best-effort gate, not
