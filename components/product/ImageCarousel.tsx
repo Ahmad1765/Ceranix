@@ -7,14 +7,9 @@ import {
   NativeScrollEvent,
   StyleSheet,
   ViewStyle,
+  Pressable,
 } from 'react-native';
 import { Image } from 'expo-image';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-} from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Feather from '@expo/vector-icons/Feather';
 import { Text } from '@/lib/rnText';
 import { colors, radii } from '@/lib/theme';
@@ -32,7 +27,7 @@ export interface ImageCarouselProps {
 /**
  * Mobile-Native Image Carousel.
  * Full-bleed swipeable gallery with momentum pagination,
- * dynamic active indicator dots, and gesture zoom support.
+ * dynamic active indicator dots, and crisp tap-to-expand.
  */
 export function ImageCarousel({
   images,
@@ -50,6 +45,17 @@ export function ImageCarousel({
 
   const validImages = (images || []).filter(Boolean);
 
+  const handleScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const offsetX = event.nativeEvent.contentOffset.x;
+      const index = Math.round(offsetX / carouselWidth);
+      if (index !== activeIndex && index >= 0 && index < validImages.length) {
+        setActiveIndex(index);
+      }
+    },
+    [activeIndex, carouselWidth, validImages.length]
+  );
+
   if (validImages.length === 0) {
     return (
       <View
@@ -64,17 +70,6 @@ export function ImageCarousel({
       </View>
     );
   }
-
-  const handleScroll = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const offsetX = event.nativeEvent.contentOffset.x;
-      const index = Math.round(offsetX / carouselWidth);
-      if (index !== activeIndex && index >= 0 && index < validImages.length) {
-        setActiveIndex(index);
-      }
-    },
-    [activeIndex, carouselWidth, validImages.length]
-  );
 
   return (
     <View
@@ -150,47 +145,24 @@ function CarouselSlide({
   height: number;
   onPress?: () => void;
 }) {
-  const scale = useSharedValue(1);
-
-  // Double-tap to zoom micro-interaction
-  const doubleTapGesture = Gesture.Tap()
-    .numberOfTaps(2)
-    .onEnd(() => {
-      if (scale.value > 1.2) {
-        scale.value = withSpring(1, { damping: 15, stiffness: 200 });
-      } else {
-        scale.value = withSpring(1.8, { damping: 15, stiffness: 200 });
-      }
-    });
-
-  const singleTapGesture = Gesture.Tap()
-    .numberOfTaps(1)
-    .onEnd(() => {
-      if (onPress) onPress();
-    });
-
-  const gesture = Gesture.Exclusive(doubleTapGesture, singleTapGesture);
-
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ scale: scale.value }],
-    };
-  });
-
   return (
-    <GestureDetector gesture={gesture}>
-      <View style={[styles.slide, { width, height }]}>
-        <Animated.View style={[{ width, height }, animatedStyle]}>
-          <Image
-            source={{ uri }}
-            contentFit="cover"
-            transition={200}
-            cachePolicy="memory-disk"
-            style={styles.image}
-          />
-        </Animated.View>
-      </View>
-    </GestureDetector>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel="View full photo"
+      style={({ pressed }) => [
+        styles.slide,
+        { width, height, opacity: pressed ? 0.96 : 1 },
+      ]}
+    >
+      <Image
+        source={{ uri }}
+        contentFit="cover"
+        transition={150}
+        cachePolicy="memory-disk"
+        style={styles.image}
+      />
+    </Pressable>
   );
 }
 
@@ -243,7 +215,6 @@ const styles = StyleSheet.create({
   dot: {
     height: 6,
     borderRadius: 3,
-    transitionProperty: 'all',
   },
   dotActive: {
     width: 20,
