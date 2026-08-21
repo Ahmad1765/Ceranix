@@ -1,39 +1,21 @@
-import { View, Pressable, StyleSheet, useWindowDimensions, Platform } from 'react-native';
+import { View, Pressable, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { colors, radii, shadow } from '@/lib/theme';
+import { colors, shadow } from '@/lib/theme';
 import { CONTENT_MAX_WIDTH } from '@/lib/responsive';
 import { getOptimizedImageUrl } from '@/lib/images';
 
 export const AVATAR_SIZE = 96;
-// White gap between the photo and the purple ring. The avatar sits on top of a
-// photograph, so it needs a light separator or the ring reads as part of the
-// image behind it.
-const RING = 4;
-
-// Banner geometry.
-//
-// 16:9 is not a look, it's a contract: it's the ratio the picker crops to, and
-// the banner renders `contentFit="cover"`, so any OTHER display ratio would
-// silently crop the seller's crop a second time. Keep these two in sync — if
-// this changes, change the picker's `aspect` and the web cropper's frame with it.
+const RING = 3;
 export const BANNER_ASPECT = 16 / 9;
 
-// Width is clamped to the same column as the cards below. Left full-bleed, a
-// desktop viewport would make a 16:9 banner over 700px tall and push the whole
-// profile below the fold.
 export function bannerSizeFor(viewportWidth: number): { width: number; height: number } {
   const width = Math.min(viewportWidth, CONTENT_MAX_WIDTH);
   return { width, height: Math.round(width / BANNER_ASPECT) };
 }
 
-/**
- * A circular control floating on the banner. Ionicons rather than Feather
- * because the heart needs a FILLED twin of its outline to read as "followed" —
- * Feather is outline-only.
- */
 export type BannerAction = {
   icon: React.ComponentProps<typeof Ionicons>['name'];
   label: string;
@@ -50,27 +32,18 @@ type Props = {
   verified?: boolean;
   /** Accessible description of whose profile this is. */
   label: string;
-  /**
-   * Tapping the banner. Only wired on your OWN profile, where it routes to the
-   * edit screen — the banner looks editable, so doing nothing on tap reads as
-   * broken rather than as "not a control".
-   */
+  /** Tapping change photo / avatar. Routes to edit screen on own profile. */
   onPress?: () => void;
-  /** Floating discs on the banner's top-right corner. */
+  /** Action buttons on top-right. */
   actions?: BannerAction[];
-  /** Back arrow, floated on the banner's top-LEFT. Omit and there is none. */
+  /** Back arrow on top-LEFT. Omit and there is none. */
   onBack?: () => void;
 };
 
 /**
- * Full-bleed banner with the avatar straddling its lower edge.
- *
- * The overlap is done with a negative margin on the avatar row rather than
- * absolute positioning, so the following content flows naturally beneath it and
- * nothing has to know the banner's height to lay itself out.
+ * Bannerless profile header: top action bar + centered avatar with badge and photo action.
  */
 export function ProfileBanner({
-  bannerUrl,
   avatarUrl,
   initial,
   verified,
@@ -79,134 +52,85 @@ export function ProfileBanner({
   actions,
   onBack,
 }: Props) {
-  const { width: viewportWidth } = useWindowDimensions();
-  const { width, height } = bannerSizeFor(viewportWidth);
-  const bannerWidth = Math.min(750, Math.max(360, Math.round(width * 1.5)));
-  const banner = bannerUrl ? getOptimizedImageUrl(bannerUrl, { width: bannerWidth, quality: 75 }) : null;
   const avatar = avatarUrl ? getOptimizedImageUrl(avatarUrl, { width: 192, quality: 80 }) : null;
   const outer = AVATAR_SIZE + RING * 2;
 
-  // Back rides in the same floating row as the actions, pinned left by an auto
-  // margin. One row of discs on the photo instead of a white nav strip stacked
-  // above it — the banner is the first thing on the screen either way.
-  const discs: (BannerAction & { leading?: boolean })[] = [
-    ...(onBack ? [{ icon: 'chevron-back' as const, label: 'Go back', onPress: onBack, leading: true }] : []),
-    ...(actions ?? []),
-  ];
-
   return (
-    <View>
-      {/* Purple-tint band doubles as both the no-banner fallback and the
-          placeholder colour behind a still-loading photo. */}
-      <Pressable
-        onPress={onPress}
-        // A plain View when there's nothing to do, so a visitor's banner isn't
-        // announced as a button.
-        disabled={!onPress}
-        accessibilityRole={onPress ? 'button' : undefined}
-        accessibilityLabel={onPress ? 'Change your banner' : undefined}
-        style={({ pressed }) => ({
-          width,
-          height,
-          alignSelf: 'center',
-          backgroundColor: colors.purpleSoft,
-          overflow: 'hidden',
-          opacity: onPress && pressed ? 0.85 : 1,
-        })}
+    <View style={{ width: '100%', maxWidth: CONTENT_MAX_WIDTH, alignSelf: 'center' }}>
+      {/* Top action bar */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: 16,
+          paddingTop: 8,
+          paddingBottom: 4,
+        }}
       >
-        {banner ? (
-          <Image
-            source={{ uri: banner }}
-            style={{ width: '100%', height: '100%' }}
-            contentFit="cover"
-            priority="high"
-            recyclingKey={bannerUrl ?? undefined}
-            transition={Platform.OS === 'web' ? 0 : 120}
-            cachePolicy="memory-disk"
-            // Decorative: the identity below carries the meaning, and a banner
-            // photo has no alt text a seller ever supplies.
-            accessible={false}
-          />
-        ) : null}
-
-
-        {/* Only on your own profile, and only while there's no banner yet — an
-            empty purple band gives no hint that it can be filled. */}
-        {onPress && !banner ? (
-          <View
-            style={{
-              ...StyleSheet.absoluteFillObject,
+        {onBack ? (
+          <Pressable
+            onPress={onBack}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            style={({ pressed }) => ({
+              width: 38,
+              height: 38,
+              borderRadius: 19,
+              backgroundColor: colors.panel,
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 6,
-            }}
+              opacity: pressed ? 0.75 : 1,
+            })}
           >
-            <Feather name="image" size={18} color={colors.purple} />
-            <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.purple }}>
-              Add a banner
-            </Text>
-          </View>
-        ) : null}
-      </Pressable>
+            <Ionicons name="chevron-back" size={20} color={colors.ink} />
+          </Pressable>
+        ) : (
+          <View style={{ width: 38, height: 38 }} />
+        )}
 
-      {/* Floating actions. A SIBLING of the banner rather than a child: the
-          banner is itself a Pressable on your own profile, and nesting these
-          inside it would route their taps to "edit banner". The outer row is
-          clamped to the banner's own width so the discs stay on the photo on a
-          desktop viewport instead of drifting to the window edge. */}
-      {discs.length ? (
-        <View
-          pointerEvents="box-none"
-          style={{ position: 'absolute', top: 10, left: 0, right: 0, alignItems: 'center' }}
-        >
-          <View
-            // box-none here too, or this full-width strip would eat taps meant
-            // for the banner beneath it (your own profile routes those to edit).
-            pointerEvents="box-none"
-            style={{
-              width,
-              flexDirection: 'row',
-              justifyContent: 'flex-end',
-              gap: 10,
-              paddingHorizontal: 12,
-            }}
-          >
-            {discs.map((a) => (
-              <Pressable
-                key={a.label}
-                onPress={a.onPress}
-                hitSlop={6}
-                accessibilityRole="button"
-                accessibilityLabel={a.label}
-                accessibilityState={{ selected: !!a.active }}
-                style={({ pressed }) => ({
-                  width: 36,
-                  height: 36,
-                  borderRadius: 18,
-                  backgroundColor: colors.white,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  opacity: pressed ? 0.75 : 1,
-                  marginRight: a.leading ? 'auto' : 0,
-                  ...shadow.md,
-                })}
-              >
-                <Ionicons name={a.icon} size={19} color={a.active ? colors.purple : colors.ink} />
-              </Pressable>
-            ))}
-          </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          {actions?.map((a) => (
+            <Pressable
+              key={a.label}
+              onPress={a.onPress}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={a.label}
+              accessibilityState={{ selected: !!a.active }}
+              style={({ pressed }) => ({
+                width: 38,
+                height: 38,
+                borderRadius: 19,
+                backgroundColor: colors.panel,
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: pressed ? 0.75 : 1,
+              })}
+            >
+              <Ionicons name={a.icon} size={19} color={a.active ? colors.purple : colors.ink} />
+            </Pressable>
+          ))}
         </View>
-      ) : null}
+      </View>
 
-      <View style={{ alignItems: 'center', marginTop: -outer / 2 }}>
-        <View
-          style={{
+      {/* Centered Avatar */}
+      <View style={{ alignItems: 'center', marginTop: 10 }}>
+        <Pressable
+          onPress={onPress}
+          disabled={!onPress}
+          accessibilityRole={onPress ? 'button' : undefined}
+          accessibilityLabel={label}
+          style={({ pressed }) => ({
             width: outer,
             height: outer,
             borderRadius: outer / 2,
             backgroundColor: colors.white,
             padding: RING,
-          }}
+            opacity: onPress && pressed ? 0.85 : 1,
+            ...shadow.sm,
+          })}
         >
           <View
             style={{
@@ -232,7 +156,6 @@ export function ProfileBanner({
                 accessibilityLabel={label}
               />
             ) : (
-
               <Text style={{ fontSize: 32, fontWeight: '900', color: colors.purple }}>
                 {initial}
               </Text>
@@ -260,39 +183,7 @@ export function ProfileBanner({
               <Feather name="check" size={12} color={colors.white} />
             </View>
           ) : null}
-        </View>
-
-        {/* "Change photo" — only on the owner's profile */}
-        {onPress ? (
-          <Pressable
-            onPress={onPress}
-            hitSlop={6}
-            accessibilityRole="button"
-            accessibilityLabel="Change profile photo"
-            style={({ pressed }) => ({
-              marginTop: 8,
-              paddingHorizontal: 12,
-              paddingVertical: 5,
-              borderRadius: radii.pill,
-              backgroundColor: colors.purpleSoft,
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 5,
-              opacity: pressed ? 0.7 : 1,
-            })}
-          >
-            <Feather name="camera" size={12} color={colors.purple} />
-            <Text
-              style={{
-                fontSize: 12.5,
-                fontWeight: '700',
-                color: colors.purple,
-              }}
-            >
-              Change photo
-            </Text>
-          </Pressable>
-        ) : null}
+        </Pressable>
       </View>
     </View>
   );

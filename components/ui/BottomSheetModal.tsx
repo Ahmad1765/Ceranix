@@ -47,6 +47,10 @@ export interface BottomSheetModalProps {
   headerRight?: React.ReactNode;
   /** Disable drag-to-dismiss gesture */
   disableDrag?: boolean;
+  /** Fixed explicit height in pixels (overrides snapHeightRatio) */
+  fixedHeight?: number;
+  /** Auto-size to content height (ignores snapHeightRatio/fixedHeight) */
+  autoHeight?: boolean;
   /** Optional custom container style */
   style?: ViewStyle;
 }
@@ -69,13 +73,16 @@ export function BottomSheetModal({
   children,
   footer,
   snapHeightRatio = 0.75,
+  fixedHeight,
+  autoHeight = false,
   scrollable = true,
   headerRight,
   disableDrag = false,
   style,
 }: BottomSheetModalProps) {
   const insets = useSafeAreaInsets();
-  const sheetHeight = SCREEN_HEIGHT * Math.min(Math.max(snapHeightRatio, 0.3), 0.95);
+  const calculatedHeight = fixedHeight ?? (autoHeight ? undefined : SCREEN_HEIGHT * Math.min(Math.max(snapHeightRatio, 0.3), 0.95));
+  const fallbackDismissHeight = calculatedHeight ?? 400;
 
   const translateY = useSharedValue(Platform.OS === 'web' ? 0 : SCREEN_HEIGHT);
   const contextY = useSharedValue(0);
@@ -112,7 +119,7 @@ export function BottomSheetModal({
     .onEnd((event) => {
       // Dismiss if dragged down by > 120px or with strong downward velocity
       if (event.translationY > 120 || event.velocityY > 600) {
-        translateY.value = withTiming(sheetHeight + 100, { duration: 200 }, () => {
+        translateY.value = withTiming(fallbackDismissHeight + 100, { duration: 200 }, () => {
           runOnJS(handleDismiss)();
         });
       } else {
@@ -129,7 +136,7 @@ export function BottomSheetModal({
   const backdropAnimatedStyle = useAnimatedStyle(() => {
     const opacity = interpolate(
       translateY.value,
-      [0, sheetHeight * 0.7],
+      [0, (calculatedHeight ?? 300) * 0.7],
       [1, 0],
       Extrapolation.CLAMP
     );
@@ -138,7 +145,8 @@ export function BottomSheetModal({
 
   if (!visible) return null;
 
-  const ContentWrapper = scrollable ? ScrollView : View;
+  const isScrollEnabled = autoHeight ? false : scrollable;
+  const ContentWrapper = isScrollEnabled ? ScrollView : View;
 
   return (
     <Modal
@@ -164,8 +172,8 @@ export function BottomSheetModal({
         <Animated.View
           style={[
             styles.sheet,
+            calculatedHeight ? { height: calculatedHeight } : { maxHeight: SCREEN_HEIGHT * 0.88 },
             {
-              height: sheetHeight,
               paddingBottom: Math.max(insets.bottom, 16),
             },
             sheetAnimatedStyle,
@@ -327,10 +335,9 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   staticContent: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 24,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
   },
   footerContainer: {
     paddingHorizontal: 20,

@@ -228,7 +228,6 @@ export default function UserProfileScreen() {
           <>
             <Animated.View style={fade}>
               <ProfileBanner
-                bannerUrl={profile.banner_url}
                 avatarUrl={profile.avatar_url}
                 initial={initial}
                 verified={profile.is_verified}

@@ -12,12 +12,8 @@ import { safeBack } from '@/lib/nav';
 import { supabase } from '@/lib/supabase';
 import {
   uploadAvatar,
-  uploadBanner,
-  cropImage,
   type LocalImage,
-  type CropRect,
 } from '@/lib/upload';
-import { BannerCropper, BANNER_ASPECT, type CropSource } from '@/components/profile';
 import { CONTENT_MAX_WIDTH } from '@/lib/responsive';
 import { useToast } from '@/lib/toast';
 
@@ -188,13 +184,6 @@ export default function ProfileEditScreen() {
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [avatarBase64, setAvatarBase64] = useState<string | null>(null);
   const [avatarRemoved, setAvatarRemoved] = useState(false);
-  const [bannerUri, setBannerUri] = useState<string | null>(null);
-  const [bannerBase64, setBannerBase64] = useState<string | null>(null);
-  const [bannerRemoved, setBannerRemoved] = useState(false);
-  // A web pick waiting to be framed — see pickBanner.
-  const [cropSource, setCropSource] = useState<(CropSource & { base64: string | null }) | null>(
-    null,
-  );
 
   const [saving, setSaving] = useState(false);
   const [usernameError, setUsernameError] = useState<string | null>(null);
@@ -216,12 +205,6 @@ export default function ProfileEditScreen() {
   }, []);
 
   // Seed the form ONCE per profile row, not on every `profile` object identity.
-  //
-  // AuthProvider hands back a fresh object on each refresh (a token refresh, a
-  // refreshProfile() call), and re-running this on those would reset every
-  // field the user has already touched — including wiping a picked avatar or
-  // banner back to the stored URL, silently discarding the pick right before
-  // they hit save. Keyed on the row id, a refresh is a no-op.
   const seededForId = useRef<string | null>(null);
   useEffect(() => {
     if (!profile || seededForId.current === profile.id) return;
@@ -233,9 +216,6 @@ export default function ProfileEditScreen() {
     setAvatarUri(profile.avatar_url ?? null);
     setAvatarBase64(null);
     setAvatarRemoved(false);
-    setBannerUri(profile.banner_url ?? null);
-    setBannerBase64(null);
-    setBannerRemoved(false);
     setUsernameError(null);
     setUsernameStatus('idle');
   }, [profile]);
@@ -247,19 +227,10 @@ export default function ProfileEditScreen() {
       bio: profile?.bio ?? '',
       location: profile?.location ?? '',
       avatarUrl: profile?.avatar_url ?? null,
-      bannerUrl: profile?.banner_url ?? null,
     }),
     [profile],
   );
 
-  // A picked image is still on the device; anything else is already a remote
-  // URL we loaded from the profile and don't need to re-upload.
-  //
-  // `blob:` is the web case and it is load-bearing: expo-image-picker returns
-  // `URL.createObjectURL(file)` on web (see ExponentImagePicker.web.js), so
-  // without it a picked photo never counts as a change — the save button stays
-  // disabled and the upload branch never runs. Native returns file:/content:,
-  // and data: covers pickers that hand back an inline payload.
   const isLocalImage = (uri: string | null) =>
     !!uri &&
     (uri.startsWith('file:') ||
@@ -268,7 +239,6 @@ export default function ProfileEditScreen() {
       uri.startsWith('blob:'));
 
   const hasNewLocalAvatar = isLocalImage(avatarUri);
-  const hasNewLocalBanner = isLocalImage(bannerUri);
 
   const isDirty =
     username.trim().toLowerCase() !== initialSnapshot.username ||
@@ -276,9 +246,7 @@ export default function ProfileEditScreen() {
     bio.trim() !== initialSnapshot.bio ||
     location.trim() !== initialSnapshot.location ||
     avatarRemoved ||
-    hasNewLocalAvatar ||
-    bannerRemoved ||
-    hasNewLocalBanner;
+    hasNewLocalAvatar;
 
   const validateUsername = useCallback((raw: string): string | null => {
     const u = raw.trim().toLowerCase();
@@ -371,59 +339,7 @@ export default function ProfileEditScreen() {
     }
   }, [ensurePermission, toast]);
 
-  // `allowsEditing` is deliberately OFF on every platform: the pick goes to our
-  // own <BannerCropper>, which frames at exactly the ratio <ProfileBanner>
-  // renders at. Neither OS alternative works for a 16:9 banner — the web build
-  // of expo-image-picker ignores allowsEditing/aspect outright, and on iOS
-  // `aspect` is Android-only, so its editor would hand back a SQUARE crop.
-  const pickBanner = useCallback(async () => {
-    tap('light');
-    const ok = await ensurePermission();
-    if (!ok) return;
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: false,
-        quality: 0.85,
-        base64: true,
-      });
-      if (result.canceled || !result.assets?.[0]) return;
-      const asset = result.assets[0];
-      if (!mounted.current) return;
-      setCropSource({
-        uri: asset.uri,
-        base64: asset.base64 ?? null,
-        width: asset.width,
-        height: asset.height,
-      });
-    } catch {
-      toast.show('Could not open photos', { variant: 'default', icon: 'alert-triangle' });
-    }
-  }, [ensurePermission, toast]);
 
-  const handleCropConfirm = useCallback(
-    async (rect: CropRect) => {
-      if (!cropSource) return;
-      const cropped = await cropImage({ uri: cropSource.uri, base64: cropSource.base64 }, rect);
-      if (!mounted.current) return;
-      // cropImage hands back a data: URI on web and a file: URI on native, both
-      // of which isLocalImage recognises — so the form goes dirty and the upload
-      // branch runs on save.
-      setBannerUri(cropped.uri);
-      setBannerBase64(cropped.base64 ?? null);
-      setBannerRemoved(false);
-      setCropSource(null);
-    },
-    [cropSource],
-  );
-
-  const removeBanner = useCallback(() => {
-    if (!bannerUri && !profile?.banner_url) return;
-    tap('light');
-    setBannerUri(null);
-    setBannerBase64(null);
-    setBannerRemoved(true);
-  }, [bannerUri, profile?.banner_url]);
 
   const removeAvatar = useCallback(() => {
     if (!avatarUri && !profile?.avatar_url) return;
@@ -503,14 +419,6 @@ export default function ProfileEditScreen() {
         avatar_url = await uploadAvatar(localImg, user.id);
       }
 
-      let banner_url: string | null = profile?.banner_url ?? null;
-      if (bannerRemoved) {
-        banner_url = null;
-      } else if (hasNewLocalBanner) {
-        const localImg: LocalImage = { uri: bannerUri!, base64: bannerBase64 };
-        banner_url = await uploadBanner(localImg, user.id);
-      }
-
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -519,7 +427,6 @@ export default function ProfileEditScreen() {
           bio: bio.trim() || null,
           location: location.trim() || null,
           avatar_url,
-          banner_url,
         })
         .eq('id', user.id);
 
@@ -568,14 +475,9 @@ export default function ProfileEditScreen() {
     hasNewLocalAvatar,
     avatarUri,
     avatarBase64,
-    bannerRemoved,
-    hasNewLocalBanner,
-    bannerUri,
-    bannerBase64,
     isOnboarding,
     isDirty,
     profile?.avatar_url,
-    profile?.banner_url,
     refreshProfile,
     toast,
     usernameStatus,
@@ -596,7 +498,6 @@ export default function ProfileEditScreen() {
   const displayName = fullName || username || profile.username || 'U';
   const initial = displayName.trim().charAt(0).toUpperCase() || 'U';
   const showRemove = !!avatarUri || (!!profile.avatar_url && !avatarRemoved);
-  const showBannerRemove = !!bannerUri || (!!profile.banner_url && !bannerRemoved);
 
   const canSave =
     !validateUsername(username) &&
@@ -714,69 +615,6 @@ export default function ProfileEditScreen() {
                 ? 'Pick a username and add a few details. You can change all of this later.'
                 : 'Update what people see when they visit your shop.'}
             </Text>
-          </View>
-
-          {/* Banner — the wide header behind the avatar on the profile
-              screens. Optional: with none set, those screens fall back to a
-              flat purple band. */}
-          <View style={{ marginTop: 26 }}>
-            <Pressable
-              onPress={pickBanner}
-              accessibilityRole="button"
-              accessibilityLabel={bannerUri ? 'Change profile banner' : 'Add a profile banner'}
-              style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
-            >
-              {/* Same ratio the profile renders at, so this preview is honest
-                  about what will be visible rather than a squashed strip. */}
-              <View
-                style={{
-                  width: '100%',
-                  maxWidth: CONTENT_MAX_WIDTH,
-                  alignSelf: 'center',
-                  aspectRatio: BANNER_ASPECT,
-                  borderRadius: 16,
-                  overflow: 'hidden',
-                  backgroundColor: 'rgba(108,71,255,0.10)',
-                  borderWidth: 1,
-                  borderColor: HAIR,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                {bannerUri ? (
-                  <Image
-                    source={{ uri: bannerUri }}
-                    style={{ width: '100%', height: '100%' }}
-                    contentFit="cover"
-                    transition={150}
-                  />
-                ) : (
-                  <View style={{ alignItems: 'center', gap: 7 }}>
-                    <Feather name="image" size={18} color={PURPLE} />
-                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: PURPLE }}>
-                      Add a banner
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </Pressable>
-
-            {showBannerRemove && (
-              <Pressable
-                onPress={removeBanner}
-                hitSlop={8}
-                style={({ pressed }) => ({
-                  alignSelf: 'center',
-                  marginTop: 10,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  opacity: pressed ? 0.7 : 1,
-                })}
-              >
-                <Feather name="trash-2" size={13} color={RED} style={{ marginRight: 6 }} />
-                <Text style={{ fontSize: 12, fontWeight: '700', color: RED }}>Remove banner</Text>
-              </Pressable>
-            )}
           </View>
 
           {/* Avatar */}
@@ -1148,13 +986,6 @@ export default function ProfileEditScreen() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
-
-      <BannerCropper
-        visible={!!cropSource}
-        source={cropSource}
-        onCancel={() => setCropSource(null)}
-        onConfirm={handleCropConfirm}
-      />
     </SafeAreaView>
   );
 }

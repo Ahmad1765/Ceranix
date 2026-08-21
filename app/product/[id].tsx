@@ -42,16 +42,15 @@ import { FullscreenImageViewer } from '@/components/product/FullscreenImageViewe
 import { FloatingHeader } from '@/components/navigation/FloatingHeader';
 import { ImageCarousel } from '@/components/product/ImageCarousel';
 import { ProductActionBar } from '@/components/product/ProductActionBar';
+import { SellerOptionsSheet } from '@/components/product/SellerOptionsSheet';
 import { CheckoutSheet } from '@/components/product/CheckoutSheet';
 import { OfferSheet } from '@/components/product/OfferSheet';
 import { PopIcon, type PopIconHandle } from '@/components/product/PopIcon';
 import { RelatedItemCard } from '@/components/product/RelatedItemCard';
 import { ProductSkeleton } from '@/components/product/ProductSkeleton';
 import { BundleSection } from '@/components/product/BundleSection';
-import { colors } from '@/lib/theme';
 
 import { BundleProgressBar } from '@/components/product/BundleProgressBar';
-import { StarRating } from '@/components/product/bits';
 import { SafetyBanner } from '@/components/SafetyBanner';
 import {
   HAIRLINE,
@@ -138,6 +137,7 @@ export default function ProductScreen() {
   const [bpVisible, setBpVisible] = useState(false);
   const [offerVisible, setOfferVisible] = useState(false);
   const [checkoutVisible, setCheckoutVisible] = useState(false);
+  const [sellerOptionsVisible, setSellerOptionsVisible] = useState(false);
   // Imperative handles for the like/save pop — fired on tap so the bounce never
   // rides an async state hydration.
   const heartAnimRef = useRef<PopIconHandle>(null);
@@ -508,6 +508,11 @@ export default function ProductScreen() {
       })),
       { text: 'Cancel', style: 'cancel' as const },
     ]);
+  };
+
+  const handleSellerMoreOptions = () => {
+    tap('selection');
+    setSellerOptionsVisible(true);
   };
 
   // Vertical scroll-driven parallax + sticky-header toggle
@@ -898,17 +903,16 @@ export default function ProductScreen() {
           />
         ) : null}
 
-        {/* ── Seller card ── */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12 }}>
+        {/* ── Seller header row ── */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 }}>
           <View
             style={{
-              backgroundColor: 'white',
-              borderRadius: 18,
-              borderWidth: HAIRLINE,
-              borderColor: 'rgba(15,15,15,0.12)',
-              padding: 14,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
             }}
           >
+            {/* Left: Avatar + Username & Subtitle */}
             <Pressable
               onPress={() => router.push(`/user/${listing.seller.id}` as any)}
               accessibilityRole="button"
@@ -917,94 +921,87 @@ export default function ProductScreen() {
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 12,
-                opacity: pressed ? 0.7 : 1,
+                flex: 1,
+                marginRight: 10,
+                opacity: pressed ? 0.75 : 1,
               })}
             >
-              {/* Avatar with subtle ring */}
+              {/* Avatar circle */}
               <View
                 style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: 28,
-                  padding: 2,
-                  backgroundColor: 'white',
-                  borderWidth: HAIRLINE,
-                  borderColor: 'rgba(15,15,15,0.08)',
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  overflow: 'hidden',
+                  backgroundColor: 'rgba(15,15,15,0.08)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
               >
-                <View
-                  style={{
-                    width: 52,
-                    height: 52,
-                    borderRadius: 26,
-                    overflow: 'hidden',
-                    backgroundColor: 'rgba(15,15,15,0.08)',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {listing.seller.avatar_url ? (
-                    <Image
-                      source={{ uri: getOptimizedImageUrl(listing.seller.avatar_url, { width: 120 }) }}
-                      style={{ width: 52, height: 52 }}
-                      contentFit="cover"
-                      cachePolicy="memory-disk"
-                      transition={150}
-                    />
-                  ) : (
-                    <Feather name="user" size={22} color="rgba(15,15,15,0.55)" />
-                  )}
-                </View>
+                {listing.seller.avatar_url ? (
+                  <Image
+                    source={{ uri: getOptimizedImageUrl(listing.seller.avatar_url, { width: 120 }) }}
+                    style={{ width: 44, height: 44 }}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                    transition={150}
+                  />
+                ) : (
+                  <Feather name="user" size={20} color="rgba(15,15,15,0.55)" />
+                )}
               </View>
 
-              {/* Seller info */}
+              {/* Username + Subtitle */}
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 15, fontWeight: '800', color: BRAND_INK }} numberOfLines={1}>
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: '800',
+                    color: BRAND_INK,
+                    letterSpacing: -0.2,
+                  }}
+                  numberOfLines={1}
+                >
                   @{listing.seller.username}
                 </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                  <StarRating rating={listing.seller.rating} />
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: BRAND_INK }}>
-                    {listing.seller.rating?.toFixed?.(1) ?? '—'}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.62)' }}>
-                    ({Math.round(listing.seller.rating ? Number(listing.seller.total_sales ?? 0) : 0)})
-                  </Text>
-                </View>
-                <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.62)', marginTop: 3 }}>
-                  {Number(listing.seller.total_sales ?? 0)} sales · {sellerItems.length + 1} listed
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: 'rgba(15,15,15,0.55)',
+                    marginTop: 2,
+                    fontWeight: '400',
+                  }}
+                  numberOfLines={1}
+                >
+                  {[
+                    listing.seller?.location,
+                    listing.created_at ? timeAgo(listing.created_at) : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' • ') || 'Active seller'}
                 </Text>
               </View>
-              <Feather name="chevron-right" size={18} color="rgba(15,15,15,0.30)" />
             </Pressable>
 
-            {/* Follow + Message — hidden when viewing your own listing */}
+            {/* Right: Actions */}
             {isOwnListing ? (
-              <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Pressable
                   onPress={handleToggleSold}
                   disabled={ownerBusy}
                   testID="owner-toggle-sold"
                   style={({ pressed }) => ({
-                    flex: 1,
-                    borderRadius: 12,
-                    paddingVertical: 11,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexDirection: 'row',
-                    gap: 6,
+                    paddingHorizontal: 14,
+                    paddingVertical: 7,
+                    borderRadius: 999,
                     backgroundColor: listing.is_sold ? 'white' : BRAND_INK,
                     borderWidth: listing.is_sold ? HAIRLINE : 0,
-                    borderColor: 'rgba(15,15,15,0.08)',
-                    opacity: soldBusy ? 0.5 : pressed ? 0.88 : 1,
-                    transform: [{ scale: pressed ? 0.98 : 1 }],
+                    borderColor: 'rgba(15,15,15,0.12)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: soldBusy ? 0.5 : pressed ? 0.85 : 1,
                   })}
                 >
-                  <Feather
-                    name={listing.is_sold ? 'rotate-ccw' : 'check'}
-                    size={14}
-                    color={listing.is_sold ? BRAND_INK : 'white'}
-                  />
                   <Text
                     style={{
                       fontSize: 13,
@@ -1012,58 +1009,40 @@ export default function ProductScreen() {
                       color: listing.is_sold ? BRAND_INK : 'white',
                     }}
                   >
-                    {listing.is_sold ? 'Mark available' : 'Mark as sold'}
+                    {listing.is_sold ? 'Available' : 'Mark sold'}
                   </Text>
                 </Pressable>
+
                 <Pressable
                   onPress={handleDelete}
                   disabled={ownerBusy}
                   testID="owner-delete"
+                  hitSlop={8}
                   style={({ pressed }) => ({
-                    flex: 1,
-                    borderRadius: 12,
-                    paddingVertical: 11,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexDirection: 'row',
-                    gap: 6,
-                    backgroundColor: 'white',
-                    borderWidth: HAIRLINE,
-                    borderColor: 'rgba(15,15,15,0.08)',
-                    opacity: deleteBusy ? 0.5 : pressed ? 0.7 : 1,
-                    transform: [{ scale: pressed ? 0.98 : 1 }],
+                    padding: 6,
+                    opacity: deleteBusy ? 0.5 : pressed ? 0.6 : 1,
                   })}
                 >
-                  <Feather name="trash-2" size={14} color={BRAND_INK} />
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: BRAND_INK }}>
-                    Delete
-                  </Text>
+                  <Feather name="trash-2" size={18} color="rgba(15,15,15,0.7)" />
                 </Pressable>
               </View>
             ) : (
-              <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                {/* Follow Button */}
                 <Pressable
                   onPress={handleFollowPress}
                   style={({ pressed }) => ({
-                    flex: 1,
-                    borderRadius: 12,
-                    paddingVertical: 11,
+                    paddingHorizontal: 16,
+                    paddingVertical: 7,
+                    borderRadius: 999,
+                    backgroundColor: followed ? 'rgba(15,15,15,0.08)' : BRAND_INK,
+                    borderWidth: followed ? HAIRLINE : 0,
+                    borderColor: 'rgba(15,15,15,0.12)',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    flexDirection: 'row',
-                    gap: 6,
-                    backgroundColor: followed ? 'white' : BRAND_PURPLE,
-                    borderWidth: followed ? HAIRLINE : 0,
-                    borderColor: 'rgba(15,15,15,0.08)',
-                    opacity: pressed ? 0.88 : 1,
-                    transform: [{ scale: pressed ? 0.98 : 1 }],
+                    opacity: pressed ? 0.85 : 1,
                   })}
                 >
-                  <Feather
-                    name={followed ? 'check' : 'plus'}
-                    size={14}
-                    color={followed ? BRAND_INK : 'white'}
-                  />
                   <Text
                     style={{
                       fontSize: 13,
@@ -1074,27 +1053,37 @@ export default function ProductScreen() {
                     {followed ? 'Following' : 'Follow'}
                   </Text>
                 </Pressable>
+
+                {/* Message Icon */}
                 <Pressable
                   onPress={() => openChat('message')}
+                  hitSlop={6}
+                  accessibilityRole="button"
+                  accessibilityLabel="Message seller"
                   style={({ pressed }) => ({
-                    flex: 1,
-                    borderRadius: 12,
-                    paddingVertical: 11,
+                    padding: 6,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    flexDirection: 'row',
-                    gap: 6,
-                    backgroundColor: 'white',
-                    borderWidth: HAIRLINE,
-                    borderColor: 'rgba(15,15,15,0.08)',
-                    opacity: pressed ? 0.7 : 1,
-                    transform: [{ scale: pressed ? 0.98 : 1 }],
+                    opacity: pressed ? 0.6 : 1,
                   })}
                 >
-                  <Feather name="message-circle" size={14} color={BRAND_INK} />
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: BRAND_INK }}>
-                    Message
-                  </Text>
+                  <Ionicons name="chatbox-outline" size={20} color={BRAND_INK} />
+                </Pressable>
+
+                {/* More / Profile Options Icon */}
+                <Pressable
+                  onPress={handleSellerMoreOptions}
+                  hitSlop={6}
+                  accessibilityRole="button"
+                  accessibilityLabel="More options"
+                  style={({ pressed }) => ({
+                    padding: 6,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: pressed ? 0.6 : 1,
+                  })}
+                >
+                  <Feather name="more-vertical" size={20} color={BRAND_INK} />
                 </Pressable>
               </View>
             )}
@@ -1686,6 +1675,16 @@ export default function ProductScreen() {
         initialIndex={fullscreenIndex ?? 0}
         onClose={() => setFullscreenIndex(null)}
       />
+
+      {/* Seller Options Sheet (Share, View, Report) */}
+      {listing?.seller ? (
+        <SellerOptionsSheet
+          visible={sellerOptionsVisible}
+          seller={listing.seller}
+          listingId={listing.id}
+          onClose={() => setSellerOptionsVisible(false)}
+        />
+      ) : null}
     </View>
   );
 }

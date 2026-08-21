@@ -346,11 +346,9 @@ function ProfileScreenInner() {
         }}
         ListHeaderComponent={
           <>
-            {/* Banner & Avatar with Change Photo Button */}
+            {/* Profile Header: Actions & Avatar */}
             <Animated.View style={heroFade}>
               <ProfileBanner
-
-                bannerUrl={profile.banner_url}
                 avatarUrl={profile.avatar_url}
                 initial={initial}
                 verified={profile.is_verified}

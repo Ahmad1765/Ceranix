@@ -147,7 +147,7 @@ function OfferBubble({
   const showStruck = !!listingPrice && listingPrice > amount;
   const discountPct =
     showStruck && listingPrice
-      ? Math.max(1, Math.round(((listingPrice - amount) / listingPrice) * 100))
+      ? Math.round(((listingPrice - amount) / listingPrice) * 100)
       : 0;
 
   const isAccepted = status === 'accepted';

@@ -520,14 +520,10 @@ function BundleSelectCard({
   return (
     <View style={{ width: CARD_WIDTH, marginBottom: 14 }}>
       {/* Primary gesture is add-to-bundle — the whole tile toggles. Opening the
-          full listing is the secondary action, moved to its own button so a tap
-          no longer navigates the buyer away mid-build. */}
-      <Pressable
-        onPress={onToggle}
-        accessibilityRole="button"
-        accessibilityState={{ selected }}
-        accessibilityLabel={`${selected ? 'Remove' : 'Add'} ${item.brand || 'item'} ${selected ? 'from' : 'to'} bundle`}
-        style={({ pressed }) => ({
+          full listing is the secondary action, moved to its own button as a sibling
+          so a tap no longer navigates away and we avoid nested <button> elements. */}
+      <View
+        style={{
           width: CARD_WIDTH,
           height: CARD_IMAGE_HEIGHT,
           borderRadius: 12,
@@ -535,30 +531,42 @@ function BundleSelectCard({
           backgroundColor: 'rgba(15,15,15,0.04)',
           borderWidth: 2,
           borderColor: selected ? BRAND_PURPLE : 'transparent',
-          transform: [{ scale: pressed ? 0.98 : 1 }],
-        })}
+          position: 'relative',
+        }}
       >
-        {item.images[0] && (
-          <Image
-            source={{ uri: getOptimizedImageUrl(item.images[0], { width: 500 }) }}
-            style={{ width: '100%', height: '100%' }}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-          />
-        )}
-        {/* Selected wash — reinforces state beyond the border. */}
-        {selected ? (
-          <View
-            style={{
-              position: 'absolute',
-              left: 0,
-              right: 0,
-              top: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(108,71,255,0.10)',
-            }}
-          />
-        ) : null}
+        <Pressable
+          onPress={onToggle}
+          accessibilityRole="button"
+          accessibilityState={{ selected }}
+          accessibilityLabel={`${selected ? 'Remove' : 'Add'} ${item.brand || 'item'} ${selected ? 'from' : 'to'} bundle`}
+          style={({ pressed }) => ({
+            width: '100%',
+            height: '100%',
+            transform: [{ scale: pressed ? 0.98 : 1 }],
+          })}
+        >
+          {item.images[0] && (
+            <Image
+              source={{ uri: getOptimizedImageUrl(item.images[0], { width: 500 }) }}
+              style={{ width: '100%', height: '100%' }}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+            />
+          )}
+          {/* Selected wash — reinforces state beyond the border. */}
+          {selected ? (
+            <View
+              style={{
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                top: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(108,71,255,0.10)',
+              }}
+            />
+          ) : null}
+        </Pressable>
 
         {/* View full listing — the escape hatch to the product page. */}
         <Pressable
@@ -577,6 +585,7 @@ function BundleSelectCard({
             alignItems: 'center',
             justifyContent: 'center',
             opacity: pressed ? 0.7 : 1,
+            zIndex: 10,
           })}
         >
           <Feather name="maximize-2" size={13} color={BRAND_INK} />
@@ -584,6 +593,7 @@ function BundleSelectCard({
 
         {/* Selection indicator — reflects state; the whole tile drives it. */}
         <View
+          pointerEvents="none"
           style={{
             position: 'absolute',
             top: 8,
@@ -594,11 +604,12 @@ function BundleSelectCard({
             backgroundColor: selected ? BRAND_PURPLE : 'rgba(255,255,255,0.92)',
             alignItems: 'center',
             justifyContent: 'center',
+            zIndex: 10,
           }}
         >
           <Feather name={selected ? 'check' : 'plus'} size={16} color={selected ? 'white' : BRAND_INK} />
         </View>
-      </Pressable>
+      </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
         <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: BRAND_INK }} numberOfLines={1}>
           {item.brand}
