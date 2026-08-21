@@ -6,7 +6,7 @@
 // screen is currently showing and leaves the tab bar's active tab untouched
 // underneath — exactly like the Offer button's sheet on the product page.
 import {
-  createContext, useCallback, useContext, useMemo, useState, type ReactNode,
+  createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode,
 } from 'react';
 import { capture } from '@/lib/analytics';
 import { View, Pressable, ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, useWindowDimensions, Modal } from 'react-native';
@@ -82,17 +82,29 @@ export function useSellSheet(): SellSheetApi {
 
 export function SellSheetProvider({ children }: { children: ReactNode }) {
   const [visible, setVisible] = useState(false);
+  const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
   const { user } = useAuth();
 
   const open = useCallback(() => {
-    if (!user) {
+    if (!user?.id) {
       router.push('/auth/login');
       return;
     }
+    setOwnerUserId(user.id);
     setVisible(true);
   }, [user]);
 
-  const close = useCallback(() => setVisible(false), []);
+  const close = useCallback(() => {
+    setVisible(false);
+    setOwnerUserId(null);
+  }, []);
+
+  // Close and unmount form whenever user becomes unauthenticated or user ID changes
+  useEffect(() => {
+    if (visible && (!user?.id || user.id !== ownerUserId)) {
+      close();
+    }
+  }, [visible, user?.id, ownerUserId, close]);
 
   const api = useMemo(() => ({ open, close }), [open, close]);
 

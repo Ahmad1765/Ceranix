@@ -13,7 +13,7 @@ import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
 import { PressableScale } from '@/components/PressableScale';
-import { colors, radii, type as typography } from '@/lib/theme';
+import { colors, radii, shadow, type as typography } from '@/lib/theme';
 import { formatPrice } from '@/lib/currency';
 import type { ChatMessage } from '@/lib/chat';
 import type { Anchor } from './ReactionPicker';
@@ -141,94 +141,256 @@ function OfferBubble({
   const amount = msg.metadata?.amount ?? 0;
   const status = msg.offer_status ?? 'pending';
   const canRespond = !mine && isSeller && status === 'pending';
-  // The buyer keeps a Pay CTA on their own accepted offer until the listing is
-  // marked sold; the seller sees the passive counterpart.
   const canPay = mine && !isSeller && status === 'accepted' && !!listingId && !listingSold;
   const awaitingPayment = !mine && isSeller && status === 'accepted' && !listingSold;
   const settled = status !== 'pending' ? OFFER_STATUS_COPY[status] : null;
   const showStruck = !!listingPrice && listingPrice > amount;
+  const discountPct =
+    showStruck && listingPrice
+      ? Math.max(1, Math.round(((listingPrice - amount) / listingPrice) * 100))
+      : 0;
+
+  const isAccepted = status === 'accepted';
+  const isDeclined = status === 'declined';
 
   return (
     <View
       style={{
-        minWidth: 172,
-        backgroundColor: colors.primarySoft,
+        minWidth: 232,
+        backgroundColor: colors.white,
         borderWidth: 1,
-        borderColor: colors.primarySofter,
-        borderRadius: BUBBLE_RADIUS,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
+        borderColor: isAccepted
+          ? 'rgba(16,185,129,0.30)'
+          : isDeclined
+          ? 'rgba(239,68,68,0.25)'
+          : 'rgba(108,71,255,0.18)',
+        borderRadius: 20,
+        padding: 15,
+        ...shadow.sm,
       }}
     >
-      <Text
+      {/* ── Top Header: Badge + Status ── */}
+      <View
         style={{
-          fontFamily: typography.family.sansBold,
-          fontSize: 12.5,
-          letterSpacing: -0.1,
-          color: colors.ink,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 10,
         }}
       >
-        {mine ? 'Offer sent' : 'Offer received'}
-      </Text>
-
-      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 3 }}>
-        <Text
+        <View
           style={{
-            fontFamily: typography.family.sansBold,
-            fontSize: 19,
-            letterSpacing: -0.4,
-            color: colors.ink,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 5,
+            paddingHorizontal: 8,
+            paddingVertical: 3.5,
+            borderRadius: radii.pill,
+            backgroundColor: isAccepted
+              ? 'rgba(16,185,129,0.10)'
+              : colors.purpleSoft,
           }}
         >
-          {formatPrice(amount)}
-        </Text>
-        {showStruck && (
-          <Text
-            style={{
-              fontFamily: typography.family.sans,
-              fontSize: 13,
-              color: colors.muteSoft,
-              textDecorationLine: 'line-through',
-            }}
-          >
-            {formatPrice(listingPrice)}
-          </Text>
-        )}
-      </View>
-
-      {msg.metadata?.note ? (
-        <Text
-          style={{
-            fontFamily: typography.family.sans,
-            fontSize: 13.5,
-            lineHeight: 19,
-            color: colors.mute,
-            marginTop: 6,
-          }}
-        >
-          {msg.metadata.note}
-        </Text>
-      ) : null}
-
-      {settled && (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8 }}>
           <Feather
-            name={settled.icon}
-            size={12}
-            color={status === 'accepted' ? colors.primary : colors.muteSoft}
+            name={isAccepted ? 'check' : mine ? 'arrow-up-right' : 'tag'}
+            size={11}
+            color={isAccepted ? '#059669' : colors.purple}
           />
           <Text
             style={{
               fontFamily: typography.family.sansBold,
-              fontSize: 11.5,
-              color: status === 'accepted' ? colors.primary : colors.muteSoft,
+              fontSize: 10.5,
+              letterSpacing: 0.5,
+              color: isAccepted ? '#059669' : colors.purple,
+              textTransform: 'uppercase',
             }}
           >
-            {settled.label}
+            {mine ? 'Offer sent' : 'Offer received'}
           </Text>
         </View>
-      )}
 
+        {settled ? (
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 4,
+              paddingHorizontal: 7,
+              paddingVertical: 2.5,
+              borderRadius: radii.pill,
+              backgroundColor: isAccepted
+                ? 'rgba(16,185,129,0.12)'
+                : isDeclined
+                ? 'rgba(239,68,68,0.10)'
+                : colors.panel,
+            }}
+          >
+            <Feather
+              name={settled.icon}
+              size={11}
+              color={
+                isAccepted
+                  ? '#059669'
+                  : isDeclined
+                  ? '#DC2626'
+                  : colors.muteSoft
+              }
+            />
+            <Text
+              style={{
+                fontFamily: typography.family.sansBold,
+                fontSize: 10.5,
+                color:
+                  isAccepted
+                    ? '#059669'
+                    : isDeclined
+                    ? '#DC2626'
+                    : colors.muteSoft,
+              }}
+            >
+              {settled.label}
+            </Text>
+          </View>
+        ) : (
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 4,
+              paddingHorizontal: 7,
+              paddingVertical: 2.5,
+              borderRadius: radii.pill,
+              backgroundColor: colors.panel,
+            }}
+          >
+            <View
+              style={{
+                width: 5,
+                height: 5,
+                borderRadius: 2.5,
+                backgroundColor: colors.purple,
+              }}
+            />
+            <Text
+              style={{
+                fontFamily: typography.family.sansSemibold,
+                fontSize: 10.5,
+                color: colors.mute,
+              }}
+            >
+              Pending
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* ── Hero Price Container ── */}
+      <View
+        style={{
+          backgroundColor: colors.panel,
+          borderRadius: radii.md,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+          borderWidth: 1,
+          borderColor: colors.hairline,
+        }}
+      >
+        <Text
+          style={{
+            fontFamily: typography.family.sansSemibold,
+            fontSize: 10.5,
+            color: colors.muteSoft,
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+          }}
+        >
+          Offered Price
+        </Text>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'baseline',
+            gap: 7,
+            marginTop: 2,
+            flexWrap: 'wrap',
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: typography.family.sansBold,
+              fontSize: 21,
+              letterSpacing: -0.4,
+              color: colors.ink,
+            }}
+          >
+            {formatPrice(amount)}
+          </Text>
+          {showStruck && (
+            <Text
+              style={{
+                fontFamily: typography.family.sans,
+                fontSize: 12.5,
+                color: colors.muteSoft,
+                textDecorationLine: 'line-through',
+              }}
+            >
+              {formatPrice(listingPrice)}
+            </Text>
+          )}
+          {discountPct > 0 && (
+            <View
+              style={{
+                backgroundColor: 'rgba(108,71,255,0.12)',
+                paddingHorizontal: 5.5,
+                paddingVertical: 1.5,
+                borderRadius: 5,
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: typography.family.sansBold,
+                  fontSize: 10.5,
+                  color: colors.purple,
+                }}
+              >
+                −{discountPct}%
+              </Text>
+            </View>
+          )}
+        </View>
+      </View>
+
+      {/* ── Optional Note ── */}
+      {msg.metadata?.note ? (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            gap: 6,
+            marginTop: 8,
+            paddingHorizontal: 10,
+            paddingVertical: 7,
+            backgroundColor: 'rgba(15,15,15,0.02)',
+            borderRadius: radii.sm,
+            borderLeftWidth: 2.5,
+            borderLeftColor: colors.purple,
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: typography.family.sans,
+              fontSize: 12.5,
+              lineHeight: 17,
+              color: colors.ink,
+              flex: 1,
+            }}
+          >
+            {`"${msg.metadata.note}"`}
+          </Text>
+        </View>
+      ) : null}
+
+      {/* ── Action Buttons for Seller ── */}
       {canRespond && (
         <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
           <PressableScale
@@ -259,14 +421,15 @@ function OfferBubble({
             onPress={onAccept}
             accessibilityLabel="Accept offer"
             style={{
-              flex: 1,
+              flex: 1.2,
               height: 38,
               borderRadius: radii.pill,
-              backgroundColor: colors.ink,
+              backgroundColor: colors.purple,
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center',
               gap: 5,
+              ...shadow.sm,
             }}
           >
             <Feather name="check" size={14} color={colors.white} />
@@ -283,22 +446,24 @@ function OfferBubble({
         </View>
       )}
 
+      {/* ── CTA for Buyer to Pay ── */}
       {canPay && (
         <PressableScale
           onPress={() => onPay(amount)}
           accessibilityLabel={`Pay ${formatPrice(amount)}`}
           style={{
             marginTop: 12,
-            height: 40,
+            height: 42,
             borderRadius: radii.pill,
-            backgroundColor: colors.primary,
+            backgroundColor: colors.purple,
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 6,
+            gap: 7,
+            ...shadow.sm,
           }}
         >
-          <Feather name="credit-card" size={14} color={colors.white} />
+          <Feather name="credit-card" size={15} color={colors.white} />
           <Text
             style={{
               fontFamily: typography.family.sansBold,
@@ -311,32 +476,49 @@ function OfferBubble({
         </PressableScale>
       )}
 
+      {/* ── Status Footers ── */}
       {awaitingPayment && (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8 }}>
-          <Feather name="clock" size={12} color={colors.muteSoft} />
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 5,
+            marginTop: 9,
+            paddingVertical: 2,
+          }}
+        >
+          <Feather name="clock" size={11.5} color={colors.muteSoft} />
           <Text
             style={{
               fontFamily: typography.family.sans,
-              fontSize: 11.5,
+              fontSize: 11,
               color: colors.muteSoft,
             }}
           >
-            Waiting for the buyer to pay
+            Waiting for buyer to complete payment
           </Text>
         </View>
       )}
 
       {status === 'accepted' && listingSold && (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8 }}>
-          <Feather name="shield" size={12} color={colors.primary} />
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 5,
+            marginTop: 9,
+            paddingVertical: 2,
+          }}
+        >
+          <Feather name="shield" size={12} color="#059669" />
           <Text
             style={{
               fontFamily: typography.family.sansBold,
-              fontSize: 11.5,
-              color: colors.primary,
+              fontSize: 11,
+              color: '#059669',
             }}
           >
-            Paid · covered by Buyer Protection
+            Paid · Covered by Buyer Protection
           </Text>
         </View>
       )}

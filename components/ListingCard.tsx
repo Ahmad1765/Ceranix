@@ -254,7 +254,7 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
     <View style={{ flex: 1, marginBottom: 16 }}>
     <PressableScale
       onPress={() => router.push(`/product/${listing.id}`)}
-      accessibilityRole="button"
+      accessibilityRole="link"
       accessibilityLabel={`${listing.brand || listing.title}${listing.size ? `, size ${listing.size}` : ''}, ${formatPrice(listing.price)}`}
       accessibilityHint="Opens listing details"
       style={{ flex: 1 }}

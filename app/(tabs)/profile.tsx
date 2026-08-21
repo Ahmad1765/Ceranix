@@ -452,77 +452,7 @@ function ProfileScreenInner() {
                 </View>
               </View>
 
-              {/* Action Buttons Row (TikTok Style: Edit profile, Share profile, Settings) */}
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  marginTop: 15,
-                  paddingHorizontal: 20,
-                  alignSelf: 'center',
-                }}
-              >
-                <Pressable
-                  onPress={() => router.push('/profile/edit')}
-                  accessibilityRole="button"
-                  accessibilityLabel="Edit profile"
-                  style={({ pressed }) => ({
-                    height: 36,
-                    paddingHorizontal: 20,
-                    borderRadius: 20,
-                    backgroundColor: '#F1F1F2',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    opacity: pressed ? 0.75 : 1,
-                    transform: [{ scale: pressed ? 0.97 : 1 }],
-                  })}
-                >
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#161823' }}>
-                    Edit profile
-                  </Text>
-                </Pressable>
 
-                <Pressable
-                  onPress={handleShareProfile}
-                  accessibilityRole="button"
-                  accessibilityLabel="Share profile"
-                  style={({ pressed }) => ({
-                    height: 36,
-                    paddingHorizontal: 20,
-                    borderRadius: 20,
-                    backgroundColor: '#F1F1F2',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    opacity: pressed ? 0.75 : 1,
-                    transform: [{ scale: pressed ? 0.97 : 1 }],
-                  })}
-                >
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#161823' }}>
-                    Share profile
-                  </Text>
-                </Pressable>
-
-                <Pressable
-                  onPress={() => router.push('/settings')}
-                  accessibilityRole="button"
-                  accessibilityLabel="Settings"
-                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                  style={({ pressed }) => ({
-                    width: 36,
-                    height: 36,
-                    borderRadius: 18,
-                    backgroundColor: '#F1F1F2',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    opacity: pressed ? 0.75 : 1,
-                    transform: [{ scale: pressed ? 0.96 : 1 }],
-                  })}
-                >
-                  <Feather name="settings" size={16} color="#161823" />
-                </Pressable>
-              </View>
 
 
               {/* Bio & Link Section */}

@@ -12,7 +12,7 @@ import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { ThumbButton } from '@/components/ui/ThumbButton';
 import { Text } from '@/lib/rnText';
 import { colors, radii, type } from '@/lib/theme';
-import { buyerProtectionFee, orderTotal, formatPrice } from '@/lib/fees';
+import { buyerProtectionFee, formatPrice, DEFAULT_SHIPPING_FEE } from '@/lib/fees';
 
 export type FulfillmentMethod = 'delivery' | 'handshake';
 export type PaymentMethodType = 'card' | 'cod';
@@ -55,10 +55,13 @@ export function CheckoutSheet({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType>('cod');
 
   const itemPrice = product?.price || 0;
-  const shippingFee = fulfillment === 'delivery' ? (product?.shippingFee ?? 0) : 0;
+  const shippingFee =
+    fulfillment === 'delivery'
+      ? (product?.shippingFee ?? DEFAULT_SHIPPING_FEE)
+      : 0;
   const protectionFee =
     product?.buyerProtectionFee ?? buyerProtectionFee(itemPrice);
-  const totalAmount = orderTotal(itemPrice) + shippingFee;
+  const totalAmount = itemPrice + shippingFee + protectionFee;
 
   const handleFulfillmentChange = (method: FulfillmentMethod) => {
     if (Platform.OS !== 'web') {
@@ -178,7 +181,7 @@ export function CheckoutSheet({
                     },
                   ]}
                 >
-                  {formatPrice(product?.shippingFee ?? 4.99)}
+                  {formatPrice(product?.shippingFee ?? DEFAULT_SHIPPING_FEE)}
                 </Text>
               </View>
               <Text

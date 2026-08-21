@@ -270,7 +270,7 @@ export function AddressSheet({
 
       <SheetField
         label="Address line 1 (Street / House / Block)"
-        placeholder="e.g. House #12, Street 4, Block C, Nishat Colony"
+        placeholder="e.g. House #12, Street 4, Block C, Johar Town"
         value={form.line1}
         onChangeText={(t) => set({ line1: t.slice(0, 120) })}
         error={errors.line1}
@@ -327,7 +327,7 @@ export function AddressSheet({
 
       <SheetField
         label="Phone (for courier delivery)"
-        placeholder="e.g. 03254864702"
+        placeholder="e.g. 03xxxxxxxxx"
         value={form.phone}
         keyboardType="phone-pad"
         onChangeText={(t) => set({ phone: t.slice(0, 30) })}

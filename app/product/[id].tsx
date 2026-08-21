@@ -656,25 +656,6 @@ export default function ProductScreen() {
         title={showStickyHeader ? listing.title : undefined}
         subtitle={showStickyHeader ? formatPrice(listing.price, { whole: true }) : undefined}
         transparent={!showStickyHeader}
-        rightActions={[
-          {
-            icon: 'share-2',
-            onPress: shareListing,
-            accessibilityLabel: 'Share listing',
-          },
-          {
-            icon: 'bookmark',
-            onPress: handleOpenSaveList,
-            active: saved,
-            activeColor: colors.purple,
-            accessibilityLabel: 'Save listing',
-          },
-          {
-            icon: 'flag',
-            onPress: handleReport,
-            accessibilityLabel: 'Report listing',
-          },
-        ]}
       />
 
       <Animated.ScrollView
