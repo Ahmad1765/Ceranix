@@ -32,7 +32,7 @@ export const lightTheme = {
   smoke: 'rgba(0, 0, 0, 0.6)',
   overlay: 'rgba(0, 0, 0, 0.45)',
   overlayLight: 'rgba(0, 0, 0, 0.18)',
-  selected: '#EAEAEA',
+  selected: '#F6F6F6',
   onSelected: '#111111',
   cream: '#FFFFFF',
   soft: '#F6F6F6',

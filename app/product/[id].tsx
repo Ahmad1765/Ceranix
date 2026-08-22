@@ -1477,8 +1477,8 @@ export default function ProductScreen() {
                     paddingHorizontal: 16,
                     paddingVertical: 9,
                     borderRadius: 999,
-                    backgroundColor: active ? BRAND_PURPLE : colors.surface,
-                    borderWidth: active ? 0 : 1,
+                    backgroundColor: active ? colors.selected : colors.white,
+                    borderWidth: 1,
                     borderColor: colors.border,
                     transform: [{ scale: pressed ? 0.96 : 1 }],
                   })}
@@ -1486,14 +1486,14 @@ export default function ProductScreen() {
                   <Ionicons
                     name={tab === 'members' ? 'person' : 'sparkles'}
                     size={13}
-                    color={active ? 'white' : colors.ink}
+                    color={colors.ink}
                     style={{ marginRight: 6 }}
                   />
                   <Text
                     style={{
                       fontSize: 13,
                       fontWeight: '700',
-                      color: active ? 'white' : colors.ink,
+                      color: colors.ink,
                     }}
                   >
                     {tab === 'members' ? "Seller's items" : 'Similar items'}

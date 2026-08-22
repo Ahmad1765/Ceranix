@@ -24,7 +24,7 @@ export function Chip({
   count,
   size = 'md',
 }: Props) {
-  const sty = stylesFor(active ? 'ink' : tone);
+  const sty = stylesFor(active ? 'selected' : tone);
   const padY = size === 'sm' ? 6 : 8;
   const padX = size === 'sm' ? 12 : 14;
   const fs = size === 'sm' ? 12 : 13;
@@ -84,8 +84,10 @@ export function Chip({
   );
 }
 
-function stylesFor(t: Tone) {
+function stylesFor(t: Tone | 'selected') {
   switch (t) {
+    case 'selected':
+      return { bg: colors.selected, fg: colors.ink, bw: 1, bc: colors.border };
     case 'pink':
       return { bg: colors.pinkSoft, fg: colors.pinkDeep, bw: 0, bc: 'transparent' };
     case 'ink':
