@@ -157,13 +157,13 @@ function OfferBubble({
     <View
       style={{
         minWidth: 232,
-        backgroundColor: colors.white,
+        backgroundColor: colors.surface,
         borderWidth: 1,
         borderColor: isAccepted
           ? 'rgba(16,185,129,0.30)'
           : isDeclined
           ? 'rgba(239,68,68,0.25)'
-          : 'rgba(108,71,255,0.18)',
+          : colors.border,
         borderRadius: 20,
         padding: 15,
         ...shadow.sm,
@@ -401,8 +401,8 @@ function OfferBubble({
               height: 38,
               borderRadius: radii.pill,
               borderWidth: 1,
-              borderColor: colors.hairline,
-              backgroundColor: colors.white,
+              borderColor: colors.border,
+              backgroundColor: colors.surface,
               alignItems: 'center',
               justifyContent: 'center',
             }}
@@ -432,12 +432,12 @@ function OfferBubble({
               ...shadow.sm,
             }}
           >
-            <Feather name="check" size={14} color={colors.white} />
+            <Feather name="check" size={14} color="#FFFFFF" />
             <Text
               style={{
                 fontFamily: typography.family.sansBold,
                 fontSize: 13,
-                color: colors.white,
+                color: '#FFFFFF',
               }}
             >
               Accept
@@ -463,12 +463,12 @@ function OfferBubble({
             ...shadow.sm,
           }}
         >
-          <Feather name="credit-card" size={15} color={colors.white} />
+          <Feather name="credit-card" size={15} color="#FFFFFF" />
           <Text
             style={{
               fontFamily: typography.family.sansBold,
               fontSize: 13.5,
-              color: colors.white,
+              color: '#FFFFFF',
             }}
           >
             Pay {formatPrice(amount)}
@@ -539,9 +539,9 @@ function TextBubble({
       style={{
         paddingHorizontal: 14,
         paddingVertical: 9,
-        backgroundColor: mine ? colors.primary : colors.white,
+        backgroundColor: mine ? colors.purple : colors.surface,
         borderWidth: mine ? 0 : 1,
-        borderColor: colors.hairline,
+        borderColor: colors.border,
         opacity: msg.pending ? 0.65 : 1,
         borderRadius: BUBBLE_RADIUS,
         // The tail sits on the sender's own side: tightened at the bottom of a
@@ -557,7 +557,7 @@ function TextBubble({
           fontFamily: typography.family.sans,
           fontSize: 15,
           lineHeight: 21,
-          color: mine ? colors.white : colors.ink,
+          color: mine ? '#FFFFFF' : colors.ink,
         }}
       >
         {msg.content}
@@ -592,9 +592,9 @@ function ReactionChip({ reactions, mine }: { reactions: string[]; mine: boolean 
         paddingHorizontal: 7,
         paddingVertical: 3,
         borderRadius: radii.pill,
-        backgroundColor: colors.white,
+        backgroundColor: colors.surface,
         borderWidth: 1,
-        borderColor: colors.hairline,
+        borderColor: colors.border,
       }}
     >
       {[...counts.entries()].map(([emoji, count]) => (

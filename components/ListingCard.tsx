@@ -363,7 +363,9 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
             position: 'absolute',
             bottom: 8,
             right: 8,
-            backgroundColor: 'rgba(255,255,255,0.94)',
+            backgroundColor: colors.surface,
+            borderWidth: 1,
+            borderColor: colors.border,
             borderRadius: 999,
             paddingVertical: 6,
             paddingHorizontal: 11,
@@ -380,9 +382,9 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
             active={liked}
             size={16}
             activeColor={BRAND_PURPLE}
-            inactiveColor={BRAND_INK}
+            inactiveColor={colors.ink}
           />
-          <Text style={{ fontSize: 12, fontWeight: '700', color: '#0F0F0F' }}>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.ink }}>
             {likeCount}
           </Text>
         </Pressable>

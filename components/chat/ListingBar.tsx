@@ -37,8 +37,8 @@ export function ListingBar({
         paddingHorizontal: 14,
         paddingVertical: 10,
         borderBottomWidth: 1,
-        borderBottomColor: colors.hairline,
-        backgroundColor: pressed ? colors.panel : colors.white,
+        borderBottomColor: colors.border,
+        backgroundColor: pressed ? colors.panel : colors.surface,
       })}
     >
       <ListingThumb uri={thumb} width={52} height={44} status={status} radius={radii.sm} />

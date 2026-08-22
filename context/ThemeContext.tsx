@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { lightTheme, darkTheme, ThemeTokens } from '../lib/theme';
+import { lightTheme, darkTheme, ThemeTokens, setActiveTheme } from '../lib/theme';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -42,7 +42,27 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  const isDark = mode === 'system' ? systemColorScheme === 'dark' : mode === 'dark';
+  const theme = isDark ? darkTheme : lightTheme;
+
+  // Keep static token references in sync with theme state
+  setActiveTheme(theme);
+  useEffect(() => {
+    setActiveTheme(theme);
+    if (typeof document !== 'undefined') {
+      document.documentElement.style.backgroundColor = theme.background;
+      document.body.style.backgroundColor = theme.background;
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    }
+  }, [theme, isDark]);
+
   const setThemeMode = async (newMode: ThemeMode) => {
+    const nextIsDark = newMode === 'system' ? systemColorScheme === 'dark' : newMode === 'dark';
+    setActiveTheme(nextIsDark ? darkTheme : lightTheme);
     setMode(newMode);
     try {
       await AsyncStorage.setItem('@theme_mode', newMode);
@@ -50,9 +70,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       console.warn('[ThemeContext] Failed to save theme mode', e);
     }
   };
-
-  const isDark = mode === 'system' ? systemColorScheme === 'dark' : mode === 'dark';
-  const theme = isDark ? darkTheme : lightTheme;
 
   return (
     <ThemeContext.Provider value={{ theme, mode, isDark, hydrated, setThemeMode }}>

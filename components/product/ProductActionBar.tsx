@@ -12,6 +12,8 @@ import * as Haptics from 'expo-haptics';
 import { Text } from '@/lib/rnText';
 import { formatPrice } from '@/lib/currency';
 
+import { colors } from '@/lib/theme';
+
 export interface ProductActionBarProps {
   price?: number;
   buyTotal?: number;
@@ -27,8 +29,6 @@ export interface ProductActionBarProps {
   className?: string;
   style?: ViewStyle;
 }
-
-const BRAND_INK = '#0F0F0F';
 
 export function ProductActionBar({
   price,
@@ -75,6 +75,8 @@ export function ProductActionBar({
       style={[
         styles.container,
         {
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
           paddingBottom: Math.max(safeBottom, 16),
         },
         style,
@@ -85,8 +87,8 @@ export function ProductActionBar({
         accessibilityRole="text"
         style={styles.trustRow}
       >
-        <Feather name="lock" size={12} color="rgba(15,15,15,0.62)" />
-        <Text style={styles.trustText}>
+        <Feather name="lock" size={12} color={colors.mute} />
+        <Text style={[styles.trustText, { color: colors.mute }]}>
           Secure checkout · Buyer Protection included
         </Text>
       </View>
@@ -103,12 +105,14 @@ export function ProductActionBar({
             style={({ pressed }) => [
               styles.offerButton,
               {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
                 opacity: pressed ? 0.7 : 1,
                 transform: [{ scale: pressed ? 0.98 : 1 }],
               },
             ]}
           >
-            <Text style={styles.offerButtonText}>Make an offer</Text>
+            <Text style={[styles.offerButtonText, { color: colors.ink }]}>Make an offer</Text>
           </Pressable>
         )}
 
@@ -125,12 +129,14 @@ export function ProductActionBar({
           style={({ pressed }) => [
             styles.buyButton,
             {
+              backgroundColor: colors.purple,
+              borderColor: colors.purple,
               opacity: pressed ? 0.85 : 1,
               transform: [{ scale: pressed ? 0.98 : 1 }],
             },
           ]}
         >
-          <Text style={styles.buyButtonText}>
+          <Text style={[styles.buyButtonText, { color: '#FFFFFF' }]}>
             {isOwner ? 'Edit listing' : 'Buy now'}
           </Text>
         </Pressable>
@@ -189,7 +195,7 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: BRAND_INK,
+    borderColor: '#0F0F0F',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FFFFFF',
@@ -197,16 +203,16 @@ const styles = StyleSheet.create({
   offerButtonText: {
     fontSize: 15,
     fontWeight: '700',
-    color: BRAND_INK,
+    color: '#0F0F0F',
     fontFamily: 'Inter_700Bold',
   },
   buyButton: {
     flex: 1,
     height: 48,
-    backgroundColor: BRAND_INK,
+    backgroundColor: '#0F0F0F',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: BRAND_INK,
+    borderColor: '#0F0F0F',
     alignItems: 'center',
     justifyContent: 'center',
   },

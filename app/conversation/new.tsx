@@ -13,6 +13,7 @@ import { getOptimizedImageUrl } from '@/lib/images';
 import { formatPrice, CURRENCY_SYMBOL } from '@/lib/currency';
 import { useToast } from '@/lib/toast';
 import { captureError } from '@/lib/sentry';
+import { colors, radii, shadow } from '@/lib/theme';
 
 type Mode = 'message' | 'offer';
 
@@ -26,13 +27,13 @@ const QUICK_REPLIES = [
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
     <Text
-      className="text-ink-mute"
       style={{
         fontSize: 11,
         fontWeight: '700',
         letterSpacing: 1.2,
         textTransform: 'uppercase',
         marginBottom: 10,
+        color: colors.mute,
       }}
     >
       {children}
@@ -188,41 +189,40 @@ export default function NewConversationScreen() {
     return (
       <SafeAreaView
         edges={['top']}
-        style={{ flex: 1, backgroundColor: 'white', alignItems: 'center', justifyContent: 'center' }}
+        style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}
       >
-        <ActivityIndicator color="#6C47FF" />
+        <ActivityIndicator color={colors.purple} />
       </SafeAreaView>
     );
   }
 
   if (!listing) {
     return (
-      <SafeAreaView edges={['top']} className="flex-1 bg-white">
-        <View className="flex-row items-center px-4 pt-3 pb-3">
+      <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.background }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12 }}>
           <Pressable onPress={() => safeBack()} hitSlop={12}>
-            <Feather name="x" size={24} color="#0F0F0F" />
+            <Feather name="x" size={24} color={colors.ink} />
           </Pressable>
         </View>
-        <View className="flex-1 items-center justify-center px-8">
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
           <View
-            className="bg-ink-panel"
             style={{
               width: 56,
               height: 56,
               borderRadius: 999,
+              backgroundColor: colors.panel,
               alignItems: 'center',
               justifyContent: 'center',
               marginBottom: 16,
             }}
           >
-            <Feather name="alert-circle" size={24} color="rgba(15,15,15,0.62)" />
+            <Feather name="alert-circle" size={24} color={colors.mute} />
           </View>
-          <Text className="text-ink" style={{ fontSize: 18, fontWeight: '700' }}>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: colors.ink }}>
             Listing unavailable
           </Text>
           <Text
-            className="text-ink-mute"
-            style={{ fontSize: 14, marginTop: 6, textAlign: 'center', lineHeight: 20 }}
+            style={{ fontSize: 14, marginTop: 6, textAlign: 'center', lineHeight: 20, color: colors.mute }}
           >
             This item may have been removed or is no longer for sale.
           </Text>
@@ -250,8 +250,7 @@ export default function NewConversationScreen() {
   return (
     <SafeAreaView
       edges={['top']}
-      className="flex-1 bg-white"
-      style={{ overflow: 'hidden' }}
+      style={{ flex: 1, backgroundColor: colors.background, overflow: 'hidden' }}
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -259,15 +258,15 @@ export default function NewConversationScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
       >
         {/* Header */}
-        <View className="flex-row items-center justify-between px-4 pt-3 pb-3">
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12 }}>
           <Pressable
             onPress={() => safeBack()}
             hitSlop={12}
             style={({ pressed }) => ({ opacity: pressed ? 0.55 : 1 })}
           >
-            <Feather name="x" size={24} color="#0F0F0F" />
+            <Feather name="x" size={24} color={colors.ink} />
           </Pressable>
-          <Text className="text-ink" style={{ fontSize: 14, fontWeight: '700' }}>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: colors.ink }}>
             {mode === 'offer' ? 'Offer' : 'Message'}
           </Text>
           <View style={{ width: 24 }} />
@@ -284,24 +283,35 @@ export default function NewConversationScreen() {
         >
           {/* Hero */}
           <Text
-            className="text-ink"
-            style={{ fontSize: 30, fontWeight: '800', letterSpacing: -0.6, lineHeight: 36, marginTop: 6 }}
+            style={{
+              fontSize: 30,
+              fontWeight: '800',
+              letterSpacing: -0.6,
+              lineHeight: 36,
+              marginTop: 6,
+              color: colors.ink,
+            }}
           >
             {heroTitle}
           </Text>
           <Text
-            className="text-ink-mute"
-            style={{ fontSize: 15, lineHeight: 22, marginTop: 8, maxWidth: 320 }}
+            style={{ fontSize: 15, lineHeight: 22, marginTop: 8, maxWidth: 320, color: colors.mute }}
           >
             {heroSub}
           </Text>
 
           {/* Listing + seller card */}
           <View
-            className="border border-ink-hair"
-            style={{ borderRadius: 18, padding: 14, marginTop: 22 }}
+            style={{
+              borderRadius: 18,
+              padding: 14,
+              marginTop: 22,
+              backgroundColor: colors.surface,
+              borderWidth: 1,
+              borderColor: colors.border,
+            }}
           >
-            <View className="flex-row items-center">
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <View
                 style={{
                   width: 64,
@@ -309,8 +319,8 @@ export default function NewConversationScreen() {
                   borderRadius: 14,
                   overflow: 'hidden',
                   marginRight: 12,
+                  backgroundColor: colors.panel,
                 }}
-                className="bg-ink-panel"
               >
                 {thumb && (
                   <Image
@@ -322,20 +332,18 @@ export default function NewConversationScreen() {
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text
-                  className="text-ink"
-                  style={{ fontSize: 15, fontWeight: '700' }}
+                  style={{ fontSize: 15, fontWeight: '700', color: colors.ink }}
                   numberOfLines={1}
                 >
                   {listing.title}
                 </Text>
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 4 }}>
-                  <Text className="text-ink" style={{ fontSize: 18, fontWeight: '800' }}>
+                  <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink }}>
                     {formatPrice(listing.price)}
                   </Text>
                   {listing.size ? (
                     <Text
-                      className="text-ink-mute"
-                      style={{ fontSize: 12, fontWeight: '600', marginLeft: 8 }}
+                      style={{ fontSize: 12, fontWeight: '600', marginLeft: 8, color: colors.mute }}
                     >
                       Size {listing.size}
                     </Text>
@@ -345,22 +353,28 @@ export default function NewConversationScreen() {
             </View>
 
             <View
-              className="border-t border-ink-hair"
-              style={{ marginTop: 14, paddingTop: 12, flexDirection: 'row', alignItems: 'center' }}
+              style={{
+                marginTop: 14,
+                paddingTop: 12,
+                flexDirection: 'row',
+                alignItems: 'center',
+                borderTopWidth: 1,
+                borderTopColor: colors.border,
+              }}
             >
-              <Text className="text-ink-mute" style={{ fontSize: 12, fontWeight: '600', marginRight: 10 }}>
+              <Text style={{ fontSize: 12, fontWeight: '600', marginRight: 10, color: colors.mute }}>
                 To
               </Text>
               <View
-                className="bg-primary-soft"
                 style={{
                   width: 24,
                   height: 24,
-                  borderRadius: 999,
+                  borderRadius: 12,
                   overflow: 'hidden',
                   alignItems: 'center',
                   justifyContent: 'center',
                   marginRight: 8,
+                  backgroundColor: colors.purpleSoft,
                 }}
               >
                 {sellerAvatar ? (
@@ -370,14 +384,13 @@ export default function NewConversationScreen() {
                     contentFit="cover"
                   />
                 ) : (
-                  <Text className="text-primary" style={{ fontSize: 11, fontWeight: '800' }}>
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: colors.purple }}>
                     {sellerInitial}
                   </Text>
                 )}
               </View>
               <Text
-                className="text-ink"
-                style={{ fontSize: 13, fontWeight: '700', flex: 1 }}
+                style={{ fontSize: 13, fontWeight: '700', flex: 1, color: colors.ink }}
                 numberOfLines={1}
               >
                 {sellerName}
@@ -389,8 +402,14 @@ export default function NewConversationScreen() {
           <View style={{ marginTop: 26 }}>
             <Eyebrow>What would you like to send?</Eyebrow>
             <View
-              className="bg-ink-panel"
-              style={{ padding: 4, borderRadius: 14, flexDirection: 'row' }}
+              style={{
+                padding: 4,
+                borderRadius: 14,
+                flexDirection: 'row',
+                backgroundColor: colors.surface,
+                borderWidth: 1,
+                borderColor: colors.border,
+              }}
             >
               {(['message', 'offer'] as Mode[]).map((m) => {
                 const active = mode === m;
@@ -405,8 +424,9 @@ export default function NewConversationScreen() {
                       flex: 1,
                       paddingVertical: 11,
                       borderRadius: 10,
-                      backgroundColor: active ? '#FFFFFF' : 'transparent',
-                      boxShadow: active ? '0px 1px 2px rgba(0,0,0,0.06)' : undefined,
+                      backgroundColor: active ? colors.panel : 'transparent',
+                      borderWidth: active ? 1 : 0,
+                      borderColor: active ? colors.border : 'transparent',
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -417,13 +437,13 @@ export default function NewConversationScreen() {
                     <Feather
                       name={m === 'message' ? 'message-circle' : 'tag'}
                       size={14}
-                      color={active ? '#0F0F0F' : 'rgba(15,15,15,0.62)'}
+                      color={active ? colors.ink : colors.mute}
                     />
                     <Text
                       style={{
                         fontSize: 13,
                         fontWeight: active ? '700' : '500',
-                        color: active ? '#0F0F0F' : 'rgba(15,15,15,0.62)',
+                        color: active ? colors.ink : colors.mute,
                       }}
                     >
                       {m === 'message' ? 'Message' : 'Offer'}
@@ -441,12 +461,14 @@ export default function NewConversationScreen() {
               <View style={{ marginTop: 28 }}>
                 <Eyebrow>Your message</Eyebrow>
                 <View
-                  className="border border-ink-hair"
                   style={{
                     borderRadius: 14,
                     paddingHorizontal: 14,
                     paddingVertical: 12,
                     minHeight: compact ? 120 : 150,
+                    backgroundColor: colors.surface,
+                    borderWidth: 1,
+                    borderColor: colors.border,
                   }}
                 >
                   <TextInput
@@ -456,10 +478,10 @@ export default function NewConversationScreen() {
                     onChangeText={setMessage}
                     multiline
                     textAlignVertical="top"
-                    placeholderTextColor="rgba(15,15,15,0.35)"
+                    placeholderTextColor={colors.mute}
                     style={{
                       fontSize: 15,
-                      color: '#0F0F0F',
+                      color: colors.ink,
                       padding: 0,
                       minHeight: compact ? 100 : 130,
                       outlineStyle: 'none',
@@ -485,8 +507,8 @@ export default function NewConversationScreen() {
                           paddingVertical: 9,
                           borderRadius: 999,
                           borderWidth: 1,
-                          borderColor: active ? '#0F0F0F' : 'rgba(15,15,15,0.08)',
-                          backgroundColor: active ? '#0F0F0F' : '#FFFFFF',
+                          borderColor: active ? colors.purple : colors.border,
+                          backgroundColor: active ? colors.purple : colors.surface,
                           transform: [{ scale: pressed ? 0.97 : 1 }],
                         })}
                       >
@@ -494,7 +516,7 @@ export default function NewConversationScreen() {
                           style={{
                             fontSize: 13,
                             fontWeight: '600',
-                            color: active ? '#FFFFFF' : '#0F0F0F',
+                            color: active ? '#FFFFFF' : colors.ink,
                           }}
                           numberOfLines={1}
                         >
@@ -512,20 +534,21 @@ export default function NewConversationScreen() {
               <View style={{ marginTop: 28 }}>
                 <Eyebrow>Your offer</Eyebrow>
                 <View
-                  className="border border-ink-hair"
                   style={{
                     borderRadius: 14,
                     paddingHorizontal: 16,
                     paddingVertical: 16,
                     flexDirection: 'row',
                     alignItems: 'center',
+                    backgroundColor: colors.surface,
+                    borderWidth: 1,
+                    borderColor: colors.border,
                   }}
                 >
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
                       <Text
-                        className="text-primary"
-                        style={{ fontSize: 26, fontWeight: '800', marginRight: 6 }}
+                        style={{ fontSize: 26, fontWeight: '800', marginRight: 6, color: colors.purple }}
                       >
                         {CURRENCY_SYMBOL}
                       </Text>
@@ -536,11 +559,11 @@ export default function NewConversationScreen() {
                         onChangeText={(t) => setAmount(t.replace(/[^0-9]/g, ''))}
                         keyboardType="number-pad"
                         maxLength={7}
-                        placeholderTextColor="rgba(15,15,15,0.25)"
+                        placeholderTextColor={colors.mute}
                         style={{
                           fontSize: 32,
                           fontWeight: '800',
-                          color: '#0F0F0F',
+                          color: colors.ink,
                           flex: 1,
                           padding: 0,
                           outlineStyle: 'none',
@@ -550,15 +573,14 @@ export default function NewConversationScreen() {
                       />
                     </View>
                     {offerValid && amountNum < listing.price ? (
-                      <Text className="text-ink-mute" style={{ fontSize: 12, marginTop: 4 }}>
+                      <Text style={{ fontSize: 12, marginTop: 4, color: colors.mute }}>
                         {Math.round(((listing.price - amountNum) / listing.price) * 100)}% off the
                         listed price
                       </Text>
                     ) : null}
                   </View>
                   <Text
-                    className="text-ink-mute"
-                    style={{ fontSize: 12, fontWeight: '600' }}
+                    style={{ fontSize: 12, fontWeight: '600', color: colors.mute }}
                   >
                     USD
                   </Text>
@@ -578,8 +600,8 @@ export default function NewConversationScreen() {
                             paddingVertical: 12,
                             borderRadius: 12,
                             borderWidth: 1,
-                            borderColor: selected ? '#0F0F0F' : 'rgba(15,15,15,0.08)',
-                            backgroundColor: selected ? '#0F0F0F' : '#FFFFFF',
+                            borderColor: selected ? colors.purple : colors.border,
+                            backgroundColor: selected ? colors.purple : colors.surface,
                             alignItems: 'center',
                             transform: [{ scale: pressed ? 0.97 : 1 }],
                           })}
@@ -589,7 +611,7 @@ export default function NewConversationScreen() {
                               fontSize: 10,
                               fontWeight: '700',
                               letterSpacing: 0.4,
-                              color: selected ? 'rgba(255,255,255,0.7)' : 'rgba(15,15,15,0.55)',
+                              color: selected ? 'rgba(255,255,255,0.85)' : colors.mute,
                             }}
                           >
                             {s.label}
@@ -598,7 +620,7 @@ export default function NewConversationScreen() {
                             style={{
                               fontSize: 14,
                               fontWeight: '800',
-                              color: selected ? '#FFFFFF' : '#0F0F0F',
+                              color: selected ? '#FFFFFF' : colors.ink,
                               marginTop: 2,
                             }}
                             numberOfLines={1}
@@ -616,12 +638,14 @@ export default function NewConversationScreen() {
               <View style={{ marginTop: 26 }}>
                 <Eyebrow>Add a note (optional)</Eyebrow>
                 <View
-                  className="border border-ink-hair"
                   style={{
                     borderRadius: 14,
                     paddingHorizontal: 14,
                     paddingVertical: 12,
                     minHeight: compact ? 70 : 90,
+                    backgroundColor: colors.surface,
+                    borderWidth: 1,
+                    borderColor: colors.border,
                   }}
                 >
                   <TextInput
@@ -630,10 +654,10 @@ export default function NewConversationScreen() {
                     onChangeText={setNote}
                     multiline
                     textAlignVertical="top"
-                    placeholderTextColor="rgba(15,15,15,0.35)"
+                    placeholderTextColor={colors.mute}
                     style={{
                       fontSize: 14,
-                      color: '#0F0F0F',
+                      color: colors.ink,
                       padding: 0,
                       minHeight: compact ? 50 : 70,
                       outlineStyle: 'none',
@@ -648,24 +672,23 @@ export default function NewConversationScreen() {
 
           {/* Footer hint */}
           <View
-            className="bg-primary-soft"
             style={{
               marginTop: 28,
               padding: 14,
               borderRadius: 14,
               flexDirection: 'row',
               alignItems: 'flex-start',
+              backgroundColor: colors.purpleSoft,
             }}
           >
             <Feather
               name="shield"
               size={14}
-              color="#6C47FF"
+              color={colors.purple}
               style={{ marginTop: 2, marginRight: 10 }}
             />
             <Text
-              className="text-ink"
-              style={{ fontSize: 12, lineHeight: 18, flex: 1, fontWeight: '500' }}
+              style={{ fontSize: 12, lineHeight: 18, flex: 1, fontWeight: '500', color: colors.ink }}
             >
               Keep payments inside Carranix — off-platform deals aren&apos;t protected.
             </Text>
@@ -674,7 +697,6 @@ export default function NewConversationScreen() {
 
         {/* Sticky CTA */}
         <View
-          className="bg-white border-t border-ink-hair"
           style={{
             position: 'absolute',
             left: 0,
@@ -683,15 +705,20 @@ export default function NewConversationScreen() {
             paddingHorizontal: 20,
             paddingTop: 12,
             paddingBottom: ctaBottomPad,
+            backgroundColor: colors.surface,
+            borderTopWidth: 1,
+            borderTopColor: colors.border,
           }}
         >
           <Pressable
             onPress={handleSend}
             disabled={!canSend}
             style={({ pressed }) => ({
-              height: 58,
+              height: 54,
               borderRadius: 16,
-              backgroundColor: canSend ? '#0F0F0F' : 'rgba(15,15,15,0.12)',
+              backgroundColor: canSend ? colors.purple : colors.panel,
+              borderWidth: canSend ? 0 : 1,
+              borderColor: colors.border,
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center',
@@ -706,8 +733,8 @@ export default function NewConversationScreen() {
                 right: 0,
                 top: 0,
                 bottom: 0,
-                width: 58,
-                backgroundColor: canSend ? '#6C47FF' : 'rgba(15,15,15,0.18)',
+                width: 54,
+                backgroundColor: canSend ? 'rgba(0,0,0,0.12)' : 'transparent',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
@@ -718,17 +745,17 @@ export default function NewConversationScreen() {
                 <Feather
                   name={mode === 'offer' ? 'tag' : 'send'}
                   size={18}
-                  color="#FFFFFF"
+                  color={canSend ? '#FFFFFF' : colors.mute}
                 />
               )}
             </View>
             <Text
               style={{
-                fontSize: 16,
+                fontSize: 15,
                 fontWeight: '800',
-                color: canSend ? '#FFFFFF' : 'rgba(15,15,15,0.55)',
+                color: canSend ? '#FFFFFF' : colors.mute,
                 letterSpacing: 0.2,
-                marginRight: 58,
+                marginRight: 54,
               }}
             >
               {sending

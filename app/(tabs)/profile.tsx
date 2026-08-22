@@ -43,7 +43,6 @@ import type { Listing } from '@/types';
 import { useToast } from '@/lib/toast';
 import { Card, ListRow, EmptyState } from '@/components/ui';
 import { SafeContainer } from '@/components/ui/SafeContainer';
-import { ThumbButton } from '@/components/ui/ThumbButton';
 import { ListingCard } from '@/components/ListingCard';
 
 import {
@@ -294,7 +293,7 @@ function ProfileScreenInner() {
     return (
       <SafeContainer
         edges={['top']}
-        backgroundColor={colors.white}
+        backgroundColor={colors.background}
         style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
       >
         <ActivityIndicator color={colors.purple} />
@@ -331,7 +330,7 @@ function ProfileScreenInner() {
     (profile as any).website || (profile.username ? `ceranix.com/@${profile.username}` : null);
 
   return (
-    <SafeContainer edges={['top', 'left', 'right']} backgroundColor={colors.white} style={{ flex: 1 }}>
+    <SafeContainer edges={['top', 'left', 'right']} backgroundColor={colors.background} style={{ flex: 1 }}>
       <FlashList
         data={gridRows}
         renderItem={renderRow}
@@ -426,7 +425,7 @@ function ProfileScreenInner() {
                   </Text>
                 </Pressable>
 
-                <View style={{ width: 1, height: 16, backgroundColor: '#EBEBEB' }} />
+                <View style={{ width: 1, height: 16, backgroundColor: colors.hairline }} />
 
                 <Pressable
                   onPress={() => router.push('/profile/followers' as Href)}
@@ -440,7 +439,7 @@ function ProfileScreenInner() {
                   </Text>
                 </Pressable>
 
-                <View style={{ width: 1, height: 16, backgroundColor: '#EBEBEB' }} />
+                <View style={{ width: 1, height: 16, backgroundColor: colors.hairline }} />
 
                 <View style={{ alignItems: 'center' }}>
                   <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink }}>
@@ -480,7 +479,7 @@ function ProfileScreenInner() {
                     style={({ pressed }) => ({
                       flexDirection: 'row',
                       alignItems: 'center',
-                      backgroundColor: '#F1F1F2',
+                      backgroundColor: colors.surface,
                       paddingHorizontal: 14,
                       paddingVertical: 7,
                       borderRadius: 9999,
@@ -495,7 +494,7 @@ function ProfileScreenInner() {
                     </Text>
                     <Text style={{ fontSize: 12, color: colors.mute }}>·</Text>
                     <Ionicons name="heart-outline" size={14} color="#FE2C55" />
-                    <Text style={{ fontSize: 13, color: '#73747B', fontWeight: '400' }}>
+                    <Text style={{ fontSize: 13, color: colors.mute, fontWeight: '400' }}>
                       My hobbies are...
                     </Text>
                   </Pressable>
@@ -538,7 +537,7 @@ function ProfileScreenInner() {
               style={{
                 flexDirection: 'row',
                 borderBottomWidth: 1,
-                borderBottomColor: '#EBEBEB',
+                borderBottomColor: colors.border,
                 marginTop: 18,
               }}
             >
@@ -559,12 +558,12 @@ function ProfileScreenInner() {
                   <Ionicons
                     name="grid-outline"
                     size={20}
-                    color={activeTab === 'selling' ? colors.ink : '#8A8B91'}
+                    color={activeTab === 'selling' ? colors.ink : colors.mute}
                   />
                   <Ionicons
                     name="caret-down-outline"
                     size={10}
-                    color={activeTab === 'selling' ? colors.ink : '#8A8B91'}
+                    color={activeTab === 'selling' ? colors.ink : colors.mute}
                   />
                 </View>
                 {activeTab === 'selling' && (
@@ -597,7 +596,7 @@ function ProfileScreenInner() {
                 <Ionicons
                   name={activeTab === 'liked' ? 'heart' : 'heart-outline'}
                   size={21}
-                  color={activeTab === 'liked' ? colors.ink : '#8A8B91'}
+                  color={activeTab === 'liked' ? colors.ink : colors.mute}
                 />
                 {activeTab === 'liked' && (
                   <View
@@ -629,7 +628,7 @@ function ProfileScreenInner() {
                 <Ionicons
                   name={activeTab === 'collections' ? 'bookmark' : 'bookmark-outline'}
                   size={20}
-                  color={activeTab === 'collections' ? colors.ink : '#8A8B91'}
+                  color={activeTab === 'collections' ? colors.ink : colors.mute}
                 />
                 {activeTab === 'collections' && (
                   <View
@@ -661,7 +660,7 @@ function ProfileScreenInner() {
                 <Ionicons
                   name={activeTab === 'details' ? 'person' : 'person-outline'}
                   size={20}
-                  color={activeTab === 'details' ? colors.ink : '#8A8B91'}
+                  color={activeTab === 'details' ? colors.ink : colors.mute}
                 />
                 {activeTab === 'details' && (
                   <View
@@ -678,7 +677,7 @@ function ProfileScreenInner() {
               </Pressable>
             </View>
 
-            {/* Playlist / Category Chips Strip (like [▶ Beast Games] [▶ MrBeast vs The Rock]) */}
+            {/* Playlist / Category Chips Strip */}
             {(activeTab === 'selling' || activeTab === 'collections') && (
               <ScrollView
                 horizontal
@@ -698,48 +697,83 @@ function ProfileScreenInner() {
                     paddingHorizontal: 14,
                     paddingVertical: 8,
                     borderRadius: 8,
-                    backgroundColor: activeListId === null ? '#F1F1F2' : '#FFFFFF',
+                    backgroundColor: activeListId === null ? colors.purple : colors.surface,
                     borderWidth: 1,
-                    borderColor: '#E5E5E5',
+                    borderColor: activeListId === null ? colors.purple : colors.border,
                     opacity: pressed ? 0.7 : 1,
                   })}
                 >
-                  <Ionicons name="play-circle-outline" size={16} color={colors.ink} />
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.ink }}>
+                  <Ionicons
+                    name="play-circle-outline"
+                    size={16}
+                    color={activeListId === null ? '#FFFFFF' : colors.ink}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: '700',
+                      color: activeListId === null ? '#FFFFFF' : colors.ink,
+                    }}
+                  >
                     All Items
                   </Text>
-                  <Text style={{ fontSize: 12, color: colors.mute, fontWeight: '600' }}>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: activeListId === null ? 'rgba(255,255,255,0.85)' : colors.mute,
+                      fontWeight: '600',
+                    }}
+                  >
                     {activeTab === 'collections' ? savedItems.length : sellingCount}
                   </Text>
                 </Pressable>
 
-                {activeTab === 'collections' && saveLists.map((list) => (
-                  <Pressable
-                    key={list.id}
-                    onPress={() => setActiveListId(list.id)}
-                    onLongPress={() => handleManageList(list)}
-                    style={({ pressed }) => ({
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 6,
-                      paddingHorizontal: 14,
-                      paddingVertical: 8,
-                      borderRadius: 8,
-                      backgroundColor: activeListId === list.id ? '#F1F1F2' : '#FFFFFF',
-                      borderWidth: 1,
-                      borderColor: '#E5E5E5',
-                      opacity: pressed ? 0.7 : 1,
-                    })}
-                  >
-                    <Ionicons name="play-circle-outline" size={16} color={colors.ink} />
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: colors.ink }}>
-                      {list.name}
-                    </Text>
-                    <Text style={{ fontSize: 12, color: colors.mute, fontWeight: '600' }}>
-                      {list.item_count ?? 0}
-                    </Text>
-                  </Pressable>
-                ))}
+                {activeTab === 'collections' && saveLists.map((list) => {
+                  const isListActive = activeListId === list.id;
+                  return (
+                    <Pressable
+                      key={list.id}
+                      onPress={() => setActiveListId(list.id)}
+                      onLongPress={() => handleManageList(list)}
+                      style={({ pressed }) => ({
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        paddingHorizontal: 14,
+                        paddingVertical: 8,
+                        borderRadius: 8,
+                        backgroundColor: isListActive ? colors.purple : colors.surface,
+                        borderWidth: 1,
+                        borderColor: isListActive ? colors.purple : colors.border,
+                        opacity: pressed ? 0.7 : 1,
+                      })}
+                    >
+                      <Ionicons
+                        name="play-circle-outline"
+                        size={16}
+                        color={isListActive ? '#FFFFFF' : colors.ink}
+                      />
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontWeight: '700',
+                          color: isListActive ? '#FFFFFF' : colors.ink,
+                        }}
+                      >
+                        {list.name}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: isListActive ? 'rgba(255,255,255,0.85)' : colors.mute,
+                          fontWeight: '600',
+                        }}
+                      >
+                        {list.item_count ?? 0}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
 
                 <Pressable
                   onPress={handleCreateList}
@@ -748,8 +782,8 @@ function ProfileScreenInner() {
                     height: 36,
                     borderRadius: 8,
                     borderWidth: 1,
-                    borderColor: '#E5E5E5',
-                    backgroundColor: '#FFFFFF',
+                    borderColor: colors.border,
+                    backgroundColor: colors.surface,
                     alignItems: 'center',
                     justifyContent: 'center',
                     opacity: pressed ? 0.7 : 1,

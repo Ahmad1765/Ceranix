@@ -658,12 +658,12 @@ function FeedSearch({
             flex: 1,
             flexDirection: 'row',
             alignItems: 'center',
-            backgroundColor: 'rgb(241, 242, 246)',
+            backgroundColor: colors.surface,
             borderRadius: radii.pill,
             paddingHorizontal: 14,
             height: 44,
             borderWidth: 1,
-            borderColor: focused ? colors.purple : 'transparent',
+            borderColor: focused ? colors.purple : colors.border,
           }}
         >
           <Feather name="search" size={17} color={focused ? colors.purple : colors.muteSoft} />
@@ -726,8 +726,8 @@ function FeedSearch({
             alignItems: 'center',
             justifyContent: 'center',
             borderWidth: 1,
-            borderColor: hasFilters ? colors.purple : colors.hairline,
-            backgroundColor: hasFilters ? colors.purpleSoft : colors.white,
+            borderColor: hasFilters ? colors.purple : colors.border,
+            backgroundColor: hasFilters ? colors.purpleSoft : colors.surface,
             transform: [{ scale: pressed ? 0.94 : 1 }],
           })}
         >
@@ -744,7 +744,7 @@ function FeedSearch({
                 paddingHorizontal: 5,
                 backgroundColor: colors.purple,
                 borderWidth: 2,
-                borderColor: colors.white,
+                borderColor: colors.surface,
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
@@ -772,8 +772,8 @@ function FeedSearch({
             alignItems: 'center',
             justifyContent: 'center',
             borderWidth: 1,
-            borderColor: savedActive ? colors.purple : colors.hairline,
-            backgroundColor: savedActive ? colors.purpleSoft : colors.white,
+            borderColor: savedActive ? colors.purple : colors.border,
+            backgroundColor: savedActive ? colors.purpleSoft : colors.surface,
             transform: [{ scale: pressed ? 0.94 : 1 }],
           })}
         >

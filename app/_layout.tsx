@@ -210,6 +210,7 @@ function RootLayoutNav() {
         <DiscoverSheetProvider>
         {!ready || !hydrated ? null : (
         <Stack
+          key={isDark ? 'dark-theme' : 'light-theme'}
           screenOptions={{
             headerShown: false,
             contentStyle: { backgroundColor: theme.background },

@@ -13,6 +13,8 @@ import * as Haptics from 'expo-haptics';
 import { Text } from '@/lib/rnText';
 import { colors, radii, type } from '@/lib/theme';
 
+import { useTheme } from '@/context/ThemeContext';
+
 export interface FloatingHeaderProps {
   title?: string;
   subtitle?: string;
@@ -55,6 +57,7 @@ export function FloatingHeader({
   style,
 }: FloatingHeaderProps) {
   const insets = useSafeAreaInsets();
+  const { theme, isDark } = useTheme();
 
   const handlePress = (onPress: () => void) => {
     if (Platform.OS !== 'web') {
@@ -81,12 +84,17 @@ export function FloatingHeader({
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               style={({ pressed }) => [
                 styles.iconCircle,
-                { opacity: pressed ? 0.75 : 1, transform: [{ scale: pressed ? 0.94 : 1 }] },
+                {
+                  backgroundColor: theme.surface,
+                  borderColor: theme.border,
+                  opacity: pressed ? 0.75 : 1,
+                  transform: [{ scale: pressed ? 0.94 : 1 }],
+                },
               ]}
               accessibilityRole="button"
               accessibilityLabel="Go back"
             >
-              <Feather name={backIcon} size={20} color={colors.ink} />
+              <Feather name={backIcon} size={20} color={theme.text} />
             </Pressable>
           ) : null}
         </View>
@@ -99,14 +107,14 @@ export function FloatingHeader({
             <>
               {title && (
                 <Text
-                  style={[styles.title, { fontFamily: type.family.sansBold }]}
+                  style={[styles.title, { color: theme.text, fontFamily: type.family.sansBold }]}
                   numberOfLines={1}
                 >
                   {title}
                 </Text>
               )}
               {subtitle && (
-                <Text style={styles.subtitle} numberOfLines={1}>
+                <Text style={[styles.subtitle, { color: theme.textMuted }]} numberOfLines={1}>
                   {subtitle}
                 </Text>
               )}
@@ -116,7 +124,6 @@ export function FloatingHeader({
 
         {/* Trailing Right: 44x44px Contextual Actions (Share, Bookmark, Filter) */}
         <View style={styles.rightSlot}>
-
           {rightActions.map((action, idx) => (
             <Pressable
               key={idx}
@@ -124,6 +131,7 @@ export function FloatingHeader({
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               style={({ pressed }) => [
                 styles.iconCircle,
+                { backgroundColor: theme.surface, borderColor: theme.border },
                 action.active && styles.iconCircleActive,
                 { opacity: pressed ? 0.75 : 1, transform: [{ scale: pressed ? 0.94 : 1 }] },
               ]}
@@ -135,8 +143,8 @@ export function FloatingHeader({
                 size={19}
                 color={
                   action.active
-                    ? action.activeColor || colors.primary
-                    : colors.ink
+                    ? action.activeColor || theme.primary
+                    : theme.text
                 }
               />
               {action.badge !== undefined && action.badge !== 0 && (
@@ -168,7 +176,8 @@ export function FloatingHeader({
       style={[
         styles.container,
         {
-          backgroundColor: Platform.OS === 'ios' ? 'transparent' : 'rgba(255,255,255,0.95)',
+          borderBottomColor: theme.border,
+          backgroundColor: Platform.OS === 'ios' ? 'transparent' : isDark ? 'rgba(15,15,15,0.95)' : 'rgba(255,255,255,0.95)',
         },
         style,
       ]}
@@ -176,11 +185,11 @@ export function FloatingHeader({
       {Platform.OS === 'ios' ? (
         <BlurView
           intensity={blurIntensity}
-          tint="light"
+          tint={isDark ? 'dark' : 'light'}
           style={StyleSheet.absoluteFillObject}
         />
       ) : (
-        <View style={[StyleSheet.absoluteFillObject, styles.fallbackBg]} />
+        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: isDark ? 'rgba(15,15,15,0.94)' : 'rgba(255, 255, 255, 0.94)' }]} />
       )}
       {content}
     </View>

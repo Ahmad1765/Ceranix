@@ -29,6 +29,8 @@ import {
   AddressSheet,
   PayoutSheet,
   VerificationSheet,
+  ThemeSheet,
+  SubscriptionSheet,
   type AddressForm,
   type PayoutForm,
   type VerifyForm,
@@ -51,15 +53,6 @@ export default function SettingsScreen() {
   const { theme, mode, isDark, setThemeMode } = useTheme();
   const toast = useToast();
 
-  const cycleTheme = useCallback(() => {
-    tap('light');
-    const nextMode = mode === 'system' ? 'dark' : mode === 'dark' ? 'light' : 'system';
-    setThemeMode(nextMode);
-    toast.show(`Theme: ${nextMode.charAt(0).toUpperCase() + nextMode.slice(1)}`, {
-      variant: 'default',
-      icon: nextMode === 'dark' ? 'moon' : nextMode === 'light' ? 'sun' : 'monitor',
-    });
-  }, [mode, setThemeMode, toast]);
   // Deep-link param: profile shop list passes `?open=bundle` so tapping the
   // Bundle row jumps straight into the modal instead of forcing the user to
   // scroll the settings page to find it.
@@ -143,6 +136,8 @@ export default function SettingsScreen() {
   const [showPayout, setShowPayout] = useState(false);
   const [showVerify, setShowVerify] = useState(false);
   const [showBundle, setShowBundle] = useState(false);
+  const [showTheme, setShowTheme] = useState(false);
+  const [showSubscription, setShowSubscription] = useState(false);
 
   // Open a section (or the Bundle modal) from a deep-link param. `?open=bundle`
   // is the original special case — a modal plus the section that hosts it — and
@@ -413,10 +408,6 @@ export default function SettingsScreen() {
       if (mounted.current) setBusy(null);
     }
   }, [busy, user, signOut, toast]);
-
-  const handleComingSoon = useCallback(() => {
-    toast.show('Coming soon', { variant: 'info', icon: 'clock' });
-  }, [toast]);
 
   // ---------- Modal save handlers ----------
   const saveAddress = useCallback(
@@ -742,10 +733,27 @@ export default function SettingsScreen() {
             chevron
           />
           <Divider />
+          <ToggleRow
+            label="Dark mode"
+            desc={isDark ? 'Dark monotone appearance active' : 'Light monotone appearance active'}
+            value={isDark}
+            onValueChange={(val) => {
+              const nextMode = val ? 'dark' : 'light';
+              setThemeMode(nextMode);
+              toast.show(`Theme: ${val ? 'Dark' : 'Light'}`, {
+                variant: 'default',
+                icon: val ? 'moon' : 'sun',
+              });
+            }}
+          />
+          <Divider />
           <Row
             label="Theme & Appearance"
             desc={`Mode: ${mode.charAt(0).toUpperCase() + mode.slice(1)} (${isDark ? 'Dark monotone' : 'Light monotone'})`}
-            onPress={cycleTheme}
+            onPress={() => {
+              tap('light');
+              setShowTheme(true);
+            }}
             chevron
           />
           <Divider />
@@ -757,11 +765,14 @@ export default function SettingsScreen() {
           />
           <Divider />
           <Row
-            label="Subscriptions"
-            desc={profile?.is_pro ? 'Pro · active' : 'Pro features for sellers'}
-            onPress={handleComingSoon}
+            label="Seller Program & Subscriptions"
+            desc={profile?.is_pro ? 'Pro Seller Program · Active' : 'Upgrade to Pro Seller Program'}
+            onPress={() => {
+              tap('light');
+              setShowSubscription(true);
+            }}
             chevron
-            badge={profile?.is_pro ? 'PRO' : 'Soon'}
+            badge={profile?.is_pro ? 'PRO' : 'FREE'}
           />
         </SectionCard>
 
@@ -958,6 +969,16 @@ export default function SettingsScreen() {
           const ok = await submitVerification(form);
           if (ok) setShowVerify(false);
         }}
+      />
+
+      <ThemeSheet
+        visible={showTheme}
+        onClose={() => setShowTheme(false)}
+      />
+
+      <SubscriptionSheet
+        visible={showSubscription}
+        onClose={() => setShowSubscription(false)}
       />
     </SafeAreaView>
   );

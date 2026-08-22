@@ -166,7 +166,7 @@ export default function UserProfileScreen() {
     return (
       <SafeContainer
         edges={['top', 'left', 'right']}
-        backgroundColor={colors.white}
+        backgroundColor={colors.background}
         style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
       >
         <ActivityIndicator color={colors.purple} />
@@ -176,7 +176,7 @@ export default function UserProfileScreen() {
 
   if (!profile) {
     return (
-      <SafeContainer edges={['top', 'left', 'right']} backgroundColor={colors.white} style={{ flex: 1 }}>
+      <SafeContainer edges={['top', 'left', 'right']} backgroundColor={colors.background} style={{ flex: 1 }}>
         <View style={{ padding: 14, flexDirection: 'row', alignItems: 'center' }}>
           <Pressable onPress={() => safeBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Feather name="chevron-left" size={26} color={colors.ink} />
@@ -212,7 +212,7 @@ export default function UserProfileScreen() {
   );
 
   return (
-    <SafeContainer edges={['top', 'left', 'right']} backgroundColor={colors.white} style={{ flex: 1 }}>
+    <SafeContainer edges={['top', 'left', 'right']} backgroundColor={colors.background} style={{ flex: 1 }}>
       <FlashList
         ref={listRef}
         data={gridRows}
@@ -312,7 +312,7 @@ export default function UserProfileScreen() {
                   </Text>
                 </Pressable>
 
-                <View style={{ width: 1, height: 16, backgroundColor: '#EBEBEB' }} />
+                <View style={{ width: 1, height: 16, backgroundColor: colors.hairline }} />
 
                 <Pressable
                   onPress={() =>
@@ -330,7 +330,7 @@ export default function UserProfileScreen() {
                   </Text>
                 </Pressable>
 
-                <View style={{ width: 1, height: 16, backgroundColor: '#EBEBEB' }} />
+                <View style={{ width: 1, height: 16, backgroundColor: colors.hairline }} />
 
                 <View style={{ alignItems: 'center' }}>
                   <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink }}>
@@ -363,7 +363,9 @@ export default function UserProfileScreen() {
                         height: 36,
                         paddingHorizontal: 26,
                         borderRadius: 20,
-                        backgroundColor: followed ? '#F1F1F2' : colors.primary,
+                        backgroundColor: followed ? colors.surface : colors.purple,
+                        borderWidth: followed ? 1 : 0,
+                        borderColor: colors.border,
                         alignItems: 'center',
                         justifyContent: 'center',
                         opacity: pressed || followBusy ? 0.75 : 1,
@@ -374,7 +376,7 @@ export default function UserProfileScreen() {
                         style={{
                           fontSize: 14.5,
                           fontWeight: '600',
-                          color: followed ? '#161823' : '#FFFFFF',
+                          color: followed ? colors.ink : '#FFFFFF',
                         }}
                       >
                         {followed ? 'Following' : 'Follow'}
@@ -395,14 +397,14 @@ export default function UserProfileScreen() {
                         height: 36,
                         paddingHorizontal: 22,
                         borderRadius: 20,
-                        backgroundColor: '#F1F1F2',
+                        backgroundColor: colors.surface,
                         alignItems: 'center',
                         justifyContent: 'center',
                         opacity: pressed ? 0.75 : 1,
                         transform: [{ scale: pressed ? 0.97 : 1 }],
                       })}
                     >
-                      <Text style={{ fontSize: 14.5, fontWeight: '600', color: '#161823' }}>
+                      <Text style={{ fontSize: 14.5, fontWeight: '600', color: colors.ink }}>
                         Message
                       </Text>
                     </Pressable>
@@ -416,14 +418,14 @@ export default function UserProfileScreen() {
                         width: 36,
                         height: 36,
                         borderRadius: 18,
-                        backgroundColor: '#F1F1F2',
+                        backgroundColor: colors.surface,
                         alignItems: 'center',
                         justifyContent: 'center',
                         opacity: pressed ? 0.75 : 1,
                         transform: [{ scale: pressed ? 0.96 : 1 }],
                       })}
                     >
-                      <Feather name="share-2" size={15} color="#161823" />
+                      <Feather name="share-2" size={15} color={colors.ink} />
                     </Pressable>
                   </>
                 ) : (
@@ -436,14 +438,14 @@ export default function UserProfileScreen() {
                         height: 36,
                         paddingHorizontal: 20,
                         borderRadius: 20,
-                        backgroundColor: '#F1F1F2',
+                        backgroundColor: colors.surface,
                         alignItems: 'center',
                         justifyContent: 'center',
                         opacity: pressed ? 0.75 : 1,
                         transform: [{ scale: pressed ? 0.97 : 1 }],
                       })}
                     >
-                      <Text style={{ fontSize: 14, fontWeight: '600', color: '#161823' }}>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: colors.ink }}>
                         Edit profile
                       </Text>
                     </Pressable>
@@ -456,14 +458,14 @@ export default function UserProfileScreen() {
                         height: 36,
                         paddingHorizontal: 20,
                         borderRadius: 20,
-                        backgroundColor: '#F1F1F2',
+                        backgroundColor: colors.surface,
                         alignItems: 'center',
                         justifyContent: 'center',
                         opacity: pressed ? 0.75 : 1,
                         transform: [{ scale: pressed ? 0.97 : 1 }],
                       })}
                     >
-                      <Text style={{ fontSize: 14, fontWeight: '600', color: '#161823' }}>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: colors.ink }}>
                         Share profile
                       </Text>
                     </Pressable>
@@ -493,7 +495,7 @@ export default function UserProfileScreen() {
                     style={({ pressed }) => ({
                       flexDirection: 'row',
                       alignItems: 'center',
-                      backgroundColor: '#F1F1F2',
+                      backgroundColor: colors.surface,
                       paddingHorizontal: 14,
                       paddingVertical: 7,
                       borderRadius: 9999,
@@ -530,9 +532,9 @@ export default function UserProfileScreen() {
               style={{
                 flexDirection: 'row',
                 borderBottomWidth: 1,
-                borderBottomColor: '#EBEBEB',
+                borderBottomColor: colors.border,
                 marginTop: 18,
-                backgroundColor: colors.white,
+                backgroundColor: colors.background,
               }}
             >
               {/* Tab 1: Shop / Grid */}
@@ -549,13 +551,13 @@ export default function UserProfileScreen() {
                   <Ionicons
                     name={activeTab === 'shop' ? 'grid' : 'grid-outline'}
                     size={20}
-                    color={activeTab === 'shop' ? colors.ink : '#8A8B91'}
+                    color={activeTab === 'shop' ? colors.ink : colors.mute}
                   />
                   <Text
                     style={{
                       fontSize: 13.5,
                       fontWeight: activeTab === 'shop' ? '700' : '500',
-                      color: activeTab === 'shop' ? colors.ink : '#8A8B91',
+                      color: activeTab === 'shop' ? colors.ink : colors.mute,
                     }}
                   >
                     Shop ({listings.length})
@@ -589,13 +591,13 @@ export default function UserProfileScreen() {
                   <Ionicons
                     name={activeTab === 'details' ? 'person' : 'person-outline'}
                     size={20}
-                    color={activeTab === 'details' ? colors.ink : '#8A8B91'}
+                    color={activeTab === 'details' ? colors.ink : colors.mute}
                   />
                   <Text
                     style={{
                       fontSize: 13.5,
                       fontWeight: activeTab === 'details' ? '700' : '500',
-                      color: activeTab === 'details' ? colors.ink : '#8A8B91',
+                      color: activeTab === 'details' ? colors.ink : colors.mute,
                     }}
                   >
                     Details
@@ -670,9 +672,9 @@ export default function UserProfileScreen() {
                         paddingHorizontal: 12,
                         paddingVertical: 6,
                         borderRadius: 8,
-                        backgroundColor: active ? '#F1F1F2' : '#FFFFFF',
+                        backgroundColor: active ? colors.purple : colors.surface,
                         borderWidth: 1,
-                        borderColor: active ? '#D1D5DB' : '#E5E5E5',
+                        borderColor: active ? colors.purple : colors.border,
                         opacity: pressed ? 0.7 : 1,
                       })}
                     >
@@ -680,7 +682,7 @@ export default function UserProfileScreen() {
                         style={{
                           fontSize: 12.5,
                           fontWeight: active ? '700' : '600',
-                          color: colors.ink,
+                          color: active ? '#FFFFFF' : colors.ink,
                         }}
                       >
                         {f.label}

@@ -9,7 +9,8 @@ import Feather from '@expo/vector-icons/Feather';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { priceBreakdown, formatPrice } from '@/lib/fees';
-import { IS_IOS, tap, BRAND_PURPLE, BRAND_PURPLE_SOFT, BRAND_INK, INK_700, HAIRLINE } from './shared';
+import { colors } from '@/lib/theme';
+import { IS_IOS, tap, BRAND_PURPLE, BRAND_PURPLE_SOFT, HAIRLINE } from './shared';
 
 const COVERAGE = [
   { icon: 'refresh-ccw' as const, text: 'A refund if your item never arrives or isn’t as described' },
@@ -29,9 +30,6 @@ export function BuyerProtectionSheet({
   const insets = useSafeAreaInsets();
   const { item, protection, total } = priceBreakdown(itemPrice);
 
-  // Both translucency flags: Android edge-to-edge (mandatory from Expo SDK 54)
-  // otherwise ends the modal window at the navigation bar, leaving an opaque
-  // strip under the backdrop and double-counting the insets.bottom padding.
   return (
     <Modal
       visible={visible}
@@ -52,9 +50,11 @@ export function BuyerProtectionSheet({
         <Pressable
           onPress={() => {}}
           style={{
-            backgroundColor: 'white',
+            backgroundColor: colors.surface,
             borderTopLeftRadius: 28,
             borderTopRightRadius: 28,
+            borderTopWidth: 1,
+            borderColor: colors.border,
             paddingHorizontal: 24,
             paddingTop: 10,
             paddingBottom: (insets.bottom || 16) + 12,
@@ -67,7 +67,7 @@ export function BuyerProtectionSheet({
               width: 40,
               height: 5,
               borderRadius: 3,
-              backgroundColor: 'rgba(15,15,15,0.14)',
+              backgroundColor: colors.border,
               marginBottom: 20,
             }}
           />
@@ -79,7 +79,7 @@ export function BuyerProtectionSheet({
               width: 62,
               height: 62,
               borderRadius: 20,
-              backgroundColor: BRAND_PURPLE_SOFT,
+              backgroundColor: colors.purpleSoft,
               alignItems: 'center',
               justifyContent: 'center',
               marginBottom: 16,
@@ -92,7 +92,7 @@ export function BuyerProtectionSheet({
             style={{
               fontSize: 24,
               fontFamily: 'Inter_700Bold',
-              color: BRAND_INK,
+              color: colors.ink,
               textAlign: 'center',
               letterSpacing: -0.4,
               marginBottom: 8,
@@ -104,7 +104,7 @@ export function BuyerProtectionSheet({
             style={{
               fontSize: 14,
               fontFamily: 'Inter_400Regular',
-              color: INK_700,
+              color: colors.mute,
               textAlign: 'center',
               lineHeight: 21,
               marginBottom: 22,
@@ -118,17 +118,18 @@ export function BuyerProtectionSheet({
           <View
             style={{
               borderRadius: 18,
-              borderWidth: HAIRLINE,
-              borderColor: 'rgba(15,15,15,0.10)',
+              borderWidth: 1,
+              borderColor: colors.border,
+              backgroundColor: colors.panel,
               paddingHorizontal: 16,
               paddingVertical: 4,
               marginBottom: 20,
             }}
           >
             <BreakdownRow label="Item price" value={formatPrice(item)} />
-            <View style={{ height: HAIRLINE, backgroundColor: 'rgba(15,15,15,0.06)' }} />
+            <View style={{ height: 1, backgroundColor: colors.border }} />
             <BreakdownRow label="Buyer Protection" value={formatPrice(protection)} />
-            <View style={{ height: HAIRLINE, backgroundColor: 'rgba(15,15,15,0.06)' }} />
+            <View style={{ height: 1, backgroundColor: colors.border }} />
             <BreakdownRow label="Total" value={formatPrice(total)} emphasize />
           </View>
 
@@ -141,7 +142,7 @@ export function BuyerProtectionSheet({
                     width: 34,
                     height: 34,
                     borderRadius: 12,
-                    backgroundColor: BRAND_PURPLE_SOFT,
+                    backgroundColor: colors.purpleSoft,
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
@@ -153,7 +154,7 @@ export function BuyerProtectionSheet({
                     flex: 1,
                     fontSize: 14,
                     fontFamily: 'Inter_500Medium',
-                    color: INK_700,
+                    color: colors.mute,
                     lineHeight: 20,
                   }}
                 >
@@ -173,14 +174,14 @@ export function BuyerProtectionSheet({
             style={({ pressed }) => ({
               height: 54,
               borderRadius: 16,
-              backgroundColor: BRAND_INK,
+              backgroundColor: colors.ink,
               alignItems: 'center',
               justifyContent: 'center',
               opacity: pressed ? 0.9 : 1,
               transform: [{ scale: pressed ? 0.99 : 1 }],
             })}
           >
-            <Text style={{ fontSize: 16, fontFamily: 'Inter_700Bold', color: 'white', letterSpacing: 0.2 }}>
+            <Text style={{ fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.background, letterSpacing: 0.2 }}>
               Got it
             </Text>
           </Pressable>
@@ -204,7 +205,7 @@ function BreakdownRow({ label, value, emphasize }: { label: string; value: strin
         style={{
           fontSize: emphasize ? 15 : 14,
           fontFamily: emphasize ? 'Inter_700Bold' : 'Inter_500Medium',
-          color: emphasize ? BRAND_INK : INK_700,
+          color: emphasize ? colors.ink : colors.mute,
         }}
       >
         {label}
@@ -213,7 +214,7 @@ function BreakdownRow({ label, value, emphasize }: { label: string; value: strin
         style={{
           fontSize: emphasize ? 17 : 14,
           fontFamily: 'Inter_700Bold',
-          color: BRAND_INK,
+          color: colors.ink,
           letterSpacing: emphasize ? -0.3 : 0,
         }}
       >

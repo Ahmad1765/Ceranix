@@ -89,12 +89,12 @@ export function SafetyBanner({ context = 'shop', title, body, style, onLinkPress
           width: 34,
           height: 34,
           borderRadius: 17,
-          backgroundColor: colors.primarySofter,
+          backgroundColor: colors.purpleSoft,
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
-        <Ionicons name="shield-checkmark" size={18} color={colors.primary} />
+        <Ionicons name="shield-checkmark" size={18} color={colors.purple} />
       </View>
       <View style={{ flex: 1 }}>
         <Text
@@ -121,7 +121,7 @@ export function SafetyBanner({ context = 'shop', title, body, style, onLinkPress
             onPress={onLink}
             accessibilityRole="link"
             accessibilityLabel="How you're covered"
-            style={{ color: colors.primary, fontFamily: typography.family.sansSemibold }}
+            style={{ color: colors.purple, fontFamily: typography.family.sansSemibold }}
           >
             How you&apos;re covered
           </Text>

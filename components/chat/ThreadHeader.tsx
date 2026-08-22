@@ -37,8 +37,8 @@ export function ThreadHeader({
         paddingTop: 4,
         paddingBottom: 8,
         borderBottomWidth: 1,
-        borderBottomColor: colors.hairline,
-        backgroundColor: colors.white,
+        borderBottomColor: colors.border,
+        backgroundColor: colors.surface,
       }}
     >
       <Pressable

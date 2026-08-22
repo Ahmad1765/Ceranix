@@ -4,8 +4,10 @@ import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
 import { getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
-import { CARD_WIDTH, CARD_IMAGE_HEIGHT, BRAND_INK, type RelatedItem } from './shared';
+import { CARD_WIDTH, CARD_IMAGE_HEIGHT, type RelatedItem } from './shared';
 import { formatPrice } from '@/lib/currency';
+
+import { colors } from '@/lib/theme';
 
 export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress: () => void }) {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -24,7 +26,7 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
           height: CARD_IMAGE_HEIGHT,
           borderRadius: 14,
           overflow: 'hidden',
-          backgroundColor: 'rgba(15,15,15,0.04)',
+          backgroundColor: colors.panel,
         }}
       >
         {hasMultiple ? (
@@ -108,7 +110,9 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
             position: 'absolute',
             top: 8,
             right: 8,
-            backgroundColor: 'rgba(255,255,255,0.94)',
+            backgroundColor: colors.surface,
+            borderWidth: 1,
+            borderColor: colors.border,
             borderRadius: 999,
             paddingHorizontal: 9,
             paddingVertical: 4,
@@ -117,19 +121,19 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
             gap: 4,
           }}
         >
-          <Feather name="heart" size={11} color={BRAND_INK} />
-          <Text style={{ fontSize: 11, fontWeight: '700', color: BRAND_INK }}>{item.likes}</Text>
+          <Feather name="heart" size={11} color={colors.ink} />
+          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.ink }}>{item.likes}</Text>
         </View>
       </View>
 
       <View style={{ marginTop: 10 }}>
-        <Text style={{ fontSize: 13, fontWeight: '700', color: BRAND_INK }} numberOfLines={1}>
+        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.ink }} numberOfLines={1}>
           {item.brand}
         </Text>
-        <Text style={{ fontSize: 11, color: 'rgba(15,15,15,0.62)', marginTop: 2 }} numberOfLines={1}>
+        <Text style={{ fontSize: 11, color: colors.mute, marginTop: 2 }} numberOfLines={1}>
           {item.meta}
         </Text>
-        <Text style={{ fontSize: 14, fontWeight: '800', color: BRAND_INK, marginTop: 4 }}>
+        <Text style={{ fontSize: 14, fontWeight: '800', color: colors.ink, marginTop: 4 }}>
           {formatPrice(item.price, { whole: true })}
         </Text>
       </View>

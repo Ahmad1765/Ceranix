@@ -14,16 +14,11 @@ import {
   uploadAvatar,
   type LocalImage,
 } from '@/lib/upload';
-import { CONTENT_MAX_WIDTH } from '@/lib/responsive';
 import { useToast } from '@/lib/toast';
+import { colors } from '@/lib/theme';
 
 const PURPLE = '#6C47FF';
-const LIME = '#84CC16';  // or another lime/green shade
-const INK = '#0F0F0F';
-const MUTE = 'rgba(15,15,15,0.62)';
-const SOFT = '#FFFFFF';
-const HAIR = 'rgba(15,15,15,0.08)';
-const RED = '#EF4444';  // or another red shade (e.g., #DC2626, #F87171)
+const RED = '#EF4444';
 
 const LIMITS = {
   username: 20,
@@ -60,19 +55,19 @@ function FieldShell({
   max?: number;
   children: React.ReactNode;
 }) {
-  const borderColor = error ? RED : focused ? INK : HAIR;
-  const labelColor = error ? RED : focused ? INK : MUTE;
+  const borderColor = error ? RED : focused ? PURPLE : colors.border;
+  const labelColor = error ? RED : focused ? PURPLE : colors.mute;
   const overTwoThirds = max !== undefined && count !== undefined && count > max * 0.85;
   const counterColor = error
     ? RED
     : overTwoThirds
       ? count! >= max!
         ? RED
-        : 'rgba(15,15,15,0.55)'
-      : 'rgba(15,15,15,0.55)';
+        : colors.mute
+      : colors.mute;
 
   return (
-    <View style={{ marginBottom: 14 }}>
+    <View style={{ marginBottom: 16 }}>
       <View
         style={{
           flexDirection: 'row',
@@ -85,8 +80,8 @@ function FieldShell({
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <Text
             style={{
-              fontSize: 11,
-              fontWeight: '700',
+              fontSize: 11.5,
+              fontWeight: '800',
               color: labelColor,
               letterSpacing: 1.2,
               textTransform: 'uppercase',
@@ -99,7 +94,7 @@ function FieldShell({
               style={{
                 width: 14,
                 height: 2,
-                backgroundColor: LIME,
+                backgroundColor: PURPLE,
                 marginLeft: 8,
                 borderRadius: 2,
               }}
@@ -107,16 +102,16 @@ function FieldShell({
           )}
         </View>
         {max !== undefined && count !== undefined ? (
-          <Text style={{ fontSize: 11, color: counterColor, fontWeight: '600' }}>
+          <Text style={{ fontSize: 11.5, color: counterColor, fontWeight: '600' }}>
             {count}/{max}
           </Text>
         ) : helper && !error ? (
-          <Text style={{ fontSize: 11, color: 'rgba(15,15,15,0.55)' }}>{helper}</Text>
+          <Text style={{ fontSize: 11.5, color: colors.mute }}>{helper}</Text>
         ) : null}
       </View>
       <View
         style={{
-          backgroundColor: 'white',
+          backgroundColor: colors.surface,
           borderRadius: 16,
           borderWidth: 1.5,
           borderColor,
@@ -143,17 +138,17 @@ function SectionHeader({ label }: { label: string }) {
       style={{
         flexDirection: 'row',
         alignItems: 'center',
-        marginTop: 18,
+        marginTop: 20,
         marginBottom: 12,
         marginLeft: 2,
       }}
     >
-      <View style={{ width: 18, height: 2, backgroundColor: INK, marginRight: 10, borderRadius: 2 }} />
+      <View style={{ width: 18, height: 2, backgroundColor: PURPLE, marginRight: 10, borderRadius: 2 }} />
       <Text
         style={{
-          fontSize: 11,
+          fontSize: 11.5,
           fontWeight: '800',
-          color: INK,
+          color: colors.ink,
           letterSpacing: 1.4,
           textTransform: 'uppercase',
         }}
@@ -488,7 +483,7 @@ export default function ProfileEditScreen() {
     return (
       <SafeAreaView
         edges={['top']}
-        style={{ flex: 1, backgroundColor: SOFT, alignItems: 'center', justifyContent: 'center' }}
+        style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}
       >
         <ActivityIndicator color={PURPLE} />
       </SafeAreaView>
@@ -505,10 +500,6 @@ export default function ProfileEditScreen() {
     usernameStatus !== 'checking' &&
     (isOnboarding || isDirty);
 
-  const ctaBg = saving ? INK : canSave ? LIME : INK;
-  const ctaFg = saving ? 'white' : canSave ? INK : 'white';
-  const ctaAccent = saving ? LIME : canSave ? INK : LIME;
-  const ctaAccentFg = saving ? INK : canSave ? LIME : INK;
   const ctaLabel = saving
     ? 'Saving…'
     : isOnboarding
@@ -518,7 +509,7 @@ export default function ProfileEditScreen() {
         : 'All saved';
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: SOFT }}>
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.background }}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
@@ -542,22 +533,22 @@ export default function ProfileEditScreen() {
               width: 38,
               height: 38,
               borderRadius: 19,
-              backgroundColor: 'white',
+              backgroundColor: colors.surface,
               alignItems: 'center',
               justifyContent: 'center',
               borderWidth: 1,
-              borderColor: HAIR,
+              borderColor: colors.border,
               opacity: isOnboarding ? 0 : 1,
             }}
           >
-            <Feather name="arrow-left" size={18} color={INK} />
+            <Feather name="arrow-left" size={18} color={colors.ink} />
           </Pressable>
 
           <Text
             style={{
               fontSize: 13,
               fontWeight: '700',
-              color: INK,
+              color: colors.ink,
               letterSpacing: 1.4,
               textTransform: 'uppercase',
             }}
@@ -572,9 +563,9 @@ export default function ProfileEditScreen() {
                   width: 8,
                   height: 8,
                   borderRadius: 4,
-                  backgroundColor: LIME,
+                  backgroundColor: PURPLE,
                   borderWidth: 1.5,
-                  borderColor: INK,
+                  borderColor: colors.ink,
                 }}
               />
             ) : null}
@@ -590,10 +581,10 @@ export default function ProfileEditScreen() {
           {/* Hero */}
           <Text
             style={{
-              fontSize: 44,
+              fontSize: 40,
               fontWeight: '900',
-              color: INK,
-              lineHeight: 46,
+              color: colors.ink,
+              lineHeight: 44,
               letterSpacing: -1.5,
               marginTop: 6,
             }}
@@ -606,11 +597,11 @@ export default function ProfileEditScreen() {
                 width: 6,
                 height: 6,
                 borderRadius: 3,
-                backgroundColor: LIME,
+                backgroundColor: PURPLE,
                 marginRight: 10,
               }}
             />
-            <Text style={{ fontSize: 14, color: MUTE, lineHeight: 20, flex: 1 }}>
+            <Text style={{ fontSize: 14, color: colors.mute, lineHeight: 20, flex: 1 }}>
               {isOnboarding
                 ? 'Pick a username and add a few details. You can change all of this later.'
                 : 'Update what people see when they visit your shop.'}
@@ -622,20 +613,22 @@ export default function ProfileEditScreen() {
             <Pressable onPress={pickAvatar} hitSlop={4}>
               <View
                 style={{
-                  width: 132,
-                  height: 132,
-                  borderRadius: 66,
-                  backgroundColor: LIME,
+                  width: 128,
+                  height: 128,
+                  borderRadius: 64,
+                  backgroundColor: colors.surface,
                   alignItems: 'center',
                   justifyContent: 'center',
+                  borderWidth: 2.5,
+                  borderColor: PURPLE,
                 }}
               >
                 <View
                   style={{
-                    width: 122,
-                    height: 122,
-                    borderRadius: 61,
-                    backgroundColor: 'white',
+                    width: 118,
+                    height: 118,
+                    borderRadius: 59,
+                    backgroundColor: colors.surface,
                     alignItems: 'center',
                     justifyContent: 'center',
                     overflow: 'hidden',
@@ -644,13 +637,13 @@ export default function ProfileEditScreen() {
                   {avatarUri ? (
                     <Image
                       source={{ uri: avatarUri }}
-                      style={{ width: 122, height: 122 }}
+                      style={{ width: 118, height: 118 }}
                       contentFit="cover"
                       transition={150}
                     />
                   ) : (
                     <Text
-                      style={{ fontSize: 56, fontWeight: '900', color: INK, letterSpacing: -2 }}
+                      style={{ fontSize: 52, fontWeight: '900', color: colors.ink, letterSpacing: -2 }}
                     >
                       {initial}
                     </Text>
@@ -660,19 +653,19 @@ export default function ProfileEditScreen() {
               <View
                 style={{
                   position: 'absolute',
-                  right: -2,
-                  bottom: -2,
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
-                  backgroundColor: INK,
+                  right: 0,
+                  bottom: 0,
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: PURPLE,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  borderWidth: 4,
-                  borderColor: SOFT,
+                  borderWidth: 3,
+                  borderColor: colors.background,
                 }}
               >
-                <Feather name="camera" size={16} color="white" />
+                <Feather name="camera" size={15} color="#FFFFFF" />
               </View>
             </Pressable>
 
@@ -680,37 +673,37 @@ export default function ProfileEditScreen() {
               <Pressable
                 onPress={pickAvatar}
                 style={({ pressed }) => ({
-                  paddingHorizontal: 14,
-                  paddingVertical: 8,
+                  paddingHorizontal: 16,
+                  paddingVertical: 9,
                   borderRadius: 999,
-                  backgroundColor: 'white',
+                  backgroundColor: colors.surface,
                   borderWidth: 1,
-                  borderColor: HAIR,
+                  borderColor: colors.border,
                   flexDirection: 'row',
                   alignItems: 'center',
                   opacity: pressed ? 0.7 : 1,
                 })}
               >
-                <Feather name="image" size={13} color={INK} style={{ marginRight: 6 }} />
-                <Text style={{ fontSize: 12, fontWeight: '700', color: INK }}>Change</Text>
+                <Feather name="image" size={13} color={colors.ink} style={{ marginRight: 6 }} />
+                <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.ink }}>Change</Text>
               </Pressable>
               {showRemove && (
                 <Pressable
                   onPress={removeAvatar}
                   style={({ pressed }) => ({
-                    paddingHorizontal: 14,
-                    paddingVertical: 8,
+                    paddingHorizontal: 16,
+                    paddingVertical: 9,
                     borderRadius: 999,
-                    backgroundColor: 'transparent',
+                    backgroundColor: colors.surface,
                     borderWidth: 1,
-                    borderColor: HAIR,
+                    borderColor: colors.border,
                     flexDirection: 'row',
                     alignItems: 'center',
                     opacity: pressed ? 0.7 : 1,
                   })}
                 >
                   <Feather name="trash-2" size={13} color={RED} style={{ marginRight: 6 }} />
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: RED }}>Remove</Text>
+                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: RED }}>Remove</Text>
                 </Pressable>
               )}
             </View>
@@ -727,10 +720,10 @@ export default function ProfileEditScreen() {
             max={LIMITS.username}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={{ fontSize: 16, color: MUTE, marginRight: 2 }}>@</Text>
+              <Text style={{ fontSize: 16, color: colors.mute, marginRight: 2 }}>@</Text>
               <TextInput
                 placeholder="ahmad_saleem"
-                placeholderTextColor="rgba(15,15,15,0.55)"
+                placeholderTextColor={colors.mute}
                 value={username}
                 onChangeText={(t) => {
                   const cleaned = t.replace(/\s+/g, '').toLowerCase();
@@ -748,10 +741,10 @@ export default function ProfileEditScreen() {
                 returnKeyType="next"
                 onSubmitEditing={() => fullNameRef.current?.focus()}
                 maxLength={LIMITS.username}
-                style={{ flex: 1, fontSize: 16, color: INK, padding: 0 }}
+                style={{ flex: 1, fontSize: 16, color: colors.ink, padding: 0 }}
               />
               {usernameStatus === 'checking' && (
-                <ActivityIndicator size="small" color={MUTE} style={{ marginLeft: 8 }} />
+                <ActivityIndicator size="small" color={colors.mute} style={{ marginLeft: 8 }} />
               )}
               {usernameStatus === 'ok' && (
                 <View
@@ -759,7 +752,7 @@ export default function ProfileEditScreen() {
                     width: 22,
                     height: 22,
                     borderRadius: 11,
-                    backgroundColor: LIME,
+                    backgroundColor: PURPLE,
                     alignItems: 'center',
                     justifyContent: 'center',
                     marginLeft: 8,
@@ -795,7 +788,7 @@ export default function ProfileEditScreen() {
             <TextInput
               ref={fullNameRef}
               placeholder="Ahmad Saleem"
-              placeholderTextColor="rgba(15,15,15,0.55)"
+              placeholderTextColor={colors.mute}
               value={fullName}
               onChangeText={(t) => setFullName(t.slice(0, LIMITS.fullName))}
               onFocus={() => setFocused('fullName')}
@@ -803,7 +796,7 @@ export default function ProfileEditScreen() {
               maxLength={LIMITS.fullName}
               returnKeyType="next"
               onSubmitEditing={() => bioRef.current?.focus()}
-              style={{ fontSize: 16, color: INK, padding: 0 }}
+              style={{ fontSize: 16, color: colors.ink, padding: 0 }}
             />
           </FieldShell>
 
@@ -820,7 +813,7 @@ export default function ProfileEditScreen() {
             <TextInput
               ref={bioRef}
               placeholder="A line about your shop"
-              placeholderTextColor="rgba(15,15,15,0.55)"
+              placeholderTextColor={colors.mute}
               value={bio}
               onChangeText={(t) => setBio(t.slice(0, LIMITS.bio))}
               onFocus={() => setFocused('bio')}
@@ -829,7 +822,7 @@ export default function ProfileEditScreen() {
               textAlignVertical="top"
               maxLength={LIMITS.bio}
               scrollEnabled={false}
-              style={{ fontSize: 16, color: INK, padding: 0, minHeight: 80 }}
+              style={{ fontSize: 16, color: colors.ink, padding: 0, minHeight: 80 }}
             />
           </FieldShell>
 
@@ -842,14 +835,14 @@ export default function ProfileEditScreen() {
             <TextInput
               ref={locationRef}
               placeholder="Karachi"
-              placeholderTextColor="rgba(15,15,15,0.55)"
+              placeholderTextColor={colors.mute}
               value={location}
               onChangeText={(t) => setLocation(t.slice(0, LIMITS.location))}
               onFocus={() => setFocused('location')}
               onBlur={() => setFocused(null)}
               maxLength={LIMITS.location}
               returnKeyType="done"
-              style={{ fontSize: 16, color: INK, padding: 0 }}
+              style={{ fontSize: 16, color: colors.ink, padding: 0 }}
             />
           </FieldShell>
 
@@ -859,10 +852,10 @@ export default function ProfileEditScreen() {
               <SectionHeader label="Account" />
               <View
                 style={{
-                  backgroundColor: 'white',
+                  backgroundColor: colors.surface,
                   borderRadius: 16,
                   borderWidth: 1.5,
-                  borderColor: HAIR,
+                  borderColor: colors.border,
                   paddingHorizontal: 16,
                   paddingVertical: 14,
                   flexDirection: 'row',
@@ -874,20 +867,20 @@ export default function ProfileEditScreen() {
                     width: 36,
                     height: 36,
                     borderRadius: 10,
-                    backgroundColor: SOFT,
+                    backgroundColor: colors.panel,
                     alignItems: 'center',
                     justifyContent: 'center',
                     marginRight: 12,
                   }}
                 >
-                  <Feather name="mail" size={16} color={INK} />
+                  <Feather name="mail" size={16} color={colors.ink} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text
                     style={{
                       fontSize: 11,
                       fontWeight: '700',
-                      color: MUTE,
+                      color: colors.mute,
                       letterSpacing: 1.2,
                       textTransform: 'uppercase',
                     }}
@@ -895,7 +888,7 @@ export default function ProfileEditScreen() {
                     Email
                   </Text>
                   <Text
-                    style={{ fontSize: 14, fontWeight: '600', color: INK, marginTop: 2 }}
+                    style={{ fontSize: 14, fontWeight: '600', color: colors.ink, marginTop: 2 }}
                     numberOfLines={1}
                   >
                     {user.email}
@@ -906,11 +899,11 @@ export default function ProfileEditScreen() {
                     paddingHorizontal: 10,
                     paddingVertical: 4,
                     borderRadius: 999,
-                    backgroundColor: SOFT,
+                    backgroundColor: colors.panel,
                   }}
                 >
                   <Text
-                    style={{ fontSize: 10, fontWeight: '800', color: MUTE, letterSpacing: 1 }}
+                    style={{ fontSize: 10, fontWeight: '800', color: colors.mute, letterSpacing: 1 }}
                   >
                     LOCKED
                   </Text>
@@ -928,57 +921,45 @@ export default function ProfileEditScreen() {
             right: 0,
             bottom: 0,
             paddingHorizontal: 20,
-            paddingTop: 16,
+            paddingTop: 14,
             paddingBottom: ctaBottomPad,
-            backgroundColor: SOFT,
+            backgroundColor: colors.surface,
             borderTopWidth: 1,
-            borderTopColor: 'rgba(15,15,15,0.08)',
+            borderTopColor: colors.border,
           }}
         >
           <Pressable
             onPress={handleSave}
             disabled={saving || !canSave}
             style={({ pressed }) => ({
-              height: 58,
-              borderRadius: 16,
-              backgroundColor: ctaBg,
+              height: 52,
+              borderRadius: 14,
+              backgroundColor: canSave || saving ? PURPLE : colors.panel,
+              borderWidth: canSave || saving ? 0 : 1,
+              borderColor: colors.border,
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center',
-              opacity: saving ? 0.85 : !canSave ? 0.45 : 1,
+              gap: 8,
+              opacity: saving ? 0.85 : !canSave ? 0.7 : 1,
               transform: [{ scale: pressed && canSave ? 0.985 : 1 }],
-              overflow: 'hidden',
             })}
           >
-            <View
-              style={{
-                position: 'absolute',
-                right: 0,
-                top: 0,
-                bottom: 0,
-                width: 58,
-                backgroundColor: ctaAccent,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              {saving ? (
-                <ActivityIndicator color={ctaAccentFg as string} />
-              ) : (
-                <Feather
-                  name={isOnboarding ? 'arrow-right' : 'check'}
-                  size={20}
-                  color={ctaAccentFg as string}
-                />
-              )}
-            </View>
+            {saving ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Feather
+                name={isOnboarding ? 'arrow-right' : 'check'}
+                size={18}
+                color={canSave ? '#FFFFFF' : colors.mute}
+              />
+            )}
             <Text
               style={{
-                fontSize: 16,
-                fontWeight: '800',
-                color: ctaFg as string,
+                fontSize: 15,
+                fontWeight: '700',
+                color: canSave || saving ? '#FFFFFF' : colors.mute,
                 letterSpacing: 0.2,
-                marginRight: 58,
               }}
             >
               {ctaLabel}

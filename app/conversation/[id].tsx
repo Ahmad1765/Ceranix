@@ -160,9 +160,11 @@ function OfferSheet({
           <Pressable
             onPress={(e) => e.stopPropagation()}
             style={{
-              backgroundColor: colors.white,
+              backgroundColor: colors.surface,
               borderTopLeftRadius: 24,
               borderTopRightRadius: 24,
+              borderTopWidth: 1,
+              borderColor: colors.border,
               paddingHorizontal: 22,
               paddingTop: 14,
               paddingBottom: Platform.OS === 'ios' ? 38 : 28,
@@ -175,7 +177,7 @@ function OfferSheet({
                 width: 36,
                 height: 4,
                 borderRadius: 2,
-                backgroundColor: 'rgba(15,15,15,0.15)',
+                backgroundColor: colors.border,
                 alignSelf: 'center',
                 marginBottom: 16,
               }}
@@ -229,7 +231,7 @@ function OfferSheet({
                   paddingVertical: 9,
                   marginBottom: 14,
                   borderWidth: 1,
-                  borderColor: colors.hairline,
+                  borderColor: colors.border,
                 }}
               >
                 <Text style={{ fontSize: 13, color: colors.mute, fontFamily: typography.family.sansSemibold }}>
@@ -255,11 +257,11 @@ function OfferSheet({
                         paddingVertical: 10,
                         paddingHorizontal: 6,
                         borderRadius: radii.md,
-                        backgroundColor: isSelected ? colors.purpleSoft : colors.white,
+                        backgroundColor: isSelected ? colors.purpleSoft : colors.panel,
                         alignItems: 'center',
                         justifyContent: 'center',
                         borderWidth: 1.5,
-                        borderColor: isSelected ? colors.purple : colors.hairline,
+                        borderColor: isSelected ? colors.purple : colors.border,
                         ...shadow.sm,
                       }}
                     >
@@ -276,7 +278,7 @@ function OfferSheet({
                           style={{
                             fontSize: 10,
                             fontFamily: typography.family.sansBold,
-                            color: isSelected ? colors.white : colors.purple,
+                            color: isSelected ? '#FFFFFF' : colors.purple,
                             textTransform: 'uppercase',
                           }}
                         >
@@ -974,16 +976,16 @@ export default function ConversationScreen() {
       mode="keyboard-avoiding"
       noScroll
       edges={['top', 'left', 'right']}
-      backgroundColor={colors.white}
+      backgroundColor={colors.background}
       style={{ flex: 1 }}
     >
       {/* Sticky Context Header (Z: 30) */}
       <View
         style={{
           zIndex: 30,
-          backgroundColor: colors.white,
+          backgroundColor: colors.surface,
           borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: colors.hairline,
+          borderBottomColor: colors.border,
         }}
       >
         <ThreadHeader
@@ -1009,8 +1011,8 @@ export default function ConversationScreen() {
               paddingHorizontal: 16,
               paddingVertical: 10,
               borderTopWidth: StyleSheet.hairlineWidth,
-              borderTopColor: colors.hairline,
-              backgroundColor: pressed ? '#F8F8FA' : colors.white,
+              borderTopColor: colors.border,
+              backgroundColor: pressed ? colors.panel : colors.surface,
             })}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
@@ -1094,8 +1096,8 @@ export default function ConversationScreen() {
       <View
         style={{
           borderTopWidth: 1,
-          borderTopColor: colors.hairline,
-          backgroundColor: colors.white,
+          borderTopColor: colors.border,
+          backgroundColor: colors.surface,
           paddingBottom: keyboardUp ? DOCK_GAP_KEYBOARD : Math.max(insets.bottom, 12),
         }}
       >

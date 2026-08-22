@@ -27,10 +27,10 @@ export function InfoCard({ icon, title, children }: Props) {
           width: '100%',
           maxWidth: CONTENT_MAX_WIDTH,
           padding: 16,
-          backgroundColor: colors.white,
+          backgroundColor: colors.surface,
           borderRadius: radii.xl,
           borderWidth: 1,
-          borderColor: colors.hairline,
+          borderColor: colors.border,
           ...shadow.sm,
         }}
       >

@@ -191,19 +191,19 @@ function RowField({
         paddingVertical: 15,
         minHeight: 50,
         borderBottomWidth: 1,
-        borderBottomColor: colors.hairline,
-        backgroundColor: pressed ? colors.panel : colors.white,
+        borderBottomColor: colors.border,
+        backgroundColor: pressed ? colors.panel : 'transparent',
       })}
     >
       <Text style={{ fontSize: 14.5, fontFamily: DISPLAY_BOLD, color: colors.ink }}>{label}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1, marginLeft: 12 }}>
         <Text
           numberOfLines={1}
-          style={{ fontSize: 14, color: value ? colors.mute : colors.muteSoft, flexShrink: 1 }}
+          style={{ fontSize: 14, color: value ? colors.ink : colors.mute, flexShrink: 1 }}
         >
           {value || placeholder}
         </Text>
-        <Feather name="chevron-right" size={17} color={colors.muteSoft} />
+        <Feather name="chevron-right" size={17} color={colors.mute} />
       </View>
     </Pressable>
   );
@@ -232,7 +232,7 @@ function UnderlineField({
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={colors.muteSoft}
+        placeholderTextColor={colors.mute}
         multiline={multiline}
         textAlignVertical={multiline ? 'top' : 'center'}
         maxLength={maxLength}
@@ -243,7 +243,7 @@ function UnderlineField({
             paddingBottom: 10,
             minHeight: multiline ? 90 : undefined,
             borderBottomWidth: 1,
-            borderBottomColor: colors.hairline,
+            borderBottomColor: colors.border,
             outlineStyle: 'none',
             outlineWidth: 0,
           } as any
@@ -468,7 +468,7 @@ function SellForm({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-white">
+    <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Header */}
       <View
         style={{
@@ -478,7 +478,7 @@ function SellForm({ onClose }: { onClose: () => void }) {
           paddingHorizontal: 16,
           paddingVertical: 14,
           borderBottomWidth: 1,
-          borderBottomColor: colors.hairline,
+          borderBottomColor: colors.border,
         }}
       >
         <Pressable
@@ -513,12 +513,13 @@ function SellForm({ onClose }: { onClose: () => void }) {
               style={{
                 borderWidth: 1.5,
                 borderStyle: 'dashed',
-                borderColor: colors.hairline,
+                borderColor: colors.border,
                 borderRadius: radii.lg,
                 padding: slots.length === 0 ? 0 : 14,
                 minHeight: slots.length === 0 ? 128 : undefined,
                 alignItems: slots.length === 0 ? 'center' : undefined,
                 justifyContent: slots.length === 0 ? 'center' : undefined,
+                backgroundColor: colors.surface,
               }}
             >
               {slots.length === 0 ? (
@@ -536,7 +537,7 @@ function SellForm({ onClose }: { onClose: () => void }) {
                     borderRadius: radii.pill,
                     borderWidth: 1.5,
                     borderColor: SELL_TEAL,
-                    backgroundColor: colors.white,
+                    backgroundColor: colors.surface,
                     transform: [{ scale: pressed ? 0.97 : 1 }],
                   })}
                 >
@@ -552,7 +553,6 @@ function SellForm({ onClose }: { onClose: () => void }) {
                       <Image
                         source={{ uri: resolveImage(slot).uri }}
                         style={{ width: '100%', height: '100%', borderRadius: 12 }}
-                        className="bg-ink-panel"
                         contentFit="cover"
                       />
                       {i === 0 && (
@@ -567,7 +567,7 @@ function SellForm({ onClose }: { onClose: () => void }) {
                             backgroundColor: SELL_TEAL,
                           }}
                         >
-                          <Text style={{ color: colors.white, fontSize: 9, fontFamily: DISPLAY_BOLD, letterSpacing: 0.4 }}>
+                          <Text style={{ color: 'white', fontSize: 9, fontFamily: DISPLAY_BOLD, letterSpacing: 0.4 }}>
                             COVER
                           </Text>
                         </View>
@@ -593,7 +593,7 @@ function SellForm({ onClose }: { onClose: () => void }) {
                           opacity: pressed ? 0.7 : 1,
                         })}
                       >
-                        <Feather name="x" size={13} color={colors.white} />
+                        <Feather name="x" size={13} color="#FFFFFF" />
                       </Pressable>
                     </View>
                   ))}
@@ -762,13 +762,13 @@ function SellForm({ onClose }: { onClose: () => void }) {
               })}
             >
               {publishing ? (
-                <ActivityIndicator color={colors.white} />
+                <ActivityIndicator color="#FFFFFF" />
               ) : (
                 <Text
                   style={{
                     fontSize: 16,
                     fontFamily: DISPLAY_BOLD,
-                    color: canPublish ? colors.white : colors.muteSoft,
+                    color: canPublish ? '#FFFFFF' : colors.muteSoft,
                     letterSpacing: 0.2,
                   }}
                 >

@@ -28,9 +28,11 @@ export function BottomSheet({ visible, title, onClose, children, footer, scroll 
         <Pressable
           onPress={(e) => e.stopPropagation()}
           style={{
-            backgroundColor: colors.white,
+            backgroundColor: colors.surface,
             borderTopLeftRadius: radii['3xl'],
             borderTopRightRadius: radii['3xl'],
+            borderTopWidth: 1,
+            borderColor: colors.border,
             paddingTop: 12,
             maxHeight: '86%',
           }}
@@ -41,7 +43,7 @@ export function BottomSheet({ visible, title, onClose, children, footer, scroll 
               width: 38,
               height: 4,
               borderRadius: 2,
-              backgroundColor: colors.hairline,
+              backgroundColor: colors.border,
               marginBottom: 14,
             }}
           />
@@ -59,7 +61,7 @@ export function BottomSheet({ visible, title, onClose, children, footer, scroll 
               {title}
             </Text>
             <Pressable hitSlop={8} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close">
-              <Feather name="x" size={20} color={colors.muteSoft} />
+              <Feather name="x" size={20} color={colors.mute} />
             </Pressable>
           </View>
 

@@ -41,13 +41,13 @@ export function StatsBar({
           flexDirection: 'row',
           alignItems: 'stretch',
           paddingVertical: 14,
-          backgroundColor: colors.white,
+          backgroundColor: isFlat ? 'transparent' : colors.surface,
           ...(isFlat
             ? {}
             : {
                 borderRadius: radii.xl,
                 borderWidth: 1,
-                borderColor: colors.hairline,
+                borderColor: colors.border,
                 ...shadow.sm,
               }),
         }}
@@ -55,7 +55,7 @@ export function StatsBar({
         {items.map((item, i) => (
           <View key={item.key} style={{ flex: 1, flexDirection: 'row' }}>
             {i > 0 ? (
-              <View style={{ width: 1, alignSelf: 'stretch', backgroundColor: colors.hairline }} />
+              <View style={{ width: 1, alignSelf: 'stretch', backgroundColor: colors.border }} />
             ) : null}
             <Stat item={item} />
           </View>

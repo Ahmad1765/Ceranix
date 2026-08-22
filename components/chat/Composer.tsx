@@ -94,7 +94,7 @@ export function Composer({
   );
 
   const sendStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(t.value, [0, 1], [colors.panel, colors.primary]),
+    backgroundColor: interpolateColor(t.value, [0, 1], [colors.surface, colors.purple]),
   }));
   const idleIcon = useAnimatedStyle(() => ({ opacity: 1 - t.value }));
   const armedIcon = useAnimatedStyle(() => ({ opacity: t.value }));
@@ -123,12 +123,11 @@ export function Composer({
         alignItems: 'flex-end',
         gap: 8,
         paddingHorizontal: 12,
-        // Asymmetric on purpose: the top gap separates the composer from the
-        // listing card above it, which sits right on its own hairline and
-        // otherwise reads as one welded block with the input.
-        paddingTop: 18,
+        paddingTop: 14,
         paddingBottom: 8,
-        backgroundColor: colors.white,
+        backgroundColor: colors.surface,
+        borderTopWidth: 1,
+        borderTopColor: colors.border,
       }}
     >
       <PressableScale
@@ -143,7 +142,7 @@ export function Composer({
           justifyContent: 'center',
         }}
       >
-        <Feather name="plus" size={20} color={colors.white} />
+        <Feather name="plus" size={20} color={colors.background} />
       </PressableScale>
 
       <View
@@ -152,6 +151,8 @@ export function Composer({
           minHeight: BUTTON,
           maxHeight: MAX_INPUT_HEIGHT + INPUT_PAD_V * 2,
           backgroundColor: colors.panel,
+          borderWidth: 1,
+          borderColor: colors.border,
           borderRadius: radii['2xl'],
           paddingHorizontal: 14,
           paddingVertical: INPUT_PAD_V,
@@ -233,7 +234,7 @@ export function Composer({
           <Ionicons name="arrow-up" size={20} color={colors.muteSoft} />
         </Animated.View>
         <Animated.View style={[{ position: 'absolute' }, armedIcon]}>
-          <Ionicons name="arrow-up" size={20} color={colors.white} />
+          <Ionicons name="arrow-up" size={20} color="#FFFFFF" />
         </Animated.View>
       </PressableScale>
     </View>

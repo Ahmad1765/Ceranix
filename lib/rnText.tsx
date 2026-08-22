@@ -44,9 +44,13 @@ function withDefaultInterFont<P extends { style?: any }>(
 ) {
   const Wrapped = React.forwardRef<unknown, P>((props, ref) => {
     const flat = StyleSheet.flatten(props.style as any) || ({} as any);
-    const style = flat.fontFamily
-      ? props.style
-      : [{ fontFamily: WEIGHT_FONT[String(flat.fontWeight ?? '400')] ?? 'Inter_400Regular' }, props.style];
+    const family = flat.fontFamily || (WEIGHT_FONT[String(flat.fontWeight ?? '400')] ?? 'Inter_400Regular');
+    const color = flat.color ?? colors.text;
+
+    const style = [
+      { fontFamily: family, color },
+      props.style,
+    ];
     return <Base ref={ref as any} {...(extraDefaults as any)} {...(props as any)} style={style} />;
   });
   Wrapped.displayName = displayName;

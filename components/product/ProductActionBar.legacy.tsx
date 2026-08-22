@@ -13,7 +13,8 @@
 import { View, Pressable } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
-import { HAIRLINE, BRAND_INK } from './shared';
+import { HAIRLINE } from './shared';
+import { colors } from '@/lib/theme';
 import { formatPrice } from '@/lib/currency';
 
 export function ProductActionBar({
@@ -38,9 +39,9 @@ export function ProductActionBar({
         bottom: 0,
         left: 0,
         right: 0,
-        backgroundColor: 'white',
+        backgroundColor: colors.surface,
         borderTopWidth: HAIRLINE,
-        borderTopColor: 'rgba(15,15,15,0.08)',
+        borderTopColor: colors.border,
         paddingHorizontal: 16,
         paddingTop: 12,
         paddingBottom: bottomInset || 16,
@@ -61,8 +62,8 @@ export function ProductActionBar({
           marginBottom: 10,
         }}
       >
-        <Feather name="lock" size={12} color="rgba(15,15,15,0.62)" />
-        <Text style={{ fontSize: 12, fontWeight: '500', color: 'rgba(15,15,15,0.62)' }}>
+        <Feather name="lock" size={12} color={colors.mute} />
+        <Text style={{ fontSize: 12, fontWeight: '500', color: colors.mute }}>
           Secure checkout · Buyer Protection included
         </Text>
       </View>
@@ -81,15 +82,15 @@ export function ProductActionBar({
             height: 48,
             borderRadius: 10,
             borderWidth: 1,
-            borderColor: BRAND_INK,
+            borderColor: colors.border,
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: 'white',
+            backgroundColor: colors.surface,
             opacity: pressed ? 0.7 : 1,
             transform: [{ scale: pressed ? 0.98 : 1 }],
           })}
         >
-          <Text style={{ fontSize: 15, fontWeight: '700', color: BRAND_INK }}>Make an offer</Text>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: colors.ink }}>Make an offer</Text>
         </Pressable>
         <Pressable
           onPress={onBuyPress}
@@ -99,19 +100,19 @@ export function ProductActionBar({
           style={({ pressed }) => ({
             flex: 1,
             height: 48,
-            backgroundColor: BRAND_INK,
+            backgroundColor: colors.ink,
             borderRadius: 10,
             // Matches the outlined twin's 1px border so both buttons occupy the
             // same box — without it the filled one sits 2px shorter.
             borderWidth: 1,
-            borderColor: BRAND_INK,
+            borderColor: colors.ink,
             alignItems: 'center',
             justifyContent: 'center',
             opacity: pressed ? 0.9 : 1,
             transform: [{ scale: pressed ? 0.98 : 1 }],
           })}
         >
-          <Text style={{ fontSize: 15, fontWeight: '800', color: 'white', letterSpacing: 0.2 }}>
+          <Text style={{ fontSize: 15, fontWeight: '800', color: colors.background, letterSpacing: 0.2 }}>
             Buy now
           </Text>
         </Pressable>

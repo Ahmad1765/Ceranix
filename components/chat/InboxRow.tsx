@@ -57,7 +57,9 @@ function InboxRowImpl({
           width: 54,
           height: 54,
           borderRadius: 27,
-          backgroundColor: colors.panel,
+          backgroundColor: colors.surface,
+          borderWidth: 1,
+          borderColor: colors.border,
           overflow: 'hidden',
           alignItems: 'center',
           justifyContent: 'center',
@@ -76,7 +78,7 @@ function InboxRowImpl({
             style={{
               fontFamily: typography.family.sansBold,
               fontSize: 19,
-              color: colors.primary,
+              color: colors.purple,
             }}
           >
             {initial}

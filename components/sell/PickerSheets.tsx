@@ -35,7 +35,7 @@ function SaveButton({ onPress, label = 'Save' }: { onPress: () => void; label?: 
           opacity: pressed ? 0.88 : 1,
         })}
       >
-        <Text style={{ fontSize: 14.5, fontFamily: DISPLAY_BOLD, color: colors.white, letterSpacing: -0.1 }}>
+        <Text style={{ fontSize: 14.5, fontFamily: DISPLAY_BOLD, color: '#FFFFFF', letterSpacing: -0.1 }}>
           {label}
         </Text>
       </Pressable>
@@ -85,8 +85,8 @@ export function SingleSelectSheet<T extends string>({
                 padding: 14,
                 borderRadius: radii.lg,
                 borderWidth: 1,
-                borderColor: active ? SELL_TEAL : colors.hairline,
-                backgroundColor: active ? SELL_TEAL_SOFT : colors.white,
+                borderColor: active ? SELL_TEAL : colors.border,
+                backgroundColor: active ? SELL_TEAL_SOFT : colors.surface,
                 opacity: pressed ? 0.85 : 1,
               })}
             >
@@ -139,7 +139,7 @@ export function TextFieldSheet({
         value={draft}
         onChangeText={setDraft}
         placeholder={placeholder}
-        placeholderTextColor={colors.muteSoft}
+        placeholderTextColor={colors.mute}
         autoFocus
         multiline={multiline}
         textAlignVertical={multiline ? 'top' : 'center'}
@@ -148,7 +148,7 @@ export function TextFieldSheet({
             fontSize: 16,
             color: colors.ink,
             borderBottomWidth: 1,
-            borderBottomColor: colors.hairline,
+            borderBottomColor: colors.border,
             paddingVertical: 10,
             minHeight: multiline ? 90 : undefined,
             outlineStyle: 'none',
@@ -192,7 +192,7 @@ export function PriceSheet({
           value={draft}
           onChangeText={setDraft}
           placeholder="0"
-          placeholderTextColor={colors.muteSoft}
+          placeholderTextColor={colors.mute}
           keyboardType="decimal-pad"
           autoFocus
           style={
@@ -320,13 +320,13 @@ export function CategorySheet({
                 paddingVertical: 8,
                 borderRadius: radii.pill,
                 borderWidth: 1,
-                borderColor: active ? colors.ink : colors.hairline,
-                backgroundColor: active ? colors.ink : colors.white,
+                borderColor: active ? colors.ink : colors.border,
+                backgroundColor: active ? colors.ink : colors.surface,
                 transform: [{ scale: pressed ? 0.97 : 1 }],
               })}
             >
-              <Feather name={c.icon} size={13} color={active ? colors.white : colors.ink} />
-              <Text style={{ fontSize: 13, fontFamily: DISPLAY_BOLD, color: active ? colors.white : colors.ink }}>
+              <Feather name={c.icon} size={13} color={active ? colors.background : colors.ink} />
+              <Text style={{ fontSize: 13, fontFamily: DISPLAY_BOLD, color: active ? colors.background : colors.ink }}>
                 {c.label}
               </Text>
             </Pressable>
@@ -341,19 +341,19 @@ export function CategorySheet({
             alignItems: 'center',
             gap: 8,
             borderWidth: 1,
-            borderColor: colors.hairline,
+            borderColor: colors.border,
             borderRadius: radii.md,
             paddingHorizontal: 12,
             height: 42,
             marginBottom: 12,
           }}
         >
-          <Feather name="search" size={15} color={colors.muteSoft} />
+          <Feather name="search" size={15} color={colors.mute} />
           <TextInput
             value={query}
             onChangeText={setQuery}
             placeholder={`Search ${def?.label.toLowerCase() ?? ''}`}
-            placeholderTextColor={colors.muteSoft}
+            placeholderTextColor={colors.mute}
             style={{ flex: 1, minWidth: 0, fontSize: 14, color: colors.ink }}
           />
         </View>
@@ -374,8 +374,8 @@ export function CategorySheet({
                 paddingVertical: 8,
                 borderRadius: radii.pill,
                 borderWidth: 1,
-                borderColor: active ? SELL_TEAL : colors.hairline,
-                backgroundColor: active ? SELL_TEAL_SOFT : colors.white,
+                borderColor: active ? SELL_TEAL : colors.border,
+                backgroundColor: active ? SELL_TEAL_SOFT : colors.surface,
                 transform: [{ scale: pressed ? 0.97 : 1 }],
               })}
             >
@@ -464,7 +464,7 @@ export function TagsSheet({
           gap: 6,
           alignItems: 'center',
           borderWidth: 1,
-          borderColor: colors.hairline,
+          borderColor: colors.border,
           borderRadius: radii.md,
           padding: 10,
           minHeight: 46,
@@ -484,8 +484,8 @@ export function TagsSheet({
               gap: 4,
             }}
           >
-            <Text style={{ fontSize: 12, fontFamily: DISPLAY_BOLD, color: colors.white }}>#{t}</Text>
-            <Feather name="x" size={11} color={colors.white} />
+            <Text style={{ fontSize: 12, fontFamily: DISPLAY_BOLD, color: '#FFFFFF' }}>#{t}</Text>
+            <Feather name="x" size={11} color="#FFFFFF" />
           </Pressable>
         ))}
         <TextInput
@@ -504,7 +504,7 @@ export function TagsSheet({
             }
           }}
           placeholder={tags.length === 0 ? 'e.g. vintage denim oversized' : 'add tag…'}
-          placeholderTextColor={colors.muteSoft}
+          placeholderTextColor={colors.mute}
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="done"

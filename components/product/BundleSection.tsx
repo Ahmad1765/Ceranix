@@ -6,12 +6,11 @@ import { router } from 'expo-router';
 import { cardImageUrl, getOptimizedImageUrl } from '@/lib/images';
 import { formatPrice } from '@/lib/currency';
 import type { Listing } from '@/types';
+import { colors } from '@/lib/theme';
 import {
   BUNDLE_TIERS,
   computeBundlePricing,
-  BRAND_INK,
   BRAND_PURPLE,
-  BRAND_PURPLE_SOFT,
   CARD_OUTER_PAD,
   CARD_GAP,
   CARD_WIDTH,
@@ -94,7 +93,7 @@ export function BundleSection({
             fontSize: 11,
             fontWeight: '700',
             letterSpacing: 1.4,
-            color: 'rgba(15,15,15,0.62)',
+            color: colors.mute,
             marginBottom: 6,
           }}
           numberOfLines={1}
@@ -105,7 +104,7 @@ export function BundleSection({
           style={{
             fontSize: 26,
             fontWeight: '900',
-            color: BRAND_INK,
+            color: colors.ink,
             letterSpacing: -0.8,
             marginBottom: 14,
           }}
@@ -177,7 +176,7 @@ export function BundleSection({
                 flex: 1,
                 fontSize: 12.5,
                 fontWeight: qualifies ? '700' : '600',
-                color: qualifies ? BRAND_PURPLE : 'rgba(15,15,15,0.62)',
+                color: qualifies ? BRAND_PURPLE : colors.mute,
               }}
               numberOfLines={1}
             >
@@ -258,16 +257,18 @@ export function BundleSection({
           style={{
             marginHorizontal: 16,
             marginTop: 18,
-            backgroundColor: BRAND_PURPLE_SOFT,
+            backgroundColor: colors.surface,
+            borderWidth: 1,
+            borderColor: colors.border,
             borderRadius: 18,
             padding: 16,
           }}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <Text style={{ fontSize: 14, fontWeight: '800', color: BRAND_INK, letterSpacing: -0.2 }}>
+            <Text style={{ fontSize: 14, fontWeight: '800', color: colors.ink, letterSpacing: -0.2 }}>
               Your bundle
             </Text>
-            <Text style={{ fontSize: 12.5, fontWeight: '600', color: 'rgba(15,15,15,0.62)' }}>
+            <Text style={{ fontSize: 12.5, fontWeight: '600', color: colors.mute }}>
               {bundleItemCount} items
             </Text>
           </View>
@@ -282,10 +283,10 @@ export function BundleSection({
               accent
             />
           ) : null}
-          <View style={{ height: HAIRLINE_COLOR_H, backgroundColor: 'rgba(15,15,15,0.10)', marginVertical: 10 }} />
+          <View style={{ height: HAIRLINE_COLOR_H, backgroundColor: colors.border, marginVertical: 10 }} />
           <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
-            <Text style={{ fontSize: 14, fontWeight: '800', color: BRAND_INK }}>Total</Text>
-            <Text style={{ fontSize: 22, fontWeight: '900', color: BRAND_INK, letterSpacing: -0.5 }}>
+            <Text style={{ fontSize: 14, fontWeight: '800', color: colors.ink }}>Total</Text>
+            <Text style={{ fontSize: 22, fontWeight: '900', color: colors.ink, letterSpacing: -0.5 }}>
               {formatPrice(total)}
             </Text>
           </View>
@@ -316,7 +317,7 @@ export function BundleSection({
           <Text
             style={{
               fontSize: 11.5,
-              color: 'rgba(15,15,15,0.55)',
+              color: colors.mute,
               textAlign: 'center',
               marginTop: 10,
             }}
@@ -334,10 +335,10 @@ const HAIRLINE_COLOR_H = 1;
 function SummaryRow({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 3 }}>
-      <Text style={{ fontSize: 13, color: accent ? BRAND_PURPLE : 'rgba(15,15,15,0.62)', fontWeight: accent ? '700' : '500' }}>
+      <Text style={{ fontSize: 13, color: accent ? BRAND_PURPLE : colors.mute, fontWeight: accent ? '700' : '500' }}>
         {label}
       </Text>
-      <Text style={{ fontSize: 13, color: accent ? BRAND_PURPLE : BRAND_INK, fontWeight: '700' }}>
+      <Text style={{ fontSize: 13, color: accent ? BRAND_PURPLE : colors.ink, fontWeight: '700' }}>
         {value}
       </Text>
     </View>
@@ -355,7 +356,7 @@ function BaseItemCard({ item }: { item: ReturnType<typeof listingToRelated> }) {
           height: CARD_IMAGE_HEIGHT,
           borderRadius: 12,
           overflow: 'hidden',
-          backgroundColor: 'rgba(15,15,15,0.04)',
+          backgroundColor: colors.panel,
           borderWidth: 2,
           borderColor: BRAND_PURPLE,
         }}
@@ -390,15 +391,15 @@ function BaseItemCard({ item }: { item: ReturnType<typeof listingToRelated> }) {
         </View>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-        <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: BRAND_INK }} numberOfLines={1}>
+        <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: colors.ink }} numberOfLines={1}>
           {item.brand}
         </Text>
-        <Text style={{ fontSize: 13, fontWeight: '800', color: BRAND_INK }}>
+        <Text style={{ fontSize: 13, fontWeight: '800', color: colors.ink }}>
           {formatPrice(item.price)}
         </Text>
       </View>
       {item.meta ? (
-        <Text style={{ fontSize: 11.5, color: 'rgba(15,15,15,0.55)', marginTop: 2 }} numberOfLines={1}>
+        <Text style={{ fontSize: 11.5, color: colors.mute, marginTop: 2 }} numberOfLines={1}>
           {item.meta}
         </Text>
       ) : null}
@@ -413,12 +414,12 @@ function BundleCollage({ images, extraCount }: { images: string[]; extraCount: n
         style={{
           height: 200,
           borderRadius: 16,
-          backgroundColor: 'rgba(15,15,15,0.04)',
+          backgroundColor: colors.panel,
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
-        <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.55)' }}>No items yet</Text>
+        <Text style={{ fontSize: 12, color: colors.mute }}>No items yet</Text>
       </View>
     );
   }
@@ -439,7 +440,7 @@ function BundleCollage({ images, extraCount }: { images: string[]; extraCount: n
               height: LARGE_H,
               borderRadius: 14,
               overflow: 'hidden',
-              backgroundColor: 'rgba(15,15,15,0.04)',
+              backgroundColor: colors.panel,
             }}
           >
             <Image
@@ -463,7 +464,7 @@ function BundleCollage({ images, extraCount }: { images: string[]; extraCount: n
                   height: SMALL_H,
                   borderRadius: 14,
                   overflow: 'hidden',
-                  backgroundColor: 'rgba(15,15,15,0.04)',
+                  backgroundColor: colors.panel,
                 }}
               >
                 <Image
@@ -480,7 +481,7 @@ function BundleCollage({ images, extraCount }: { images: string[]; extraCount: n
                       left: 0,
                       right: 0,
                       bottom: 0,
-                      backgroundColor: 'rgba(15,15,15,0.55)',
+                      backgroundColor: 'rgba(0,0,0,0.65)',
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
@@ -528,7 +529,7 @@ function BundleSelectCard({
           height: CARD_IMAGE_HEIGHT,
           borderRadius: 12,
           overflow: 'hidden',
-          backgroundColor: 'rgba(15,15,15,0.04)',
+          backgroundColor: colors.panel,
           borderWidth: 2,
           borderColor: selected ? BRAND_PURPLE : 'transparent',
           position: 'relative',
@@ -562,7 +563,7 @@ function BundleSelectCard({
                 right: 0,
                 top: 0,
                 bottom: 0,
-                backgroundColor: 'rgba(108,71,255,0.10)',
+                backgroundColor: 'rgba(108,71,255,0.12)',
               }}
             />
           ) : null}
@@ -581,14 +582,16 @@ function BundleSelectCard({
             width: 30,
             height: 30,
             borderRadius: 15,
-            backgroundColor: 'rgba(255,255,255,0.92)',
+            backgroundColor: colors.surface,
+            borderWidth: 1,
+            borderColor: colors.border,
             alignItems: 'center',
             justifyContent: 'center',
             opacity: pressed ? 0.7 : 1,
             zIndex: 10,
           })}
         >
-          <Feather name="maximize-2" size={13} color={BRAND_INK} />
+          <Feather name="maximize-2" size={13} color={colors.ink} />
         </Pressable>
 
         {/* Selection indicator — reflects state; the whole tile drives it. */}
@@ -601,20 +604,22 @@ function BundleSelectCard({
             width: 30,
             height: 30,
             borderRadius: 15,
-            backgroundColor: selected ? BRAND_PURPLE : 'rgba(255,255,255,0.92)',
+            backgroundColor: selected ? BRAND_PURPLE : colors.surface,
+            borderWidth: selected ? 0 : 1,
+            borderColor: colors.border,
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 10,
           }}
         >
-          <Feather name={selected ? 'check' : 'plus'} size={16} color={selected ? 'white' : BRAND_INK} />
+          <Feather name={selected ? 'check' : 'plus'} size={16} color={selected ? 'white' : colors.ink} />
         </View>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-        <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: BRAND_INK }} numberOfLines={1}>
+        <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: colors.ink }} numberOfLines={1}>
           {item.brand}
         </Text>
-        <Text style={{ fontSize: 13, fontWeight: '800', color: BRAND_INK }}>
+        <Text style={{ fontSize: 13, fontWeight: '800', color: colors.ink }}>
           {formatPrice(item.price)}
         </Text>
       </View>
@@ -622,7 +627,7 @@ function BundleSelectCard({
           whether it even fits before adding it to a bundle. */}
       {item.meta ? (
         <Text
-          style={{ fontSize: 11.5, color: 'rgba(15,15,15,0.55)', marginTop: 2 }}
+          style={{ fontSize: 11.5, color: colors.mute, marginTop: 2 }}
           numberOfLines={1}
         >
           {item.meta}

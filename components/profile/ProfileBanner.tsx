@@ -78,7 +78,9 @@ export function ProfileBanner({
               width: 38,
               height: 38,
               borderRadius: 19,
-              backgroundColor: colors.panel,
+              backgroundColor: colors.surface,
+              borderWidth: 1,
+              borderColor: colors.border,
               alignItems: 'center',
               justifyContent: 'center',
               opacity: pressed ? 0.75 : 1,
@@ -103,7 +105,9 @@ export function ProfileBanner({
                 width: 38,
                 height: 38,
                 borderRadius: 19,
-                backgroundColor: colors.panel,
+                backgroundColor: colors.surface,
+                borderWidth: 1,
+                borderColor: colors.border,
                 alignItems: 'center',
                 justifyContent: 'center',
                 opacity: pressed ? 0.75 : 1,
@@ -126,7 +130,7 @@ export function ProfileBanner({
             width: outer,
             height: outer,
             borderRadius: outer / 2,
-            backgroundColor: colors.white,
+            backgroundColor: colors.surface,
             padding: RING,
             opacity: onPress && pressed ? 0.85 : 1,
             ...shadow.sm,
@@ -177,10 +181,10 @@ export function ProfileBanner({
                 alignItems: 'center',
                 justifyContent: 'center',
                 borderWidth: 2,
-                borderColor: colors.white,
+                borderColor: colors.background,
               }}
             >
-              <Feather name="check" size={12} color={colors.white} />
+              <Feather name="check" size={12} color="#FFFFFF" />
             </View>
           ) : null}
         </Pressable>

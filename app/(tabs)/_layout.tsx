@@ -2,19 +2,17 @@ import { Tabs } from 'expo-router';
 import { AnimatedTabBar } from '../../components/AnimatedTabBar';
 import { useSellSheet } from '@/components/sell/SellSheet';
 import { useDiscoverSheet } from '@/components/discover/DiscoverSheet';
+import { useTheme } from '@/context/ThemeContext';
 
 export default function TabsLayout() {
+  const { isDark } = useTheme();
   const { open: openSellSheet } = useSellSheet();
   const { open: openDiscoverSheet } = useDiscoverSheet();
 
   return (
     <Tabs
+      key={isDark ? 'tabs-dark' : 'tabs-light'}
       tabBar={(props) => <AnimatedTabBar {...props} />}
-      // freezeOnBlur: a blurred tab stops re-rendering entirely. Chat holds a
-      // realtime inbox subscription and every screen holds React Query
-      // subscriptions, so without this a cache write re-renders four off-screen
-      // trees while the visible one is scrolling. Native-only — the web build
-      // of react-native-screens just toggles `display: none` and ignores it.
       screenOptions={{ headerShown: false, freezeOnBlur: true }}
     >
       <Tabs.Screen name="index" options={{ title: 'Home' }} />

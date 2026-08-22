@@ -24,6 +24,8 @@ const ICON_TINT = 'rgba(108,71,255,0.10)';
  * here always agrees with the builder it scrolls to. Purely a summary +
  * affordance: tapping jumps to the bundle builder at the bottom of the page.
  */
+import { colors } from '@/lib/theme';
+
 export function BundleProgressBar({
   listing,
   sellerItems,
@@ -57,10 +59,10 @@ export function BundleProgressBar({
       accessibilityLabel={`${headline}. ${guidance}. Opens the bundle builder.`}
       style={({ pressed }) => ({
         marginHorizontal: 16,
-        backgroundColor: 'white',
+        backgroundColor: colors.surface,
         borderRadius: 16,
         borderWidth: HAIRLINE,
-        borderColor: CARD_BORDER,
+        borderColor: colors.border,
         paddingHorizontal: 14,
         paddingVertical: 14,
         opacity: pressed ? 0.92 : 1,
@@ -72,7 +74,7 @@ export function BundleProgressBar({
             width: 32,
             height: 32,
             borderRadius: 10,
-            backgroundColor: ICON_TINT,
+            backgroundColor: 'rgba(108,71,255,0.12)',
             alignItems: 'center',
             justifyContent: 'center',
           }}
@@ -81,7 +83,7 @@ export function BundleProgressBar({
         </View>
         <View style={{ flex: 1 }}>
           <Text
-            style={{ fontSize: 14, fontWeight: '800', color: BRAND_INK, letterSpacing: -0.2 }}
+            style={{ fontSize: 14, fontWeight: '800', color: colors.ink, letterSpacing: -0.2 }}
             numberOfLines={1}
           >
             {headline}
@@ -89,7 +91,7 @@ export function BundleProgressBar({
           <Text
             style={{
               fontSize: 12.5,
-              color: qualifies ? BRAND_PURPLE : SUBTLE_INK,
+              color: qualifies ? BRAND_PURPLE : colors.mute,
               fontWeight: qualifies ? '700' : '500',
               marginTop: 2,
             }}
@@ -98,12 +100,12 @@ export function BundleProgressBar({
             {guidance}
           </Text>
         </View>
-        <Feather name="chevron-down" size={18} color="rgba(15,15,15,0.35)" />
+        <Feather name="chevron-down" size={18} color={colors.mute} />
       </View>
 
       {/* Threshold track — distinct from the image pagination dots: a filled
           purple bar with a pip at each discount tier. */}
-      <View style={{ height: 6, borderRadius: 99, backgroundColor: TRACK_BG, position: 'relative' }}>
+      <View style={{ height: 6, borderRadius: 99, backgroundColor: colors.panel, position: 'relative' }}>
         <View
           style={{
             position: 'absolute',
@@ -131,7 +133,7 @@ export function BundleProgressBar({
                 height: 6,
                 marginLeft: -3,
                 borderRadius: 3,
-                backgroundColor: reached ? 'white' : 'rgba(15,15,15,0.22)',
+                backgroundColor: reached ? colors.white : colors.border,
               }}
             />
           );

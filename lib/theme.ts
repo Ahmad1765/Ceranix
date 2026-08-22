@@ -36,9 +36,9 @@ export const lightTheme = {
   onSelected: '#111111',
   cream: '#FFFFFF',
   soft: '#F6F6F6',
-  purple: '#000000',
-  purpleDeep: '#1A1A1A',
-  purpleSoft: 'rgba(0, 0, 0, 0.06)',
+  purple: '#6C47FF',
+  purpleDeep: '#5538D6',
+  purpleSoft: 'rgba(108, 71, 255, 0.12)',
   pink: '#000000',
   pinkSoft: 'rgba(0, 0, 0, 0.06)',
   pinkDeep: '#1A1A1A',
@@ -71,7 +71,7 @@ export const darkTheme = {
   primaryDeep: '#E0E0E0',
   primarySoft: 'rgba(255, 255, 255, 0.10)',
   primarySofter: 'rgba(255, 255, 255, 0.18)',
-  white: '#FFFFFF',
+  white: '#161616', // Card and container surface in dark mode
   ink: '#F5F5F5',
   ink2: '#F5F5F5',
   hair: 'rgba(255, 255, 255, 0.08)',
@@ -85,11 +85,11 @@ export const darkTheme = {
   overlayLight: 'rgba(0, 0, 0, 0.40)',
   selected: '#242424',
   onSelected: '#FFFFFF',
-  cream: '#161616',
+  cream: '#1E1E1E',
   soft: '#161616',
-  purple: '#FFFFFF',
-  purpleDeep: '#E0E0E0',
-  purpleSoft: 'rgba(255, 255, 255, 0.10)',
+  purple: '#6C47FF',
+  purpleDeep: '#5538D6',
+  purpleSoft: 'rgba(108, 71, 255, 0.20)',
   pink: '#FFFFFF',
   pinkSoft: 'rgba(255, 255, 255, 0.10)',
   pinkDeep: '#E0E0E0',
@@ -97,9 +97,9 @@ export const darkTheme = {
   amber: '#FFFFFF',
   sky: '#FFFFFF',
   lime: '#FFFFFF',
-  gradStart: '#FFFFFF',
-  gradMid: '#FFFFFF',
-  gradEnd: '#FFFFFF',
+  gradStart: '#202020',
+  gradMid: '#161616',
+  gradEnd: '#0F0F0F',
   red: '#F5F5F5',
   redSoft: 'rgba(255, 255, 255, 0.08)',
   green: '#FFFFFF',
@@ -109,8 +109,42 @@ export const darkTheme = {
 
 export type ThemeTokens = typeof lightTheme;
 
-// Default colors export for static references
-export const colors = lightTheme;
+let currentTheme: ThemeTokens = lightTheme;
+
+export function setActiveTheme(nextTheme: ThemeTokens) {
+  currentTheme = nextTheme;
+}
+
+export function getActiveTheme(): ThemeTokens {
+  return currentTheme;
+}
+
+// Dynamic colors proxy that always resolves properties from active theme
+export const colors: ThemeTokens = new Proxy({} as ThemeTokens, {
+  get(_target, prop: string | symbol) {
+    if (typeof prop === 'string') {
+      return (currentTheme as any)[prop] ?? (lightTheme as any)[prop];
+    }
+    return (currentTheme as any)[prop];
+  },
+  set() {
+    return false;
+  },
+  has(_target, prop: string | symbol) {
+    return prop in currentTheme;
+  },
+  ownKeys() {
+    return Reflect.ownKeys(currentTheme);
+  },
+  getOwnPropertyDescriptor(_target, prop) {
+    return (
+      Object.getOwnPropertyDescriptor(currentTheme, prop) || {
+        enumerable: true,
+        configurable: true,
+      }
+    );
+  },
+});
 
 export const gradients = {
   story: ['#000000', '#000000', '#000000'] as const,
@@ -216,8 +250,25 @@ export const getEyebrowMute = (activeTheme: ThemeTokens = lightTheme) => ({
   letterSpacing: 1.2,
 });
 
-export const eyebrow = getEyebrow(lightTheme);
-export const eyebrowMute = getEyebrowMute(lightTheme);
+export const eyebrow: ReturnType<typeof getEyebrow> = new Proxy(
+  {} as ReturnType<typeof getEyebrow>,
+  {
+    get(_target, prop: string | symbol) {
+      const active = getEyebrow(currentTheme);
+      return (active as any)[prop];
+    },
+  },
+);
+
+export const eyebrowMute: ReturnType<typeof getEyebrowMute> = new Proxy(
+  {} as ReturnType<typeof getEyebrowMute>,
+  {
+    get(_target, prop: string | symbol) {
+      const active = getEyebrowMute(currentTheme);
+      return (active as any)[prop];
+    },
+  },
+);
 
 export const tintedPurple = 'rgba(0, 0, 0, 0.45)';
 
@@ -281,4 +332,12 @@ export const getTextStyles = (activeTheme: ThemeTokens = lightTheme) =>
     eyebrow: getEyebrow(activeTheme),
   }) as const;
 
-export const textStyles = getTextStyles(lightTheme);
+export const textStyles: ReturnType<typeof getTextStyles> = new Proxy(
+  {} as ReturnType<typeof getTextStyles>,
+  {
+    get(_target, prop: string | symbol) {
+      const active = getTextStyles(currentTheme);
+      return (active as any)[prop];
+    },
+  },
+);

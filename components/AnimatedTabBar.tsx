@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { colors } from '../lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 
 // Clean Instagram-style dock: white pill, icon-only, a single soft-purple disc
 // that slides behind the active tab. Palette-locked (purple accent, ink icons,
@@ -158,6 +159,12 @@ function selectionHaptic() {
 export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const reduced = useReducedMotion();
+  const { theme, isDark } = useTheme();
+
+  const dockBg = isDark ? 'rgba(24, 24, 24, 0.94)' : BAR_FILL;
+  const dockBorder = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.7)';
+  const discFill = isDark ? 'rgba(255, 255, 255, 0.14)' : DISC_FILL;
+  const blurTint = isDark ? 'dark' : 'light';
 
   const routes = state.routes.filter(
     (r) => StyleSheet.flatten(descriptors[r.key].options.tabBarItemStyle)?.display !== 'none',
@@ -399,17 +406,19 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
             borderRadius: BAR_HEIGHT / 2,
             borderCurve: 'continuous',
             paddingHorizontal: 6,
-            backgroundColor: BAR_FILL,
+            backgroundColor: dockBg,
             borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.7)',
-            boxShadow: '0px 2px 6px rgba(0,0,0,0.05), 0px 14px 30px rgba(0,0,0,0.12)',
+            borderColor: dockBorder,
+            boxShadow: isDark
+              ? '0px 2px 8px rgba(0,0,0,0.5), 0px 14px 30px rgba(0,0,0,0.6)'
+              : '0px 2px 6px rgba(0,0,0,0.05), 0px 14px 30px rgba(0,0,0,0.12)',
             elevation: 16,
           }}
         >
           {/* Frosted glass fill — iOS only, see BLUR_ENABLED. */}
           {BLUR_ENABLED ? (
             <BlurView
-              tint="light"
+              tint={blurTint}
               intensity={44}
               pointerEvents="none"
               style={{
@@ -432,7 +441,7 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
                 width: DISC,
                 height: DISC,
                 borderRadius: DISC / 2,
-                backgroundColor: DISC_FILL,
+                backgroundColor: discFill,
               },
               discStyle,
             ]}
@@ -488,6 +497,7 @@ function TabItem({
   label: string;
   onLayout: (e: LayoutChangeEvent) => void;
 }) {
+  const { theme } = useTheme();
   const icon = ICONS[routeName] ?? ICONS.index;
 
   // Derived from `highlight` on the UI thread, so this item animates during a
@@ -508,11 +518,6 @@ function TabItem({
     transform: [{ scale: 0.55 + active.value * 0.45 }],
   }));
 
-  // No keyboard handler here on purpose. react-native-web renders this as a
-  // real <button tabindex="0">, and RNGH's KeyboardEventManager already turns
-  // Enter/Space on it into a tap on the dock's gesture — resolveIndex() above
-  // is what makes that land on the right tab. Adding an onKeyDown here would
-  // fire a second, competing selection.
   return (
     <View
       onLayout={onLayout}
@@ -529,25 +534,26 @@ function TabItem({
               height: PILL.height,
               borderRadius: PILL.radius,
               borderCurve: 'continuous',
-              backgroundColor: colors.ink,
+              backgroundColor: theme.text,
               alignItems: 'center',
               justifyContent: 'center',
             },
             wrapStyle,
           ]}
         >
-          <Ionicons name="add" size={22} color={colors.white} />
+          <Ionicons name="add" size={22} color={theme.background} />
         </Animated.View>
       ) : (
         <Animated.View style={[{ width: ICON, height: ICON }, wrapStyle]}>
           <Animated.View style={[StyleSheet.absoluteFill, outlineStyle]}>
-            <Ionicons name={icon.outline} size={ICON} color={INACTIVE} />
+            <Ionicons name={icon.outline} size={ICON} color={theme.text} />
           </Animated.View>
           <Animated.View style={[StyleSheet.absoluteFill, filledStyle]}>
-            <Ionicons name={icon.filled} size={ICON} color={ACCENT} />
+            <Ionicons name={icon.filled} size={ICON} color={theme.text} />
           </Animated.View>
         </Animated.View>
       )}
     </View>
   );
 }
+
