@@ -228,7 +228,7 @@ export function BottomSheetModal({
 
           {/* Dynamic Body Content */}
           <ContentWrapper
-            {...(scrollable
+            {...(isScrollEnabled
               ? {
                   style: { flex: 1 },
                   showsVerticalScrollIndicator: false,

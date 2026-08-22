@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Pressable, StyleSheet, ActivityIndicator, Share, Platform } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { router } from 'expo-router';
@@ -38,12 +38,14 @@ export function SellerOptionsSheet({
   const toast = useToast();
   const [mode, setMode] = useState<'options' | 'report'>('options');
   const [submittingReport, setSubmittingReport] = useState(false);
+  const isSubmittingReportRef = useRef(false);
 
   // Reset mode on reopen
   useEffect(() => {
     if (visible) {
       setMode('options');
       setSubmittingReport(false);
+      isSubmittingReportRef.current = false;
     }
   }, [visible]);
 
@@ -86,6 +88,8 @@ export function SellerOptionsSheet({
   };
 
   const handleSelectReportReason = async (reasonId: string) => {
+    if (isSubmittingReportRef.current) return;
+
     if (!user) {
       onClose();
       toast.show('Sign in to report a seller', { variant: 'info', icon: 'log-in' });
@@ -99,20 +103,25 @@ export function SellerOptionsSheet({
       return;
     }
 
+    isSubmittingReportRef.current = true;
     setSubmittingReport(true);
-    const ok = await reportUser({
-      reporterId: user.id,
-      reportedUserId: seller.id,
-      reason: reasonId,
-      listingId: listingId ?? null,
-    });
-    setSubmittingReport(false);
-    onClose();
+    try {
+      const ok = await reportUser({
+        reporterId: user.id,
+        reportedUserId: seller.id,
+        reason: reasonId,
+        listingId: listingId ?? null,
+      });
+      onClose();
 
-    if (ok) {
-      toast.show('Thanks — our team will take a look.', { variant: 'success', icon: 'flag' });
-    } else {
-      toast.show('Could not submit report. Please try again.', { variant: 'default', icon: 'alert-triangle' });
+      if (ok) {
+        toast.show('Thanks — our team will take a look.', { variant: 'success', icon: 'flag' });
+      } else {
+        toast.show('Could not submit report. Please try again.', { variant: 'default', icon: 'alert-triangle' });
+      }
+    } finally {
+      isSubmittingReportRef.current = false;
+      setSubmittingReport(false);
     }
   };
 

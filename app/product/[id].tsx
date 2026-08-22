@@ -904,9 +904,15 @@ export default function ProductScreen() {
         ) : null}
 
         {/* ── Seller header row ── */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 }}>
+        <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 }}>
           <View
             style={{
+              backgroundColor: 'white',
+              borderRadius: 18,
+              borderWidth: 1,
+              borderColor: 'rgba(15,15,15,0.08)',
+              paddingHorizontal: 14,
+              paddingVertical: 12,
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -929,25 +935,27 @@ export default function ProductScreen() {
               {/* Avatar circle */}
               <View
                 style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
+                  width: 42,
+                  height: 42,
+                  borderRadius: 21,
                   overflow: 'hidden',
-                  backgroundColor: 'rgba(15,15,15,0.08)',
+                  backgroundColor: 'rgba(15,15,15,0.04)',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  borderWidth: 1,
+                  borderColor: 'rgba(15,15,15,0.08)',
                 }}
               >
                 {listing.seller.avatar_url ? (
                   <Image
                     source={{ uri: getOptimizedImageUrl(listing.seller.avatar_url, { width: 120 }) }}
-                    style={{ width: 44, height: 44 }}
+                    style={{ width: 40, height: 40, borderRadius: 20 }}
                     contentFit="cover"
                     cachePolicy="memory-disk"
                     transition={150}
                   />
                 ) : (
-                  <Feather name="user" size={20} color="rgba(15,15,15,0.55)" />
+                  <Feather name="user" size={18} color="rgba(15,15,15,0.45)" />
                 )}
               </View>
 
@@ -955,8 +963,8 @@ export default function ProductScreen() {
               <View style={{ flex: 1 }}>
                 <Text
                   style={{
-                    fontSize: 16,
-                    fontWeight: '800',
+                    fontSize: 15,
+                    fontWeight: '600',
                     color: BRAND_INK,
                     letterSpacing: -0.2,
                   }}
@@ -966,9 +974,9 @@ export default function ProductScreen() {
                 </Text>
                 <Text
                   style={{
-                    fontSize: 13,
-                    color: 'rgba(15,15,15,0.55)',
-                    marginTop: 2,
+                    fontSize: 12.5,
+                    color: 'rgba(15,15,15,0.48)',
+                    marginTop: 1.5,
                     fontWeight: '400',
                   }}
                   numberOfLines={1}
@@ -985,18 +993,18 @@ export default function ProductScreen() {
 
             {/* Right: Actions */}
             {isOwnListing ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Pressable
                   onPress={handleToggleSold}
                   disabled={ownerBusy}
                   testID="owner-toggle-sold"
                   style={({ pressed }) => ({
-                    paddingHorizontal: 14,
-                    paddingVertical: 7,
+                    paddingHorizontal: 13,
+                    paddingVertical: 5.5,
                     borderRadius: 999,
                     backgroundColor: listing.is_sold ? 'white' : BRAND_INK,
-                    borderWidth: listing.is_sold ? HAIRLINE : 0,
-                    borderColor: 'rgba(15,15,15,0.12)',
+                    borderWidth: 1,
+                    borderColor: listing.is_sold ? 'rgba(15,15,15,0.12)' : BRAND_INK,
                     alignItems: 'center',
                     justifyContent: 'center',
                     opacity: soldBusy ? 0.5 : pressed ? 0.85 : 1,
@@ -1004,8 +1012,8 @@ export default function ProductScreen() {
                 >
                   <Text
                     style={{
-                      fontSize: 13,
-                      fontWeight: '700',
+                      fontSize: 12,
+                      fontWeight: '600',
                       color: listing.is_sold ? BRAND_INK : 'white',
                     }}
                   >
@@ -1017,37 +1025,44 @@ export default function ProductScreen() {
                   onPress={handleDelete}
                   disabled={ownerBusy}
                   testID="owner-delete"
+                  accessibilityRole="button"
+                  accessibilityLabel="Delete listing"
                   hitSlop={8}
                   style={({ pressed }) => ({
-                    padding: 6,
-                    opacity: deleteBusy ? 0.5 : pressed ? 0.6 : 1,
+                    width: 32,
+                    height: 32,
+                    borderRadius: 16,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: pressed ? 'rgba(15,15,15,0.06)' : 'transparent',
+                    opacity: deleteBusy ? 0.5 : 1,
                   })}
                 >
-                  <Feather name="trash-2" size={18} color="rgba(15,15,15,0.7)" />
+                  <Feather name="trash-2" size={17} color="rgba(15,15,15,0.65)" />
                 </Pressable>
               </View>
             ) : (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 {/* Follow Button */}
                 <Pressable
                   onPress={handleFollowPress}
                   style={({ pressed }) => ({
-                    paddingHorizontal: 16,
-                    paddingVertical: 7,
+                    paddingHorizontal: 12,
+                    paddingVertical: 5.5,
                     borderRadius: 999,
-                    backgroundColor: followed ? 'rgba(15,15,15,0.08)' : BRAND_INK,
-                    borderWidth: followed ? HAIRLINE : 0,
-                    borderColor: 'rgba(15,15,15,0.12)',
+                    backgroundColor: followed ? 'rgba(15,15,15,0.03)' : BRAND_INK,
+                    borderWidth: 1,
+                    borderColor: followed ? 'rgba(15,15,15,0.12)' : BRAND_INK,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    opacity: pressed ? 0.85 : 1,
+                    opacity: pressed ? 0.8 : 1,
                   })}
                 >
                   <Text
                     style={{
-                      fontSize: 13,
-                      fontWeight: '700',
-                      color: followed ? BRAND_INK : 'white',
+                      fontSize: 12,
+                      fontWeight: '500',
+                      color: followed ? 'rgba(15,15,15,0.72)' : 'white',
                     }}
                   >
                     {followed ? 'Following' : 'Follow'}
@@ -1061,13 +1076,15 @@ export default function ProductScreen() {
                   accessibilityRole="button"
                   accessibilityLabel="Message seller"
                   style={({ pressed }) => ({
-                    padding: 6,
+                    width: 32,
+                    height: 32,
+                    borderRadius: 16,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    opacity: pressed ? 0.6 : 1,
+                    backgroundColor: pressed ? 'rgba(15,15,15,0.06)' : 'transparent',
                   })}
                 >
-                  <Ionicons name="chatbox-outline" size={20} color={BRAND_INK} />
+                  <Ionicons name="chatbox-outline" size={18} color="rgba(15,15,15,0.65)" />
                 </Pressable>
 
                 {/* More / Profile Options Icon */}
@@ -1077,13 +1094,15 @@ export default function ProductScreen() {
                   accessibilityRole="button"
                   accessibilityLabel="More options"
                   style={({ pressed }) => ({
-                    padding: 6,
+                    width: 32,
+                    height: 32,
+                    borderRadius: 16,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    opacity: pressed ? 0.6 : 1,
+                    backgroundColor: pressed ? 'rgba(15,15,15,0.06)' : 'transparent',
                   })}
                 >
-                  <Feather name="more-vertical" size={20} color={BRAND_INK} />
+                  <Feather name="more-vertical" size={18} color="rgba(15,15,15,0.65)" />
                 </Pressable>
               </View>
             )}

@@ -31,6 +31,7 @@ import { SellSheetProvider } from '@/components/sell/SellSheet';
 import { DiscoverSheetProvider } from '@/components/discover/DiscoverSheet';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { ThemeProvider, useTheme } from '@/context/ThemeContext';
 
 // FIRST, before any element is created: take Pressable out of NativeWind's
 // cssInterop. That wrapper silently drops function-valued `style` props
@@ -124,7 +125,8 @@ function useFocusOutOfAriaHidden() {
   }, []);
 }
 
-function RootLayout() {
+function RootLayoutNav() {
+  const { theme, isDark } = useTheme();
   const [ready, setReady] = useState(false);
   useFocusOutOfAriaHidden();
   const pathname = usePathname();
@@ -173,12 +175,6 @@ function RootLayout() {
     // the fact, so anything painted before Inter resolves keeps rendering in
     // the system font for the life of that view. Releasing the gate early
     // meant the whole app came up in Roboto on Android while web looked right.
-    //
-    // Nothing else belongs in this Promise.all. It used to also `Asset.loadAsync`
-    // adaptive-icon.png and favicon.png, which no component renders — the former
-    // is baked into the Android launcher icon by app.config.js at build time and
-    // the latter is browser chrome. Warming them held the splash screen open for
-    // two decodes whose results were never read.
     Promise.all([iconFonts, interFonts])
       .catch(console.warn)
       .finally(() => {
@@ -203,8 +199,8 @@ function RootLayout() {
   // displays chrome only on demand (toast, guest gate, sheets), so this does
   // not reintroduce the Android late-font repaint problem described above.
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <StatusBar style="dark" />
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: theme.background }}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <ErrorBoundary>
       <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
       <AuthProvider>
@@ -213,7 +209,12 @@ function RootLayout() {
         <SellSheetProvider>
         <DiscoverSheetProvider>
         {!ready ? null : (
-        <Stack screenOptions={{ headerShown: false }}>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: theme.background },
+          }}
+        >
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
           <Stack.Screen
@@ -275,6 +276,14 @@ function RootLayout() {
       </PersistQueryClientProvider>
       </ErrorBoundary>
     </GestureHandlerRootView>
+  );
+}
+
+function RootLayout() {
+  return (
+    <ThemeProvider>
+      <RootLayoutNav />
+    </ThemeProvider>
   );
 }
 

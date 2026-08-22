@@ -10,4 +10,5 @@ export { Tabs } from './Tabs';
 export { SafeContainer } from './SafeContainer';
 export { ThumbButton } from './ThumbButton';
 export { BottomSheetModal } from './BottomSheetModal';
+export { UserCommentHeader } from './UserCommentHeader';
 

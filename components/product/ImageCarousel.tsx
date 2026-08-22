@@ -99,7 +99,7 @@ export function ImageCarousel({
             uri={uri}
             width={carouselWidth}
             height={carouselHeight}
-            onPress={() => onImagePress?.(index)}
+            onPress={onImagePress ? () => onImagePress(index) : undefined}
           />
         ))}
       </ScrollView>
@@ -145,24 +145,40 @@ function CarouselSlide({
   height: number;
   onPress?: () => void;
 }) {
+  const imageElement = (
+    <Image
+      source={{ uri }}
+      contentFit="cover"
+      transition={150}
+      cachePolicy="memory-disk"
+      style={styles.image}
+    />
+  );
+
+  if (onPress) {
+    return (
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel="View full photo"
+        style={({ pressed }) => [
+          styles.slide,
+          { width, height, opacity: pressed ? 0.96 : 1 },
+        ]}
+      >
+        {imageElement}
+      </Pressable>
+    );
+  }
+
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel="View full photo"
-      style={({ pressed }) => [
-        styles.slide,
-        { width, height, opacity: pressed ? 0.96 : 1 },
-      ]}
+    <View
+      accessibilityRole="image"
+      accessibilityLabel="Product photo"
+      style={[styles.slide, { width, height }]}
     >
-      <Image
-        source={{ uri }}
-        contentFit="cover"
-        transition={150}
-        cachePolicy="memory-disk"
-        style={styles.image}
-      />
-    </Pressable>
+      {imageElement}
+    </View>
   );
 }
 

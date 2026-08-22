@@ -18,8 +18,8 @@ export type ChatAction = {
   /** Optional second line — say what the action does when it isn't obvious. */
   hint?: string;
   icon: keyof typeof Feather.glyphMap;
-  /** `primary` tints the icon purple. Everything else stays ink. */
-  tone?: 'default' | 'primary';
+  /** `primary` tints purple, `destructive` tints red. Everything else stays ink. */
+  tone?: 'default' | 'primary' | 'destructive';
   onPress: () => void;
 };
 
@@ -111,14 +111,20 @@ export function ChatActionSheet({
                   <Feather
                     name={a.icon}
                     size={19}
-                    color={a.tone === 'primary' ? colors.primary : colors.ink}
+                    color={
+                      a.tone === 'destructive'
+                        ? '#DC2626'
+                        : a.tone === 'primary'
+                        ? colors.primary
+                        : colors.ink
+                    }
                   />
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text
                       style={{
                         fontFamily: typography.family.sansSemibold,
                         fontSize: 15,
-                        color: colors.ink,
+                        color: a.tone === 'destructive' ? '#DC2626' : colors.ink,
                       }}
                     >
                       {a.label}

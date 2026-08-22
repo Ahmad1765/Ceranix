@@ -17,6 +17,7 @@ import { confirm } from '@/lib/confirm';
 import { safeBack } from '@/lib/nav';
 import { tap } from '@/lib/haptics';
 import { colors } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { isOptedOut, setAnalyticsOptOut } from '@/lib/analytics';
 import {
   SectionCard,
@@ -48,7 +49,18 @@ type Busy = 'logout' | 'delete' | 'password' | null;
 
 export default function SettingsScreen() {
   const { profile, user, session, signOut, refreshProfile } = useAuth();
+  const { theme, mode, isDark, setThemeMode } = useTheme();
   const toast = useToast();
+
+  const cycleTheme = useCallback(() => {
+    tap('light');
+    const nextMode = mode === 'system' ? 'dark' : mode === 'dark' ? 'light' : 'system';
+    setThemeMode(nextMode);
+    toast.show(`Theme: ${nextMode.charAt(0).toUpperCase() + nextMode.slice(1)}`, {
+      variant: 'default',
+      icon: nextMode === 'dark' ? 'moon' : nextMode === 'light' ? 'sun' : 'monitor',
+    });
+  }, [mode, setThemeMode, toast]);
   // Deep-link param: profile shop list passes `?open=bundle` so tapping the
   // Bundle row jumps straight into the modal instead of forcing the user to
   // scroll the settings page to find it.
@@ -530,7 +542,7 @@ export default function SettingsScreen() {
 
   // ---------- Render ----------
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.background }}>
       {/* Header */}
       <View
         style={{
@@ -728,6 +740,13 @@ export default function SettingsScreen() {
             label="Notifications"
             desc="Push, email & in-app"
             onPress={openSystemSettings}
+            chevron
+          />
+          <Divider />
+          <Row
+            label="Theme & Appearance"
+            desc={`Mode: ${mode.charAt(0).toUpperCase() + mode.slice(1)} (${isDark ? 'Dark monotone' : 'Light monotone'})`}
+            onPress={cycleTheme}
             chevron
           />
           <Divider />

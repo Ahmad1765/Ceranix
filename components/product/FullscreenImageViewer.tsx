@@ -31,15 +31,33 @@ export function FullscreenImageViewer({
   const { width, height } = useWindowDimensions();
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const scrollRef = useRef<ScrollView>(null);
+  const isInitialOpenRef = useRef(true);
+  const activeIndexRef = useRef(activeIndex);
+  activeIndexRef.current = activeIndex;
 
   // Sync to initialIndex whenever the viewer opens
   useEffect(() => {
-    if (visible) {
-      setActiveIndex(initialIndex);
-      setTimeout(() => {
-        scrollRef.current?.scrollTo({ x: initialIndex * width, y: 0, animated: false });
-      }, 50);
+    if (!visible) {
+      isInitialOpenRef.current = true;
+      return;
     }
+
+    let targetIndex: number;
+    if (isInitialOpenRef.current) {
+      targetIndex = initialIndex;
+      setActiveIndex(initialIndex);
+      isInitialOpenRef.current = false;
+    } else {
+      targetIndex = activeIndexRef.current;
+    }
+
+    const timer = setTimeout(() => {
+      scrollRef.current?.scrollTo({ x: targetIndex * width, y: 0, animated: false });
+    }, 50);
+
+    return () => {
+      clearTimeout(timer);
+    };
   }, [visible, initialIndex, width]);
 
   if (!visible || !images || images.length === 0) return null;
@@ -130,7 +148,7 @@ export function FullscreenImageViewer({
         </ScrollView>
 
         {/* Web/Desktop Navigation Arrows */}
-        {images.length > 1 && activeIndex > 0 && (
+        {Platform.OS === 'web' && images.length > 1 && activeIndex > 0 && (
           <Pressable
             onPress={handlePrev}
             style={({ pressed }) => [styles.arrowBtn, styles.leftArrow, pressed && { opacity: 0.7 }]}
@@ -141,7 +159,7 @@ export function FullscreenImageViewer({
           </Pressable>
         )}
 
-        {images.length > 1 && activeIndex < images.length - 1 && (
+        {Platform.OS === 'web' && images.length > 1 && activeIndex < images.length - 1 && (
           <Pressable
             onPress={handleNext}
             style={({ pressed }) => [styles.arrowBtn, styles.rightArrow, pressed && { opacity: 0.7 }]}

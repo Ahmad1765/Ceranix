@@ -46,6 +46,8 @@ import { formatPrice } from '@/lib/currency';
 import { Button, EmptyState, SafeContainer, ThumbButton } from '@/components/ui';
 import { explainCoverage } from '@/components/SafetyBanner';
 import { reportListing, REPORT_REASONS } from '@/lib/reports';
+import { confirm } from '@/lib/confirm';
+import { blockUser, unblockUser, isUserBlocked, BLOCK_REASONS } from '@/lib/blocks';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { withTimeout } from '@/lib/async';
 import { maybeSoftAskForPush } from '@/lib/notifications';
@@ -451,6 +453,7 @@ export default function ConversationScreen() {
   const [plusOpen, setPlusOpen] = useState(false);
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [blockSheetOpen, setBlockSheetOpen] = useState(false);
 
   useEffect(() => {
     if (!conversationId) return;
@@ -537,6 +540,60 @@ export default function ConversationScreen() {
   const other = useMemo(() => (user && conv ? otherParticipant(conv, user.id) : null), [user, conv]);
   const isSeller = !!user && !!conv && conv.seller_id === user.id;
   const rows = useMemo(() => buildThreadRows(messages), [messages]);
+
+  const [isBlocked, setIsBlocked] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id || !other?.id) return;
+    isUserBlocked(user.id, other.id).then(setIsBlocked);
+  }, [user?.id, other?.id]);
+
+  const handleToggleBlock = useCallback(async () => {
+    if (!user?.id || !other?.id) return;
+    const targetName = other.username ? `@${other.username}` : (other.full_name || 'this user');
+    if (isBlocked) {
+      const ok = await confirm({
+        title: `Unblock ${targetName}?`,
+        message: 'They will be able to message you and interact with your listings again.',
+        confirmLabel: 'Unblock',
+        cancelLabel: 'Cancel',
+      });
+      if (!ok) return;
+      const success = await unblockUser({ blockerId: user.id, blockedId: other.id });
+      if (success) {
+        setIsBlocked(false);
+        toast.show(`Unblocked ${targetName}`);
+      }
+    } else {
+      setBlockSheetOpen(true);
+    }
+  }, [user?.id, other?.id, other?.username, other?.full_name, isBlocked, toast]);
+
+  const handleBlockWithReason = useCallback(
+    async (reasonLabel: string) => {
+      if (!user?.id || !other?.id) return;
+      setBlockSheetOpen(false);
+      const targetName = other.username ? `@${other.username}` : (other.full_name || 'this user');
+
+      const success = await blockUser({
+        blockerId: user.id,
+        blockedId: other.id,
+        blockedUsername: other.username ?? undefined,
+        reason: reasonLabel,
+      });
+      if (success) {
+        setIsBlocked(true);
+        toast.show(`Blocked ${targetName}`, {
+          variant: 'default',
+          icon: 'slash',
+        });
+      } else {
+        toast.show('Failed to block user. Please try again.');
+      }
+    },
+    [user?.id, other?.id, other?.username, other?.full_name, toast],
+  );
+
 
   const byMessage = useMemo(() => {
     const map = new Map<string, string[]>();
@@ -877,6 +934,20 @@ export default function ConversationScreen() {
           },
         ]
       : []),
+    ...(other?.id
+      ? [
+          {
+            id: 'block',
+            label: isBlocked
+              ? `Unblock ${other.username ? `@${other.username}` : 'user'}`
+              : `Block ${other.username ? `@${other.username}` : 'user'}`,
+            hint: isBlocked ? 'Allow messages from this user' : 'Prevent messages and interaction',
+            icon: 'slash' as const,
+            tone: isBlocked ? ('default' as const) : ('destructive' as const),
+            onPress: handleToggleBlock,
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -1009,12 +1080,57 @@ export default function ConversationScreen() {
           paddingBottom: keyboardUp ? DOCK_GAP_KEYBOARD : Math.max(insets.bottom, 12),
         }}
       >
-        <Composer
-          value={input}
-          onChangeText={setInput}
-          onSend={handleSend}
-          onPlus={() => setPlusOpen(true)}
-        />
+        {isBlocked ? (
+          <View
+            style={{
+              paddingHorizontal: 16,
+              paddingVertical: 14,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: colors.panel,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: typography.family.sans,
+                fontSize: 13,
+                color: colors.muteSoft,
+                flex: 1,
+                marginRight: 12,
+              }}
+            >
+              You have blocked this user.
+            </Text>
+            <Pressable
+              onPress={handleToggleBlock}
+              style={({ pressed }) => ({
+                paddingHorizontal: 14,
+                paddingVertical: 6,
+                borderRadius: radii.pill,
+                backgroundColor: colors.ink,
+                opacity: pressed ? 0.8 : 1,
+              })}
+            >
+              <Text
+                style={{
+                  fontFamily: typography.family.sansSemibold,
+                  fontSize: 12,
+                  color: colors.white,
+                }}
+              >
+                Unblock
+              </Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Composer
+            value={input}
+            onChangeText={setInput}
+            onSend={handleSend}
+            onPlus={() => setPlusOpen(true)}
+          />
+        )}
       </View>
 
       <ReactionPicker
@@ -1047,6 +1163,20 @@ export default function ConversationScreen() {
           onPress: () => handleReport(r.id),
         }))}
         onClose={() => setReportOpen(false)}
+      />
+
+      <ChatActionSheet
+        visible={blockSheetOpen}
+        title="WHY ARE YOU BLOCKING THIS USER?"
+        actions={BLOCK_REASONS.map((r) => ({
+          id: r.id,
+          label: r.label,
+          hint: r.hint,
+          icon: r.icon as any,
+          tone: 'destructive' as const,
+          onPress: () => handleBlockWithReason(r.label),
+        }))}
+        onClose={() => setBlockSheetOpen(false)}
       />
 
       <OfferSheet
