@@ -80,6 +80,8 @@ export function SafetyBanner({ context = 'shop', title, body, style, onLinkPress
           padding: bare ? 0 : 14,
           borderRadius: radii.xl,
           backgroundColor: bare ? 'transparent' : colors.panel,
+          borderWidth: bare ? 0 : 1,
+          borderColor: colors.border,
         },
         style,
       ]}
