@@ -16,7 +16,6 @@ import {
 import { confirm } from '@/lib/confirm';
 import { safeBack } from '@/lib/nav';
 import { tap } from '@/lib/haptics';
-import { colors } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { isOptedOut, setAnalyticsOptOut } from '@/lib/analytics';
 import {
@@ -563,20 +562,20 @@ export default function SettingsScreen() {
             width: 38,
             height: 38,
             borderRadius: 19,
-            backgroundColor: 'white',
+            backgroundColor: theme.surface,
             alignItems: 'center',
             justifyContent: 'center',
             borderWidth: 1,
-            borderColor: colors.hairline,
+            borderColor: theme.border,
           }}
         >
-          <Feather name="arrow-left" size={18} color={colors.ink} />
+          <Feather name="arrow-left" size={18} color={theme.text} />
         </Pressable>
         <Text
           style={{
             fontSize: 13,
             fontWeight: '700',
-            color: colors.ink,
+            color: theme.text,
             letterSpacing: 1.4,
             textTransform: 'uppercase',
           }}
@@ -778,7 +777,7 @@ export default function SettingsScreen() {
               <View style={{ paddingVertical: 14 }}>
                 <SheetLabel>Email</SheetLabel>
                 <Text
-                  style={{ fontSize: 14, fontWeight: '700', color: colors.ink, marginTop: 4 }}
+                  style={{ fontSize: 14, fontWeight: '700', color: theme.text, marginTop: 4 }}
                   numberOfLines={1}
                 >
                   {user.email}
@@ -845,7 +844,7 @@ export default function SettingsScreen() {
             style={({ pressed }) => ({
               height: 58,
               borderRadius: 16,
-              backgroundColor: colors.ink,
+              backgroundColor: theme.accent,
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center',
@@ -862,18 +861,29 @@ export default function SettingsScreen() {
                 top: 0,
                 bottom: 0,
                 width: 58,
-                backgroundColor: colors.primary,
+                backgroundColor: theme.accent === '#FFFFFF' ? '#EEEEEE' : theme.text,
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
               {busy === 'logout' ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color={theme.accent === '#FFFFFF' ? '#0F0F0F' : '#FFFFFF'} />
               ) : (
-                <Feather name="log-out" size={18} color="#FFFFFF" />
+                <Feather
+                  name="log-out"
+                  size={18}
+                  color={theme.accent === '#FFFFFF' ? '#0F0F0F' : '#FFFFFF'}
+                />
               )}
             </View>
-            <Text style={{ fontSize: 16, fontWeight: '800', color: 'white', marginRight: 58 }}>
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: '800',
+                color: theme.accent === '#FFFFFF' ? '#0F0F0F' : '#FFFFFF',
+                marginRight: 58,
+              }}
+            >
               {busy === 'logout' ? 'Signing out…' : 'Log out'}
             </Text>
           </Pressable>
@@ -883,7 +893,7 @@ export default function SettingsScreen() {
           style={{
             textAlign: 'center',
             fontSize: 11,
-            color: 'rgba(15,15,15,0.55)',
+            color: theme.textMuted,
             marginTop: 18,
             fontWeight: '600',
             letterSpacing: 0.4,

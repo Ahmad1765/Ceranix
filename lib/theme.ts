@@ -202,77 +202,83 @@ export const shadow = {
   })!,
 } as const;
 
-export const eyebrow = {
+export const getEyebrow = (activeTheme: ThemeTokens = lightTheme) => ({
   fontSize: type.size.xs,
   fontWeight: type.weight.bold,
-  color: colors.ink,
+  color: activeTheme.text,
   letterSpacing: 1.4,
   textTransform: 'uppercase' as const,
-};
+});
 
-export const eyebrowMute = {
-  ...eyebrow,
-  color: colors.mute,
+export const getEyebrowMute = (activeTheme: ThemeTokens = lightTheme) => ({
+  ...getEyebrow(activeTheme),
+  color: activeTheme.textMuted,
   letterSpacing: 1.2,
-};
+});
+
+export const eyebrow = getEyebrow(lightTheme);
+export const eyebrowMute = getEyebrowMute(lightTheme);
 
 export const tintedPurple = 'rgba(0, 0, 0, 0.45)';
 
-export const textStyles = {
-  display: {
-    fontFamily: type.family.sansBold,
-    fontSize: type.size.display,
-    color: colors.ink,
-    letterSpacing: -1,
-    lineHeight: 48,
-  },
-  h1: {
-    fontFamily: type.family.sansBold,
-    fontSize: type.size['5xl'],
-    color: colors.ink,
-    letterSpacing: -0.6,
-    lineHeight: 38,
-  },
-  h2: {
-    fontFamily: type.family.sansBold,
-    fontSize: type.size['4xl'],
-    color: colors.ink,
-    letterSpacing: -0.4,
-    lineHeight: 30,
-  },
-  title: {
-    fontFamily: type.family.sansBold,
-    fontSize: type.size['2xl'],
-    color: colors.ink,
-    letterSpacing: -0.2,
-  },
-  body: {
-    fontFamily: type.family.sans,
-    fontSize: type.size.lg,
-    color: colors.ink,
-    lineHeight: 22,
-  },
-  bodyStrong: {
-    fontFamily: type.family.sansSemibold,
-    fontSize: type.size.lg,
-    color: colors.ink,
-  },
-  bodyMuted: {
-    fontFamily: type.family.sans,
-    fontSize: type.size.md,
-    color: colors.mute,
-    lineHeight: 20,
-  },
-  caption: {
-    fontFamily: type.family.sansMedium,
-    fontSize: type.size.sm,
-    color: colors.mute,
-  },
-  label: {
-    fontFamily: type.family.sansBold,
-    fontSize: type.size.base,
-    color: colors.ink,
-    letterSpacing: 0.1,
-  },
-  eyebrow: { ...eyebrow },
-} as const;
+export const getTextStyles = (activeTheme: ThemeTokens = lightTheme) =>
+  ({
+    display: {
+      fontFamily: type.family.sansBold,
+      fontSize: type.size.display,
+      color: activeTheme.text,
+      letterSpacing: -1,
+      lineHeight: 48,
+    },
+    h1: {
+      fontFamily: type.family.sansBold,
+      fontSize: type.size['5xl'],
+      color: activeTheme.text,
+      letterSpacing: -0.6,
+      lineHeight: 38,
+    },
+    h2: {
+      fontFamily: type.family.sansBold,
+      fontSize: type.size['4xl'],
+      color: activeTheme.text,
+      letterSpacing: -0.4,
+      lineHeight: 30,
+    },
+    title: {
+      fontFamily: type.family.sansBold,
+      fontSize: type.size['2xl'],
+      color: activeTheme.text,
+      letterSpacing: -0.2,
+    },
+    body: {
+      fontFamily: type.family.sans,
+      fontSize: type.size.lg,
+      color: activeTheme.text,
+      lineHeight: 22,
+    },
+    bodyStrong: {
+      fontFamily: type.family.sansSemibold,
+      fontSize: type.size.lg,
+      color: activeTheme.text,
+    },
+    bodyMuted: {
+      fontFamily: type.family.sans,
+      fontSize: type.size.md,
+      color: activeTheme.textMuted,
+      lineHeight: 20,
+    },
+    caption: {
+      fontFamily: type.family.sansMedium,
+      fontSize: type.size.sm,
+      color: activeTheme.textMuted,
+    },
+    label: {
+      fontFamily: type.family.sansBold,
+      fontSize: type.size.base,
+      color: activeTheme.text,
+      letterSpacing: 0.1,
+    },
+    eyebrow: getEyebrow(activeTheme),
+  }) as const;
+
+export const textStyles = getTextStyles(lightTheme);

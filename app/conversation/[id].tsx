@@ -541,11 +541,30 @@ export default function ConversationScreen() {
   const isSeller = !!user && !!conv && conv.seller_id === user.id;
   const rows = useMemo(() => buildThreadRows(messages), [messages]);
 
-  const [isBlocked, setIsBlocked] = useState(false);
+  type BlockStatus = 'loading' | 'blocked' | 'unblocked' | 'unavailable';
+  const [blockStatus, setBlockStatus] = useState<BlockStatus>('loading');
+  const isBlocked = blockStatus === 'blocked';
 
   useEffect(() => {
-    if (!user?.id || !other?.id) return;
-    isUserBlocked(user.id, other.id).then(setIsBlocked);
+    if (!user?.id || !other?.id) {
+      setBlockStatus('unavailable');
+      return;
+    }
+    let active = true;
+    setBlockStatus('loading');
+    isUserBlocked(user.id, other.id)
+      .then((blocked) => {
+        if (!active) return;
+        setBlockStatus(blocked ? 'blocked' : 'unblocked');
+      })
+      .catch((err) => {
+        if (!active) return;
+        console.warn('[conversation] failed to check block status', err);
+        setBlockStatus('unavailable');
+      });
+    return () => {
+      active = false;
+    };
   }, [user?.id, other?.id]);
 
   const handleToggleBlock = useCallback(async () => {
@@ -561,7 +580,7 @@ export default function ConversationScreen() {
       if (!ok) return;
       const success = await unblockUser({ blockerId: user.id, blockedId: other.id });
       if (success) {
-        setIsBlocked(false);
+        setBlockStatus('unblocked');
         toast.show(`Unblocked ${targetName}`);
       }
     } else {
@@ -582,7 +601,7 @@ export default function ConversationScreen() {
         reason: reasonLabel,
       });
       if (success) {
-        setIsBlocked(true);
+        setBlockStatus('blocked');
         toast.show(`Blocked ${targetName}`, {
           variant: 'default',
           icon: 'slash',
@@ -1080,7 +1099,7 @@ export default function ConversationScreen() {
           paddingBottom: keyboardUp ? DOCK_GAP_KEYBOARD : Math.max(insets.bottom, 12),
         }}
       >
-        {isBlocked ? (
+        {blockStatus === 'blocked' ? (
           <View
             style={{
               paddingHorizontal: 16,
@@ -1123,13 +1142,32 @@ export default function ConversationScreen() {
               </Text>
             </Pressable>
           </View>
-        ) : (
+        ) : blockStatus === 'unblocked' ? (
           <Composer
             value={input}
             onChangeText={setInput}
             onSend={handleSend}
             onPlus={() => setPlusOpen(true)}
           />
+        ) : (
+          <View
+            style={{
+              paddingHorizontal: 16,
+              paddingVertical: 14,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: typography.family.sans,
+                fontSize: 13,
+                color: colors.muteSoft,
+              }}
+            >
+              {blockStatus === 'loading' ? 'Checking conversation status…' : 'Messaging is unavailable.'}
+            </Text>
+          </View>
         )}
       </View>
 

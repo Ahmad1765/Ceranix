@@ -126,7 +126,7 @@ function useFocusOutOfAriaHidden() {
 }
 
 function RootLayoutNav() {
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, hydrated } = useTheme();
   const [ready, setReady] = useState(false);
   useFocusOutOfAriaHidden();
   const pathname = usePathname();
@@ -208,7 +208,7 @@ function RootLayoutNav() {
         <GuestGateProvider>
         <SellSheetProvider>
         <DiscoverSheetProvider>
-        {!ready ? null : (
+        {!ready || !hydrated ? null : (
         <Stack
           screenOptions={{
             headerShown: false,

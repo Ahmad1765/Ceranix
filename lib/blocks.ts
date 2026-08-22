@@ -4,6 +4,26 @@ import { captureError } from '@/lib/sentry';
 
 const BLOCKED_USERS_KEY = (userId: string) => `carrinex_blocked_users_${userId}`;
 
+const blockMutationLocks = new Map<string, Promise<unknown>>();
+
+async function runWithBlockLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const prev = blockMutationLocks.get(key) || Promise.resolve();
+  let release: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  blockMutationLocks.set(key, current);
+  try {
+    await prev;
+    return await fn();
+  } finally {
+    release!();
+    if (blockMutationLocks.get(key) === current) {
+      blockMutationLocks.delete(key);
+    }
+  }
+}
+
 export const BLOCK_REASONS = [
   {
     id: 'harassment',
@@ -67,32 +87,38 @@ export async function blockUser(opts: {
   reason?: string;
 }): Promise<boolean> {
   const { blockerId, blockedId, blockedUsername, reason = 'Blocked from conversation' } = opts;
-  try {
-    // 1. Update local storage
-    const current = await getBlockedUserIds(blockerId);
-    if (!current.includes(blockedId)) {
-      const updated = [...current, blockedId];
-      await AsyncStorage.setItem(BLOCKED_USERS_KEY(blockerId), JSON.stringify(updated));
-    }
-
-    // 2. Track in reports table for moderation log
+  return runWithBlockLock(blockerId, async () => {
     try {
-      const details = blockedUsername ? `${reason} (@${blockedUsername})` : reason;
-      await supabase.from('reports').insert({
-        reporter_id: blockerId,
-        reported_user_id: blockedId,
-        reason: 'blocked_user',
-        details,
-      });
-    } catch {
-      // Non-blocking if table write fails
-    }
+      // 1. Update local storage (serialized)
+      const current = await getBlockedUserIds(blockerId);
+      if (!current.includes(blockedId)) {
+        const updated = [...current, blockedId];
+        await AsyncStorage.setItem(BLOCKED_USERS_KEY(blockerId), JSON.stringify(updated));
+      }
 
-    return true;
-  } catch (e: any) {
-    captureError(e, { fn: 'blockUser' });
-    return false;
-  }
+      // 2. Track in reports table for moderation log
+      try {
+        const details = blockedUsername ? `${reason} (@${blockedUsername})` : reason;
+        const { error } = await supabase.from('reports').insert({
+          reporter_id: blockerId,
+          reported_user_id: blockedId,
+          reason: 'blocked_user',
+          details,
+        });
+        if (error) {
+          console.warn('[blocks] report insert error', error.message);
+          captureError(error, { fn: 'blockUser:reportInsert' });
+        }
+      } catch (insertErr: unknown) {
+        captureError(insertErr, { fn: 'blockUser:reportInsert' });
+      }
+
+      return true;
+    } catch (e: unknown) {
+      captureError(e, { fn: 'blockUser' });
+      return false;
+    }
+  });
 }
 
 export async function unblockUser(opts: {
@@ -100,13 +126,15 @@ export async function unblockUser(opts: {
   blockedId: string;
 }): Promise<boolean> {
   const { blockerId, blockedId } = opts;
-  try {
-    const current = await getBlockedUserIds(blockerId);
-    const updated = current.filter((id) => id !== blockedId);
-    await AsyncStorage.setItem(BLOCKED_USERS_KEY(blockerId), JSON.stringify(updated));
-    return true;
-  } catch (e: any) {
-    captureError(e, { fn: 'unblockUser' });
-    return false;
-  }
+  return runWithBlockLock(blockerId, async () => {
+    try {
+      const current = await getBlockedUserIds(blockerId);
+      const updated = current.filter((id) => id !== blockedId);
+      await AsyncStorage.setItem(BLOCKED_USERS_KEY(blockerId), JSON.stringify(updated));
+      return true;
+    } catch (e: unknown) {
+      captureError(e, { fn: 'unblockUser' });
+      return false;
+    }
+  });
 }

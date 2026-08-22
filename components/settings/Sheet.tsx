@@ -1,9 +1,3 @@
-// Bottom-sheet shell and form primitives shared by the four settings sheets.
-//
-// SheetLabel, SheetChoice and SheetDestructive are new: each one replaces a
-// block that had been pasted into two to four of those sheets with only the
-// text changed. Their styling is reproduced exactly, so this is a relocation,
-// not a restyle.
 import { useState } from 'react';
 import {
   View,
@@ -16,8 +10,8 @@ import {
 } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
-import { colors } from '@/lib/theme';
 import { tap } from '@/lib/haptics';
+import { useTheme } from '@/context/ThemeContext';
 
 export function SheetModal({
   visible,
@@ -30,6 +24,8 @@ export function SheetModal({
   title: string;
   children: React.ReactNode;
 }) {
+  const { theme, isDark } = useTheme();
+
   return (
     <Modal
       visible={visible}
@@ -41,7 +37,7 @@ export function SheetModal({
       <View
         style={{
           flex: 1,
-          backgroundColor: 'rgba(15,15,15,0.55)',
+          backgroundColor: theme.overlay,
           justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end',
           alignItems: 'center',
           paddingHorizontal: Platform.OS === 'web' ? 16 : 0,
@@ -54,7 +50,7 @@ export function SheetModal({
         >
           <View
             style={{
-              backgroundColor: colors.white,
+              backgroundColor: theme.surface,
               borderRadius: Platform.OS === 'web' ? 24 : 0,
               ...(Platform.OS !== 'web' && {
                 borderTopLeftRadius: 28,
@@ -64,6 +60,8 @@ export function SheetModal({
               paddingHorizontal: 20,
               paddingBottom: Platform.OS === 'ios' ? 32 : 20,
               maxHeight: '100%',
+              borderWidth: isDark ? 1 : 0,
+              borderColor: theme.border,
               shadowColor: '#000',
               shadowOffset: { width: 0, height: 10 },
               shadowOpacity: 0.15,
@@ -78,7 +76,7 @@ export function SheetModal({
                 width: 40,
                 height: 4,
                 borderRadius: 2,
-                backgroundColor: colors.hairline,
+                backgroundColor: theme.border,
                 marginBottom: 12,
               }}
             />
@@ -90,7 +88,7 @@ export function SheetModal({
                 marginBottom: 14,
               }}
             >
-              <Text style={{ fontSize: 22, fontWeight: '900', color: colors.ink, letterSpacing: -0.6 }}>
+              <Text style={{ fontSize: 22, fontWeight: '900', color: theme.text, letterSpacing: -0.6 }}>
                 {title}
               </Text>
               <Pressable
@@ -102,14 +100,14 @@ export function SheetModal({
                   width: 34,
                   height: 34,
                   borderRadius: 17,
-                  backgroundColor: 'white',
+                  backgroundColor: theme.panel,
                   alignItems: 'center',
                   justifyContent: 'center',
                   borderWidth: 1,
-                  borderColor: colors.hairline,
+                  borderColor: theme.border,
                 }}
               >
-                <Feather name="x" size={16} color={colors.ink} />
+                <Feather name="x" size={16} color={theme.text} />
               </Pressable>
             </View>
             <ScrollView
@@ -126,14 +124,6 @@ export function SheetModal({
   );
 }
 
-/**
- * The uppercase micro-label above a field or a choice group.
- *
- * Was pasted in four places: SheetField's own label, the payout "Type" heading,
- * the verification "Document type" heading, and the account section's "Email".
- * `tone` reproduces SheetField's focus/error colouring; the standalone headings
- * always used the muted tone.
- */
 export function SheetLabel({
   children,
   tone = 'mute',
@@ -143,8 +133,9 @@ export function SheetLabel({
   tone?: 'mute' | 'focus' | 'error';
   style?: { marginBottom?: number; marginLeft?: number };
 }) {
+  const { theme } = useTheme();
   const color =
-    tone === 'error' ? colors.danger : tone === 'focus' ? colors.ink : colors.smoke;
+    tone === 'error' ? theme.danger : tone === 'focus' ? theme.text : theme.textMuted;
   return (
     <Text
       style={{
@@ -176,8 +167,10 @@ export function SheetField({
   placeholder?: string;
   keyboardType?: 'default' | 'number-pad' | 'phone-pad' | 'email-address';
 }) {
+  const { theme } = useTheme();
   const [focused, setFocused] = useState(false);
-  const borderColor = error ? colors.danger : focused ? colors.ink : colors.hairline;
+  const borderColor = error ? theme.danger : focused ? theme.text : theme.border;
+
   return (
     <View style={{ marginBottom: 12 }}>
       <SheetLabel
@@ -188,7 +181,7 @@ export function SheetField({
       </SheetLabel>
       <View
         style={{
-          backgroundColor: 'white',
+          backgroundColor: theme.panel,
           borderRadius: 14,
           borderWidth: 1.5,
           borderColor,
@@ -203,17 +196,17 @@ export function SheetField({
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           placeholder={placeholder}
-          placeholderTextColor="rgba(15,15,15,0.55)"
+          placeholderTextColor={theme.textMuted}
           keyboardType={keyboardType}
           accessibilityLabel={label}
-          style={{ fontSize: 15, color: colors.ink, padding: 0 }}
+          style={{ fontSize: 15, color: theme.text, padding: 0 }}
         />
       </View>
       {error && (
         <Text
           style={{
             fontSize: 11,
-            color: colors.danger,
+            color: theme.danger,
             marginTop: 4,
             marginLeft: 4,
             fontWeight: '600',
@@ -226,16 +219,6 @@ export function SheetField({
   );
 }
 
-/**
- * A single-select group of options.
- *
- * Replaces three hand-rolled copies — the bundle percentages, the payout
- * bank/wallet segment, and the verification document types — which differed
- * only in radius and whether the options shared the row width.
- *
- *  - `pill`  : content-width, fully rounded (bundle percentages, document types)
- *  - `block` : equal-width, 14px radius  (payout type segmented control)
- */
 export function SheetChoice<T extends string | number>({
   options,
   value,
@@ -251,7 +234,9 @@ export function SheetChoice<T extends string | number>({
   shape?: 'pill' | 'block';
   style?: { marginBottom?: number };
 }) {
+  const { theme } = useTheme();
   const block = shape === 'block';
+
   return (
     <View
       style={{
@@ -278,9 +263,9 @@ export function SheetChoice<T extends string | number>({
               paddingHorizontal: block ? 0 : 16,
               paddingVertical: block ? 12 : 12,
               borderRadius: block ? 14 : 999,
-              backgroundColor: active ? colors.ink : 'white',
+              backgroundColor: active ? theme.accent : theme.panel,
               borderWidth: 1.5,
-              borderColor: active ? colors.ink : colors.hairline,
+              borderColor: active ? theme.accent : theme.border,
               opacity: pressed ? 0.85 : 1,
             })}
           >
@@ -288,7 +273,9 @@ export function SheetChoice<T extends string | number>({
               style={{
                 fontSize: block ? 13 : 14,
                 fontWeight: '800',
-                color: active ? 'white' : colors.ink,
+                color: active
+                  ? (theme.accent === '#FFFFFF' ? '#0F0F0F' : '#FFFFFF')
+                  : theme.text,
               }}
             >
               {renderLabel(option)}
@@ -311,6 +298,8 @@ export function SheetPrimary({
   loading?: boolean;
   disabled?: boolean;
 }) {
+  const { theme } = useTheme();
+
   return (
     <Pressable
       onPress={onPress}
@@ -320,7 +309,7 @@ export function SheetPrimary({
       style={({ pressed }) => ({
         height: 54,
         borderRadius: 16,
-        backgroundColor: disabled ? colors.ink : colors.primary,
+        backgroundColor: theme.accent,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
@@ -330,9 +319,16 @@ export function SheetPrimary({
       })}
     >
       {loading ? (
-        <ActivityIndicator color="#FFFFFF" />
+        <ActivityIndicator color={theme.accent === '#FFFFFF' ? '#0F0F0F' : '#FFFFFF'} />
       ) : (
-        <Text style={{ fontSize: 15, fontWeight: '800', color: '#FFFFFF', letterSpacing: 0.2 }}>
+        <Text
+          style={{
+            fontSize: 15,
+            fontWeight: '800',
+            color: theme.accent === '#FFFFFF' ? '#0F0F0F' : '#FFFFFF',
+            letterSpacing: 0.2,
+          }}
+        >
           {label}
         </Text>
       )}
@@ -340,10 +336,6 @@ export function SheetPrimary({
   );
 }
 
-/**
- * The "Remove …" footer link under a sheet's primary button. Was byte-identical
- * in the address and payout sheets, differing only in its label.
- */
 export function SheetDestructive({
   label,
   onPress,
@@ -353,6 +345,8 @@ export function SheetDestructive({
   onPress: () => void;
   disabled?: boolean;
 }) {
+  const { theme } = useTheme();
+
   return (
     <Pressable
       onPress={onPress}
@@ -360,7 +354,7 @@ export function SheetDestructive({
       accessibilityRole="button"
       style={{ alignItems: 'center', paddingVertical: 14, marginTop: 4 }}
     >
-      <Text style={{ color: colors.danger, fontWeight: '700', fontSize: 13 }}>{label}</Text>
+      <Text style={{ color: theme.danger, fontWeight: '700', fontSize: 13 }}>{label}</Text>
     </Pressable>
   );
 }

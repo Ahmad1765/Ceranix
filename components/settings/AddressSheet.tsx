@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useRef } from 'react';
 import { View, Pressable, ActivityIndicator, ScrollView } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
-import { colors } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { tap } from '@/lib/haptics';
@@ -169,13 +169,15 @@ export function AddressSheet({
     }));
   };
 
+  const { theme } = useTheme();
+
   return (
     <SheetModal visible={visible} onClose={onClose} title="Shipping address">
       {/* ── Location Adder Action ────────────────────────────────────────── */}
       <View
         style={{
           marginBottom: 16,
-          backgroundColor: colors.panel,
+          backgroundColor: theme.panel,
           borderRadius: 16,
           padding: 12,
         }}
@@ -187,12 +189,12 @@ export function AddressSheet({
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: locating ? colors.primarySofter : colors.white,
+            backgroundColor: locating ? theme.primarySoft : theme.surface,
             borderRadius: 12,
             paddingVertical: 11,
             paddingHorizontal: 14,
             borderWidth: 1,
-            borderColor: colors.primarySofter,
+            borderColor: theme.border,
             gap: 8,
             opacity: pressed ? 0.8 : 1,
             shadowColor: '#000',
@@ -203,15 +205,15 @@ export function AddressSheet({
         >
           {locating ? (
             <>
-              <ActivityIndicator size="small" color={colors.primary} />
-              <Text style={{ fontSize: 13.5, fontWeight: '700', color: colors.primary }}>
+              <ActivityIndicator size="small" color={theme.accent} />
+              <Text style={{ fontSize: 13.5, fontWeight: '700', color: theme.accent }}>
                 Detecting your location…
               </Text>
             </>
           ) : (
             <>
-              <Feather name="navigation" size={15} color={colors.primary} />
-              <Text style={{ fontSize: 13.5, fontWeight: '700', color: colors.primary }}>
+              <Feather name="navigation" size={15} color={theme.accent} />
+              <Text style={{ fontSize: 13.5, fontWeight: '700', color: theme.accent }}>
                 Use Current Location (GPS Auto-fill)
               </Text>
             </>
@@ -220,7 +222,7 @@ export function AddressSheet({
 
         {/* Quick city suggestions */}
         <View style={{ marginTop: 10 }}>
-          <Text style={{ fontSize: 11, color: colors.mute, fontWeight: '600', marginBottom: 6 }}>
+          <Text style={{ fontSize: 11, color: theme.textMuted, fontWeight: '600', marginBottom: 6 }}>
             QUICK CITY SELECT:
           </Text>
           <ScrollView
@@ -238,16 +240,16 @@ export function AddressSheet({
                     paddingHorizontal: 10,
                     paddingVertical: 5,
                     borderRadius: 8,
-                    backgroundColor: isSelected ? colors.primary : colors.white,
+                    backgroundColor: isSelected ? theme.accent : theme.surface,
                     borderWidth: 1,
-                    borderColor: isSelected ? colors.primary : 'rgba(0,0,0,0.08)',
+                    borderColor: isSelected ? theme.accent : theme.border,
                   }}
                 >
                   <Text
                     style={{
                       fontSize: 12,
                       fontWeight: isSelected ? '800' : '600',
-                      color: isSelected ? colors.white : colors.ink,
+                      color: isSelected ? (theme.accent === '#FFFFFF' ? '#0F0F0F' : '#FFFFFF') : theme.text,
                     }}
                   >
                     {c}

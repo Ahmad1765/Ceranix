@@ -1,14 +1,8 @@
-// The top of the settings page: title block, then whichever identity card the
-// session state calls for — the profile card, a loading placeholder while the
-// profile resolves, or the signed-out sign-in CTA.
-//
-// Purely presentational. `onEditProfile` / `onSignIn` are supplied by the screen
-// so navigation stays in one place.
 import { View, Pressable, ActivityIndicator } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
-import { colors } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import type { User as Profile } from '@/types';
 
 export function SettingsHero({
@@ -23,8 +17,15 @@ export function SettingsHero({
   onEditProfile: () => void;
   onSignIn: () => void;
 }) {
+  const { theme, isDark } = useTheme();
   const initial =
     ((profile?.full_name || profile?.username || 'U').trim().charAt(0) || 'U').toUpperCase();
+
+  const cardBg = isDark ? theme.surface : theme.text;
+  const cardText = isDark ? theme.text : '#FFFFFF';
+  const cardMuted = isDark ? theme.textMuted : 'rgba(255,255,255,0.6)';
+  const iconBoxBg = isDark ? theme.panel : theme.accent;
+  const iconColor = isDark ? theme.text : (theme.accent === '#FFFFFF' ? '#0F0F0F' : '#FFFFFF');
 
   return (
     <>
@@ -32,7 +33,7 @@ export function SettingsHero({
         style={{
           fontSize: 44,
           fontWeight: '900',
-          color: colors.ink,
+          color: theme.text,
           lineHeight: 46,
           letterSpacing: -1.5,
           marginTop: 6,
@@ -48,11 +49,11 @@ export function SettingsHero({
             width: 6,
             height: 6,
             borderRadius: 3,
-            backgroundColor: colors.primary,
+            backgroundColor: theme.accent,
             marginRight: 10,
           }}
         />
-        <Text style={{ fontSize: 14, color: colors.smoke, lineHeight: 20, flex: 1 }}>
+        <Text style={{ fontSize: 14, color: theme.textMuted, lineHeight: 20, flex: 1 }}>
           Manage your shop, account and how you appear on Carrinex.
         </Text>
       </View>
@@ -63,8 +64,10 @@ export function SettingsHero({
           accessibilityRole="button"
           accessibilityLabel="Edit profile"
           style={({ pressed }) => ({
-            backgroundColor: colors.ink,
+            backgroundColor: cardBg,
             borderRadius: 24,
+            borderWidth: isDark ? 1 : 0,
+            borderColor: theme.border,
             padding: 18,
             flexDirection: 'row',
             alignItems: 'center',
@@ -77,7 +80,7 @@ export function SettingsHero({
               width: 56,
               height: 56,
               borderRadius: 28,
-              backgroundColor: colors.primary,
+              backgroundColor: iconBoxBg,
               alignItems: 'center',
               justifyContent: 'center',
               overflow: 'hidden',
@@ -91,22 +94,22 @@ export function SettingsHero({
                 contentFit="cover"
               />
             ) : (
-              <Text style={{ fontSize: 24, fontWeight: '900', color: '#FFFFFF' }}>{initial}</Text>
+              <Text style={{ fontSize: 24, fontWeight: '900', color: iconColor }}>{initial}</Text>
             )}
           </View>
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={{ fontSize: 17, fontWeight: '800', color: 'white' }} numberOfLines={1}>
+              <Text style={{ fontSize: 17, fontWeight: '800', color: cardText }} numberOfLines={1}>
                 {profile.full_name || profile.username}
               </Text>
               {profile.is_verified && (
                 <View style={{ marginLeft: 6 }}>
-                  <Feather name="check-circle" size={14} color="#FFFFFF" />
+                  <Feather name="check-circle" size={14} color={cardText} />
                 </View>
               )}
             </View>
             <Text
-              style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}
+              style={{ fontSize: 13, color: cardMuted, marginTop: 2 }}
               numberOfLines={1}
             >
               @{profile.username} · Tap to edit profile
@@ -117,35 +120,37 @@ export function SettingsHero({
               width: 38,
               height: 38,
               borderRadius: 19,
-              backgroundColor: colors.primary,
+              backgroundColor: iconBoxBg,
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
-            <Feather name="edit-2" size={16} color="#FFFFFF" />
+            <Feather name="edit-2" size={16} color={iconColor} />
           </View>
         </Pressable>
       ) : hasSession ? (
         <View
           style={{
-            backgroundColor: 'white',
+            backgroundColor: theme.surface,
             borderRadius: 20,
             padding: 20,
             marginBottom: 20,
             alignItems: 'center',
             borderWidth: 1.5,
-            borderColor: colors.hairline,
+            borderColor: theme.border,
           }}
         >
-          <ActivityIndicator color={colors.ink} />
+          <ActivityIndicator color={theme.text} />
         </View>
       ) : (
         <Pressable
           onPress={onSignIn}
           accessibilityRole="button"
           style={({ pressed }) => ({
-            backgroundColor: colors.ink,
+            backgroundColor: cardBg,
             borderRadius: 20,
+            borderWidth: isDark ? 1 : 0,
+            borderColor: theme.border,
             padding: 18,
             marginBottom: 20,
             flexDirection: 'row',
@@ -158,21 +163,21 @@ export function SettingsHero({
               width: 44,
               height: 44,
               borderRadius: 12,
-              backgroundColor: colors.primary,
+              backgroundColor: iconBoxBg,
               alignItems: 'center',
               justifyContent: 'center',
               marginRight: 14,
             }}
           >
-            <Feather name="log-in" size={18} color="#FFFFFF" />
+            <Feather name="log-in" size={18} color={iconColor} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 15, fontWeight: '800', color: 'white' }}>Sign in</Text>
-            <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
+            <Text style={{ fontSize: 15, fontWeight: '800', color: cardText }}>Sign in</Text>
+            <Text style={{ fontSize: 12, color: cardMuted, marginTop: 2 }}>
               Access your shop and listings
             </Text>
           </View>
-          <Feather name="arrow-right" size={18} color="white" />
+          <Feather name="arrow-right" size={18} color={cardText} />
         </Pressable>
       )}
     </>

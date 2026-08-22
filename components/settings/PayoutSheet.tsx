@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { Text } from '@/lib/rnText';
-import { colors } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import type { PayoutKind, PayoutMethod } from '@/types';
 import {
   SheetModal,
@@ -33,6 +33,7 @@ export function PayoutSheet({
   onSave: (form: PayoutForm) => Promise<void>;
   onRemove?: () => Promise<void>;
 }) {
+  const { theme } = useTheme();
   const [form, setForm] = useState<PayoutForm>({ kind: 'bank', label: '', account_last4: '' });
   const [saving, setSaving] = useState(false);
 
@@ -54,7 +55,7 @@ export function PayoutSheet({
 
   return (
     <SheetModal visible={visible} onClose={onClose} title="Payout method">
-      <Text style={{ fontSize: 13, color: colors.smoke, lineHeight: 19, marginBottom: 16 }}>
+      <Text style={{ fontSize: 13, color: theme.textMuted, lineHeight: 19, marginBottom: 16 }}>
         Add where you want your earnings sent. We never store full account numbers — only the last 4
         digits for your reference.
       </Text>

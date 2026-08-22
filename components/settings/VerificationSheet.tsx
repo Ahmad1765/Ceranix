@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
-import { colors } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import type { DocumentKind, Verification } from '@/types';
 import { SheetModal, SheetField, SheetLabel, SheetChoice, SheetPrimary } from './Sheet';
 
@@ -31,6 +31,7 @@ export function VerificationSheet({
   onClose: () => void;
   onSave: (form: VerifyForm) => Promise<void>;
 }) {
+  const { theme } = useTheme();
   const [form, setForm] = useState<VerifyForm>({
     legal_name: '',
     document_kind: 'national_id',
@@ -63,30 +64,34 @@ export function VerificationSheet({
               width: 56,
               height: 56,
               borderRadius: 28,
-              backgroundColor: colors.primary,
+              backgroundColor: theme.accent,
               alignItems: 'center',
               justifyContent: 'center',
               marginBottom: 12,
             }}
           >
-            <Feather name="check" size={24} color="#FFFFFF" />
+            <Feather
+              name="check"
+              size={24}
+              color={theme.accent === '#FFFFFF' ? '#0F0F0F' : '#FFFFFF'}
+            />
           </View>
-          <Text style={{ fontSize: 16, fontWeight: '800', color: colors.ink }}>
+          <Text style={{ fontSize: 16, fontWeight: '800', color: theme.text }}>
             You&apos;re verified
           </Text>
-          <Text style={{ fontSize: 13, color: colors.smoke, marginTop: 4 }}>
+          <Text style={{ fontSize: 13, color: theme.textMuted, marginTop: 4 }}>
             Approved on {initial.reviewed_at?.slice(0, 10) ?? '—'}
           </Text>
         </View>
       ) : (
         <>
-          <Text style={{ fontSize: 13, color: colors.smoke, lineHeight: 19, marginBottom: 16 }}>
+          <Text style={{ fontSize: 13, color: theme.textMuted, lineHeight: 19, marginBottom: 16 }}>
             Submit your details to verify your identity. We typically review within 2–3 business days.
           </Text>
           {initial?.status === 'submitted' && (
             <View
               style={{
-                backgroundColor: colors.white,
+                backgroundColor: theme.panel,
                 borderRadius: 14,
                 padding: 12,
                 marginBottom: 14,
@@ -94,8 +99,8 @@ export function VerificationSheet({
                 alignItems: 'center',
               }}
             >
-              <Feather name="clock" size={14} color={colors.ink} style={{ marginRight: 8 }} />
-              <Text style={{ fontSize: 12, color: colors.ink, fontWeight: '700' }}>
+              <Feather name="clock" size={14} color={theme.text} style={{ marginRight: 8 }} />
+              <Text style={{ fontSize: 12, color: theme.text, fontWeight: '700' }}>
                 Already submitted — under review
               </Text>
             </View>

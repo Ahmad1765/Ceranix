@@ -1,20 +1,8 @@
-// The settings page's row vocabulary: a collapsible card, the rows that live
-// inside it, and the hairline between them.
-//
-// These are deliberately NOT components/ui/ListRow. That one owns its own
-// horizontal padding (SectionCard supplies it here), uses a pressed background
-// wash rather than opacity, defaults chevron to true, has no `loading` state,
-// and resolves `destructive` through colors.red — which lib/theme.ts aliases to
-// ink. Rendering "Delete account" in the same black as "Change password" would
-// drop the only pre-click signal that one of them is irreversible.
-//
-// Reconciling the two row components is worth doing, but it is its own change
-// with its own blast radius (app/(tabs)/profile.tsx is ListRow's consumer).
 import { View, Pressable, Switch, ActivityIndicator } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
-import { colors } from '@/lib/theme';
 import { tap } from '@/lib/haptics';
+import { useTheme } from '@/context/ThemeContext';
 
 export function SectionCard({
   icon,
@@ -31,13 +19,15 @@ export function SectionCard({
   onToggle: () => void;
   children?: React.ReactNode;
 }) {
+  const { theme } = useTheme();
+
   return (
     <View
       style={{
-        backgroundColor: 'white',
+        backgroundColor: theme.surface,
         borderRadius: 20,
         borderWidth: 1.5,
-        borderColor: expanded ? colors.ink : colors.hairline,
+        borderColor: expanded ? theme.text : theme.border,
         marginBottom: 12,
         overflow: 'hidden',
       }}
@@ -59,19 +49,23 @@ export function SectionCard({
             width: 40,
             height: 40,
             borderRadius: 12,
-            backgroundColor: expanded ? colors.primary : colors.white,
+            backgroundColor: expanded ? theme.accent : theme.panel,
             alignItems: 'center',
             justifyContent: 'center',
             marginRight: 14,
           }}
         >
-          <Feather name={icon} size={18} color={expanded ? '#FFFFFF' : colors.ink} />
+          <Feather
+            name={icon}
+            size={18}
+            color={expanded ? (theme.accent === '#FFFFFF' ? '#0F0F0F' : '#FFFFFF') : theme.text}
+          />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 15, fontWeight: '800', color: colors.ink, letterSpacing: -0.2 }}>
+          <Text style={{ fontSize: 15, fontWeight: '800', color: theme.text, letterSpacing: -0.2 }}>
             {title}
           </Text>
-          <Text style={{ fontSize: 12, color: colors.smoke, marginTop: 2 }} numberOfLines={1}>
+          <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 2 }} numberOfLines={1}>
             {subtitle}
           </Text>
         </View>
@@ -80,12 +74,12 @@ export function SectionCard({
             width: 28,
             height: 28,
             borderRadius: 14,
-            backgroundColor: colors.white,
+            backgroundColor: theme.panel,
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <Feather name={expanded ? 'minus' : 'plus'} size={14} color={colors.ink} />
+          <Feather name={expanded ? 'minus' : 'plus'} size={14} color={theme.text} />
         </View>
       </Pressable>
       {expanded && (
@@ -94,7 +88,7 @@ export function SectionCard({
             paddingHorizontal: 16,
             paddingBottom: 4,
             borderTopWidth: 1,
-            borderTopColor: colors.hairline,
+            borderTopColor: theme.border,
           }}
         >
           {children}
@@ -118,13 +112,15 @@ export function Row({
   desc?: string;
   onPress?: () => void;
   chevron?: boolean;
-  /** Irreversible actions only — paints the row in colors.danger. */
+  /** Irreversible actions only — paints the row in theme.danger. */
   destructive?: boolean;
   disabled?: boolean;
   loading?: boolean;
   badge?: string;
 }) {
-  const tone = destructive ? colors.danger : colors.ink;
+  const { theme } = useTheme();
+  const tone = destructive ? theme.danger : theme.text;
+
   return (
     <Pressable
       onPress={onPress}
@@ -148,21 +144,28 @@ export function Row({
                 paddingHorizontal: 8,
                 paddingVertical: 2,
                 borderRadius: 999,
-                backgroundColor: colors.primary,
+                backgroundColor: theme.accent,
               }}
             >
-              <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFFFFF', letterSpacing: 0.4 }}>
+              <Text
+                style={{
+                  fontSize: 10,
+                  fontWeight: '800',
+                  color: theme.accent === '#FFFFFF' ? '#0F0F0F' : '#FFFFFF',
+                  letterSpacing: 0.4,
+                }}
+              >
                 {badge.toUpperCase()}
               </Text>
             </View>
           )}
         </View>
-        {desc && <Text style={{ fontSize: 12, color: colors.smoke, marginTop: 3 }}>{desc}</Text>}
+        {desc && <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 3 }}>{desc}</Text>}
       </View>
       {loading ? (
-        <ActivityIndicator size="small" color={destructive ? colors.danger : colors.smoke} />
+        <ActivityIndicator size="small" color={destructive ? theme.danger : theme.textMuted} />
       ) : chevron ? (
-        <Feather name="chevron-right" size={16} color={destructive ? colors.danger : colors.smoke} />
+        <Feather name="chevron-right" size={16} color={destructive ? theme.danger : theme.textMuted} />
       ) : null}
     </Pressable>
   );
@@ -181,11 +184,13 @@ export function ToggleRow({
   onValueChange: (v: boolean) => void;
   disabled?: boolean;
 }) {
+  const { theme } = useTheme();
+
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 14 }}>
       <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 14, fontWeight: '700', color: colors.ink }}>{label}</Text>
-        {desc && <Text style={{ fontSize: 12, color: colors.smoke, marginTop: 3 }}>{desc}</Text>}
+        <Text style={{ fontSize: 14, fontWeight: '700', color: theme.text }}>{label}</Text>
+        {desc && <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 3 }}>{desc}</Text>}
       </View>
       <Switch
         value={value}
@@ -195,14 +200,15 @@ export function ToggleRow({
         }}
         disabled={disabled}
         accessibilityLabel={label}
-        trackColor={{ false: 'rgba(15,15,15,0.12)', true: colors.primary }}
-        thumbColor="#FFFFFF"
-        ios_backgroundColor="rgba(15,15,15,0.12)"
+        trackColor={{ false: theme.border, true: theme.accent }}
+        thumbColor={theme.accent === '#FFFFFF' ? '#FFFFFF' : '#FFFFFF'}
+        ios_backgroundColor={theme.border}
       />
     </View>
   );
 }
 
 export function Divider() {
-  return <View style={{ height: 1, backgroundColor: colors.hairline }} />;
+  const { theme } = useTheme();
+  return <View style={{ height: 1, backgroundColor: theme.border }} />;
 }

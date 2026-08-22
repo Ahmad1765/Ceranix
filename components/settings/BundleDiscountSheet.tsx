@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Text } from '@/lib/rnText';
-import { colors } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { SheetModal, SheetChoice, SheetPrimary } from './Sheet';
 
 const OPTIONS = [0, 5, 10, 15, 20] as const;
@@ -16,6 +16,7 @@ export function BundleDiscountSheet({
   onClose: () => void;
   onSave: (pct: number) => Promise<void>;
 }) {
+  const { theme } = useTheme();
   const [selected, setSelected] = useState<number>(currentPct);
   const [saving, setSaving] = useState(false);
 
@@ -30,7 +31,7 @@ export function BundleDiscountSheet({
 
   return (
     <SheetModal visible={visible} onClose={onClose} title="Bundle discount">
-      <Text style={{ fontSize: 13, color: colors.smoke, lineHeight: 19, marginBottom: 16 }}>
+      <Text style={{ fontSize: 13, color: theme.textMuted, lineHeight: 19, marginBottom: 16 }}>
         Offer a discount when buyers purchase multiple items from your shop in one go.
       </Text>
       <SheetChoice
