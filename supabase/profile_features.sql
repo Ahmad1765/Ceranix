@@ -178,6 +178,8 @@ begin
    where id = v_user_id
   returning * into v_profile;
 
+  perform set_config('app.override_trust_fields', 'off', true);
+
   if v_profile.id is null then
     raise exception 'profile not found';
   end if;

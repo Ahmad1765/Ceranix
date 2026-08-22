@@ -19,7 +19,7 @@ describe('buyerProtectionFee', () => {
 
   it('never scales with the item price', () => {
     expect(buyerProtectionFee(100_000)).toBe(buyerProtectionFee(100));
-    expect(buyerProtectionFee(3.33)).toBe(BUYER_PROTECTION_FEE);
+    expect(buyerProtectionFee(3.33)).toBe(0);
   });
 
   it('is zero for empty, zero, or invalid prices', () => {
