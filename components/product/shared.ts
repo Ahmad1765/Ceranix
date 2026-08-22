@@ -46,9 +46,6 @@ export const CONDITION_LABELS: Record<string, string> = {
 };
 
 // Category labels now live in the single-source taxonomy (lib/categories).
-// Re-exported here so existing product-screen imports keep working.
-import { colors } from '@/lib/theme';
-
 export { CATEGORY_LABELS } from '@/lib/categories';
 
 export const ITEM_COLOR = { name: 'Carrinex purple', hex: '#6C47FF' };
@@ -57,10 +54,6 @@ export const ITEM_COLOR = { name: 'Carrinex purple', hex: '#6C47FF' };
 export const BRAND_PURPLE = '#6C47FF';
 export const BRAND_PURPLE_SOFT = 'rgba(108,71,255,0.10)';
 export const BRAND_LIME = '#6C47FF';
-export const BRAND_INK = colors.ink;
-export const INK_700 = colors.mute;
-export const TAG_BG = colors.surface;
-export const TAG_BORDER = colors.border;
 
 export const LINK_PURPLE = BRAND_PURPLE;
 

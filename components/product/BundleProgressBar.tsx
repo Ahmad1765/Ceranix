@@ -6,25 +6,10 @@ import type { Listing } from '@/types';
 import {
   BUNDLE_TIERS,
   computeBundlePricing,
-  BRAND_INK,
   BRAND_PURPLE,
   HAIRLINE,
 } from './shared';
-
-const TRACK_BG = 'rgba(15,15,15,0.06)';
-const CARD_BORDER = 'rgba(15,15,15,0.10)';
-// #616161 on white ≈ 5.7:1 — clears WCAG AA for small text.
-const SUBTLE_INK = 'rgba(15,15,15,0.62)';
-const ICON_TINT = 'rgba(108,71,255,0.10)';
-
-/**
- * Compact, tappable bundle-discount indicator that lives directly under the
- * title. It mirrors the money math in lib/bundle.ts (the same code path the
- * full BundleSection and checkout use), so the "add N more to save X%" nudge
- * here always agrees with the builder it scrolls to. Purely a summary +
- * affordance: tapping jumps to the bundle builder at the bottom of the page.
- */
-import { colors } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 
 export function BundleProgressBar({
   listing,
@@ -37,6 +22,7 @@ export function BundleProgressBar({
   selectedIds: Set<string>;
   onPress: () => void;
 }) {
+  const { theme } = useTheme();
   const selectedItems = sellerItems.filter((s) => selectedIds.has(s.id));
   const { itemCount, pct, qualifies, progress, nextTier } = computeBundlePricing(
     listing.price,
@@ -59,10 +45,10 @@ export function BundleProgressBar({
       accessibilityLabel={`${headline}. ${guidance}. Opens the bundle builder.`}
       style={({ pressed }) => ({
         marginHorizontal: 16,
-        backgroundColor: colors.surface,
+        backgroundColor: theme.surface,
         borderRadius: 16,
         borderWidth: HAIRLINE,
-        borderColor: colors.border,
+        borderColor: theme.border,
         paddingHorizontal: 14,
         paddingVertical: 14,
         opacity: pressed ? 0.92 : 1,
@@ -83,7 +69,7 @@ export function BundleProgressBar({
         </View>
         <View style={{ flex: 1 }}>
           <Text
-            style={{ fontSize: 14, fontWeight: '800', color: colors.ink, letterSpacing: -0.2 }}
+            style={{ fontSize: 14, fontWeight: '800', color: theme.ink, letterSpacing: -0.2 }}
             numberOfLines={1}
           >
             {headline}
@@ -91,7 +77,7 @@ export function BundleProgressBar({
           <Text
             style={{
               fontSize: 12.5,
-              color: qualifies ? BRAND_PURPLE : colors.mute,
+              color: qualifies ? BRAND_PURPLE : theme.mute,
               fontWeight: qualifies ? '700' : '500',
               marginTop: 2,
             }}
@@ -100,12 +86,12 @@ export function BundleProgressBar({
             {guidance}
           </Text>
         </View>
-        <Feather name="chevron-down" size={18} color={colors.mute} />
+        <Feather name="chevron-down" size={18} color={theme.mute} />
       </View>
 
       {/* Threshold track — distinct from the image pagination dots: a filled
           purple bar with a pip at each discount tier. */}
-      <View style={{ height: 6, borderRadius: 99, backgroundColor: colors.panel, position: 'relative' }}>
+      <View style={{ height: 6, borderRadius: 99, backgroundColor: theme.panel, position: 'relative' }}>
         <View
           style={{
             position: 'absolute',
@@ -133,7 +119,7 @@ export function BundleProgressBar({
                 height: 6,
                 marginLeft: -3,
                 borderRadius: 3,
-                backgroundColor: reached ? colors.white : colors.border,
+                backgroundColor: reached ? theme.white : theme.border,
               }}
             />
           );

@@ -59,7 +59,6 @@ import {
   IMAGE_HEIGHT,
   CONDITION_LABELS,
   BRAND_PURPLE,
-  BRAND_INK,
   FALLBACK_SELLER,
   EMPTY_LISTINGS,
   conditionLabel,
@@ -68,6 +67,7 @@ import {
   CARD_GAP,
   CARD_OUTER_PAD,
 } from '@/components/product/shared';
+import { useTheme } from '@/context/ThemeContext';
 import { categoryLabel, subcategoryLabel } from '@/lib/categories';
 import { itemColorLabel } from '@/lib/itemColors';
 import { ColorSwatch } from '@/components/ColorSwatch';
@@ -113,6 +113,7 @@ type DetailRow = {
 // blocks (`?.`, `??`, `?:`, `&&`, `||`) must stay out of a try/catch here.
 
 export default function ProductScreen() {
+  const { theme } = useTheme();
   const { id } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -592,7 +593,7 @@ export default function ProductScreen() {
               height: 48,
               borderRadius: 14,
               paddingHorizontal: 28,
-              backgroundColor: BRAND_INK,
+              backgroundColor: theme.ink,
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center',

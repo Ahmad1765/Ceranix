@@ -135,7 +135,7 @@ security definer
 set search_path = ''
 as $$
 begin
-  if coalesce(auth.role(), '') = 'service_role' then
+  if coalesce(auth.role(), '') = 'service_role' or current_setting('app.override_trust_fields', true) = 'on' then
     return new;
   end if;
   if new.is_verified is distinct from old.is_verified
@@ -154,6 +154,40 @@ create trigger trg_guard_profile_trust
   for each row execute procedure public.guard_profile_trust_fields();
 
 revoke execute on function public.guard_profile_trust_fields() from public, anon, authenticated;
+
+-- 5c) Verified seller program subscription RPC ------------------------------
+create or replace function public.update_seller_subscription(p_is_pro boolean)
+returns public.profiles
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_profile public.profiles;
+begin
+  if v_user_id is null then
+    raise exception 'authentication required';
+  end if;
+
+  perform set_config('app.override_trust_fields', 'on', true);
+
+  update public.profiles
+     set is_pro = p_is_pro,
+         updated_at = now()
+   where id = v_user_id
+  returning * into v_profile;
+
+  if v_profile.id is null then
+    raise exception 'profile not found';
+  end if;
+
+  return v_profile;
+end;
+$$;
+
+revoke execute on function public.update_seller_subscription(boolean) from public, anon;
+grant  execute on function public.update_seller_subscription(boolean) to authenticated;
 
 create or replace function public.guard_verification_status()
 returns trigger

@@ -546,6 +546,7 @@ export default function ConversationScreen() {
   type BlockStatus = 'loading' | 'blocked' | 'unblocked' | 'unavailable';
   const [blockStatus, setBlockStatus] = useState<BlockStatus>('loading');
   const isBlocked = blockStatus === 'blocked';
+  const blockCheckReqIdRef = useRef(0);
 
   useEffect(() => {
     if (!user?.id || !other?.id) {
@@ -553,14 +554,15 @@ export default function ConversationScreen() {
       return;
     }
     let active = true;
+    const currentReqId = ++blockCheckReqIdRef.current;
     setBlockStatus('loading');
     isUserBlocked(user.id, other.id)
       .then((blocked) => {
-        if (!active) return;
+        if (!active || currentReqId !== blockCheckReqIdRef.current) return;
         setBlockStatus(blocked ? 'blocked' : 'unblocked');
       })
       .catch((err) => {
-        if (!active) return;
+        if (!active || currentReqId !== blockCheckReqIdRef.current) return;
         console.warn('[conversation] failed to check block status', err);
         setBlockStatus('unavailable');
       });
@@ -580,6 +582,7 @@ export default function ConversationScreen() {
         cancelLabel: 'Cancel',
       });
       if (!ok) return;
+      blockCheckReqIdRef.current++;
       const success = await unblockUser({ blockerId: user.id, blockedId: other.id });
       if (success) {
         setBlockStatus('unblocked');
@@ -596,6 +599,7 @@ export default function ConversationScreen() {
       setBlockSheetOpen(false);
       const targetName = other.username ? `@${other.username}` : (other.full_name || 'this user');
 
+      blockCheckReqIdRef.current++;
       const success = await blockUser({
         blockerId: user.id,
         blockedId: other.id,

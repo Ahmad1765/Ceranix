@@ -26,7 +26,7 @@ import { useToast } from '@/lib/toast';
 import { isLiked as fetchIsLiked, toggleLike } from '@/lib/listings';
 import { useGuestGate } from '@/components/GuestGate';
 import { PopIcon, type PopIconHandle } from '@/components/product/PopIcon';
-import { BRAND_PURPLE, BRAND_INK, conditionLabel } from '@/components/product/shared';
+import { BRAND_PURPLE, conditionLabel } from '@/components/product/shared';
 import { colors, radii, shadow } from '@/lib/theme';
 import type { Listing } from '@/types';
 

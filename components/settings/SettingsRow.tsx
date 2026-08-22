@@ -201,7 +201,7 @@ export function ToggleRow({
         disabled={disabled}
         accessibilityLabel={label}
         trackColor={{ false: theme.border, true: theme.accent }}
-        thumbColor={theme.accent === '#FFFFFF' ? '#FFFFFF' : '#FFFFFF'}
+        thumbColor={theme.accent?.toUpperCase() === '#FFFFFF' ? '#000000' : '#FFFFFF'}
         ios_backgroundColor={theme.border}
       />
     </View>

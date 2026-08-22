@@ -1,9 +1,11 @@
 import { View } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { BRAND_INK, BRAND_LIME } from './shared';
+import { BRAND_LIME } from './shared';
+import { useTheme } from '@/context/ThemeContext';
 
-export function SectionEyebrow({ label, color = BRAND_INK }: { label: string; color?: string }) {
+export function SectionEyebrow({ label, color }: { label: string; color?: string }) {
+  const { theme } = useTheme();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
       <View
@@ -19,7 +21,7 @@ export function SectionEyebrow({ label, color = BRAND_INK }: { label: string; co
         style={{
           fontSize: 11,
           fontWeight: '800',
-          color,
+          color: color ?? theme.ink,
           letterSpacing: 1.4,
           textTransform: 'uppercase',
         }}

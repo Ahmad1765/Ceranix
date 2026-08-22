@@ -65,30 +65,28 @@ export function SubscriptionSheet({
     const nextPro = !isPro;
 
     try {
-      // Update profile
-      const { error } = await supabase
-        .from('profiles')
-        .update({ is_pro: nextPro })
-        .eq('id', user.id);
+      const { error } = await supabase.rpc('update_seller_subscription', {
+        p_is_pro: nextPro,
+      });
 
       if (error) {
-        // Fallback: If DB trigger restricts direct update, give informational toast
         console.warn('[subscription] Update error:', error);
-        toast.show('Program status updated', {
-          variant: 'success',
-          icon: 'check',
+        toast.show(error.message || 'Could not update program', {
+          variant: 'default',
+          icon: 'alert-triangle',
         });
-      } else {
-        toast.show(
-          nextPro
-            ? 'Welcome to the Pro Seller Program!'
-            : 'Switched to Standard Seller Program',
-          {
-            variant: 'success',
-            icon: nextPro ? 'award' : 'check',
-          }
-        );
+        return;
       }
+
+      toast.show(
+        nextPro
+          ? 'Welcome to the Pro Seller Program!'
+          : 'Switched to Standard Seller Program',
+        {
+          variant: 'success',
+          icon: nextPro ? 'award' : 'check',
+        }
+      );
       await refreshProfile();
       onClose();
     } catch (e: any) {
