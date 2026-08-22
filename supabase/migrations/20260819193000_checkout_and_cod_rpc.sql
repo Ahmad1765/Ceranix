@@ -32,7 +32,7 @@ declare
   v_caller_id uuid;
   v_listing record;
   v_item_price_cents integer;
-  v_fee_cents integer := 10000; -- Rs 100 flat Buyer Protection fee in paisa (100 * 100)
+  v_fee_cents integer := 0; -- Waived Buyer Protection fee
   v_order public.orders;
   v_order_status text;
   v_offer_message_id uuid := null;

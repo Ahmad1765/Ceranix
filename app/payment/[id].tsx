@@ -1,5 +1,5 @@
 import { capture } from '@/lib/analytics';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View,
   Pressable,
@@ -833,23 +833,26 @@ export default function PaymentScreen() {
             <Text style={Value}>{formatPrice(itemPrice)}</Text>
           </View>
 
-          <RowDivider />
-
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingHorizontal: 20,
-              paddingVertical: 16,
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Feather name="shield" size={13} color={colors.primary} />
-              <Text style={Label}>Buyer Protection</Text>
-            </View>
-            <Text style={Value}>{formatPrice(fee)}</Text>
-          </View>
+          {fee > 0 ? (
+            <>
+              <RowDivider />
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingHorizontal: 20,
+                  paddingVertical: 16,
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Feather name="shield" size={13} color={colors.primary} />
+                  <Text style={Label}>Buyer Protection</Text>
+                </View>
+                <Text style={Value}>{formatPrice(fee)}</Text>
+              </View>
+            </>
+          ) : null}
         </View>
 
         {/* Total moment */}

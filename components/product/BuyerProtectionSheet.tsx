@@ -10,7 +10,7 @@ import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { priceBreakdown, formatPrice } from '@/lib/fees';
 import { colors } from '@/lib/theme';
-import { IS_IOS, tap, BRAND_PURPLE, BRAND_PURPLE_SOFT, HAIRLINE } from './shared';
+import { IS_IOS, tap, BRAND_PURPLE } from './shared';
 
 const COVERAGE = [
   { icon: 'refresh-ccw' as const, text: 'A refund if your item never arrives or isn’t as described' },
@@ -128,7 +128,10 @@ export function BuyerProtectionSheet({
           >
             <BreakdownRow label="Item price" value={formatPrice(item)} />
             <View style={{ height: 1, backgroundColor: colors.border }} />
-            <BreakdownRow label="Buyer Protection" value={formatPrice(protection)} />
+            <BreakdownRow
+              label="Buyer Protection"
+              value={protection > 0 ? formatPrice(protection) : 'Free'}
+            />
             <View style={{ height: 1, backgroundColor: colors.border }} />
             <BreakdownRow label="Total" value={formatPrice(total)} emphasize />
           </View>

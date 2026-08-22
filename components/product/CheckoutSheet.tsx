@@ -267,13 +267,15 @@ export function CheckoutSheet({
             <Text style={styles.summaryLabel}>Item price</Text>
             <Text style={styles.summaryValue}>{formatPrice(itemPrice)}</Text>
           </View>
-          <View style={styles.summaryRow}>
-            <View style={styles.labelWithIcon}>
-              <Text style={styles.summaryLabel}>Buyer protection</Text>
-              <Feather name="shield" size={12} color={colors.primary} />
+          {protectionFee > 0 ? (
+            <View style={styles.summaryRow}>
+              <View style={styles.labelWithIcon}>
+                <Text style={styles.summaryLabel}>Buyer protection</Text>
+                <Feather name="shield" size={12} color={colors.primary} />
+              </View>
+              <Text style={styles.summaryValue}>{formatPrice(protectionFee)}</Text>
             </View>
-            <Text style={styles.summaryValue}>{formatPrice(protectionFee)}</Text>
-          </View>
+          ) : null}
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Shipping</Text>
             <Text style={styles.summaryValue}>

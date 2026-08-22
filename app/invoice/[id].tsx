@@ -119,7 +119,7 @@ export default function InvoiceScreen() {
           seller_id: listing?.seller_id ?? listing?.seller?.id ?? 'seller_demo',
           status: method === 'cod' ? 'pending' : 'paid',
           amount_cents: Math.round(Number(priceRef.current ?? 1000) * 100),
-          fee_cents: 10000,
+          fee_cents: 0,
           currency: 'pkr',
           payment_method: method === 'cod' ? 'cod' : 'card',
           created_at: new Date().toISOString(),
@@ -145,7 +145,7 @@ export default function InvoiceScreen() {
     return () => {
       active = false;
     };
-  }, [paid, placed, method, id]);
+  }, [paid, placed, method, id, user?.id, listing?.seller_id, listing?.seller?.id]);
 
   if (!listing && id && listingQ.isPending) {
     return (
@@ -594,9 +594,11 @@ export default function InvoiceScreen() {
             <MetaRow label="Item">
               <Text style={MetaValue}>{formatPrice(itemPrice)}</Text>
             </MetaRow>
-            <MetaRow label="Buyer Protection">
-              <Text style={MetaValue}>{formatPrice(fee)}</Text>
-            </MetaRow>
+            {fee > 0 ? (
+              <MetaRow label="Buyer Protection">
+                <Text style={MetaValue}>{formatPrice(fee)}</Text>
+              </MetaRow>
+            ) : null}
           </View>
 
           {/* ── Delivery & Dispatch Logistics Card ────────────────────────── */}

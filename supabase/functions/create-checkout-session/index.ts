@@ -1,3 +1,4 @@
+// @ts-nocheck
 // supabase/functions/create-checkout-session/index.ts
 // Deploy: supabase functions deploy create-checkout-session
 // Required secrets:
@@ -182,7 +183,7 @@ Deno.serve(async (req: Request) => {
     // Buyer Protection fee, added as its own line item so the buyer is charged
     // the same total shown in the app. Flat, never a percentage — keep this in
     // sync with BUYER_PROTECTION_FEE in lib/fees.ts.
-    const BUYER_PROTECTION_FEE = 100;
+    const BUYER_PROTECTION_FEE = 0;
     const feeCents = Math.round(BUYER_PROTECTION_FEE * 100);
 
     let successUrlObj: URL;

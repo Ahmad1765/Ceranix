@@ -17,8 +17,8 @@
 // IMPORTANT: the edge function re-implements this same math in Deno
 // (supabase/functions/create-checkout-session). Keep the two in sync.
 
-/** The flat Buyer Protection fee, in PKR. */
-export const BUYER_PROTECTION_FEE = 100;
+/** The flat Buyer Protection fee, in PKR (set to 0 to waive fee). */
+export const BUYER_PROTECTION_FEE = 0;
 
 /** Default shipping fee in PKR (free / zero-fee basis). */
 export const DEFAULT_SHIPPING_FEE = 0;

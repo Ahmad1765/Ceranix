@@ -344,7 +344,7 @@ export class PaymentService {
         buyer_id: 'mock-buyer',
         seller_id: 'mock-seller',
         amount_cents: 100000,
-        fee_cents: 10000,
+        fee_cents: Math.round(BUYER_PROTECTION_FEE * 100),
         currency: 'pkr',
         payment_method: 'cod',
         status: 'paid',

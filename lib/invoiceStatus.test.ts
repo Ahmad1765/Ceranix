@@ -76,8 +76,8 @@ describe('deriveInvoiceAmounts', () => {
   it('falls back to listing price + computed fee before any order exists', () => {
     expect(deriveInvoiceAmounts(null, 2500, buyerProtectionFee)).toEqual({
       item: 2500,
-      fee: 100,
-      total: 2600,
+      fee: 0,
+      total: 2500,
     });
   });
 
