@@ -82,7 +82,7 @@ export function BottomSheetModal({
   style,
 }: BottomSheetModalProps) {
   const insets = useSafeAreaInsets();
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
   const calculatedHeight = fixedHeight ?? (autoHeight ? undefined : SCREEN_HEIGHT * Math.min(Math.max(snapHeightRatio, 0.3), 0.95));
   const fallbackDismissHeight = calculatedHeight ?? 400;
 

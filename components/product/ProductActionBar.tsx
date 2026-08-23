@@ -45,7 +45,7 @@ export function ProductActionBar({
   style,
 }: ProductActionBarProps) {
   const insets = useSafeAreaInsets();
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
   const safeBottom = bottomInset !== undefined ? bottomInset : insets.bottom;
 
   const handleOffer = () => {
