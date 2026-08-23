@@ -707,7 +707,7 @@ export default function ProductScreen() {
                 width: 52,
                 height: 52,
                 borderRadius: 26,
-                backgroundColor: colors.surface,
+                backgroundColor: colors.white,
                 alignItems: 'center',
                 justifyContent: 'center',
                 borderWidth: HAIRLINE,
@@ -741,7 +741,7 @@ export default function ProductScreen() {
                 width: 52,
                 height: 52,
                 borderRadius: 26,
-                backgroundColor: colors.surface,
+                backgroundColor: colors.white,
                 alignItems: 'center',
                 justifyContent: 'center',
                 borderWidth: HAIRLINE,
@@ -901,7 +901,7 @@ export default function ProductScreen() {
         <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 }}>
           <View
             style={{
-              backgroundColor: colors.surface,
+              backgroundColor: colors.white,
               borderRadius: 18,
               borderWidth: 1,
               borderColor: colors.border,
@@ -996,7 +996,7 @@ export default function ProductScreen() {
                     paddingHorizontal: 13,
                     paddingVertical: 5.5,
                     borderRadius: 999,
-                    backgroundColor: listing.is_sold ? colors.surface : colors.ink,
+                    backgroundColor: listing.is_sold ? colors.white : colors.ink,
                     borderWidth: 1,
                     borderColor: listing.is_sold ? colors.border : colors.ink,
                     alignItems: 'center',
@@ -1044,7 +1044,7 @@ export default function ProductScreen() {
                     paddingHorizontal: 12,
                     paddingVertical: 5.5,
                     borderRadius: 999,
-                    backgroundColor: followed ? colors.surface : colors.ink,
+                    backgroundColor: followed ? colors.white : colors.ink,
                     borderWidth: 1,
                     borderColor: followed ? colors.border : colors.ink,
                     alignItems: 'center',
@@ -1109,7 +1109,7 @@ export default function ProductScreen() {
         <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 6 }}>
           <View
             style={{
-              backgroundColor: colors.surface,
+              backgroundColor: colors.white,
               borderRadius: 18,
               borderWidth: HAIRLINE,
               borderColor: colors.border,
@@ -1296,7 +1296,7 @@ export default function ProductScreen() {
                     paddingVertical: 16,
                     borderTopWidth: HAIRLINE,
                     borderTopColor: colors.border,
-                    backgroundColor: pressed && row.onPress ? colors.panel : colors.surface,
+                    backgroundColor: pressed && row.onPress ? colors.panel : colors.white,
                   })}
                 >
                   <Text
@@ -1335,7 +1335,7 @@ export default function ProductScreen() {
                   key={tag}
                   onPress={() => router.push(`/(tabs)/discover?q=${encodeURIComponent(tag)}` as any)}
                   style={({ pressed }) => ({
-                    backgroundColor: colors.surface,
+                    backgroundColor: colors.white,
                     borderWidth: 1,
                     borderColor: colors.border,
                     borderRadius: 999,

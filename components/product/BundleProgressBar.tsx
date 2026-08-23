@@ -45,7 +45,7 @@ export function BundleProgressBar({
       accessibilityLabel={`${headline}. ${guidance}. Opens the bundle builder.`}
       style={({ pressed }) => ({
         marginHorizontal: 16,
-        backgroundColor: theme.surface,
+        backgroundColor: theme.white,
         borderRadius: 16,
         borderWidth: HAIRLINE,
         borderColor: theme.border,
