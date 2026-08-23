@@ -541,7 +541,7 @@ export default function HomeScreen() {
   );
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.background }}>
       <FlashList
         ref={listRef}
         data={gridRows}
