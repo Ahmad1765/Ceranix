@@ -586,7 +586,7 @@ export default function InboxScreen() {
   );
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Header — centered title, side icons */}
       <View
         style={{

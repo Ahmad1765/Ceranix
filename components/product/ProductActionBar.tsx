@@ -11,8 +11,7 @@ import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
 import { Text } from '@/lib/rnText';
 import { formatPrice } from '@/lib/currency';
-
-import { colors } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 
 export interface ProductActionBarProps {
   price?: number;
@@ -46,6 +45,7 @@ export function ProductActionBar({
   style,
 }: ProductActionBarProps) {
   const insets = useSafeAreaInsets();
+  const { theme, isDark } = useTheme();
   const safeBottom = bottomInset !== undefined ? bottomInset : insets.bottom;
 
   const handleOffer = () => {
@@ -75,8 +75,8 @@ export function ProductActionBar({
       style={[
         styles.container,
         {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.border,
+          backgroundColor: theme.surface,
+          borderTopColor: theme.border,
           paddingBottom: Math.max(safeBottom, 16),
         },
         style,
@@ -87,8 +87,8 @@ export function ProductActionBar({
         accessibilityRole="text"
         style={styles.trustRow}
       >
-        <Feather name="lock" size={12} color={colors.mute} />
-        <Text style={[styles.trustText, { color: colors.mute }]}>
+        <Feather name="lock" size={12} color={theme.mute} />
+        <Text style={[styles.trustText, { color: theme.mute }]}>
           Secure checkout · Buyer Protection included
         </Text>
       </View>
@@ -105,14 +105,14 @@ export function ProductActionBar({
             style={({ pressed }) => [
               styles.offerButton,
               {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
+                backgroundColor: theme.panel,
+                borderColor: theme.border,
                 opacity: pressed ? 0.7 : 1,
                 transform: [{ scale: pressed ? 0.98 : 1 }],
               },
             ]}
           >
-            <Text style={[styles.offerButtonText, { color: colors.ink }]}>Make an offer</Text>
+            <Text style={[styles.offerButtonText, { color: theme.ink }]}>Make an offer</Text>
           </Pressable>
         )}
 
@@ -129,8 +129,8 @@ export function ProductActionBar({
           style={({ pressed }) => [
             styles.buyButton,
             {
-              backgroundColor: colors.purple,
-              borderColor: colors.purple,
+              backgroundColor: theme.purple,
+              borderColor: theme.purple,
               opacity: pressed ? 0.85 : 1,
               transform: [{ scale: pressed ? 0.98 : 1 }],
             },

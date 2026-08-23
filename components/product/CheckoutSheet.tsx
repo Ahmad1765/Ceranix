@@ -12,6 +12,7 @@ import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { ThumbButton } from '@/components/ui/ThumbButton';
 import { Text } from '@/lib/rnText';
 import { colors, radii, type } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { buyerProtectionFee, formatPrice, DEFAULT_SHIPPING_FEE } from '@/lib/fees';
 
 export type FulfillmentMethod = 'delivery' | 'handshake';
@@ -51,6 +52,7 @@ export function CheckoutSheet({
   onConfirmPay,
   loading = false,
 }: CheckoutSheetProps) {
+  const { theme, isDark } = useTheme();
   const [fulfillment, setFulfillment] = useState<FulfillmentMethod>('delivery');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType>('cod');
 
@@ -109,7 +111,7 @@ export function CheckoutSheet({
     >
       <View style={styles.content}>
         {/* 1. Compact Product Summary (Mini-Image + Title + Price) */}
-        <View style={styles.productCard}>
+        <View style={[styles.productCard, { backgroundColor: theme.panel }]}>
           {product?.imageUrl ? (
             <Image
               source={{ uri: product.imageUrl }}
@@ -121,28 +123,28 @@ export function CheckoutSheet({
               style={[
                 styles.productThumb,
                 {
-                  backgroundColor: colors.panel,
+                  backgroundColor: theme.surface,
                   alignItems: 'center',
                   justifyContent: 'center',
                 },
               ]}
             >
-              <Feather name="image" size={24} color={colors.mute} />
+              <Feather name="image" size={24} color={theme.mute} />
             </View>
           )}
           <View style={styles.productDetails}>
             <Text
-              style={[styles.productTitle, { fontFamily: type.family.sansBold }]}
+              style={[styles.productTitle, { color: theme.ink, fontFamily: type.family.sansBold }]}
               numberOfLines={2}
             >
               {product?.title}
             </Text>
             {product?.sellerName && (
-              <Text style={styles.sellerName} numberOfLines={1}>
+              <Text style={[styles.sellerName, { color: theme.mute }]} numberOfLines={1}>
                 Sold by @{product.sellerName}
               </Text>
             )}
-            <Text style={[styles.itemPrice, { fontFamily: type.family.sansBold }]}>
+            <Text style={[styles.itemPrice, { color: theme.ink, fontFamily: type.family.sansBold }]}>
               {formatPrice(itemPrice)}
             </Text>
           </View>
@@ -150,7 +152,7 @@ export function CheckoutSheet({
 
         {/* 2. Fulfillment Method Toggle (Local Handshake vs Insured Delivery) */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { fontFamily: type.family.sansBold }]}>
+          <Text style={[styles.sectionTitle, { color: theme.ink, fontFamily: type.family.sansBold }]}>
             Fulfillment
           </Text>
           <View style={styles.fulfillmentGrid}>
@@ -158,7 +160,15 @@ export function CheckoutSheet({
               onPress={() => handleFulfillmentChange('delivery')}
               style={[
                 styles.fulfillmentCard,
-                fulfillment === 'delivery' && styles.fulfillmentCardActive,
+                {
+                  backgroundColor:
+                    fulfillment === 'delivery'
+                      ? isDark
+                        ? 'rgba(108, 71, 255, 0.22)'
+                        : theme.primarySoft
+                      : theme.panel,
+                  borderColor: fulfillment === 'delivery' ? theme.purple : theme.hairline,
+                },
               ]}
               accessibilityRole="radio"
               accessibilityState={{ selected: fulfillment === 'delivery' }}
@@ -167,7 +177,7 @@ export function CheckoutSheet({
                 <Feather
                   name="truck"
                   size={18}
-                  color={fulfillment === 'delivery' ? colors.primary : colors.ink}
+                  color={fulfillment === 'delivery' ? (isDark ? '#A78BFA' : theme.purple) : theme.ink}
                 />
                 <Text
                   style={[
@@ -175,8 +185,10 @@ export function CheckoutSheet({
                     {
                       color:
                         fulfillment === 'delivery'
-                          ? colors.primary
-                          : colors.mute,
+                          ? isDark
+                            ? '#A78BFA'
+                            : theme.purple
+                          : theme.mute,
                       fontFamily: type.family.sansBold,
                     },
                   ]}
@@ -187,19 +199,27 @@ export function CheckoutSheet({
               <Text
                 style={[
                   styles.fulfillmentLabel,
-                  { fontFamily: type.family.sansBold },
+                  { color: theme.ink, fontFamily: type.family.sansBold },
                 ]}
               >
                 Insured Delivery
               </Text>
-              <Text style={styles.fulfillmentHint}>2-4 business days</Text>
+              <Text style={[styles.fulfillmentHint, { color: theme.mute }]}>2-4 business days</Text>
             </Pressable>
 
             <Pressable
               onPress={() => handleFulfillmentChange('handshake')}
               style={[
                 styles.fulfillmentCard,
-                fulfillment === 'handshake' && styles.fulfillmentCardActive,
+                {
+                  backgroundColor:
+                    fulfillment === 'handshake'
+                      ? isDark
+                        ? 'rgba(108, 71, 255, 0.22)'
+                        : theme.primarySoft
+                      : theme.panel,
+                  borderColor: fulfillment === 'handshake' ? theme.purple : theme.hairline,
+                },
               ]}
               accessibilityRole="radio"
               accessibilityState={{ selected: fulfillment === 'handshake' }}
@@ -208,7 +228,7 @@ export function CheckoutSheet({
                 <Feather
                   name="map-pin"
                   size={18}
-                  color={fulfillment === 'handshake' ? colors.primary : colors.ink}
+                  color={fulfillment === 'handshake' ? (isDark ? '#A78BFA' : theme.purple) : theme.ink}
                 />
                 <Text
                   style={[
@@ -216,8 +236,10 @@ export function CheckoutSheet({
                     {
                       color:
                         fulfillment === 'handshake'
-                          ? colors.primary
-                          : colors.mute,
+                          ? isDark
+                            ? '#A78BFA'
+                            : theme.purple
+                          : theme.mute,
                       fontFamily: type.family.sansBold,
                     },
                   ]}
@@ -228,19 +250,19 @@ export function CheckoutSheet({
               <Text
                 style={[
                   styles.fulfillmentLabel,
-                  { fontFamily: type.family.sansBold },
+                  { color: theme.ink, fontFamily: type.family.sansBold },
                 ]}
               >
                 Local Handshake
               </Text>
-              <Text style={styles.fulfillmentHint}>Meet in public place</Text>
+              <Text style={[styles.fulfillmentHint, { color: theme.mute }]}>Meet in public place</Text>
             </Pressable>
           </View>
         </View>
 
         {/* 3. Payment Method Selection */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { fontFamily: type.family.sansBold }]}>
+          <Text style={[styles.sectionTitle, { color: theme.ink, fontFamily: type.family.sansBold }]}>
             Payment Method
           </Text>
           <View style={styles.paymentList}>
@@ -262,31 +284,31 @@ export function CheckoutSheet({
         </View>
 
         {/* 4. Complete Price Breakdown */}
-        <View style={styles.summaryCard}>
+        <View style={[styles.summaryCard, { backgroundColor: theme.panel }]}>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Item price</Text>
-            <Text style={styles.summaryValue}>{formatPrice(itemPrice)}</Text>
+            <Text style={[styles.summaryLabel, { color: theme.mute }]}>Item price</Text>
+            <Text style={[styles.summaryValue, { color: theme.ink }]}>{formatPrice(itemPrice)}</Text>
           </View>
           {protectionFee > 0 ? (
             <View style={styles.summaryRow}>
               <View style={styles.labelWithIcon}>
-                <Text style={styles.summaryLabel}>Buyer protection</Text>
-                <Feather name="shield" size={12} color={colors.primary} />
+                <Text style={[styles.summaryLabel, { color: theme.mute }]}>Buyer protection</Text>
+                <Feather name="shield" size={12} color={isDark ? '#A78BFA' : theme.purple} />
               </View>
-              <Text style={styles.summaryValue}>{formatPrice(protectionFee)}</Text>
+              <Text style={[styles.summaryValue, { color: theme.ink }]}>{formatPrice(protectionFee)}</Text>
             </View>
           ) : null}
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Shipping</Text>
-            <Text style={styles.summaryValue}>
+            <Text style={[styles.summaryLabel, { color: theme.mute }]}>Shipping</Text>
+            <Text style={[styles.summaryValue, { color: theme.ink }]}>
               {shippingFee === 0 ? 'Free' : formatPrice(shippingFee)}
             </Text>
           </View>
-          <View style={[styles.summaryRow, styles.totalRow]}>
-            <Text style={[styles.totalLabel, { fontFamily: type.family.sansBold }]}>
+          <View style={[styles.totalRow, { borderTopColor: theme.hairline }]}>
+            <Text style={[styles.totalLabel, { color: theme.ink, fontFamily: type.family.sansBold }]}>
               Total
             </Text>
-            <Text style={[styles.totalValue, { fontFamily: type.family.sansBold }]}>
+            <Text style={[styles.totalValue, { color: isDark ? '#A78BFA' : theme.purple, fontFamily: type.family.sansBold }]}>
               {formatPrice(totalAmount)}
             </Text>
           </View>
@@ -309,10 +331,21 @@ function PaymentRow({
   selected: boolean;
   onSelect: () => void;
 }) {
+  const { theme, isDark } = useTheme();
   return (
     <Pressable
       onPress={onSelect}
-      style={[styles.paymentRow, selected && styles.paymentRowActive]}
+      style={[
+        styles.paymentRow,
+        {
+          backgroundColor: selected
+            ? isDark
+              ? 'rgba(108, 71, 255, 0.20)'
+              : 'rgba(108, 71, 255, 0.06)'
+            : theme.panel,
+          borderColor: selected ? theme.purple : theme.hairline,
+        },
+      ]}
       accessibilityRole="radio"
       accessibilityState={{ selected }}
     >
@@ -320,34 +353,42 @@ function PaymentRow({
         <View
           style={[
             styles.paymentIconBox,
-            selected && { backgroundColor: colors.primarySoft },
+            {
+              backgroundColor: theme.surface,
+            },
           ]}
         >
           <Feather
             name={icon}
             size={18}
-            color={selected ? colors.primary : colors.ink}
+            color={selected ? (isDark ? '#A78BFA' : theme.purple) : theme.ink}
           />
         </View>
         <View style={styles.paymentText}>
           <Text
             style={[
               styles.paymentTitle,
-              { fontFamily: selected ? type.family.sansBold : type.family.sansMedium },
+              {
+                color: theme.ink,
+                fontFamily: selected ? type.family.sansBold : type.family.sansMedium,
+              },
             ]}
           >
             {title}
           </Text>
-          <Text style={styles.paymentSubtitle}>{subtitle}</Text>
+          <Text style={[styles.paymentSubtitle, { color: theme.mute }]}>{subtitle}</Text>
         </View>
       </View>
       <View
         style={[
           styles.radioCircle,
-          selected && { borderColor: colors.primary, backgroundColor: colors.primary },
+          {
+            borderColor: selected ? theme.purple : theme.hairline,
+            backgroundColor: selected ? theme.purple : 'transparent',
+          },
         ]}
       >
-        {selected && <View style={styles.radioInner} />}
+        {selected && <View style={[styles.radioInner, { backgroundColor: '#FFFFFF' }]} />}
       </View>
     </Pressable>
   );

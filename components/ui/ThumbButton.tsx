@@ -16,7 +16,8 @@ import Animated, {
 import * as Haptics from 'expo-haptics';
 import Feather from '@expo/vector-icons/Feather';
 import { Text } from '@/lib/rnText';
-import { colors, radii, type } from '@/lib/theme';
+import { radii, type, ThemeTokens } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 
 export type ButtonVariant =
   | 'primary'
@@ -105,6 +106,7 @@ export function ThumbButton({
   textStyle,
   accessibilityLabel,
 }: ThumbButtonProps) {
+  const { theme, isDark } = useTheme();
   const height = heightToken ? TOKEN_HEIGHTS[heightToken] : HEIGHT_MAP[size];
   const fontSize = FONT_SIZES[size];
   const paddingX = PADDING_HORIZONTAL[size];
@@ -132,7 +134,7 @@ export function ThumbButton({
     scale.value = withSpring(1, { damping: 15, stiffness: 300 });
   };
 
-  const colorStyles = getColorStyles(variant, disabled);
+  const colorStyles = getColorStyles(variant, theme, isDark, disabled);
 
   return (
     <AnimatedPressable
@@ -202,7 +204,7 @@ export function ThumbButton({
                   styles.badgeContainer,
                   {
                     backgroundColor:
-                      variant === 'primary' ? 'rgba(255,255,255,0.25)' : colors.primarySoft,
+                      variant === 'primary' ? 'rgba(255,255,255,0.25)' : theme.primarySoft,
                   },
                 ]}
               >
@@ -210,7 +212,7 @@ export function ThumbButton({
                   style={[
                     styles.badgeText,
                     {
-                      color: variant === 'primary' ? colors.white : colors.primary,
+                      color: variant === 'primary' ? '#FFFFFF' : theme.primary,
                       fontSize: fontSize - 2,
                     },
                   ]}
@@ -236,11 +238,16 @@ export function ThumbButton({
   );
 }
 
-function getColorStyles(variant: ButtonVariant, disabled?: boolean) {
+function getColorStyles(
+  variant: ButtonVariant,
+  theme: ThemeTokens,
+  isDark: boolean,
+  disabled?: boolean,
+) {
   if (disabled) {
     return {
-      bg: colors.panel,
-      fg: colors.muteSoft,
+      bg: isDark ? '#222222' : theme.panel,
+      fg: theme.muteSoft,
       borderWidth: 0,
       borderColor: 'transparent',
     };
@@ -249,51 +256,51 @@ function getColorStyles(variant: ButtonVariant, disabled?: boolean) {
   switch (variant) {
     case 'primary':
       return {
-        bg: colors.primary,
-        fg: colors.white,
+        bg: isDark ? theme.purple : theme.primary,
+        fg: '#FFFFFF',
         borderWidth: 0,
         borderColor: 'transparent',
       };
     case 'secondary':
     case 'ghost':
       return {
-        bg: colors.white,
-        fg: colors.ink,
+        bg: theme.surface,
+        fg: theme.ink,
         borderWidth: 1,
-        borderColor: colors.hairline,
+        borderColor: theme.hairline,
       };
     case 'dark':
       return {
-        bg: colors.ink,
-        fg: colors.white,
+        bg: isDark ? '#FFFFFF' : '#111111',
+        fg: isDark ? '#111111' : '#FFFFFF',
         borderWidth: 0,
         borderColor: 'transparent',
       };
     case 'soft':
       return {
-        bg: colors.primarySoft,
-        fg: colors.primary,
+        bg: theme.purpleSoft,
+        fg: isDark ? '#A78BFA' : theme.purple,
         borderWidth: 0,
         borderColor: 'transparent',
       };
     case 'danger':
       return {
-        bg: colors.danger,
-        fg: colors.white,
+        bg: theme.danger,
+        fg: '#FFFFFF',
         borderWidth: 0,
         borderColor: 'transparent',
       };
     case 'text':
       return {
         bg: 'transparent',
-        fg: colors.primary,
+        fg: isDark ? '#A78BFA' : theme.purple,
         borderWidth: 0,
         borderColor: 'transparent',
       };
     default:
       return {
-        bg: colors.primary,
-        fg: colors.white,
+        bg: isDark ? theme.purple : theme.primary,
+        fg: '#FFFFFF',
         borderWidth: 0,
         borderColor: 'transparent',
       };

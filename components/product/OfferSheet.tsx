@@ -11,6 +11,7 @@ import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { ThumbButton } from '@/components/ui/ThumbButton';
 import { Text, TextInput } from '@/lib/rnText';
 import { colors, radii, type } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { formatPrice, CURRENCY_SYMBOL } from '@/lib/currency';
 
 export interface OfferSheetProps {
@@ -35,6 +36,7 @@ export function OfferSheet({
   onSubmit,
   loading = false,
 }: OfferSheetProps) {
+  const { theme, isDark } = useTheme();
   const [customAmount, setCustomAmount] = useState('');
   const [selectedTier, setSelectedTier] = useState<number | null>(null);
 
@@ -103,9 +105,9 @@ export function OfferSheet({
     >
       <View style={styles.content}>
         {/* Asking Price Banner */}
-        <View style={styles.askingRow}>
-          <Text style={styles.askingLabel}>Listed asking price</Text>
-          <Text style={[styles.askingValue, { fontFamily: type.family.sansBold }]}>
+        <View style={[styles.askingRow, { backgroundColor: theme.panel }]}>
+          <Text style={[styles.askingLabel, { color: theme.mute }]}>Listed asking price</Text>
+          <Text style={[styles.askingValue, { color: theme.ink, fontFamily: type.family.sansBold }]}>
             {formatPrice(askingPrice)}
           </Text>
         </View>
@@ -120,7 +122,12 @@ export function OfferSheet({
                 onPress={() => handleSelectTier(idx, tier.amount)}
                 style={[
                   styles.presetChip,
-                  isSelected && styles.presetChipSelected,
+                  {
+                    backgroundColor: isSelected
+                      ? (isDark ? 'rgba(108, 71, 255, 0.22)' : theme.primarySoft)
+                      : theme.panel,
+                    borderColor: isSelected ? theme.purple : theme.hairline,
+                  },
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel={`-${tier.percent}%: ${formatPrice(tier.amount)}`}
@@ -129,7 +136,7 @@ export function OfferSheet({
                   style={[
                     styles.presetPercent,
                     {
-                      color: isSelected ? colors.primary : colors.mute,
+                      color: isSelected ? (isDark ? '#A78BFA' : theme.purple) : theme.mute,
                       fontFamily: type.family.sansBold,
                     },
                   ]}
@@ -140,7 +147,7 @@ export function OfferSheet({
                   style={[
                     styles.presetAmount,
                     {
-                      color: isSelected ? colors.primary : colors.ink,
+                      color: isSelected ? (isDark ? '#FFFFFF' : theme.purple) : theme.ink,
                       fontFamily: type.family.sansBold,
                     },
                   ]}
@@ -153,15 +160,15 @@ export function OfferSheet({
         </View>
 
         {/* Custom Input Field */}
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputPrefix}>{CURRENCY_SYMBOL}</Text>
+        <View style={[styles.inputContainer, { backgroundColor: theme.panel, borderColor: theme.hairline }]}>
+          <Text style={[styles.inputPrefix, { color: theme.ink }]}>{CURRENCY_SYMBOL}</Text>
           <TextInput
             value={customAmount}
             onChangeText={handleCustomChange}
             placeholder={String(askingPrice)}
-            placeholderTextColor={colors.mute}
+            placeholderTextColor={theme.mute}
             keyboardType="number-pad"
-            style={[styles.input, { fontFamily: type.family.sansBold }]}
+            style={[styles.input, { color: theme.ink, fontFamily: type.family.sansBold }]}
             maxLength={Math.max(10, String(askingPrice || 0).length + 2)}
             returnKeyType="done"
           />
@@ -172,17 +179,24 @@ export function OfferSheet({
                 setSelectedTier(null);
               }}
               hitSlop={8}
-              style={styles.clearButton}
+              style={[styles.clearButton, { backgroundColor: theme.surface }]}
             >
-              <Feather name="x" size={16} color={colors.mute} />
+              <Feather name="x" size={16} color={theme.mute} />
             </Pressable>
           )}
         </View>
 
         {/* Informational Guidance */}
-        <View style={styles.infoBox}>
-          <Feather name="info" size={14} color={colors.primary} />
-          <Text style={styles.infoText}>
+        <View
+          style={[
+            styles.infoBox,
+            {
+              backgroundColor: isDark ? 'rgba(108, 71, 255, 0.15)' : 'rgba(108, 71, 255, 0.06)',
+            },
+          ]}
+        >
+          <Feather name="info" size={14} color={isDark ? '#A78BFA' : theme.purple} />
+          <Text style={[styles.infoText, { color: theme.mute }]}>
             Offers are valid for 24 hours. The seller can accept, counter, or decline.
           </Text>
         </View>

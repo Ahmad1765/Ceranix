@@ -835,7 +835,7 @@ export default function ConversationScreen() {
 
   if (loading) {
     return (
-      <SafeContainer edges={['top', 'left', 'right']} backgroundColor={colors.white} style={{ flex: 1 }}>
+      <SafeContainer edges={['top', 'left', 'right']} backgroundColor={colors.background} style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6 }}>
           <Pressable
             onPress={() => safeBack()}
@@ -856,7 +856,7 @@ export default function ConversationScreen() {
 
   if (!conv) {
     return (
-      <SafeContainer edges={['top', 'left', 'right']} backgroundColor={colors.white} style={{ flex: 1 }}>
+      <SafeContainer edges={['top', 'left', 'right']} backgroundColor={colors.background} style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6 }}>
           <Pressable
             onPress={() => safeBack()}

@@ -28,6 +28,7 @@ import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
 import { Text } from '@/lib/rnText';
 import { colors, radii, type } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -81,6 +82,7 @@ export function BottomSheetModal({
   style,
 }: BottomSheetModalProps) {
   const insets = useSafeAreaInsets();
+  const { theme, isDark } = useTheme();
   const calculatedHeight = fixedHeight ?? (autoHeight ? undefined : SCREEN_HEIGHT * Math.min(Math.max(snapHeightRatio, 0.3), 0.95));
   const fallbackDismissHeight = calculatedHeight ?? 400;
 
@@ -172,10 +174,13 @@ export function BottomSheetModal({
         <Animated.View
           style={[
             styles.sheet,
-            calculatedHeight ? { height: calculatedHeight } : { maxHeight: SCREEN_HEIGHT * 0.88 },
             {
+              backgroundColor: theme.surface,
+              borderTopWidth: StyleSheet.hairlineWidth,
+              borderColor: theme.border,
               paddingBottom: Math.max(insets.bottom, 16),
             },
+            calculatedHeight ? { height: calculatedHeight } : { maxHeight: SCREEN_HEIGHT * 0.88 },
             sheetAnimatedStyle,
             style,
           ]}
@@ -184,18 +189,18 @@ export function BottomSheetModal({
           <GestureDetector gesture={panGesture}>
             <View>
               <View style={styles.dragHandleContainer}>
-                <View style={styles.dragHandle} />
+                <View style={[styles.dragHandle, { backgroundColor: theme.hairline }]} />
               </View>
 
               {/* Header with Title & 44x44 Dismiss Button */}
               {(title || subtitle || headerRight) && (
-                <View style={styles.header}>
+                <View style={[styles.header, { borderBottomColor: theme.hairline }]}>
                   <View style={styles.headerTextContainer}>
                     {title && (
                       <Text
                         style={[
                           styles.headerTitle,
-                          { fontFamily: type.family.sansBold },
+                          { color: theme.ink, fontFamily: type.family.sansBold },
                         ]}
                         numberOfLines={1}
                       >
@@ -203,7 +208,7 @@ export function BottomSheetModal({
                       </Text>
                     )}
                     {subtitle && (
-                      <Text style={styles.headerSubtitle} numberOfLines={1}>
+                      <Text style={[styles.headerSubtitle, { color: theme.mute }]} numberOfLines={1}>
                         {subtitle}
                       </Text>
                     )}
@@ -214,11 +219,11 @@ export function BottomSheetModal({
                     <Pressable
                       onPress={onClose}
                       hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                      style={styles.closeButton}
+                      style={[styles.closeButton, { backgroundColor: theme.panel }]}
                       accessibilityRole="button"
                       accessibilityLabel="Close"
                     >
-                      <Feather name="x" size={20} color={colors.ink} />
+                      <Feather name="x" size={20} color={theme.ink} />
                     </Pressable>
                   </View>
                 </View>
@@ -241,7 +246,11 @@ export function BottomSheetModal({
           </ContentWrapper>
 
           {/* Thumb-Zone Pinned Footer (Z: 120 inside sheet) */}
-          {footer && <View style={styles.footerContainer}>{footer}</View>}
+          {footer && (
+            <View style={[styles.footerContainer, { backgroundColor: theme.surface, borderTopColor: theme.hairline }]}>
+              {footer}
+            </View>
+          )}
         </Animated.View>
       </GestureHandlerRootView>
     </Modal>
