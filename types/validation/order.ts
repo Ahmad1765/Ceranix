@@ -67,7 +67,16 @@ export const CheckoutPayloadSchema = z.object({
   buyerId: z.string().uuid('Invalid buyer ID'),
   paymentMethod: z.enum(['cod', 'card']),
   shippingAddress: ShippingAddressSchema,
-  offerAmount: z.number().positive().optional().nullable(),
+  offerAmount: z
+    .number()
+    .positive('Offer amount must be positive')
+    .max(21474836.47, 'Offer amount exceeds maximum allowed value')
+    .refine(
+      (val) => Number(val.toFixed(2)) === val,
+      'Offer amount must have at most 2 decimal places'
+    )
+    .optional()
+    .nullable(),
   deliveryNotes: z.string().max(300).optional().nullable(),
 });
 

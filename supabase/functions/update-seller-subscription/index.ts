@@ -1,3 +1,4 @@
+// @ts-nocheck
 // supabase/functions/update-seller-subscription/index.ts
 // Deploy: supabase functions deploy update-seller-subscription
 // Requires env: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
@@ -6,12 +7,12 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const envOrigins = Deno.env.get('ALLOWED_ORIGINS');
-const ALLOWED_ORIGINS = envOrigins ? envOrigins.split(',').map((o) => o.trim()).filter(Boolean) : [];
+const ALLOWED_ORIGINS = envOrigins ? envOrigins.split(',').map((o: string) => o.trim()).filter(Boolean) : [];
 
 function getCorsHeaders(req: Request): Record<string, string> | null {
   const origin = req.headers.get('Origin');
   if (!origin) return {};
-  if (ALLOWED_ORIGINS.length > 0 && !ALLOWED_ORIGINS.includes(origin)) return null;
+  if (!ALLOWED_ORIGINS.includes(origin)) return null;
   return {
     'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -61,7 +62,13 @@ Deno.serve(async (req: Request) => {
     }
     const user = userData.user;
 
-    const body = await req.json();
+    let body: { is_pro?: unknown };
+    try {
+      body = await req.json();
+    } catch {
+      return json({ error: 'Invalid request body' }, 400);
+    }
+
     if (typeof body?.is_pro !== 'boolean') {
       return json({ error: 'is_pro boolean is required' }, 400);
     }
@@ -81,7 +88,7 @@ Deno.serve(async (req: Request) => {
 
     return json({ success: true, profile: data });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : 'Unknown error';
-    return json({ error: msg }, 500);
+    console.error('Unexpected error in update-seller-subscription:', e);
+    return json({ error: 'Internal server error' }, 500);
   }
 });

@@ -162,6 +162,17 @@ export default function UserProfileScreen() {
 
   const rowKey = useCallback((row: Listing[]) => row[0]?.id ?? 'empty', []);
 
+  const availableCount = listings.filter((l) => !l.is_sold).length;
+  const soldCount = listings.length - availableCount;
+
+  useEffect(() => {
+    if (shopFilter === 'sold' && soldCount === 0) {
+      setShopFilter('all');
+    } else if (shopFilter === 'available' && availableCount === 0) {
+      setShopFilter('all');
+    }
+  }, [shopFilter, soldCount, availableCount]);
+
   if (loading) {
     return (
       <SafeContainer
@@ -202,16 +213,6 @@ export default function UserProfileScreen() {
     followers: profile.followers_count ?? 0,
   };
   const sellerLevel = computeLevel(sellerStats).current;
-  const availableCount = listings.filter((l) => !l.is_sold).length;
-  const soldCount = listings.length - availableCount;
-
-  useEffect(() => {
-    if (shopFilter === 'sold' && soldCount === 0) {
-      setShopFilter('all');
-    } else if (shopFilter === 'available' && availableCount === 0) {
-      setShopFilter('all');
-    }
-  }, [shopFilter, soldCount, availableCount]);
 
   const credentials = sellerCredentials(
     profile,

@@ -1,4 +1,3 @@
-// @ts-nocheck
 // supabase/functions/create-checkout-session/index.ts
 // Deploy: supabase functions deploy create-checkout-session
 // Required secrets:
@@ -24,7 +23,9 @@
 //   - The session carries listing/buyer metadata; the stripe-webhook function
 //     records the order and marks the listing sold after payment completes.
 
+// @ts-ignore
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
+// @ts-ignore
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { resolveOfferCharge } from './pricing.ts';
 

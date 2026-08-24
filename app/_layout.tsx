@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { disablePressableInterop } from '@/lib/pressableInterop';
 import { installAlertShim } from '@/lib/alertShim';
-import { initSentry, wrapWithSentry } from '@/lib/sentry';
+import { initSentry } from '@/lib/sentry';
 import { initAnalytics, screen } from '@/lib/analytics';
 import { normalizeScreenName } from '@/lib/analyticsEvents';
 import { Stack, usePathname } from 'expo-router';
@@ -165,7 +165,6 @@ function RootLayoutNav() {
         .catch(console.warn)
         .finally(() => {
           setReady(true);
-          SplashScreen.hideAsync();
         });
       return;
     }
@@ -179,9 +178,14 @@ function RootLayoutNav() {
       .catch(console.warn)
       .finally(() => {
         setReady(true);
-        SplashScreen.hideAsync();
       });
   }, []);
+
+  useEffect(() => {
+    if (ready && hydrated) {
+      SplashScreen.hideAsync();
+    }
+  }, [ready, hydrated]);
 
   // Preloader disabled — render nothing until boot assets are ready instead of
   // the branded loading screen.
@@ -279,14 +283,10 @@ function RootLayoutNav() {
   );
 }
 
-function RootLayout() {
+export default function RootLayout() {
   return (
     <ThemeProvider>
       <RootLayoutNav />
     </ThemeProvider>
   );
 }
-
-// Sentry.wrap adds native crash, touch-event, and performance instrumentation
-// around the root. No-ops (returns the component unchanged) without a DSN.
-export default wrapWithSentry(RootLayout);

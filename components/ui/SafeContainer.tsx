@@ -109,7 +109,7 @@ export function SafeContainer({
           children
         )}
         {stickyFooter && (
-          <View style={stickyFooterStyle}>
+          <View style={[stickyFooterStyle, { paddingBottom: 12 }]}>
             {stickyFooter}
           </View>
         )}

@@ -1,3 +1,7 @@
+import type { ValidatedShippingAddress } from './validation/order';
+
+export type { ValidatedShippingAddress };
+
 export type Gender = 'all' | 'men' | 'women' | 'unisex';
 
 export type Condition = 'new_with_tags' | 'like_new' | 'good' | 'fair';
@@ -79,7 +83,7 @@ export interface Order {
   offer_message_id?: string | null;
   payment_method?: PaymentMethod;
   status: OrderStatus;
-  shipping_address?: Partial<ShippingAddress> | Record<string, any> | null;
+  shipping_address?: ValidatedShippingAddress | null;
   delivery_notes?: string | null;
   courier_name?: string | null;
   tracking_number?: string | null;

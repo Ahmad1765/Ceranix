@@ -4,7 +4,7 @@ import {
   CodPaymentProvider,
   StripePaymentProvider,
 } from '@/lib/paymentService';
-import { ShippingAddressSchema } from '@/types/validation/order';
+import { ShippingAddressSchema, CheckoutPayloadSchema } from '@/types/validation/order';
 
 vi.mock('react-native', () => ({
   Platform: { OS: 'web' },
@@ -107,6 +107,50 @@ describe('ShippingAddressSchema (Zod Strict Validation)', () => {
   it('rejects short phone number', () => {
     const invalid = { ...validAddress, phone: '123' };
     expect(ShippingAddressSchema.safeParse(invalid).success).toBe(false);
+  });
+});
+
+describe('CheckoutPayloadSchema (offerAmount & Order Validation)', () => {
+  const validPayload = {
+    listingId: '11111111-1111-1111-1111-111111111111',
+    buyerId: '22222222-2222-2222-2222-222222222222',
+    paymentMethod: 'cod' as const,
+    shippingAddress: {
+      recipientName: 'Muhammad Ahmad',
+      phone: '03254864702',
+      line1: 'E-381 Block C Nishat Colony',
+      city: 'Lahore',
+      state: 'Punjab',
+      postalCode: '54000',
+      country: 'Pakistan',
+    },
+  };
+
+  it('validates a payload with optional and nullable offerAmount', () => {
+    expect(CheckoutPayloadSchema.safeParse(validPayload).success).toBe(true);
+    expect(CheckoutPayloadSchema.safeParse({ ...validPayload, offerAmount: null }).success).toBe(true);
+    expect(CheckoutPayloadSchema.safeParse({ ...validPayload, offerAmount: 1500 }).success).toBe(true);
+    expect(CheckoutPayloadSchema.safeParse({ ...validPayload, offerAmount: 1500.5 }).success).toBe(true);
+    expect(CheckoutPayloadSchema.safeParse({ ...validPayload, offerAmount: 1500.99 }).success).toBe(true);
+  });
+
+  it('accepts max safe integer cents bound for offerAmount', () => {
+    expect(CheckoutPayloadSchema.safeParse({ ...validPayload, offerAmount: 21474836.47 }).success).toBe(true);
+  });
+
+  it('rejects offerAmount exceeding max safe integer cents bound', () => {
+    expect(CheckoutPayloadSchema.safeParse({ ...validPayload, offerAmount: 21474836.48 }).success).toBe(false);
+    expect(CheckoutPayloadSchema.safeParse({ ...validPayload, offerAmount: 30000000 }).success).toBe(false);
+  });
+
+  it('rejects non-positive offerAmount', () => {
+    expect(CheckoutPayloadSchema.safeParse({ ...validPayload, offerAmount: 0 }).success).toBe(false);
+    expect(CheckoutPayloadSchema.safeParse({ ...validPayload, offerAmount: -10 }).success).toBe(false);
+  });
+
+  it('rejects offerAmount with more than two decimal places', () => {
+    expect(CheckoutPayloadSchema.safeParse({ ...validPayload, offerAmount: 15.123 }).success).toBe(false);
+    expect(CheckoutPayloadSchema.safeParse({ ...validPayload, offerAmount: 9.999 }).success).toBe(false);
   });
 });
 

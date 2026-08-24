@@ -77,8 +77,8 @@ begin
     returning * into v_order;
   end if;
 
-  -- 4. Re-list the item so it is available again
-  if v_order.listing_id is not null then
+  -- 4. Re-list the item for non-paid cancellations so it is available again
+  if v_order.status = 'canceled' and v_order.listing_id is not null then
     update public.listings
        set is_sold = false
      where id = v_order.listing_id;
@@ -102,7 +102,8 @@ begin
     ) values (
       v_conv_id,
       v_caller_id,
-      'Order cancelled by ' || v_caller_role || E'\nReason: ' || coalesce(p_reason, 'No reason specified') || E'\nThe item is now available again.',
+      'Order cancelled by ' || v_caller_role || E'\nReason: ' || coalesce(p_reason, 'No reason specified') ||
+      case when v_order.status = 'canceled' then E'\nThe item is now available again.' else '' end,
       'system',
       jsonb_build_object(
         'order_id', p_order_id,
@@ -152,8 +153,14 @@ begin
     raise exception 'Only the seller can mark this order as shipped' using errcode = '42501';
   end if;
 
-  if v_order.status = 'canceled' then
-    raise exception 'Cannot ship a cancelled order' using errcode = '22000';
+  -- Make repeated calls idempotent by returning without updating shipped_at or creating another system message
+  if v_order.shipped_at is not null then
+    return v_order;
+  end if;
+
+  -- Allow shipping only from non-terminal active status (pending or paid)
+  if v_order.status in ('refund_due', 'refunded', 'failed', 'completed', 'canceled') then
+    raise exception 'Cannot ship order with status: %', v_order.status using errcode = '22000';
   end if;
 
   update public.orders

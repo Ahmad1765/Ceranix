@@ -1,11 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
+import { eyebrow, eyebrowMute, lightTheme, darkTheme, setActiveTheme } from './theme';
 
 vi.mock('react-native', () => ({
   Platform: { OS: 'web', select: (obj: any) => obj.web || obj.default },
   NativeModules: {},
 }));
-
-import { eyebrow, eyebrowMute, lightTheme, darkTheme, setActiveTheme } from './theme';
 
 describe('theme eyebrow & eyebrowMute proxies', () => {
   it('enumerates typography properties when spread', () => {

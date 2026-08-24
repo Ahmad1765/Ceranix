@@ -101,7 +101,7 @@ export class CodPaymentProvider implements PaymentProvider {
         p_listing_id: request.listingId,
         p_buyer_id: request.buyerId ?? null,
         p_payment_method: 'cod',
-        p_shipping_address: toSnakeCaseAddress(validatedAddress),
+        p_shipping_address: validatedAddress,
         p_offer_amount: request.offerAmount ?? null,
         p_delivery_notes: request.deliveryNotes?.trim() || validatedAddress.deliveryInstructions || null,
       });
@@ -155,7 +155,7 @@ export class CodPaymentProvider implements PaymentProvider {
       offer_message_id: null,
       payment_method: 'cod',
       status: 'pending',
-      shipping_address: toSnakeCaseAddress(validatedAddress),
+      shipping_address: validatedAddress,
       delivery_notes: request.deliveryNotes ?? validatedAddress.deliveryInstructions ?? null,
       created_at: new Date().toISOString(),
     };
@@ -236,7 +236,7 @@ export class StripePaymentProvider implements PaymentProvider {
         p_listing_id: request.listingId,
         p_buyer_id: request.buyerId ?? null,
         p_payment_method: 'card',
-        p_shipping_address: toSnakeCaseAddress(validatedAddress),
+        p_shipping_address: validatedAddress,
         p_offer_amount: request.offerAmount ?? null,
         p_delivery_notes: request.deliveryNotes?.trim() || null,
       });
@@ -272,7 +272,7 @@ export class StripePaymentProvider implements PaymentProvider {
       offer_message_id: null,
       payment_method: 'card',
       status: 'paid',
-      shipping_address: toSnakeCaseAddress(validatedAddress),
+      shipping_address: validatedAddress,
       delivery_notes: request.deliveryNotes ?? null,
       created_at: new Date().toISOString(),
     };
@@ -385,13 +385,18 @@ export class PaymentService {
         fallbackError = new Error(updateError.message);
       } else if (updatedOrder) {
         if (listingId) {
-          await supabase
+          const { error: listingError } = await supabase
             .from('listings')
             .update({ is_sold: false })
             .eq('id', listingId);
+          if (listingError) {
+            fallbackError = new Error(listingError.message);
+          }
         }
-        capture('order_cancelled', { order_id: orderId, reason, fallback: true });
-        return updatedOrder as Order;
+        if (!fallbackError) {
+          capture('order_cancelled', { order_id: orderId, reason, fallback: true });
+          return updatedOrder as Order;
+        }
       }
     } catch (e: any) {
       fallbackError = e instanceof Error ? e : new Error(String(e));

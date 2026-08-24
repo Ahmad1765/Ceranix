@@ -119,6 +119,9 @@ export function SellerOptionsSheet({
       } else {
         toast.show('Could not submit report. Please try again.', { variant: 'default', icon: 'alert-triangle' });
       }
+    } catch {
+      onClose();
+      toast.show('Could not submit report. Please try again.', { variant: 'default', icon: 'alert-triangle' });
     } finally {
       isSubmittingReportRef.current = false;
       setSubmittingReport(false);
@@ -159,7 +162,7 @@ export function SellerOptionsSheet({
               onPress={handleViewProfile}
               style={({ pressed }) => [styles.actionRow, pressed && styles.actionRowPressed]}
             >
-              <View style={[styles.iconCircle, { backgroundColor: 'rgba(15,15,15,0.06)' }]}>
+              <View style={[styles.iconCircle, { backgroundColor: colors.primarySoft }]}>
                 <Feather name="shopping-bag" size={17} color={colors.ink} />
               </View>
               <View style={styles.actionContent}>
@@ -254,7 +257,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   actionRowPressed: {
-    backgroundColor: 'rgba(15,15,15,0.07)',
+    backgroundColor: colors.primarySoft,
   },
   iconCircle: {
     width: 38,
@@ -279,7 +282,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: 'rgba(15,15,15,0.06)',
+    backgroundColor: colors.divider,
     marginLeft: 64,
   },
   backBtn: {

@@ -33,6 +33,12 @@ export type SaveList = {
   item_count?: number;
 };
 
+export type DefaultListResult =
+  | { status: 'success'; listId: string }
+  | { status: 'network_error'; error: unknown }
+  | { status: 'error'; error: unknown }
+  | { status: 'not_found' };
+
 // Idempotent — seeds the four starter lists on first call, no-op after.
 // Memoized per user per session: the RPC is cheap but it's still a network
 // round-trip on every profile focus otherwise.
@@ -42,7 +48,7 @@ export async function ensureSaveLists(userId: string): Promise<void> {
   const { error } = await supabase.rpc('ensure_save_lists', { p_user_id: userId });
   if (error) {
     console.warn('[saves] ensureSaveLists', error.message);
-    return; // don't memoize failures
+    throw error;
   }
   ensuredFor.add(userId);
 }
@@ -224,25 +230,43 @@ export async function isSaved(listingId: string, userId: string): Promise<boolea
 
 // Returns or lazily creates the user's default list ID. The DB seed
 // function is idempotent so this safe-creates on first save.
-export async function getOrCreateDefaultList(userId: string): Promise<string | null> {
-  const { data, error: readErr } = await supabase
-    .from('save_lists')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('is_default', true)
-    .maybeSingle();
-  if (data?.id) return data.id;
-  if (readErr && isNetworkError(readErr)) return null;
+export async function getOrCreateDefaultList(userId: string): Promise<DefaultListResult> {
+  try {
+    const { data, error: readErr } = await supabase
+      .from('save_lists')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('is_default', true)
+      .maybeSingle();
+    if (readErr) {
+      if (isNetworkError(readErr)) return { status: 'network_error', error: readErr };
+      return { status: 'error', error: readErr };
+    }
+    if (data?.id) return { status: 'success', listId: data.id };
 
-  await ensureSaveLists(userId);
-  const { data: again, error: againErr } = await supabase
-    .from('save_lists')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('is_default', true)
-    .maybeSingle();
-  if (againErr && isNetworkError(againErr)) return null;
-  return again?.id ?? null;
+    try {
+      await ensureSaveLists(userId);
+    } catch (rpcErr) {
+      if (isNetworkError(rpcErr)) return { status: 'network_error', error: rpcErr };
+      return { status: 'error', error: rpcErr };
+    }
+
+    const { data: again, error: againErr } = await supabase
+      .from('save_lists')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('is_default', true)
+      .maybeSingle();
+    if (againErr) {
+      if (isNetworkError(againErr)) return { status: 'network_error', error: againErr };
+      return { status: 'error', error: againErr };
+    }
+    if (again?.id) return { status: 'success', listId: again.id };
+    return { status: 'not_found' };
+  } catch (err) {
+    if (isNetworkError(err)) return { status: 'network_error', error: err };
+    return { status: 'error', error: err };
+  }
 }
 
 // Quick-save shortcut. Returns the new saved-state (true on success,
@@ -297,9 +321,9 @@ export async function toggleSave(
   }
 
   // Saving
-  const listId = await getOrCreateDefaultList(userId);
-  if (!listId) {
-    // Default list couldn't be fetched (likely offline); queue the action
+  const defaultList = await getOrCreateDefaultList(userId);
+  if (defaultList.status === 'network_error') {
+    // Default list couldn't be fetched due to network error; queue the action
     await enqueueOfflineAction({
       type: 'save_toggle',
       userId,
@@ -310,7 +334,12 @@ export async function toggleSave(
     return true;
   }
 
-  const ok = await addToList(listId, listingId, userId);
+  if (defaultList.status !== 'success' || !defaultList.listId) {
+    console.warn('[saves] toggleSave default list unavailable', defaultList);
+    return currentlySaved;
+  }
+
+  const ok = await addToList(defaultList.listId, listingId, userId);
   if (ok) updateSavedCache(userId, listingId, true);
   return ok ? true : currentlySaved;
 }

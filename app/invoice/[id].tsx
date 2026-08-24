@@ -18,6 +18,7 @@ import { deriveInvoiceStatus, deriveInvoiceAmounts } from '@/lib/invoiceStatus';
 import { confirm } from '@/lib/confirm';
 import { paymentService } from '@/lib/paymentService';
 import { generateMapsLink } from '@/lib/maps';
+import { BRAND } from '@/lib/brand';
 import { OrderStepper } from '@/components/orders/OrderStepper';
 import { CancelOrderModal } from '@/components/orders/CancelOrderModal';
 import { MarkShippedModal } from '@/components/orders/MarkShippedModal';
@@ -241,7 +242,7 @@ export default function InvoiceScreen() {
         : '💳 *PRE-PAID VIA CARD*';
 
     const lines: string[] = [
-      `📦 *CERANIX DISPATCH SLIP*`,
+      `📦 *${BRAND.toUpperCase()} DISPATCH SLIP*`,
       `Order: #${invoiceNumber}`,
       `Item: ${listing.title}`,
       '',
@@ -333,7 +334,7 @@ export default function InvoiceScreen() {
     setCompletingReceipt(true);
     try {
       const updated = await paymentService.confirmOrderReceived({ orderId: order.id });
-      setOrder((prev) => ({ ...(prev || updated), status: 'completed' } as any));
+      setOrder((prev) => ({ ...(prev ?? {}), ...(updated ?? {}), status: 'completed' } as any));
       toast.show('Order completed! Thank you for confirming.', {
         variant: 'default',
         icon: 'check',

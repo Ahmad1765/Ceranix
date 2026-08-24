@@ -135,9 +135,10 @@ function OrdersScreen() {
 
   const [side, setSide] = useState<OrderSide>(sideParam === 'sold' ? 'sold' : 'bought');
   const [filter, setFilter] = useState<FilterStatus>('in_progress');
-  const [showToast, setShowToast] = useState(justPaid === '1');
+  const [showToast, setShowToast] = useState(justPaid === '1' || justPaid === '0');
 
   const q = useMyOrdersQuery(user?.id ?? null);
+  const { refetch } = q;
 
   const { bought, sold } = useMemo(
     () => partitionOrders(q.data ?? [], user?.id ?? ''),
@@ -146,7 +147,7 @@ function OrdersScreen() {
 
   // In development, synthesize recently purchased item if fresh from checkout and database replication is in flight
   const allBoughtOrders = useMemo(() => {
-    if (__DEV__ && justPaid === '1' && itemTitleParam && !bought.some((b) => b.listing?.title === itemTitleParam)) {
+    if (__DEV__ && (justPaid === '1' || justPaid === '0') && itemTitleParam && !bought.some((b) => b.listing?.title === itemTitleParam)) {
       const parsedAmount = amountParam ? Number(amountParam) : 0;
       const targetListingId = listingIdParam || '';
       const mockOrder: MyOrder = {
@@ -157,8 +158,8 @@ function OrdersScreen() {
         amount_cents: Math.round(parsedAmount * 100),
         fee_cents: 0,
         currency: 'pkr',
-        payment_method: 'card',
-        status: 'pending',
+        payment_method: justPaid === '1' ? 'card' : 'cod',
+        status: justPaid === '1' ? 'paid' : 'pending',
         shipping_address: null,
         delivery_notes: null,
         created_at: new Date().toISOString(),
@@ -175,10 +176,10 @@ function OrdersScreen() {
   }, [bought, justPaid, itemTitleParam, amountParam, listingIdParam, user?.id]);
 
   useEffect(() => {
-    if (justPaid === '1') {
-      q.refetch();
+    if (justPaid === '1' || justPaid === '0') {
+      refetch();
     }
-  }, [justPaid, q]);
+  }, [justPaid, refetch]);
 
   const rawRows = side === 'bought' ? allBoughtOrders : sold;
 
@@ -198,8 +199,8 @@ function OrdersScreen() {
   }, [rawRows, filter]);
 
   const onRefresh = useCallback(() => {
-    q.refetch();
-  }, [q]);
+    refetch();
+  }, [refetch]);
 
   // Auto-dismiss toast after 6 seconds
   useEffect(() => {
@@ -294,7 +295,23 @@ function OrdersScreen() {
         <View style={styles.emptyContainer}>
           <EmptyState
             icon="shopping-bag"
-            title={side === 'bought' ? 'No orders in progress' : 'No sales in progress'}
+            title={
+              filter === 'in_progress'
+                ? side === 'bought'
+                  ? 'No orders in progress'
+                  : 'No sales in progress'
+                : filter === 'canceled'
+                ? side === 'bought'
+                  ? 'No canceled orders'
+                  : 'No canceled sales'
+                : filter === 'completed'
+                ? side === 'bought'
+                  ? 'No completed orders'
+                  : 'No completed sales'
+                : side === 'bought'
+                ? 'No orders'
+                : 'No sales'
+            }
             description="When you buy or sell items, they will show up here."
             cta={{
               label: side === 'bought' ? 'Browse items' : 'List an item',
@@ -327,7 +344,9 @@ function OrdersScreen() {
           <View style={styles.toastCard}>
             <View style={{ flex: 1 }}>
               <Text style={styles.toastText}>
-                Thank you, we have received your payment. It&apos;s being processed.
+                {justPaid === '1'
+                  ? "Thank you, we have received your payment. It's being processed."
+                  : "Your order has been placed. It's being processed."}
               </Text>
             </View>
             <Pressable onPress={() => setShowToast(false)} hitSlop={8} style={{ paddingLeft: 10 }}>

@@ -61,7 +61,7 @@ export function SaveListSheet({
       setLoading(true);
       // Seed the four starter lists for new users — idempotent so existing
       // users see no change.
-      await ensureSaveLists(userId);
+      await ensureSaveLists(userId).catch(() => {});
       const [ls, contained] = await Promise.all([
         listSaveLists(userId),
         getListsContaining(userId, listingId).catch(() => new Set<string>()),

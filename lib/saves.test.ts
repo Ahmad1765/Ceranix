@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { addToList, removeFromList, getListsContaining, toggleSave } from './saves';
+import { addToList, removeFromList, getListsContaining, toggleSave, getOrCreateDefaultList } from './saves';
 import { supabase } from './supabase';
 import { enqueueOfflineAction } from './offlineSync';
 
 vi.mock('@/lib/supabase', () => ({
   supabase: {
     from: vi.fn(),
+    rpc: vi.fn(),
   },
 }));
 
@@ -123,6 +124,89 @@ describe('lib/saves network error handling and empty set behavior', () => {
 
     const result = await toggleSave('listing-1', 'user-123', true);
     expect(result).toBe(false);
+    expect(enqueueOfflineAction).not.toHaveBeenCalled();
+  });
+
+  it('getOrCreateDefaultList returns discriminated status correctly', async () => {
+    // 1. Success on read
+    (supabase.from as any).mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'default-list-1' }, error: null }),
+          }),
+        }),
+      }),
+    });
+
+    const successRes = await getOrCreateDefaultList('user-1');
+    expect(successRes).toEqual({ status: 'success', listId: 'default-list-1' });
+
+    // 2. Network error on read
+    (supabase.from as any).mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: { message: 'Failed to fetch', code: 'NETWORK_ERROR' } }),
+          }),
+        }),
+      }),
+    });
+
+    const netRes = await getOrCreateDefaultList('user-1');
+    expect(netRes.status).toBe('network_error');
+
+    // 3. Permanent error on read
+    (supabase.from as any).mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: { message: 'permission denied', code: '42501' } }),
+          }),
+        }),
+      }),
+    });
+
+    const permRes = await getOrCreateDefaultList('user-1');
+    expect(permRes.status).toBe('error');
+  });
+
+  it('toggleSave enqueues save_toggle on network failure but not on permanent error', async () => {
+    // Network error when finding default list
+    (supabase.from as any).mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: { message: 'Network timeout', code: 'NETWORK_ERROR' } }),
+          }),
+        }),
+      }),
+    });
+
+    const netResult = await toggleSave('listing-net', 'user-1', false);
+    expect(netResult).toBe(true);
+    expect(enqueueOfflineAction).toHaveBeenCalledWith({
+      type: 'save_toggle',
+      userId: 'user-1',
+      listingId: 'listing-net',
+      targetSaved: true,
+    });
+
+    vi.clearAllMocks();
+
+    // Permanent error
+    (supabase.from as any).mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: { message: 'Fatal DB Error', code: '500' } }),
+          }),
+        }),
+      }),
+    });
+
+    const permResult = await toggleSave('listing-perm', 'user-1', false);
+    expect(permResult).toBe(false);
     expect(enqueueOfflineAction).not.toHaveBeenCalled();
   });
 });

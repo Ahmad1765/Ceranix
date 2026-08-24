@@ -52,6 +52,7 @@ export function SubscriptionSheet({
   const isPro = !!profile?.is_pro;
 
   const handleTogglePro = async () => {
+    if (loading) return;
     if (!user?.id) {
       toast.show('Please sign in to change program', {
         variant: 'default',
@@ -278,6 +279,7 @@ export function SubscriptionSheet({
             }
             onPress={handleTogglePro}
             loading={loading}
+            disabled={loading}
           />
         </View>
       </View>

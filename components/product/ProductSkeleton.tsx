@@ -39,7 +39,7 @@ export function SkeletonBlock({
           width,
           height,
           borderRadius: radius,
-          backgroundColor: 'rgba(15,15,15,0.06)',
+          backgroundColor: colors.primarySoft,
         },
         animStyle,
         style,
@@ -95,7 +95,7 @@ export function ProductSkeleton({ insetsTop }: { insetsTop: number }) {
             marginTop: 24,
             paddingTop: 20,
             borderTopWidth: 1,
-            borderTopColor: 'rgba(15,15,15,0.06)',
+            borderTopColor: colors.primarySoft,
           }}
         >
           <SkeletonBlock width={44} height={44} radius={22} />

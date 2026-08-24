@@ -24,17 +24,21 @@ export function OrderStepper({
   cancelReason,
   isSeller = false,
 }: OrderStepperProps) {
-  if (status === 'canceled' || status === 'refunded') {
+  if (status === 'canceled' || status === 'refunded' || status === 'failed') {
     return (
       <View style={styles.canceledCard}>
         <View style={styles.canceledHeader}>
           <Feather name="x-circle" size={20} color="#DC2626" style={{ marginRight: 8 }} />
           <Text style={styles.canceledTitle}>
-            {status === 'refunded' ? 'Order Refunded' : 'Order Canceled'}
+            {status === 'refunded' ? 'Order Refunded' : status === 'failed' ? 'Order Failed' : 'Order Canceled'}
           </Text>
         </View>
         <Text style={styles.canceledSubtitle}>
-          {cancelReason ? `Reason: ${cancelReason}` : 'This transaction was cancelled and the listing is now available.'}
+          {cancelReason
+            ? `Reason: ${cancelReason}`
+            : status === 'failed'
+            ? 'Payment could not be processed for this order.'
+            : 'This transaction was cancelled and the listing is now available.'}
         </Text>
       </View>
     );
@@ -54,8 +58,19 @@ export function OrderStepper({
     currentStage = 2; // Paid & Seller Preparing
   }
 
+  let placedSubtitle = 'Paid';
+  if (paymentMethod === 'cod') {
+    placedSubtitle = 'CoD Order';
+  } else if (status === 'pending') {
+    placedSubtitle = 'Pending';
+  } else if (status === 'refund_due') {
+    placedSubtitle = 'Refund due';
+  } else if (status === 'failed') {
+    placedSubtitle = 'Failed';
+  }
+
   const steps = [
-    { title: 'Placed', subtitle: paymentMethod === 'cod' ? 'CoD Order' : 'Paid' },
+    { title: 'Placed', subtitle: placedSubtitle },
     { title: 'Packing', subtitle: 'Seller preparing' },
     { title: 'Shipped', subtitle: courierName || 'In transit' },
     { title: 'Completed', subtitle: 'Delivered' },

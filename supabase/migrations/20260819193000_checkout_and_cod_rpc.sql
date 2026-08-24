@@ -89,6 +89,11 @@ begin
        and c.buyer_id = v_caller_id
        and m.kind = 'offer'
        and m.offer_status = 'accepted'
+       and not exists (
+         select 1 from public.orders o
+          where o.offer_message_id = m.id
+            and o.status <> 'canceled'
+       )
      order by m.updated_at desc
      limit 1;
 

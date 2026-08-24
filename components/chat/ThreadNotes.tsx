@@ -49,6 +49,8 @@ export function SafetyNote({ onPress }: { onPress: () => void }) {
           Sharing personal details or following links is dangerous. You aren&apos;t protected if you leave {BRAND}.{' '}
           <Text
             onPress={onPress}
+            accessibilityRole="link"
+            accessibilityLabel="How you're covered"
             style={{
               fontFamily: typography.family.sansSemibold,
               color: '#007782',

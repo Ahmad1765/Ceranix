@@ -16,6 +16,8 @@ export default function UploadTabFallback() {
     const opened = open();
     if (opened) {
       router.navigate('/(tabs)');
+    } else {
+      router.replace('/auth/login');
     }
   }, [open, isFocused]);
 

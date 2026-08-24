@@ -67,18 +67,23 @@ export default function PaymentScreen() {
       ? paymentMethodParam
       : 'card';
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethodOption>(initialMethod);
-  const [cardLast4, setCardLast4] = useState('2907');
-  const [cardBrand, setCardBrand] = useState('Visa');
+  const [cardLast4, setCardLast4] = useState<string | null>(null);
+  const [cardBrand, setCardBrand] = useState<string | null>(null);
   const [saveCard, setSaveCard] = useState(true);
-  const [hasChosenMethod, setHasChosenMethod] = useState(Boolean(paymentMethodParam));
+  const [hasChosenMethod, setHasChosenMethod] = useState(
+    Boolean(paymentMethodParam && paymentMethodParam !== 'card'),
+  );
   const [fulfillment, setFulfillment] = useState<string>(fulfillmentParam || 'delivery');
 
   useEffect(() => {
-    if (paymentMethodParam === 'cod' || paymentMethodParam === 'card' || paymentMethodParam === 'apple_pay') {
+    if (paymentMethodParam === 'cod' || paymentMethodParam === 'apple_pay') {
       setSelectedMethod(paymentMethodParam);
       setHasChosenMethod(true);
+    } else if (paymentMethodParam === 'card') {
+      setSelectedMethod('card');
+      setHasChosenMethod(Boolean(cardLast4));
     }
-  }, [paymentMethodParam]);
+  }, [paymentMethodParam, cardLast4]);
 
   useEffect(() => {
     if (fulfillmentParam) {
@@ -229,7 +234,9 @@ export default function PaymentScreen() {
     if (selected.cardBrand) setCardBrand(selected.cardBrand);
     if (selected.cardLast4) setCardLast4(selected.cardLast4);
     if (selected.saveCard !== undefined) setSaveCard(selected.saveCard);
-    setHasChosenMethod(true);
+    if (selected.method !== 'card' || selected.cardLast4) {
+      setHasChosenMethod(true);
+    }
   };
 
   const handlePay = async () => {
@@ -244,7 +251,8 @@ export default function PaymentScreen() {
       return;
     }
 
-    if (!hasChosenMethod) {
+    const isMethodReady = hasChosenMethod && (selectedMethod !== 'card' || Boolean(cardLast4));
+    if (!isMethodReady) {
       toast.show('Please choose a payment method', {
         variant: 'default',
         icon: 'credit-card',
@@ -308,7 +316,7 @@ export default function PaymentScreen() {
         pathname: '/orders',
         params: {
           side: 'bought',
-          justPaid: '1',
+          justPaid: isPaid ? '1' : '0',
           title: listing.title,
           amount: String(totalAmount),
         },
@@ -479,7 +487,7 @@ export default function PaymentScreen() {
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionHeader}>Payment</Text>
 
-          {!hasChosenMethod ? (
+          {!hasChosenMethod || (selectedMethod === 'card' && !cardLast4) ? (
             /* Choose Payment Method Row */
             <Pressable
               onPress={() => setPaymentOptionsOpen(true)}
@@ -496,10 +504,10 @@ export default function PaymentScreen() {
                   {selectedMethod === 'card' ? (
                     <>
                       <View style={styles.visaSmallBadge}>
-                        <Text style={styles.visaSmallText}>VISA</Text>
+                        <Text style={styles.visaSmallText}>{(cardBrand ?? 'VISA').toUpperCase()}</Text>
                       </View>
                       <Text style={styles.cardLast4Text}>
-                        {cardBrand} ending with {cardLast4}
+                        {cardBrand || 'Card'} ending with {cardLast4}
                       </Text>
                     </>
                   ) : selectedMethod === 'apple_pay' ? (

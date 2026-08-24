@@ -137,6 +137,7 @@ export function MobileTabBar({
             return (
               <SellFabButton
                 key={tab.name}
+                theme={theme}
                 onPress={() => handleTabPress(tab.name, true)}
               />
             );
@@ -149,6 +150,7 @@ export function MobileTabBar({
               label={tab.label}
               isActive={isActive}
               badge={tab.name === 'chat' ? unreadChatCount : 0}
+              theme={theme}
               onPress={() => handleTabPress(tab.name, false)}
             />
           );
@@ -163,14 +165,17 @@ function TabItemButton({
   label,
   isActive,
   badge = 0,
+  theme,
   onPress,
 }: {
   icon: keyof typeof Feather.glyphMap;
   label: string;
   isActive: boolean;
   badge?: number;
+  theme?: typeof colors;
   onPress: () => void;
 }) {
+  const activeTheme = theme || colors;
   return (
     <Pressable
       onPress={onPress}
@@ -187,7 +192,7 @@ function TabItemButton({
         <Feather
           name={icon}
           size={22}
-          color={isActive ? colors.primary : colors.ink}
+          color={isActive ? colors.primary : activeTheme.ink}
         />
         {badge > 0 && (
           <View style={styles.badge}>
@@ -201,7 +206,7 @@ function TabItemButton({
         style={[
           styles.tabLabel,
           {
-            color: isActive ? colors.primary : colors.mute,
+            color: isActive ? colors.primary : activeTheme.mute,
             fontFamily: isActive ? type.family.sansBold : type.family.sansMedium,
           },
         ]}
@@ -212,7 +217,14 @@ function TabItemButton({
   );
 }
 
-function SellFabButton({ onPress }: { onPress: () => void }) {
+function SellFabButton({
+  onPress,
+  theme,
+}: {
+  onPress: () => void;
+  theme?: typeof colors;
+}) {
+  const activeTheme = theme || colors;
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -238,7 +250,7 @@ function SellFabButton({ onPress }: { onPress: () => void }) {
           accessibilityRole="button"
           accessibilityLabel="Sell an item"
         >
-          <Feather name="plus" size={26} color={colors.white} />
+          <Feather name="plus" size={26} color={activeTheme.white} />
         </Pressable>
       </Animated.View>
     </View>

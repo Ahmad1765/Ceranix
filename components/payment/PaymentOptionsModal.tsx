@@ -46,13 +46,15 @@ export function PaymentOptionsModal({
   const [cardCvc, setCardCvc] = useState('');
   const [cardName, setCardName] = useState('');
   const [showCardForm, setShowCardForm] = useState(false);
-  const [saveCard, setSaveCard] = useState(true);
+  const [saveCard, setSaveCard] = useState(false);
+  const [cardError, setCardError] = useState<string | null>(null);
 
   useEffect(() => {
     if (visible) {
       const active = initialSelected || 'card';
       setSelected(active);
       setShowCardForm(active === 'card');
+      setCardError(null);
     }
   }, [visible, initialSelected]);
 
@@ -79,6 +81,7 @@ export function PaymentOptionsModal({
     if (selected === 'card') {
       const clean = cardNumber.replace(/\s+/g, '');
       if (!clean) {
+        setCardError('Please enter your card number');
         return; // require non-empty card number before submitting
       }
       if (clean.length >= 4) {
@@ -191,6 +194,7 @@ export function PaymentOptionsModal({
                 <TextInput
                   value={cardNumber}
                   onChangeText={(val) => {
+                    if (cardError) setCardError(null);
                     const clean = val.replace(/\D/g, '').slice(0, 16);
                     const formatted = clean.match(/.{1,4}/g)?.join(' ') || clean;
                     setCardNumber(formatted);
@@ -198,8 +202,11 @@ export function PaymentOptionsModal({
                   keyboardType="number-pad"
                   placeholder="•••• •••• •••• 2907"
                   placeholderTextColor="#9CA3AF"
-                  style={styles.textInput}
+                  style={[styles.textInput, cardError ? styles.textInputError : null]}
                 />
+                {cardError ? (
+                  <Text style={styles.errorText}>{cardError}</Text>
+                ) : null}
 
                 <View style={styles.formRow}>
                   <View style={{ flex: 1, marginRight: 8 }}>
@@ -526,6 +533,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     fontSize: 13.5,
     color: '#111111',
+    fontFamily: 'Inter_500Medium',
+  },
+  textInputError: {
+    borderColor: '#EF4444',
+  },
+  errorText: {
+    fontSize: 11.5,
+    color: '#EF4444',
+    marginTop: 4,
     fontFamily: 'Inter_500Medium',
   },
   formRow: {

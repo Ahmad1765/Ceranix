@@ -85,11 +85,15 @@ export function CancelOrderModal({
       visible={visible}
       transparent
       animationType="slide"
-      onRequestClose={onClose}
+      onRequestClose={cancelling ? undefined : onClose}
       statusBarTranslucent
     >
       <View style={styles.overlay}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Dismiss" />
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={cancelling ? undefined : onClose}
+          accessibilityLabel="Dismiss"
+        />
 
         <View
           style={[
@@ -110,6 +114,7 @@ export function CancelOrderModal({
               </Text>
             </View>
             <Pressable
+              disabled={cancelling}
               onPress={onClose}
               hitSlop={HIT_SLOP_8}
               style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.6 }]}

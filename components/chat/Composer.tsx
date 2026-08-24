@@ -94,7 +94,7 @@ export function Composer({
   );
 
   const sendStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(t.value, [0, 1], [colors.surface, colors.purple]),
+    backgroundColor: interpolateColor(t.value, [0, 1], [colors.panel, colors.purple]),
   }));
   const idleIcon = useAnimatedStyle(() => ({ opacity: 1 - t.value }));
   const armedIcon = useAnimatedStyle(() => ({ opacity: t.value }));

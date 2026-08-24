@@ -132,16 +132,7 @@ function SystemNotice({ msg }: { msg: ChatMessage }) {
               color: '#4B5563',
             }}
           >
-            Thank you, we have received your payment. It&apos;s being processed.{' '}
-            <Text
-              style={{
-                color: '#007782',
-                fontFamily: typography.family.sansSemibold,
-                textDecorationLine: 'underline',
-              }}
-            >
-              Learn more
-            </Text>
+            {msg.content}
           </Text>
         </View>
       </View>

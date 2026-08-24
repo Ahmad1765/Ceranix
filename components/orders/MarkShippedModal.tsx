@@ -65,11 +65,15 @@ export function MarkShippedModal({
       visible={visible}
       transparent
       animationType="slide"
-      onRequestClose={onClose}
+      onRequestClose={saving ? undefined : onClose}
       statusBarTranslucent
     >
       <View style={styles.overlay}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Dismiss" />
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={saving ? undefined : onClose}
+          accessibilityLabel="Dismiss"
+        />
 
         <View
           style={[
@@ -88,6 +92,7 @@ export function MarkShippedModal({
               </Text>
             </View>
             <Pressable
+              disabled={saving}
               onPress={onClose}
               hitSlop={HIT_SLOP_8}
               style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.6 }]}

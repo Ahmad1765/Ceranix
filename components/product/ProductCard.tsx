@@ -58,6 +58,12 @@ export const ProductCard = memo(function ProductCard({
     setPendingLiked(null);
   }, [item.id]);
 
+  React.useEffect(() => {
+    if (pendingLiked !== null && Boolean(item.isLiked) === pendingLiked) {
+      setPendingLiked(null);
+    }
+  }, [item.isLiked, pendingLiked]);
+
   const isLiked = pendingLiked ?? !!item.isLiked;
 
   // Reanimated press scale physics
@@ -138,6 +144,8 @@ export const ProductCard = memo(function ProductCard({
         {/* $44x44px Touch Target Like / Bookmark Action */}
         <Pressable
           onPress={handleLikePress}
+          accessibilityRole="button"
+          accessibilityState={{ selected: isLiked }}
           accessibilityLabel={isLiked ? 'Unlike item' : 'Like item'}
           style={({ pressed }) => [
             styles.likeButtonWrapper,
