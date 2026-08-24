@@ -21,6 +21,7 @@ export interface User {
   full_name: string;
   bio: string | null;
   location: string | null;
+  website?: string | null;
   rating: number;
   total_sales: number;
   created_at: string;

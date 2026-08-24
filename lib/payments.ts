@@ -48,7 +48,7 @@ export async function fetchOrderForListing(
 ): Promise<Order | null> {
   const { data, error } = await supabase
     .from("orders")
-    .select("id, status, amount_cents, fee_cents, currency, payment_method, shipping_address, delivery_notes, courier_name, tracking_number, cancel_reason, shipped_at, completed_at, created_at, listing_id, buyer_id, seller_id")
+    .select("id, status, amount_cents, fee_cents, currency, payment_method, shipping_address, delivery_notes, courier_name, tracking_number, cancel_reason, cancelled_by, shipped_at, completed_at, created_at, listing_id, buyer_id, seller_id")
     .eq("listing_id", listingId)
     .order("created_at", { ascending: false })
     .limit(1)

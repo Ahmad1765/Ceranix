@@ -199,4 +199,33 @@ describe('PaymentService Dispatcher & Seller Completion', () => {
     expect(updated.status).toBe('paid');
     expect(updated.payment_method).toBe('cod');
   });
+
+  it('handles cancelOrder in demo mode', async () => {
+    const cancelled = await paymentService.cancelOrder({
+      orderId: 'order-cancel-123',
+      listingId: 'listing-123',
+      reason: 'Buyer changed mind',
+    });
+    expect(cancelled.status).toBe('canceled');
+    expect(cancelled.id).toBe('order-cancel-123');
+  });
+
+  it('handles markOrderShipped in demo mode', async () => {
+    const shipped = await paymentService.markOrderShipped({
+      orderId: 'order-ship-123',
+      courier: 'TCS',
+      trackingNumber: 'TCS123456',
+    });
+    expect(shipped.status).toBe('paid');
+    expect(shipped.id).toBe('order-ship-123');
+  });
+
+  it('handles confirmOrderReceived in demo mode', async () => {
+    const received = await paymentService.confirmOrderReceived({
+      orderId: 'order-recv-123',
+    });
+    expect(received.status).toBe('completed');
+    expect(received.id).toBe('order-recv-123');
+  });
 });
+

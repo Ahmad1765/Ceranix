@@ -125,11 +125,12 @@ function OrdersSkeleton() {
 function OrdersScreen() {
   const { user } = useAuth();
   const sell = useSellSheet();
-  const { side: sideParam, justPaid, title: itemTitleParam, amount: amountParam } = useLocalSearchParams<{
+  const { side: sideParam, justPaid, title: itemTitleParam, amount: amountParam, listingId: listingIdParam } = useLocalSearchParams<{
     side?: string;
     justPaid?: string;
     title?: string;
     amount?: string;
+    listingId?: string;
   }>();
 
   const [side, setSide] = useState<OrderSide>(sideParam === 'sold' ? 'sold' : 'bought');
@@ -143,33 +144,41 @@ function OrdersScreen() {
     [q.data, user?.id],
   );
 
-  // Synthesize recently purchased mock item if fresh from checkout and database replication is in flight
+  // In development, synthesize recently purchased item if fresh from checkout and database replication is in flight
   const allBoughtOrders = useMemo(() => {
-    if (justPaid === '1' && itemTitleParam && !bought.some((b) => b.listing?.title === itemTitleParam)) {
+    if (__DEV__ && justPaid === '1' && itemTitleParam && !bought.some((b) => b.listing?.title === itemTitleParam)) {
+      const parsedAmount = amountParam ? Number(amountParam) : 0;
+      const targetListingId = listingIdParam || '';
       const mockOrder: MyOrder = {
         id: `recent_order_${Date.now()}`,
-        listing_id: 'mock_listing_id',
+        listing_id: targetListingId,
         buyer_id: user?.id ?? 'buyer',
         seller_id: 'seller',
-        amount_cents: amountParam ? Math.round(Number(amountParam) * 100) : 1436,
-        fee_cents: 75,
-        currency: 'usd',
+        amount_cents: Math.round(parsedAmount * 100),
+        fee_cents: 0,
+        currency: 'pkr',
         payment_method: 'card',
         status: 'pending',
         shipping_address: null,
         delivery_notes: null,
         created_at: new Date().toISOString(),
         listing: {
-          id: 'mock_listing_id',
+          id: targetListingId,
           title: itemTitleParam,
-          price: amountParam ? Number(amountParam) - 1.84 : 1.00,
+          price: parsedAmount,
           images: [],
         },
       };
       return [mockOrder, ...bought];
     }
     return bought;
-  }, [bought, justPaid, itemTitleParam, amountParam, user?.id]);
+  }, [bought, justPaid, itemTitleParam, amountParam, listingIdParam, user?.id]);
+
+  useEffect(() => {
+    if (justPaid === '1') {
+      q.refetch();
+    }
+  }, [justPaid, q]);
 
   const rawRows = side === 'bought' ? allBoughtOrders : sold;
 
@@ -180,10 +189,10 @@ function OrdersScreen() {
       return rawRows.filter((o) => o.status === 'pending' || o.status === 'paid');
     }
     if (filter === 'canceled') {
-      return rawRows.filter((o) => o.status === 'canceled');
+      return rawRows.filter((o) => o.status === 'canceled' || o.status === 'refunded');
     }
     if (filter === 'completed') {
-      return rawRows.filter((o) => o.status === 'paid');
+      return rawRows.filter((o) => o.status === 'completed');
     }
     return rawRows;
   }, [rawRows, filter]);
@@ -279,7 +288,7 @@ function OrdersScreen() {
       </View>
 
       {/* ── Order List / Content ── */}
-      {q.isPending && allBoughtOrders.length === 0 ? (
+      {q.isPending && (side === 'sold' ? sold.length === 0 : allBoughtOrders.length === 0) ? (
         <OrdersSkeleton />
       ) : rows.length === 0 ? (
         <View style={styles.emptyContainer}>

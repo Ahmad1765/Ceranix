@@ -132,7 +132,10 @@ export function FloatingHeader({
               style={({ pressed }) => [
                 styles.iconCircle,
                 { backgroundColor: theme.surface, borderColor: theme.border },
-                action.active && styles.iconCircleActive,
+                action.active && {
+                  backgroundColor: theme.primarySoft,
+                  borderColor: theme.primarySofter || theme.border,
+                },
                 { opacity: pressed ? 0.75 : 1, transform: [{ scale: pressed ? 0.94 : 1 }] },
               ]}
               accessibilityRole="button"
@@ -148,8 +151,8 @@ export function FloatingHeader({
                 }
               />
               {action.badge !== undefined && action.badge !== 0 && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{action.badge}</Text>
+                <View style={[styles.badge, { backgroundColor: theme.primary }]}>
+                  <Text style={[styles.badgeText, { color: theme.background || colors.white }]}>{action.badge}</Text>
                 </View>
               )}
             </Pressable>
@@ -281,10 +284,6 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  iconCircleActive: {
-    backgroundColor: colors.primarySoft,
-    borderColor: 'rgba(108,71,255,0.2)',
-  },
   badge: {
     position: 'absolute',
     top: -2,
@@ -292,7 +291,6 @@ const styles = StyleSheet.create({
     minWidth: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
@@ -300,6 +298,5 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 10,
     fontWeight: '700',
-    color: colors.white,
   },
 });

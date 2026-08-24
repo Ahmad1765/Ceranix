@@ -46,8 +46,12 @@ begin
     raise exception 'Only the buyer or seller can cancel this order' using errcode = '42501';
   end if;
 
-  if v_order.status in ('completed', 'refunded', 'canceled') then
+  if v_order.status in ('completed', 'refunded', 'canceled', 'refund_due') then
     raise exception 'Order is already %', v_order.status using errcode = '22000';
+  end if;
+
+  if v_order.shipped_at is not null then
+    raise exception 'Cannot cancel an order that has already been shipped' using errcode = '22000';
   end if;
 
   if v_caller_id = v_order.buyer_id then
@@ -56,13 +60,22 @@ begin
     v_caller_role := 'Seller';
   end if;
 
-  -- 3. Update order to canceled
-  update public.orders
-     set status = 'canceled',
-         cancel_reason = p_reason,
-         cancelled_by = v_caller_id
-   where id = p_order_id
-  returning * into v_order;
+  -- 3. Update order status: for paid orders, set to refund_due; for unpaid/pending, set to canceled
+  if v_order.status = 'paid' then
+    update public.orders
+       set status = 'refund_due',
+           cancel_reason = p_reason,
+           cancelled_by = v_caller_id
+     where id = p_order_id
+    returning * into v_order;
+  else
+    update public.orders
+       set status = 'canceled',
+           cancel_reason = p_reason,
+           cancelled_by = v_caller_id
+     where id = p_order_id
+    returning * into v_order;
+  end if;
 
   -- 4. Re-list the item so it is available again
   if v_order.listing_id is not null then
@@ -93,7 +106,7 @@ begin
       'system',
       jsonb_build_object(
         'order_id', p_order_id,
-        'status', 'canceled',
+        'status', v_order.status,
         'reason', p_reason,
         'cancelled_by_role', v_caller_role
       )
@@ -155,6 +168,7 @@ begin
     into v_conv_id
     from public.conversations
    where listing_id = v_order.listing_id
+     and ((buyer_id = v_order.buyer_id and seller_id = v_order.seller_id) or (buyer_id = v_order.seller_id and seller_id = v_order.buyer_id))
    limit 1;
 
   if v_conv_id is not null then
@@ -217,8 +231,16 @@ begin
     raise exception 'Only the buyer can confirm receipt of this order' using errcode = '42501';
   end if;
 
+  if v_order.status = 'completed' then
+    return v_order;
+  end if;
+
+  if v_order.status <> 'paid' then
+    raise exception 'Order cannot be confirmed from current status: %', v_order.status using errcode = '22000';
+  end if;
+
   update public.orders
-     set status = 'paid',
+     set status = 'completed',
          completed_at = now()
    where id = p_order_id
   returning * into v_order;
@@ -228,6 +250,7 @@ begin
     into v_conv_id
     from public.conversations
    where listing_id = v_order.listing_id
+     and ((buyer_id = v_order.buyer_id and seller_id = v_order.seller_id) or (buyer_id = v_order.seller_id and seller_id = v_order.buyer_id))
    limit 1;
 
   if v_conv_id is not null then

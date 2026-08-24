@@ -12,6 +12,7 @@ export type InvoiceStatus =
   | 'pending'
   | 'confirming'
   | 'refunded'
+  | 'refund_due'
   | 'canceled'
   | 'cod_pending'
   | 'failed';
@@ -36,7 +37,8 @@ export function deriveInvoiceStatus(
 ): InvoiceStatus {
   if (order?.status === 'completed') return 'completed';
   if (order?.status === 'paid') return 'paid';
-  if (order?.status === 'refunded' || order?.status === 'refund_due') return 'refunded';
+  if (order?.status === 'refund_due') return 'refund_due';
+  if (order?.status === 'refunded') return 'refunded';
   if (order?.status === 'canceled') return 'canceled';
   if (order?.status === 'failed') return 'failed';
   if (order?.payment_method === 'cod' && order?.status === 'pending') return 'cod_pending';

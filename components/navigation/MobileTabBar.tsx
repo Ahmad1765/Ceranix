@@ -18,6 +18,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Text } from '@/lib/rnText';
 import { colors, type } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 
 export interface MobileTabBarProps extends Partial<BottomTabBarProps> {
   activeTab?: string;
@@ -57,6 +58,7 @@ export function MobileTabBar({
   style,
 }: MobileTabBarProps) {
   const insets = useSafeAreaInsets();
+  const { theme, isDark } = useTheme();
 
   const currentRouteName = state
     ? state.routes[state.index]?.name
@@ -104,6 +106,8 @@ export function MobileTabBar({
         styles.wrapper,
         {
           paddingBottom: Math.max(insets.bottom, 12),
+          borderTopColor: theme.hairline || colors.hairline,
+          backgroundColor: Platform.OS === 'ios' ? 'transparent' : isDark ? 'rgba(24, 24, 24, 0.95)' : 'rgba(255, 255, 255, 0.95)',
         },
         style,
       ]}
@@ -112,11 +116,17 @@ export function MobileTabBar({
       {Platform.OS === 'ios' ? (
         <BlurView
           intensity={30}
-          tint="light"
+          tint={isDark ? 'dark' : 'light'}
           style={StyleSheet.absoluteFillObject}
         />
       ) : (
-        <View style={[StyleSheet.absoluteFillObject, styles.fallbackBg]} />
+        <View
+          style={[
+            StyleSheet.absoluteFillObject,
+            styles.fallbackBg,
+            { backgroundColor: isDark ? 'rgba(24, 24, 24, 0.95)' : 'rgba(255, 255, 255, 0.95)' },
+          ]}
+        />
       )}
 
       <View style={styles.tabRow}>
@@ -244,7 +254,6 @@ const styles = StyleSheet.create({
     zIndex: 50,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.hairline,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -261,7 +270,7 @@ const styles = StyleSheet.create({
     }),
   },
   fallbackBg: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    ...StyleSheet.absoluteFillObject,
   },
   tabRow: {
     height: 52,

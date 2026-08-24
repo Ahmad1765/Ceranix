@@ -326,8 +326,7 @@ function ProfileScreenInner() {
     { viewer: 'owner' },
   );
 
-  const websiteLink =
-    (profile as any).website || (profile.username ? `${APP_URL}/user/${profile.id}` : null);
+  const websiteLink = profile.website?.trim() || null;
 
   return (
     <SafeContainer edges={['top', 'left', 'right']} backgroundColor={colors.background} style={{ flex: 1 }}>

@@ -46,12 +46,12 @@ export function OrderStepper({
   // Stage 3: Shipped
   // Stage 4: Completed
   let currentStage = 1;
-  if (status === 'paid' && !shippedAt) {
-    currentStage = 2; // Paid & Seller Preparing
-  } else if (shippedAt || status === 'shipped') {
+  if (status === 'completed' || status === 'delivered') {
+    currentStage = 4; // Completed / Delivered
+  } else if (shippedAt || status === 'shipped' || status === 'in_transit') {
     currentStage = 3; // Shipped / In transit
-  } else if (status === 'completed') {
-    currentStage = 4; // Completed
+  } else if (status === 'paid') {
+    currentStage = 2; // Paid & Seller Preparing
   }
 
   const steps = [

@@ -208,8 +208,8 @@ export default function InvoiceScreen() {
     total,
   } = deriveInvoiceAmounts(order, listing.price, buyerProtectionFee);
   const seller = listing.seller;
-  const isSeller = (user?.id && (user.id === listing.seller_id || user.id === seller?.id)) || false;
-  const isBuyer = (user?.id && (user.id === order?.buyer_id || (!isSeller && user.id))) || false;
+  const isSeller = Boolean(user?.id && (user.id === listing.seller_id || user.id === seller?.id));
+  const isBuyer = Boolean(user?.id && order?.buyer_id && user.id === order.buyer_id);
   const invoiceNumber = deriveInvoiceNumber(listing.id);
   const buyerName = displayName(profile?.full_name, profile?.username);
   const status = deriveInvoiceStatus(order, confirming);
@@ -273,38 +273,48 @@ export default function InvoiceScreen() {
   const handleCancelOrder = async (reason: string) => {
     if (!order?.id) return;
     tap('medium');
-    const updated = await paymentService.cancelOrder({
-      orderId: order.id,
-      listingId: listing.id,
-      reason,
-    });
-    setOrder(updated);
-    toast.show('Order cancelled successfully', {
-      variant: 'default',
-      icon: 'check',
-    });
+    try {
+      const updated = await paymentService.cancelOrder({
+        orderId: order.id,
+        listingId: listing.id,
+        reason,
+      });
+      setOrder(updated);
+      toast.show('Order cancelled successfully', {
+        variant: 'default',
+        icon: 'check',
+      });
+    } catch (e: any) {
+      toast.show(e?.message || 'Failed to cancel order', {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
+      throw e;
+    }
   };
 
   // Seller Mark Shipped Handler
   const handleMarkShipped = async (courier: string, trackingNumber: string) => {
     if (!order?.id) return;
     tap('medium');
-    const updated = await paymentService.markOrderShipped({
-      orderId: order.id,
-      courier,
-      trackingNumber,
-    });
-    setOrder((prev) => ({
-      ...(prev || updated),
-      status: 'paid',
-      courier_name: courier,
-      tracking_number: trackingNumber,
-      shipped_at: new Date().toISOString(),
-    } as any));
-    toast.show('Order marked as shipped!', {
-      variant: 'default',
-      icon: 'check',
-    });
+    try {
+      const updated = await paymentService.markOrderShipped({
+        orderId: order.id,
+        courier,
+        trackingNumber,
+      });
+      setOrder(updated);
+      toast.show('Order marked as shipped!', {
+        variant: 'default',
+        icon: 'check',
+      });
+    } catch (e: any) {
+      toast.show(e?.message || 'Failed to mark order as shipped', {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
+      throw e;
+    }
   };
 
   // Buyer Confirm Received Handler
@@ -637,17 +647,6 @@ export default function InvoiceScreen() {
             <Feather name="x-circle" size={16} color="#DC2626" />
             <Text style={styles.statusBannerCanceledText}>This order is canceled</Text>
           </View>
-        ) : isSeller && !isShipped && isOrderActive ? (
-          <Pressable
-            onPress={() => setShowShipModal(true)}
-            style={({ pressed }) => [
-              styles.primaryBtn,
-              pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
-            ]}
-          >
-            <Feather name="truck" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
-            <Text style={styles.primaryBtnText}>Mark as Shipped</Text>
-          </Pressable>
         ) : isSeller && order?.payment_method === 'cod' && order?.status === 'pending' ? (
           <Pressable
             onPress={handleCompleteCodOrder}
@@ -665,6 +664,17 @@ export default function InvoiceScreen() {
                 <Text style={styles.primaryBtnText}>Mark CoD Delivered & Paid</Text>
               </>
             )}
+          </Pressable>
+        ) : isSeller && !isShipped && isOrderActive ? (
+          <Pressable
+            onPress={() => setShowShipModal(true)}
+            style={({ pressed }) => [
+              styles.primaryBtn,
+              pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
+            ]}
+          >
+            <Feather name="truck" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
+            <Text style={styles.primaryBtnText}>Mark as Shipped</Text>
           </Pressable>
         ) : isBuyer && isShipped && order?.status !== 'completed' ? (
           <Pressable

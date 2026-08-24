@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -26,6 +26,14 @@ export const CANCELLATION_REASONS = [
   'Other reason',
 ] as const;
 
+export const SELLER_CANCELLATION_REASONS = [
+  'Item damaged or unavailable',
+  'Buyer requested cancellation',
+  'Unable to ship in time',
+  'Pricing error',
+  'Other reason',
+] as const;
+
 interface CancelOrderModalProps {
   visible: boolean;
   onClose: () => void;
@@ -40,21 +48,19 @@ export function CancelOrderModal({
   isSeller = false,
 }: CancelOrderModalProps) {
   const insets = useSafeAreaInsets();
+  const reasons = isSeller ? SELLER_CANCELLATION_REASONS : CANCELLATION_REASONS;
   const [selectedReason, setSelectedReason] = useState<string>(
-    isSeller ? 'Item damaged or unavailable' : 'Changed my mind',
+    isSeller ? SELLER_CANCELLATION_REASONS[0] : CANCELLATION_REASONS[0],
   );
   const [customReason, setCustomReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
 
-  const reasons = isSeller
-    ? [
-        'Item damaged or unavailable',
-        'Buyer requested cancellation',
-        'Unable to ship in time',
-        'Pricing error',
-        'Other reason',
-      ]
-    : CANCELLATION_REASONS;
+  useEffect(() => {
+    if (visible) {
+      setSelectedReason(isSeller ? SELLER_CANCELLATION_REASONS[0] : CANCELLATION_REASONS[0]);
+      setCustomReason('');
+    }
+  }, [visible, isSeller]);
 
   const handleConfirm = async () => {
     tap('medium');
@@ -67,6 +73,8 @@ export function CancelOrderModal({
     try {
       await onConfirmCancel(finalReason);
       onClose();
+    } catch {
+      // Handled cleanly; toast shown by caller
     } finally {
       setCancelling(false);
     }

@@ -111,7 +111,9 @@ export function BuyerProtectionSheet({
               paddingHorizontal: 6,
             }}
           >
-            Every order is covered for a small fee, so you can buy with confidence.
+            {protection > 0
+              ? 'Every order is covered for a small fee, so you can buy with confidence.'
+              : 'Buyer protection is included on every order, so you can buy with confidence.'}
           </Text>
 
           {/* Breakdown card */}

@@ -52,6 +52,16 @@ export function FullscreenImageViewer({
 
   const targetIndex = isInitialOpenRef.current ? initialIndex : activeIndex;
 
+  const handleLayout = () => {
+    if (targetIndex > 0) {
+      scrollRef.current?.scrollTo({
+        x: targetIndex * width,
+        y: 0,
+        animated: false,
+      });
+    }
+  };
+
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = e.nativeEvent.contentOffset.x;
     const index = Math.round(offsetX / width);
@@ -116,7 +126,7 @@ export function FullscreenImageViewer({
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
-          contentOffset={{ x: targetIndex * width, y: 0 }}
+          onLayout={handleLayout}
           onScroll={handleScroll}
           scrollEventThrottle={16}
           bounces={images.length > 1}

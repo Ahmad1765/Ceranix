@@ -140,25 +140,25 @@ begin
   end if;
 
   if new.is_verified is distinct from old.is_verified then
-    if current_setting('app.auth_override_is_verified', true) <> 'authorized' then
+    if coalesce(current_setting('app.auth_override_is_verified', true), '') <> 'authorized' then
       raise exception 'profile trust field (is_verified) is read-only';
     end if;
   end if;
 
   if new.is_pro is distinct from old.is_pro then
-    if current_setting('app.auth_override_is_pro', true) <> 'authorized' then
+    if coalesce(current_setting('app.auth_override_is_pro', true), '') <> 'authorized' then
       raise exception 'profile trust field (is_pro) is read-only';
     end if;
   end if;
 
   if new.rating is distinct from old.rating then
-    if current_setting('app.auth_override_rating', true) <> 'authorized' then
+    if coalesce(current_setting('app.auth_override_rating', true), '') <> 'authorized' then
       raise exception 'profile trust field (rating) is read-only';
     end if;
   end if;
 
   if new.total_sales is distinct from old.total_sales then
-    if current_setting('app.auth_override_total_sales', true) <> 'authorized' then
+    if coalesce(current_setting('app.auth_override_total_sales', true), '') <> 'authorized' then
       raise exception 'profile trust field (total_sales) is read-only';
     end if;
   end if;
@@ -175,14 +175,13 @@ create trigger trg_guard_profile_trust
 revoke execute on function public.guard_profile_trust_fields() from public, anon, authenticated;
 
 -- 5c) Verified seller program subscription RPC ------------------------------
-create or replace function public.update_seller_subscription(p_is_pro boolean)
+create or replace function public.update_seller_subscription(p_user_id uuid, p_is_pro boolean)
 returns public.profiles
 language plpgsql
 security definer
 set search_path = ''
 as $$
 declare
-  v_user_id uuid := auth.uid();
   v_profile public.profiles;
 begin
   if coalesce(auth.role(), '') <> 'service_role' then
@@ -194,7 +193,7 @@ begin
   update public.profiles
      set is_pro = p_is_pro,
          updated_at = now()
-   where id = v_user_id
+   where id = p_user_id
   returning * into v_profile;
 
   perform set_config('app.auth_override_is_pro', 'off', true);
@@ -207,8 +206,8 @@ begin
 end;
 $$;
 
-revoke execute on function public.update_seller_subscription(boolean) from public, anon, authenticated;
-grant  execute on function public.update_seller_subscription(boolean) to service_role;
+revoke execute on function public.update_seller_subscription(uuid, boolean) from public, anon, authenticated;
+grant  execute on function public.update_seller_subscription(uuid, boolean) to service_role;
 
 create or replace function public.guard_verification_status()
 returns trigger

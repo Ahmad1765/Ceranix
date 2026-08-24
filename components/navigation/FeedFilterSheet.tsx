@@ -113,6 +113,19 @@ export function FeedFilterSheet({
     return count;
   }, [filters]);
 
+  const isDirty = useMemo(() => {
+    return (
+      filters.category !== initial.category ||
+      filters.sort !== initial.sort ||
+      filters.priceMin !== initial.priceMin ||
+      filters.priceMax !== initial.priceMax ||
+      filters.conditions.length !== initial.conditions.length ||
+      filters.sizes.length !== initial.sizes.length ||
+      filters.conditions.some((c) => !initial.conditions.includes(c)) ||
+      filters.sizes.some((s) => !initial.sizes.includes(s))
+    );
+  }, [filters, initial]);
+
   const toggleCategory = (cat: Category) => {
     if (Platform.OS !== 'web') {
       Haptics.selectionAsync().catch(() => {});
@@ -211,7 +224,7 @@ export function FeedFilterSheet({
           <View style={styles.applyButtonFlex}>
             <ThumbButton
               label={
-                resultCount !== undefined
+                !isDirty && resultCount !== undefined
                   ? `Apply (${resultCount})`
                   : activeCount > 0
                   ? `Apply (${activeCount})`

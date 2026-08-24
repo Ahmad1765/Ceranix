@@ -4,6 +4,7 @@ import {
   View,
   FlatList,
   Keyboard,
+  KeyboardAvoidingView,
   Platform,
   Pressable,
   ActivityIndicator,
@@ -158,7 +159,10 @@ function OfferSheet({
           justifyContent: 'flex-end',
         }}
       >
-        <View style={{ width: '100%', maxWidth: 520, alignSelf: 'center' }}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ width: '100%', maxWidth: 520, alignSelf: 'center' }}
+        >
           <Pressable
             onPress={(e) => e.stopPropagation()}
             style={{
@@ -428,7 +432,7 @@ function OfferSheet({
               onPress={handleSubmit}
             />
           </Pressable>
-        </View>
+        </KeyboardAvoidingView>
       </Pressable>
     </Modal>
   );
@@ -1055,7 +1059,7 @@ export default function ConversationScreen() {
                         color: colors.mute,
                       }}
                     >
-                      {`${formatPrice(conv.listing.price)} Includes Buyer Protection 🛡️`}
+                      {`${formatPrice(conv.listing.price + buyerProtectionFee(conv.listing.price))} Includes Buyer Protection 🛡️`}
                     </Text>
                   )}
                 </View>
@@ -1097,9 +1101,9 @@ export default function ConversationScreen() {
             {other?.username ? (
               <SellerIntroBubble
                 name={other.username}
-                location={null}
+                location={(other as any).location ?? null}
                 lastSeen={null}
-                rating={null}
+                rating={(other as any).rating ? `★ ${Number((other as any).rating).toFixed(1)}` : null}
               />
             ) : null}
           </>

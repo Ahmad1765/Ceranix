@@ -1640,7 +1640,7 @@ export default function ProductScreen() {
             return;
           }
           if (!listing?.id) return;
-          router.push(`/payment/${listing.id}` as any);
+          setCheckoutVisible(true);
         }}
       />
 

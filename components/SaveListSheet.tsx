@@ -64,7 +64,7 @@ export function SaveListSheet({
       await ensureSaveLists(userId);
       const [ls, contained] = await Promise.all([
         listSaveLists(userId),
-        getListsContaining(userId, listingId),
+        getListsContaining(userId, listingId).catch(() => new Set<string>()),
       ]);
       if (cancelled) return;
       setLists(ls);

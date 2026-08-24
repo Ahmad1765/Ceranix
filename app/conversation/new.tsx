@@ -14,6 +14,7 @@ import { formatPrice, CURRENCY_SYMBOL } from '@/lib/currency';
 import { useToast } from '@/lib/toast';
 import { captureError } from '@/lib/sentry';
 import { colors, radii, shadow } from '@/lib/theme';
+import { BRAND } from '@/lib/brand';
 
 type Mode = 'message' | 'offer';
 
@@ -690,7 +691,7 @@ export default function NewConversationScreen() {
             <Text
               style={{ fontSize: 12, lineHeight: 18, flex: 1, fontWeight: '500', color: colors.ink }}
             >
-              Keep payments inside Carranix — off-platform deals aren&apos;t protected.
+              Keep payments inside {BRAND} — off-platform deals aren&apos;t protected.
             </Text>
           </View>
         </ScrollView>

@@ -49,9 +49,11 @@ function tap(style: 'light' | 'medium' = 'light') {
 }
 
 export default function PaymentScreen() {
-  const { id, offer } = useLocalSearchParams<{
+  const { id, offer, fulfillment: fulfillmentParam, paymentMethod: paymentMethodParam } = useLocalSearchParams<{
     id: string;
     offer?: string;
+    fulfillment?: string;
+    paymentMethod?: string;
   }>();
   const { user, profile, loading: authLoading } = useAuth();
   const toast = useToast();
@@ -60,11 +62,29 @@ export default function PaymentScreen() {
   const listing = listingQ.data ?? null;
 
   // Checkout states
-  const [selectedMethod, setSelectedMethod] = useState<PaymentMethodOption>('card');
+  const initialMethod: PaymentMethodOption =
+    paymentMethodParam === 'cod' || paymentMethodParam === 'apple_pay' || paymentMethodParam === 'card'
+      ? paymentMethodParam
+      : 'card';
+  const [selectedMethod, setSelectedMethod] = useState<PaymentMethodOption>(initialMethod);
   const [cardLast4, setCardLast4] = useState('2907');
   const [cardBrand, setCardBrand] = useState('Visa');
   const [saveCard, setSaveCard] = useState(true);
-  const [hasChosenMethod, setHasChosenMethod] = useState(false);
+  const [hasChosenMethod, setHasChosenMethod] = useState(Boolean(paymentMethodParam));
+  const [fulfillment, setFulfillment] = useState<string>(fulfillmentParam || 'delivery');
+
+  useEffect(() => {
+    if (paymentMethodParam === 'cod' || paymentMethodParam === 'card' || paymentMethodParam === 'apple_pay') {
+      setSelectedMethod(paymentMethodParam);
+      setHasChosenMethod(true);
+    }
+  }, [paymentMethodParam]);
+
+  useEffect(() => {
+    if (fulfillmentParam) {
+      setFulfillment(fulfillmentParam);
+    }
+  }, [fulfillmentParam]);
 
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null);
   const [addressLoading, setAddressLoading] = useState(true);
@@ -103,24 +123,6 @@ export default function PaymentScreen() {
               .maybeSingle();
             if (active && anyAddr) {
               setShippingAddress(anyAddr as ShippingAddress);
-            } else {
-              // Create default fallback address for clean UI display matching mockups
-              const defaultAddr: ShippingAddress = {
-                id: 'default_addr',
-                user_id: user.id,
-                recipient_name: profile?.full_name || profile?.username || 'Sam Lee',
-                line1: '1228 University Drive',
-                line2: null,
-                city: 'MENLO PARK',
-                state: 'CA',
-                postal_code: '94025',
-                country: 'United States',
-                phone: '+1 650 555 0199',
-                is_default: true,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              };
-              setShippingAddress(defaultAddr);
             }
           }
         }
@@ -176,7 +178,7 @@ export default function PaymentScreen() {
   // Price breakdown calculations without extra fees
   const itemPrice = offerAmount ?? Number(listing.price ?? 0);
   const bpFee = buyerProtectionFee(itemPrice); // 0 (waived)
-  const deliveryFee = shippingFee(itemPrice); // 0 (free standard shipping)
+  const deliveryFee = fulfillment === 'handshake' ? 0 : shippingFee(itemPrice); // 0 (free standard shipping or handshake)
   const salesTax = 0;
   const totalAmount = Math.round((itemPrice + bpFee + deliveryFee + salesTax) * 100) / 100;
 
@@ -207,12 +209,11 @@ export default function PaymentScreen() {
       setShippingAddress(mockAddress);
       setAddressSheetOpen(false);
 
-      try {
-        await supabase.rpc('upsert_shipping_address_with_default', {
-          p_payload: payload,
-        });
-      } catch {
-        // RPC fallback handled gracefully
+      const { error } = await supabase.rpc('upsert_shipping_address_with_default', {
+        p_payload: payload,
+      });
+      if (error) {
+        throw error;
       }
       toast.show('Shipping address updated', { variant: 'default', icon: 'check' });
     } catch (e: any) {
@@ -275,6 +276,7 @@ export default function PaymentScreen() {
       }
 
       // 3. Create or get conversation and post order confirmation system message
+      const isPaid = result.status === 'paid';
       try {
         const conv = await getOrCreateConversation({
           buyerId: user.id,
@@ -285,12 +287,14 @@ export default function PaymentScreen() {
           await supabase.from('messages').insert({
             conversation_id: conv.id,
             sender_id: user.id,
-            content: "Done!\nThank you, we have received your payment. It's being processed.",
+            content: isPaid
+              ? "Done!\nThank you, we have received your payment. It's being processed."
+              : "Done!\nYour order has been placed. It's being processed.",
             kind: 'system',
             metadata: {
-              paid: true,
-              payment_status: 'paid',
-              order_status: 'paid',
+              paid: isPaid,
+              payment_status: isPaid ? 'paid' : result.status,
+              order_status: result.status,
               amount: totalAmount,
             },
           });
@@ -422,15 +426,17 @@ export default function PaymentScreen() {
           <View style={styles.sectionCard}>
             <View style={styles.addressInfo}>
               <Text style={styles.addressName}>
-                {shippingAddress?.recipient_name || profile?.full_name || 'Delivery Address'}
+                {shippingAddress?.recipient_name || profile?.full_name || ''}
               </Text>
               <Text style={styles.addressLine}>
-                {shippingAddress?.line1 || '1228 University Drive'}
+                {shippingAddress?.line1 || ''}
               </Text>
               <Text style={styles.addressLine}>
-                {`${shippingAddress?.postal_code || '94025'} ${
-                  shippingAddress?.city || 'MENLO PARK'
-                }${shippingAddress?.state ? `, ${shippingAddress.state}` : ''}`}
+                {shippingAddress
+                  ? `${shippingAddress.postal_code || ''} ${shippingAddress.city || ''}${
+                      shippingAddress.state ? `, ${shippingAddress.state}` : ''
+                    }`.trim()
+                  : ''}
               </Text>
             </View>
             <Pressable
@@ -452,9 +458,9 @@ export default function PaymentScreen() {
             <View style={styles.deliveryHeaderRow}>
               <View style={styles.deliveryCarrierRow}>
                 <View style={styles.carrierIconWrapper}>
-                  <Feather name="package" size={14} color="#FFFFFF" />
+                  <Feather name={fulfillment === 'handshake' ? 'map-pin' : 'package'} size={14} color="#FFFFFF" />
                 </View>
-                <Text style={styles.carrierName}>Standard Delivery</Text>
+                <Text style={styles.carrierName}>{fulfillment === 'handshake' ? 'In-Person Meetup (Handshake)' : 'Standard Delivery'}</Text>
               </View>
               <Text style={[styles.deliveryPrice, deliveryFee === 0 && { color: '#059669', fontWeight: '600' }]}>
                 {deliveryFee > 0 ? formatPrice(deliveryFee) : 'Free'}
@@ -462,7 +468,9 @@ export default function PaymentScreen() {
             </View>
             <View style={styles.deliveryTimeRow}>
               <Feather name="clock" size={13} color="#767676" style={{ marginRight: 6 }} />
-              <Text style={styles.deliveryTimeText}>Home delivery, 1 - 3 business days</Text>
+              <Text style={styles.deliveryTimeText}>
+                {fulfillment === 'handshake' ? 'Meet seller directly in public safe zone' : 'Home delivery, 1 - 3 business days'}
+              </Text>
             </View>
           </View>
         </View>

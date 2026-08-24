@@ -96,16 +96,18 @@ export function SafeContainer({
             paddingTop: edgePadding.paddingTop,
             paddingLeft: edgePadding.paddingLeft,
             paddingRight: edgePadding.paddingRight,
-            paddingBottom: stickyFooter
-              ? STICKY_FOOTER_CLEARANCE +
-                (edges.includes('bottom') ? Math.max(insets.bottom, 12) : 0) +
-                extraBottomPadding
-              : edgePadding.paddingBottom,
+            paddingBottom: edgePadding.paddingBottom,
           },
           style,
         ]}
       >
-        {children}
+        {stickyFooter ? (
+          <View style={[styles.fill, { paddingBottom: STICKY_FOOTER_CLEARANCE }]}>
+            {children}
+          </View>
+        ) : (
+          children
+        )}
         {stickyFooter && (
           <View style={stickyFooterStyle}>
             {stickyFooter}

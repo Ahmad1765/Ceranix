@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -46,6 +46,15 @@ export function PaymentOptionsModal({
   const [cardCvc, setCardCvc] = useState('');
   const [cardName, setCardName] = useState('');
   const [showCardForm, setShowCardForm] = useState(false);
+  const [saveCard, setSaveCard] = useState(true);
+
+  useEffect(() => {
+    if (visible) {
+      const active = initialSelected || 'card';
+      setSelected(active);
+      setShowCardForm(active === 'card');
+    }
+  }, [visible, initialSelected]);
 
   const handleSelect = (method: PaymentMethodOption) => {
     if (Platform.OS !== 'web') {
@@ -64,22 +73,31 @@ export function PaymentOptionsModal({
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     }
 
-    let brand = 'Visa';
-    let last4 = '2907';
+    let brand: string | undefined = undefined;
+    let last4: string | undefined = undefined;
 
-    if (cardNumber.trim().length >= 4) {
+    if (selected === 'card') {
       const clean = cardNumber.replace(/\s+/g, '');
-      last4 = clean.slice(-4);
-      if (clean.startsWith('5')) brand = 'Mastercard';
-      else if (clean.startsWith('3')) brand = 'Amex';
-      else brand = 'Visa';
+      if (!clean) {
+        return; // require non-empty card number before submitting
+      }
+      if (clean.length >= 4) {
+        last4 = clean.slice(-4);
+        if (clean.startsWith('5')) brand = 'Mastercard';
+        else if (clean.startsWith('3')) brand = 'Amex';
+        else if (clean.startsWith('4')) brand = 'Visa';
+        else brand = 'Card';
+      } else {
+        last4 = clean;
+        brand = 'Card';
+      }
     }
 
     onSelect({
       method: selected,
       cardBrand: selected === 'card' ? brand : undefined,
       cardLast4: selected === 'card' ? last4 : undefined,
-      saveCard: true,
+      saveCard: selected === 'card' ? saveCard : undefined,
     });
     onClose();
   };
@@ -216,6 +234,33 @@ export function PaymentOptionsModal({
                     />
                   </View>
                 </View>
+
+                {/* Save Card Toggle */}
+                <Pressable
+                  onPress={() => setSaveCard(!saveCard)}
+                  style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: saveCard }}
+                >
+                  <View
+                    style={{
+                      width: 18,
+                      height: 18,
+                      borderRadius: 4,
+                      borderWidth: 1.5,
+                      borderColor: saveCard ? TEAL : '#D1D5DB',
+                      backgroundColor: saveCard ? TEAL : '#FFFFFF',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginRight: 8,
+                    }}
+                  >
+                    {saveCard && <Feather name="check" size={12} color="#FFFFFF" />}
+                  </View>
+                  <Text style={{ fontSize: 12.5, color: '#374151', fontFamily: 'Inter_500Medium' }}>
+                    Save card for future purchases
+                  </Text>
+                </Pressable>
               </View>
             )}
           </Pressable>

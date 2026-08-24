@@ -163,8 +163,31 @@ export function AddressSheet({
       return;
     }
     setSaving(true);
-    await onSave(form);
-    setSaving(false);
+    try {
+      await onSave(form);
+    } catch (e: any) {
+      toast.show(e?.message ?? 'Failed to save address', {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemove = async () => {
+    if (!onRemove) return;
+    setSaving(true);
+    try {
+      await onRemove();
+    } catch (e: any) {
+      toast.show(e?.message ?? 'Failed to remove address', {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -197,17 +220,21 @@ export function AddressSheet({
             ]}
           >
             {/* Top Drag Notch (mobile only) */}
-            {Platform.OS !== 'web' && <View style={styles.notch} />}
+            {Platform.OS !== 'web' && <View style={[styles.notch, { backgroundColor: theme.border }]} />}
 
             {/* Header */}
             <View style={styles.header}>
-              <Text style={styles.title}>Delivery address</Text>
+              <Text style={[styles.title, { color: theme.text }]}>Delivery address</Text>
               <Pressable
                 onPress={onClose}
                 hitSlop={HIT_SLOP_8}
-                style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.6 }]}
+                style={({ pressed }) => [
+                  styles.closeBtn,
+                  { backgroundColor: theme.panel, borderColor: theme.border, borderWidth: 1 },
+                  pressed && { opacity: 0.6 },
+                ]}
               >
-                <Feather name="x" size={18} color="#111111" />
+                <Feather name="x" size={18} color={theme.text} />
               </Pressable>
             </View>
 
@@ -242,17 +269,22 @@ export function AddressSheet({
 
               {/* Recipient Name */}
               <View style={styles.fieldGroup}>
-                <Text style={styles.label}>Full name</Text>
+                <Text style={[styles.label, { color: theme.textMuted }]}>Full name</Text>
                 <TextInput
                   value={form.recipient_name}
                   onChangeText={(t) => set({ recipient_name: t })}
                   onFocus={() => setFocusedField('name')}
                   onBlur={() => setFocusedField(null)}
                   placeholder="e.g. Sam Lee"
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={theme.textMuted}
                   style={[
                     styles.input,
-                    focusedField === 'name' && styles.inputFocused,
+                    {
+                      backgroundColor: theme.panel,
+                      borderColor: theme.border,
+                      color: theme.text,
+                    },
+                    focusedField === 'name' && [styles.inputFocused, { borderColor: theme.accent, backgroundColor: theme.panel, color: theme.text }],
                     attemptedSubmit && Boolean(errors.recipient_name) && styles.inputError,
                   ]}
                 />
@@ -263,17 +295,22 @@ export function AddressSheet({
 
               {/* Street Address */}
               <View style={styles.fieldGroup}>
-                <Text style={styles.label}>Street address</Text>
+                <Text style={[styles.label, { color: theme.textMuted }]}>Street address</Text>
                 <TextInput
                   value={form.line1}
                   onChangeText={(t) => set({ line1: t })}
                   onFocus={() => setFocusedField('line1')}
                   onBlur={() => setFocusedField(null)}
                   placeholder="House / Apartment, Street, Area"
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={theme.textMuted}
                   style={[
                     styles.input,
-                    focusedField === 'line1' && styles.inputFocused,
+                    {
+                      backgroundColor: theme.panel,
+                      borderColor: theme.border,
+                      color: theme.text,
+                    },
+                    focusedField === 'line1' && [styles.inputFocused, { borderColor: theme.accent, backgroundColor: theme.panel, color: theme.text }],
                     attemptedSubmit && Boolean(errors.line1) && styles.inputError,
                   ]}
                 />
@@ -284,32 +321,45 @@ export function AddressSheet({
 
               {/* Landmark / Suite (Optional) */}
               <View style={styles.fieldGroup}>
-                <Text style={styles.label}>Apartment, suite, landmark (optional)</Text>
+                <Text style={[styles.label, { color: theme.textMuted }]}>Apartment, suite, landmark (optional)</Text>
                 <TextInput
                   value={form.line2}
                   onChangeText={(t) => set({ line2: t })}
                   onFocus={() => setFocusedField('line2')}
                   onBlur={() => setFocusedField(null)}
                   placeholder="e.g. Near Central Park, Floor 3"
-                  placeholderTextColor="#9CA3AF"
-                  style={[styles.input, focusedField === 'line2' && styles.inputFocused]}
+                  placeholderTextColor={theme.textMuted}
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: theme.panel,
+                      borderColor: theme.border,
+                      color: theme.text,
+                    },
+                    focusedField === 'line2' && [styles.inputFocused, { borderColor: theme.accent, backgroundColor: theme.panel, color: theme.text }],
+                  ]}
                 />
               </View>
 
               {/* City & State / Region */}
               <View style={styles.row}>
                 <View style={[styles.fieldGroup, { flex: 1, marginRight: 6 }]}>
-                  <Text style={styles.label}>City</Text>
+                  <Text style={[styles.label, { color: theme.textMuted }]}>City</Text>
                   <TextInput
                     value={form.city}
                     onChangeText={(t) => set({ city: t })}
                     onFocus={() => setFocusedField('city')}
                     onBlur={() => setFocusedField(null)}
                     placeholder="e.g. Lahore"
-                    placeholderTextColor="#9CA3AF"
+                    placeholderTextColor={theme.textMuted}
                     style={[
                       styles.input,
-                      focusedField === 'city' && styles.inputFocused,
+                      {
+                        backgroundColor: theme.panel,
+                        borderColor: theme.border,
+                        color: theme.text,
+                      },
+                      focusedField === 'city' && [styles.inputFocused, { borderColor: theme.accent, backgroundColor: theme.panel, color: theme.text }],
                       attemptedSubmit && Boolean(errors.city) && styles.inputError,
                     ]}
                   />
@@ -319,15 +369,23 @@ export function AddressSheet({
                 </View>
 
                 <View style={[styles.fieldGroup, { flex: 1, marginLeft: 6 }]}>
-                  <Text style={styles.label}>State / Province</Text>
+                  <Text style={[styles.label, { color: theme.textMuted }]}>State / Province</Text>
                   <TextInput
                     value={form.state}
                     onChangeText={(t) => set({ state: t })}
                     onFocus={() => setFocusedField('state')}
                     onBlur={() => setFocusedField(null)}
                     placeholder="e.g. Punjab"
-                    placeholderTextColor="#9CA3AF"
-                    style={[styles.input, focusedField === 'state' && styles.inputFocused]}
+                    placeholderTextColor={theme.textMuted}
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: theme.panel,
+                        borderColor: theme.border,
+                        color: theme.text,
+                      },
+                      focusedField === 'state' && [styles.inputFocused, { borderColor: theme.accent, backgroundColor: theme.panel, color: theme.text }],
+                    ]}
                   />
                 </View>
               </View>
@@ -335,45 +393,69 @@ export function AddressSheet({
               {/* Postal Code & Country */}
               <View style={styles.row}>
                 <View style={[styles.fieldGroup, { flex: 1, marginRight: 6 }]}>
-                  <Text style={styles.label}>Postal code</Text>
+                  <Text style={[styles.label, { color: theme.textMuted }]}>Postal code</Text>
                   <TextInput
                     value={form.postal_code}
                     onChangeText={(t) => set({ postal_code: t })}
                     onFocus={() => setFocusedField('postal')}
                     onBlur={() => setFocusedField(null)}
                     placeholder="e.g. 54000"
-                    placeholderTextColor="#9CA3AF"
+                    placeholderTextColor={theme.textMuted}
                     keyboardType="number-pad"
-                    style={[styles.input, focusedField === 'postal' && styles.inputFocused]}
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: theme.panel,
+                        borderColor: theme.border,
+                        color: theme.text,
+                      },
+                      focusedField === 'postal' && [styles.inputFocused, { borderColor: theme.accent, backgroundColor: theme.panel, color: theme.text }],
+                    ]}
                   />
                 </View>
 
                 <View style={[styles.fieldGroup, { flex: 1, marginLeft: 6 }]}>
-                  <Text style={styles.label}>Country</Text>
+                  <Text style={[styles.label, { color: theme.textMuted }]}>Country</Text>
                   <TextInput
                     value={form.country}
                     onChangeText={(t) => set({ country: t })}
                     onFocus={() => setFocusedField('country')}
                     onBlur={() => setFocusedField(null)}
                     placeholder="e.g. Pakistan"
-                    placeholderTextColor="#9CA3AF"
-                    style={[styles.input, focusedField === 'country' && styles.inputFocused]}
+                    placeholderTextColor={theme.textMuted}
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: theme.panel,
+                        borderColor: theme.border,
+                        color: theme.text,
+                      },
+                      focusedField === 'country' && [styles.inputFocused, { borderColor: theme.accent, backgroundColor: theme.panel, color: theme.text }],
+                    ]}
                   />
                 </View>
               </View>
 
               {/* Phone Number */}
               <View style={styles.fieldGroup}>
-                <Text style={styles.label}>Phone number (for delivery courier)</Text>
+                <Text style={[styles.label, { color: theme.textMuted }]}>Phone number (for delivery courier)</Text>
                 <TextInput
                   value={form.phone}
                   onChangeText={(t) => set({ phone: t })}
                   onFocus={() => setFocusedField('phone')}
                   onBlur={() => setFocusedField(null)}
                   placeholder="e.g. 0300 1234567"
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={theme.textMuted}
                   keyboardType="phone-pad"
-                  style={[styles.input, focusedField === 'phone' && styles.inputFocused]}
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: theme.panel,
+                      borderColor: theme.border,
+                      color: theme.text,
+                    },
+                    focusedField === 'phone' && [styles.inputFocused, { borderColor: theme.accent, backgroundColor: theme.panel, color: theme.text }],
+                  ]}
                 />
               </View>
             </ScrollView>
@@ -383,6 +465,8 @@ export function AddressSheet({
               style={[
                 styles.footer,
                 {
+                  backgroundColor: theme.surface,
+                  borderTopColor: theme.border,
                   paddingBottom: Math.max(insets.bottom, 16),
                 },
               ]}
@@ -392,13 +476,14 @@ export function AddressSheet({
                 onPress={handleSubmit}
                 style={({ pressed }) => [
                   styles.saveBtn,
+                  { backgroundColor: theme.accent },
                   pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
                 ]}
               >
                 {saving ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
+                  <ActivityIndicator color={theme.background} size="small" />
                 ) : (
-                  <Text style={styles.saveBtnText}>
+                  <Text style={[styles.saveBtnText, { color: theme.background }]}>
                     {initial ? 'Save address' : 'Add delivery address'}
                   </Text>
                 )}
@@ -407,11 +492,7 @@ export function AddressSheet({
               {/* Optional Remove */}
               {onRemove && (
                 <Pressable
-                  onPress={async () => {
-                    setSaving(true);
-                    await onRemove();
-                    setSaving(false);
-                  }}
+                  onPress={handleRemove}
                   disabled={saving}
                   style={styles.removeBtn}
                 >

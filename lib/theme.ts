@@ -257,6 +257,24 @@ export const eyebrow: ReturnType<typeof getEyebrow> = new Proxy(
       const active = getEyebrow(currentTheme);
       return (active as any)[prop];
     },
+    set() {
+      return false;
+    },
+    has(_target, prop: string | symbol) {
+      return prop in getEyebrow(currentTheme);
+    },
+    ownKeys() {
+      return Reflect.ownKeys(getEyebrow(currentTheme));
+    },
+    getOwnPropertyDescriptor(_target, prop) {
+      const active = getEyebrow(currentTheme);
+      return (
+        Object.getOwnPropertyDescriptor(active, prop) || {
+          enumerable: true,
+          configurable: true,
+        }
+      );
+    },
   },
 );
 
@@ -266,6 +284,24 @@ export const eyebrowMute: ReturnType<typeof getEyebrowMute> = new Proxy(
     get(_target, prop: string | symbol) {
       const active = getEyebrowMute(currentTheme);
       return (active as any)[prop];
+    },
+    set() {
+      return false;
+    },
+    has(_target, prop: string | symbol) {
+      return prop in getEyebrowMute(currentTheme);
+    },
+    ownKeys() {
+      return Reflect.ownKeys(getEyebrowMute(currentTheme));
+    },
+    getOwnPropertyDescriptor(_target, prop) {
+      const active = getEyebrowMute(currentTheme);
+      return (
+        Object.getOwnPropertyDescriptor(active, prop) || {
+          enumerable: true,
+          configurable: true,
+        }
+      );
     },
   },
 );

@@ -144,7 +144,7 @@ export async function getListsContaining(
     .eq('save_lists.user_id', userId);
   if (error) {
     console.warn('[saves] getListsContaining', error.message);
-    return new Set();
+    throw error;
   }
   return new Set(((data ?? []) as { list_id: string }[]).map((r) => r.list_id));
 }
@@ -168,9 +168,10 @@ export async function addToList(
           listingId,
           op: 'add',
         });
+        invalidateSavedCache();
+        return true;
       }
-      invalidateSavedCache();
-      return true;
+      return false;
     }
     console.warn('[saves] addToList', error.message);
     return false;
@@ -201,9 +202,10 @@ export async function removeFromList(
           listingId,
           op: 'remove',
         });
+        invalidateSavedCache();
+        return true;
       }
-      invalidateSavedCache();
-      return true;
+      return false;
     }
     console.warn('[saves] removeFromList', error.message);
     return false;
@@ -275,14 +277,6 @@ export async function toggleSave(
           console.warn('[saves] toggleSave delete error', error);
           return currentlySaved;
         }
-      } else {
-        // If lists were empty due to network or offline, queue the remove action
-        await enqueueOfflineAction({
-          type: 'save_toggle',
-          userId,
-          listingId,
-          targetSaved: false,
-        });
       }
     } catch (e) {
       if (isNetworkError(e)) {

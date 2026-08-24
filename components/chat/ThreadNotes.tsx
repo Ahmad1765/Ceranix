@@ -3,6 +3,7 @@ import { View, Pressable } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import { colors, type as typography } from '@/lib/theme';
+import { BRAND } from '@/lib/brand';
 import { dayLabel } from './format';
 
 export function DateDivider({ iso }: { iso: string }) {
@@ -45,7 +46,7 @@ export function SafetyNote({ onPress }: { onPress: () => void }) {
             color: '#1F2937',
           }}
         >
-          Sharing personal details or following links is dangerous. You aren&apos;t protected if you leave Ceranix.{' '}
+          Sharing personal details or following links is dangerous. You aren&apos;t protected if you leave {BRAND}.{' '}
           <Text
             onPress={onPress}
             style={{
@@ -97,40 +98,46 @@ export function SellerIntroBubble({
         >
           Hi, I&apos;m {name}
         </Text>
-        <Text
-          style={{
-            fontFamily: typography.family.sans,
-            fontSize: 12.5,
-            color: '#6B7280',
-            marginBottom: 4,
-          }}
-        >
-          {rating || 'No reviews yet'}
-        </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-          <Feather name="map-pin" size={12} color="#6B7280" style={{ marginRight: 5 }} />
+        {rating ? (
           <Text
             style={{
               fontFamily: typography.family.sans,
               fontSize: 12.5,
               color: '#6B7280',
+              marginBottom: 4,
             }}
           >
-            {location || 'United States, Los Angeles, CA'}
+            {rating}
           </Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Feather name="clock" size={12} color="#6B7280" style={{ marginRight: 5 }} />
-          <Text
-            style={{
-              fontFamily: typography.family.sans,
-              fontSize: 12.5,
-              color: '#6B7280',
-            }}
-          >
-            {lastSeen || 'Last seen a day ago'}
-          </Text>
-        </View>
+        ) : null}
+        {location ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+            <Feather name="map-pin" size={12} color="#6B7280" style={{ marginRight: 5 }} />
+            <Text
+              style={{
+                fontFamily: typography.family.sans,
+                fontSize: 12.5,
+                color: '#6B7280',
+              }}
+            >
+              {location}
+            </Text>
+          </View>
+        ) : null}
+        {lastSeen ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Feather name="clock" size={12} color="#6B7280" style={{ marginRight: 5 }} />
+            <Text
+              style={{
+                fontFamily: typography.family.sans,
+                fontSize: 12.5,
+                color: '#6B7280',
+              }}
+            >
+              {lastSeen}
+            </Text>
+          </View>
+        ) : null}
       </View>
     </View>
   );

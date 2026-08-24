@@ -44,9 +44,10 @@ export function MockStripePaymentSheet({
     setSubmitting(true);
     try {
       await onConfirm();
-    } catch (err) {
+    } catch {
+      // Error handled by onConfirm or toast; avoid unhandled promise rejection
+    } finally {
       setSubmitting(false);
-      throw err;
     }
   };
 

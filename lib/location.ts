@@ -35,14 +35,18 @@ export async function reverseGeocodeCoords(
 
   try {
     // 1. Try Nominatim reverse geocode (accurate road, block, city, postal code)
+    const headers: Record<string, string> = {
+      'Accept-Language': 'en',
+    };
+    if (Platform.OS !== 'web') {
+      headers['User-Agent'] = 'CeranixApp/1.0 (support@ceranix.com)';
+    }
+
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&addressdetails=1`,
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&addressdetails=1&email=support@ceranix.com`,
       {
         signal: controller.signal,
-        headers: {
-          'Accept-Language': 'en',
-          'User-Agent': 'CeranixApp/1.0',
-        },
+        headers,
       },
     );
 
@@ -72,13 +76,23 @@ export async function reverseGeocodeCoords(
       const postal_code = String(addr.postcode || '');
       const country = addr.country ? String(addr.country) : '';
 
-      return {
-        line1: line1.slice(0, 120),
-        city: city.slice(0, 60),
-        state: state.slice(0, 60),
-        postal_code: postal_code.slice(0, 20),
-        country: country.slice(0, 60),
-      };
+      const hasUsableFields = Boolean(
+        line1.trim() ||
+        city.trim() ||
+        state.trim() ||
+        postal_code.trim() ||
+        country.trim()
+      );
+
+      if (hasUsableFields) {
+        return {
+          line1: line1.slice(0, 120),
+          city: city.slice(0, 60),
+          state: state.slice(0, 60),
+          postal_code: postal_code.slice(0, 20),
+          country: country.slice(0, 60),
+        };
+      }
     }
   } catch {
     // fallback below

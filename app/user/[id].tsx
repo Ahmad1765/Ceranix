@@ -1,5 +1,5 @@
 import { capture } from '@/lib/analytics';
-import { memo, useCallback, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Pressable,
@@ -204,6 +204,14 @@ export default function UserProfileScreen() {
   const sellerLevel = computeLevel(sellerStats).current;
   const availableCount = listings.filter((l) => !l.is_sold).length;
   const soldCount = listings.length - availableCount;
+
+  useEffect(() => {
+    if (shopFilter === 'sold' && soldCount === 0) {
+      setShopFilter('all');
+    } else if (shopFilter === 'available' && availableCount === 0) {
+      setShopFilter('all');
+    }
+  }, [shopFilter, soldCount, availableCount]);
 
   const credentials = sellerCredentials(
     profile,

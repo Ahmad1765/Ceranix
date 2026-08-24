@@ -40,8 +40,7 @@ export interface PaymentProvider {
 export function isDemoMode(): boolean {
   return (
     process.env.EXPO_PUBLIC_DEMO_MODE === 'true' ||
-    process.env.NODE_ENV === 'test' ||
-    !process.env.EXPO_PUBLIC_SUPABASE_URL
+    process.env.NODE_ENV === 'test'
   );
 }
 
@@ -83,6 +82,10 @@ export class CodPaymentProvider implements PaymentProvider {
   readonly id = 'cod' as const;
 
   async processCheckout(request: CheckoutRequest): Promise<CheckoutResult> {
+    if (!process.env.EXPO_PUBLIC_SUPABASE_URL && !isDemoMode()) {
+      throw new Error('Supabase URL is not configured');
+    }
+
     // 1. Strict Zod validation on shipping address before sending payload
     if (!request.shippingAddress) {
       throw new Error('Shipping address is required for Cash on Delivery');
@@ -214,6 +217,10 @@ export class StripePaymentProvider implements PaymentProvider {
       };
     }
 
+    if (!isDemoMode()) {
+      throw new Error('Card payments are not configured and demo mode is disabled');
+    }
+
     // Mock Stripe Payment Sheet / PaymentIntent simulation
     await new Promise((resolve) => setTimeout(resolve, 600));
 
@@ -271,12 +278,13 @@ export class StripePaymentProvider implements PaymentProvider {
     };
 
     const isDemo = !backendOrder;
+    const finalAmountCents = backendOrder ? backendOrder.amount_cents : amountCents;
 
     capture('checkout_completed', {
       listing_id: request.listingId,
       payment_method: 'card',
       order_id: mockOrderId,
-      amount_cents: amountCents,
+      amount_cents: finalAmountCents,
       demo_mode: isDemo,
     });
 
@@ -342,6 +350,7 @@ export class PaymentService {
     listingId?: string;
     reason?: string;
   }): Promise<Order> {
+    let rpcError: Error | null = null;
     try {
       const { data, error } = await supabase.rpc('cancel_order', {
         p_order_id: orderId,
@@ -352,31 +361,47 @@ export class PaymentService {
         capture('order_cancelled', { order_id: orderId, reason });
         return data as Order;
       }
-    } catch {
-      // RPC fallback handled below
+      if (error) {
+        rpcError = new Error(error.message);
+      }
+    } catch (e: any) {
+      rpcError = e instanceof Error ? e : new Error(String(e));
     }
 
     // Direct fallback: update orders row + listings row
+    let fallbackError: Error | null = null;
     try {
-      await supabase
+      const { data: updatedOrder, error: updateError } = await supabase
         .from('orders')
         .update({
           status: 'canceled',
           cancel_reason: reason,
         })
-        .eq('id', orderId);
+        .eq('id', orderId)
+        .select()
+        .maybeSingle();
 
-      if (listingId) {
-        await supabase
-          .from('listings')
-          .update({ is_sold: false })
-          .eq('id', listingId);
+      if (updateError) {
+        fallbackError = new Error(updateError.message);
+      } else if (updatedOrder) {
+        if (listingId) {
+          await supabase
+            .from('listings')
+            .update({ is_sold: false })
+            .eq('id', listingId);
+        }
+        capture('order_cancelled', { order_id: orderId, reason, fallback: true });
+        return updatedOrder as Order;
       }
-    } catch {
-      // Fallback handled
+    } catch (e: any) {
+      fallbackError = e instanceof Error ? e : new Error(String(e));
     }
 
-    capture('order_cancelled', { order_id: orderId, reason, fallback: true });
+    if (!isDemoMode()) {
+      throw fallbackError || rpcError || new Error('Failed to cancel order');
+    }
+
+    capture('order_cancelled', { order_id: orderId, reason, demo_mode: true });
     return {
       id: orderId,
       listing_id: listingId,
@@ -400,6 +425,7 @@ export class PaymentService {
     courier?: string;
     trackingNumber?: string;
   }): Promise<Order> {
+    let rpcError: Error | null = null;
     try {
       const { data, error } = await supabase.rpc('mark_order_shipped', {
         p_order_id: orderId,
@@ -411,22 +437,39 @@ export class PaymentService {
         capture('order_shipped', { order_id: orderId, courier, tracking_number: trackingNumber });
         return data as Order;
       }
-    } catch {
-      // RPC fallback handled below
+      if (error) {
+        rpcError = new Error(error.message);
+      }
+    } catch (e: any) {
+      rpcError = e instanceof Error ? e : new Error(String(e));
     }
 
     // Direct fallback
+    let fallbackError: Error | null = null;
     try {
-      await supabase
+      const { data: updatedOrder, error: updateError } = await supabase
         .from('orders')
         .update({
           courier_name: courier,
           tracking_number: trackingNumber,
           shipped_at: new Date().toISOString(),
         })
-        .eq('id', orderId);
-    } catch {
-      // Fallback handled
+        .eq('id', orderId)
+        .select()
+        .maybeSingle();
+
+      if (updateError) {
+        fallbackError = new Error(updateError.message);
+      } else if (updatedOrder) {
+        capture('order_shipped', { order_id: orderId, courier, tracking_number: trackingNumber, fallback: true });
+        return updatedOrder as Order;
+      }
+    } catch (e: any) {
+      fallbackError = e instanceof Error ? e : new Error(String(e));
+    }
+
+    if (!isDemoMode()) {
+      throw fallbackError || rpcError || new Error('Failed to mark order as shipped');
     }
 
     return {
@@ -443,6 +486,7 @@ export class PaymentService {
    * Buyer action to confirm receipt and complete order.
    */
   async confirmOrderReceived({ orderId }: { orderId: string }): Promise<Order> {
+    let rpcError: Error | null = null;
     try {
       const { data, error } = await supabase.rpc('confirm_order_received', {
         p_order_id: orderId,
@@ -452,13 +496,43 @@ export class PaymentService {
         capture('order_completed_by_buyer', { order_id: orderId });
         return data as Order;
       }
-    } catch {
-      // fallback
+      if (error) {
+        rpcError = new Error(error.message);
+      }
+    } catch (e: any) {
+      rpcError = e instanceof Error ? e : new Error(String(e));
+    }
+
+    // Direct fallback
+    let fallbackError: Error | null = null;
+    try {
+      const { data: updatedOrder, error: updateError } = await supabase
+        .from('orders')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', orderId)
+        .select()
+        .maybeSingle();
+
+      if (updateError) {
+        fallbackError = new Error(updateError.message);
+      } else if (updatedOrder) {
+        capture('order_completed_by_buyer', { order_id: orderId, fallback: true });
+        return updatedOrder as Order;
+      }
+    } catch (e: any) {
+      fallbackError = e instanceof Error ? e : new Error(String(e));
+    }
+
+    if (!isDemoMode()) {
+      throw fallbackError || rpcError || new Error('Failed to confirm order received');
     }
 
     return {
       id: orderId,
-      status: 'paid',
+      status: 'completed',
       amount_cents: 0,
       fee_cents: 0,
       currency: 'pkr',

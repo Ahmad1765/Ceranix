@@ -42,7 +42,7 @@ export function UserCommentHeader({
   onOptionsPress,
   style,
 }: UserCommentHeaderProps) {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const [following, setFollowing] = useState(initialFollowing);
 
   useEffect(() => {
@@ -209,7 +209,7 @@ export function UserCommentHeader({
                 style={{
                   fontSize: 12,
                   fontWeight: '500',
-                  color: following ? theme.text : (theme.accent === '#FFFFFF' ? '#0F0F0F' : '#FFFFFF'),
+                  color: following ? theme.text : (isDark ? '#0F0F0F' : '#FFFFFF'),
                 }}
               >
                 {following ? 'Following' : 'Follow'}

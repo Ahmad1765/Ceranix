@@ -65,13 +65,14 @@ export function SubscriptionSheet({
     const nextPro = !isPro;
 
     try {
-      const { error } = await supabase.rpc('update_seller_subscription', {
-        p_is_pro: nextPro,
+      const { data, error } = await supabase.functions.invoke('update-seller-subscription', {
+        body: { is_pro: nextPro },
       });
 
-      if (error) {
-        console.warn('[subscription] Update error:', error);
-        toast.show(error.message || 'Could not update program', {
+      if (error || data?.error) {
+        const errorMsg = error?.message || data?.error || 'Could not update program';
+        console.warn('[subscription] Update error:', errorMsg);
+        toast.show(errorMsg, {
           variant: 'default',
           icon: 'alert-triangle',
         });
@@ -87,7 +88,11 @@ export function SubscriptionSheet({
           icon: nextPro ? 'award' : 'check',
         }
       );
-      await refreshProfile();
+      try {
+        await refreshProfile();
+      } catch (err) {
+        console.warn('[subscription] Failed to refresh profile:', err);
+      }
       onClose();
     } catch (e: any) {
       toast.show(e?.message ?? 'Could not update program', {

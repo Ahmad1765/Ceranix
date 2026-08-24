@@ -27,11 +27,11 @@ describe('deriveInvoiceStatus', () => {
 
   it('shows Refunded — not Pending — for a returned payment', () => {
     expect(deriveInvoiceStatus(order('refunded'), false)).toBe('refunded');
-    expect(deriveInvoiceStatus(order('refund_due'), false)).toBe('refunded');
+    expect(deriveInvoiceStatus(order('refund_due'), false)).toBe('refund_due');
   });
 
-  it('keeps Refunded even while a confirm poll is running', () => {
-    expect(deriveInvoiceStatus(order('refund_due'), true)).toBe('refunded');
+  it('keeps refund_due even while a confirm poll is running', () => {
+    expect(deriveInvoiceStatus(order('refund_due'), true)).toBe('refund_due');
   });
 
   it('shows failed for a failed payment', () => {

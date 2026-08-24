@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -32,16 +32,29 @@ export function MarkShippedModal({
   onConfirmShipped,
 }: MarkShippedModalProps) {
   const insets = useSafeAreaInsets();
-  const [courier, setCourier] = useState('Standard Courier');
+  const [courier, setCourier] = useState<string>(COURIER_PRESETS[0]);
+  const [customCourier, setCustomCourier] = useState('');
   const [trackingNumber, setTrackingNumber] = useState('');
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      setCourier(COURIER_PRESETS[0]);
+      setCustomCourier('');
+      setTrackingNumber('');
+      setSaving(false);
+    }
+  }, [visible]);
 
   const handleConfirm = async () => {
     tap('medium');
     setSaving(true);
     try {
-      await onConfirmShipped(courier.trim() || 'Standard Delivery', trackingNumber.trim());
+      const finalCourier = courier === 'Other' ? (customCourier.trim() || 'Other') : courier;
+      await onConfirmShipped(finalCourier.trim() || 'Standard Delivery', trackingNumber.trim());
       onClose();
+    } catch {
+      // Handled cleanly; sheet stays open
     } finally {
       setSaving(false);
     }
@@ -110,9 +123,10 @@ export function MarkShippedModal({
             {courier === 'Other' && (
               <View style={{ marginBottom: 12 }}>
                 <TextInput
+                  value={customCourier}
+                  onChangeText={setCustomCourier}
                   placeholder="Enter courier name"
                   placeholderTextColor="#9CA3AF"
-                  onChangeText={setCourier}
                   style={styles.textInput}
                 />
               </View>

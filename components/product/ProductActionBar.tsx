@@ -145,7 +145,7 @@ export function ProductActionBar({
             },
           ]}
         >
-          <Text style={styles.buyButtonText}>
+          <Text style={[styles.buyButtonText, { color: theme.background }]}>
             {isOwner ? 'Edit listing' : 'Buy now'}
           </Text>
         </Pressable>

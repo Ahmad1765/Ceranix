@@ -13,8 +13,10 @@ export default function UploadTabFallback() {
 
   useEffect(() => {
     if (!isFocused) return;
-    open();
-    router.navigate('/(tabs)');
+    const opened = open();
+    if (opened) {
+      router.navigate('/(tabs)');
+    }
   }, [open, isFocused]);
 
   return null;

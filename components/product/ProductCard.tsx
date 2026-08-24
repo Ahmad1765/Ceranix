@@ -138,21 +138,11 @@ export const ProductCard = memo(function ProductCard({
         {/* $44x44px Touch Target Like / Bookmark Action */}
         <Pressable
           onPress={handleLikePress}
-          className="no-ring"
           accessibilityLabel={isLiked ? 'Unlike item' : 'Like item'}
           style={({ pressed }) => [
             styles.likeButtonWrapper,
             {
               opacity: pressed ? 0.8 : 1,
-              ...(Platform.OS === 'web'
-                ? ({
-                    outline: 'none !important',
-                    outlineStyle: 'none !important',
-                    border: 'none !important',
-                    borderWidth: 0,
-                    boxShadow: 'none !important',
-                  } as any)
-                : {}),
             },
           ]}
         >

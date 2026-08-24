@@ -7,11 +7,11 @@ alter table public.orders
   add column if not exists shipping_address jsonb,
   add column if not exists delivery_notes text;
 
--- 2. Update status check constraint to include 'failed' if not already present
+-- 2. Update status check constraint to include 'completed' and 'failed' if not already present
 alter table public.orders drop constraint if exists orders_status_check;
 alter table public.orders
   add constraint orders_status_check
-  check (status in ('pending', 'paid', 'refunded', 'canceled', 'refund_due', 'failed'));
+  check (status in ('pending', 'paid', 'refunded', 'canceled', 'refund_due', 'failed', 'completed'));
 
 -- 3. Atomic RPC: process_checkout
 -- Locks the listing row, verifies is_sold is false, inserts order into public.orders, updates listing is_sold to true.
@@ -112,9 +112,9 @@ begin
     v_session_id := 'cod_' || gen_random_uuid()::text;
     v_payment_intent := null;
   else
-    v_order_status := 'paid';
-    v_session_id := 'cs_mock_' || gen_random_uuid()::text;
-    v_payment_intent := 'pi_mock_' || gen_random_uuid()::text;
+    v_order_status := 'pending';
+    v_session_id := null;
+    v_payment_intent := null;
   end if;
 
   -- 6. Insert order row

@@ -2,16 +2,13 @@ import { Tabs } from 'expo-router';
 import { AnimatedTabBar } from '../../components/AnimatedTabBar';
 import { useSellSheet } from '@/components/sell/SellSheet';
 import { useDiscoverSheet } from '@/components/discover/DiscoverSheet';
-import { useTheme } from '@/context/ThemeContext';
 
 export default function TabsLayout() {
-  const { isDark } = useTheme();
   const { open: openSellSheet } = useSellSheet();
   const { open: openDiscoverSheet } = useDiscoverSheet();
 
   return (
     <Tabs
-      key={isDark ? 'tabs-dark' : 'tabs-light'}
       tabBar={(props) => <AnimatedTabBar {...props} />}
       screenOptions={{ headerShown: false, freezeOnBlur: true }}
     >

@@ -95,10 +95,8 @@ function MetaLine({
   );
 }
 
-// ── System notice ─────────────────────────────────────────────────────────
-
 function SystemNotice({ msg }: { msg: ChatMessage }) {
-  if (msg.content.includes('payment') || msg.metadata?.paid || msg.content.startsWith('Done!')) {
+  if (msg.metadata?.paid === true) {
     return (
       <View style={{ paddingHorizontal: 16, marginVertical: 12 }}>
         <View
@@ -192,9 +190,14 @@ function OfferBubble({
 >) {
   const amount = msg.metadata?.amount ?? 0;
   const status = msg.offer_status ?? 'pending';
+  const isPaid = Boolean(
+    msg.metadata?.paid ||
+    msg.metadata?.order_status === 'paid' ||
+    msg.metadata?.payment_status === 'paid'
+  );
   const canRespond = !mine && isSeller && status === 'pending';
-  const canPay = mine && !isSeller && status === 'accepted' && !!listingId && !listingSold;
-  const awaitingPayment = !mine && isSeller && status === 'accepted' && !listingSold;
+  const canPay = mine && !isSeller && status === 'accepted' && !!listingId && !listingSold && !isPaid;
+  const awaitingPayment = !mine && isSeller && status === 'accepted' && !listingSold && !isPaid;
   const settled = status !== 'pending' ? OFFER_STATUS_COPY[status] : null;
   const showStruck = !!listingPrice && listingPrice > amount;
   const discountPct =
@@ -552,12 +555,7 @@ function OfferBubble({
         </View>
       )}
 
-      {status === 'accepted' &&
-        (msg.metadata?.order_status === 'paid' ||
-          msg.metadata?.payment_status === 'paid' ||
-          (msg.metadata as any)?.paid === true ||
-          (msg as any).order_status === 'paid' ||
-          (msg as any).payment_status === 'paid') && (
+      {status === 'accepted' && isPaid && (
         <View
           style={{
             flexDirection: 'row',
