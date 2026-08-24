@@ -1,14 +1,26 @@
-import { useEffect, useMemo, useState, useRef } from 'react';
-import { View, Pressable, ActivityIndicator, ScrollView } from 'react-native';
-import { Text } from '@/lib/rnText';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
+import {
+  View,
+  Pressable,
+  ActivityIndicator,
+  ScrollView,
+  Modal,
+  Platform,
+  KeyboardAvoidingView,
+  StyleSheet,
+  ViewStyle,
+  TextStyle,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Text, TextInput } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { tap } from '@/lib/haptics';
-import { getCurrentLocationAddress, POPULAR_CITIES } from '@/lib/location';
+import { getCurrentLocationAddress } from '@/lib/location';
 import type { ShippingAddress } from '@/types';
-import { SheetModal, SheetField, SheetPrimary, SheetDestructive } from './Sheet';
+import { HIT_SLOP_8 } from '@/lib/responsive';
 
 export type AddressForm = {
   recipient_name: string;
@@ -32,6 +44,8 @@ const EMPTY: AddressForm = {
   phone: '',
 };
 
+const TEAL = '#007782';
+
 export function AddressSheet({
   visible,
   initial,
@@ -45,12 +59,16 @@ export function AddressSheet({
   onSave: (form: AddressForm) => Promise<void>;
   onRemove?: () => Promise<void>;
 }) {
+  const insets = useSafeAreaInsets();
+  const { theme, isDark } = useTheme();
   const { profile } = useAuth();
   const toast = useToast();
 
   const [form, setForm] = useState<AddressForm>(EMPTY);
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
   const prevVisibleRef = useRef(visible);
 
   useEffect(() => {
@@ -85,54 +103,33 @@ export function AddressSheet({
       });
       setSaving(false);
       setLocating(false);
+      setFocusedField(null);
+      setAttemptedSubmit(false);
     }
     prevVisibleRef.current = visible;
   }, [visible, initial, profile]);
 
   const errors = useMemo(() => {
     const e: Partial<Record<keyof AddressForm, string>> = {};
-    if (!form.recipient_name.trim()) e.recipient_name = 'Recipient name is required';
+    if (!form.recipient_name.trim()) e.recipient_name = 'Full name is required';
     if (!form.line1.trim()) e.line1 = 'Street address is required';
     if (!form.city.trim()) e.city = 'City is required';
-    if (!form.postal_code.trim()) e.postal_code = 'Postal code is required';
-    if (!form.country.trim()) e.country = 'Country is required';
     return e;
   }, [form]);
 
   const canSave = Object.keys(errors).length === 0;
 
   const set = (patch: Partial<AddressForm>) => {
-    const nextPatch = { ...patch };
-    // Smart cleaning: if city contains comma (e.g. "Lahore, Pakistan"), split cleanly
-    if (typeof nextPatch.city === 'string' && nextPatch.city.includes(',')) {
-      const parts = nextPatch.city.split(',').map((p) => p.trim());
-      nextPatch.city = parts[0];
-      if (parts[1]) {
-        nextPatch.country = parts[1];
-      }
-    }
-    setForm((s) => ({ ...s, ...nextPatch }));
+    setForm((s) => ({ ...s, ...patch }));
   };
 
-  const locRequestIdRef = useRef(0);
-
-  // Invalidate any in-flight location request when the sheet closes
-  useEffect(() => {
-    if (!visible) {
-      locRequestIdRef.current += 1;
-    }
-  }, [visible]);
-
-  // Location Auto-detect / Location Adder
   const handleUseCurrentLocation = async () => {
     if (locating) return;
     tap('medium');
     setLocating(true);
-    const requestId = ++locRequestIdRef.current;
 
     try {
       const loc = await getCurrentLocationAddress();
-      if (locRequestIdRef.current !== requestId) return;
       setForm((s) => ({
         ...s,
         line1: loc.line1 || s.line1,
@@ -142,236 +139,446 @@ export function AddressSheet({
         country: loc.country || s.country || 'Pakistan',
       }));
 
-      toast.show('Address auto-filled from your location', {
+      toast.show('Address updated from your location', {
         variant: 'default',
         icon: 'check',
       });
     } catch (e: any) {
-      if (locRequestIdRef.current !== requestId) return;
       toast.show(e?.message ?? 'Could not detect location', {
         variant: 'default',
         icon: 'alert-triangle',
       });
     } finally {
-      if (locRequestIdRef.current === requestId) {
-        setLocating(false);
-      }
+      setLocating(false);
     }
   };
 
-  // Quick city selector helper
-  const handleSelectCity = (cityName: string) => {
-    tap('light');
-    let state = form.state;
-    if (['Lahore', 'Faisalabad', 'Multan', 'Rawalpindi', 'Gujranwala', 'Sialkot'].includes(cityName)) {
-      state = 'Punjab';
-    } else if (['Karachi', 'Hyderabad', 'Sukkur'].includes(cityName)) {
-      state = 'Sindh';
-    } else if (['Islamabad'].includes(cityName)) {
-      state = 'Islamabad Capital Territory';
-    } else if (['Peshawar'].includes(cityName)) {
-      state = 'Khyber Pakhtunkhwa';
-    } else if (['Quetta'].includes(cityName)) {
-      state = 'Balochistan';
+  const handleSubmit = async () => {
+    setAttemptedSubmit(true);
+    if (!canSave) {
+      toast.show('Please fill in the required address fields', {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
+      return;
     }
-
-    setForm((s) => ({
-      ...s,
-      city: cityName,
-      state: state || s.state,
-      country: s.country || 'Pakistan',
-    }));
+    setSaving(true);
+    await onSave(form);
+    setSaving(false);
   };
-
-  const { theme } = useTheme();
 
   return (
-    <SheetModal visible={visible} onClose={onClose} title="Shipping address">
-      {/* ── Location Adder Action ────────────────────────────────────────── */}
-      <View
-        style={{
-          marginBottom: 16,
-          backgroundColor: theme.panel,
-          borderRadius: 16,
-          padding: 12,
-        }}
-      >
-        <Pressable
-          onPress={handleUseCurrentLocation}
-          disabled={locating}
-          style={({ pressed }) => ({
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: locating ? theme.primarySoft : theme.surface,
-            borderRadius: 12,
-            paddingVertical: 11,
-            paddingHorizontal: 14,
-            borderWidth: 1,
-            borderColor: theme.border,
-            gap: 8,
-            opacity: pressed ? 0.8 : 1,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.05,
-            shadowRadius: 2,
-          })}
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <View style={[styles.overlay, { backgroundColor: isDark ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.45)' }]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close sheet" />
+
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={[
+            styles.keyboardContainer,
+            {
+              paddingTop: Platform.OS === 'ios' ? insets.top : 12,
+            },
+          ]}
         >
-          {locating ? (
-            <>
-              <ActivityIndicator size="small" color={theme.accent} />
-              <Text style={{ fontSize: 13.5, fontWeight: '700', color: theme.accent }}>
-                Detecting your location…
-              </Text>
-            </>
-          ) : (
-            <>
-              <Feather name="navigation" size={15} color={theme.accent} />
-              <Text style={{ fontSize: 13.5, fontWeight: '700', color: theme.accent }}>
-                Use Current Location (GPS Auto-fill)
-              </Text>
-            </>
-          )}
-        </Pressable>
-
-        {/* Quick city suggestions */}
-        <View style={{ marginTop: 10 }}>
-          <Text style={{ fontSize: 11, color: theme.textMuted, fontWeight: '600', marginBottom: 6 }}>
-            QUICK CITY SELECT:
-          </Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 6 }}
+          <View
+            style={[
+              styles.sheetContainer,
+              {
+                backgroundColor: theme.surface || '#FFFFFF',
+                borderColor: theme.border || '#E5E7EB',
+              },
+            ]}
           >
-            {POPULAR_CITIES.map((c) => {
-              const isSelected = form.city.toLowerCase() === c.toLowerCase();
-              return (
-                <Pressable
-                  key={c}
-                  onPress={() => handleSelectCity(c)}
-                  style={{
-                    paddingHorizontal: 10,
-                    paddingVertical: 5,
-                    borderRadius: 8,
-                    backgroundColor: isSelected ? theme.accent : theme.surface,
-                    borderWidth: 1,
-                    borderColor: isSelected ? theme.accent : theme.border,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      fontWeight: isSelected ? '800' : '600',
-                      color: isSelected ? (theme.accent === '#FFFFFF' ? '#0F0F0F' : '#FFFFFF') : theme.text,
-                    }}
-                  >
-                    {c}
+            {/* Top Drag Notch (mobile only) */}
+            {Platform.OS !== 'web' && <View style={styles.notch} />}
+
+            {/* Header */}
+            <View style={styles.header}>
+              <Text style={styles.title}>Delivery address</Text>
+              <Pressable
+                onPress={onClose}
+                hitSlop={HIT_SLOP_8}
+                style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.6 }]}
+              >
+                <Feather name="x" size={18} color="#111111" />
+              </Pressable>
+            </View>
+
+            {/* Scrollable Form Content */}
+            <ScrollView
+              style={styles.scrollView}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.scrollContent}
+            >
+              {/* Quick Auto-Fill Action */}
+              <Pressable
+                onPress={handleUseCurrentLocation}
+                disabled={locating}
+                style={({ pressed }) => [
+                  styles.autoFillBtn,
+                  pressed && { opacity: 0.75 },
+                ]}
+              >
+                {locating ? (
+                  <>
+                    <ActivityIndicator size="small" color={TEAL} style={{ marginRight: 6 }} />
+                    <Text style={styles.autoFillText}>Locating your address…</Text>
+                  </>
+                ) : (
+                  <>
+                    <Feather name="crosshair" size={14} color={TEAL} style={{ marginRight: 6 }} />
+                    <Text style={styles.autoFillText}>Use current location</Text>
+                  </>
+                )}
+              </Pressable>
+
+              {/* Recipient Name */}
+              <View style={styles.fieldGroup}>
+                <Text style={styles.label}>Full name</Text>
+                <TextInput
+                  value={form.recipient_name}
+                  onChangeText={(t) => set({ recipient_name: t })}
+                  onFocus={() => setFocusedField('name')}
+                  onBlur={() => setFocusedField(null)}
+                  placeholder="e.g. Sam Lee"
+                  placeholderTextColor="#9CA3AF"
+                  style={[
+                    styles.input,
+                    focusedField === 'name' && styles.inputFocused,
+                    attemptedSubmit && Boolean(errors.recipient_name) && styles.inputError,
+                  ]}
+                />
+                {attemptedSubmit && Boolean(errors.recipient_name) && (
+                  <Text style={styles.errorText}>{errors.recipient_name}</Text>
+                )}
+              </View>
+
+              {/* Street Address */}
+              <View style={styles.fieldGroup}>
+                <Text style={styles.label}>Street address</Text>
+                <TextInput
+                  value={form.line1}
+                  onChangeText={(t) => set({ line1: t })}
+                  onFocus={() => setFocusedField('line1')}
+                  onBlur={() => setFocusedField(null)}
+                  placeholder="House / Apartment, Street, Area"
+                  placeholderTextColor="#9CA3AF"
+                  style={[
+                    styles.input,
+                    focusedField === 'line1' && styles.inputFocused,
+                    attemptedSubmit && Boolean(errors.line1) && styles.inputError,
+                  ]}
+                />
+                {attemptedSubmit && Boolean(errors.line1) && (
+                  <Text style={styles.errorText}>{errors.line1}</Text>
+                )}
+              </View>
+
+              {/* Landmark / Suite (Optional) */}
+              <View style={styles.fieldGroup}>
+                <Text style={styles.label}>Apartment, suite, landmark (optional)</Text>
+                <TextInput
+                  value={form.line2}
+                  onChangeText={(t) => set({ line2: t })}
+                  onFocus={() => setFocusedField('line2')}
+                  onBlur={() => setFocusedField(null)}
+                  placeholder="e.g. Near Central Park, Floor 3"
+                  placeholderTextColor="#9CA3AF"
+                  style={[styles.input, focusedField === 'line2' && styles.inputFocused]}
+                />
+              </View>
+
+              {/* City & State / Region */}
+              <View style={styles.row}>
+                <View style={[styles.fieldGroup, { flex: 1, marginRight: 6 }]}>
+                  <Text style={styles.label}>City</Text>
+                  <TextInput
+                    value={form.city}
+                    onChangeText={(t) => set({ city: t })}
+                    onFocus={() => setFocusedField('city')}
+                    onBlur={() => setFocusedField(null)}
+                    placeholder="e.g. Lahore"
+                    placeholderTextColor="#9CA3AF"
+                    style={[
+                      styles.input,
+                      focusedField === 'city' && styles.inputFocused,
+                      attemptedSubmit && Boolean(errors.city) && styles.inputError,
+                    ]}
+                  />
+                  {attemptedSubmit && Boolean(errors.city) && (
+                    <Text style={styles.errorText}>{errors.city}</Text>
+                  )}
+                </View>
+
+                <View style={[styles.fieldGroup, { flex: 1, marginLeft: 6 }]}>
+                  <Text style={styles.label}>State / Province</Text>
+                  <TextInput
+                    value={form.state}
+                    onChangeText={(t) => set({ state: t })}
+                    onFocus={() => setFocusedField('state')}
+                    onBlur={() => setFocusedField(null)}
+                    placeholder="e.g. Punjab"
+                    placeholderTextColor="#9CA3AF"
+                    style={[styles.input, focusedField === 'state' && styles.inputFocused]}
+                  />
+                </View>
+              </View>
+
+              {/* Postal Code & Country */}
+              <View style={styles.row}>
+                <View style={[styles.fieldGroup, { flex: 1, marginRight: 6 }]}>
+                  <Text style={styles.label}>Postal code</Text>
+                  <TextInput
+                    value={form.postal_code}
+                    onChangeText={(t) => set({ postal_code: t })}
+                    onFocus={() => setFocusedField('postal')}
+                    onBlur={() => setFocusedField(null)}
+                    placeholder="e.g. 54000"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="number-pad"
+                    style={[styles.input, focusedField === 'postal' && styles.inputFocused]}
+                  />
+                </View>
+
+                <View style={[styles.fieldGroup, { flex: 1, marginLeft: 6 }]}>
+                  <Text style={styles.label}>Country</Text>
+                  <TextInput
+                    value={form.country}
+                    onChangeText={(t) => set({ country: t })}
+                    onFocus={() => setFocusedField('country')}
+                    onBlur={() => setFocusedField(null)}
+                    placeholder="e.g. Pakistan"
+                    placeholderTextColor="#9CA3AF"
+                    style={[styles.input, focusedField === 'country' && styles.inputFocused]}
+                  />
+                </View>
+              </View>
+
+              {/* Phone Number */}
+              <View style={styles.fieldGroup}>
+                <Text style={styles.label}>Phone number (for delivery courier)</Text>
+                <TextInput
+                  value={form.phone}
+                  onChangeText={(t) => set({ phone: t })}
+                  onFocus={() => setFocusedField('phone')}
+                  onBlur={() => setFocusedField(null)}
+                  placeholder="e.g. 0300 1234567"
+                  placeholderTextColor="#9CA3AF"
+                  keyboardType="phone-pad"
+                  style={[styles.input, focusedField === 'phone' && styles.inputFocused]}
+                />
+              </View>
+            </ScrollView>
+
+            {/* ── Fixed Footer Action Bar (Always Visible at Bottom) ── */}
+            <View
+              style={[
+                styles.footer,
+                {
+                  paddingBottom: Math.max(insets.bottom, 16),
+                },
+              ]}
+            >
+              <Pressable
+                disabled={saving}
+                onPress={handleSubmit}
+                style={({ pressed }) => [
+                  styles.saveBtn,
+                  pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
+                ]}
+              >
+                {saving ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.saveBtnText}>
+                    {initial ? 'Save address' : 'Add delivery address'}
                   </Text>
+                )}
+              </Pressable>
+
+              {/* Optional Remove */}
+              {onRemove && (
+                <Pressable
+                  onPress={async () => {
+                    setSaving(true);
+                    await onRemove();
+                    setSaving(false);
+                  }}
+                  disabled={saving}
+                  style={styles.removeBtn}
+                >
+                  <Text style={styles.removeBtnText}>Remove address</Text>
                 </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
+              )}
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </View>
-
-      {/* ── Form Fields ─────────────────────────────────────────────────── */}
-      <SheetField
-        label="Recipient name"
-        placeholder="Full name of person receiving the package"
-        value={form.recipient_name}
-        onChangeText={(t) => set({ recipient_name: t.slice(0, 80) })}
-        error={errors.recipient_name}
-      />
-
-      <SheetField
-        label="Address line 1 (Street / House / Block)"
-        placeholder="e.g. House #12, Street 4, Block C, Johar Town"
-        value={form.line1}
-        onChangeText={(t) => set({ line1: t.slice(0, 120) })}
-        error={errors.line1}
-      />
-
-      <SheetField
-        label="Address line 2 (Optional landmark / suite)"
-        placeholder="e.g. Near Shell pump, Flat 3B"
-        value={form.line2}
-        onChangeText={(t) => set({ line2: t.slice(0, 120) })}
-      />
-
-      <View style={{ flexDirection: 'row', gap: 12 }}>
-        <View style={{ flex: 1 }}>
-          <SheetField
-            label="City"
-            placeholder="e.g. Lahore"
-            value={form.city}
-            onChangeText={(t) => set({ city: t.slice(0, 60) })}
-            error={errors.city}
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <SheetField
-            label="State / region"
-            placeholder="e.g. Punjab"
-            value={form.state}
-            onChangeText={(t) => set({ state: t.slice(0, 60) })}
-          />
-        </View>
-      </View>
-
-      <View style={{ flexDirection: 'row', gap: 12 }}>
-        <View style={{ flex: 1 }}>
-          <SheetField
-            label="Postal code"
-            placeholder="e.g. 54000"
-            value={form.postal_code}
-            keyboardType="number-pad"
-            onChangeText={(t) => set({ postal_code: t.slice(0, 20) })}
-            error={errors.postal_code}
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <SheetField
-            label="Country"
-            placeholder="e.g. Pakistan"
-            value={form.country}
-            onChangeText={(t) => set({ country: t.slice(0, 60) })}
-            error={errors.country}
-          />
-        </View>
-      </View>
-
-      <SheetField
-        label="Phone (for courier delivery)"
-        placeholder="e.g. 03xxxxxxxxx"
-        value={form.phone}
-        keyboardType="phone-pad"
-        onChangeText={(t) => set({ phone: t.slice(0, 30) })}
-      />
-
-      <SheetPrimary
-        label={saving ? 'Saving…' : initial ? 'Update address' : 'Save address'}
-        loading={saving}
-        disabled={!canSave || saving}
-        onPress={async () => {
-          if (!canSave) return;
-          setSaving(true);
-          await onSave(form);
-          setSaving(false);
-        }}
-      />
-
-      {onRemove && (
-        <SheetDestructive
-          label="Remove address"
-          disabled={saving}
-          onPress={async () => {
-            setSaving(true);
-            await onRemove();
-            setSaving(false);
-          }}
-        />
-      )}
-    </SheetModal>
+    </Modal>
   );
 }
+
+const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end',
+    alignItems: 'center',
+    paddingHorizontal: Platform.OS === 'web' ? 16 : 0,
+  } as ViewStyle,
+  keyboardContainer: {
+    width: '100%',
+    maxWidth: 480,
+    maxHeight: '92%',
+    height: Platform.OS === 'web' ? 620 : undefined,
+  } as ViewStyle,
+  sheetContainer: {
+    flex: 1,
+    maxHeight: '100%',
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderRadius: Platform.OS === 'web' ? 24 : 0,
+    borderWidth: 1,
+    paddingTop: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 10,
+    overflow: 'hidden',
+  } as ViewStyle,
+  notch: {
+    alignSelf: 'center',
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E5E7EB',
+    marginBottom: 10,
+  } as ViewStyle,
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginBottom: 10,
+    paddingBottom: 4,
+  } as ViewStyle,
+  title: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111111',
+    fontFamily: 'Inter_700Bold',
+    letterSpacing: -0.3,
+  } as TextStyle,
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  } as ViewStyle,
+  scrollView: {
+    flex: 1,
+  } as ViewStyle,
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  } as ViewStyle,
+  autoFillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#E6F5F6',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    marginBottom: 14,
+  } as ViewStyle,
+  autoFillText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: TEAL,
+    fontFamily: 'Inter_700Bold',
+  } as TextStyle,
+  fieldGroup: {
+    marginBottom: 12,
+  } as ViewStyle,
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  } as ViewStyle,
+  label: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#4B5563',
+    fontFamily: 'Inter_600SemiBold',
+    marginBottom: 6,
+    marginLeft: 2,
+  } as TextStyle,
+  input: {
+    height: 46,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    fontSize: 14,
+    color: '#111111',
+    fontFamily: 'Inter_500Medium',
+  } as TextStyle,
+  inputFocused: {
+    borderColor: '#111111',
+    backgroundColor: '#FFFFFF',
+  } as TextStyle,
+  inputError: {
+    borderColor: '#EF4444',
+  } as TextStyle,
+  errorText: {
+    fontSize: 11.5,
+    color: '#EF4444',
+    marginTop: 4,
+    marginLeft: 4,
+    fontFamily: 'Inter_500Medium',
+  } as TextStyle,
+  footer: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+  } as ViewStyle,
+  saveBtn: {
+    height: 48,
+    backgroundColor: '#111111',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  } as ViewStyle,
+  saveBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    fontFamily: 'Inter_700Bold',
+    letterSpacing: 0.1,
+  } as TextStyle,
+  removeBtn: {
+    alignItems: 'center',
+    paddingVertical: 10,
+    marginTop: 2,
+  } as ViewStyle,
+  removeBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#EF4444',
+    fontFamily: 'Inter_600SemiBold',
+  } as TextStyle,
+});

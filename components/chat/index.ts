@@ -1,5 +1,5 @@
 export { MessageRow } from './MessageRow';
-export { DateDivider, SafetyNote } from './ThreadNotes';
+export { DateDivider, SafetyNote, SellerIntroBubble } from './ThreadNotes';
 export { ListingBar } from './ListingBar';
 export { ListingThumb, listingStatus, type ListingStatus } from './ListingThumb';
 export { Composer } from './Composer';

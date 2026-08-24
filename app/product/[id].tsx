@@ -683,6 +683,35 @@ export default function ProductScreen() {
             />
           </Animated.View>
 
+          {/* Sold banner spanning across the bottom of the photo */}
+          {listing.is_sold && (
+            <View
+              style={{
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: 42,
+                backgroundColor: '#007782',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 20,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 16,
+                  fontWeight: '800',
+                  color: '#FFFFFF',
+                  letterSpacing: 0.5,
+                  fontFamily: 'Inter_700Bold',
+                }}
+              >
+                Sold
+              </Text>
+            </View>
+          )}
+
           {/* Floating actions — a stacked column of separate circular discs (Mercari style) */}
           <View
             style={{
@@ -1590,6 +1619,7 @@ export default function ProductScreen() {
         buyTotal={buyTotal}
         bottomInset={insets.bottom}
         isOwner={isOwnListing}
+        isSold={listing.is_sold}
         onChatPress={() => openChat('message')}
         onOfferPress={() => {
           if (canOffer()) setOfferVisible(true);
@@ -1610,7 +1640,7 @@ export default function ProductScreen() {
             return;
           }
           if (!listing?.id) return;
-          setCheckoutVisible(true);
+          router.push(`/payment/${listing.id}` as any);
         }}
       />
 

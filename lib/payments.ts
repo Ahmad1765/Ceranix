@@ -17,13 +17,19 @@ type SessionResponse = { url: string; sessionId: string };
 // one back to Pending and send the buyer to pay a second time.
 export type Order = {
   id: string;
-  status: "pending" | "paid" | "refunded" | "canceled" | "refund_due" | "failed";
+  status: "pending" | "paid" | "refunded" | "canceled" | "refund_due" | "failed" | "completed";
   amount_cents: number;
   fee_cents: number;
   currency: string;
   payment_method?: "card" | "cod";
   shipping_address?: Record<string, any> | null;
   delivery_notes?: string | null;
+  courier_name?: string | null;
+  tracking_number?: string | null;
+  cancel_reason?: string | null;
+  cancelled_by?: string | null;
+  shipped_at?: string | null;
+  completed_at?: string | null;
   created_at: string;
   listing_id?: string;
   buyer_id?: string;
@@ -42,7 +48,7 @@ export async function fetchOrderForListing(
 ): Promise<Order | null> {
   const { data, error } = await supabase
     .from("orders")
-    .select("id, status, amount_cents, fee_cents, currency, payment_method, shipping_address, delivery_notes, created_at")
+    .select("id, status, amount_cents, fee_cents, currency, payment_method, shipping_address, delivery_notes, courier_name, tracking_number, cancel_reason, shipped_at, completed_at, created_at, listing_id, buyer_id, seller_id")
     .eq("listing_id", listingId)
     .order("created_at", { ascending: false })
     .limit(1)

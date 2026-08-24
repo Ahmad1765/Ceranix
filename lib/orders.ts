@@ -68,6 +68,8 @@ export function orderBadge(
   paymentMethod?: MyOrder['payment_method'] | string,
 ): { label: string; tone: OrderTone } {
   switch (status) {
+    case 'completed':
+      return { label: 'Completed', tone: 'positive' };
     case 'paid':
       return { label: side === 'bought' ? 'Paid' : 'Sold', tone: 'positive' };
     case 'refunded':

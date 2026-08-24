@@ -61,7 +61,8 @@ export type OrderStatus =
   | 'refunded'
   | 'canceled'
   | 'refund_due'
-  | 'failed';
+  | 'failed'
+  | 'completed';
 
 // A row of public.orders — record of payments and Cash on Delivery orders.
 export interface Order {
@@ -79,6 +80,12 @@ export interface Order {
   status: OrderStatus;
   shipping_address?: Partial<ShippingAddress> | Record<string, any> | null;
   delivery_notes?: string | null;
+  courier_name?: string | null;
+  tracking_number?: string | null;
+  cancel_reason?: string | null;
+  cancelled_by?: string | null;
+  shipped_at?: string | null;
+  completed_at?: string | null;
   created_at: string;
 }
 

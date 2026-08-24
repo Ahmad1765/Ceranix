@@ -24,6 +24,7 @@ export interface ProductActionBarProps {
   onBuyPress?: () => void;
   onChatPress?: () => void;
   isOwner?: boolean;
+  isSold?: boolean;
   disabled?: boolean;
   className?: string;
   style?: ViewStyle;
@@ -40,6 +41,7 @@ export function ProductActionBar({
   onBuyPress,
   onChatPress,
   isOwner = false,
+  isSold = false,
   disabled = false,
   className = '',
   style,
@@ -58,8 +60,6 @@ export function ProductActionBar({
     }
     const allowed = onOfferOpen ? onOfferOpen() : true;
     if (allowed === false) return;
-    // If neither onOfferPress nor onOfferOpen resulted in an action,
-    // fall through silently — the caller should provide at least one handler.
   };
 
   const handleBuy = () => {
@@ -68,6 +68,27 @@ export function ProductActionBar({
     }
     onBuyPress?.();
   };
+
+  if (isSold) {
+    return (
+      <View
+        className={className}
+        style={[
+          styles.container,
+          {
+            backgroundColor: theme.surface,
+            borderTopColor: theme.border,
+            paddingBottom: Math.max(safeBottom, 16),
+          },
+          style,
+        ]}
+      >
+        <View style={[styles.soldContainer, { backgroundColor: theme.panel }]}>
+          <Text style={[styles.soldText, { color: theme.mute }]}>This item has been sold</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View
@@ -82,19 +103,7 @@ export function ProductActionBar({
         style,
       ]}
     >
-      {/* Secure checkout · Buyer Protection included trust line */}
-      <View
-        accessibilityRole="text"
-        style={styles.trustRow}
-      >
-        <Feather name="lock" size={12} color={theme.mute} />
-        <Text style={[styles.trustText, { color: theme.mute }]}>
-          Secure checkout · Buyer Protection included
-        </Text>
-      </View>
-
       <View style={styles.actionRow}>
-        {/* Equal halves, both 48h/10r: one outlined, one filled */}
         {!isOwner && (
           <Pressable
             onPress={handleOffer}
@@ -107,7 +116,7 @@ export function ProductActionBar({
               {
                 backgroundColor: theme.panel,
                 borderColor: theme.border,
-                opacity: pressed ? 0.7 : 1,
+                opacity: pressed ? 0.75 : 1,
                 transform: [{ scale: pressed ? 0.98 : 1 }],
               },
             ]}
@@ -123,20 +132,20 @@ export function ProductActionBar({
           accessibilityLabel={
             isOwner
               ? 'Edit listing'
-              : `Buy now for ${buyTotal ? formatPrice(buyTotal) : price ? formatPrice(price) : ''}, Buyer Protection included`
+              : `Buy now for ${buyTotal ? formatPrice(buyTotal) : price ? formatPrice(price) : ''}`
           }
           accessibilityHint="Proceeds to secure checkout"
           style={({ pressed }) => [
             styles.buyButton,
             {
-              backgroundColor: theme.purple,
-              borderColor: theme.purple,
-              opacity: pressed ? 0.85 : 1,
+              backgroundColor: theme.ink,
+              borderColor: theme.ink,
+              opacity: pressed ? 0.88 : 1,
               transform: [{ scale: pressed ? 0.98 : 1 }],
             },
           ]}
         >
-          <Text style={[styles.buyButtonText, { color: '#FFFFFF' }]}>
+          <Text style={styles.buyButtonText}>
             {isOwner ? 'Edit listing' : 'Buy now'}
           </Text>
         </Pressable>
@@ -172,19 +181,6 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  trustRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginBottom: 10,
-  },
-  trustText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: 'rgba(15, 15, 15, 0.62)',
-    fontFamily: 'Inter_500Medium',
-  },
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -195,32 +191,38 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#0F0F0F',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
   },
   offerButtonText: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#0F0F0F',
     fontFamily: 'Inter_700Bold',
   },
   buyButton: {
     flex: 1,
     height: 48,
-    backgroundColor: '#0F0F0F',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#0F0F0F',
     alignItems: 'center',
     justifyContent: 'center',
   },
   buyButtonText: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#FFFFFF',
     fontFamily: 'Inter_700Bold',
     letterSpacing: 0.2,
+  },
+  soldContainer: {
+    height: 48,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  soldText: {
+    fontSize: 14,
+    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
   },
 });

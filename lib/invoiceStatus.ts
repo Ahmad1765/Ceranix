@@ -8,6 +8,7 @@ import type { Order } from '@/lib/payments';
 
 export type InvoiceStatus =
   | 'paid'
+  | 'completed'
   | 'pending'
   | 'confirming'
   | 'refunded'
@@ -33,6 +34,7 @@ export function deriveInvoiceStatus(
   order: Pick<Order, 'status' | 'payment_method'> | null | undefined,
   confirming: boolean,
 ): InvoiceStatus {
+  if (order?.status === 'completed') return 'completed';
   if (order?.status === 'paid') return 'paid';
   if (order?.status === 'refunded' || order?.status === 'refund_due') return 'refunded';
   if (order?.status === 'canceled') return 'canceled';

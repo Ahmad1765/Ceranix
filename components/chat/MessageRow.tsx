@@ -98,6 +98,58 @@ function MetaLine({
 // ── System notice ─────────────────────────────────────────────────────────
 
 function SystemNotice({ msg }: { msg: ChatMessage }) {
+  if (msg.content.includes('payment') || msg.metadata?.paid || msg.content.startsWith('Done!')) {
+    return (
+      <View style={{ paddingHorizontal: 16, marginVertical: 12 }}>
+        <View
+          style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: '#E5E7EB',
+            padding: 14,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.05,
+            shadowRadius: 2,
+            elevation: 1,
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: typography.family.sansBold,
+              fontSize: 14.5,
+              fontWeight: '700',
+              color: '#111111',
+              marginBottom: 4,
+            }}
+          >
+            Done!
+          </Text>
+          <Text
+            style={{
+              fontFamily: typography.family.sans,
+              fontSize: 13,
+              lineHeight: 18,
+              color: '#4B5563',
+            }}
+          >
+            Thank you, we have received your payment. It&apos;s being processed.{' '}
+            <Text
+              style={{
+                color: '#007782',
+                fontFamily: typography.family.sansSemibold,
+                textDecorationLine: 'underline',
+              }}
+            >
+              Learn more
+            </Text>
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={{ paddingHorizontal: 40, marginVertical: 12 }}>
       <Text

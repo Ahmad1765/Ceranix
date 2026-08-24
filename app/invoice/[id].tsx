@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { View, Pressable, ScrollView, ActivityIndicator, Share, Platform, Linking } from 'react-native';
+import { View, Pressable, ScrollView, ActivityIndicator, Share, Platform, Linking, StyleSheet } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -14,10 +14,15 @@ import { safeBack } from '@/lib/nav';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { buyerProtectionFee, formatPrice } from '@/lib/fees';
 import { fetchOrderForListing, type Order } from '@/lib/payments';
-import { deriveInvoiceStatus, deriveInvoiceAmounts, type InvoiceStatus } from '@/lib/invoiceStatus';
+import { deriveInvoiceStatus, deriveInvoiceAmounts } from '@/lib/invoiceStatus';
 import { confirm } from '@/lib/confirm';
 import { paymentService } from '@/lib/paymentService';
 import { generateMapsLink } from '@/lib/maps';
+import { OrderStepper } from '@/components/orders/OrderStepper';
+import { CancelOrderModal } from '@/components/orders/CancelOrderModal';
+import { MarkShippedModal } from '@/components/orders/MarkShippedModal';
+
+const TEAL = '#007782';
 
 function tap(style: 'light' | 'medium' = 'light') {
   if (Platform.OS !== 'ios') return;
@@ -26,19 +31,6 @@ function tap(style: 'light' | 'medium' = 'light') {
       ? Haptics.ImpactFeedbackStyle.Light
       : Haptics.ImpactFeedbackStyle.Medium,
   );
-}
-
-function formatDate(iso: string | undefined | null) {
-  if (!iso) return '—';
-  try {
-    return new Date(iso).toLocaleDateString('en-US', {
-      month: 'short',
-      day: '2-digit',
-      year: 'numeric',
-    });
-  } catch {
-    return '—';
-  }
 }
 
 function deriveInvoiceNumber(id: string): string {
@@ -55,11 +47,6 @@ function stripHexSuffix(s: string): string {
   }
   const cleaned = s.replace(/[0-9a-f]{6,}$/i, '');
   return cleaned.length >= 3 ? cleaned : s;
-}
-
-function displayHandle(username: string | null | undefined): string {
-  if (!username) return '—';
-  return '@' + stripHexSuffix(username);
 }
 
 function displayName(
@@ -88,6 +75,9 @@ export default function InvoiceScreen() {
   const [order, setOrder] = useState<Order | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [completingCod, setCompletingCod] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showShipModal, setShowShipModal] = useState(false);
+  const [completingReceipt, setCompletingReceipt] = useState(false);
 
   const priceRef = useRef(listing?.price);
   priceRef.current = listing?.price;
@@ -215,20 +205,13 @@ export default function InvoiceScreen() {
 
   const {
     item: itemPrice,
-    fee,
     total,
   } = deriveInvoiceAmounts(order, listing.price, buyerProtectionFee);
   const seller = listing.seller;
   const isSeller = (user?.id && (user.id === listing.seller_id || user.id === seller?.id)) || false;
+  const isBuyer = (user?.id && (user.id === order?.buyer_id || (!isSeller && user.id))) || false;
   const invoiceNumber = deriveInvoiceNumber(listing.id);
-  const issueDate = listing.created_at;
-  const dueDate = listing.created_at
-    ? new Date(new Date(listing.created_at).getTime() + 14 * 86400_000).toISOString()
-    : null;
-  const sellerName = displayName(seller?.full_name, seller?.username);
-  const sellerHandle = displayHandle(seller?.username);
   const buyerName = displayName(profile?.full_name, profile?.username);
-  const buyerHandle = displayHandle(profile?.username);
   const status = deriveInvoiceStatus(order, confirming);
   const heroImage = listing.images?.[0];
   const mapsUrl = generateMapsLink(order?.shipping_address);
@@ -237,7 +220,7 @@ export default function InvoiceScreen() {
     tap('light');
     try {
       await Share.share({
-        message: `Invoice ${invoiceNumber}\n${listing.title} · ${formatPrice(total)}`,
+        message: `Order #${invoiceNumber}\n${listing.title} · ${formatPrice(total)}`,
       });
     } catch {
       toast.show('Share failed', { variant: 'default', icon: 'alert-triangle' });
@@ -281,9 +264,75 @@ export default function InvoiceScreen() {
     }
   };
 
-  const onPay = () => {
+  const handleContactOtherUser = () => {
+    tap('light');
+    router.push(`/conversation/new?listing=${listing.id}` as any);
+  };
+
+  // Order Cancellation Handler
+  const handleCancelOrder = async (reason: string) => {
+    if (!order?.id) return;
     tap('medium');
-    router.push(`/payment/${listing.id}` as any);
+    const updated = await paymentService.cancelOrder({
+      orderId: order.id,
+      listingId: listing.id,
+      reason,
+    });
+    setOrder(updated);
+    toast.show('Order cancelled successfully', {
+      variant: 'default',
+      icon: 'check',
+    });
+  };
+
+  // Seller Mark Shipped Handler
+  const handleMarkShipped = async (courier: string, trackingNumber: string) => {
+    if (!order?.id) return;
+    tap('medium');
+    const updated = await paymentService.markOrderShipped({
+      orderId: order.id,
+      courier,
+      trackingNumber,
+    });
+    setOrder((prev) => ({
+      ...(prev || updated),
+      status: 'paid',
+      courier_name: courier,
+      tracking_number: trackingNumber,
+      shipped_at: new Date().toISOString(),
+    } as any));
+    toast.show('Order marked as shipped!', {
+      variant: 'default',
+      icon: 'check',
+    });
+  };
+
+  // Buyer Confirm Received Handler
+  const handleConfirmReceived = async () => {
+    if (!order?.id || completingReceipt) return;
+    tap('medium');
+
+    const confirmed = await confirm({
+      title: 'Confirm Package Received?',
+      message: 'Confirm that you have received your order in good condition. This will complete the transaction.',
+      confirmLabel: 'Everything is OK',
+    });
+
+    if (!confirmed) return;
+
+    setCompletingReceipt(true);
+    try {
+      const updated = await paymentService.confirmOrderReceived({ orderId: order.id });
+      setOrder((prev) => ({ ...(prev || updated), status: 'completed' } as any));
+      toast.show('Order completed! Thank you for confirming.', {
+        variant: 'default',
+        icon: 'check',
+      });
+    } catch {
+      toast.show('Failed to update order', { variant: 'default', icon: 'alert-triangle' });
+    } finally {
+      setCompletingReceipt(false);
+    }
   };
 
   // Seller CoD Completion with Optimistic UI Update
@@ -300,7 +349,6 @@ export default function InvoiceScreen() {
     if (!confirmed) return;
 
     const previousOrder = order;
-    // Optimistic UI Update
     setOrder((prev) => (prev ? { ...prev, status: 'paid' } : null));
     setCompletingCod(true);
 
@@ -312,7 +360,6 @@ export default function InvoiceScreen() {
         icon: 'check',
       });
     } catch (e: any) {
-      // Revert optimistic update on failure
       setOrder(previousOrder);
       toast.show(e?.message ?? 'Failed to complete order', {
         variant: 'default',
@@ -323,8 +370,11 @@ export default function InvoiceScreen() {
     }
   };
 
+  const isOrderActive = order?.status === 'paid' || order?.status === 'pending';
+  const isShipped = Boolean(order?.shipped_at || (order as any)?.tracking_number);
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#F9FAFB' }} edges={['top']}>
       {/* Top bar */}
       <View
         style={{
@@ -334,6 +384,9 @@ export default function InvoiceScreen() {
           paddingHorizontal: 20,
           paddingTop: 6,
           paddingBottom: 14,
+          backgroundColor: '#FFFFFF',
+          borderBottomWidth: 1,
+          borderBottomColor: '#E5E7EB',
         }}
       >
         <Pressable
@@ -350,6 +403,11 @@ export default function InvoiceScreen() {
         >
           <Feather name="arrow-left" size={20} color={colors.ink} />
         </Pressable>
+
+        <Text style={{ fontSize: 17, fontWeight: '700', color: colors.ink, fontFamily: 'Inter_700Bold' }}>
+          Order Details
+        </Text>
+
         <Pressable
           onPress={onShare}
           hitSlop={HIT_SLOP_8}
@@ -368,132 +426,40 @@ export default function InvoiceScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 140 }}
+        contentContainerStyle={{ paddingBottom: 140, paddingTop: 16 }}
       >
-        {/* Purple document panel */}
+        {/* Order Stepper (Lifecycle Tracking) */}
+        <View style={{ paddingHorizontal: 16 }}>
+          <OrderStepper
+            status={order?.status ?? (paid === '1' ? 'paid' : 'pending')}
+            paymentMethod={order?.payment_method}
+            shippedAt={order?.shipped_at}
+            courierName={(order as any)?.courier_name}
+            trackingNumber={(order as any)?.tracking_number}
+            cancelReason={(order as any)?.cancel_reason}
+            isSeller={isSeller}
+          />
+        </View>
+
+        {/* Item Summary Card */}
         <View
           style={{
             marginHorizontal: 16,
-            backgroundColor: colors.primary,
-            borderRadius: 32,
-            paddingHorizontal: 26,
-            paddingTop: 22,
-            paddingBottom: 24,
-            overflow: 'hidden',
+            backgroundColor: '#FFFFFF',
+            borderRadius: 16,
+            padding: 16,
+            borderWidth: 1,
+            borderColor: '#E5E7EB',
+            marginBottom: 14,
           }}
         >
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'flex-start',
-            }}
-          >
-            <View style={{ flex: 1, paddingRight: 16, minWidth: 0 }}>
-              <Text style={InkEyebrow}>From (Seller)</Text>
-              <Text
-                style={InkAddress}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
-              >
-                {sellerName}
-              </Text>
-              <Text
-                style={InkAddressMute}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
-              >
-                {sellerHandle}
-              </Text>
-            </View>
-            <View style={{ flex: 1, alignItems: 'flex-end', minWidth: 0 }}>
-              <Text style={[InkEyebrow, { textAlign: 'right' }]}>Billed to</Text>
-              <Text
-                style={[InkAddress, { textAlign: 'right' }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
-              >
-                {buyerName}
-              </Text>
-              <Text
-                style={[InkAddressMute, { textAlign: 'right' }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
-              >
-                {buyerHandle}
-              </Text>
-            </View>
-          </View>
-
-          {/* Hero */}
-          <View style={{ marginTop: 32, marginBottom: 28 }}>
-            <Text
-              style={{
-                fontSize: 54,
-                fontWeight: '900',
-                color: colors.ink,
-                letterSpacing: -2.4,
-                lineHeight: 56,
-              }}
-            >
-              INVOICE
-            </Text>
-            <Text
-              numberOfLines={1}
-              style={{
-                fontSize: 54,
-                fontWeight: '900',
-                color: colors.ink,
-                letterSpacing: -2.4,
-                lineHeight: 56,
-                marginTop: 2,
-              }}
-            >
-              {invoiceNumber}
-            </Text>
-          </View>
-
-          {/* Dates strip */}
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              borderTopWidth: 1,
-              borderTopColor: 'rgba(15,15,15,0.18)',
-              paddingTop: 12,
-            }}
-          >
-            <View>
-              <Text style={InkEyebrow}>Issued</Text>
-              <Text style={InkValue}>{formatDate(issueDate)}</Text>
-            </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Text style={[InkEyebrow, { textAlign: 'right' }]}>Due</Text>
-              <Text style={[InkValue, { textAlign: 'right' }]}>{formatDate(dueDate)}</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* White summary */}
-        <View style={{ paddingHorizontal: 16, marginTop: 22 }}>
-          {/* Item hero row */}
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              paddingVertical: 8,
-            }}
-          >
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <View
               style={{
-                width: 56,
-                height: 56,
-                borderRadius: 14,
-                backgroundColor: colors.primarySofter,
+                width: 64,
+                height: 64,
+                borderRadius: 12,
+                backgroundColor: '#F3F4F6',
                 overflow: 'hidden',
                 marginRight: 14,
                 alignItems: 'center',
@@ -501,489 +467,253 @@ export default function InvoiceScreen() {
               }}
             >
               {heroImage ? (
-                <Image
-                  source={{ uri: heroImage }}
-                  style={{ width: 56, height: 56 }}
-                  contentFit="cover"
-                />
+                <Image source={{ uri: heroImage }} style={{ width: 64, height: 64 }} contentFit="cover" />
               ) : (
-                <Feather name="package" size={20} color={colors.primary} />
+                <Feather name="package" size={24} color="#9CA3AF" />
               )}
             </View>
+
             <View style={{ flex: 1 }}>
-              <Text
-                style={{
-                  fontSize: 16,
-                  fontWeight: '800',
-                  color: colors.ink,
-                  letterSpacing: -0.3,
-                }}
-                numberOfLines={1}
-              >
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#111111', fontFamily: 'Inter_700Bold' }} numberOfLines={1}>
                 {listing.title}
               </Text>
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: colors.mute,
-                  marginTop: 3,
-                  textTransform: 'capitalize',
-                }}
-              >
-                {listing.category} · Qty 1
+              <Text style={{ fontSize: 13, color: '#6B7280', marginTop: 2, textTransform: 'capitalize' }}>
+                {listing.category} · Ref #{invoiceNumber}
+              </Text>
+              <Text style={{ fontSize: 16, fontWeight: '800', color: TEAL, marginTop: 4, fontFamily: 'Inter_700Bold' }}>
+                {formatPrice(itemPrice)}
               </Text>
             </View>
-            <Text
-              style={{
-                fontSize: 16,
-                fontWeight: '800',
-                color: colors.ink,
-                letterSpacing: -0.3,
-              }}
-            >
-              {formatPrice(itemPrice)}
-            </Text>
           </View>
+        </View>
 
-          {/* Meta rows */}
-          <View style={{ marginTop: 22 }}>
-            <MetaRow label="Status">
-              <StatusPill status={status} isSeller={isSeller} />
-            </MetaRow>
-
-            <MetaRow label="Payment Method">
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Feather
-                  name={order?.payment_method === 'cod' ? 'truck' : 'credit-card'}
-                  size={14}
-                  color={colors.primary}
-                />
-                <Text style={MetaValue}>
-                  {order?.payment_method === 'cod'
-                    ? 'Cash on Delivery (CoD)'
-                    : 'Credit / Debit Card'}
-                </Text>
-              </View>
-            </MetaRow>
-
-            <Pressable
-              onPress={() => {
-                if (seller?.id) {
-                  tap('light');
-                  router.push(`/user/${seller.id}` as any);
-                }
-              }}
-              style={({ pressed }) => ({ opacity: pressed ? 0.55 : 1 })}
-            >
-              <MetaRow label="Seller">
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Text style={MetaValue}>@{seller?.username ?? 'unknown'}</Text>
-                  <Feather
-                    name="chevron-right"
-                    size={16}
-                    color="rgba(15,15,15,0.55)"
-                    style={{ marginLeft: 4 }}
-                  />
-                </View>
-              </MetaRow>
-            </Pressable>
-
-            <MetaRow label="Reference">
-              <Text style={MetaValue}>#{invoiceNumber}</Text>
-            </MetaRow>
-            <MetaRow label="Item">
-              <Text style={MetaValue}>{formatPrice(itemPrice)}</Text>
-            </MetaRow>
-            {fee > 0 ? (
-              <MetaRow label="Buyer Protection">
-                <Text style={MetaValue}>{formatPrice(fee)}</Text>
-              </MetaRow>
-            ) : null}
-          </View>
-
-          {/* ── Delivery & Dispatch Logistics Card ────────────────────────── */}
-          {order?.shipping_address ? (
-            <View
-              style={{
-                marginTop: 18,
-                backgroundColor: colors.panel,
-                borderRadius: 20,
-                padding: 16,
-                borderWidth: 1,
-                borderColor: 'rgba(15,15,15,0.06)',
-              }}
-            >
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: 10,
-                }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Feather name="map-pin" size={15} color={colors.primary} />
-                  <Text style={{ fontSize: 13.5, fontWeight: '800', color: colors.ink }}>
-                    Delivery Destination
-                  </Text>
-                </View>
-
-                {/* Google Maps link button */}
-                {mapsUrl ? (
-                  <Pressable
-                    onPress={() => {
-                      tap('light');
-                      Linking.openURL(mapsUrl).catch((err) => {
-                        console.warn('[invoice] openURL failed', err);
-                      });
-                    }}
-                    style={({ pressed }) => ({
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 4,
-                      paddingHorizontal: 8,
-                      paddingVertical: 4,
-                      borderRadius: 8,
-                      backgroundColor: colors.white,
-                      opacity: pressed ? 0.6 : 1,
-                    })}
-                  >
-                    <Feather name="external-link" size={12} color={colors.primary} />
-                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: colors.primary }}>
-                      Maps
-                    </Text>
-                  </Pressable>
-                ) : null}
-              </View>
-
-              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.ink }}>
-                {order.shipping_address.recipient_name ?? buyerName}
-              </Text>
-              <Text style={{ fontSize: 13, color: colors.mute, marginTop: 2 }}>
-                {[order.shipping_address.line1, order.shipping_address.line2].filter(Boolean).join(', ')}
-              </Text>
-              <Text style={{ fontSize: 13, color: colors.mute, marginTop: 1 }}>
-                {[order.shipping_address.city, order.shipping_address.state, order.shipping_address.postal_code].filter(Boolean).join(', ')}
-              </Text>
-              {order.shipping_address.phone ? (
-                <Text style={{ fontSize: 13, fontWeight: '600', color: colors.ink, marginTop: 4 }}>
-                  📞 {order.shipping_address.phone}
-                </Text>
-              ) : null}
-              {order.delivery_notes ? (
-                <View
-                  style={{
-                    marginTop: 8,
-                    padding: 8,
-                    backgroundColor: colors.white,
-                    borderRadius: 8,
-                  }}
-                >
-                  <Text style={{ fontSize: 12, color: colors.mute }}>
-                    <Text style={{ fontWeight: '700', color: colors.ink }}>Note: </Text>
-                    {order.delivery_notes}
-                  </Text>
-                </View>
-              ) : null}
-
-              {/* Prominent Share Dispatch Slip Button for Seller */}
-              {isSeller ? (
-                <Pressable
-                  onPress={onShareDispatchSlip}
-                  style={({ pressed }) => ({
-                    marginTop: 12,
-                    paddingVertical: 10,
-                    paddingHorizontal: 14,
-                    borderRadius: 12,
-                    backgroundColor: colors.white,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
-                    borderWidth: 1,
-                    borderColor: 'rgba(15,15,15,0.1)',
-                    opacity: pressed ? 0.75 : 1,
-                  })}
-                >
-                  <Feather name="send" size={14} color={colors.primary} />
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: colors.ink }}>
-                    Share Dispatch Slip (with Maps Link)
-                  </Text>
-                </Pressable>
-              ) : null}
-            </View>
-          ) : null}
-
-          {/* Total */}
+        {/* Shipping Address Card */}
+        {order?.shipping_address && (
           <View
             style={{
-              marginTop: 18,
-              paddingTop: 22,
-              borderTopWidth: 1,
-              borderTopColor: colors.hairline,
-              flexDirection: 'row',
-              alignItems: 'flex-end',
-              justifyContent: 'space-between',
+              marginHorizontal: 16,
+              backgroundColor: '#FFFFFF',
+              borderRadius: 16,
+              padding: 16,
+              borderWidth: 1,
+              borderColor: '#E5E7EB',
+              marginBottom: 14,
             }}
           >
-            <Text
-              style={{
-                fontSize: 14,
-                color: colors.mute,
-                paddingBottom: 6,
-              }}
-            >
-              {order?.payment_method === 'cod' ? 'Total due on delivery' : 'Total due'}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+              <Feather name="map-pin" size={16} color={TEAL} style={{ marginRight: 8 }} />
+              <Text style={{ fontSize: 14, fontWeight: '700', color: '#111111', fontFamily: 'Inter_700Bold' }}>
+                Delivery Address
+              </Text>
+            </View>
+
+            <Text style={{ fontSize: 14, fontWeight: '600', color: '#111111', marginBottom: 2 }}>
+              {order.shipping_address.recipient_name || buyerName}
             </Text>
-            <Text
-              style={{
-                fontSize: 44,
-                fontWeight: '900',
-                color: colors.ink,
-                letterSpacing: -2,
-                lineHeight: 46,
-              }}
-            >
-              {formatPrice(total)}
+            <Text style={{ fontSize: 13, color: '#4B5563', lineHeight: 18 }}>
+              {[order.shipping_address.line1, order.shipping_address.line2].filter(Boolean).join(', ')}
             </Text>
+            <Text style={{ fontSize: 13, color: '#4B5563' }}>
+              {[order.shipping_address.city, order.shipping_address.state, order.shipping_address.postal_code, order.shipping_address.country].filter(Boolean).join(', ')}
+            </Text>
+            {order.shipping_address.phone ? (
+              <Text style={{ fontSize: 12.5, color: '#6B7280', marginTop: 4 }}>
+                📞 {order.shipping_address.phone}
+              </Text>
+            ) : null}
+
+            {mapsUrl && (
+              <Pressable
+                onPress={() => Linking.openURL(mapsUrl)}
+                style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10 }}
+              >
+                <Feather name="external-link" size={13} color={TEAL} style={{ marginRight: 4 }} />
+                <Text style={{ fontSize: 12.5, fontWeight: '600', color: TEAL }}>
+                  Open in Google Maps
+                </Text>
+              </Pressable>
+            )}
           </View>
+        )}
+
+        {/* Payment & Breakdown Card */}
+        <View
+          style={{
+            marginHorizontal: 16,
+            backgroundColor: '#FFFFFF',
+            borderRadius: 16,
+            padding: 16,
+            borderWidth: 1,
+            borderColor: '#E5E7EB',
+            marginBottom: 14,
+          }}
+        >
+          <Text style={{ fontSize: 14, fontWeight: '700', color: '#111111', fontFamily: 'Inter_700Bold', marginBottom: 12 }}>
+            Payment Summary
+          </Text>
+
+          <MetaRow label="Item Price">
+            <Text style={MetaValue}>{formatPrice(itemPrice)}</Text>
+          </MetaRow>
+          <MetaRow label="Buyer Protection">
+            <Text style={[MetaValue, { color: '#059669' }]}>Free</Text>
+          </MetaRow>
+          <MetaRow label="Standard Shipping">
+            <Text style={[MetaValue, { color: '#059669' }]}>Free</Text>
+          </MetaRow>
+
+          <View style={{ height: 1, backgroundColor: '#E5E7EB', marginVertical: 10 }} />
+
+          <MetaRow label="Total Amount">
+            <Text style={[MetaValue, { fontSize: 16, color: '#111111' }]}>{formatPrice(total)}</Text>
+          </MetaRow>
+
+          <MetaRow label="Payment Method">
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Feather
+                name={order?.payment_method === 'cod' ? 'truck' : 'credit-card'}
+                size={14}
+                color={TEAL}
+              />
+              <Text style={MetaValue}>
+                {order?.payment_method === 'cod' ? 'Cash on Delivery' : 'Card Payment'}
+              </Text>
+            </View>
+          </MetaRow>
+        </View>
+
+        {/* Quick Order Actions Strip */}
+        <View style={{ paddingHorizontal: 16, gap: 8 }}>
+          {/* Chat with Seller / Buyer */}
+          <Pressable
+            onPress={handleContactOtherUser}
+            style={({ pressed }) => [
+              styles.secondaryActionBtn,
+              pressed && { opacity: 0.75 },
+            ]}
+          >
+            <Feather name="message-circle" size={16} color="#111111" style={{ marginRight: 8 }} />
+            <Text style={styles.secondaryActionBtnText}>
+              {isSeller ? 'Message Buyer' : 'Message Seller'}
+            </Text>
+          </Pressable>
+
+          {/* Seller Share Dispatch Slip */}
+          {isSeller && (
+            <Pressable
+              onPress={onShareDispatchSlip}
+              style={({ pressed }) => [
+                styles.secondaryActionBtn,
+                pressed && { opacity: 0.75 },
+              ]}
+            >
+              <Feather name="printer" size={16} color="#111111" style={{ marginRight: 8 }} />
+              <Text style={styles.secondaryActionBtnText}>Share Dispatch Slip</Text>
+            </Pressable>
+          )}
+
+          {/* Cancel Order Action (Active Orders Only) */}
+          {isOrderActive && (
+            <Pressable
+              onPress={() => setShowCancelModal(true)}
+              style={({ pressed }) => [
+                styles.cancelOrderBtn,
+                pressed && { opacity: 0.75 },
+              ]}
+            >
+              <Feather name="x-octagon" size={15} color="#DC2626" style={{ marginRight: 6 }} />
+              <Text style={styles.cancelOrderBtnText}>
+                {isSeller ? 'Cancel Sale' : 'Cancel Order'}
+              </Text>
+            </Pressable>
+          )}
         </View>
       </ScrollView>
 
-      {/* Bottom action */}
-      <View
-        style={{
-          position: 'absolute',
-          left: 16,
-          right: 16,
-          bottom: 24,
-          pointerEvents: 'box-none',
-        }}
-      >
-        {status === 'paid' ? (
+      {/* ── Fixed Bottom Primary Action Bar ── */}
+      <View style={styles.bottomBar}>
+        {status === 'canceled' || order?.status === 'canceled' ? (
+          <View style={styles.statusBannerCanceled}>
+            <Feather name="x-circle" size={16} color="#DC2626" />
+            <Text style={styles.statusBannerCanceledText}>This order is canceled</Text>
+          </View>
+        ) : isSeller && !isShipped && isOrderActive ? (
           <Pressable
-            onPress={() => {
-              tap('light');
-              toast.show('Download coming soon', { variant: 'info', icon: 'download' });
-            }}
-            style={({ pressed }) => ({
-              height: 56,
-              borderRadius: 999,
-              backgroundColor: colors.ink,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 8 },
-              shadowOpacity: 0.14,
-              shadowRadius: 16,
-              elevation: 5,
-              transform: [{ scale: pressed ? 0.985 : 1 }],
-            })}
+            onPress={() => setShowShipModal(true)}
+            style={({ pressed }) => [
+              styles.primaryBtn,
+              pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
+            ]}
           >
-            <Feather name="download" size={16} color={colors.white} />
-            <Text
-              style={{
-                marginLeft: 10,
-                fontSize: 15,
-                fontWeight: '800',
-                color: colors.white,
-                letterSpacing: 0.2,
-              }}
-            >
-              Download invoice
-            </Text>
+            <Feather name="truck" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
+            <Text style={styles.primaryBtnText}>Mark as Shipped</Text>
           </Pressable>
-        ) : status === 'cod_pending' ? (
-          isSeller && !order?.id?.startsWith('order_demo') ? (
-            /* Seller Action: Mark Cash Collected & Delivered */
-            <Pressable
-              onPress={handleCompleteCodOrder}
-              disabled={completingCod}
-              style={({ pressed }) => ({
-                height: 60,
-                borderRadius: 999,
-                backgroundColor: colors.primary,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                paddingHorizontal: 20,
-                gap: 10,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 8 },
-                shadowOpacity: 0.16,
-                shadowRadius: 16,
-                elevation: 5,
-                transform: [{ scale: pressed ? 0.985 : 1 }],
-              })}
-            >
-              {completingCod ? (
-                <ActivityIndicator size="small" color={colors.white} />
-              ) : (
-                <Feather name="check-circle" size={18} color={colors.white} />
-              )}
-              <Text
-                style={{
-                  fontSize: 15,
-                  fontWeight: '800',
-                  color: colors.white,
-                  letterSpacing: 0.2,
-                }}
-              >
-                {completingCod ? 'Updating order…' : 'Mark Cash Collected & Delivered'}
-              </Text>
-            </Pressable>
-          ) : (
-            /* Buyer CoD confirmation state */
-            <View
-              accessibilityRole="text"
-              style={{
-                height: 60,
-                borderRadius: 999,
-                backgroundColor: colors.primarySofter,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                paddingHorizontal: 16,
-                gap: 10,
-                borderWidth: 1,
-                borderColor: colors.primary,
-              }}
-            >
-              <Feather name="truck" size={16} color={colors.primary} />
-              <Text
-                style={{
-                  fontSize: 14,
-                  fontWeight: '800',
-                  color: colors.primaryDeep,
-                  letterSpacing: 0.1,
-                }}
-              >
-                Pay {formatPrice(total)} to courier on delivery
-              </Text>
-            </View>
-          )
-        ) : status === 'confirming' ? (
-          <View
-            accessibilityRole="text"
-            style={{
-              height: 64,
-              borderRadius: 999,
-              backgroundColor: colors.panel,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 10,
-            }}
+        ) : isSeller && order?.payment_method === 'cod' && order?.status === 'pending' ? (
+          <Pressable
+            onPress={handleCompleteCodOrder}
+            disabled={completingCod}
+            style={({ pressed }) => [
+              styles.primaryBtn,
+              pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
+            ]}
           >
-            <ActivityIndicator size="small" color={colors.ink} />
-            <Text
-              style={{
-                fontSize: 15,
-                fontWeight: '800',
-                color: colors.ink,
-                letterSpacing: 0.2,
-              }}
-            >
-              Confirming your payment…
-            </Text>
-          </View>
-        ) : status === 'refunded' ? (
-          <View
-            accessibilityRole="text"
-            style={{
-              height: 64,
-              borderRadius: 999,
-              backgroundColor: colors.panel,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 10,
-            }}
+            {completingCod ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <>
+                <Feather name="check-circle" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
+                <Text style={styles.primaryBtnText}>Mark CoD Delivered & Paid</Text>
+              </>
+            )}
+          </Pressable>
+        ) : isBuyer && isShipped && order?.status !== 'completed' ? (
+          <Pressable
+            onPress={handleConfirmReceived}
+            disabled={completingReceipt}
+            style={({ pressed }) => [
+              styles.primaryBtnTeal,
+              pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
+            ]}
           >
-            <Feather name="rotate-ccw" size={16} color={colors.ink} />
-            <Text
-              style={{
-                fontSize: 15,
-                fontWeight: '800',
-                color: colors.ink,
-                letterSpacing: 0.2,
-              }}
-            >
-              Refunded to your card
-            </Text>
-          </View>
-        ) : status === 'canceled' ? (
-          <View
-            accessibilityRole="text"
-            style={{
-              height: 64,
-              borderRadius: 999,
-              backgroundColor: colors.panel,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 10,
-            }}
-          >
-            <Feather name="x-circle" size={16} color={colors.ink} />
-            <Text
-              style={{
-                fontSize: 15,
-                fontWeight: '800',
-                color: colors.ink,
-                letterSpacing: 0.2,
-              }}
-            >
-              Order canceled
-            </Text>
-          </View>
+            {completingReceipt ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <>
+                <Feather name="check" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
+                <Text style={styles.primaryBtnText}>Confirm Delivery (Everything is OK)</Text>
+              </>
+            )}
+          </Pressable>
         ) : (
           <Pressable
-            onPress={onPay}
-            style={({ pressed }) => ({
-              height: 64,
-              borderRadius: 999,
-              backgroundColor: colors.primary,
-              flexDirection: 'row',
-              alignItems: 'center',
-              paddingHorizontal: 8,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 10 },
-              shadowOpacity: 0.16,
-              shadowRadius: 18,
-              elevation: 6,
-              transform: [{ scale: pressed ? 0.985 : 1 }],
-            })}
+            onPress={handleContactOtherUser}
+            style={({ pressed }) => [
+              styles.primaryBtn,
+              pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
+            ]}
           >
-            <View
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: 24,
-                backgroundColor: colors.white,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Feather name="arrow-right" size={20} color={colors.primary} />
-            </View>
-            <View style={{ flex: 1, alignItems: 'center' }}>
-              <Text
-                style={{
-                  fontSize: 16,
-                  fontWeight: '900',
-                  color: colors.white,
-                  letterSpacing: 0.2,
-                  marginRight: 48,
-                }}
-              >
-                Pay {formatPrice(total)}
-              </Text>
-            </View>
+            <Feather name="message-circle" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
+            <Text style={styles.primaryBtnText}>
+              {isSeller ? 'Chat with Buyer' : 'Chat with Seller'}
+            </Text>
           </Pressable>
         )}
       </View>
+
+      {/* Cancel Order Modal */}
+      <CancelOrderModal
+        visible={showCancelModal}
+        onClose={() => setShowCancelModal(false)}
+        onConfirmCancel={handleCancelOrder}
+        isSeller={isSeller}
+      />
+
+      {/* Mark Shipped Modal */}
+      <MarkShippedModal
+        visible={showShipModal}
+        onClose={() => setShowShipModal(false)}
+        onConfirmShipped={handleMarkShipped}
+      />
     </SafeAreaView>
   );
 }
@@ -995,7 +725,7 @@ function MetaRow({ label, children }: { label: string; children: React.ReactNode
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingVertical: 12,
+        paddingVertical: 8,
       }}
     >
       <Text style={MetaLabel}>{label}</Text>
@@ -1004,133 +734,100 @@ function MetaRow({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
-function StatusPill({
-  status,
-  isSeller,
-}: {
-  status: InvoiceStatus;
-  isSeller?: boolean;
-}) {
-  const paid = status === 'paid';
-  const codPending = status === 'cod_pending';
-  const confirming = status === 'confirming';
-  const refunded = status === 'refunded';
-  const canceled = status === 'canceled';
-  const failed = status === 'failed';
-
-  const icon = paid
-    ? 'check'
-    : codPending
-      ? 'truck'
-      : refunded
-        ? 'rotate-ccw'
-        : canceled
-          ? 'x-circle'
-          : failed
-            ? 'alert-circle'
-            : confirming
-              ? 'loader'
-              : 'clock';
-
-  const label = paid
-    ? 'Paid'
-    : codPending
-      ? isSeller
-        ? 'CoD · Awaiting collection'
-        : 'CoD · Pay on delivery'
-      : refunded
-        ? 'Refunded'
-        : canceled
-          ? 'Canceled'
-          : failed
-            ? 'Failed'
-            : confirming
-              ? 'Confirming'
-              : 'Pending';
-
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingLeft: 8,
-        paddingRight: 12,
-        height: 28,
-        borderRadius: 999,
-        backgroundColor: paid
-          ? colors.primarySofter
-          : codPending
-            ? colors.primarySofter
-            : colors.panel,
-      }}
-    >
-      <View
-        style={{
-          width: 16,
-          height: 16,
-          borderRadius: 999,
-          backgroundColor: paid
-            ? colors.primary
-            : codPending
-              ? colors.primary
-              : colors.ink,
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginRight: 6,
-        }}
-      >
-        <Feather name={icon as any} size={10} color={colors.white} />
-      </View>
-      <Text
-        style={{
-          fontSize: 12,
-          fontWeight: '800',
-          color: colors.ink,
-          letterSpacing: 0.2,
-        }}
-      >
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-const InkEyebrow = {
-  fontSize: 10,
-  fontWeight: '700' as const,
-  color: 'rgba(15,15,15,0.55)',
-  letterSpacing: 1.2,
-  textTransform: 'uppercase' as const,
-};
-
-const InkAddress = {
-  fontSize: 13,
-  fontWeight: '700' as const,
-  color: colors.ink,
-  marginTop: 4,
-};
-
-const InkAddressMute = {
-  fontSize: 12,
-  color: 'rgba(15,15,15,0.62)',
-  marginTop: 2,
-};
-
-const InkValue = {
-  fontSize: 13,
-  fontWeight: '700' as const,
-  color: colors.ink,
-  marginTop: 4,
-};
-
 const MetaLabel = {
-  fontSize: 14,
-  color: colors.mute,
-  fontWeight: '500' as const,
+  fontSize: 13.5,
+  color: '#6B7280',
+  fontFamily: 'Inter_500Medium',
 };
 
 const MetaValue = {
-  fontSize: 14,
+  fontSize: 13.5,
   fontWeight: '700' as const,
-  color: colors.ink,
+  color: '#111111',
+  fontFamily: 'Inter_700Bold',
 };
+
+const styles = StyleSheet.create({
+  secondaryActionBtn: {
+    height: 46,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryActionBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111111',
+    fontFamily: 'Inter_600SemiBold',
+  },
+  cancelOrderBtn: {
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  cancelOrderBtnText: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#DC2626',
+    fontFamily: 'Inter_700Bold',
+  },
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 28 : 16,
+  },
+  primaryBtn: {
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#111111',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryBtnTeal: {
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: TEAL,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    fontFamily: 'Inter_700Bold',
+  },
+  statusBannerCanceled: {
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  statusBannerCanceledText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#6B7280',
+    fontFamily: 'Inter_700Bold',
+  },
+});

@@ -1,18 +1,13 @@
-// The two non-message rows in a thread: the day divider and the safety notice
-// that opens it.
-//
-// Both are deliberately typographic — no card, no panel, no icon. Anything
-// that isn't a message should read as a caption printed on the page rather
-// than as another object competing with the conversation.
-
-import { View } from 'react-native';
+import React from 'react';
+import { View, Pressable } from 'react-native';
 import { Text } from '@/lib/rnText';
+import Feather from '@expo/vector-icons/Feather';
 import { colors, type as typography } from '@/lib/theme';
 import { dayLabel } from './format';
 
 export function DateDivider({ iso }: { iso: string }) {
   return (
-    <View style={{ alignItems: 'center', marginTop: 20, marginBottom: 4 }}>
+    <View style={{ alignItems: 'center', marginTop: 18, marginBottom: 6 }}>
       <Text
         style={{
           fontFamily: typography.family.sansBold,
@@ -29,30 +24,114 @@ export function DateDivider({ iso }: { iso: string }) {
 
 export function SafetyNote({ onPress }: { onPress: () => void }) {
   return (
-    <View style={{ paddingHorizontal: 36, paddingTop: 20, paddingBottom: 6 }}>
-      <Text
+    <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 }}>
+      <View
         style={{
-          fontFamily: typography.family.sans,
-          fontSize: 12,
-          lineHeight: 17,
-          color: colors.muteSoft,
-          textAlign: 'center',
+          flexDirection: 'row',
+          alignItems: 'flex-start',
+          backgroundColor: '#E6F5F6',
+          borderRadius: 8,
+          padding: 12,
+          gap: 10,
         }}
       >
-        Keep payments and messages in the app — that&apos;s what Buyer Protection covers.{' '}
+        <Feather name="info" size={16} color="#007782" style={{ marginTop: 1 }} />
         <Text
-          onPress={onPress}
-          accessibilityRole="link"
-          accessibilityLabel="How you're covered"
           style={{
-            fontFamily: typography.family.sansSemibold,
-            fontSize: 12,
-            color: colors.primary,
+            flex: 1,
+            fontFamily: typography.family.sans,
+            fontSize: 12.5,
+            lineHeight: 17,
+            color: '#1F2937',
           }}
         >
-          How you&apos;re covered
+          Sharing personal details or following links is dangerous. You aren&apos;t protected if you leave Ceranix.{' '}
+          <Text
+            onPress={onPress}
+            style={{
+              fontFamily: typography.family.sansSemibold,
+              color: '#007782',
+              textDecorationLine: 'underline',
+            }}
+          >
+            See safety tips
+          </Text>
         </Text>
-      </Text>
+      </View>
+    </View>
+  );
+}
+
+export function SellerIntroBubble({
+  name,
+  location,
+  lastSeen,
+  rating,
+}: {
+  name: string;
+  location?: string | null;
+  lastSeen?: string | null;
+  rating?: string | null;
+}) {
+  return (
+    <View style={{ paddingHorizontal: 16, marginTop: 12, marginBottom: 8, alignItems: 'flex-start' }}>
+      <View
+        style={{
+          backgroundColor: '#FFFFFF',
+          borderRadius: 14,
+          borderWidth: 1,
+          borderColor: '#E5E7EB',
+          padding: 14,
+          minWidth: 220,
+          maxWidth: '85%',
+        }}
+      >
+        <Text
+          style={{
+            fontFamily: typography.family.sansBold,
+            fontSize: 14,
+            fontWeight: '700',
+            color: '#111111',
+            marginBottom: 6,
+          }}
+        >
+          Hi, I&apos;m {name}
+        </Text>
+        <Text
+          style={{
+            fontFamily: typography.family.sans,
+            fontSize: 12.5,
+            color: '#6B7280',
+            marginBottom: 4,
+          }}
+        >
+          {rating || 'No reviews yet'}
+        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+          <Feather name="map-pin" size={12} color="#6B7280" style={{ marginRight: 5 }} />
+          <Text
+            style={{
+              fontFamily: typography.family.sans,
+              fontSize: 12.5,
+              color: '#6B7280',
+            }}
+          >
+            {location || 'United States, Los Angeles, CA'}
+          </Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Feather name="clock" size={12} color="#6B7280" style={{ marginRight: 5 }} />
+          <Text
+            style={{
+              fontFamily: typography.family.sans,
+              fontSize: 12.5,
+              color: '#6B7280',
+            }}
+          >
+            {lastSeen || 'Last seen a day ago'}
+          </Text>
+        </View>
+      </View>
     </View>
   );
 }

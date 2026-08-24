@@ -43,6 +43,7 @@ import { useToast } from '@/lib/toast';
 import { captureError } from '@/lib/sentry';
 import { colors, radii, shadow, type as typography } from '@/lib/theme';
 import { formatPrice } from '@/lib/currency';
+import { buyerProtectionFee } from '@/lib/fees';
 import { Button, EmptyState, SafeContainer, ThumbButton } from '@/components/ui';
 import { explainCoverage } from '@/components/SafetyBanner';
 import { reportListing, REPORT_REASONS } from '@/lib/reports';
@@ -61,6 +62,7 @@ import {
   MessageRow,
   ReactionPicker,
   SafetyNote,
+  SellerIntroBubble,
   ThreadHeader,
   type Anchor,
   type ChatAction,
@@ -1035,21 +1037,28 @@ export default function ConversationScreen() {
                 >
                   {conv.listing?.title ?? 'Listing removed'}
                 </Text>
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    fontFamily: typography.family.sans,
-                    fontSize: 12,
-                    color: colors.mute,
-                    marginTop: 2,
-                  }}
-                >
-                  {status === 'removed'
-                    ? 'No longer available'
-                    : conv.listing?.price != null
-                      ? formatPrice(conv.listing.price)
-                      : '—'}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2, gap: 6 }}>
+                  <Text
+                    style={{
+                      fontFamily: typography.family.sansBold,
+                      fontSize: 12.5,
+                      color: colors.ink,
+                    }}
+                  >
+                    {conv.listing?.price != null ? formatPrice(conv.listing.price) : '—'}
+                  </Text>
+                  {conv.listing?.price != null && (
+                    <Text
+                      style={{
+                        fontFamily: typography.family.sans,
+                        fontSize: 11.5,
+                        color: colors.mute,
+                      }}
+                    >
+                      {`${formatPrice(conv.listing.price)} Includes Buyer Protection 🛡️`}
+                    </Text>
+                  )}
+                </View>
               </View>
             </View>
 
@@ -1082,7 +1091,19 @@ export default function ConversationScreen() {
         scrollEventThrottle={16}
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
-        ListHeaderComponent={<SafetyNote onPress={explainCoverage} />}
+        ListHeaderComponent={
+          <>
+            <SafetyNote onPress={explainCoverage} />
+            {other?.username ? (
+              <SellerIntroBubble
+                name={other.username}
+                location={null}
+                lastSeen={null}
+                rating={null}
+              />
+            ) : null}
+          </>
+        }
         ListEmptyComponent={
           <View style={{ paddingHorizontal: 32, paddingVertical: 16 }}>
             <Text

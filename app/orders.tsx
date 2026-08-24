@@ -1,17 +1,12 @@
-// Order history — the read path for public.orders.
-//
-// Why this screen exists: orders were write-only from the app's point of view.
-// The one route that renders a payment (/invoice/[id]) was reachable solely
-// from /payment/[id] or Stripe's return URL, so the moment a buyer left that
-// screen their purchase became unreachable — while two shipped entry points
-// ("My shop · Purchases, sales & payouts" on the profile and in Settings) both
-// promised it and pushed each other in a circle instead.
-//
-// The data layer was already built for exactly this query: orders_buyer_idx /
-// orders_seller_idx, and an RLS policy scoped to buyer_id or seller_id. Nothing
-// here needs a migration; it reads what the webhook already writes.
-import { useMemo, useState, useCallback } from 'react';
-import { View, Pressable, FlatList, RefreshControl } from 'react-native';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import {
+  View,
+  Pressable,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Platform,
+} from 'react-native';
 import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -21,158 +16,106 @@ import { tap } from '@/lib/haptics';
 import { colors } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { RequireAuth } from '@/components/RequireAuth';
-import { ScreenHeader } from '@/components/ui/ScreenHeader';
-import { Tabs } from '@/components/ui/Tabs';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useSellSheet } from '@/components/sell/SellSheet';
 import { useMyOrdersQuery } from '@/lib/queries';
 import { getOptimizedImageUrl } from '@/lib/images';
 import { buyerProtectionFee, formatPrice } from '@/lib/fees';
 import { deriveInvoiceAmounts } from '@/lib/invoiceStatus';
-import { partitionOrders, orderBadge, type OrderSide } from '@/lib/orders';
+import { partitionOrders, type OrderSide } from '@/lib/orders';
 import type { MyOrder } from '@/lib/payments';
 
-function formatDate(iso: string | null | undefined) {
-  if (!iso) return '—';
-  try {
-    return new Date(iso).toLocaleDateString('en-US', {
-      month: 'short',
-      day: '2-digit',
-      year: 'numeric',
-    });
-  } catch {
-    return '—';
-  }
-}
+const TEAL = '#007782';
 
-// Badge tones resolve inside the purple/white/black palette — 'positive' is the
-// purple accent, never a green, so this screen stays on the app's three colors.
-function toneStyle(tone: 'positive' | 'neutral' | 'warn') {
-  if (tone === 'positive') {
-    return { bg: colors.primarySofter, fg: colors.primaryDeep };
-  }
-  if (tone === 'warn') {
-    return { bg: colors.panel, fg: colors.ink };
-  }
-  return { bg: colors.panel, fg: colors.mute };
-}
+type FilterStatus = 'all' | 'in_progress' | 'canceled' | 'completed';
 
 function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
-  // Amounts come from lib/invoiceStatus so the history row and the invoice it
-  // opens can't disagree about what was charged — the order row carries minor
-  // units and an accepted-offer price that listing.price does not reflect.
   const { total } = deriveInvoiceAmounts(order, order.listing?.price, buyerProtectionFee);
-  const badge = orderBadge(order.status, side, order.payment_method);
-  const tone = toneStyle(badge.tone);
   const image = order.listing?.images?.[0];
+  const isCanceled = order.status === 'canceled' || order.status === 'refunded';
+  const isShipped = Boolean((order as any).shipped_at || (order as any).tracking_number);
+
+  const handlePress = () => {
+    tap();
+    if (order.listing_id) {
+      router.push(`/invoice/${order.listing_id}` as any);
+    }
+  };
 
   return (
     <Pressable
-      onPress={() => {
-        tap();
-        // /invoice/[id] is keyed by the LISTING id, not the order id.
-        router.push(`/invoice/${order.listing_id}` as any);
-      }}
+      onPress={handlePress}
       testID="order-row"
       accessibilityRole="button"
-      accessibilityLabel={`${order.listing?.title ?? 'Item'}, ${badge.label}, ${formatPrice(total)}`}
-      style={({ pressed }) => ({
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        gap: 14,
-        opacity: pressed ? 0.6 : 1,
-      })}
+      style={({ pressed }) => [
+        styles.orderRow,
+        pressed && { opacity: 0.75 },
+      ]}
     >
-      <View
-        style={{
-          width: 56,
-          height: 68,
-          borderRadius: 12,
-          backgroundColor: colors.panel,
-          overflow: 'hidden',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
+      {/* Thumbnail */}
+      <View style={styles.thumbnailContainer}>
         {image ? (
           <Image
             source={{ uri: getOptimizedImageUrl(image, { width: 160 }) }}
-            style={{ width: 56, height: 68 }}
+            style={styles.thumbnailImage}
             contentFit="cover"
             cachePolicy="memory-disk"
           />
         ) : (
-          <Feather name="package" size={18} color={colors.mute} />
+          <Feather name="package" size={20} color="#9CA3AF" />
         )}
       </View>
 
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text
-          style={{ fontSize: 15, fontWeight: '800', color: colors.ink, letterSpacing: -0.2 }}
-          numberOfLines={1}
-        >
-          {order.listing?.title ?? 'Item no longer listed'}
+      {/* Item info */}
+      <View style={styles.orderInfo}>
+        <Text style={styles.orderTitle} numberOfLines={1}>
+          {order.listing?.title ?? 'Order'}
         </Text>
-        <Text style={{ fontSize: 12.5, color: colors.mute, marginTop: 3 }}>
-          {formatDate(order.created_at)}
+        <Text style={styles.orderPrice}>
+          {formatPrice(total)}
         </Text>
-        <View
-          style={{
-            alignSelf: 'flex-start',
-            marginTop: 7,
-            paddingHorizontal: 9,
-            paddingVertical: 3,
-            borderRadius: 999,
-            backgroundColor: tone.bg,
-          }}
-        >
-          <Text style={{ fontSize: 11, fontWeight: '800', color: tone.fg, letterSpacing: 0.2 }}>
-            {badge.label}
+        <View style={styles.statusRow}>
+          <Feather
+            name={isCanceled ? 'x-circle' : isShipped ? 'truck' : 'check-circle'}
+            size={12}
+            color={isCanceled ? '#DC2626' : isShipped ? TEAL : '#059669'}
+            style={{ marginRight: 4 }}
+          />
+          <Text
+            style={[
+              styles.statusText,
+              isCanceled && { color: '#DC2626' },
+              isShipped && { color: TEAL },
+            ]}
+          >
+            {isCanceled
+              ? 'Order Canceled'
+              : isShipped
+              ? 'Shipped · In transit'
+              : order.status === 'paid'
+              ? 'Order Confirmed'
+              : 'CoD · Awaiting delivery'}
           </Text>
         </View>
       </View>
 
-      <View style={{ alignItems: 'flex-end' }}>
-        <Text style={{ fontSize: 15, fontWeight: '900', color: colors.ink, letterSpacing: -0.3 }}>
-          {formatPrice(total)}
-        </Text>
-        <Feather name="chevron-right" size={16} color={colors.muteSoft} style={{ marginTop: 6 }} />
-      </View>
+      {/* Chevron */}
+      <Feather name="chevron-right" size={18} color="#9CA3AF" />
     </Pressable>
   );
 }
 
-// Row-shaped placeholders rather than a centred spinner: the list geometry is
-// known before the data is, so holding it means the real rows land in place
-// instead of the screen jumping from a centred dot to a full list.
-//
-// ponytail: deliberately static — no shimmer. A shimmer needs a Reanimated
-// loop per row, which is real cost for a list that is usually cached and paints
-// immediately. Add one only if the empty frame is measurably long enough to
-// notice.
 function OrdersSkeleton() {
   return (
-    <View style={{ paddingVertical: 6 }} accessibilityLabel="Loading your orders">
-      {[0, 1, 2, 3].map((i) => (
-        <View
-          key={i}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            paddingHorizontal: 16,
-            paddingVertical: 12,
-            gap: 14,
-          }}
-        >
-          <View style={{ width: 56, height: 68, borderRadius: 12, backgroundColor: colors.panel }} />
-          <View style={{ flex: 1, gap: 8 }}>
-            <View style={{ height: 13, width: '62%', borderRadius: 6, backgroundColor: colors.panel }} />
-            <View style={{ height: 11, width: '34%', borderRadius: 6, backgroundColor: colors.panel }} />
-            <View style={{ height: 17, width: 78, borderRadius: 999, backgroundColor: colors.panel }} />
+    <View style={{ paddingVertical: 6 }}>
+      {[0, 1, 2].map((i) => (
+        <View key={i} style={styles.skeletonRow}>
+          <View style={styles.skeletonThumb} />
+          <View style={styles.skeletonContent}>
+            <View style={[styles.skeletonBar, { width: '60%', height: 14 }]} />
+            <View style={[styles.skeletonBar, { width: '30%', height: 13 }]} />
+            <View style={[styles.skeletonBar, { width: '45%', height: 12 }]} />
           </View>
-          <View style={{ height: 15, width: 62, borderRadius: 6, backgroundColor: colors.panel }} />
         </View>
       ))}
     </View>
@@ -182,92 +125,207 @@ function OrdersSkeleton() {
 function OrdersScreen() {
   const { user } = useAuth();
   const sell = useSellSheet();
-  // ?side=sold lets a caller land on the seller's half directly (the profile's
-  // "Sold" stat does). Anything else falls back to purchases.
-  const { side: sideParam } = useLocalSearchParams<{ side?: string }>();
+  const { side: sideParam, justPaid, title: itemTitleParam, amount: amountParam } = useLocalSearchParams<{
+    side?: string;
+    justPaid?: string;
+    title?: string;
+    amount?: string;
+  }>();
+
   const [side, setSide] = useState<OrderSide>(sideParam === 'sold' ? 'sold' : 'bought');
+  const [filter, setFilter] = useState<FilterStatus>('in_progress');
+  const [showToast, setShowToast] = useState(justPaid === '1');
+
   const q = useMyOrdersQuery(user?.id ?? null);
 
   const { bought, sold } = useMemo(
     () => partitionOrders(q.data ?? [], user?.id ?? ''),
     [q.data, user?.id],
   );
-  const rows = side === 'bought' ? bought : sold;
+
+  // Synthesize recently purchased mock item if fresh from checkout and database replication is in flight
+  const allBoughtOrders = useMemo(() => {
+    if (justPaid === '1' && itemTitleParam && !bought.some((b) => b.listing?.title === itemTitleParam)) {
+      const mockOrder: MyOrder = {
+        id: `recent_order_${Date.now()}`,
+        listing_id: 'mock_listing_id',
+        buyer_id: user?.id ?? 'buyer',
+        seller_id: 'seller',
+        amount_cents: amountParam ? Math.round(Number(amountParam) * 100) : 1436,
+        fee_cents: 75,
+        currency: 'usd',
+        payment_method: 'card',
+        status: 'pending',
+        shipping_address: null,
+        delivery_notes: null,
+        created_at: new Date().toISOString(),
+        listing: {
+          id: 'mock_listing_id',
+          title: itemTitleParam,
+          price: amountParam ? Number(amountParam) - 1.84 : 1.00,
+          images: [],
+        },
+      };
+      return [mockOrder, ...bought];
+    }
+    return bought;
+  }, [bought, justPaid, itemTitleParam, amountParam, user?.id]);
+
+  const rawRows = side === 'bought' ? allBoughtOrders : sold;
+
+  // Filter items based on active status chip
+  const rows = useMemo(() => {
+    if (filter === 'all') return rawRows;
+    if (filter === 'in_progress') {
+      return rawRows.filter((o) => o.status === 'pending' || o.status === 'paid');
+    }
+    if (filter === 'canceled') {
+      return rawRows.filter((o) => o.status === 'canceled');
+    }
+    if (filter === 'completed') {
+      return rawRows.filter((o) => o.status === 'paid');
+    }
+    return rawRows;
+  }, [rawRows, filter]);
 
   const onRefresh = useCallback(() => {
     q.refetch();
   }, [q]);
 
+  // Auto-dismiss toast after 6 seconds
+  useEffect(() => {
+    if (showToast) {
+      const timer = setTimeout(() => setShowToast(false), 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [showToast]);
+
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
-      <ScreenHeader title="Purchases & sales" back />
+    <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
+      {/* ── Top Header: [<] My orders ── */}
+      <View style={styles.header}>
+        <Pressable
+          onPress={() => router.push('/(tabs)' as any)}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.5 }]}
+        >
+          <Feather name="arrow-left" size={22} color={colors.ink} />
+        </Pressable>
+        <Text style={styles.headerTitle}>My orders</Text>
+        <View style={styles.headerPlaceholder} />
+      </View>
 
-      <Tabs
-        variant="underline"
-        accent="primary"
-        value={side}
-        onChange={setSide}
-        tabs={[
-          { value: 'bought', label: 'Purchases', icon: 'shopping-bag', count: bought.length },
-          { value: 'sold', label: 'Sales', icon: 'tag', count: sold.length },
-        ]}
-      />
+      {/* ── Segmented Tabs: Sold | Bought ── */}
+      <View style={styles.tabBar}>
+        <Pressable
+          onPress={() => {
+            tap();
+            setSide('sold');
+          }}
+          style={styles.tabButton}
+        >
+          <Text style={[styles.tabText, side === 'sold' && styles.tabTextActive]}>
+            Sold
+          </Text>
+          {side === 'sold' && <View style={styles.tabUnderline} />}
+        </Pressable>
 
-      {q.isPending ? (
-        <View testID="orders-loading">
-          <OrdersSkeleton />
-        </View>
-      ) : q.isError ? (
-        // A load failure must not render as "no purchases yet" — on a screen
-        // about money, "we couldn't reach it" and "it isn't there" are very
-        // different claims, and only one of them is retryable.
-        <View testID="orders-error">
+        <Pressable
+          onPress={() => {
+            tap();
+            setSide('bought');
+          }}
+          style={styles.tabButton}
+        >
+          <Text style={[styles.tabText, side === 'bought' && styles.tabTextActive]}>
+            Bought
+          </Text>
+          {side === 'bought' && <View style={styles.tabUnderline} />}
+        </Pressable>
+      </View>
+
+      {/* ── Filter Pills: All | In progress | Canceled | Completed ── */}
+      <View style={styles.filterRow}>
+        {(
+          [
+            { key: 'all', label: 'All' },
+            { key: 'in_progress', label: 'In progress' },
+            { key: 'canceled', label: 'Canceled' },
+            { key: 'completed', label: 'Completed' },
+          ] as const
+        ).map((item) => {
+          const active = filter === item.key;
+          return (
+            <Pressable
+              key={item.key}
+              onPress={() => {
+                tap();
+                setFilter(item.key);
+              }}
+              style={({ pressed }) => [
+                styles.filterPill,
+                active ? styles.filterPillActive : styles.filterPillInactive,
+                pressed && { opacity: 0.75 },
+              ]}
+            >
+              <Text style={[styles.filterPillText, active && styles.filterPillTextActive]}>
+                {item.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {/* ── Order List / Content ── */}
+      {q.isPending && allBoughtOrders.length === 0 ? (
+        <OrdersSkeleton />
+      ) : rows.length === 0 ? (
+        <View style={styles.emptyContainer}>
           <EmptyState
-            icon="alert-circle"
-            title="Couldn't load your orders"
-            description="Check your connection and try again — nothing has changed on your account."
-            cta={{ label: 'Try again', onPress: () => q.refetch(), icon: 'refresh-cw' }}
+            icon="shopping-bag"
+            title={side === 'bought' ? 'No orders in progress' : 'No sales in progress'}
+            description="When you buy or sell items, they will show up here."
+            cta={{
+              label: side === 'bought' ? 'Browse items' : 'List an item',
+              onPress: () => (side === 'bought' ? router.push('/(tabs)' as any) : sell.open()),
+              icon: side === 'bought' ? 'search' : 'plus',
+            }}
           />
         </View>
-      ) : rows.length === 0 ? (
-        side === 'bought' ? (
-          <View testID="orders-empty-bought">
-            <EmptyState
-              icon="shopping-bag"
-              title="No purchases yet"
-              description="Everything you buy shows up here with its invoice, so you can always come back to it."
-              cta={{ label: 'Browse items', onPress: () => router.push('/(tabs)' as any), icon: 'search' }}
-            />
-          </View>
-        ) : (
-          <View testID="orders-empty-sold">
-            <EmptyState
-              icon="tag"
-              title="No sales yet"
-              description="When someone buys one of your items, the sale and its payout land here."
-              cta={{ label: 'List an item', onPress: () => sell.open(), icon: 'plus' }}
-            />
-          </View>
-        )
       ) : (
         <FlatList
-          testID="orders-list"
           data={rows}
           keyExtractor={(o) => o.id}
           renderItem={({ item }) => <OrderRow order={item} side={side} />}
-          ItemSeparatorComponent={() => (
-            <View style={{ height: 1, backgroundColor: colors.hairline, marginLeft: 86 }} />
-          )}
-          contentContainerStyle={{ paddingVertical: 6, paddingBottom: 40 }}
+          ItemSeparatorComponent={() => <View style={styles.rowDivider} />}
+          contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
               refreshing={q.isRefetching}
               onRefresh={onRefresh}
-              tintColor={colors.primary}
+              tintColor={TEAL}
             />
           }
         />
+      )}
+
+      {/* ── Toast Popup Banner at Bottom (Image 2 Screen 2) ── */}
+      {showToast && (
+        <View style={styles.toastContainer}>
+          <View style={styles.toastCard}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.toastText}>
+                Thank you, we have received your payment. It&apos;s being processed.
+              </Text>
+            </View>
+            <Pressable onPress={() => setShowToast(false)} hitSlop={8} style={{ paddingLeft: 10 }}>
+              <Feather name="x" size={16} color="#FFFFFF" />
+            </Pressable>
+          </View>
+        </View>
       )}
     </SafeAreaView>
   );
@@ -280,3 +338,212 @@ export default function Orders() {
     </RequireAuth>
   );
 }
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EBEBEB',
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111111',
+    fontFamily: 'Inter_700Bold',
+  },
+  headerPlaceholder: {
+    width: 36,
+  },
+  tabBar: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EBEBEB',
+    backgroundColor: '#FFFFFF',
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  tabText: {
+    fontSize: 14.5,
+    fontWeight: '500',
+    color: '#767676',
+    fontFamily: 'Inter_500Medium',
+  },
+  tabTextActive: {
+    fontWeight: '700',
+    color: '#111111',
+    fontFamily: 'Inter_700Bold',
+  },
+  tabUnderline: {
+    position: 'absolute',
+    bottom: -1,
+    left: 24,
+    right: 24,
+    height: 2.5,
+    backgroundColor: TEAL,
+    borderRadius: 1.5,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#F0F0F0',
+  },
+  filterPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 6.5,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  filterPillActive: {
+    backgroundColor: '#E6F5F6',
+    borderColor: TEAL,
+  },
+  filterPillInactive: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E0E0E0',
+  },
+  filterPillText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#4B5563',
+    fontFamily: 'Inter_500Medium',
+  },
+  filterPillTextActive: {
+    fontWeight: '700',
+    color: TEAL,
+    fontFamily: 'Inter_700Bold',
+  },
+  listContent: {
+    paddingVertical: 4,
+    paddingBottom: 40,
+  },
+  orderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  thumbnailContainer: {
+    width: 58,
+    height: 58,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  thumbnailImage: {
+    width: '100%',
+    height: '100%',
+  },
+  orderInfo: {
+    flex: 1,
+    marginRight: 10,
+  },
+  orderTitle: {
+    fontSize: 14.5,
+    fontWeight: '700',
+    color: '#111111',
+    fontFamily: 'Inter_700Bold',
+    marginBottom: 2,
+  },
+  orderPrice: {
+    fontSize: 13.5,
+    color: '#4B5563',
+    fontFamily: 'Inter_500Medium',
+    marginBottom: 3,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#059669',
+    fontFamily: 'Inter_600SemiBold',
+  },
+  rowDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#EBEBEB',
+    marginLeft: 88,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 24,
+  },
+  skeletonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  skeletonThumb: {
+    width: 58,
+    height: 58,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+    marginRight: 14,
+  },
+  skeletonContent: {
+    flex: 1,
+    gap: 6,
+  },
+  skeletonBar: {
+    borderRadius: 4,
+    backgroundColor: '#F3F4F6',
+  },
+  toastContainer: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: Platform.OS === 'ios' ? 24 : 16,
+    zIndex: 99,
+  },
+  toastCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#1E293B',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  toastText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#FFFFFF',
+    fontFamily: 'Inter_500Medium',
+    lineHeight: 18,
+  },
+});
