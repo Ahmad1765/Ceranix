@@ -80,6 +80,7 @@ export function CheckoutSheet({
   };
 
   const handlePayPress = () => {
+    if (loading) return;
     onConfirmPay({
       fulfillment,
       paymentMethod,
@@ -102,6 +103,7 @@ export function CheckoutSheet({
             variant="primary"
             size="hero"
             loading={loading}
+            disabled={loading}
             icon="lock"
             onPress={handlePayPress}
             accessibilityLabel={`Confirm and pay ${formatPrice(totalAmount)}`}

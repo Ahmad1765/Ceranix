@@ -86,6 +86,22 @@ export function OfferSheet({
       scrollable
       footer={
         <View style={styles.footerInner}>
+          {parsedAmount >= askingPrice && parsedAmount > 0 && (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                marginBottom: 8,
+              }}
+            >
+              <Feather name="alert-circle" size={13} color={colors.danger} />
+              <Text style={{ fontSize: 12, color: colors.danger, fontFamily: type.family.sans }}>
+                Offers must be below the asking price ({formatPrice(askingPrice)})
+              </Text>
+            </View>
+          )}
           <ThumbButton
             label={
               parsedAmount > 0

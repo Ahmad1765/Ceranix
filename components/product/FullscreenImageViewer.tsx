@@ -42,25 +42,15 @@ export function FullscreenImageViewer({
       return;
     }
 
-    let targetIndex: number;
     if (isInitialOpenRef.current) {
-      targetIndex = initialIndex;
       setActiveIndex(initialIndex);
       isInitialOpenRef.current = false;
-    } else {
-      targetIndex = activeIndexRef.current;
     }
-
-    const timer = setTimeout(() => {
-      scrollRef.current?.scrollTo({ x: targetIndex * width, y: 0, animated: false });
-    }, 50);
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [visible, initialIndex, width]);
+  }, [visible, initialIndex]);
 
   if (!visible || !images || images.length === 0) return null;
+
+  const targetIndex = isInitialOpenRef.current ? initialIndex : activeIndex;
 
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = e.nativeEvent.contentOffset.x;
@@ -126,6 +116,7 @@ export function FullscreenImageViewer({
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
+          contentOffset={{ x: targetIndex * width, y: 0 }}
           onScroll={handleScroll}
           scrollEventThrottle={16}
           bounces={images.length > 1}

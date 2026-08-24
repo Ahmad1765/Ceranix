@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Pressable, StyleProp, ViewStyle } from 'react-native';
 import { Image } from 'expo-image';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -44,6 +44,10 @@ export function UserCommentHeader({
 }: UserCommentHeaderProps) {
   const { theme } = useTheme();
   const [following, setFollowing] = useState(initialFollowing);
+
+  useEffect(() => {
+    setFollowing(initialFollowing);
+  }, [initialFollowing]);
 
   const handleFollowPress = () => {
     if (!onFollowToggle) return;

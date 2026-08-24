@@ -12,6 +12,28 @@ import { deriveOffline, type ConnectivitySnapshot } from '@/lib/offlineState';
 import { updateLikedCache, updateSavedCache, invalidateSavedCache } from '@/lib/engagementCache';
 
 export const OFFLINE_SYNC_QUEUE_KEY = 'CERANIX_OFFLINE_SYNC_QUEUE';
+export const MAX_QUEUE_LENGTH = 100;
+export const MAX_RETRY_ATTEMPTS = 5;
+
+const queueMutationLocks = new Map<string, Promise<unknown>>();
+
+async function runWithQueueLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const prev = queueMutationLocks.get(key) || Promise.resolve();
+  let release: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  queueMutationLocks.set(key, current);
+  try {
+    await prev;
+    return await fn();
+  } finally {
+    release!();
+    if (queueMutationLocks.get(key) === current) {
+      queueMutationLocks.delete(key);
+    }
+  }
+}
 
 export type LikeToggleAction = {
   id: string;
@@ -20,6 +42,7 @@ export type LikeToggleAction = {
   listingId: string;
   targetLiked: boolean;
   timestamp: number;
+  attempts?: number;
 };
 
 export type SaveToggleAction = {
@@ -29,6 +52,7 @@ export type SaveToggleAction = {
   listingId: string;
   targetSaved: boolean;
   timestamp: number;
+  attempts?: number;
 };
 
 export type SaveListItemAction = {
@@ -39,6 +63,7 @@ export type SaveListItemAction = {
   listingId: string;
   op: 'add' | 'remove';
   timestamp: number;
+  attempts?: number;
 };
 
 export type OfflineAction = LikeToggleAction | SaveToggleAction | SaveListItemAction;
@@ -64,8 +89,12 @@ export function coalesceActions(actions: OfflineAction[]): OfflineAction[] {
     }
 
     if (key) {
-      // Latest action for this key overwrites earlier ones
-      map.set(key, action);
+      // Latest action for this key overwrites earlier ones while preserving attempts
+      const existing = map.get(key);
+      map.set(key, {
+        ...action,
+        attempts: Math.max(existing?.attempts ?? 0, action.attempts ?? 0),
+      });
     }
   }
 
@@ -88,14 +117,15 @@ export async function getOfflineQueue(): Promise<OfflineAction[]> {
 }
 
 /**
- * Save the pending offline actions queue to AsyncStorage.
+ * Save the pending offline actions queue to AsyncStorage with bounded maximum length.
  */
 export async function saveOfflineQueue(queue: OfflineAction[]): Promise<void> {
   try {
-    if (queue.length === 0) {
+    const bounded = queue.slice(-MAX_QUEUE_LENGTH);
+    if (bounded.length === 0) {
       await AsyncStorage.removeItem(OFFLINE_SYNC_QUEUE_KEY);
     } else {
-      await AsyncStorage.setItem(OFFLINE_SYNC_QUEUE_KEY, JSON.stringify(queue));
+      await AsyncStorage.setItem(OFFLINE_SYNC_QUEUE_KEY, JSON.stringify(bounded));
     }
   } catch (err) {
     console.warn('[offlineSync] saveOfflineQueue error:', err);
@@ -103,7 +133,7 @@ export async function saveOfflineQueue(queue: OfflineAction[]): Promise<void> {
 }
 
 /**
- * Enqueue a new offline action with automatic coalescing and persistence.
+ * Enqueue a new offline action with automatic coalescing, queue lock, and persistence.
  */
 export async function enqueueOfflineAction(
   action: EnqueueOfflineActionInput,
@@ -112,11 +142,14 @@ export async function enqueueOfflineAction(
     ...action,
     id: `${action.type}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
     timestamp: Date.now(),
+    attempts: 0,
   } as OfflineAction;
 
-  const current = await getOfflineQueue();
-  const next = coalesceActions([...current, fullAction]);
-  await saveOfflineQueue(next);
+  await runWithQueueLock(OFFLINE_SYNC_QUEUE_KEY, async () => {
+    const current = await getOfflineQueue();
+    const next = coalesceActions([...current, fullAction]);
+    await saveOfflineQueue(next);
+  });
 
   // Keep local engagement cache in sync immediately
   if (action.type === 'like_toggle') {
@@ -198,13 +231,21 @@ export async function executeOfflineAction(action: OfflineAction): Promise<{ ok:
           .eq('is_default', true)
           .maybeSingle();
 
-        if (listErr && isNetworkError(listErr)) return { ok: false, retry: true };
+        if (listErr) {
+          if (isNetworkError(listErr)) return { ok: false, retry: true };
+          console.warn('[offlineSync] save_lists select error:', listErr.message);
+          return { ok: false, retry: false };
+        }
 
         if (listData?.id) {
           defaultListId = listData.id;
         } else {
           const { error: ensureErr } = await supabase.rpc('ensure_save_lists', { p_user_id: action.userId });
-          if (ensureErr && isNetworkError(ensureErr)) return { ok: false, retry: true };
+          if (ensureErr) {
+            if (isNetworkError(ensureErr)) return { ok: false, retry: true };
+            console.warn('[offlineSync] ensure_save_lists rpc error:', ensureErr.message);
+            return { ok: false, retry: false };
+          }
 
           const { data: listAgain, error: againErr } = await supabase
             .from('save_lists')
@@ -213,7 +254,11 @@ export async function executeOfflineAction(action: OfflineAction): Promise<{ ok:
             .eq('is_default', true)
             .maybeSingle();
 
-          if (againErr && isNetworkError(againErr)) return { ok: false, retry: true };
+          if (againErr) {
+            if (isNetworkError(againErr)) return { ok: false, retry: true };
+            console.warn('[offlineSync] save_lists select again error:', againErr.message);
+            return { ok: false, retry: false };
+          }
           defaultListId = listAgain?.id ?? null;
         }
 
@@ -237,7 +282,11 @@ export async function executeOfflineAction(action: OfflineAction): Promise<{ ok:
           .eq('listing_id', action.listingId)
           .eq('save_lists.user_id', action.userId);
 
-        if (findErr && isNetworkError(findErr)) return { ok: false, retry: true };
+        if (findErr) {
+          if (isNetworkError(findErr)) return { ok: false, retry: true };
+          console.warn('[offlineSync] save_list_items find error:', findErr.message);
+          return { ok: false, retry: false };
+        }
 
         const listIds = ((lists ?? []) as { list_id: string }[]).map((r) => r.list_id);
         if (listIds.length > 0) {
@@ -246,7 +295,11 @@ export async function executeOfflineAction(action: OfflineAction): Promise<{ ok:
             .delete()
             .in('list_id', listIds)
             .eq('listing_id', action.listingId);
-          if (delErr && isNetworkError(delErr)) return { ok: false, retry: true };
+          if (delErr) {
+            if (isNetworkError(delErr)) return { ok: false, retry: true };
+            console.warn('[offlineSync] save_list_items delete error:', delErr.message);
+            return { ok: false, retry: false };
+          }
         }
       }
       return { ok: true, retry: false };
@@ -342,8 +395,12 @@ export async function flushOfflineSyncQueue(): Promise<{ syncedCount: number; er
       if (result.ok) {
         syncedCount++;
       } else if (result.retry) {
-        // Keep in queue for next connectivity window
-        retryActions.push(action);
+        const nextAttempts = (action.attempts ?? 0) + 1;
+        if (nextAttempts <= MAX_RETRY_ATTEMPTS) {
+          retryActions.push({ ...action, attempts: nextAttempts });
+        } else {
+          console.warn('[offlineSync] Dropping offline action after exceeding max retries:', action);
+        }
         errors++;
       } else {
         // Fatal non-retryable error (e.g. row deleted or auth denied), drop it
@@ -351,12 +408,14 @@ export async function flushOfflineSyncQueue(): Promise<{ syncedCount: number; er
       }
     }
 
-    // Re-read latest queue to preserve concurrent additions during flush
-    const latestQueue = await getOfflineQueue();
-    const initialIds = new Set(initialQueue.map((a) => a.id));
-    const concurrentActions = latestQueue.filter((a) => !initialIds.has(a.id));
+    await runWithQueueLock(OFFLINE_SYNC_QUEUE_KEY, async () => {
+      // Re-read latest queue to preserve concurrent additions during flush
+      const latestQueue = await getOfflineQueue();
+      const initialIds = new Set(initialQueue.map((a) => a.id));
+      const concurrentActions = latestQueue.filter((a) => !initialIds.has(a.id));
 
-    await saveOfflineQueue([...otherUserActions, ...retryActions, ...concurrentActions]);
+      await saveOfflineQueue([...otherUserActions, ...retryActions, ...concurrentActions]);
+    });
   } catch (err) {
     console.warn('[offlineSync] flushOfflineSyncQueue error:', err);
   } finally {

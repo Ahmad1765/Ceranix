@@ -114,14 +114,25 @@ export function AddressSheet({
     setForm((s) => ({ ...s, ...nextPatch }));
   };
 
+  const locRequestIdRef = useRef(0);
+
+  // Invalidate any in-flight location request when the sheet closes
+  useEffect(() => {
+    if (!visible) {
+      locRequestIdRef.current += 1;
+    }
+  }, [visible]);
+
   // Location Auto-detect / Location Adder
   const handleUseCurrentLocation = async () => {
     if (locating) return;
     tap('medium');
     setLocating(true);
+    const requestId = ++locRequestIdRef.current;
 
     try {
       const loc = await getCurrentLocationAddress();
+      if (locRequestIdRef.current !== requestId) return;
       setForm((s) => ({
         ...s,
         line1: loc.line1 || s.line1,
@@ -136,12 +147,15 @@ export function AddressSheet({
         icon: 'check',
       });
     } catch (e: any) {
+      if (locRequestIdRef.current !== requestId) return;
       toast.show(e?.message ?? 'Could not detect location', {
         variant: 'default',
         icon: 'alert-triangle',
       });
     } finally {
-      setLocating(false);
+      if (locRequestIdRef.current === requestId) {
+        setLocating(false);
+      }
     }
   };
 

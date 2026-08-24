@@ -24,7 +24,7 @@ import {
   countActiveFilters,
   type FeedFilters,
   type FeedSort,
-} from '@/components/FeedFilterSheet';
+} from '@/components/navigation/FeedFilterSheet';
 import {
   useMyFeedListingsQuery,
   useFeedListingsQuery,
@@ -339,6 +339,8 @@ export default function HomeScreen() {
     if (filters.category) rows = rows.filter((l) => l.category === filters.category);
     if (filters.conditions.length > 0)
       rows = rows.filter((l) => filters.conditions.includes(l.condition));
+    if (filters.sizes.length > 0)
+      rows = rows.filter((l) => !!l.size && filters.sizes.includes(l.size));
     if (filters.priceMin != null) rows = rows.filter((l) => l.price >= filters.priceMin!);
     if (filters.priceMax != null) rows = rows.filter((l) => l.price <= filters.priceMax!);
     switch (filters.sort) {
@@ -574,6 +576,7 @@ export default function HomeScreen() {
         initial={filters}
         onApply={setFilters}
         onClose={() => setFilterOpen(false)}
+        resultCount={filteredListings.length}
       />
 
       {user?.id ? (

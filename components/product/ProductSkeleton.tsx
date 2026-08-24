@@ -7,6 +7,7 @@ import Animated, {
   withTiming,
   withSequence,
 } from 'react-native-reanimated';
+import { colors } from '@/lib/theme';
 
 export function SkeletonBlock({
   width,
@@ -49,7 +50,7 @@ export function SkeletonBlock({
 
 export function ProductSkeleton({ insetsTop }: { insetsTop: number }) {
   return (
-    <View style={{ flex: 1, backgroundColor: 'white' }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Header (back button area) */}
       <View
         style={{

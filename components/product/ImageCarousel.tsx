@@ -1,8 +1,8 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   ScrollView,
-  Dimensions,
+  useWindowDimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
   StyleSheet,
@@ -13,8 +13,6 @@ import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
 import { Text } from '@/lib/rnText';
 import { colors, radii } from '@/lib/theme';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export interface ImageCarouselProps {
   images: string[];
@@ -36,9 +34,24 @@ export function ImageCarousel({
   className = '',
   style,
 }: ImageCarouselProps) {
+  const { width: windowWidth } = useWindowDimensions();
   const [activeIndex, setActiveIndex] = useState(0);
-  const [carouselWidth, setCarouselWidth] = useState(SCREEN_WIDTH);
+  const [carouselWidth, setCarouselWidth] = useState(windowWidth);
   const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    setCarouselWidth(windowWidth);
+  }, [windowWidth]);
+
+  useEffect(() => {
+    if (carouselWidth > 0) {
+      scrollRef.current?.scrollTo({
+        x: activeIndex * carouselWidth,
+        y: 0,
+        animated: false,
+      });
+    }
+  }, [carouselWidth]);
 
   // Height based on aspect ratio
   const carouselHeight = aspectRatio === '1:1' ? carouselWidth : carouselWidth * 1.25;

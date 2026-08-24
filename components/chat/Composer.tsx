@@ -126,8 +126,6 @@ export function Composer({
         paddingTop: 14,
         paddingBottom: 8,
         backgroundColor: colors.surface,
-        borderTopWidth: 1,
-        borderTopColor: colors.border,
       }}
     >
       <PressableScale

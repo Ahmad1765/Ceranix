@@ -564,7 +564,7 @@ export default function ConversationScreen() {
       .catch((err) => {
         if (!active || currentReqId !== blockCheckReqIdRef.current) return;
         console.warn('[conversation] failed to check block status', err);
-        setBlockStatus('unavailable');
+        setBlockStatus('unblocked');
       });
     return () => {
       active = false;
@@ -587,6 +587,9 @@ export default function ConversationScreen() {
       if (success) {
         setBlockStatus('unblocked');
         toast.show(`Unblocked ${targetName}`);
+      } else {
+        setBlockStatus('blocked');
+        toast.show('Failed to unblock user. Please try again.');
       }
     } else {
       setBlockSheetOpen(true);

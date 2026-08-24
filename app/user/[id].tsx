@@ -334,7 +334,7 @@ export default function UserProfileScreen() {
 
                 <View style={{ alignItems: 'center' }}>
                   <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink }}>
-                    {formatCount(totalLikes > 0 ? totalLikes : listings.length * 12 + 15)}
+                    {formatCount(totalLikes)}
                   </Text>
                   <Text style={{ fontSize: 12, color: colors.mute, marginTop: 1 }}>Likes</Text>
                 </View>
@@ -385,11 +385,7 @@ export default function UserProfileScreen() {
 
                     <Pressable
                       onPress={() => {
-                        if (listings.length > 0) {
-                          router.push(`/conversation/new?listing=${listings[0].id}` as any);
-                        } else {
-                          Alert.alert('No listings', 'This user has no active listings to inquire about.');
-                        }
+                        router.push(`/conversation/new?user=${userId}` as any);
                       }}
                       accessibilityRole="button"
                       accessibilityLabel="Message seller"

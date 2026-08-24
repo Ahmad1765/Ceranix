@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Modal,
@@ -89,15 +89,22 @@ export function BottomSheetModal({
   const translateY = useSharedValue(Platform.OS === 'web' ? 0 : SCREEN_HEIGHT);
   const contextY = useSharedValue(0);
 
+  // Internal visibility stays true during exit animation so the component
+  // remains mounted until the slide-down completes.
+  const [internalVisible, setInternalVisible] = useState(visible);
+
   // Trigger haptic tick on open
   useEffect(() => {
     if (visible) {
+      setInternalVisible(true);
       if (Platform.OS !== 'web') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       }
       translateY.value = withSpring(0, SPRING_CONFIG);
     } else {
-      translateY.value = withTiming(SCREEN_HEIGHT, { duration: 220 });
+      translateY.value = withTiming(SCREEN_HEIGHT, { duration: 220 }, () => {
+        runOnJS(setInternalVisible)(false);
+      });
     }
   }, [visible, translateY]);
 
@@ -145,14 +152,14 @@ export function BottomSheetModal({
     return { opacity };
   });
 
-  if (!visible) return null;
+  if (!internalVisible) return null;
 
   const isScrollEnabled = autoHeight ? false : scrollable;
   const ContentWrapper = isScrollEnabled ? ScrollView : View;
 
   return (
     <Modal
-      visible={visible}
+      visible={internalVisible}
       transparent
       animationType={Platform.OS === 'web' ? 'fade' : 'none'}
       statusBarTranslucent

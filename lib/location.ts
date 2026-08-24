@@ -139,14 +139,24 @@ export async function getCurrentLocationAddress(): Promise<GeocodedAddress> {
     throw new Error('Location permission denied. Please allow location access to auto-fill your address.');
   }
 
-  const pos = await Location.getCurrentPositionAsync({
-    accuracy: Location.Accuracy.Balanced,
-  });
+  const NATIVE_TIMEOUT_MS = 10000;
 
-  const geocoded = await reverseGeocodeCoords(pos.coords.latitude, pos.coords.longitude);
-  if (!geocoded) {
-    throw new Error('Could not resolve street address from current location.');
-  }
+  const nativeResult = await Promise.race([
+    (async () => {
+      const pos = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
 
-  return geocoded;
+      const geocoded = await reverseGeocodeCoords(pos.coords.latitude, pos.coords.longitude);
+      if (!geocoded) {
+        throw new Error('Could not resolve street address from current location.');
+      }
+      return geocoded;
+    })(),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Location request timed out. Please try again.')), NATIVE_TIMEOUT_MS),
+    ),
+  ]);
+
+  return nativeResult;
 }

@@ -25,7 +25,7 @@ import { useToast } from '@/lib/toast';
 import { safeBack } from '@/lib/nav';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { supabase } from '@/lib/supabase';
-import { buyerProtectionFee, formatPrice } from '@/lib/fees';
+import { buyerProtectionFee, formatPrice, shippingFee } from '@/lib/fees';
 import { SlideToConfirm } from '@/components/SlideToConfirm';
 import { AddressSheet, type AddressForm } from '@/components/settings/AddressSheet';
 import { MockStripePaymentSheet } from '@/components/payment/MockStripePaymentSheet';
@@ -50,7 +50,7 @@ function formatShortDate(d: Date) {
 }
 
 export default function PaymentScreen() {
-  const { id, offer, paymentMethod: paramPaymentMethod } = useLocalSearchParams<{
+  const { id, offer, paymentMethod: paramPaymentMethod, fulfillment } = useLocalSearchParams<{
     id: string;
     offer?: string;
     paymentMethod?: string;
@@ -187,7 +187,8 @@ export default function PaymentScreen() {
 
   const itemPrice = offerAmount ?? Number(listing.price ?? 0);
   const fee = buyerProtectionFee(itemPrice);
-  const total = itemPrice + fee;
+  const deliveryShippingFee = fulfillment === 'delivery' ? shippingFee(itemPrice) : 0;
+  const total = itemPrice + fee + deliveryShippingFee;
   const sellerName =
     listing.seller?.full_name || listing.seller?.username || 'Seller';
   const sellerInitial = (listing.seller?.username || 'S').charAt(0).toUpperCase();
@@ -217,18 +218,29 @@ export default function PaymentScreen() {
       });
 
       if (error) {
-        // Fallback for local mock
-        const mockAddress: ShippingAddress = {
-          id: `mock_addr_${Date.now()}`,
-          ...payload,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        setShippingAddress(mockAddress);
-      } else {
-        setShippingAddress(data as ShippingAddress);
+        if (__DEV__) {
+          const mockAddress: ShippingAddress = {
+            id: `mock_addr_${Date.now()}`,
+            ...payload,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          setShippingAddress(mockAddress);
+          setAddressSheetOpen(false);
+          toast.show('Using dev mock address (RPC failed)', {
+            variant: 'default',
+            icon: 'alert-triangle',
+          });
+          return;
+        }
+        toast.show(error.message || 'Failed to save shipping address', {
+          variant: 'default',
+          icon: 'alert-triangle',
+        });
+        return;
       }
 
+      setShippingAddress(data as ShippingAddress);
       setAddressSheetOpen(false);
       toast.show('Shipping address saved', { variant: 'default', icon: 'check' });
     } catch (e: any) {
@@ -245,7 +257,7 @@ export default function PaymentScreen() {
     if (paying) return;
 
     // Validate address presence for Cash on Delivery
-    if (paymentMethod === 'cod' && !shippingAddress) {
+    if (paymentMethod === 'cod' && fulfillment === 'delivery' && !shippingAddress) {
       toast.show('Please add a shipping address for delivery', {
         variant: 'default',
         icon: 'map-pin',
@@ -322,6 +334,11 @@ export default function PaymentScreen() {
           icon: 'check',
         });
         router.replace(`/invoice/${id}?placed=1&method=cod` as any);
+      } else {
+        toast.show(result.error ?? 'Could not place order', {
+          variant: 'default',
+          icon: 'alert-triangle',
+        });
       }
     } catch (e: any) {
       toast.show(e?.message ?? 'Could not place order', {
@@ -354,12 +371,15 @@ export default function PaymentScreen() {
           icon: 'check',
         });
         router.replace(`/invoice/${id}?paid=1` as any);
+      } else {
+        throw new Error(result.error ?? 'Card payment failed');
       }
     } catch (e: any) {
       toast.show(e?.message ?? 'Card payment failed', {
         variant: 'default',
         icon: 'alert-triangle',
       });
+      throw e;
     }
   };
 

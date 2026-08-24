@@ -12,6 +12,7 @@ export type FeedSort = 'relevance' | 'newest' | 'price_asc' | 'price_desc' | 'po
 export interface FeedFilters {
   category: Category | null;
   conditions: Condition[];
+  sizes: string[];
   priceMin: number | null;
   priceMax: number | null;
   sort: FeedSort;
@@ -20,6 +21,7 @@ export interface FeedFilters {
 export const EMPTY_FEED_FILTERS: FeedFilters = {
   category: null,
   conditions: [],
+  sizes: [],
   priceMin: null,
   priceMax: null,
   sort: 'relevance',
@@ -30,6 +32,7 @@ export function countActiveFilters(f: FeedFilters): number {
   let n = 0;
   if (f.category) n += 1;
   n += f.conditions.length;
+  n += (f.sizes?.length ?? 0);
   if (f.priceMin != null || f.priceMax != null) n += 1;
   if (f.sort !== 'relevance') n += 1;
   return n;
@@ -71,12 +74,15 @@ export function FeedFilterSheet({ visible, initial, onApply, onClose }: Props) {
   const [priceMax, setPriceMax] = useState<string>(initial.priceMax?.toString() ?? '');
   const [sort, setSort] = useState<FeedSort>(initial.sort);
 
+  const [sizes, setSizes] = useState<string[]>(initial.sizes ?? []);
+
   // Re-seed local state from the applied filters each time the sheet opens so a
   // cancelled edit never leaks into the next open.
   useEffect(() => {
     if (!visible) return;
     setCategory(initial.category);
     setConditions(initial.conditions);
+    setSizes(initial.sizes ?? []);
     setPriceMin(initial.priceMin?.toString() ?? '');
     setPriceMax(initial.priceMax?.toString() ?? '');
     setSort(initial.sort);
@@ -88,6 +94,7 @@ export function FeedFilterSheet({ visible, initial, onApply, onClose }: Props) {
   const reset = () => {
     setCategory(null);
     setConditions([]);
+    setSizes([]);
     setPriceMin('');
     setPriceMax('');
     setSort('relevance');
@@ -96,13 +103,14 @@ export function FeedFilterSheet({ visible, initial, onApply, onClose }: Props) {
   const apply = () => {
     const min = priceMin.trim() ? Math.max(0, parseInt(priceMin, 10) || 0) : null;
     const max = priceMax.trim() ? Math.max(0, parseInt(priceMax, 10) || 0) : null;
-    onApply({ category, conditions, priceMin: min, priceMax: max, sort });
+    onApply({ category, conditions, sizes, priceMin: min, priceMax: max, sort });
     onClose();
   };
 
   const draft: FeedFilters = {
     category,
     conditions,
+    sizes,
     priceMin: priceMin.trim() ? parseInt(priceMin, 10) || 0 : null,
     priceMax: priceMax.trim() ? parseInt(priceMax, 10) || 0 : null,
     sort,

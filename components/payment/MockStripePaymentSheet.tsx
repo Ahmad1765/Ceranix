@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Modal,
@@ -30,6 +30,12 @@ export function MockStripePaymentSheet({
   loading = false,
 }: MockStripePaymentSheetProps) {
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!visible) {
+      setSubmitting(false);
+    }
+  }, [visible]);
 
   const isBusy = loading || submitting;
 

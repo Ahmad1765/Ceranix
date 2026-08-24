@@ -113,7 +113,7 @@ type DetailRow = {
 // blocks (`?.`, `??`, `?:`, `&&`, `||`) must stay out of a try/catch here.
 
 export default function ProductScreen() {
-  const { theme } = useTheme();
+  useTheme();
   const { id } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -593,15 +593,15 @@ export default function ProductScreen() {
               height: 48,
               borderRadius: 14,
               paddingHorizontal: 28,
-              backgroundColor: theme.ink,
+              backgroundColor: colors.ink,
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center',
               opacity: pressed ? 0.85 : 1,
             })}
           >
-            <Feather name="refresh-cw" size={14} color="#fff" />
-            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14, marginLeft: 8 }}>
+            <Feather name="refresh-cw" size={14} color={colors.white} />
+            <Text style={{ color: colors.white, fontWeight: '800', fontSize: 14, marginLeft: 8 }}>
               Retry
             </Text>
           </Pressable>

@@ -57,9 +57,9 @@ export function ProductActionBar({
       return;
     }
     const allowed = onOfferOpen ? onOfferOpen() : true;
-    if (allowed !== false && onSubmitOffer) {
-      // Offer trigger
-    }
+    if (allowed === false) return;
+    // If neither onOfferPress nor onOfferOpen resulted in an action,
+    // fall through silently — the caller should provide at least one handler.
   };
 
   const handleBuy = () => {

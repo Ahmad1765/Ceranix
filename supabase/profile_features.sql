@@ -135,15 +135,34 @@ security definer
 set search_path = ''
 as $$
 begin
-  if coalesce(auth.role(), '') = 'service_role' or current_setting('app.override_trust_fields', true) = 'on' then
+  if coalesce(auth.role(), '') = 'service_role' then
     return new;
   end if;
-  if new.is_verified is distinct from old.is_verified
-     or new.is_pro      is distinct from old.is_pro
-     or new.rating      is distinct from old.rating
-     or new.total_sales is distinct from old.total_sales then
-    raise exception 'profile trust fields (is_verified, is_pro, rating, total_sales) are read-only';
+
+  if new.is_verified is distinct from old.is_verified then
+    if current_setting('app.auth_override_is_verified', true) <> 'authorized' then
+      raise exception 'profile trust field (is_verified) is read-only';
+    end if;
   end if;
+
+  if new.is_pro is distinct from old.is_pro then
+    if current_setting('app.auth_override_is_pro', true) <> 'authorized' then
+      raise exception 'profile trust field (is_pro) is read-only';
+    end if;
+  end if;
+
+  if new.rating is distinct from old.rating then
+    if current_setting('app.auth_override_rating', true) <> 'authorized' then
+      raise exception 'profile trust field (rating) is read-only';
+    end if;
+  end if;
+
+  if new.total_sales is distinct from old.total_sales then
+    if current_setting('app.auth_override_total_sales', true) <> 'authorized' then
+      raise exception 'profile trust field (total_sales) is read-only';
+    end if;
+  end if;
+
   return new;
 end;
 $$;
@@ -166,11 +185,11 @@ declare
   v_user_id uuid := auth.uid();
   v_profile public.profiles;
 begin
-  if v_user_id is null then
-    raise exception 'authentication required';
+  if coalesce(auth.role(), '') <> 'service_role' then
+    raise exception 'Permission denied: update_seller_subscription may only be called by service_role';
   end if;
 
-  perform set_config('app.override_trust_fields', 'on', true);
+  perform set_config('app.auth_override_is_pro', 'authorized', true);
 
   update public.profiles
      set is_pro = p_is_pro,
@@ -178,7 +197,7 @@ begin
    where id = v_user_id
   returning * into v_profile;
 
-  perform set_config('app.override_trust_fields', 'off', true);
+  perform set_config('app.auth_override_is_pro', 'off', true);
 
   if v_profile.id is null then
     raise exception 'profile not found';
@@ -188,8 +207,8 @@ begin
 end;
 $$;
 
-revoke execute on function public.update_seller_subscription(boolean) from public, anon;
-grant  execute on function public.update_seller_subscription(boolean) to authenticated;
+revoke execute on function public.update_seller_subscription(boolean) from public, anon, authenticated;
+grant  execute on function public.update_seller_subscription(boolean) to service_role;
 
 create or replace function public.guard_verification_status()
 returns trigger

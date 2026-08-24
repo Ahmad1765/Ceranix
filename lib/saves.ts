@@ -261,15 +261,19 @@ export async function toggleSave(
           .delete()
           .in('list_id', Array.from(lists))
           .eq('listing_id', listingId);
-        if (error && isNetworkError(error)) {
-          await enqueueOfflineAction({
-            type: 'save_toggle',
-            userId,
-            listingId,
-            targetSaved: false,
-          });
-          updateSavedCache(userId, listingId, false);
-          return false;
+        if (error) {
+          if (isNetworkError(error)) {
+            await enqueueOfflineAction({
+              type: 'save_toggle',
+              userId,
+              listingId,
+              targetSaved: false,
+            });
+            updateSavedCache(userId, listingId, false);
+            return false;
+          }
+          console.warn('[saves] toggleSave delete error', error);
+          return currentlySaved;
         }
       } else {
         // If lists were empty due to network or offline, queue the remove action

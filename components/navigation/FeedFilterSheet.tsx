@@ -35,6 +35,16 @@ export const EMPTY_FEED_FILTERS: FeedFilters = {
   sort: 'relevance',
 };
 
+export function countActiveFilters(f: FeedFilters): number {
+  let count = 0;
+  if (f.category) count += 1;
+  count += f.conditions.length;
+  count += f.sizes.length;
+  if (f.priceMin != null || f.priceMax != null) count += 1;
+  if (f.sort !== 'relevance') count += 1;
+  return count;
+}
+
 const CATEGORIES: { id: Category; label: string; icon: keyof typeof Feather.glyphMap }[] = [
   { id: 'clothing', label: 'Clothing', icon: 'shopping-bag' },
   { id: 'shoes', label: 'Shoes', icon: 'shopping-bag' },

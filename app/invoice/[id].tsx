@@ -111,7 +111,7 @@ export default function InvoiceScreen() {
       if (!active) return;
       if (first) {
         setOrder(first);
-      } else if (placed === '1') {
+      } else if (__DEV__ && placed === '1') {
         setOrder({
           id: `order_demo_${Date.now()}`,
           listing_id: String(listingId),
@@ -288,7 +288,7 @@ export default function InvoiceScreen() {
 
   // Seller CoD Completion with Optimistic UI Update
   const handleCompleteCodOrder = async () => {
-    if (!order?.id || completingCod) return;
+    if (!order?.id || order.id.startsWith('order_demo') || completingCod) return;
     tap('medium');
 
     const confirmed = await confirm({
@@ -629,7 +629,7 @@ export default function InvoiceScreen() {
                 </View>
 
                 {/* Google Maps link button */}
-                {Boolean(mapsUrl) && (
+                {mapsUrl ? (
                   <Pressable
                     onPress={() => {
                       tap('light');
@@ -653,7 +653,7 @@ export default function InvoiceScreen() {
                       Maps
                     </Text>
                   </Pressable>
-                )}
+                ) : null}
               </View>
 
               <Text style={{ fontSize: 14, fontWeight: '700', color: colors.ink }}>
@@ -795,7 +795,7 @@ export default function InvoiceScreen() {
             </Text>
           </Pressable>
         ) : status === 'cod_pending' ? (
-          isSeller ? (
+          isSeller && !order?.id?.startsWith('order_demo') ? (
             /* Seller Action: Mark Cash Collected & Delivered */
             <Pressable
               onPress={handleCompleteCodOrder}

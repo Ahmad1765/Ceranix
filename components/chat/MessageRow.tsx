@@ -500,7 +500,12 @@ function OfferBubble({
         </View>
       )}
 
-      {status === 'accepted' && listingSold && (
+      {status === 'accepted' &&
+        (msg.metadata?.order_status === 'paid' ||
+          msg.metadata?.payment_status === 'paid' ||
+          (msg.metadata as any)?.paid === true ||
+          (msg as any).order_status === 'paid' ||
+          (msg as any).payment_status === 'paid') && (
         <View
           style={{
             flexDirection: 'row',

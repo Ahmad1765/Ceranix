@@ -9,9 +9,12 @@ import {
   ScrollViewProps,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 
 export type SafeEdge = 'top' | 'bottom' | 'left' | 'right';
+
+/** Fixed content clearance reserved above the sticky footer across all modes. */
+const STICKY_FOOTER_CLEARANCE = 80;
 
 export interface SafeContainerProps {
   children: React.ReactNode;
@@ -49,13 +52,15 @@ export function SafeContainer({
   noScroll = false,
   stickyFooter,
   extraBottomPadding = 0,
-  backgroundColor = colors.bg,
+  backgroundColor: bgOverride,
   className = '',
   style,
   contentContainerStyle,
   scrollViewProps,
 }: SafeContainerProps) {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
+  const backgroundColor = bgOverride ?? theme.background;
 
   const edgePadding = React.useMemo(() => {
     return {
@@ -67,6 +72,17 @@ export function SafeContainer({
       paddingRight: edges.includes('right') ? insets.right : 0,
     };
   }, [edges, insets, extraBottomPadding]);
+
+  const stickyFooterStyle = [
+    styles.stickyFooter,
+    {
+      backgroundColor: theme.surface,
+      borderTopColor: theme.hairline,
+      paddingBottom: edges.includes('bottom')
+        ? Math.max(insets.bottom, 12)
+        : 12,
+    },
+  ];
 
   // View Mode
   if (mode === 'view') {
@@ -80,23 +96,18 @@ export function SafeContainer({
             paddingTop: edgePadding.paddingTop,
             paddingLeft: edgePadding.paddingLeft,
             paddingRight: edgePadding.paddingRight,
-            paddingBottom: stickyFooter ? 80 : edgePadding.paddingBottom,
+            paddingBottom: stickyFooter
+              ? STICKY_FOOTER_CLEARANCE +
+                (edges.includes('bottom') ? Math.max(insets.bottom, 12) : 0) +
+                extraBottomPadding
+              : edgePadding.paddingBottom,
           },
           style,
         ]}
       >
         {children}
         {stickyFooter && (
-          <View
-            style={[
-              styles.stickyFooter,
-              {
-                paddingBottom: edges.includes('bottom')
-                  ? Math.max(insets.bottom, 12)
-                  : 12,
-              },
-            ]}
-          >
+          <View style={stickyFooterStyle}>
             {stickyFooter}
           </View>
         )}
@@ -126,8 +137,8 @@ export function SafeContainer({
           contentContainerStyle={[
             {
               paddingBottom: edges.includes('bottom')
-                ? Math.max(insets.bottom, 16) + (stickyFooter ? 80 : 0) + extraBottomPadding
-                : (stickyFooter ? 80 : 0) + extraBottomPadding,
+                ? Math.max(insets.bottom, 16) + (stickyFooter ? STICKY_FOOTER_CLEARANCE : 0) + extraBottomPadding
+                : (stickyFooter ? STICKY_FOOTER_CLEARANCE : 0) + extraBottomPadding,
             },
             contentContainerStyle,
           ]}
@@ -137,16 +148,7 @@ export function SafeContainer({
         </ScrollView>
 
         {stickyFooter && (
-          <View
-            style={[
-              styles.stickyFooter,
-              {
-                paddingBottom: edges.includes('bottom')
-                  ? Math.max(insets.bottom, 12)
-                  : 12,
-              },
-            ]}
-          >
+          <View style={stickyFooterStyle}>
             {stickyFooter}
           </View>
         )}
@@ -181,8 +183,8 @@ export function SafeContainer({
             styles.grow,
             {
               paddingBottom: edges.includes('bottom')
-                ? Math.max(insets.bottom, 16) + (stickyFooter ? 80 : 0) + extraBottomPadding
-                : (stickyFooter ? 80 : 0) + extraBottomPadding,
+                ? Math.max(insets.bottom, 16) + (stickyFooter ? STICKY_FOOTER_CLEARANCE : 0) + extraBottomPadding
+                : (stickyFooter ? STICKY_FOOTER_CLEARANCE : 0) + extraBottomPadding,
             },
             contentContainerStyle,
           ]}
@@ -194,16 +196,7 @@ export function SafeContainer({
 
 
       {stickyFooter && (
-        <View
-          style={[
-            styles.stickyFooter,
-            {
-              paddingBottom: edges.includes('bottom')
-                ? Math.max(insets.bottom, 12)
-                : 12,
-            },
-          ]}
-        >
+        <View style={stickyFooterStyle}>
           {stickyFooter}
         </View>
       )}
@@ -224,9 +217,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 50,
-    backgroundColor: colors.surface,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.hairline,
     paddingTop: 12,
     paddingHorizontal: 16,
     ...Platform.select({

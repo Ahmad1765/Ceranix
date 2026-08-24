@@ -72,6 +72,28 @@ describe('ShippingAddressSchema (Zod Strict Validation)', () => {
     }
   });
 
+  it('parses successfully when line2, deliveryInstructions, and coordinates are explicitly null', () => {
+    const withNulls = {
+      recipientName: 'Null Test User',
+      phone: '03009876543',
+      line1: '789 Null Street',
+      city: 'Lahore',
+      state: 'Punjab',
+      postalCode: '54000',
+      country: 'Pakistan',
+      line2: null,
+      deliveryInstructions: null,
+      coordinates: null,
+    };
+    const result = ShippingAddressSchema.safeParse(withNulls);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.line2).toBeNull();
+      expect(result.data.deliveryInstructions).toBeNull();
+      expect(result.data.coordinates).toBeNull();
+    }
+  });
+
   it('rejects missing or short recipient name', () => {
     const invalid = { ...validAddress, recipientName: 'A' };
     expect(ShippingAddressSchema.safeParse(invalid).success).toBe(false);

@@ -98,7 +98,7 @@ export class CodPaymentProvider implements PaymentProvider {
         p_listing_id: request.listingId,
         p_buyer_id: request.buyerId ?? null,
         p_payment_method: 'cod',
-        p_shipping_address: validatedAddress,
+        p_shipping_address: toSnakeCaseAddress(validatedAddress),
         p_offer_amount: request.offerAmount ?? null,
         p_delivery_notes: request.deliveryNotes?.trim() || validatedAddress.deliveryInstructions || null,
       });
@@ -220,15 +220,16 @@ export class StripePaymentProvider implements PaymentProvider {
     // Try executing atomic process_checkout on backend for card
     let backendOrder: Order | null = null;
     let cardRpcError: Error | null = null;
+    let validatedAddress: ValidatedShippingAddress | null = null;
     try {
       const normalized = request.shippingAddress ? normalizeAddressInput(request.shippingAddress) : null;
-      const validatedAddress = normalized ? ShippingAddressSchema.parse(normalized) : null;
+      validatedAddress = normalized ? ShippingAddressSchema.parse(normalized) : null;
 
       const { data, error } = await supabase.rpc('process_checkout', {
         p_listing_id: request.listingId,
         p_buyer_id: request.buyerId ?? null,
         p_payment_method: 'card',
-        p_shipping_address: validatedAddress,
+        p_shipping_address: toSnakeCaseAddress(validatedAddress),
         p_offer_amount: request.offerAmount ?? null,
         p_delivery_notes: request.deliveryNotes?.trim() || null,
       });
@@ -251,9 +252,6 @@ export class StripePaymentProvider implements PaymentProvider {
     const mockPaymentIntent = backendOrder?.stripe_payment_intent || `pi_test_mock_${Date.now()}`;
     const mockOrderId = backendOrder?.id || `order_mock_${Date.now()}`;
 
-    const normalizedReqAddr = request.shippingAddress ? normalizeAddressInput(request.shippingAddress) : null;
-    const validatedReqAddr = normalizedReqAddr ? ShippingAddressSchema.parse(normalizedReqAddr) : null;
-
     const mockOrder: Order = backendOrder || {
       id: mockOrderId,
       listing_id: request.listingId,
@@ -267,18 +265,22 @@ export class StripePaymentProvider implements PaymentProvider {
       offer_message_id: null,
       payment_method: 'card',
       status: 'paid',
-      shipping_address: toSnakeCaseAddress(validatedReqAddr),
+      shipping_address: toSnakeCaseAddress(validatedAddress),
       delivery_notes: request.deliveryNotes ?? null,
       created_at: new Date().toISOString(),
     };
+
+    const isDemo = !backendOrder;
 
     capture('checkout_completed', {
       listing_id: request.listingId,
       payment_method: 'card',
       order_id: mockOrderId,
       amount_cents: amountCents,
-      demo_mode: true,
+      demo_mode: isDemo,
     });
+
+    const status = (backendOrder?.status as any) || 'paid';
 
     return {
       success: true,
@@ -287,8 +289,10 @@ export class StripePaymentProvider implements PaymentProvider {
       sessionId: mockSessionId,
       clientSecret: `${mockPaymentIntent}_secret_test`,
       paymentMethod: 'card',
-      status: 'paid',
-      message: 'Demo Card payment processed successfully',
+      status,
+      message: isDemo
+        ? 'Demo Card payment processed successfully'
+        : 'Card payment processed successfully',
     };
   }
 

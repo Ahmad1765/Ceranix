@@ -327,7 +327,7 @@ function ProfileScreenInner() {
   );
 
   const websiteLink =
-    (profile as any).website || (profile.username ? `ceranix.com/@${profile.username}` : null);
+    (profile as any).website || (profile.username ? `${APP_URL}/user/${profile.id}` : null);
 
   return (
     <SafeContainer edges={['top', 'left', 'right']} backgroundColor={colors.background} style={{ flex: 1 }}>

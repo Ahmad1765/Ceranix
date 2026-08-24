@@ -36,14 +36,12 @@ declare
   v_order public.orders;
   v_order_status text;
   v_offer_message_id uuid := null;
+  v_accepted_offer_amount numeric := null;
   v_session_id text;
   v_payment_intent text;
 begin
-  -- 1. Verify caller
+  -- 1. Verify caller exclusively from auth.uid()
   v_caller_id := auth.uid();
-  if v_caller_id is null and p_buyer_id is not null then
-    v_caller_id := p_buyer_id;
-  end if;
 
   if v_caller_id is null then
     raise exception 'Authentication required' using errcode = '42501';
@@ -83,8 +81,8 @@ begin
 
   -- 4. Calculate item price (check accepted offer if hint provided)
   if p_offer_amount is not null and p_offer_amount > 0 then
-    select m.id
-      into v_offer_message_id
+    select m.id, (m.metadata->>'amount')::numeric
+      into v_offer_message_id, v_accepted_offer_amount
       from public.messages m
       join public.conversations c on c.id = m.conversation_id
      where c.listing_id = p_listing_id
@@ -94,7 +92,12 @@ begin
      order by m.updated_at desc
      limit 1;
 
-    v_item_price_cents := round(p_offer_amount * 100)::integer;
+    if v_offer_message_id is not null and v_accepted_offer_amount is not null and v_accepted_offer_amount = p_offer_amount then
+      v_item_price_cents := round(p_offer_amount * 100)::integer;
+    else
+      v_offer_message_id := null;
+      v_item_price_cents := round(v_listing.price * 100)::integer;
+    end if;
   else
     v_item_price_cents := round(v_listing.price * 100)::integer;
   end if;
@@ -234,7 +237,12 @@ begin
 end;
 $$;
 
--- Grant execution to authenticated and anon users
-grant execute on function public.process_checkout to authenticated;
-grant execute on function public.create_cod_order to authenticated;
-grant execute on function public.complete_cod_order to authenticated;
+-- Revoke default public execution
+revoke execute on function public.process_checkout(uuid, uuid, text, jsonb, numeric, text) from public, anon;
+revoke execute on function public.create_cod_order(uuid, jsonb, text, numeric) from public, anon;
+revoke execute on function public.complete_cod_order(uuid) from public, anon;
+
+-- Grant execution exclusively to authenticated users
+grant execute on function public.process_checkout(uuid, uuid, text, jsonb, numeric, text) to authenticated;
+grant execute on function public.create_cod_order(uuid, jsonb, text, numeric) to authenticated;
+grant execute on function public.complete_cod_order(uuid) to authenticated;

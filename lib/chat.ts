@@ -16,7 +16,14 @@ export interface ChatMessage {
   sender_id: string;
   content: string;
   kind: MessageKind;
-  metadata: { amount?: number; currency?: string; note?: string } | null;
+  metadata: {
+    amount?: number;
+    currency?: string;
+    note?: string;
+    order_status?: string;
+    payment_status?: string;
+    paid?: boolean;
+  } | null;
   offer_status: OfferStatus | null;
   created_at: string;
   updated_at?: string;
