@@ -4,17 +4,15 @@ import {
   View,
   FlatList,
   Keyboard,
-  KeyboardAvoidingView,
   Platform,
   Pressable,
   ActivityIndicator,
-  Modal,
   Alert,
   StyleSheet,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
-import { Text, TextInput } from '@/lib/rnText';
+import { Text } from '@/lib/rnText';
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, router } from 'expo-router';
 import { safeBack } from '@/lib/nav';
@@ -42,10 +40,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { qk } from '@/lib/queries';
 import { useToast } from '@/lib/toast';
 import { captureError } from '@/lib/sentry';
-import { colors, radii, shadow, type as typography } from '@/lib/theme';
+import { colors, radii, type as typography } from '@/lib/theme';
 import { formatPrice } from '@/lib/currency';
 import { buyerProtectionFee } from '@/lib/fees';
-import { Button, EmptyState, SafeContainer, ThumbButton } from '@/components/ui';
+import { EmptyState, SafeContainer, ThumbButton } from '@/components/ui';
 import { explainCoverage } from '@/components/SafetyBanner';
 import { reportListing, REPORT_REASONS } from '@/lib/reports';
 import { confirm } from '@/lib/confirm';
@@ -53,6 +51,7 @@ import { blockUser, unblockUser, isUserBlocked, BLOCK_REASONS } from '@/lib/bloc
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { withTimeout } from '@/lib/async';
 import { maybeSoftAskForPush } from '@/lib/notifications';
+import { OfferSheet } from '@/components/product/OfferSheet';
 import {
   buildThreadRows,
   ChatActionSheet,
@@ -91,351 +90,6 @@ function useKeyboardVisible(): boolean {
     };
   }, []);
   return visible;
-}
-
-function OfferSheet({
-  visible,
-  listingPrice,
-  onClose,
-  onSubmit,
-}: {
-  visible: boolean;
-  listingPrice: number | null;
-  onClose: () => void;
-  onSubmit: (amount: number, note: string) => Promise<void>;
-}) {
-  const [amount, setAmount] = useState('');
-  const [note, setNote] = useState('');
-  const [sending, setSending] = useState(false);
-  const [focusedInput, setFocusedInput] = useState<'amount' | 'note' | null>(null);
-
-  useEffect(() => {
-    if (!visible) {
-      setAmount('');
-      setNote('');
-      setSending(false);
-      setFocusedInput(null);
-    }
-  }, [visible]);
-
-  const suggestions = useMemo(() => {
-    if (!listingPrice) return [];
-    return [
-      { label: '10% off', pct: 10, amount: Math.round(listingPrice * 0.9) },
-      { label: '15% off', pct: 15, amount: Math.round(listingPrice * 0.85) },
-      { label: '20% off', pct: 20, amount: Math.round(listingPrice * 0.8) },
-    ].filter((v) => v.amount > 0);
-  }, [listingPrice]);
-
-  const parsed = parseInt(amount, 10);
-  const valid = Number.isFinite(parsed) && parsed > 0;
-
-  const diff = listingPrice && valid ? listingPrice - parsed : 0;
-  const savePct = listingPrice && valid ? Math.round((diff / listingPrice) * 100) : 0;
-
-  const handleSubmit = async () => {
-    if (!valid) return;
-    setSending(true);
-    try {
-      await onSubmit(parsed, note);
-    } catch (e) {
-      console.warn('[OfferSheet] submit failed', e);
-    }
-    setSending(false);
-  };
-
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
-      <Pressable
-        onPress={onClose}
-        style={{
-          flex: 1,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          justifyContent: 'flex-end',
-        }}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={{ width: '100%', maxWidth: 520, alignSelf: 'center' }}
-        >
-          <Pressable
-            onPress={(e) => e.stopPropagation()}
-            style={{
-              backgroundColor: colors.surface,
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
-              borderTopWidth: 1,
-              borderColor: colors.border,
-              paddingHorizontal: 22,
-              paddingTop: 14,
-              paddingBottom: Platform.OS === 'ios' ? 38 : 28,
-              ...shadow.lg,
-            }}
-          >
-            {/* Handle bar */}
-            <View
-              style={{
-                width: 36,
-                height: 4,
-                borderRadius: 2,
-                backgroundColor: colors.border,
-                alignSelf: 'center',
-                marginBottom: 16,
-              }}
-            />
-
-            {/* Header */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: 14,
-              }}
-            >
-              <View>
-                <Text style={{ fontSize: 19, fontFamily: typography.family.sansBold, color: colors.ink }}>
-                  Make an Offer
-                </Text>
-                <Text style={{ fontSize: 12.5, color: colors.muteSoft, marginTop: 2 }}>
-                  Direct binding offer to the seller
-                </Text>
-              </View>
-              <Pressable
-                onPress={onClose}
-                hitSlop={HIT_SLOP_8}
-                accessibilityRole="button"
-                accessibilityLabel="Close offer sheet"
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 16,
-                  backgroundColor: colors.panel,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Feather name="x" size={18} color={colors.ink} />
-              </Pressable>
-            </View>
-
-            {/* Asking Price Banner */}
-            {listingPrice ? (
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  backgroundColor: colors.panel,
-                  borderRadius: radii.md,
-                  paddingHorizontal: 14,
-                  paddingVertical: 9,
-                  marginBottom: 14,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                }}
-              >
-                <Text style={{ fontSize: 13, color: colors.mute, fontFamily: typography.family.sansSemibold }}>
-                  Original asking price
-                </Text>
-                <Text style={{ fontSize: 14, fontFamily: typography.family.sansBold, color: colors.ink }}>
-                  {formatPrice(listingPrice)}
-                </Text>
-              </View>
-            ) : null}
-
-            {/* Preset discount chips */}
-            {suggestions.length > 0 ? (
-              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
-                {suggestions.map((s) => {
-                  const isSelected = amount === String(s.amount);
-                  return (
-                    <Pressable
-                      key={s.amount}
-                      onPress={() => setAmount(String(s.amount))}
-                      style={{
-                        flex: 1,
-                        paddingVertical: 10,
-                        paddingHorizontal: 6,
-                        borderRadius: radii.md,
-                        backgroundColor: isSelected ? colors.purpleSoft : colors.panel,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderWidth: 1.5,
-                        borderColor: isSelected ? colors.purple : colors.border,
-                        ...shadow.sm,
-                      }}
-                    >
-                      <View
-                        style={{
-                          backgroundColor: isSelected ? colors.purple : 'rgba(108,71,255,0.08)',
-                          paddingHorizontal: 6,
-                          paddingVertical: 1.5,
-                          borderRadius: radii.pill,
-                          marginBottom: 4,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontSize: 10,
-                            fontFamily: typography.family.sansBold,
-                            color: isSelected ? '#FFFFFF' : colors.purple,
-                            textTransform: 'uppercase',
-                          }}
-                        >
-                          {s.label}
-                        </Text>
-                      </View>
-                      <Text
-                        style={{
-                          fontSize: 13.5,
-                          fontFamily: typography.family.sansBold,
-                          color: isSelected ? colors.purple : colors.ink,
-                        }}
-                      >
-                        {formatPrice(s.amount)}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ) : null}
-
-            {/* Custom Amount Input */}
-            <View style={{ marginBottom: 12 }}>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: colors.panel,
-                  borderRadius: radii.md,
-                  borderWidth: 1.5,
-                  borderColor: focusedInput === 'amount' ? colors.purple : colors.hairline,
-                  paddingHorizontal: 14,
-                }}
-              >
-                <Feather
-                  name="tag"
-                  size={16}
-                  color={focusedInput === 'amount' ? colors.purple : colors.muteSoft}
-                  style={{ marginRight: 8 }}
-                />
-                <TextInput
-                  value={amount}
-                  onChangeText={setAmount}
-                  onFocus={() => setFocusedInput('amount')}
-                  onBlur={() => setFocusedInput(null)}
-                  placeholder="Enter custom offer amount"
-                  keyboardType="numeric"
-                  style={{
-                    flex: 1,
-                    fontSize: 16,
-                    fontFamily: typography.family.sansBold,
-                    color: colors.ink,
-                    paddingVertical: 12,
-                  }}
-                  placeholderTextColor={colors.muteSoft}
-                />
-                {valid && (
-                  <Pressable onPress={() => setAmount('')} hitSlop={6}>
-                    <Feather name="x-circle" size={16} color={colors.muteSoft} />
-                  </Pressable>
-                )}
-              </View>
-
-              {/* Dynamic Savings Helper Pill */}
-              {valid && listingPrice ? (
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 5,
-                    marginTop: 6,
-                    paddingHorizontal: 4,
-                  }}
-                >
-                  {diff > 0 ? (
-                    <>
-                      <Feather name="check" size={12} color="#059669" />
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          fontFamily: typography.family.sansSemibold,
-                          color: '#059669',
-                        }}
-                      >
-                        You save {formatPrice(diff)} ({savePct}% below asking)
-                      </Text>
-                    </>
-                  ) : diff === 0 ? (
-                    <Text style={{ fontSize: 12, color: colors.muteSoft }}>
-                      Matches full asking price
-                    </Text>
-                  ) : (
-                    <Text style={{ fontSize: 12, color: colors.purple }}>
-                      {formatPrice(Math.abs(diff))} above asking price
-                    </Text>
-                  )}
-                </View>
-              ) : null}
-            </View>
-
-            {/* Note Input */}
-            <View
-              style={{
-                backgroundColor: colors.panel,
-                borderRadius: radii.md,
-                borderWidth: 1.5,
-                borderColor: focusedInput === 'note' ? colors.purple : colors.hairline,
-                paddingHorizontal: 14,
-                paddingVertical: 10,
-                marginBottom: 16,
-              }}
-            >
-              <TextInput
-                value={note}
-                onChangeText={setNote}
-                onFocus={() => setFocusedInput('note')}
-                onBlur={() => setFocusedInput(null)}
-                placeholder="Add a message for the seller (optional)"
-                multiline
-                style={{
-                  fontSize: 13.5,
-                  fontFamily: typography.family.sans,
-                  color: colors.ink,
-                  minHeight: 52,
-                  textAlignVertical: 'top',
-                }}
-                placeholderTextColor={colors.muteSoft}
-              />
-            </View>
-
-            {/* Submit Button */}
-            <Button
-              label={
-                sending
-                  ? 'Sending offer…'
-                  : valid
-                  ? `Send Offer · ${formatPrice(parsed)}`
-                  : 'Enter offer amount'
-              }
-              variant="primary"
-              size="lg"
-              full
-              disabled={!valid || sending}
-              loading={sending}
-              onPress={handleSubmit}
-            />
-          </Pressable>
-        </KeyboardAvoidingView>
-      </Pressable>
-    </Modal>
-  );
 }
 
 export default function ConversationScreen() {
@@ -1253,9 +907,13 @@ export default function ConversationScreen() {
 
       <OfferSheet
         visible={offerVisible}
-        listingPrice={conv.listing?.price ?? null}
+        askingPrice={conv.listing?.price ?? null}
+        title={conv.listing?.title ?? null}
+        imageUrl={listingThumb ?? null}
         onClose={() => setOfferVisible(false)}
-        onSubmit={handleSendOffer}
+        onSubmit={async (amount: number) => {
+          await handleSendOffer(amount, '');
+        }}
       />
     </SafeContainer>
   );

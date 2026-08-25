@@ -1,22 +1,37 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { View, KeyboardAvoidingView, Platform, Pressable, ScrollView, ActivityIndicator, Alert, useWindowDimensions } from 'react-native';
+import {
+  View,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  ActivityIndicator,
+  Alert,
+  useWindowDimensions,
+  StyleSheet,
+} from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
 import { useLocalSearchParams, router } from 'expo-router';
 import { safeBack } from '@/lib/nav';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
 import { Image } from 'expo-image';
+import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/lib/auth';
 import { useListingQuery } from '@/lib/queries';
 import { getOrCreateConversation, sendMessage, sendOffer } from '@/lib/chat';
 import { getOptimizedImageUrl } from '@/lib/images';
-import { formatPrice, CURRENCY_SYMBOL } from '@/lib/currency';
+import { formatPrice } from '@/lib/currency';
+import { orderTotal } from '@/lib/fees';
 import { useToast } from '@/lib/toast';
 import { captureError } from '@/lib/sentry';
-import { colors, radii, shadow } from '@/lib/theme';
+import { colors, radii, type } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { BRAND } from '@/lib/brand';
 
 type Mode = 'message' | 'offer';
+
+const TEAL_BRAND = '#007782';
 
 const QUICK_REPLIES = [
   'Hi! Is this still available?',
@@ -30,7 +45,7 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
     <Text
       style={{
         fontSize: 11,
-        fontWeight: '700',
+        fontFamily: type.family.sansBold,
         letterSpacing: 1.2,
         textTransform: 'uppercase',
         marginBottom: 10,
@@ -43,10 +58,12 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
 }
 
 export default function NewConversationScreen() {
+  const { theme, isDark } = useTheme();
   const params = useLocalSearchParams<{ listing?: string; mode?: string; amount?: string }>();
   const listingId = typeof params.listing === 'string' ? params.listing : '';
   const initialMode: Mode = params.mode === 'offer' ? 'offer' : 'message';
-  const initialAmount = typeof params.amount === 'string' ? params.amount : '';
+  const initialAmountRaw = typeof params.amount === 'string' ? params.amount : '';
+  const initialAmount = initialAmountRaw ? String(parseFloat(initialAmountRaw) || '') : '';
 
   const { user } = useAuth();
   const toast = useToast();
@@ -54,9 +71,6 @@ export default function NewConversationScreen() {
   const { width: winWidth, height: winHeight } = useWindowDimensions();
   const compact = winHeight < 700 || winWidth < 360;
 
-  // The item being messaged/offered on. Shared cache with the product screen the
-  // buyer just came from, so the compose sheet opens on a populated hero rather
-  // than a spinner.
   const listingQ = useListingQuery(listingId || null);
   const listing = listingQ.data ?? null;
   const [mode, setMode] = useState<Mode>(initialMode);
@@ -64,70 +78,70 @@ export default function NewConversationScreen() {
   const [amount, setAmount] = useState(initialAmount);
   const [note, setNote] = useState('');
   const [sending, setSending] = useState(false);
-  const [hasToggled, setHasToggled] = useState(false);
+  const [selectedCard, setSelectedCard] = useState<'tier10' | 'tier20' | 'custom'>('custom');
 
-  const messageRef = useRef<TextInput>(null);
-  const amountRef = useRef<TextInput>(null);
+  const messageRef = useRef<any>(null);
+  const amountRef = useRef<any>(null);
 
-  // Focus the active field on first mount without triggering the
-  // browser's scrollIntoView (which on react-native-web shifts the
-  // page horizontally and clips the hero on the left edge).
+  // Preset tiers: 10% and 20%
+  const preset10 = useMemo(() => {
+    if (!listing || listing.price <= 0) return 0;
+    return Math.max(1, Math.round(listing.price * 0.9));
+  }, [listing]);
+
+  const preset20 = useMemo(() => {
+    if (!listing || listing.price <= 0) return 0;
+    return Math.max(1, Math.round(listing.price * 0.8));
+  }, [listing]);
+
   useEffect(() => {
-    if (hasToggled) return;
-    const target = initialMode === 'offer' ? amountRef.current : messageRef.current;
-    if (!target) return;
-    const id = requestAnimationFrame(() => {
-      try {
-        (target as any).focus({ preventScroll: true });
-      } catch {
-        target.focus();
-      }
-    });
-    return () => cancelAnimationFrame(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (listing && listing.price > 0 && !amount) {
+      setAmount(String(preset20 || Math.round(listing.price * 0.8)));
+      setSelectedCard('custom');
+    }
+  }, [listing, preset20]);
 
-  // Keep reporting a failed listing load to Sentry. React Query owns the retry
-  // and the UI state now, but it does not report anywhere, and this screen sits
-  // in the offer path — a silent failure here is a buyer who can't make an
-  // offer and nobody knowing about it. Fires once per settled error, not once
-  // per attempt, since `error` is only populated after the retries are spent.
+  const handleSelectCard = (card: 'tier10' | 'tier20' | 'custom') => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
+    setSelectedCard(card);
+
+    if (card === 'tier10') {
+      setAmount(String(preset10));
+      amountRef.current?.blur?.();
+    } else if (card === 'tier20') {
+      setAmount(String(preset20));
+      amountRef.current?.blur?.();
+    } else if (card === 'custom') {
+      amountRef.current?.focus?.();
+    }
+  };
+
+  const handleCustomChange = (text: string) => {
+    const clean = text.replace(/[^0-9.]/g, '');
+    setSelectedCard('custom');
+    setAmount(clean);
+  };
+
   const loadError = listingQ.error;
   useEffect(() => {
     if (loadError) captureError(loadError, { fn: 'conversationNew.fetchListing' });
   }, [loadError]);
 
-  const offerSuggestions = useMemo(() => {
-    if (!listing || listing.price <= 0) return [];
-    // Money snap: round suggestions down to a tier that reads naturally for
-    // the price band. Avoids ugly $13.30 / $55.30 numbers and prevents
-    // -10% on a $5 item from rounding back up to the list price.
-    const step =
-      listing.price <= 20 ? 1 :
-      listing.price <= 100 ? 5 :
-      listing.price <= 500 ? 10 :
-      25;
-    const snap = (n: number) => Math.max(step, Math.floor(n / step) * step);
-
-    const snapped = [0.3, 0.2, 0.1]
-      .map((off) => snap(listing.price * (1 - off)))
-      .filter((v) => v > 0 && v < listing.price);
-    const unique = Array.from(new Set(snapped));
-
-    return unique.map((value) => ({
-      value,
-      label: `-${Math.round(((listing.price - value) / listing.price) * 100)}%`,
-    }));
-  }, [listing]);
-
-  const amountNum = parseInt(amount, 10);
-  const offerValid = mode === 'offer' && Number.isFinite(amountNum) && amountNum > 0;
+  const amountNum = parseFloat(amount) || 0;
+  const offerValid = mode === 'offer' && Number.isFinite(amountNum) && amountNum > 0 && (!listing || amountNum < listing.price);
   const msgValid = mode === 'message' && message.trim().length > 0;
   const canSend = (offerValid || msgValid) && !sending;
 
+  const totalWithProtection = useMemo(() => {
+    if (amountNum <= 0) return 0;
+    return orderTotal(amountNum);
+  }, [amountNum]);
+
   const handleSend = async () => {
     if (!user) {
-      Alert.alert('Sign in required', 'Please sign in to send messages.');
+      Alert.alert('Sign in required', 'Please sign in to send messages or offers.');
       return;
     }
     if (!listing) return;
@@ -183,16 +197,21 @@ export default function NewConversationScreen() {
     }
   };
 
-  // Still in flight with nothing cached. A missing listing param disables the
-  // query, so it falls straight through to "Listing unavailable" below — what
-  // the old `if (!listingId) setLoading(false)` produced.
+  const handleLearnWhy = () => {
+    Alert.alert(
+      'Daily Offer Limit',
+      'To prevent spam and keep negotiations active and meaningful for sellers, buyers are limited to 25 offers per day.',
+      [{ text: 'Got it' }]
+    );
+  };
+
   if (!listing && listingId && listingQ.isPending) {
     return (
       <SafeAreaView
         edges={['top']}
         style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}
       >
-        <ActivityIndicator color={colors.purple} />
+        <ActivityIndicator color={TEAL_BRAND} />
       </SafeAreaView>
     );
   }
@@ -219,7 +238,7 @@ export default function NewConversationScreen() {
           >
             <Feather name="alert-circle" size={24} color={colors.mute} />
           </View>
-          <Text style={{ fontSize: 18, fontWeight: '700', color: colors.ink }}>
+          <Text style={{ fontSize: 18, fontFamily: type.family.sansBold, color: colors.ink }}>
             Listing unavailable
           </Text>
           <Text
@@ -232,45 +251,56 @@ export default function NewConversationScreen() {
     );
   }
 
-  const sellerName = listing.seller?.full_name || listing.seller?.username || 'Seller';
-  const sellerAvatar = listing.seller?.avatar_url
-    ? getOptimizedImageUrl(listing.seller.avatar_url, { width: 120 })
-    : null;
   const thumb = listing.images?.[0] ? getOptimizedImageUrl(listing.images[0], { width: 240 }) : null;
-  const sellerInitial = sellerName.trim().charAt(0).toUpperCase();
-
-  const ctaBottomPad = Math.max(insets.bottom, 12) + 12;
-  const ctaTotalHeight = 58 + 12 + ctaBottomPad;
-
-  const heroTitle = mode === 'offer' ? 'Make an offer' : 'Send a message';
-  const heroSub =
-    mode === 'offer'
-      ? 'Sellers respond faster to fair, friendly offers.'
-      : 'Ask a quick question — sellers usually reply within a day.';
 
   return (
     <SafeAreaView
       edges={['top']}
-      style={{ flex: 1, backgroundColor: colors.background, overflow: 'hidden' }}
+      style={{ flex: 1, backgroundColor: isDark ? theme.background : '#FFFFFF', overflow: 'hidden' }}
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
       >
-        {/* Header */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12 }}>
+        {/* Top Header */}
+        <View
+          style={[
+            styles.headerBar,
+            { borderBottomColor: isDark ? theme.hairline : '#E5E7EB' },
+          ]}
+        >
           <Pressable
             onPress={() => safeBack()}
-            hitSlop={12}
-            style={({ pressed }) => ({ opacity: pressed ? 0.55 : 1 })}
+            hitSlop={{ top: 12, bottom: 12, left: 16, right: 16 }}
+            style={styles.closeButton}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
           >
-            <Feather name="x" size={24} color={colors.ink} />
+            <Text style={[styles.closeText, { color: isDark ? theme.ink : '#15191A' }]}>Close</Text>
           </Pressable>
-          <Text style={{ fontSize: 14, fontWeight: '700', color: colors.ink }}>
-            {mode === 'offer' ? 'Offer' : 'Message'}
+
+          <Text
+            style={[
+              styles.headerTitle,
+              { color: isDark ? theme.ink : '#15191A', fontFamily: type.family.sansBold },
+            ]}
+          >
+            {mode === 'offer' ? 'Make an offer' : 'Send a message'}
           </Text>
-          <View style={{ width: 24 }} />
+
+          {mode === 'message' ? (
+            <Pressable
+              onPress={() => setMode('offer')}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              style={styles.modeSwitchBtn}
+            >
+              <Text style={[styles.modeSwitchText, { color: TEAL_BRAND, fontFamily: type.family.sansMedium }]}>
+                Offer
+              </Text>
+            </Pressable>
+          ) : (
+            <View style={styles.headerSpacer} />
+          )}
         </View>
 
         <ScrollView
@@ -278,198 +308,234 @@ export default function NewConversationScreen() {
           keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
-            paddingHorizontal: 20,
-            paddingBottom: ctaTotalHeight + 24,
+            paddingHorizontal: 16,
+            paddingTop: 14,
+            paddingBottom: Math.max(insets.bottom, 24) + 80,
           }}
         >
-          {/* Hero */}
-          <Text
-            style={{
-              fontSize: 30,
-              fontWeight: '800',
-              letterSpacing: -0.6,
-              lineHeight: 36,
-              marginTop: 6,
-              color: colors.ink,
-            }}
-          >
-            {heroTitle}
-          </Text>
-          <Text
-            style={{ fontSize: 15, lineHeight: 22, marginTop: 8, maxWidth: 320, color: colors.mute }}
-          >
-            {heroSub}
-          </Text>
+          {/* Item Card Row */}
+          <View style={styles.itemRow}>
+            {thumb ? (
+              <Image
+                source={{ uri: thumb }}
+                style={styles.itemImage}
+                contentFit="cover"
+                transition={150}
+              />
+            ) : (
+              <View style={[styles.itemImagePlaceholder, { backgroundColor: isDark ? theme.panel : '#F3F4F6' }]}>
+                <Feather name="tag" size={22} color={theme.mute} />
+              </View>
+            )}
 
-          {/* Listing + seller card */}
-          <View
-            style={{
-              borderRadius: 18,
-              padding: 14,
-              marginTop: 22,
-              backgroundColor: colors.surface,
-              borderWidth: 1,
-              borderColor: colors.border,
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <View
-                style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: 14,
-                  overflow: 'hidden',
-                  marginRight: 12,
-                  backgroundColor: colors.panel,
-                }}
-              >
-                {thumb && (
-                  <Image
-                    source={{ uri: thumb }}
-                    style={{ width: '100%', height: '100%' }}
-                    contentFit="cover"
-                  />
-                )}
-              </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text
-                  style={{ fontSize: 15, fontWeight: '700', color: colors.ink }}
-                  numberOfLines={1}
-                >
-                  {listing.title}
-                </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 4 }}>
-                  <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink }}>
-                    {formatPrice(listing.price)}
-                  </Text>
-                  {listing.size ? (
-                    <Text
-                      style={{ fontSize: 12, fontWeight: '600', marginLeft: 8, color: colors.mute }}
-                    >
-                      Size {listing.size}
-                    </Text>
-                  ) : null}
-                </View>
-              </View>
-            </View>
-
-            <View
-              style={{
-                marginTop: 14,
-                paddingTop: 12,
-                flexDirection: 'row',
-                alignItems: 'center',
-                borderTopWidth: 1,
-                borderTopColor: colors.border,
-              }}
-            >
-              <Text style={{ fontSize: 12, fontWeight: '600', marginRight: 10, color: colors.mute }}>
-                To
-              </Text>
-              <View
-                style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: 12,
-                  overflow: 'hidden',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: 8,
-                  backgroundColor: colors.purpleSoft,
-                }}
-              >
-                {sellerAvatar ? (
-                  <Image
-                    source={{ uri: sellerAvatar }}
-                    style={{ width: '100%', height: '100%' }}
-                    contentFit="cover"
-                  />
-                ) : (
-                  <Text style={{ fontSize: 11, fontWeight: '800', color: colors.purple }}>
-                    {sellerInitial}
-                  </Text>
-                )}
-              </View>
+            <View style={styles.itemDetails}>
               <Text
-                style={{ fontSize: 13, fontWeight: '700', flex: 1, color: colors.ink }}
                 numberOfLines={1}
+                style={[
+                  styles.itemTitle,
+                  { color: isDark ? theme.ink : '#15191A', fontFamily: type.family.sansBold },
+                ]}
               >
-                {sellerName}
+                {listing.title}
+              </Text>
+              <Text style={[styles.itemPrice, { color: isDark ? theme.mute : '#5A6566' }]}>
+                Item price: {formatPrice(listing.price)}
               </Text>
             </View>
           </View>
 
-          {/* Mode segmented */}
-          <View style={{ marginTop: 26 }}>
-            <Eyebrow>What would you like to send?</Eyebrow>
-            <View
-              style={{
-                padding: 4,
-                borderRadius: 14,
-                flexDirection: 'row',
-                backgroundColor: colors.surface,
-                borderWidth: 1,
-                borderColor: colors.border,
-              }}
-            >
-              {(['message', 'offer'] as Mode[]).map((m) => {
-                const active = mode === m;
-                return (
-                  <Pressable
-                    key={m}
-                    onPress={() => {
-                      setMode(m);
-                      setHasToggled(true);
-                    }}
-                    style={({ pressed }) => ({
-                      flex: 1,
-                      paddingVertical: 11,
-                      borderRadius: 10,
-                      backgroundColor: active ? colors.panel : 'transparent',
-                      borderWidth: active ? 1 : 0,
-                      borderColor: active ? colors.border : 'transparent',
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 6,
-                      transform: [{ scale: pressed ? 0.98 : 1 }],
-                    })}
-                  >
-                    <Feather
-                      name={m === 'message' ? 'message-circle' : 'tag'}
-                      size={14}
-                      color={active ? colors.ink : colors.mute}
-                    />
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        fontWeight: active ? '700' : '500',
-                        color: active ? colors.ink : colors.mute,
-                      }}
-                    >
-                      {m === 'message' ? 'Message' : 'Offer'}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-
-          {/* Mode-specific content */}
-          {mode === 'message' ? (
+          {mode === 'offer' ? (
             <>
-              {/* Message field */}
-              <View style={{ marginTop: 28 }}>
+              {/* 3 Preset Tier Cards */}
+              <View style={styles.cardsRow}>
+                {/* 10% off card */}
+                <Pressable
+                  onPress={() => handleSelectCard('tier10')}
+                  style={[
+                    styles.presetCard,
+                    {
+                      backgroundColor: isDark ? theme.panel : '#FFFFFF',
+                      borderColor: selectedCard === 'tier10' ? TEAL_BRAND : isDark ? theme.border : '#E5E7EB',
+                      borderWidth: selectedCard === 'tier10' ? 2 : 1,
+                    },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`10% off: ${formatPrice(preset10)}`}
+                >
+                  <Text
+                    style={[
+                      styles.cardTopText,
+                      { color: isDark ? theme.ink : '#15191A', fontFamily: type.family.sansBold },
+                    ]}
+                  >
+                    {formatPrice(preset10)}
+                  </Text>
+                  <Text style={[styles.cardBottomText, { color: TEAL_BRAND, fontFamily: type.family.sansMedium }]}>
+                    10% off
+                  </Text>
+                </Pressable>
+
+                {/* 20% off card */}
+                <Pressable
+                  onPress={() => handleSelectCard('tier20')}
+                  style={[
+                    styles.presetCard,
+                    {
+                      backgroundColor: isDark ? theme.panel : '#FFFFFF',
+                      borderColor: selectedCard === 'tier20' ? TEAL_BRAND : isDark ? theme.border : '#E5E7EB',
+                      borderWidth: selectedCard === 'tier20' ? 2 : 1,
+                    },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`20% off: ${formatPrice(preset20)}`}
+                >
+                  <Text
+                    style={[
+                      styles.cardTopText,
+                      { color: isDark ? theme.ink : '#15191A', fontFamily: type.family.sansBold },
+                    ]}
+                  >
+                    {formatPrice(preset20)}
+                  </Text>
+                  <Text style={[styles.cardBottomText, { color: TEAL_BRAND, fontFamily: type.family.sansMedium }]}>
+                    20% off
+                  </Text>
+                </Pressable>
+
+                {/* Custom card */}
+                <Pressable
+                  onPress={() => handleSelectCard('custom')}
+                  style={[
+                    styles.presetCard,
+                    {
+                      backgroundColor: isDark ? theme.panel : '#FFFFFF',
+                      borderColor: selectedCard === 'custom' ? TEAL_BRAND : isDark ? theme.border : '#E5E7EB',
+                      borderWidth: selectedCard === 'custom' ? 2 : 1,
+                    },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Custom set a price"
+                >
+                  <Text
+                    style={[
+                      styles.cardTopText,
+                      { color: isDark ? theme.ink : '#15191A', fontFamily: type.family.sansBold },
+                    ]}
+                  >
+                    Custom
+                  </Text>
+                  <Text style={[styles.cardBottomText, { color: TEAL_BRAND, fontFamily: type.family.sansMedium }]}>
+                    Set a price
+                  </Text>
+                </Pressable>
+              </View>
+
+              {/* Input Section with underline */}
+              <Pressable
+                onPress={() => {
+                  setSelectedCard('custom');
+                  amountRef.current?.focus?.();
+                }}
+                style={styles.inputSection}
+              >
+                <View style={styles.displayRow}>
+                  <TextInput
+                    ref={amountRef}
+                    value={amount}
+                    onChangeText={handleCustomChange}
+                    placeholder="0"
+                    placeholderTextColor={isDark ? theme.mute : '#9CA3AF'}
+                    keyboardType="decimal-pad"
+                    returnKeyType="done"
+                    style={[
+                      styles.amountInput,
+                      {
+                        color: isDark ? theme.ink : '#15191A',
+                        fontFamily: type.family.sansBold,
+                      },
+                    ]}
+                  />
+                </View>
+
+                {/* Underline */}
+                <View
+                  style={[
+                    styles.underline,
+                    {
+                      backgroundColor:
+                        selectedCard === 'custom'
+                          ? TEAL_BRAND
+                          : isDark
+                          ? '#4B5563'
+                          : '#6B7280',
+                    },
+                  ]}
+                />
+
+                {/* Fee breakdown helper text */}
+                <Text style={[styles.feeHelperText, { color: isDark ? theme.mute : '#5A6566' }]}>
+                  {amountNum > 0
+                    ? `${formatPrice(totalWithProtection)} incl. Buyer Protection fee`
+                    : `incl. Buyer Protection fee`}
+                </Text>
+              </Pressable>
+
+              {/* Action Button: "Offer $15.00" */}
+              <View style={styles.actionButtonContainer}>
+                <Pressable
+                  onPress={handleSend}
+                  disabled={!offerValid || sending}
+                  style={({ pressed }) => [
+                    styles.actionButton,
+                    {
+                      backgroundColor: TEAL_BRAND,
+                      opacity: !offerValid || sending ? 0.5 : pressed ? 0.88 : 1,
+                    },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    amountNum > 0 ? `Offer ${formatPrice(amountNum)}` : 'Make an offer'
+                  }
+                >
+                  <Text
+                    style={[
+                      styles.actionButtonText,
+                      { fontFamily: type.family.sansBold },
+                    ]}
+                  >
+                    {sending
+                      ? 'Sending offer…'
+                      : amountNum > 0
+                      ? `Offer ${formatPrice(amountNum)}`
+                      : 'Make an offer'}
+                  </Text>
+                </Pressable>
+              </View>
+
+              {/* Subtext: "25 offers left for today. Learn why." */}
+              <View style={styles.limitRow}>
+                <Text style={[styles.limitText, { color: isDark ? theme.mute : '#5A6566' }]}>
+                  25 offers left for today.{' '}
+                </Text>
+                <Pressable onPress={handleLearnWhy} hitSlop={6}>
+                  <Text style={styles.learnWhyText}>Learn why.</Text>
+                </Pressable>
+              </View>
+            </>
+          ) : (
+            <>
+              {/* Message mode */}
+              <View style={{ marginTop: 16 }}>
                 <Eyebrow>Your message</Eyebrow>
                 <View
                   style={{
-                    borderRadius: 14,
+                    borderRadius: 12,
                     paddingHorizontal: 14,
                     paddingVertical: 12,
-                    minHeight: compact ? 120 : 150,
-                    backgroundColor: colors.surface,
+                    minHeight: compact ? 120 : 140,
+                    backgroundColor: isDark ? theme.panel : colors.surface,
                     borderWidth: 1,
-                    borderColor: colors.border,
+                    borderColor: isDark ? theme.border : colors.border,
                   }}
                 >
                   <TextInput
@@ -482,19 +548,16 @@ export default function NewConversationScreen() {
                     placeholderTextColor={colors.mute}
                     style={{
                       fontSize: 15,
-                      color: colors.ink,
+                      color: isDark ? theme.ink : colors.ink,
                       padding: 0,
-                      minHeight: compact ? 100 : 130,
-                      outlineStyle: 'none',
-                      outlineWidth: 0,
-                      borderWidth: 0,
-                    } as any}
+                      minHeight: compact ? 100 : 120,
+                    }}
                   />
                 </View>
               </View>
 
               {/* Quick replies */}
-              <View style={{ marginTop: 26 }}>
+              <View style={{ marginTop: 20 }}>
                 <Eyebrow>Quick replies</Eyebrow>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                   {QUICK_REPLIES.map((q) => {
@@ -508,16 +571,16 @@ export default function NewConversationScreen() {
                           paddingVertical: 9,
                           borderRadius: 999,
                           borderWidth: 1,
-                          borderColor: active ? colors.purple : colors.border,
-                          backgroundColor: active ? colors.purple : colors.surface,
+                          borderColor: active ? TEAL_BRAND : isDark ? theme.border : colors.border,
+                          backgroundColor: active ? TEAL_BRAND : isDark ? theme.panel : colors.surface,
                           transform: [{ scale: pressed ? 0.97 : 1 }],
                         })}
                       >
                         <Text
                           style={{
                             fontSize: 13,
-                            fontWeight: '600',
-                            color: active ? '#FFFFFF' : colors.ink,
+                            fontFamily: type.family.sansSemibold,
+                            color: active ? '#FFFFFF' : isDark ? theme.ink : colors.ink,
                           }}
                           numberOfLines={1}
                         >
@@ -528,250 +591,181 @@ export default function NewConversationScreen() {
                   })}
                 </View>
               </View>
-            </>
-          ) : (
-            <>
-              {/* Hero amount input */}
-              <View style={{ marginTop: 28 }}>
-                <Eyebrow>Your offer</Eyebrow>
-                <View
-                  style={{
-                    borderRadius: 14,
-                    paddingHorizontal: 16,
-                    paddingVertical: 16,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    backgroundColor: colors.surface,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                  }}
+
+              {/* Message Send Button */}
+              <View style={{ marginTop: 24 }}>
+                <Pressable
+                  onPress={handleSend}
+                  disabled={!msgValid || sending}
+                  style={({ pressed }) => [
+                    styles.actionButton,
+                    {
+                      backgroundColor: TEAL_BRAND,
+                      opacity: !msgValid || sending ? 0.5 : pressed ? 0.88 : 1,
+                    },
+                  ]}
                 >
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-                      <Text
-                        style={{ fontSize: 26, fontWeight: '800', marginRight: 6, color: colors.purple }}
-                      >
-                        {CURRENCY_SYMBOL}
-                      </Text>
-                      <TextInput
-                        ref={amountRef}
-                        placeholder="0"
-                        value={amount}
-                        onChangeText={(t) => setAmount(t.replace(/[^0-9]/g, ''))}
-                        keyboardType="number-pad"
-                        maxLength={7}
-                        placeholderTextColor={colors.mute}
-                        style={{
-                          fontSize: 32,
-                          fontWeight: '800',
-                          color: colors.ink,
-                          flex: 1,
-                          padding: 0,
-                          outlineStyle: 'none',
-                          outlineWidth: 0,
-                          borderWidth: 0,
-                        } as any}
-                      />
-                    </View>
-                    {offerValid && amountNum < listing.price ? (
-                      <Text style={{ fontSize: 12, marginTop: 4, color: colors.mute }}>
-                        {Math.round(((listing.price - amountNum) / listing.price) * 100)}% off the
-                        listed price
-                      </Text>
-                    ) : null}
-                  </View>
                   <Text
-                    style={{ fontSize: 12, fontWeight: '600', color: colors.mute }}
+                    style={[
+                      styles.actionButtonText,
+                      { fontFamily: type.family.sansBold },
+                    ]}
                   >
-                    USD
+                    {sending ? 'Sending message…' : 'Send message'}
                   </Text>
-                </View>
-
-                {/* Suggestions */}
-                {offerSuggestions.length > 0 && (
-                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-                    {offerSuggestions.map((s) => {
-                      const selected = amountNum === s.value;
-                      return (
-                        <Pressable
-                          key={s.value}
-                          onPress={() => setAmount(String(s.value))}
-                          style={({ pressed }) => ({
-                            flex: 1,
-                            paddingVertical: 12,
-                            borderRadius: 12,
-                            borderWidth: 1,
-                            borderColor: selected ? colors.purple : colors.border,
-                            backgroundColor: selected ? colors.purple : colors.surface,
-                            alignItems: 'center',
-                            transform: [{ scale: pressed ? 0.97 : 1 }],
-                          })}
-                        >
-                          <Text
-                            style={{
-                              fontSize: 10,
-                              fontWeight: '700',
-                              letterSpacing: 0.4,
-                              color: selected ? 'rgba(255,255,255,0.85)' : colors.mute,
-                            }}
-                          >
-                            {s.label}
-                          </Text>
-                          <Text
-                            style={{
-                              fontSize: 14,
-                              fontWeight: '800',
-                              color: selected ? '#FFFFFF' : colors.ink,
-                              marginTop: 2,
-                            }}
-                            numberOfLines={1}
-                          >
-                            {formatPrice(s.value)}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                )}
-              </View>
-
-              {/* Note */}
-              <View style={{ marginTop: 26 }}>
-                <Eyebrow>Add a note (optional)</Eyebrow>
-                <View
-                  style={{
-                    borderRadius: 14,
-                    paddingHorizontal: 14,
-                    paddingVertical: 12,
-                    minHeight: compact ? 70 : 90,
-                    backgroundColor: colors.surface,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                  }}
-                >
-                  <TextInput
-                    placeholder="Why does this offer make sense? Keep it friendly."
-                    value={note}
-                    onChangeText={setNote}
-                    multiline
-                    textAlignVertical="top"
-                    placeholderTextColor={colors.mute}
-                    style={{
-                      fontSize: 14,
-                      color: colors.ink,
-                      padding: 0,
-                      minHeight: compact ? 50 : 70,
-                      outlineStyle: 'none',
-                      outlineWidth: 0,
-                      borderWidth: 0,
-                    } as any}
-                  />
-                </View>
+                </Pressable>
               </View>
             </>
           )}
-
-          {/* Footer hint */}
-          <View
-            style={{
-              marginTop: 28,
-              padding: 14,
-              borderRadius: 14,
-              flexDirection: 'row',
-              alignItems: 'flex-start',
-              backgroundColor: colors.purpleSoft,
-            }}
-          >
-            <Feather
-              name="shield"
-              size={14}
-              color={colors.purple}
-              style={{ marginTop: 2, marginRight: 10 }}
-            />
-            <Text
-              style={{ fontSize: 12, lineHeight: 18, flex: 1, fontWeight: '500', color: colors.ink }}
-            >
-              Keep payments inside {BRAND} — off-platform deals aren&apos;t protected.
-            </Text>
-          </View>
         </ScrollView>
-
-        {/* Sticky CTA */}
-        <View
-          style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            bottom: 0,
-            paddingHorizontal: 20,
-            paddingTop: 12,
-            paddingBottom: ctaBottomPad,
-            backgroundColor: colors.surface,
-            borderTopWidth: 1,
-            borderTopColor: colors.border,
-          }}
-        >
-          <Pressable
-            onPress={handleSend}
-            disabled={!canSend}
-            style={({ pressed }) => ({
-              height: 54,
-              borderRadius: 16,
-              backgroundColor: canSend ? colors.purple : colors.panel,
-              borderWidth: canSend ? 0 : 1,
-              borderColor: colors.border,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              opacity: sending ? 0.7 : 1,
-              transform: [{ scale: pressed && canSend ? 0.985 : 1 }],
-              overflow: 'hidden',
-            })}
-          >
-            <View
-              style={{
-                position: 'absolute',
-                right: 0,
-                top: 0,
-                bottom: 0,
-                width: 54,
-                backgroundColor: canSend ? 'rgba(0,0,0,0.12)' : 'transparent',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              {sending ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Feather
-                  name={mode === 'offer' ? 'tag' : 'send'}
-                  size={18}
-                  color={canSend ? '#FFFFFF' : colors.mute}
-                />
-              )}
-            </View>
-            <Text
-              style={{
-                fontSize: 15,
-                fontWeight: '800',
-                color: canSend ? '#FFFFFF' : colors.mute,
-                letterSpacing: 0.2,
-                marginRight: 54,
-              }}
-            >
-              {sending
-                ? 'Sending…'
-                : mode === 'offer'
-                  ? offerValid
-                    ? `Send offer · ${formatPrice(amountNum)}`
-                    : 'Enter an amount'
-                  : msgValid
-                    ? 'Send message'
-                    : 'Type a message'}
-            </Text>
-          </Pressable>
-        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  headerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E5E7EB',
+  },
+  closeButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+    minWidth: 50,
+  },
+  closeText: {
+    fontSize: 16,
+    color: '#15191A',
+  },
+  headerTitle: {
+    fontSize: 17,
+    color: '#15191A',
+    textAlign: 'center',
+  },
+  headerSpacer: {
+    minWidth: 50,
+  },
+  modeSwitchBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+    minWidth: 50,
+    alignItems: 'flex-end',
+  },
+  modeSwitchText: {
+    fontSize: 15,
+  },
+  itemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  itemImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 6,
+    backgroundColor: '#F3F4F6',
+  },
+  itemImagePlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  itemDetails: {
+    flex: 1,
+    marginLeft: 12,
+    justifyContent: 'center',
+  },
+  itemTitle: {
+    fontSize: 16,
+    color: '#15191A',
+    marginBottom: 3,
+  },
+  itemPrice: {
+    fontSize: 14,
+    color: '#5A6566',
+  },
+  cardsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 20,
+  },
+  presetCard: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardTopText: {
+    fontSize: 15,
+    color: '#15191A',
+    marginBottom: 2,
+    textAlign: 'center',
+  },
+  cardBottomText: {
+    fontSize: 12.5,
+    textAlign: 'center',
+  },
+  inputSection: {
+    marginBottom: 20,
+  },
+  displayRow: {
+    paddingVertical: 2,
+  },
+  amountInput: {
+    fontSize: 24,
+    color: '#15191A',
+    padding: 0,
+    margin: 0,
+    height: 34,
+  },
+  underline: {
+    height: 1.5,
+    backgroundColor: '#6B7280',
+    marginTop: 4,
+    marginBottom: 6,
+    width: '100%',
+  },
+  feeHelperText: {
+    fontSize: 13,
+    color: '#5A6566',
+  },
+  actionButtonContainer: {
+    marginBottom: 12,
+  },
+  actionButton: {
+    height: 48,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  actionButtonText: {
+    fontSize: 16,
+    color: '#FFFFFF',
+  },
+  limitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 4,
+  },
+  limitText: {
+    fontSize: 13,
+    color: '#5A6566',
+  },
+  learnWhyText: {
+    fontSize: 13,
+    color: TEAL_BRAND,
+    textDecorationLine: 'underline',
+  },
+});

@@ -36,6 +36,7 @@ import type { FollowState } from '@/lib/follows';
 import { getOptimizedImageUrl } from '@/lib/images';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
+import { getOrCreateConversation, sendOffer } from '@/lib/chat';
 import { AnimatedNumber } from '@/components/AnimatedNumber';
 import { SaveListSheet } from '@/components/SaveListSheet';
 import { colors } from '@/lib/theme';
@@ -450,12 +451,40 @@ export default function ProductScreen() {
     return true;
   };
 
-  const submitOffer = (amount: number) => {
-    if (!listing) return;
-    router.push({
-      pathname: '/conversation/new',
-      params: { listing: listing.id, mode: 'offer', amount: amount.toFixed(2) },
-    } as any);
+  const [offerLoading, setOfferLoading] = useState(false);
+
+  const submitOffer = async (amount: number) => {
+    if (!listing || !user) return;
+    setOfferLoading(true);
+    try {
+      const conv = await getOrCreateConversation({
+        buyerId: user.id,
+        sellerId: listing.seller_id,
+        listingId: listing.id,
+      });
+      if (!conv) {
+        Alert.alert('Could not start chat', 'Please try again.');
+        return;
+      }
+      const saved = await sendOffer({
+        conversationId: conv.id,
+        senderId: user.id,
+        amount,
+      });
+      if (saved) {
+        setOfferVisible(false);
+        toast.show('Offer sent', { variant: 'success', icon: 'check' });
+        capture('offer_made', { listing_id: listing.id, amount });
+        router.push(`/conversation/${conv.id}` as any);
+      } else {
+        Alert.alert('Could not send offer', 'Please try again.');
+      }
+    } catch (e: any) {
+      captureError(e, { fn: 'product.submitOffer' });
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+    } finally {
+      setOfferLoading(false);
+    }
   };
 
   const shareListing = async () => {
@@ -1697,11 +1726,11 @@ export default function ProductScreen() {
       <OfferSheet
         visible={offerVisible}
         askingPrice={itemPrice}
+        title={listing?.title}
+        imageUrl={listing?.images?.[0] ?? (listing as any)?.image_url ?? null}
+        loading={offerLoading}
         onClose={() => setOfferVisible(false)}
-        onSubmit={(amount) => {
-          setOfferVisible(false);
-          submitOffer(amount);
-        }}
+        onSubmit={submitOffer}
       />
 
       {/* Buyer Protection breakdown — opens from the price row */}

@@ -1,319 +1,591 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   View,
+  Modal,
   Pressable,
   Platform,
   StyleSheet,
+  Alert,
+  KeyboardAvoidingView,
 } from 'react-native';
+import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
-import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
-import { ThumbButton } from '@/components/ui/ThumbButton';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, TextInput } from '@/lib/rnText';
-import { colors, radii, type } from '@/lib/theme';
+import { radii, type } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
-import { formatPrice, CURRENCY_SYMBOL } from '@/lib/currency';
+import { formatPrice } from '@/lib/currency';
+import { orderTotal } from '@/lib/fees';
+import { getOptimizedImageUrl } from '@/lib/images';
 
 export interface OfferSheetProps {
   visible: boolean;
-  askingPrice: number;
+  askingPrice?: number | null;
+  itemPrice?: number | null; // backward compatibility alias
+  title?: string | null;
+  imageUrl?: string | null;
   onClose: () => void;
-  onSubmit: (amount: number) => void;
+  onSubmit: (amount: number, note?: string) => Promise<void> | void;
   loading?: boolean;
+  offersLeftToday?: number;
 }
 
-const DISCOUNT_TIERS = [0.10, 0.15, 0.20] as const;
+const TEAL_BRAND = '#007782';
 
 /**
- * Mobile-First Quick Offer Bottom Sheet.
- * Displays smart discount calculation chips (-10%, -15%, -20%)
- * and an interactive numeric keypad for instant zero-navigation negotiation.
+ * Vinted-style "Make an offer" bottom sheet modal.
+ * Features 10% / 20% / Custom price cards, native numeric input,
+ * dynamic buyer protection fee calculations, primary action CTA, and daily limits.
  */
 export function OfferSheet({
   visible,
-  askingPrice = 0,
+  askingPrice: askingPriceProp,
+  itemPrice: itemPriceProp,
+  title,
+  imageUrl,
   onClose,
   onSubmit,
   loading = false,
+  offersLeftToday = 25,
 }: OfferSheetProps) {
+  const insets = useSafeAreaInsets();
   const { theme, isDark } = useTheme();
-  const [customAmount, setCustomAmount] = useState('');
-  const [selectedTier, setSelectedTier] = useState<number | null>(null);
+  const inputRef = useRef<any>(null);
 
-  // Compute preset discount offer amounts rounded to nearest whole dollar
-  const presets = useMemo(() => {
-    return DISCOUNT_TIERS.map((rate) => {
-      const discounted = Math.max(1, Math.round(askingPrice * (1 - rate)));
-      return {
-        percent: Math.round(rate * 100),
-        amount: discounted,
-      };
-    });
+  const rawPrice = askingPriceProp ?? itemPriceProp ?? 0;
+  const askingPrice = typeof rawPrice === 'number' && Number.isFinite(rawPrice) ? rawPrice : 0;
+
+  const [selectedCard, setSelectedCard] = useState<'tier10' | 'tier20' | 'custom'>('custom');
+  const [customAmount, setCustomAmount] = useState('15');
+  const [submitting, setSubmitting] = useState(false);
+
+  // Preset tiers: 10% off and 20% off
+  const preset10 = useMemo(() => {
+    if (askingPrice <= 0) return 0;
+    return Math.max(1, Math.round(askingPrice * 0.9));
   }, [askingPrice]);
 
-  const handleSelectTier = (tierIndex: number, amount: number) => {
+  const preset20 = useMemo(() => {
+    if (askingPrice <= 0) return 0;
+    return Math.max(1, Math.round(askingPrice * 0.8));
+  }, [askingPrice]);
+
+  // Reset or initialize state on open
+  useEffect(() => {
+    if (visible) {
+      if (askingPrice > 0) {
+        setCustomAmount(String(preset20 || Math.round(askingPrice * 0.8)));
+        setSelectedCard('custom');
+      } else {
+        setCustomAmount('');
+        setSelectedCard('custom');
+      }
+      setSubmitting(false);
+    }
+  }, [visible, askingPrice, preset20]);
+
+  const handleSelectCard = (card: 'tier10' | 'tier20' | 'custom') => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     }
-    setSelectedTier(tierIndex);
-    setCustomAmount(String(amount));
+    setSelectedCard(card);
+
+    if (card === 'tier10') {
+      setCustomAmount(String(preset10));
+      inputRef.current?.blur?.();
+    } else if (card === 'tier20') {
+      setCustomAmount(String(preset20));
+      inputRef.current?.blur?.();
+    } else if (card === 'custom') {
+      inputRef.current?.focus?.();
+    }
   };
 
   const handleCustomChange = (text: string) => {
-    const numericOnly = text.replace(/[^0-9]/g, '');
-    setCustomAmount(numericOnly);
-    setSelectedTier(null);
+    // Only allow digits and a single decimal point
+    const clean = text.replace(/[^0-9.]/g, '');
+    setSelectedCard('custom');
+    setCustomAmount(clean);
   };
 
-  const parsedAmount = parseInt(customAmount, 10) || 0;
-  const isValidOffer = parsedAmount > 0 && parsedAmount < askingPrice;
+  const parsedAmount = parseFloat(customAmount) || 0;
+  const isValidOffer = parsedAmount > 0 && (askingPrice <= 0 || parsedAmount < askingPrice);
 
-  const handleSubmit = () => {
-    if (!isValidOffer) return;
+  const totalWithProtection = useMemo(() => {
+    if (parsedAmount <= 0) return 0;
+    return orderTotal(parsedAmount);
+  }, [parsedAmount]);
+
+  const handleSubmit = async () => {
+    if (!isValidOffer || submitting || loading) return;
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     }
-    onSubmit(parsedAmount);
+
+    setSubmitting(true);
+    try {
+      await onSubmit(parsedAmount);
+    } catch (e) {
+      console.warn('[OfferSheet] submit failed', e);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  return (
-    <BottomSheetModal
-      visible={visible}
-      onClose={onClose}
-      title="Make an Offer"
-      subtitle="Direct binding offer to the seller"
-      snapHeightRatio={0.62}
-      scrollable
-      footer={
-        <View style={styles.footerInner}>
-          {parsedAmount >= askingPrice && parsedAmount > 0 && (
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-                marginBottom: 8,
-              }}
-            >
-              <Feather name="alert-circle" size={13} color={colors.danger} />
-              <Text style={{ fontSize: 12, color: colors.danger, fontFamily: type.family.sans }}>
-                Offers must be below the asking price ({formatPrice(askingPrice)})
-              </Text>
-            </View>
-          )}
-          <ThumbButton
-            label={
-              parsedAmount > 0
-                ? `Send Binding Offer · ${formatPrice(parsedAmount)}`
-                : 'Send Binding Offer'
-            }
-            variant="primary"
-            heightToken="48px"
-            disabled={!isValidOffer || loading}
-            loading={loading}
-            icon="tag"
-            onPress={handleSubmit}
-            accessibilityLabel="Send binding offer"
-          />
-        </View>
-      }
-    >
-      <View style={styles.content}>
-        {/* Asking Price Banner */}
-        <View style={[styles.askingRow, { backgroundColor: theme.panel }]}>
-          <Text style={[styles.askingLabel, { color: theme.mute }]}>Listed asking price</Text>
-          <Text style={[styles.askingValue, { color: theme.ink, fontFamily: type.family.sansBold }]}>
-            {formatPrice(askingPrice)}
-          </Text>
-        </View>
+  const handleLearnWhy = () => {
+    Alert.alert(
+      'Daily Offer Limit',
+      'To prevent spam and keep negotiations active and meaningful for sellers, buyers are limited to 25 offers per day.',
+      [{ text: 'Got it' }]
+    );
+  };
 
-        {/* 1-Tap Smart Offer Preset Chips */}
-        <View style={styles.presetsRow}>
-          {presets.map((tier, idx) => {
-            const isSelected = selectedTier === idx;
-            return (
+  if (!visible) return null;
+
+  const optimizedThumb = imageUrl ? getOptimizedImageUrl(imageUrl, { width: 100 }) : null;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalOverlay}>
+        {/* Backdrop dismiss */}
+        <Pressable
+          style={styles.backdrop}
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Close offer modal"
+        />
+
+        {/* Modal Sheet Container */}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ width: '100%', maxWidth: 540, alignSelf: 'center' }}
+        >
+          <View
+            style={[
+              styles.sheetContainer,
+              {
+                backgroundColor: isDark ? theme.surface : '#FFFFFF',
+                borderColor: theme.border,
+                paddingBottom: Math.max(insets.bottom, 24),
+              },
+            ]}
+          >
+            {/* Header Bar */}
+            <View style={[styles.headerBar, { borderBottomColor: isDark ? theme.hairline : '#E5E7EB' }]}>
               <Pressable
-                key={tier.percent}
-                onPress={() => handleSelectTier(idx, tier.amount)}
-                style={[
-                  styles.presetChip,
-                  {
-                    backgroundColor: isSelected
-                      ? (isDark ? 'rgba(108, 71, 255, 0.22)' : theme.primarySoft)
-                      : theme.panel,
-                    borderColor: isSelected ? theme.purple : theme.hairline,
-                  },
-                ]}
+                onPress={onClose}
+                hitSlop={{ top: 12, bottom: 12, left: 16, right: 16 }}
+                style={styles.closeButton}
                 accessibilityRole="button"
-                accessibilityLabel={`-${tier.percent}%: ${formatPrice(tier.amount)}`}
+                accessibilityLabel="Close"
               >
-                <Text
+                <Text style={[styles.closeText, { color: isDark ? theme.ink : '#15191A' }]}>Close</Text>
+              </Pressable>
+
+              <Text
+                style={[
+                  styles.headerTitle,
+                  { color: isDark ? theme.ink : '#15191A', fontFamily: type.family.sansBold },
+                ]}
+              >
+                Make an offer
+              </Text>
+
+              {/* Spacer to keep title centered */}
+              <View style={styles.headerSpacer} />
+            </View>
+
+            {/* Main Content Area */}
+            <View style={styles.mainContent}>
+              {/* Item Card Row */}
+              <View style={styles.itemRow}>
+                {optimizedThumb ? (
+                  <Image
+                    source={{ uri: optimizedThumb }}
+                    style={styles.itemImage}
+                    contentFit="cover"
+                    transition={150}
+                  />
+                ) : (
+                  <View style={[styles.itemImagePlaceholder, { backgroundColor: isDark ? theme.panel : '#F3F4F6' }]}>
+                    <Feather name="tag" size={22} color={theme.mute} />
+                  </View>
+                )}
+
+                <View style={styles.itemDetails}>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.itemTitle,
+                      { color: isDark ? theme.ink : '#15191A', fontFamily: type.family.sansBold },
+                    ]}
+                  >
+                    {title || 'Selected Item'}
+                  </Text>
+                  <Text style={[styles.itemPrice, { color: isDark ? theme.mute : '#5A6566' }]}>
+                    Item price: {formatPrice(askingPrice)}
+                  </Text>
+                </View>
+              </View>
+
+              {/* 3 Preset Tier Cards */}
+              <View style={styles.cardsRow}>
+                {/* 10% off card */}
+                <Pressable
+                  onPress={() => handleSelectCard('tier10')}
                   style={[
-                    styles.presetPercent,
+                    styles.presetCard,
                     {
-                      color: isSelected ? (isDark ? '#A78BFA' : theme.purple) : theme.mute,
-                      fontFamily: type.family.sansBold,
+                      backgroundColor: isDark ? theme.panel : '#FFFFFF',
+                      borderColor: selectedCard === 'tier10' ? TEAL_BRAND : isDark ? theme.border : '#E5E7EB',
+                      borderWidth: selectedCard === 'tier10' ? 2 : 1,
                     },
                   ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`10% off: ${formatPrice(preset10)}`}
                 >
-                  -{tier.percent}%
-                </Text>
-                <Text
+                  <Text
+                    style={[
+                      styles.cardTopText,
+                      { color: isDark ? theme.ink : '#15191A', fontFamily: type.family.sansBold },
+                    ]}
+                  >
+                    {formatPrice(preset10)}
+                  </Text>
+                  <Text style={[styles.cardBottomText, { color: TEAL_BRAND, fontFamily: type.family.sansMedium }]}>
+                    10% off
+                  </Text>
+                </Pressable>
+
+                {/* 20% off card */}
+                <Pressable
+                  onPress={() => handleSelectCard('tier20')}
                   style={[
-                    styles.presetAmount,
+                    styles.presetCard,
                     {
-                      color: isSelected ? (isDark ? '#FFFFFF' : theme.purple) : theme.ink,
-                      fontFamily: type.family.sansBold,
+                      backgroundColor: isDark ? theme.panel : '#FFFFFF',
+                      borderColor: selectedCard === 'tier20' ? TEAL_BRAND : isDark ? theme.border : '#E5E7EB',
+                      borderWidth: selectedCard === 'tier20' ? 2 : 1,
                     },
                   ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`20% off: ${formatPrice(preset20)}`}
                 >
-                  {formatPrice(tier.amount)}
+                  <Text
+                    style={[
+                      styles.cardTopText,
+                      { color: isDark ? theme.ink : '#15191A', fontFamily: type.family.sansBold },
+                    ]}
+                  >
+                    {formatPrice(preset20)}
+                  </Text>
+                  <Text style={[styles.cardBottomText, { color: TEAL_BRAND, fontFamily: type.family.sansMedium }]}>
+                    20% off
+                  </Text>
+                </Pressable>
+
+                {/* Custom card */}
+                <Pressable
+                  onPress={() => handleSelectCard('custom')}
+                  style={[
+                    styles.presetCard,
+                    {
+                      backgroundColor: isDark ? theme.panel : '#FFFFFF',
+                      borderColor: selectedCard === 'custom' ? TEAL_BRAND : isDark ? theme.border : '#E5E7EB',
+                      borderWidth: selectedCard === 'custom' ? 2 : 1,
+                    },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Custom set a price"
+                >
+                  <Text
+                    style={[
+                      styles.cardTopText,
+                      { color: isDark ? theme.ink : '#15191A', fontFamily: type.family.sansBold },
+                    ]}
+                  >
+                    Custom
+                  </Text>
+                  <Text style={[styles.cardBottomText, { color: TEAL_BRAND, fontFamily: type.family.sansMedium }]}>
+                    Set a price
+                  </Text>
+                </Pressable>
+              </View>
+
+              {/* Input Section with underline */}
+              <Pressable
+                onPress={() => {
+                  setSelectedCard('custom');
+                  inputRef.current?.focus?.();
+                }}
+                style={styles.inputSection}
+              >
+                <View style={styles.displayRow}>
+                  <TextInput
+                    ref={inputRef}
+                    value={customAmount}
+                    onChangeText={handleCustomChange}
+                    placeholder="0"
+                    placeholderTextColor={isDark ? theme.mute : '#9CA3AF'}
+                    keyboardType="decimal-pad"
+                    returnKeyType="done"
+                    style={[
+                      styles.amountInput,
+                      {
+                        color: isDark ? theme.ink : '#15191A',
+                        fontFamily: type.family.sansBold,
+                      },
+                    ]}
+                  />
+                </View>
+
+                {/* Underline */}
+                <View
+                  style={[
+                    styles.underline,
+                    {
+                      backgroundColor:
+                        selectedCard === 'custom'
+                          ? TEAL_BRAND
+                          : isDark
+                          ? '#4B5563'
+                          : '#6B7280',
+                    },
+                  ]}
+                />
+
+                {/* Fee breakdown helper text */}
+                <Text style={[styles.feeHelperText, { color: isDark ? theme.mute : '#5A6566' }]}>
+                  {parsedAmount > 0
+                    ? `${formatPrice(totalWithProtection)} incl. Buyer Protection fee`
+                    : `incl. Buyer Protection fee`}
                 </Text>
               </Pressable>
-            );
-          })}
-        </View>
 
-        {/* Custom Input Field */}
-        <View style={[styles.inputContainer, { backgroundColor: theme.panel, borderColor: theme.hairline }]}>
-          <Text style={[styles.inputPrefix, { color: theme.ink }]}>{CURRENCY_SYMBOL}</Text>
-          <TextInput
-            value={customAmount}
-            onChangeText={handleCustomChange}
-            placeholder={String(askingPrice)}
-            placeholderTextColor={theme.mute}
-            keyboardType="number-pad"
-            style={[styles.input, { color: theme.ink, fontFamily: type.family.sansBold }]}
-            maxLength={Math.max(10, String(askingPrice || 0).length + 2)}
-            returnKeyType="done"
-          />
-          {customAmount.length > 0 && (
-            <Pressable
-              onPress={() => {
-                setCustomAmount('');
-                setSelectedTier(null);
-              }}
-              hitSlop={8}
-              style={[styles.clearButton, { backgroundColor: theme.surface }]}
-            >
-              <Feather name="x" size={16} color={theme.mute} />
-            </Pressable>
-          )}
-        </View>
+              {/* Action Button: "Offer $15.00" */}
+              <View style={styles.actionButtonContainer}>
+                <Pressable
+                  onPress={handleSubmit}
+                  disabled={!isValidOffer || submitting || loading}
+                  style={({ pressed }) => [
+                    styles.actionButton,
+                    {
+                      backgroundColor: TEAL_BRAND,
+                      opacity: !isValidOffer || submitting || loading ? 0.5 : pressed ? 0.88 : 1,
+                    },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    parsedAmount > 0 ? `Offer ${formatPrice(parsedAmount)}` : 'Make an offer'
+                  }
+                >
+                  <Text
+                    style={[
+                      styles.actionButtonText,
+                      { fontFamily: type.family.sansBold },
+                    ]}
+                  >
+                    {submitting || loading
+                      ? 'Sending offer…'
+                      : parsedAmount > 0
+                      ? `Offer ${formatPrice(parsedAmount)}`
+                      : 'Make an offer'}
+                  </Text>
+                </Pressable>
+              </View>
 
-        {/* Informational Guidance */}
-        <View
-          style={[
-            styles.infoBox,
-            {
-              backgroundColor: isDark ? 'rgba(108, 71, 255, 0.15)' : 'rgba(108, 71, 255, 0.06)',
-            },
-          ]}
-        >
-          <Feather name="info" size={14} color={isDark ? '#A78BFA' : theme.purple} />
-          <Text style={[styles.infoText, { color: theme.mute }]}>
-            Offers are valid for 24 hours. The seller can accept, counter, or decline.
-          </Text>
-        </View>
+              {/* Subtext: "25 offers left for today. Learn why." */}
+              <View style={styles.limitRow}>
+                <Text style={[styles.limitText, { color: isDark ? theme.mute : '#5A6566' }]}>
+                  {offersLeftToday} offers left for today.{' '}
+                </Text>
+                <Pressable onPress={handleLearnWhy} hitSlop={6}>
+                  <Text style={styles.learnWhyText}>Learn why.</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </View>
-    </BottomSheetModal>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
-    gap: 16,
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
   },
-  askingRow: {
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  sheetContainer: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: radii['2xl'],
+    borderTopRightRadius: radii['2xl'],
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.12,
+        shadowRadius: 16,
+      },
+      android: {
+        elevation: 12,
+      },
+      default: {
+        boxShadow: '0 -4px 24px rgba(0, 0, 0, 0.15)',
+      },
+    }),
+  },
+  headerBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 12,
-    backgroundColor: colors.panel,
-    borderRadius: radii.xl,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E5E7EB',
   },
-  askingLabel: {
-    fontSize: 13,
-    color: colors.mute,
+  closeButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+    minWidth: 50,
   },
-  askingValue: {
-    fontSize: 15,
-    color: colors.ink,
+  closeText: {
+    fontSize: 16,
+    color: '#15191A',
   },
-  presetsRow: {
+  headerTitle: {
+    fontSize: 17,
+    color: '#15191A',
+    textAlign: 'center',
+  },
+  headerSpacer: {
+    minWidth: 50,
+  },
+  mainContent: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 8,
+  },
+  itemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  itemImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 6,
+    backgroundColor: '#F3F4F6',
+  },
+  itemImagePlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  itemDetails: {
+    flex: 1,
+    marginLeft: 12,
+    justifyContent: 'center',
+  },
+  itemTitle: {
+    fontSize: 16,
+    color: '#15191A',
+    marginBottom: 3,
+  },
+  itemPrice: {
+    fontSize: 14,
+    color: '#5A6566',
+  },
+  cardsRow: {
     flexDirection: 'row',
     gap: 10,
+    marginBottom: 20,
   },
-  presetChip: {
+  presetCard: {
     flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderRadius: radii.xl,
-    borderWidth: 1.5,
-    borderColor: colors.hairline,
-    backgroundColor: colors.white,
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
   },
-  presetChipSelected: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primarySoft,
+  cardTopText: {
+    fontSize: 15,
+    color: '#15191A',
+    marginBottom: 2,
+    textAlign: 'center',
   },
-  presetPercent: {
-    fontSize: 11,
-    letterSpacing: 0.2,
+  cardBottomText: {
+    fontSize: 12.5,
+    textAlign: 'center',
   },
-  presetAmount: {
-    fontSize: 14,
+  inputSection: {
+    marginBottom: 20,
   },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 56,
-    borderRadius: radii['2xl'],
-    borderWidth: 1.5,
-    borderColor: colors.hairline,
-    backgroundColor: colors.white,
-    paddingHorizontal: 16,
+  displayRow: {
+    paddingVertical: 2,
   },
-  inputPrefix: {
-    fontSize: 20,
-    color: colors.ink,
-    fontFamily: type.family.sansBold,
-    marginRight: 8,
-  },
-  input: {
-    flex: 1,
-    fontSize: 22,
-    color: colors.ink,
+  amountInput: {
+    fontSize: 24,
+    color: '#15191A',
     padding: 0,
+    margin: 0,
+    height: 34,
   },
-  clearButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.panel,
+  underline: {
+    height: 1.5,
+    backgroundColor: '#6B7280',
+    marginTop: 4,
+    marginBottom: 6,
+    width: '100%',
+  },
+  feeHelperText: {
+    fontSize: 13,
+    color: '#5A6566',
+  },
+  actionButtonContainer: {
+    marginBottom: 12,
+  },
+  actionButton: {
+    height: 48,
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
+    width: '100%',
   },
-  infoBox: {
+  actionButtonText: {
+    fontSize: 16,
+    color: '#FFFFFF',
+  },
+  limitRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    padding: 10,
-    backgroundColor: 'rgba(108, 71, 255, 0.06)',
-    borderRadius: radii.lg,
+    justifyContent: 'center',
+    paddingVertical: 4,
   },
-  infoText: {
-    flex: 1,
-    fontSize: 11,
-    color: colors.mute,
-    lineHeight: 15,
+  limitText: {
+    fontSize: 13,
+    color: '#5A6566',
   },
-  footerInner: {
-    width: '100%',
-    paddingBottom: 4,
+  learnWhyText: {
+    fontSize: 13,
+    color: TEAL_BRAND,
+    textDecorationLine: 'underline',
   },
 });
