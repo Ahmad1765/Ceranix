@@ -36,6 +36,7 @@ import type { FollowState } from '@/lib/follows';
 import { getOptimizedImageUrl } from '@/lib/images';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
+import { captureError } from '@/lib/sentry';
 import { getOrCreateConversation, sendOffer } from '@/lib/chat';
 import { AnimatedNumber } from '@/components/AnimatedNumber';
 import { SaveListSheet } from '@/components/SaveListSheet';

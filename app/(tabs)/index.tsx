@@ -449,96 +449,98 @@ export default function HomeScreen() {
           search) by title or brand. Focus lifts the hairline to purple; the
           border is always present so focusing never shifts layout. */}
       <FeedSearch
-          value={query}
-          onChangeText={setQuery}
-          focused={searchFocused}
-          onFocus={() => setSearchFocused(true)}
-          onBlur={() => setSearchFocused(false)}
-          resultCount={isSearching || activeFilterCount > 0 ? filteredListings.length : null}
-          filterCount={activeFilterCount}
-          onOpenFilter={() => setFilterOpen(true)}
-          savedActive={showingSaved}
-          onToggleSaved={() => selectChip(showingSaved ? FOR_YOU : SAVED)}
-        />
+        value={query}
+        onChangeText={setQuery}
+        focused={searchFocused}
+        onFocus={() => setSearchFocused(true)}
+        onBlur={() => setSearchFocused(false)}
+        resultCount={isSearching || activeFilterCount > 0 ? filteredListings.length : null}
+        filterCount={activeFilterCount}
+        onOpenFilter={() => setFilterOpen(true)}
+        savedActive={showingSaved}
+        onToggleSaved={() => selectChip(showingSaved ? FOR_YOU : SAVED)}
+      />
 
-        {showColdStartBanner ? (
-          <Pressable
-            onPress={() => {
-              haptic();
-              router.push('/auth/login');
-            }}
-            style={{
-              marginHorizontal: 16,
-              marginTop: 14,
-              padding: 14,
-              borderRadius: radii.md,
-              backgroundColor: colors.purpleSoft,
-              flexDirection: 'row',
-              alignItems: 'center',
-            }}
-          >
-            <Feather name="user-plus" size={16} color={colors.purple} style={{ marginRight: 10 }} />
-            <Text style={{ flex: 1, color: colors.purple, fontSize: 13, fontWeight: '600' }}>
-              Sign in and like a few items to see this feed personalize itself.
-            </Text>
-          </Pressable>
-        ) : null}
+      {/* Chip row: For you + (+) + Trending + saved searches */}
+      <ChipRow
+        savedSearches={savedSearches}
+        activeChip={activeChip}
+        onSelectChip={selectChip}
+        onDeleteChip={onDeleteChip}
+        onAdd={() => {
+          if (!user?.id) {
+            toast.show('Sign in to create drop alerts', { variant: 'info', icon: 'log-in' });
+            router.push('/auth/login');
+            return;
+          }
+          setAlertSheetOpen(true);
+        }}
+      />
 
-        {showFollowCta ? (
-          <Pressable
-            onPress={() => {
-              haptic();
-              router.push('/(tabs)/discover');
-            }}
-            style={{
-              marginHorizontal: 16,
-              marginTop: 14,
-              padding: 14,
-              borderRadius: radii.md,
-              backgroundColor: colors.purpleSoft,
-              flexDirection: 'row',
-              alignItems: 'center',
-            }}
-          >
-            <Feather name="compass" size={16} color={colors.purple} style={{ marginRight: 10 }} />
-            <Text style={{ flex: 1, color: colors.purple, fontSize: 13, fontWeight: '600' }}>
-              Follow some sellers or like a few items to start personalizing your feed.
-            </Text>
-          </Pressable>
-        ) : null}
-
-        {/* Chip row: For you + Trending + Saved + saved searches + add */}
-        <ChipRow
-          savedSearches={savedSearches}
-          activeChip={activeChip}
-          onSelectChip={selectChip}
-          onDeleteChip={onDeleteChip}
-          onAdd={() => {
-            if (!user?.id) {
-              toast.show('Sign in to create drop alerts', { variant: 'info', icon: 'log-in' });
-              router.push('/auth/login');
-              return;
-            }
-            setAlertSheetOpen(true);
+      {showColdStartBanner ? (
+        <Pressable
+          onPress={() => {
+            haptic();
+            router.push('/auth/login');
           }}
-        />
+          style={{
+            marginHorizontal: 16,
+            marginTop: 10,
+            marginBottom: 4,
+            padding: 14,
+            borderRadius: radii.md,
+            backgroundColor: colors.purpleSoft,
+            flexDirection: 'row',
+            alignItems: 'center',
+          }}
+        >
+          <Feather name="user-plus" size={16} color={colors.purple} style={{ marginRight: 10 }} />
+          <Text style={{ flex: 1, color: colors.purple, fontSize: 13, fontWeight: '600' }}>
+            Sign in and like a few items to see this feed personalize itself.
+          </Text>
+        </Pressable>
+      ) : null}
 
-        {/* Price drops on items the user liked — a marketplace-only signal.
-            Strip renders only when there's at least one real drop. */}
-        {showRails && priceDrops.length > 0 ? (
-          <View style={{ marginBottom: 14 }}>
-            <RailHeader icon="trending-down" title="Price drops on your likes" />
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: HORIZONTAL_PAD, gap: GRID_GAP }}
-            >
-              {priceDrops.map((drop) => (
-                <PriceDropCard key={drop.id} listing={drop} width={130} />
-              ))}
-            </ScrollView>
-          </View>
-        ) : null}
+      {showFollowCta ? (
+        <Pressable
+          onPress={() => {
+            haptic();
+            router.push('/(tabs)/discover');
+          }}
+          style={{
+            marginHorizontal: 16,
+            marginTop: 10,
+            marginBottom: 4,
+            padding: 14,
+            borderRadius: radii.md,
+            backgroundColor: colors.purpleSoft,
+            flexDirection: 'row',
+            alignItems: 'center',
+          }}
+        >
+          <Feather name="compass" size={16} color={colors.purple} style={{ marginRight: 10 }} />
+          <Text style={{ flex: 1, color: colors.purple, fontSize: 13, fontWeight: '600' }}>
+            Follow some sellers or like a few items to start personalizing your feed.
+          </Text>
+        </Pressable>
+      ) : null}
+
+      {/* Price drops on items the user liked — a marketplace-only signal.
+          Strip renders only when there's at least one real drop. */}
+      {showRails && priceDrops.length > 0 ? (
+        <View style={{ marginBottom: 14 }}>
+          <RailHeader icon="trending-down" title="Price drops on your likes" />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: HORIZONTAL_PAD, gap: GRID_GAP }}
+          >
+            {priceDrops.map((drop) => (
+              <PriceDropCard key={drop.id} listing={drop} width={130} />
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
     </>
   );
 
@@ -663,13 +665,19 @@ function FeedSearch({
             alignItems: 'center',
             backgroundColor: colors.surface,
             borderRadius: radii.pill,
-            paddingHorizontal: 14,
+            paddingLeft: 14,
+            paddingRight: 10,
             height: 44,
             borderWidth: 1,
             borderColor: focused ? colors.purple : colors.border,
           }}
         >
-          <Feather name="search" size={17} color={focused ? colors.purple : colors.muteSoft} />
+          <Feather
+            name="search"
+            size={17}
+            color={focused ? colors.purple : colors.muteSoft}
+            style={{ flexShrink: 0 }}
+          />
           <TextInput
             value={value}
             onChangeText={onChangeText}
@@ -680,14 +688,15 @@ function FeedSearch({
             style={
               {
                 flex: 1,
+                minWidth: 0,
+                flexShrink: 1,
                 marginLeft: 9,
+                marginRight: 6,
                 fontFamily: typography.family.sansSemibold,
                 fontSize: 13,
                 letterSpacing: -0.1,
                 color: colors.ink,
                 padding: 0,
-                // RN-Web only: drop the browser's default focus ring — the purple
-                // border is our focus affordance.
                 outlineStyle: 'none',
                 outlineWidth: 0,
               } as any
@@ -706,6 +715,15 @@ function FeedSearch({
               }}
               accessibilityRole="button"
               accessibilityLabel="Clear search"
+              style={({ pressed }) => ({
+                flexShrink: 0,
+                width: 24,
+                height: 24,
+                borderRadius: radii.pill,
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: pressed ? 0.6 : 1,
+              })}
             >
               <Feather name="x" size={16} color={colors.muteSoft} />
             </Pressable>
@@ -759,8 +777,7 @@ function FeedSearch({
           ) : null}
         </Pressable>
 
-        {/* Saved toggle — icon-only, beside the filter button (Polymarket
-            reference). Replaces the old "Saved" text chip. */}
+        {/* Saved toggle — icon-only, beside the filter button */}
         <Pressable
           onPress={() => {
             haptic();
@@ -825,17 +842,15 @@ function ChipRow({
     >
       <Chip
         label="For you"
-        icon="zap"
         active={activeChip === FOR_YOU}
         onPress={() => onSelectChip(FOR_YOU)}
       />
+      <AddChip onPress={onAdd} />
       <Chip
         label="Trending"
-        icon="trending-up"
         active={activeChip === TRENDING}
         onPress={() => onSelectChip(TRENDING)}
       />
-      <AddChip onPress={onAdd} />
       {savedSearches.map((s) => (
         <Chip
           key={s.id}
@@ -895,6 +910,7 @@ function Chip({
       <Text
         style={{
           fontSize: 13,
+          fontFamily: typography.family.sansSemibold,
           fontWeight: '600',
           color: textColor,
           letterSpacing: -0.1,

@@ -759,12 +759,12 @@ export default function DiscoverScreen() {
               borderRadius: radii.pill,
               flexDirection: 'row',
               alignItems: 'center',
-              paddingHorizontal: 16,
-              paddingVertical: 6,
+              paddingLeft: 14,
+              paddingRight: 10,
               height: 46,
             }}
           >
-            <Feather name="search" size={18} color={colors.muteSoft} />
+            <Feather name="search" size={18} color={colors.muteSoft} style={{ flexShrink: 0 }} />
             <TextInput
               value={query}
               onChangeText={setQuery}
@@ -781,7 +781,10 @@ export default function DiscoverScreen() {
               placeholderTextColor={colors.muteSoft}
               style={{
                 flex: 1,
+                minWidth: 0,
+                flexShrink: 1,
                 marginLeft: 10,
+                marginRight: 6,
                 fontSize: 14.5,
                 color: colors.ink,
                 padding: 0,
@@ -794,10 +797,24 @@ export default function DiscoverScreen() {
               autoCapitalize="none"
             />
             {searching ? (
-              <ActivityIndicator size="small" color={colors.purple} style={{ marginRight: 4 }} />
+              <ActivityIndicator size="small" color={colors.purple} style={{ marginRight: 6, flexShrink: 0 }} />
             ) : null}
             {query.length > 0 && (
-              <Pressable hitSlop={HIT_SLOP_8} onPress={() => setQuery('')}>
+              <Pressable
+                hitSlop={HIT_SLOP_8}
+                onPress={() => setQuery('')}
+                accessibilityRole="button"
+                accessibilityLabel="Clear search"
+                style={({ pressed }) => ({
+                  flexShrink: 0,
+                  width: 24,
+                  height: 24,
+                  borderRadius: radii.pill,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: pressed ? 0.6 : 1,
+                })}
+              >
                 <Feather name="x" size={16} color={colors.muteSoft} />
               </Pressable>
             )}

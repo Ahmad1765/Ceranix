@@ -443,8 +443,9 @@ function DiscoverSheetBody({ onClose }: { onClose: () => void }) {
             height: 44,
             flexDirection: 'row',
             alignItems: 'center',
-            paddingHorizontal: 14,
-            borderRadius: radii.md,
+            borderRadius: radii.pill,
+            paddingLeft: 14,
+            paddingRight: 10,
             borderWidth: 1,
             borderColor: colors.hair,
             backgroundColor: colors.panel,
@@ -466,6 +467,7 @@ function DiscoverSheetBody({ onClose }: { onClose: () => void }) {
               {
                 flex: 1,
                 marginLeft: 10,
+                marginRight: 6,
                 fontSize: 14.5,
                 fontFamily: type.family.sans,
                 color: colors.ink,
@@ -478,7 +480,20 @@ function DiscoverSheetBody({ onClose }: { onClose: () => void }) {
             ]}
           />
           {query.length > 0 ? (
-            <Pressable hitSlop={HIT_SLOP_8} onPress={() => setQuery('')} accessibilityLabel="Clear search">
+            <Pressable
+              hitSlop={HIT_SLOP_8}
+              onPress={() => setQuery('')}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+              style={({ pressed }) => ({
+                width: 24,
+                height: 24,
+                borderRadius: radii.pill,
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: pressed ? 0.6 : 1,
+              })}
+            >
               <Feather name="x" size={16} color={colors.muteSoft} />
             </Pressable>
           ) : null}
