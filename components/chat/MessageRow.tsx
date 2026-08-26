@@ -286,6 +286,7 @@ function OutgoingOfferBubble({
             alignItems: 'center',
             justifyContent: 'center',
             paddingHorizontal: 12,
+            alignSelf: 'stretch',
           }}
         >
           <Text
@@ -294,6 +295,7 @@ function OutgoingOfferBubble({
               fontSize: 13,
               fontWeight: '700',
               color: '#FFFFFF',
+              textAlign: 'center',
             }}
           >
             Buy now · Pay {formatPrice(amount)}
@@ -489,6 +491,7 @@ function IncomingOfferCard({
                   fontSize: 13,
                   fontWeight: '700',
                   color: colors.ink,
+                  textAlign: 'center',
                 }}
               >
                 Decline
@@ -517,6 +520,7 @@ function IncomingOfferCard({
                   fontSize: 13,
                   fontWeight: '700',
                   color: '#FFFFFF',
+                  textAlign: 'center',
                 }}
               >
                 Accept
@@ -541,6 +545,7 @@ function IncomingOfferCard({
                 backgroundColor: 'transparent',
                 alignItems: 'center',
                 justifyContent: 'center',
+                alignSelf: 'stretch',
               }}
             >
               <Text
@@ -549,6 +554,7 @@ function IncomingOfferCard({
                   fontSize: 13,
                   fontWeight: '700',
                   color: TEAL_BRAND,
+                  textAlign: 'center',
                 }}
               >
                 Offer your price
@@ -575,6 +581,7 @@ function IncomingOfferCard({
             alignItems: 'center',
             justifyContent: 'center',
             marginTop: 4,
+            alignSelf: 'stretch',
           }}
         >
           <Text
@@ -583,6 +590,7 @@ function IncomingOfferCard({
               fontSize: 13.5,
               fontWeight: '700',
               color: '#FFFFFF',
+              textAlign: 'center',
             }}
           >
             Offer your price
@@ -607,6 +615,7 @@ function IncomingOfferCard({
             alignItems: 'center',
             justifyContent: 'center',
             marginTop: 4,
+            alignSelf: 'stretch',
           }}
         >
           <Text
@@ -615,6 +624,7 @@ function IncomingOfferCard({
               fontSize: 13.5,
               fontWeight: '700',
               color: '#FFFFFF',
+              textAlign: 'center',
             }}
           >
             Buy now · Pay {formatPrice(amount)}

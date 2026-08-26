@@ -69,28 +69,29 @@ export function ConversationListingHeader({
           >
             {listing?.title ?? 'Listing removed'}
           </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2, gap: 6 }}>
+          <Text
+            style={{
+              fontFamily: typography.family.sansBold,
+              fontSize: 12.5,
+              color: colors.ink,
+              marginTop: 2,
+            }}
+          >
+            {listing?.price != null ? formatPrice(listing.price) : '—'}
+          </Text>
+          {listing?.price != null && (
             <Text
+              numberOfLines={1}
               style={{
-                fontFamily: typography.family.sansBold,
-                fontSize: 12.5,
-                color: colors.ink,
+                fontFamily: typography.family.sans,
+                fontSize: 11.5,
+                color: colors.mute,
+                marginTop: 1,
               }}
             >
-              {listing?.price != null ? formatPrice(listing.price) : '—'}
+              {`${formatPrice(listing.price + buyerProtectionFee(listing.price))} Includes Buyer Protection 🛡️`}
             </Text>
-            {listing?.price != null && (
-              <Text
-                style={{
-                  fontFamily: typography.family.sans,
-                  fontSize: 11.5,
-                  color: colors.mute,
-                }}
-              >
-                {`${formatPrice(listing.price + buyerProtectionFee(listing.price))} Includes Buyer Protection 🛡️`}
-              </Text>
-            )}
-          </View>
+          )}
         </View>
       </View>
 
