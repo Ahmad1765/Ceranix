@@ -16,7 +16,6 @@ import * as Haptics from 'expo-haptics';
 import { PressableScale } from '@/components/PressableScale';
 import { colors, radii, shadow, type as typography } from '@/lib/theme';
 import { formatPrice } from '@/lib/currency';
-import { buyerProtectionFee } from '@/lib/fees';
 import type { ChatMessage } from '@/lib/chat';
 import type { Anchor } from './ReactionPicker';
 import { bubbleStamp } from './format';
@@ -35,6 +34,7 @@ export type MessageRowProps = {
   lastOfGroup: boolean;
   /** Shown in the meta line of an incoming group, the way Plick attributes them. */
   senderName: string;
+  senderAvatar?: string | null;
   listingId: string | null;
   listingTitle?: string | null;
   listingThumb?: string | null;
@@ -44,6 +44,7 @@ export type MessageRowProps = {
   reactions: string[];
   onAccept: () => void;
   onDecline: () => void;
+  onCounterOffer?: () => void;
   onPay: (amount: number) => void;
   onRetry: () => void;
   /** Long-press: opens the reaction bar over the measured bubble. */
@@ -70,7 +71,7 @@ function MetaLine({
       <PressableScale
         onPress={onRetry}
         accessibilityLabel="Retry sending message"
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5 }}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}
       >
         <Feather name="rotate-cw" size={10} color={colors.ink} />
         <Text style={{ ...base, fontFamily: typography.family.sansSemibold, color: colors.ink }}>
@@ -86,13 +87,12 @@ function MetaLine({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
-        marginTop: 5,
+        marginTop: 4,
         paddingHorizontal: 2,
       }}
     >
       <Text style={base}>
         {msg.pending ? 'Sending…' : bubbleStamp(msg.created_at)}
-        {!mine && senderName ? `  ${senderName}` : ''}
       </Text>
       {mine && !msg.pending && <Feather name="check" size={11} color={colors.muteSoft} />}
     </View>
@@ -162,30 +162,516 @@ function SystemNotice({ msg }: { msg: ChatMessage }) {
 
 // ── Offer ─────────────────────────────────────────────────────────────────
 
-const OFFER_STATUS_COPY: Record<string, { label: string; icon: keyof typeof Feather.glyphMap }> = {
-  accepted: { label: 'Accepted', icon: 'check-circle' },
-  declined: { label: 'Declined', icon: 'x-circle' },
-  expired: { label: 'Expired', icon: 'clock' },
-  withdrawn: { label: 'Withdrawn', icon: 'corner-up-left' },
-};
+const TEAL_BRAND = '#007782';
 
-function OfferBubble({
+function OutgoingOfferBubble({
   msg,
-  mine,
-  isSeller,
-  listingId,
-  listingTitle,
-  listingThumb,
+  listingPrice,
+  canPay,
+  onPay,
+}: {
+  msg: ChatMessage;
+  listingPrice: number | null;
+  canPay: boolean;
+  onPay: (amount: number) => void;
+}) {
+  const amount = msg.metadata?.amount ?? 0;
+  const status = msg.offer_status ?? 'pending';
+  const showStruck = !!listingPrice && listingPrice > amount;
+  const isPaid = Boolean(
+    msg.metadata?.paid ||
+    msg.metadata?.order_status === 'paid' ||
+    msg.metadata?.payment_status === 'paid'
+  );
+
+  return (
+    <View
+      style={{
+        backgroundColor: '#EDF2F7',
+        borderRadius: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 9,
+        borderWidth: 1,
+        borderColor: 'rgba(0, 0, 0, 0.06)',
+      }}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
+        <Text
+          style={{
+            fontFamily: typography.family.sansBold,
+            fontSize: 15,
+            fontWeight: '700',
+            color: colors.ink,
+          }}
+        >
+          {formatPrice(amount)}
+        </Text>
+        {showStruck && (
+          <Text
+            style={{
+              fontFamily: typography.family.sans,
+              fontSize: 13,
+              color: colors.muteSoft,
+              textDecorationLine: 'line-through',
+            }}
+          >
+            {formatPrice(listingPrice)}
+          </Text>
+        )}
+        {status === 'declined' && (
+          <Text
+            style={{
+              fontFamily: typography.family.sansMedium,
+              fontSize: 13,
+              color: '#DC2626',
+              marginLeft: 2,
+            }}
+          >
+            Declined
+          </Text>
+        )}
+        {status === 'accepted' && (
+          <Text
+            style={{
+              fontFamily: typography.family.sansBold,
+              fontSize: 13,
+              color: '#059669',
+              marginLeft: 2,
+            }}
+          >
+            Accepted
+          </Text>
+        )}
+        {status === 'expired' && (
+          <Text
+            style={{
+              fontFamily: typography.family.sans,
+              fontSize: 13,
+              color: colors.muteSoft,
+              marginLeft: 2,
+            }}
+          >
+            Expired
+          </Text>
+        )}
+      </View>
+
+      {msg.metadata?.note ? (
+        <Text
+          style={{
+            fontFamily: typography.family.sans,
+            fontSize: 12.5,
+            color: colors.mute,
+            marginTop: 4,
+          }}
+        >
+          {`"${msg.metadata.note}"`}
+        </Text>
+      ) : null}
+
+      {canPay && (
+        <PressableScale
+          onPress={() => {
+            if (Platform.OS !== 'web') {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+            }
+            onPay(amount);
+          }}
+          accessibilityLabel={`Pay ${formatPrice(amount)}`}
+          style={{
+            marginTop: 8,
+            height: 38,
+            borderRadius: 6,
+            backgroundColor: TEAL_BRAND,
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingHorizontal: 12,
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: typography.family.sansBold,
+              fontSize: 13,
+              fontWeight: '700',
+              color: '#FFFFFF',
+            }}
+          >
+            Buy now · Pay {formatPrice(amount)}
+          </Text>
+        </PressableScale>
+      )}
+
+      {isPaid && (
+        <Text
+          style={{
+            fontFamily: typography.family.sansBold,
+            fontSize: 11.5,
+            color: TEAL_BRAND,
+            marginTop: 4,
+          }}
+        >
+          Paid · Protected 🛡️
+        </Text>
+      )}
+    </View>
+  );
+}
+
+function IncomingOfferCard({
+  msg,
+  senderName,
   listingPrice,
   listingSold,
+  isSeller,
+  canRespond,
+  canPay,
+  awaitingPayment,
+  isPaid,
   onAccept,
   onDecline,
+  onCounterOffer,
   onPay,
-}: Omit<
-  MessageRowProps,
-  'grouped' | 'lastOfGroup' | 'senderName' | 'onRetry' | 'reactions' | 'onLongPress'
->) {
+}: {
+  msg: ChatMessage;
+  senderName: string;
+  listingPrice: number | null;
+  listingSold: boolean;
+  isSeller: boolean;
+  canRespond: boolean;
+  canPay: boolean;
+  awaitingPayment: boolean;
+  isPaid: boolean;
+  onAccept: () => void;
+  onDecline: () => void;
+  onCounterOffer?: () => void;
+  onPay: (amount: number) => void;
+}) {
   const amount = msg.metadata?.amount ?? 0;
+  const status = msg.offer_status ?? 'pending';
+  const showStruck = !!listingPrice && listingPrice > amount;
+  const isDeclined = status === 'declined';
+  const isAccepted = status === 'accepted';
+  const isExpired = status === 'expired';
+  const canMakeCounter = (isDeclined || isExpired) && !listingSold && !!onCounterOffer;
+
+  return (
+    <View
+      style={{
+        minWidth: 240,
+        maxWidth: 320,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: 'rgba(0, 0, 0, 0.08)',
+        borderRadius: 12,
+        padding: 14,
+        ...shadow.sm,
+      }}
+    >
+      <Text
+        style={{
+          fontFamily: typography.family.sans,
+          fontSize: 13.5,
+          color: '#374151',
+          marginBottom: 4,
+        }}
+      >
+        {senderName} made you a new offer:
+      </Text>
+
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'baseline',
+          gap: 6,
+          flexWrap: 'wrap',
+          marginBottom: canRespond || canPay || canMakeCounter || awaitingPayment || isPaid ? 10 : 0,
+        }}
+      >
+        <Text
+          style={{
+            fontFamily: typography.family.sansBold,
+            fontSize: 16,
+            fontWeight: '700',
+            color: colors.ink,
+          }}
+        >
+          {formatPrice(amount)}
+        </Text>
+        {showStruck && (
+          <Text
+            style={{
+              fontFamily: typography.family.sans,
+              fontSize: 13.5,
+              color: colors.muteSoft,
+              textDecorationLine: 'line-through',
+            }}
+          >
+            {formatPrice(listingPrice)}
+          </Text>
+        )}
+        {isDeclined && (
+          <Text
+            style={{
+              fontFamily: typography.family.sansMedium,
+              fontSize: 13.5,
+              color: '#6B7280',
+              marginLeft: 2,
+            }}
+          >
+            Declined
+          </Text>
+        )}
+        {isAccepted && (
+          <Text
+            style={{
+              fontFamily: typography.family.sansBold,
+              fontSize: 13.5,
+              color: '#059669',
+              marginLeft: 2,
+            }}
+          >
+            Accepted
+          </Text>
+        )}
+        {isExpired && (
+          <Text
+            style={{
+              fontFamily: typography.family.sans,
+              fontSize: 13.5,
+              color: colors.muteSoft,
+              marginLeft: 2,
+            }}
+          >
+            Expired
+          </Text>
+        )}
+      </View>
+
+      {msg.metadata?.note ? (
+        <Text
+          style={{
+            fontFamily: typography.family.sans,
+            fontSize: 12.5,
+            color: colors.mute,
+            marginBottom: 8,
+          }}
+        >
+          {`"${msg.metadata.note}"`}
+        </Text>
+      ) : null}
+
+      {/* Seller Action Buttons for Pending Offer */}
+      {canRespond && (
+        <View style={{ gap: 8, marginTop: 4 }}>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <PressableScale
+              onPress={() => {
+                if (Platform.OS !== 'web') {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                }
+                onDecline();
+              }}
+              accessibilityLabel="Decline offer"
+              style={{
+                flex: 1,
+                height: 38,
+                borderRadius: 6,
+                borderWidth: 1,
+                borderColor: colors.border,
+                backgroundColor: '#FFFFFF',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: typography.family.sansBold,
+                  fontSize: 13,
+                  fontWeight: '700',
+                  color: colors.ink,
+                }}
+              >
+                Decline
+              </Text>
+            </PressableScale>
+            <PressableScale
+              onPress={() => {
+                if (Platform.OS !== 'web') {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                }
+                onAccept();
+              }}
+              accessibilityLabel="Accept offer"
+              style={{
+                flex: 1,
+                height: 38,
+                borderRadius: 6,
+                backgroundColor: TEAL_BRAND,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: typography.family.sansBold,
+                  fontSize: 13,
+                  fontWeight: '700',
+                  color: '#FFFFFF',
+                }}
+              >
+                Accept
+              </Text>
+            </PressableScale>
+          </View>
+
+          {onCounterOffer && (
+            <PressableScale
+              onPress={() => {
+                if (Platform.OS !== 'web') {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                }
+                onCounterOffer();
+              }}
+              accessibilityLabel="Offer your price"
+              style={{
+                height: 38,
+                borderRadius: 6,
+                borderWidth: 1,
+                borderColor: TEAL_BRAND,
+                backgroundColor: 'transparent',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: typography.family.sansBold,
+                  fontSize: 13,
+                  fontWeight: '700',
+                  color: TEAL_BRAND,
+                }}
+              >
+                Offer your price
+              </Text>
+            </PressableScale>
+          )}
+        </View>
+      )}
+
+      {/* Offer your price button when declined or counterable */}
+      {canMakeCounter && (
+        <PressableScale
+          onPress={() => {
+            if (Platform.OS !== 'web') {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+            }
+            onCounterOffer?.();
+          }}
+          accessibilityLabel="Offer your price"
+          style={{
+            height: 40,
+            borderRadius: 6,
+            backgroundColor: TEAL_BRAND,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginTop: 4,
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: typography.family.sansBold,
+              fontSize: 13.5,
+              fontWeight: '700',
+              color: '#FFFFFF',
+            }}
+          >
+            Offer your price
+          </Text>
+        </PressableScale>
+      )}
+
+      {/* Buyer CTA to Complete Purchase */}
+      {canPay && (
+        <PressableScale
+          onPress={() => {
+            if (Platform.OS !== 'web') {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+            }
+            onPay(amount);
+          }}
+          accessibilityLabel={`Buy now for ${formatPrice(amount)}`}
+          style={{
+            height: 42,
+            borderRadius: 6,
+            backgroundColor: TEAL_BRAND,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginTop: 4,
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: typography.family.sansBold,
+              fontSize: 13.5,
+              fontWeight: '700',
+              color: '#FFFFFF',
+            }}
+          >
+            Buy now · Pay {formatPrice(amount)}
+          </Text>
+        </PressableScale>
+      )}
+
+      {/* Awaiting buyer checkout notice */}
+      {awaitingPayment && (
+        <Text
+          style={{
+            fontFamily: typography.family.sansMedium,
+            fontSize: 12,
+            color: colors.muteSoft,
+            marginTop: 4,
+          }}
+        >
+          Waiting for buyer to complete checkout
+        </Text>
+      )}
+
+      {/* Paid confirmation */}
+      {isPaid && (
+        <Text
+          style={{
+            fontFamily: typography.family.sansBold,
+            fontSize: 12,
+            color: TEAL_BRAND,
+            marginTop: 4,
+          }}
+        >
+          Paid · Covered by Buyer Protection 🛡️
+        </Text>
+      )}
+    </View>
+  );
+}
+
+function OfferBubble(
+  props: Omit<
+    MessageRowProps,
+    'grouped' | 'lastOfGroup' | 'onRetry' | 'reactions' | 'onLongPress'
+  >,
+) {
+  const {
+    msg,
+    mine,
+    isSeller,
+    senderName,
+    listingId,
+    listingPrice,
+    listingSold,
+    onAccept,
+    onDecline,
+    onCounterOffer,
+    onPay,
+  } = props;
   const status = msg.offer_status ?? 'pending';
   const isPaid = Boolean(
     msg.metadata?.paid ||
@@ -193,525 +679,36 @@ function OfferBubble({
     msg.metadata?.payment_status === 'paid'
   );
   const canRespond = !mine && isSeller && status === 'pending';
-  const canPay = mine && !isSeller && status === 'accepted' && !!listingId && !listingSold && !isPaid;
-  const awaitingPayment = !mine && isSeller && status === 'accepted' && !listingSold && !isPaid;
-  const settled = status !== 'pending' ? OFFER_STATUS_COPY[status] : null;
-  const showStruck = !!listingPrice && listingPrice > amount;
-  const savingsAmount = showStruck && listingPrice ? listingPrice - amount : 0;
-  const discountPct =
-    showStruck && listingPrice
-      ? Math.round(((listingPrice - amount) / listingPrice) * 100)
-      : 0;
+  const canPay = !isSeller && status === 'accepted' && !!listingId && !listingSold && !isPaid;
+  const awaitingPayment = isSeller && status === 'accepted' && !listingSold && !isPaid;
 
-  const isAccepted = status === 'accepted';
-  const isDeclined = status === 'declined';
-  const fee = buyerProtectionFee(amount);
+  if (mine) {
+    return (
+      <OutgoingOfferBubble
+        msg={msg}
+        listingPrice={listingPrice}
+        canPay={canPay}
+        onPay={onPay}
+      />
+    );
+  }
 
   return (
-    <View
-      style={{
-        minWidth: 260,
-        maxWidth: 320,
-        backgroundColor: colors.white,
-        borderWidth: 1,
-        borderColor: isAccepted
-          ? 'rgba(108,71,255,0.35)'
-          : isDeclined
-          ? 'rgba(239,68,68,0.25)'
-          : colors.border,
-        borderRadius: radii['2xl'],
-        padding: 16,
-        ...shadow.sm,
-      }}
-    >
-      {/* ── Top Header: Directional Tag + Status ── */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: 12,
-        }}
-      >
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 5,
-            paddingHorizontal: 9,
-            paddingVertical: 4,
-            borderRadius: radii.pill,
-            backgroundColor: isAccepted ? colors.purpleSoft : colors.surface,
-          }}
-        >
-          <Feather
-            name={isAccepted ? 'check' : mine ? 'arrow-up-right' : 'arrow-down-left'}
-            size={11.5}
-            color={isAccepted ? colors.purple : colors.ink}
-          />
-          <Text
-            style={{
-              fontFamily: typography.family.sansBold,
-              fontSize: 10.5,
-              fontWeight: '700',
-              letterSpacing: 0.6,
-              color: isAccepted ? colors.purple : colors.ink,
-              textTransform: 'uppercase',
-            }}
-          >
-            {mine ? 'Offer sent' : 'Offer received'}
-          </Text>
-        </View>
-
-        {settled ? (
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 4,
-              paddingHorizontal: 8,
-              paddingVertical: 3,
-              borderRadius: radii.pill,
-              backgroundColor: isAccepted
-                ? colors.purpleSoft
-                : isDeclined
-                ? 'rgba(239,68,68,0.10)'
-                : colors.surface,
-            }}
-          >
-            <Feather
-              name={settled.icon}
-              size={11.5}
-              color={
-                isAccepted
-                  ? colors.purple
-                  : isDeclined
-                  ? '#DC2626'
-                  : colors.muteSoft
-              }
-            />
-            <Text
-              style={{
-                fontFamily: typography.family.sansBold,
-                fontSize: 11,
-                fontWeight: '700',
-                color:
-                  isAccepted
-                    ? colors.purple
-                    : isDeclined
-                    ? '#DC2626'
-                    : colors.muteSoft,
-              }}
-            >
-              {settled.label}
-            </Text>
-          </View>
-        ) : (
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 5,
-              paddingHorizontal: 8,
-              paddingVertical: 3,
-              borderRadius: radii.pill,
-              backgroundColor: colors.surface,
-            }}
-          >
-            <View
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: 3,
-                backgroundColor: colors.purple,
-              }}
-            />
-            <Text
-              style={{
-                fontFamily: typography.family.sansSemibold,
-                fontSize: 11,
-                fontWeight: '600',
-                color: colors.mute,
-              }}
-            >
-              Pending
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* ── Product Context Snippet (if available) ── */}
-      {listingTitle ? (
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 10,
-            paddingBottom: 12,
-            marginBottom: 12,
-            borderBottomWidth: 1,
-            borderBottomColor: colors.hairline,
-          }}
-        >
-          {listingThumb ? (
-            <Image
-              source={{ uri: listingThumb }}
-              style={{
-                width: 38,
-                height: 38,
-                borderRadius: radii.md,
-                backgroundColor: colors.surface,
-              }}
-              contentFit="cover"
-            />
-          ) : (
-            <View
-              style={{
-                width: 38,
-                height: 38,
-                borderRadius: radii.md,
-                backgroundColor: colors.surface,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Feather name="tag" size={16} color={colors.mute} />
-            </View>
-          )}
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text
-              numberOfLines={1}
-              style={{
-                fontFamily: typography.family.sansBold,
-                fontSize: 13,
-                color: colors.ink,
-                letterSpacing: -0.1,
-              }}
-            >
-              {listingTitle}
-            </Text>
-            {listingPrice != null && (
-              <Text
-                style={{
-                  fontFamily: typography.family.sans,
-                  fontSize: 11.5,
-                  color: colors.muteSoft,
-                  marginTop: 1,
-                }}
-              >
-                Listed at {formatPrice(listingPrice)}
-              </Text>
-            )}
-          </View>
-        </View>
-      ) : null}
-
-      {/* ── Hero Price Container ── */}
-      <View
-        style={{
-          backgroundColor: colors.surface,
-          borderRadius: radii.xl,
-          paddingHorizontal: 16,
-          paddingVertical: 14,
-          borderWidth: 1,
-          borderColor: colors.hairline,
-        }}
-      >
-        <Text
-          style={{
-            fontFamily: typography.family.sansSemibold,
-            fontSize: 10.5,
-            fontWeight: '600',
-            color: colors.muteSoft,
-            textTransform: 'uppercase',
-            letterSpacing: 0.6,
-          }}
-        >
-          Offered Price
-        </Text>
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'baseline',
-            gap: 8,
-            marginTop: 4,
-            flexWrap: 'wrap',
-          }}
-        >
-          <Text
-            style={{
-              fontFamily: typography.family.sansBold,
-              fontSize: 24,
-              fontWeight: '700',
-              letterSpacing: -0.5,
-              color: colors.ink,
-            }}
-          >
-            {formatPrice(amount)}
-          </Text>
-          {showStruck && (
-            <Text
-              style={{
-                fontFamily: typography.family.sans,
-                fontSize: 13.5,
-                color: colors.muteSoft,
-                textDecorationLine: 'line-through',
-              }}
-            >
-              {formatPrice(listingPrice)}
-            </Text>
-          )}
-          {discountPct > 0 && (
-            <View
-              style={{
-                backgroundColor: colors.purpleSoft,
-                paddingHorizontal: 6,
-                paddingVertical: 2,
-                borderRadius: radii.sm,
-              }}
-            >
-              <Text
-                style={{
-                  fontFamily: typography.family.sansBold,
-                  fontSize: 11,
-                  fontWeight: '700',
-                  color: colors.purple,
-                }}
-              >
-                −{discountPct}% ({formatPrice(savingsAmount)} off)
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Protection fee helper line */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 5,
-            marginTop: 8,
-            paddingTop: 8,
-            borderTopWidth: 1,
-            borderTopColor: colors.hairline,
-          }}
-        >
-          <Feather name="shield" size={11} color={colors.purple} />
-          <Text
-            style={{
-              fontFamily: typography.family.sans,
-              fontSize: 11,
-              color: colors.mute,
-            }}
-          >
-            Includes {formatPrice(fee)} Buyer Protection
-          </Text>
-        </View>
-      </View>
-
-      {/* ── Optional Note ── */}
-      {msg.metadata?.note ? (
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'flex-start',
-            gap: 8,
-            marginTop: 10,
-            paddingHorizontal: 12,
-            paddingVertical: 8,
-            backgroundColor: colors.surface,
-            borderRadius: radii.md,
-            borderLeftWidth: 3,
-            borderLeftColor: colors.purple,
-          }}
-        >
-          <Text
-            style={{
-              fontFamily: typography.family.sans,
-              fontSize: 13,
-              lineHeight: 18,
-              color: colors.ink,
-              flex: 1,
-            }}
-          >
-            {`"${msg.metadata.note}"`}
-          </Text>
-        </View>
-      ) : null}
-
-      {/* ── Action Buttons for Seller ── */}
-      {canRespond && (
-        <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
-          <PressableScale
-            onPress={() => {
-              if (Platform.OS !== 'web') {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-              }
-              onDecline();
-            }}
-            accessibilityLabel="Decline offer"
-            style={{
-              flex: 1,
-              height: 42,
-              borderRadius: radii.pill,
-              borderWidth: 1,
-              borderColor: colors.border,
-              backgroundColor: colors.surface,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Text
-              style={{
-                fontFamily: typography.family.sansBold,
-                fontSize: 13,
-                fontWeight: '700',
-                color: colors.ink,
-              }}
-            >
-              Decline
-            </Text>
-          </PressableScale>
-          <PressableScale
-            onPress={() => {
-              if (Platform.OS !== 'web') {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-              }
-              onAccept();
-            }}
-            accessibilityLabel="Accept offer"
-            style={{
-              flex: 1.3,
-              height: 42,
-              borderRadius: radii.pill,
-              backgroundColor: colors.purple,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 6,
-              ...shadow.sm,
-            }}
-          >
-            <Feather name="check" size={14} color="#FFFFFF" />
-            <Text
-              style={{
-                fontFamily: typography.family.sansBold,
-                fontSize: 13,
-                fontWeight: '700',
-                color: '#FFFFFF',
-              }}
-            >
-              Accept
-            </Text>
-          </PressableScale>
-        </View>
-      )}
-
-      {/* ── CTA for Buyer to Pay ── */}
-      {canPay && (
-        <View style={{ marginTop: 14 }}>
-          <PressableScale
-            onPress={() => {
-              if (Platform.OS !== 'web') {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-              }
-              onPay(amount);
-            }}
-            accessibilityLabel={`Pay ${formatPrice(amount)}`}
-            style={{
-              height: 48,
-              borderRadius: radii.pill,
-              backgroundColor: colors.purple,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-              ...shadow.sm,
-            }}
-          >
-            <Feather name="credit-card" size={15} color="#FFFFFF" />
-            <Text
-              style={{
-                fontFamily: typography.family.sansBold,
-                fontSize: 14,
-                fontWeight: '700',
-                color: '#FFFFFF',
-              }}
-            >
-              Complete Purchase · Pay {formatPrice(amount)}
-            </Text>
-          </PressableScale>
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 5,
-              marginTop: 8,
-            }}
-          >
-            <Feather name="shield" size={11} color={colors.purple} />
-            <Text
-              style={{
-                fontFamily: typography.family.sansMedium,
-                fontSize: 11,
-                color: colors.muteSoft,
-              }}
-            >
-              Escrow Protected · Funds released after delivery
-            </Text>
-          </View>
-        </View>
-      )}
-
-      {/* ── Status Footers ── */}
-      {awaitingPayment && (
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 6,
-            marginTop: 12,
-            paddingVertical: 2,
-          }}
-        >
-          <Feather name="clock" size={12} color={colors.muteSoft} />
-          <Text
-            style={{
-              fontFamily: typography.family.sansMedium,
-              fontSize: 11.5,
-              color: colors.muteSoft,
-            }}
-          >
-            Waiting for buyer to complete checkout
-          </Text>
-        </View>
-      )}
-
-      {status === 'accepted' && isPaid && (
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 6,
-            marginTop: 12,
-            paddingVertical: 2,
-          }}
-        >
-          <Feather name="shield" size={12.5} color={colors.purple} />
-          <Text
-            style={{
-              fontFamily: typography.family.sansBold,
-              fontSize: 11.5,
-              fontWeight: '700',
-              color: colors.purple,
-            }}
-          >
-            Paid · Covered by Buyer Protection 🛡️
-          </Text>
-        </View>
-      )}
-    </View>
+    <IncomingOfferCard
+      msg={msg}
+      senderName={senderName}
+      listingPrice={listingPrice}
+      listingSold={listingSold}
+      isSeller={isSeller}
+      canRespond={canRespond}
+      canPay={canPay}
+      awaitingPayment={awaitingPayment}
+      isPaid={isPaid}
+      onAccept={onAccept}
+      onDecline={onDecline}
+      onCounterOffer={onCounterOffer}
+      onPay={onPay}
+    />
   );
 }
 
@@ -809,7 +806,7 @@ function ReactionChip({ reactions, mine }: { reactions: string[]; mine: boolean 
 // ── Row ───────────────────────────────────────────────────────────────────
 
 function MessageRowImpl(props: MessageRowProps) {
-  const { msg, mine, grouped, lastOfGroup, senderName, reactions, onRetry, onLongPress } = props;
+  const { msg, mine, grouped, lastOfGroup, senderName, senderAvatar, reactions, onRetry, onLongPress } = props;
   const bubbleRef = useRef<View>(null);
 
   // A message that hasn't landed yet has no server id to hang a reaction off.
@@ -834,36 +831,69 @@ function MessageRowImpl(props: MessageRowProps) {
     <View
       style={{
         paddingHorizontal: 16,
-        marginTop: grouped ? 2 : 12,
+        marginTop: grouped ? 2 : 10,
         alignItems: mine ? 'flex-end' : 'flex-start',
       }}
     >
-      <Pressable
-        ref={bubbleRef}
-        onLongPress={canReact ? handleLongPress : undefined}
-        // Long enough not to fire while someone is scrolling with a finger
-        // resting on a bubble, short enough to feel deliberate.
-        delayLongPress={320}
-        accessibilityRole={canReact ? 'button' : undefined}
-        accessibilityLabel={canReact ? 'Message. Long press to react' : undefined}
-        // No pressed styling: the bubble isn't a button, and flashing it on
-        // every tap-through would be noise.
-        //
-        // The width cap lives here, not on the bubble: this is the outermost
-        // node with a definite-width parent, so the percentage has something
-        // real to resolve against. On the bubble it resolved against a
-        // shrink-wrapped parent, which on web collapses to min-content — one
-        // character per line.
+      <View
         style={{
-          maxWidth: msg.kind === 'offer' ? '86%' : '78%',
-          alignItems: mine ? 'flex-end' : 'flex-start',
+          flexDirection: 'row',
+          alignItems: 'flex-end',
+          gap: 8,
+          maxWidth: '100%',
         }}
       >
-        {msg.kind === 'offer' ? <OfferBubble {...props} /> : <TextBubble {...props} />}
-        <ReactionChip reactions={reactions} mine={mine} />
-      </Pressable>
+        {!mine && (
+          <View style={{ width: 28, height: 28, marginBottom: 2 }}>
+            {lastOfGroup ? (
+              senderAvatar ? (
+                <Image
+                  source={{ uri: senderAvatar }}
+                  style={{ width: 28, height: 28, borderRadius: 14 }}
+                  contentFit="cover"
+                />
+              ) : (
+                <View
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 14,
+                    backgroundColor: '#F3F4F6',
+                    borderWidth: 1,
+                    borderColor: '#E5E7EB',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Feather name="user" size={15} color="#9CA3AF" />
+                </View>
+              )
+            ) : null}
+          </View>
+        )}
+
+        <Pressable
+          ref={bubbleRef}
+          onLongPress={canReact ? handleLongPress : undefined}
+          // Long enough not to fire while someone is scrolling with a finger
+          // resting on a bubble, short enough to feel deliberate.
+          delayLongPress={320}
+          accessibilityRole={canReact ? 'button' : undefined}
+          accessibilityLabel={canReact ? 'Message. Long press to react' : undefined}
+          style={{
+            maxWidth: msg.kind === 'offer' ? (mine ? '86%' : '82%') : '78%',
+            alignItems: mine ? 'flex-end' : 'flex-start',
+          }}
+        >
+          {msg.kind === 'offer' ? <OfferBubble {...props} /> : <TextBubble {...props} />}
+          <ReactionChip reactions={reactions} mine={mine} />
+        </Pressable>
+      </View>
+
       {lastOfGroup && (
-        <MetaLine msg={msg} mine={mine} senderName={senderName} onRetry={onRetry} />
+        <View style={{ marginLeft: mine ? 0 : 36 }}>
+          <MetaLine msg={msg} mine={mine} senderName={senderName} onRetry={onRetry} />
+        </View>
       )}
     </View>
   );

@@ -1,0 +1,526 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// PRODUCT DETAILS TABLE (PRESENTATIONAL)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// 💡 EDUCATIONAL PATTERN: Structured Attribute Grids & Controlled Text Clamping
+// This component organizes all product attributes (condition, size, color, brand,
+// categories) and controlled text expansion into a cohesive editorial block.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { memo, useMemo } from 'react';
+import { View, Pressable, Alert } from 'react-native';
+import { Text } from '@/lib/rnText';
+import { router } from 'expo-router';
+import Feather from '@expo/vector-icons/Feather';
+import { colors } from '@/lib/theme';
+import { formatPrice } from '@/lib/currency';
+import { categoryLabel, subcategoryLabel } from '@/lib/categories';
+import { itemColorLabel } from '@/lib/itemColors';
+import { ColorSwatch } from '@/components/ColorSwatch';
+import { SafetyBanner } from '@/components/SafetyBanner';
+import {
+  BRAND_PURPLE,
+  CONDITION_LABELS,
+  HAIRLINE,
+  conditionLabel,
+  tap,
+  timeAgo,
+} from '@/components/product/shared';
+import type { Listing } from '@/types';
+
+const DESC_CLAMP_LINES = 6;
+const LABEL_W = 104;
+
+type DetailRow = {
+  label: string;
+  value?: string | null;
+  link?: boolean;
+  onPress?: () => void;
+  trailing?: React.ReactNode;
+};
+
+type ProductDetailsTableProps = {
+  listing: Listing;
+  bpFee: number;
+  descExpanded: boolean;
+  onToggleDescExpanded: () => void;
+  onOpenBpSheet: () => void;
+  onShare: () => void;
+  onReport: () => void;
+};
+
+export const ProductDetailsTable = memo(function ProductDetailsTable({
+  listing,
+  bpFee,
+  descExpanded,
+  onToggleDescExpanded,
+  onOpenBpSheet,
+  onShare,
+  onReport,
+}: ProductDetailsTableProps) {
+  const heartCount = Math.max(0, Number(listing.likes ?? 0));
+  const itemPrice = Number(listing.price ?? 0);
+  const catSubLabel = listing.subcategory
+    ? subcategoryLabel(listing.category, listing.subcategory)
+    : '';
+
+  // Description paragraphs handling
+  const descParas = useMemo(
+    () =>
+      String(listing.description ?? '')
+        .split('|')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    [listing.description],
+  );
+  const descFull = useMemo(() => descParas.join('\n\n'), [descParas]);
+  const descIsLong = descFull.length > 240 || descParas.length > 3;
+  const hasDescription = descParas.length > 0;
+
+  // Metadata segments
+  const metaSegments = useMemo(() => {
+    const cond = conditionLabel(listing.condition);
+    const uploaded = listing.created_at ? timeAgo(listing.created_at) : '';
+    return [
+      listing.size ? { text: `Size ${listing.size}` } : null,
+      cond ? { text: cond } : null,
+      listing.brand ? { text: listing.brand, link: true } : null,
+      listing.seller?.location ? { text: listing.seller.location } : null,
+      uploaded ? { text: `Uploaded ${uploaded}` } : null,
+    ].filter(Boolean) as { text: string; link?: boolean }[];
+  }, [listing.size, listing.condition, listing.brand, listing.seller?.location, listing.created_at]);
+
+  // Attribute Rows
+  const detailRows: DetailRow[] = useMemo(
+    () => [
+      {
+        label: 'Brand',
+        value: listing.brand,
+        link: !!listing.brand,
+        onPress: listing.brand
+          ? () => {
+              tap('selection');
+              router.push(`/(tabs)/discover?q=${encodeURIComponent(listing.brand!)}` as any);
+            }
+          : undefined,
+        trailing: listing.brand ? <Feather name="chevron-right" size={18} color={colors.mute} /> : undefined,
+      },
+      {
+        label: 'Size',
+        value: listing.size,
+      },
+      {
+        label: 'Condition',
+        value: CONDITION_LABELS[listing.condition] ?? listing.condition,
+        onPress: () =>
+          Alert.alert(
+            'Condition guide',
+            'New with tags — Unworn, original tags still attached\n\n' +
+              'Like new — Worn once or twice, no visible flaws\n\n' +
+              'Very good — Gently used, only minor signs of wear\n\n' +
+              'Fair — Noticeable wear, but still fully wearable',
+          ),
+        trailing: <Feather name="info" size={17} color={colors.mute} />,
+      },
+      ...(listing.color
+        ? [
+            {
+              label: 'Color',
+              value: itemColorLabel(listing.color),
+              trailing: <ColorSwatch colorId={listing.color} size={18} />,
+            },
+          ]
+        : []),
+      ...(listing.created_at ? [{ label: 'Uploaded', value: timeAgo(listing.created_at) }] : []),
+    ],
+    [listing.brand, listing.size, listing.condition, listing.color, listing.created_at],
+  );
+
+  return (
+    <>
+      {/* ── Title & Price Header ── */}
+      <View style={{ paddingHorizontal: 20, paddingTop: 22, paddingBottom: 14 }}>
+        {heartCount > 0 && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 6 }}>
+            <Feather name="heart" size={12} color={colors.mute} />
+            <Text style={{ fontSize: 12, color: colors.mute, fontFamily: 'Inter_500Medium' }}>
+              Liked by <Text style={{ fontFamily: 'Inter_700Bold', color: colors.ink }}>{heartCount} {heartCount === 1 ? 'person' : 'people'}</Text>
+            </Text>
+          </View>
+        )}
+
+        <Text
+          style={{
+            fontSize: 28,
+            fontFamily: 'Inter_700Bold',
+            color: colors.ink,
+            lineHeight: 33,
+            letterSpacing: -0.7,
+          }}
+          numberOfLines={2}
+        >
+          {listing.title}
+        </Text>
+
+        {metaSegments.length > 0 && (
+          <Text
+            numberOfLines={2}
+            style={{ marginTop: 10, fontSize: 14, lineHeight: 20, color: colors.mute, fontFamily: 'Inter_500Medium' }}
+          >
+            {metaSegments.map((s, i) => (
+              <Text key={i}>
+                {i > 0 ? <Text style={{ color: colors.muteSoft }}>{' · '}</Text> : null}
+                {s.link ? (
+                  <Text
+                    style={{
+                      color: BRAND_PURPLE,
+                      fontFamily: 'Inter_600SemiBold',
+                      textDecorationLine: 'underline',
+                    }}
+                    accessibilityRole="link"
+                    accessibilityLabel={`Shop more from ${s.text}`}
+                    onPress={() => {
+                      tap('selection');
+                      router.push(`/(tabs)/discover?q=${encodeURIComponent(listing.brand!)}` as any);
+                    }}
+                  >
+                    {s.text}
+                  </Text>
+                ) : (
+                  s.text
+                )}
+              </Text>
+            ))}
+          </Text>
+        )}
+
+        <View style={{ marginTop: 18 }}>
+          <Text
+            style={{
+              fontSize: 22,
+              fontFamily: 'Inter_700Bold',
+              color: colors.ink,
+              letterSpacing: -0.4,
+            }}
+          >
+            {formatPrice(itemPrice, { whole: true })}
+          </Text>
+          {bpFee > 0 ? (
+            <Pressable
+              onPress={() => { tap('selection'); onOpenBpSheet(); }}
+              accessibilityRole="button"
+              accessibilityLabel={`Plus ${formatPrice(bpFee)} Buyer Protection fee. See the breakdown.`}
+              hitSlop={8}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 7,
+                marginTop: 6,
+                alignSelf: 'flex-start',
+                minHeight: 28,
+                opacity: pressed ? 0.6 : 1,
+              })}
+            >
+              <Text style={{ fontSize: 14, fontFamily: 'Inter_500Medium', color: colors.mute }}>
+                +{formatPrice(bpFee)} Buyer Protection fee
+              </Text>
+              <Feather name="shield" size={15} color={BRAND_PURPLE} />
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
+
+      {/* ── Description + Details Box ── */}
+      <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 6 }}>
+        <View
+          style={{
+            backgroundColor: colors.white,
+            borderRadius: 18,
+            borderWidth: HAIRLINE,
+            borderColor: colors.border,
+            overflow: 'hidden',
+          }}
+        >
+          {hasDescription && (
+            <View
+              style={{
+                paddingHorizontal: 18,
+                paddingTop: 18,
+                paddingBottom: descIsLong ? 8 : 18,
+              }}
+            >
+              <Text
+                numberOfLines={descIsLong && !descExpanded ? DESC_CLAMP_LINES : undefined}
+                style={{
+                  fontSize: 15,
+                  color: colors.ink,
+                  lineHeight: 24,
+                  fontFamily: 'Inter_400Regular',
+                }}
+              >
+                {descFull}
+              </Text>
+              {descIsLong && (
+                <Pressable
+                  onPress={() => { tap('selection'); onToggleDescExpanded(); }}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel={descExpanded ? 'Collapse description' : 'Expand full description'}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4,
+                    minHeight: 44,
+                    opacity: pressed ? 0.6 : 1,
+                  })}
+                >
+                  <Text style={{ fontSize: 13, fontFamily: 'Inter_600SemiBold', color: BRAND_PURPLE, letterSpacing: 0.2 }}>
+                    {descExpanded ? 'Show less' : 'Read more'}
+                  </Text>
+                  <Feather
+                    name={descExpanded ? 'chevron-up' : 'chevron-down'}
+                    size={16}
+                    color={BRAND_PURPLE}
+                  />
+                </Pressable>
+              )}
+            </View>
+          )}
+
+          {/* Category Breadcrumb */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingHorizontal: 18,
+              paddingVertical: 16,
+              borderTopWidth: hasDescription ? HAIRLINE : 0,
+              borderTopColor: colors.border,
+            }}
+          >
+            <Text
+              style={{
+                width: LABEL_W,
+                fontFamily: 'Inter_600SemiBold',
+                fontSize: 15,
+                color: colors.ink,
+                letterSpacing: 0.1,
+              }}
+            >
+              Category
+            </Text>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+              <Pressable
+                onPress={() => {
+                  tap('selection');
+                  router.push(`/(tabs)/discover?category=${encodeURIComponent(listing.category)}` as any);
+                }}
+                style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+              >
+                <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 15, color: colors.mute }}>
+                  {categoryLabel(listing.category)}
+                </Text>
+              </Pressable>
+              {catSubLabel ? (
+                <>
+                  <Feather
+                    name="chevron-right"
+                    size={14}
+                    color={colors.mute}
+                    style={{ marginHorizontal: 3 }}
+                  />
+                  <Pressable
+                    onPress={() => {
+                      tap('selection');
+                      router.push(
+                        `/(tabs)/discover?category=${encodeURIComponent(listing.category)}&sub=${encodeURIComponent(listing.subcategory!)}` as any,
+                      );
+                    }}
+                    style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+                  >
+                    <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 15, color: colors.mute }}>
+                      {catSubLabel}
+                    </Text>
+                  </Pressable>
+                </>
+              ) : null}
+            </View>
+            <Feather
+              name="chevron-right"
+              size={18}
+              color={colors.mute}
+              style={{ marginLeft: 10 }}
+            />
+          </View>
+
+          {/* Attribute Rows */}
+          {detailRows.map((row) => (
+            <Pressable
+              key={row.label}
+              onPress={row.onPress}
+              disabled={!row.onPress}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 18,
+                paddingVertical: 16,
+                borderTopWidth: HAIRLINE,
+                borderTopColor: colors.border,
+                backgroundColor: pressed && row.onPress ? colors.panel : colors.white,
+              })}
+            >
+              <Text
+                style={{
+                  width: LABEL_W,
+                  fontSize: 15,
+                  fontFamily: 'Inter_600SemiBold',
+                  color: colors.ink,
+                  letterSpacing: 0.1,
+                }}
+              >
+                {row.label}
+              </Text>
+              <Text
+                style={{
+                  flex: 1,
+                  fontSize: 15,
+                  fontFamily: 'Inter_400Regular',
+                  color: row.link ? BRAND_PURPLE : colors.mute,
+                }}
+                numberOfLines={1}
+              >
+                {row.value}
+              </Text>
+              {row.trailing ? <View style={{ marginLeft: 10 }}>{row.trailing}</View> : null}
+            </Pressable>
+          ))}
+        </View>
+
+        {/* Tag Chips */}
+        {listing.tags && listing.tags.length > 0 && (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 16, gap: 8, paddingHorizontal: 4 }}>
+            {listing.tags.map((tag) => (
+              <Pressable
+                key={tag}
+                onPress={() => router.push(`/(tabs)/discover?q=${encodeURIComponent(tag)}` as any)}
+                style={({ pressed }) => ({
+                  backgroundColor: colors.white,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  borderRadius: 999,
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  opacity: pressed ? 0.6 : 1,
+                })}
+              >
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: colors.ink,
+                    fontFamily: 'Inter_500Medium',
+                    letterSpacing: 0.1,
+                  }}
+                >
+                  #{tag}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        {/* Share / Report / ID Footer Row */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginTop: 22,
+            paddingHorizontal: 4,
+          }}
+        >
+          <Pressable
+            onPress={onShare}
+            accessibilityRole="button"
+            accessibilityLabel="Share this listing"
+            hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+            style={({ pressed }) => ({
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              paddingVertical: 6,
+              opacity: pressed ? 0.6 : 1,
+            })}
+          >
+            <Feather name="share-2" size={16} color={colors.ink} />
+            <Text
+              style={{
+                fontSize: 13,
+                color: colors.ink,
+                fontFamily: 'Inter_600SemiBold',
+                letterSpacing: 0.2,
+              }}
+            >
+              Share
+            </Text>
+          </Pressable>
+
+          <View
+            pointerEvents="box-none"
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: 0,
+              bottom: 0,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Pressable
+              onPress={onReport}
+              accessibilityRole="button"
+              accessibilityLabel="Report this listing"
+              hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8,
+                paddingVertical: 6,
+                transform: [{ translateX: -12 }],
+                opacity: pressed ? 0.6 : 1,
+              })}
+            >
+              <Feather name="flag" size={16} color={colors.mute} />
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: colors.mute,
+                  fontFamily: 'Inter_600SemiBold',
+                  letterSpacing: 0.2,
+                }}
+              >
+                Report
+              </Text>
+            </Pressable>
+          </View>
+
+          <Text
+            style={{
+              fontSize: 12,
+              color: colors.mute,
+              letterSpacing: 0.4,
+              fontFamily: 'Inter_500Medium',
+            }}
+          >
+            ID · {listing.id.slice(0, 8)}
+          </Text>
+        </View>
+      </View>
+
+      {/* Safety & Trust Banner */}
+      <View style={{ paddingHorizontal: 16, paddingTop: 22, paddingBottom: 6 }}>
+        <SafetyBanner />
+      </View>
+    </>
+  );
+});

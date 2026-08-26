@@ -1,0 +1,141 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// PRODUCT RELATED SECTION (PRESENTATIONAL)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// 💡 EDUCATIONAL PATTERN: Tabbed Content Switcher & Related Discovery
+// Encapsulates the multi-item bundle builder tab and the collaborative filtering
+// similar items tab into a single memoized component.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { memo } from 'react';
+import { View, Pressable } from 'react-native';
+import { Text } from '@/lib/rnText';
+import { router } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { colors } from '@/lib/theme';
+import { BundleSection } from '@/components/product/BundleSection';
+import { RelatedItemCard } from '@/components/product/RelatedItemCard';
+import {
+  CARD_GAP,
+  CARD_OUTER_PAD,
+  listingToRelated,
+  tap,
+} from '@/components/product/shared';
+import type { Listing } from '@/types';
+
+type ProductRelatedSectionProps = {
+  listing: Listing;
+  relatedTab: 'members' | 'similar';
+  sellerItems: Listing[];
+  similarItems: Listing[];
+  selectedBundleIds: Set<string>;
+  onTabChange: (tab: 'members' | 'similar') => void;
+  onToggleBundleItem: (id: string) => void;
+  onSelectAllBundle: () => void;
+  onClearAllBundle: () => void;
+  onSendBundleOffer: (amount: number) => void;
+};
+
+export const ProductRelatedSection = memo(function ProductRelatedSection({
+  listing,
+  relatedTab,
+  sellerItems,
+  similarItems,
+  selectedBundleIds,
+  onTabChange,
+  onToggleBundleItem,
+  onSelectAllBundle,
+  onClearAllBundle,
+  onSendBundleOffer,
+}: ProductRelatedSectionProps) {
+  return (
+    <View style={{ marginTop: 22 }}>
+      {/* Tab Pills: Seller's Items vs Similar Items */}
+      <View style={{ flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 4 }}>
+        {(['members', 'similar'] as const).map((tab) => {
+          const active = relatedTab === tab;
+          return (
+            <Pressable
+              key={tab}
+              onPress={() => {
+                tap('selection');
+                onTabChange(tab);
+              }}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 16,
+                paddingVertical: 9,
+                borderRadius: 999,
+                backgroundColor: active ? colors.selected : colors.white,
+                borderWidth: 1,
+                borderColor: colors.border,
+                transform: [{ scale: pressed ? 0.96 : 1 }],
+              })}
+            >
+              <Ionicons
+                name={tab === 'members' ? 'person' : 'sparkles'}
+                size={13}
+                color={colors.ink}
+                style={{ marginRight: 6 }}
+              />
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: '700',
+                  color: colors.ink,
+                }}
+              >
+                {tab === 'members' ? "Seller's items" : 'Similar items'}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {/* Tab Contents */}
+      {relatedTab === 'members' ? (
+        <BundleSection
+          listing={listing}
+          sellerItems={sellerItems}
+          selectedIds={selectedBundleIds}
+          onToggle={onToggleBundleItem}
+          onSelectAll={onSelectAllBundle}
+          onClearAll={onClearAllBundle}
+          onSendBundleOffer={onSendBundleOffer}
+        />
+      ) : (
+        <View style={{ paddingTop: 18 }}>
+          {similarItems.length === 0 ? (
+            <View style={{ paddingHorizontal: 20, paddingVertical: 14 }}>
+              <Text style={{ fontSize: 13, color: colors.mute }}>
+                No similar items found yet — check back soon.
+              </Text>
+            </View>
+          ) : (
+            <View
+              style={{
+                width: '100%',
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                paddingHorizontal: CARD_OUTER_PAD,
+                columnGap: CARD_GAP,
+              }}
+            >
+              {similarItems.map((row) => {
+                const item = listingToRelated(row);
+                return (
+                  <RelatedItemCard
+                    key={item.id}
+                    item={item}
+                    onPress={() => router.push(`/product/${item.id}`)}
+                  />
+                );
+              })}
+            </View>
+          )}
+        </View>
+      )}
+    </View>
+  );
+});

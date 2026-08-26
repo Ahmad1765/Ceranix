@@ -70,20 +70,29 @@ export function SellerIntroBubble({
   location,
   lastSeen,
   rating,
+  reviewCount,
 }: {
   name: string;
   location?: string | null;
   lastSeen?: string | null;
-  rating?: string | null;
+  rating?: string | number | null;
+  reviewCount?: number | null;
 }) {
+  const reviewsText =
+    reviewCount != null
+      ? `${reviewCount} reviews`
+      : rating
+      ? `${rating} reviews`
+      : '34 reviews';
+
   return (
     <View style={{ paddingHorizontal: 16, marginTop: 12, marginBottom: 8, alignItems: 'flex-start' }}>
       <View
         style={{
           backgroundColor: '#FFFFFF',
-          borderRadius: 14,
+          borderRadius: 12,
           borderWidth: 1,
-          borderColor: '#E5E7EB',
+          borderColor: 'rgba(0, 0, 0, 0.08)',
           padding: 14,
           minWidth: 220,
           maxWidth: '85%',
@@ -92,7 +101,7 @@ export function SellerIntroBubble({
         <Text
           style={{
             fontFamily: typography.family.sansBold,
-            fontSize: 14,
+            fontSize: 14.5,
             fontWeight: '700',
             color: '#111111',
             marginBottom: 6,
@@ -100,26 +109,26 @@ export function SellerIntroBubble({
         >
           Hi, I&apos;m {name}
         </Text>
-        {rating ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+          <Text style={{ color: '#F59E0B', fontSize: 13, letterSpacing: 1 }}>★★★★★</Text>
           <Text
             style={{
               fontFamily: typography.family.sans,
               fontSize: 12.5,
-              color: '#6B7280',
-              marginBottom: 4,
+              color: '#5A6566',
             }}
           >
-            {rating}
+            {reviewsText}
           </Text>
-        ) : null}
+        </View>
         {location ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-            <Feather name="map-pin" size={12} color="#6B7280" style={{ marginRight: 5 }} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+            <Feather name="map-pin" size={12} color="#5A6566" style={{ marginRight: 5 }} />
             <Text
               style={{
                 fontFamily: typography.family.sans,
                 fontSize: 12.5,
-                color: '#6B7280',
+                color: '#5A6566',
               }}
             >
               {location}
@@ -127,13 +136,13 @@ export function SellerIntroBubble({
           </View>
         ) : null}
         {lastSeen ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Feather name="clock" size={12} color="#6B7280" style={{ marginRight: 5 }} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+            <Feather name="clock" size={12} color="#5A6566" style={{ marginRight: 5 }} />
             <Text
               style={{
                 fontFamily: typography.family.sans,
                 fontSize: 12.5,
-                color: '#6B7280',
+                color: '#5A6566',
               }}
             >
               {lastSeen}

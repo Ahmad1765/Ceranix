@@ -1,5 +1,22 @@
-import { capture } from '@/lib/analytics';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+// ─────────────────────────────────────────────────────────────────────────────
+// CONVERSATION SCREEN (CONTAINER / COORDINATOR)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// 💡 EDUCATIONAL PATTERN: Container vs. Presentational Component Pattern
+//
+// 1. Separation of Concerns:
+//    This screen acts purely as a "Container / Coordinator":
+//    - It manages route parameters (`useLocalSearchParams`).
+//    - It coordinates custom hooks (`useConversationThread`, `useConversationBlock`).
+//    - It delegates rendering to focused subcomponents (`ThreadHeader`, `MessageRow`,
+//      `ConversationListingHeader`, `ConversationBlockedBanner`, `ConversationActionSheets`).
+//
+// 2. High Cohesion & Low Coupling:
+//    WebSocket lifecycles, message reconciliation, and blocking workflows are no longer
+//    tangled inside UI render trees. They are self-contained, easily testable hooks.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   FlatList,
@@ -7,10 +24,7 @@ import {
   Platform,
   Pressable,
   ActivityIndicator,
-  Alert,
   StyleSheet,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
 } from 'react-native';
 import { Text } from '@/lib/rnText';
 import * as Clipboard from 'expo-clipboard';
@@ -19,64 +33,35 @@ import { safeBack } from '@/lib/nav';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
 import { useAuth } from '@/lib/auth';
-import {
-  fetchMessages,
-  fetchReactions,
-  getConversation,
-  markConversationRead,
-  sendMessage,
-  sendOffer,
-  setReaction,
-  subscribeToMessages,
-  subscribeToReactions,
-  updateOfferStatus,
-  otherParticipant,
-  type ChatMessage,
-  type ConversationRow,
-  type MessageReaction,
-} from '@/lib/chat';
-import { getOptimizedImageUrl } from '@/lib/images';
-import { useQueryClient } from '@tanstack/react-query';
-import { qk } from '@/lib/queries';
 import { useToast } from '@/lib/toast';
-import { captureError } from '@/lib/sentry';
-import { colors, radii, type as typography } from '@/lib/theme';
+import { colors, type as typography } from '@/lib/theme';
 import { formatPrice } from '@/lib/currency';
-import { buyerProtectionFee } from '@/lib/fees';
-import { EmptyState, SafeContainer, ThumbButton } from '@/components/ui';
+import { EmptyState, SafeContainer } from '@/components/ui';
 import { explainCoverage } from '@/components/SafetyBanner';
-import { reportListing, REPORT_REASONS } from '@/lib/reports';
-import { confirm } from '@/lib/confirm';
-import { blockUser, unblockUser, isUserBlocked, BLOCK_REASONS } from '@/lib/blocks';
 import { HIT_SLOP_8 } from '@/lib/responsive';
-import { withTimeout } from '@/lib/async';
-import { maybeSoftAskForPush } from '@/lib/notifications';
-import { OfferSheet } from '@/components/product/OfferSheet';
 import {
-  buildThreadRows,
-  ChatActionSheet,
+  type Anchor,
+  type ChatAction,
+  type MessageAction,
+  type ThreadRow,
   Composer,
+  ConversationActionSheets,
+  ConversationBlockedBanner,
+  ConversationListingHeader,
   DateDivider,
-  ListingThumb,
-  listingStatus,
   MessageRow,
   ReactionPicker,
   SafetyNote,
   SellerIntroBubble,
   ThreadHeader,
-  type Anchor,
-  type ChatAction,
-  type MessageAction,
-  type ThreadRow,
+  useConversationBlock,
+  useConversationThread,
 } from '@/components/chat';
 
-/** Breathing room under composer when keyboard is up */
+/** Breathing room under composer when software keyboard is up */
 const DOCK_GAP_KEYBOARD = 6;
-
-/** One shared empty array so an unreacted message keeps a stable prop identity */
 const EMPTY_REACTIONS: string[] = [];
 
-// Is the software keyboard up?
 function useKeyboardVisible(): boolean {
   const [visible, setVisible] = useState(false);
   useEffect(() => {
@@ -97,233 +82,24 @@ export default function ConversationScreen() {
   const conversationId = typeof id === 'string' ? id : '';
   const { user } = useAuth();
   const toast = useToast();
-  const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const keyboardUp = useKeyboardVisible();
-  const listRef = useRef<FlatList<ThreadRow>>(null);
 
-  const [conv, setConv] = useState<ConversationRow | null>(null);
-  const convListingId = conv?.listing_id ?? null;
-  const convListingPrice = conv?.listing?.price ?? null;
-  const convListingSold = conv?.listing?.is_sold ?? false;
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [reactions, setReactions] = useState<MessageReaction[]>([]);
-  const [pressed, setPressed] = useState<{ msg: ChatMessage; anchor: Anchor } | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [input, setInput] = useState('');
+  // ── Custom Domain Hooks ──────────────────────────────────────────────────
+  const thread = useConversationThread(conversationId, user);
+  const block = useConversationBlock(user, thread.other);
+
+  // ── Sheet & Context Menu Visibility States ───────────────────────────────
+  const [pressed, setPressed] = useState<{ msg: any; anchor: Anchor } | null>(null);
   const [offerVisible, setOfferVisible] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
-  const [blockSheetOpen, setBlockSheetOpen] = useState(false);
 
-  useEffect(() => {
-    if (!conversationId) return;
-    let cancelled = false;
-    setLoading(true);
-    (async () => {
-      let loaded:
-        | [Awaited<ReturnType<typeof getConversation>>, ChatMessage[], MessageReaction[]]
-        | null = null;
-      try {
-        loaded = await Promise.all([
-          withTimeout(getConversation(conversationId), 12_000, null),
-          withTimeout(fetchMessages(conversationId), 12_000, []),
-          withTimeout(fetchReactions(conversationId), 12_000, [] as MessageReaction[]),
-        ]);
-      } catch (e) {
-        console.warn('[conversation] load failed', e);
-      }
-
-      if (cancelled) return;
-      if (loaded !== null) {
-        setConv(loaded[0]);
-        setMessages(loaded[1]);
-        setReactions(loaded[2]);
-      }
-      setLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [conversationId]);
-
-  useEffect(() => {
-    if (!user?.id || !conversationId) return;
-    maybeSoftAskForPush(user.id).catch(() => {});
-  }, [user?.id, conversationId]);
-
-  useEffect(() => {
-    if (!conversationId) return;
-    const unsub = subscribeToMessages(conversationId, (event) => {
-      setMessages((prev) => {
-        if (event.type === 'insert') {
-          if (prev.some((m) => m.id === event.message.id)) return prev;
-          return [...prev, event.message];
-        }
-        return prev.map((m) => (m.id === event.message.id ? { ...m, ...event.message } : m));
-      });
-    });
-    return unsub;
-  }, [conversationId]);
-
-  useEffect(() => {
-    if (!conversationId || !user?.id) return;
-    markConversationRead(conversationId).then(() => {
-      queryClient.invalidateQueries({ queryKey: qk.inbox(user.id) });
-    });
-  }, [conversationId, user?.id, messages.length, queryClient]);
-
-  useEffect(() => {
-    if (!conversationId) return;
-    return subscribeToReactions(conversationId, (event) => {
-      setReactions((prev) => {
-        if (event.type === 'cleared') {
-          return prev.filter(
-            (r) => !(r.message_id === event.messageId && r.user_id === event.userId),
-          );
-        }
-        const { message_id, user_id, emoji } = event.reaction;
-        const rest = prev.filter((r) => !(r.message_id === message_id && r.user_id === user_id));
-        return [...rest, { message_id, user_id, emoji }];
-      });
-    });
-  }, [conversationId]);
-
-  const pinnedRef = useRef(true);
-  const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
-    pinnedRef.current = contentSize.height - (contentOffset.y + layoutMeasurement.height) < 60;
-  }, []);
-  const followEnd = useCallback(() => {
-    if (pinnedRef.current) listRef.current?.scrollToEnd({ animated: false });
-  }, []);
-
-  const other = useMemo(() => (user && conv ? otherParticipant(conv, user.id) : null), [user, conv]);
-  const isSeller = !!user && !!conv && conv.seller_id === user.id;
-  const rows = useMemo(() => buildThreadRows(messages), [messages]);
-
-  type BlockStatus = 'loading' | 'blocked' | 'unblocked' | 'unavailable';
-  const [blockStatus, setBlockStatus] = useState<BlockStatus>('loading');
-  const isBlocked = blockStatus === 'blocked';
-  const blockCheckReqIdRef = useRef(0);
-
-  useEffect(() => {
-    if (!user?.id || !other?.id) {
-      setBlockStatus('unavailable');
-      return;
-    }
-    let active = true;
-    const currentReqId = ++blockCheckReqIdRef.current;
-    setBlockStatus('loading');
-    isUserBlocked(user.id, other.id)
-      .then((blocked) => {
-        if (!active || currentReqId !== blockCheckReqIdRef.current) return;
-        setBlockStatus(blocked ? 'blocked' : 'unblocked');
-      })
-      .catch((err) => {
-        if (!active || currentReqId !== blockCheckReqIdRef.current) return;
-        console.warn('[conversation] failed to check block status', err);
-        setBlockStatus('unblocked');
-      });
-    return () => {
-      active = false;
-    };
-  }, [user?.id, other?.id]);
-
-  const handleToggleBlock = useCallback(async () => {
-    if (!user?.id || !other?.id) return;
-    const targetName = other.username ? `@${other.username}` : (other.full_name || 'this user');
-    if (isBlocked) {
-      const ok = await confirm({
-        title: `Unblock ${targetName}?`,
-        message: 'They will be able to message you and interact with your listings again.',
-        confirmLabel: 'Unblock',
-        cancelLabel: 'Cancel',
-      });
-      if (!ok) return;
-      blockCheckReqIdRef.current++;
-      const success = await unblockUser({ blockerId: user.id, blockedId: other.id });
-      if (success) {
-        setBlockStatus('unblocked');
-        toast.show(`Unblocked ${targetName}`);
-      } else {
-        setBlockStatus('blocked');
-        toast.show('Failed to unblock user. Please try again.');
-      }
-    } else {
-      setBlockSheetOpen(true);
-    }
-  }, [user?.id, other?.id, other?.username, other?.full_name, isBlocked, toast]);
-
-  const handleBlockWithReason = useCallback(
-    async (reasonLabel: string) => {
-      if (!user?.id || !other?.id) return;
-      setBlockSheetOpen(false);
-      const targetName = other.username ? `@${other.username}` : (other.full_name || 'this user');
-
-      blockCheckReqIdRef.current++;
-      const success = await blockUser({
-        blockerId: user.id,
-        blockedId: other.id,
-        blockedUsername: other.username ?? undefined,
-        reason: reasonLabel,
-      });
-      if (success) {
-        setBlockStatus('blocked');
-        toast.show(`Blocked ${targetName}`, {
-          variant: 'default',
-          icon: 'slash',
-        });
-      } else {
-        toast.show('Failed to block user. Please try again.');
-      }
-    },
-    [user?.id, other?.id, other?.username, other?.full_name, toast],
-  );
-
-
-  const byMessage = useMemo(() => {
-    const map = new Map<string, string[]>();
-    reactions.forEach((r) => {
-      const list = map.get(r.message_id);
-      if (list) list.push(r.emoji);
-      else map.set(r.message_id, [r.emoji]);
-    });
-    return map;
-  }, [reactions]);
-
-  const myReactionOn = useCallback(
-    (messageId: string) =>
-      reactions.find((r) => r.message_id === messageId && r.user_id === user?.id)?.emoji ?? null,
-    [reactions, user?.id],
-  );
-
-  const handleReact = useCallback(
-    async (emoji: string) => {
-      const msg = pressed?.msg;
-      if (!user || !msg) return;
-      const current = myReactionOn(msg.id);
-      const removing = current === emoji;
-      setPressed(null);
-
-      setReactions((prev) => {
-        const rest = prev.filter((r) => !(r.message_id === msg.id && r.user_id === user.id));
-        return removing ? rest : [...rest, { message_id: msg.id, user_id: user.id, emoji }];
-      });
-
-      const ok = await setReaction({
-        messageId: msg.id,
-        userId: user.id,
-        emoji: removing ? null : emoji,
-      });
-      if (!ok) {
-        setReactions(await fetchReactions(conversationId));
-        toast.show("Couldn't save reaction", { variant: 'default', icon: 'alert-triangle' });
-      }
-    },
-    [conversationId, myReactionOn, pressed?.msg, toast, user],
-  );
+  // ── Navigation & Clipboard Helpers ───────────────────────────────────────
+  const openListing = useCallback(() => {
+    if (thread.convListingId) router.push(`/product/${thread.convListingId}` as any);
+  }, [thread.convListingId]);
 
   const handleCopy = useCallback(async () => {
     const msg = pressed?.msg;
@@ -336,134 +112,104 @@ export default function ConversationScreen() {
     toast.show('Copied', { variant: 'success', icon: 'check' });
   }, [pressed?.msg, toast]);
 
-  const deliver = useCallback(
-    async (text: string, tempId: string) => {
-      if (!user || !conversationId) return;
-
-      let saved: ChatMessage | null = null;
-      let failure: unknown = null;
-      try {
-        saved = await sendMessage({ conversationId, senderId: user.id, content: text });
-      } catch (e) {
-        failure = e;
-      }
-
-      const delivered = saved;
-      if (delivered) {
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === delivered.id)) return prev.filter((m) => m.id !== tempId);
-          return prev.map((m) => (m.id === tempId ? delivered : m));
-        });
-        return;
-      }
-
-      console.warn('[conversation] send failed', failure ?? 'insert returned no row');
-      setMessages((prev) =>
-        prev.map((m) => (m.id === tempId ? { ...m, pending: false, failed: true } : m)),
-      );
-    },
-    [conversationId, user],
+  const messageActions: MessageAction[] = useMemo(
+    () => [{ id: 'copy', label: 'Copy', icon: 'copy', onPress: handleCopy }],
+    [handleCopy],
   );
 
-  const handleSend = useCallback(() => {
-    if (!user || !conversationId) return;
-    const text = input.trim();
-    if (!text) return;
-    const temp: ChatMessage = {
-      id: `temp-${Date.now()}`,
-      conversation_id: conversationId,
-      sender_id: user.id,
-      content: text,
-      kind: 'text',
-      metadata: null,
-      offer_status: null,
-      created_at: new Date().toISOString(),
-      pending: true,
-    };
-    pinnedRef.current = true;
-    setMessages((prev) => [...prev, temp]);
-    setInput('');
-    deliver(text, temp.id);
-  }, [conversationId, deliver, input, user]);
-
-  const handleRetry = useCallback(
-    (msg: ChatMessage) => {
-      setMessages((prev) =>
-        prev.map((m) => (m.id === msg.id ? { ...m, pending: true, failed: false } : m)),
-      );
-      deliver(msg.content, msg.id);
-    },
-    [deliver],
+  // ── Context Action Sheets Menus ──────────────────────────────────────────
+  const plusActions: ChatAction[] = useMemo(
+    () => [
+      ...(thread.canOffer
+        ? [
+            {
+              id: 'offer',
+              label: 'Make an offer',
+              hint: thread.convListingPrice ? `Listed at ${formatPrice(thread.convListingPrice)}` : undefined,
+              icon: 'tag' as const,
+              tone: 'primary' as const,
+              onPress: () => setOfferVisible(true),
+            },
+          ]
+        : []),
+      ...(thread.convListingId
+        ? [
+            {
+              id: 'listing',
+              label: 'View listing',
+              icon: 'external-link' as const,
+              onPress: openListing,
+            },
+          ]
+        : []),
+      {
+        id: 'coverage',
+        label: "How you're covered",
+        hint: 'Buyer Protection, payments, and support',
+        icon: 'shield' as const,
+        onPress: explainCoverage,
+      },
+    ],
+    [thread.canOffer, thread.convListingPrice, thread.convListingId, openListing],
   );
 
-  const handleSendOffer = useCallback(
-    async (amount: number, note: string) => {
-      if (!user || !conversationId) return;
-      try {
-        const saved = await sendOffer({ conversationId, senderId: user.id, amount, note });
-        if (saved) {
-          pinnedRef.current = true;
-          setMessages((prev) => (prev.some((m) => m.id === saved.id) ? prev : [...prev, saved]));
-          setOfferVisible(false);
-          toast.show('Offer sent', { variant: 'success', icon: 'check' });
-          capture('offer_made', { listing_id: convListingId, amount });
-        } else {
-          Alert.alert('Could not send offer', 'Please try again.');
-        }
-      } catch (e: any) {
-        captureError(e, { fn: 'conversation.sendOffer' });
-        toast.show("Couldn't send offer", { variant: 'default', icon: 'alert-triangle' });
-      }
-    },
-    [conversationId, user, toast, convListingId],
+  const overflowActions: ChatAction[] = useMemo(
+    () => [
+      ...(thread.other?.id
+        ? [
+            {
+              id: 'profile',
+              label: 'View profile',
+              icon: 'user' as const,
+              onPress: () => router.push(`/user/${thread.other!.id}` as any),
+            },
+          ]
+        : []),
+      ...(thread.convListingId
+        ? [
+            {
+              id: 'listing',
+              label: 'View listing',
+              icon: 'external-link' as const,
+              onPress: openListing,
+            },
+          ]
+        : []),
+      {
+        id: 'coverage',
+        label: "How you're covered",
+        icon: 'shield' as const,
+        onPress: explainCoverage,
+      },
+      ...(thread.convListingId
+        ? [
+            {
+              id: 'report',
+              label: 'Report this conversation',
+              icon: 'flag' as const,
+              onPress: () => setReportOpen(true),
+            },
+          ]
+        : []),
+      ...(thread.other?.id
+        ? [
+            {
+              id: 'block',
+              label: block.isBlocked
+                ? `Unblock ${thread.other.username ? `@${thread.other.username}` : 'user'}`
+                : `Block ${thread.other.username ? `@${thread.other.username}` : 'user'}`,
+              hint: block.isBlocked ? 'Allow messages from this user' : 'Prevent messages and interaction',
+              icon: 'slash' as const,
+              tone: block.isBlocked ? ('default' as const) : ('destructive' as const),
+              onPress: block.handleToggleBlock,
+            },
+          ]
+        : []),
+    ],
+    [thread.other, thread.convListingId, openListing, block.isBlocked, block.handleToggleBlock],
   );
 
-  const handleOfferResponse = useCallback(
-    async (msg: ChatMessage, status: 'accepted' | 'declined') => {
-      const prev = msg.offer_status ?? 'pending';
-      setMessages((m) => m.map((x) => (x.id === msg.id ? { ...x, offer_status: status } : x)));
-      const ok = await updateOfferStatus(msg.id, status);
-      if (!ok) {
-        setMessages((m) => m.map((x) => (x.id === msg.id ? { ...x, offer_status: prev } : x)));
-        Alert.alert('Could not update offer', 'Please try again.');
-      } else {
-        toast.show(status === 'accepted' ? 'Offer accepted' : 'Offer declined', {
-          variant: status === 'accepted' ? 'success' : 'info',
-        });
-      }
-    },
-    [toast],
-  );
-
-  const handleReport = useCallback(
-    async (reason: string) => {
-      if (!user || !convListingId) return;
-      const ok = await reportListing({
-        listingId: convListingId,
-        reporterId: user.id,
-        reason,
-        reportedUserId: other?.id ?? null,
-      });
-      toast.show(ok ? 'Report sent — thank you' : "Couldn't send report", {
-        variant: ok ? 'success' : 'default',
-        icon: ok ? 'check' : 'alert-triangle',
-      });
-    },
-    [convListingId, other?.id, toast, user],
-  );
-
-  const openListing = useCallback(() => {
-    if (convListingId) router.push(`/product/${convListingId}` as any);
-  }, [convListingId]);
-
-  const senderName = other?.full_name || other?.username || 'User';
-  const otherAvatar = other?.avatar_url
-    ? getOptimizedImageUrl(other.avatar_url, { width: 120 })
-    : null;
-  const listingThumb = conv?.listing?.images?.[0]
-    ? getOptimizedImageUrl(conv.listing.images[0], { width: 120 })
-    : null;
-
+  // ── Message Thread Row Renderer ──────────────────────────────────────────
   const renderRow = useCallback(
     ({ item }: { item: ThreadRow }) => {
       if (item.type === 'date') return <DateDivider iso={item.iso} />;
@@ -471,42 +217,34 @@ export default function ConversationScreen() {
         <MessageRow
           msg={item.msg}
           mine={!!user && item.msg.sender_id === user.id}
-          isSeller={isSeller}
+          isSeller={thread.isSeller}
           grouped={item.grouped}
           lastOfGroup={item.lastOfGroup}
-          senderName={senderName}
-          listingId={convListingId}
-          listingTitle={conv?.listing?.title ?? null}
-          listingThumb={listingThumb}
-          listingPrice={convListingPrice}
-          listingSold={convListingSold}
-          reactions={byMessage.get(item.msg.id) ?? EMPTY_REACTIONS}
-          onAccept={() => handleOfferResponse(item.msg, 'accepted')}
-          onDecline={() => handleOfferResponse(item.msg, 'declined')}
+          senderName={thread.senderName}
+          senderAvatar={thread.otherAvatar}
+          listingId={thread.convListingId}
+          listingTitle={thread.conv?.listing?.title ?? null}
+          listingThumb={thread.listingThumb}
+          listingPrice={thread.convListingPrice}
+          listingSold={thread.convListingSold}
+          reactions={thread.byMessage.get(item.msg.id) ?? EMPTY_REACTIONS}
+          onAccept={() => thread.handleOfferResponse(item.msg, 'accepted')}
+          onDecline={() => thread.handleOfferResponse(item.msg, 'declined')}
+          onCounterOffer={() => setOfferVisible(true)}
           onPay={(amount) =>
-            convListingId && router.push(`/payment/${convListingId}?offer=${amount}` as any)
+            thread.convListingId &&
+            router.push(`/payment/${thread.convListingId}?offer=${amount}` as any)
           }
-          onRetry={() => handleRetry(item.msg)}
+          onRetry={() => thread.handleRetry(item.msg)}
           onLongPress={(anchor) => setPressed({ msg: item.msg, anchor })}
         />
       );
     },
-    [
-      user,
-      isSeller,
-      senderName,
-      byMessage,
-      convListingId,
-      conv?.listing?.title,
-      listingThumb,
-      convListingPrice,
-      convListingSold,
-      handleOfferResponse,
-      handleRetry,
-    ],
+    [user, thread],
   );
 
-  if (loading) {
+  // ── Loading & Empty Fallbacks ────────────────────────────────────────────
+  if (thread.loading) {
     return (
       <SafeContainer edges={['top', 'left', 'right']} backgroundColor={colors.background} style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6 }}>
@@ -527,7 +265,7 @@ export default function ConversationScreen() {
     );
   }
 
-  if (!conv) {
+  if (!thread.conv) {
     return (
       <SafeContainer edges={['top', 'left', 'right']} backgroundColor={colors.background} style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6 }}>
@@ -550,98 +288,6 @@ export default function ConversationScreen() {
     );
   }
 
-  const status = listingStatus(conv.listing);
-  const canOffer = !isSeller && !!conv.listing_id && status === 'active';
-
-  const plusActions: ChatAction[] = [
-    ...(canOffer
-      ? [
-          {
-            id: 'offer',
-            label: 'Make an offer',
-            hint: conv.listing?.price ? `Listed at ${formatPrice(conv.listing.price)}` : undefined,
-            icon: 'tag' as const,
-            tone: 'primary' as const,
-            onPress: () => setOfferVisible(true),
-          },
-        ]
-      : []),
-    ...(conv.listing_id
-      ? [
-          {
-            id: 'listing',
-            label: 'View listing',
-            icon: 'external-link' as const,
-            onPress: openListing,
-          },
-        ]
-      : []),
-    {
-      id: 'coverage',
-      label: "How you're covered",
-      hint: 'Buyer Protection, payments, and support',
-      icon: 'shield' as const,
-      onPress: explainCoverage,
-    },
-  ];
-
-  const messageActions: MessageAction[] = [
-    { id: 'copy', label: 'Copy', icon: 'copy', onPress: handleCopy },
-  ];
-
-  const overflowActions: ChatAction[] = [
-    ...(other?.id
-      ? [
-          {
-            id: 'profile',
-            label: 'View profile',
-            icon: 'user' as const,
-            onPress: () => router.push(`/user/${other.id}` as any),
-          },
-        ]
-      : []),
-    ...(conv.listing_id
-      ? [
-          {
-            id: 'listing',
-            label: 'View listing',
-            icon: 'external-link' as const,
-            onPress: openListing,
-          },
-        ]
-      : []),
-    {
-      id: 'coverage',
-      label: "How you're covered",
-      icon: 'shield' as const,
-      onPress: explainCoverage,
-    },
-    ...(conv.listing_id
-      ? [
-          {
-            id: 'report',
-            label: 'Report this conversation',
-            icon: 'flag' as const,
-            onPress: () => setReportOpen(true),
-          },
-        ]
-      : []),
-    ...(other?.id
-      ? [
-          {
-            id: 'block',
-            label: isBlocked
-              ? `Unblock ${other.username ? `@${other.username}` : 'user'}`
-              : `Block ${other.username ? `@${other.username}` : 'user'}`,
-            hint: isBlocked ? 'Allow messages from this user' : 'Prevent messages and interaction',
-            icon: 'slash' as const,
-            tone: isBlocked ? ('default' as const) : ('destructive' as const),
-            onPress: handleToggleBlock,
-          },
-        ]
-      : []),
-  ];
-
   return (
     <SafeContainer
       mode="keyboard-avoiding"
@@ -650,7 +296,7 @@ export default function ConversationScreen() {
       backgroundColor={colors.background}
       style={{ flex: 1 }}
     >
-      {/* Sticky Context Header (Z: 30) */}
+      {/* Pinned Sticky Header */}
       <View
         style={{
           zIndex: 30,
@@ -660,108 +306,47 @@ export default function ConversationScreen() {
         }}
       >
         <ThreadHeader
-          name={senderName}
-          subtitle={other?.username ? `@${other.username}` : null}
-          avatar={otherAvatar}
+          name={thread.senderName}
+          subtitle={thread.other?.username ? `@${thread.other.username}` : null}
+          avatar={thread.otherAvatar}
           onBack={() => safeBack()}
-          onPressIdentity={other?.id ? () => router.push(`/user/${other.id}` as any) : undefined}
+          onPressIdentity={thread.other?.id ? () => router.push(`/user/${thread.other!.id}` as any) : undefined}
           onOverflow={() => setOverflowOpen(true)}
         />
 
-        {/* Sticky Product Context Bar */}
-        {conv.listing_id && (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Open listing ${conv.listing?.title ?? 'Listing'}`}
-            onPress={openListing}
-            style={({ pressed }) => ({
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 12,
-              paddingHorizontal: 16,
-              paddingVertical: 10,
-              borderTopWidth: StyleSheet.hairlineWidth,
-              borderTopColor: colors.border,
-              backgroundColor: pressed ? colors.panel : colors.surface,
-            })}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
-              <ListingThumb uri={listingThumb} width={44} height={44} status={status} radius={radii.sm} />
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    fontFamily: typography.family.sansBold,
-                    fontSize: 13.5,
-                    color: colors.ink,
-                  }}
-                >
-                  {conv.listing?.title ?? 'Listing removed'}
-                </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2, gap: 6 }}>
-                  <Text
-                    style={{
-                      fontFamily: typography.family.sansBold,
-                      fontSize: 12.5,
-                      color: colors.ink,
-                    }}
-                  >
-                    {conv.listing?.price != null ? formatPrice(conv.listing.price) : '—'}
-                  </Text>
-                  {conv.listing?.price != null && (
-                    <Text
-                      style={{
-                        fontFamily: typography.family.sans,
-                        fontSize: 11.5,
-                        color: colors.mute,
-                      }}
-                    >
-                      {`${formatPrice(conv.listing.price + buyerProtectionFee(conv.listing.price))} Includes Buyer Protection 🛡️`}
-                    </Text>
-                  )}
-                </View>
-              </View>
-            </View>
-
-            {!isSeller && status === 'active' && convListingId ? (
-              <View style={{ width: 94 }}>
-                <ThumbButton
-                  label="Buy Now"
-                  variant="primary"
-                  size="sm"
-                  onPress={() => router.push(`/payment/${convListingId}` as any)}
-                  accessibilityLabel="Buy now"
-                />
-              </View>
-            ) : (
-              <Feather name="chevron-right" size={18} color={colors.muteSoft} />
-            )}
-          </Pressable>
-        )}
+        <ConversationListingHeader
+          listing={thread.conv.listing}
+          listingId={thread.convListingId}
+          listingThumb={thread.listingThumb}
+          status={thread.status}
+          isSeller={thread.isSeller}
+          onPressListing={openListing}
+          onPressBuyNow={() => router.push(`/payment/${thread.convListingId}` as any)}
+        />
       </View>
 
-      {/* Message Thread Surface */}
+      {/* Message Thread FlatList */}
       <FlatList
-        ref={listRef}
-        data={rows}
+        ref={thread.listRef}
+        data={thread.rows}
         keyExtractor={(row) => row.key}
         renderItem={renderRow}
         contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end', paddingBottom: 12 }}
-        onContentSizeChange={followEnd}
-        onScroll={onScroll}
+        onContentSizeChange={thread.followEnd}
+        onScroll={thread.onScroll}
         scrollEventThrottle={16}
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
           <>
             <SafetyNote onPress={explainCoverage} />
-            {other?.username ? (
+            {thread.other?.username ? (
               <SellerIntroBubble
-                name={other.username}
-                location={(other as any).location ?? null}
+                name={thread.other.username}
+                location={(thread.other as any).location ?? null}
                 lastSeen={null}
-                rating={(other as any).rating ? `★ ${Number((other as any).rating).toFixed(1)}` : null}
+                rating={(thread.other as any).rating ? Number((thread.other as any).rating).toFixed(1) : null}
+                reviewCount={(thread.other as any).total_sales ?? (thread.other as any).reviews_count ?? null}
               />
             ) : null}
           </>
@@ -782,7 +367,7 @@ export default function ConversationScreen() {
         }
       />
 
-      {/* Native iMessage-Style Composer Dock */}
+      {/* Bottom Composer / Block Banner Dock */}
       <View
         style={{
           borderTopWidth: 1,
@@ -791,132 +376,55 @@ export default function ConversationScreen() {
           paddingBottom: keyboardUp ? DOCK_GAP_KEYBOARD : Math.max(insets.bottom, 12),
         }}
       >
-        {blockStatus === 'blocked' ? (
-          <View
-            style={{
-              paddingHorizontal: 16,
-              paddingVertical: 14,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              backgroundColor: colors.panel,
-            }}
-          >
-            <Text
-              style={{
-                fontFamily: typography.family.sans,
-                fontSize: 13,
-                color: colors.muteSoft,
-                flex: 1,
-                marginRight: 12,
-              }}
-            >
-              You have blocked this user.
-            </Text>
-            <Pressable
-              onPress={handleToggleBlock}
-              style={({ pressed }) => ({
-                paddingHorizontal: 14,
-                paddingVertical: 6,
-                borderRadius: radii.pill,
-                backgroundColor: colors.ink,
-                opacity: pressed ? 0.8 : 1,
-              })}
-            >
-              <Text
-                style={{
-                  fontFamily: typography.family.sansSemibold,
-                  fontSize: 12,
-                  color: colors.white,
-                }}
-              >
-                Unblock
-              </Text>
-            </Pressable>
-          </View>
-        ) : blockStatus === 'unblocked' ? (
+        {block.blockStatus === 'unblocked' ? (
           <Composer
-            value={input}
-            onChangeText={setInput}
-            onSend={handleSend}
+            value={thread.input}
+            onChangeText={thread.setInput}
+            onSend={thread.handleSend}
             onPlus={() => setPlusOpen(true)}
           />
         ) : (
-          <View
-            style={{
-              paddingHorizontal: 16,
-              paddingVertical: 14,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Text
-              style={{
-                fontFamily: typography.family.sans,
-                fontSize: 13,
-                color: colors.muteSoft,
-              }}
-            >
-              {blockStatus === 'loading' ? 'Checking conversation status…' : 'Messaging is unavailable.'}
-            </Text>
-          </View>
+          <ConversationBlockedBanner
+            blockStatus={block.blockStatus}
+            onUnblock={block.handleToggleBlock}
+          />
         )}
       </View>
 
+      {/* Pop-up Reaction Picker */}
       <ReactionPicker
         anchor={pressed?.anchor ?? null}
-        selected={pressed ? myReactionOn(pressed.msg.id) : null}
+        selected={pressed ? thread.myReactionOn(pressed.msg.id) : null}
         actions={messageActions}
-        onSelect={handleReact}
+        onSelect={(emoji) => {
+          if (pressed?.msg?.id) thread.handleReact(pressed.msg.id, emoji);
+          setPressed(null);
+        }}
         onClose={() => setPressed(null)}
       />
 
-      <ChatActionSheet
-        visible={plusOpen}
-        actions={plusActions}
-        onClose={() => setPlusOpen(false)}
-      />
-
-      <ChatActionSheet
-        visible={overflowOpen}
-        actions={overflowActions}
-        onClose={() => setOverflowOpen(false)}
-      />
-
-      <ChatActionSheet
-        visible={reportOpen}
-        title="WHY ARE YOU REPORTING THIS?"
-        actions={REPORT_REASONS.map((r) => ({
-          id: r.id,
-          label: r.label,
-          icon: 'flag' as const,
-          onPress: () => handleReport(r.id),
-        }))}
-        onClose={() => setReportOpen(false)}
-      />
-
-      <ChatActionSheet
-        visible={blockSheetOpen}
-        title="WHY ARE YOU BLOCKING THIS USER?"
-        actions={BLOCK_REASONS.map((r) => ({
-          id: r.id,
-          label: r.label,
-          hint: r.hint,
-          icon: r.icon as any,
-          tone: 'destructive' as const,
-          onPress: () => handleBlockWithReason(r.label),
-        }))}
-        onClose={() => setBlockSheetOpen(false)}
-      />
-
-      <OfferSheet
-        visible={offerVisible}
-        askingPrice={conv.listing?.price ?? null}
-        title={conv.listing?.title ?? null}
-        imageUrl={listingThumb ?? null}
-        onClose={() => setOfferVisible(false)}
-        onSubmit={async (amount: number) => {
-          await handleSendOffer(amount, '');
+      {/* Overlays & Action Sheets */}
+      <ConversationActionSheets
+        plusOpen={plusOpen}
+        plusActions={plusActions}
+        onClosePlus={() => setPlusOpen(false)}
+        overflowOpen={overflowOpen}
+        overflowActions={overflowActions}
+        onCloseOverflow={() => setOverflowOpen(false)}
+        reportOpen={reportOpen}
+        onCloseReport={() => setReportOpen(false)}
+        onSelectReportReason={thread.handleReport}
+        blockSheetOpen={block.blockSheetOpen}
+        onCloseBlockSheet={() => block.setBlockSheetOpen(false)}
+        onSelectBlockReason={block.handleBlockWithReason}
+        offerVisible={offerVisible}
+        listingPrice={thread.convListingPrice}
+        listingTitle={thread.conv?.listing?.title}
+        listingThumb={thread.listingThumb}
+        onCloseOffer={() => setOfferVisible(false)}
+        onSubmitOffer={async (amount) => {
+          const success = await thread.handleSendOffer(amount, '');
+          if (success) setOfferVisible(false);
         }}
       />
     </SafeContainer>

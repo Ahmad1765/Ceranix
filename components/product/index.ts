@@ -8,4 +8,10 @@ export { OfferSheet } from './OfferSheet';
 export type { OfferSheetProps } from './OfferSheet';
 export { ProductCard } from './ProductCard';
 export type { ProductCardProps, ProductCardData } from './ProductCard';
-
+export { ProductHeaderNav } from './ProductHeaderNav';
+export { ProductHeroSection } from './ProductHeroSection';
+export { ProductDetailsTable } from './ProductDetailsTable';
+export { ProductSellerProfileCard } from './ProductSellerProfileCard';
+export { ProductRelatedSection } from './ProductRelatedSection';
+export { useProductEngagement } from './useProductEngagement';
+export { useProductBundle } from './useProductBundle';

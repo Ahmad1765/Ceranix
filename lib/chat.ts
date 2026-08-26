@@ -44,16 +44,16 @@ export interface ConversationRow {
   buyer_last_read_at?: string | null;
   seller_last_read_at?: string | null;
   listing?: Pick<Listing, 'id' | 'title' | 'price' | 'images' | 'is_sold'> | null;
-  buyer?: Pick<User, 'id' | 'username' | 'avatar_url' | 'full_name'> | null;
-  seller?: Pick<User, 'id' | 'username' | 'avatar_url' | 'full_name'> | null;
+  buyer?: Pick<User, 'id' | 'username' | 'avatar_url' | 'full_name' | 'location' | 'rating' | 'total_sales'> | null;
+  seller?: Pick<User, 'id' | 'username' | 'avatar_url' | 'full_name' | 'location' | 'rating' | 'total_sales'> | null;
 }
 
 const CONVERSATION_SELECT = `
   id, listing_id, buyer_id, seller_id, last_message, last_sender_id, updated_at,
   buyer_last_read_at, seller_last_read_at,
   listing:listings(id, title, price, images, is_sold),
-  buyer:profiles!conversations_buyer_id_fkey(id, username, avatar_url, full_name),
-  seller:profiles!conversations_seller_id_fkey(id, username, avatar_url, full_name)
+  buyer:profiles!conversations_buyer_id_fkey(id, username, avatar_url, full_name, location, rating, total_sales),
+  seller:profiles!conversations_seller_id_fkey(id, username, avatar_url, full_name, location, rating, total_sales)
 `;
 
 export async function listConversations(userId: string): Promise<ConversationRow[]> {
