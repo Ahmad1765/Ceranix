@@ -457,6 +457,12 @@ export default function ConversationScreen() {
   }, [convListingId]);
 
   const senderName = other?.full_name || other?.username || 'User';
+  const otherAvatar = other?.avatar_url
+    ? getOptimizedImageUrl(other.avatar_url, { width: 120 })
+    : null;
+  const listingThumb = conv?.listing?.images?.[0]
+    ? getOptimizedImageUrl(conv.listing.images[0], { width: 120 })
+    : null;
 
   const renderRow = useCallback(
     ({ item }: { item: ThreadRow }) => {
@@ -470,6 +476,8 @@ export default function ConversationScreen() {
           lastOfGroup={item.lastOfGroup}
           senderName={senderName}
           listingId={convListingId}
+          listingTitle={conv?.listing?.title ?? null}
+          listingThumb={listingThumb}
           listingPrice={convListingPrice}
           listingSold={convListingSold}
           reactions={byMessage.get(item.msg.id) ?? EMPTY_REACTIONS}
@@ -489,6 +497,8 @@ export default function ConversationScreen() {
       senderName,
       byMessage,
       convListingId,
+      conv?.listing?.title,
+      listingThumb,
       convListingPrice,
       convListingSold,
       handleOfferResponse,
@@ -540,12 +550,6 @@ export default function ConversationScreen() {
     );
   }
 
-  const otherAvatar = other?.avatar_url
-    ? getOptimizedImageUrl(other.avatar_url, { width: 120 })
-    : null;
-  const listingThumb = conv.listing?.images?.[0]
-    ? getOptimizedImageUrl(conv.listing.images[0], { width: 120 })
-    : null;
   const status = listingStatus(conv.listing);
   const canOffer = !isSeller && !!conv.listing_id && status === 'active';
 

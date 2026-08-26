@@ -11,7 +11,7 @@ import * as Haptics from 'expo-haptics';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { ThumbButton } from '@/components/ui/ThumbButton';
 import { Text, TextInput } from '@/lib/rnText';
-import { colors, radii, type } from '@/lib/theme';
+import { colors, radii, shadow, type } from '@/lib/theme';
 import { CURRENCY_SYMBOL } from '@/lib/currency';
 import type { Category, Condition } from '@/types';
 
@@ -46,8 +46,8 @@ export function countActiveFilters(f: FeedFilters): number {
 }
 
 const CATEGORIES: { id: Category; label: string; icon: keyof typeof Feather.glyphMap }[] = [
-  { id: 'clothing', label: 'Clothing', icon: 'shopping-bag' },
-  { id: 'shoes', label: 'Shoes', icon: 'shopping-bag' },
+  { id: 'clothing', label: 'Clothing', icon: 'layers' },
+  { id: 'shoes', label: 'Shoes', icon: 'box' },
   { id: 'bags', label: 'Bags', icon: 'briefcase' },
   { id: 'accessories', label: 'Accessories', icon: 'watch' },
   { id: 'electronics', label: 'Tech', icon: 'smartphone' },
@@ -72,6 +72,14 @@ const SORTS: { id: FeedSort; label: string }[] = [
   { id: 'popular', label: 'Most Liked' },
 ];
 
+const PRICE_PRESETS: { label: string; min: number | null; max: number | null }[] = [
+  { label: 'All', min: null, max: null },
+  { label: `Under ${CURRENCY_SYMBOL}25`, min: null, max: 25 },
+  { label: `${CURRENCY_SYMBOL}25 - ${CURRENCY_SYMBOL}50`, min: 25, max: 50 },
+  { label: `${CURRENCY_SYMBOL}50 - ${CURRENCY_SYMBOL}100`, min: 50, max: 100 },
+  { label: `${CURRENCY_SYMBOL}100+`, min: 100, max: null },
+];
+
 export interface FeedFilterSheetProps {
   visible: boolean;
   initial?: FeedFilters;
@@ -82,7 +90,7 @@ export interface FeedFilterSheetProps {
 
 /**
  * Mobile-First Discovery Filter Bottom Sheet.
- * Multi-criteria refinement with 1-tap chip selectors, price bounding,
+ * Multi-criteria refinement with horizontal chip selectors, price bounding,
  * and zero-navigation instant list application.
  */
 export function FeedFilterSheet({
@@ -94,6 +102,8 @@ export function FeedFilterSheet({
 }: FeedFilterSheetProps) {
   const [filters, setFilters] = useState<FeedFilters>(initial);
   const prevVisibleRef = React.useRef(visible);
+  const [minFocused, setMinFocused] = useState(false);
+  const [maxFocused, setMaxFocused] = useState(false);
 
   // Sync with initial only when visible transitions from false to true
   React.useEffect(() => {
@@ -166,6 +176,17 @@ export function FeedFilterSheet({
     });
   };
 
+  const handleApplyPreset = (min: number | null, max: number | null) => {
+    if (Platform.OS !== 'web') {
+      Haptics.selectionAsync().catch(() => {});
+    }
+    setFilters((prev) => ({
+      ...prev,
+      priceMin: min,
+      priceMax: max,
+    }));
+  };
+
   const handleReset = () => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -200,12 +221,12 @@ export function FeedFilterSheet({
       onClose={onClose}
       title="Filter & Refine"
       subtitle={activeCount > 0 ? `${activeCount} filter${activeCount > 1 ? 's' : ''} applied` : 'Browse all items'}
-      snapHeightRatio={0.85}
+      snapHeightRatio={0.88}
       scrollable
       headerRight={
         activeCount > 0 ? (
           <Pressable onPress={handleReset} hitSlop={8} style={styles.headerReset}>
-            <Text style={styles.headerResetText}>Reset</Text>
+            <Text style={styles.headerResetText}>Reset all</Text>
           </Pressable>
         ) : null
       }
@@ -242,9 +263,12 @@ export function FeedFilterSheet({
       <View style={styles.container}>
         {/* 1. Category Horizontal Chips */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { fontFamily: type.family.sansBold }]}>
-            Category
-          </Text>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Category</Text>
+            {filters.category ? (
+              <Text style={styles.sectionActiveHint}>1 selected</Text>
+            ) : null}
+          </View>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -256,9 +280,10 @@ export function FeedFilterSheet({
                 <Pressable
                   key={cat.id}
                   onPress={() => toggleCategory(cat.id)}
-                  style={[
+                  style={({ pressed }) => [
                     styles.chip,
                     active && styles.chipActive,
+                    { transform: [{ scale: pressed ? 0.95 : 1 }] },
                   ]}
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: active }}
@@ -266,16 +291,17 @@ export function FeedFilterSheet({
                   <Feather
                     name={cat.icon}
                     size={14}
-                    color={active ? colors.primary : colors.ink}
+                    color={active ? '#FFFFFF' : colors.ink}
                   />
                   <Text
                     style={[
                       styles.chipText,
                       {
-                        color: active ? colors.primary : colors.ink,
+                        color: active ? '#FFFFFF' : colors.ink,
                         fontFamily: active
                           ? type.family.sansBold
                           : type.family.sansMedium,
+                        fontWeight: active ? '700' : '500',
                       },
                     ]}
                   >
@@ -289,9 +315,12 @@ export function FeedFilterSheet({
 
         {/* 2. Size Horizontal Chips */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { fontFamily: type.family.sansBold }]}>
-            Size
-          </Text>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Size</Text>
+            {filters.sizes.length > 0 ? (
+              <Text style={styles.sectionActiveHint}>{filters.sizes.length} selected</Text>
+            ) : null}
+          </View>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -303,9 +332,10 @@ export function FeedFilterSheet({
                 <Pressable
                   key={size}
                   onPress={() => toggleSize(size)}
-                  style={[
+                  style={({ pressed }) => [
                     styles.chip,
                     active && styles.chipActive,
+                    { transform: [{ scale: pressed ? 0.95 : 1 }] },
                   ]}
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: active }}
@@ -314,10 +344,11 @@ export function FeedFilterSheet({
                     style={[
                       styles.chipText,
                       {
-                        color: active ? colors.primary : colors.ink,
+                        color: active ? '#FFFFFF' : colors.ink,
                         fontFamily: active
                           ? type.family.sansBold
                           : type.family.sansMedium,
+                        fontWeight: active ? '700' : '500',
                       },
                     ]}
                   >
@@ -331,9 +362,12 @@ export function FeedFilterSheet({
 
         {/* 3. Condition Horizontal Chips */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { fontFamily: type.family.sansBold }]}>
-            Condition
-          </Text>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Condition</Text>
+            {filters.conditions.length > 0 ? (
+              <Text style={styles.sectionActiveHint}>{filters.conditions.length} selected</Text>
+            ) : null}
+          </View>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -345,9 +379,10 @@ export function FeedFilterSheet({
                 <Pressable
                   key={cond.id}
                   onPress={() => toggleCondition(cond.id)}
-                  style={[
+                  style={({ pressed }) => [
                     styles.chip,
                     active && styles.chipActive,
+                    { transform: [{ scale: pressed ? 0.95 : 1 }] },
                   ]}
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: active }}
@@ -356,10 +391,11 @@ export function FeedFilterSheet({
                     style={[
                       styles.chipText,
                       {
-                        color: active ? colors.primary : colors.ink,
+                        color: active ? '#FFFFFF' : colors.ink,
                         fontFamily: active
                           ? type.family.sansBold
                           : type.family.sansMedium,
+                        fontWeight: active ? '700' : '500',
                       },
                     ]}
                   >
@@ -371,13 +407,69 @@ export function FeedFilterSheet({
           </ScrollView>
         </View>
 
-        {/* 4. Price Range Visualizer Inputs */}
+        {/* 4. Price Range Presets + Min/Max Inputs */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { fontFamily: type.family.sansBold }]}>
-            Price Range
-          </Text>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Price Range</Text>
+            {filters.priceMin != null || filters.priceMax != null ? (
+              <Text style={styles.sectionActiveHint}>
+                {filters.priceMin != null && filters.priceMax != null
+                  ? `${CURRENCY_SYMBOL}${filters.priceMin} - ${CURRENCY_SYMBOL}${filters.priceMax}`
+                  : filters.priceMin != null
+                  ? `From ${CURRENCY_SYMBOL}${filters.priceMin}`
+                  : filters.priceMax != null
+                  ? `Up to ${CURRENCY_SYMBOL}${filters.priceMax}`
+                  : ''}
+              </Text>
+            ) : null}
+          </View>
+
+          {/* Quick Price Preset Chips */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipRow}
+          >
+            {PRICE_PRESETS.map((preset, index) => {
+              const isMatch =
+                filters.priceMin === preset.min && filters.priceMax === preset.max;
+              return (
+                <Pressable
+                  key={index}
+                  onPress={() => handleApplyPreset(preset.min, preset.max)}
+                  style={({ pressed }) => [
+                    styles.chip,
+                    isMatch && styles.chipActive,
+                    { transform: [{ scale: pressed ? 0.95 : 1 }] },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      {
+                        color: isMatch ? '#FFFFFF' : colors.ink,
+                        fontFamily: isMatch
+                          ? type.family.sansBold
+                          : type.family.sansMedium,
+                        fontWeight: isMatch ? '700' : '500',
+                      },
+                    ]}
+                  >
+                    {preset.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          {/* Custom Min/Max Inputs */}
           <View style={styles.priceRow}>
-            <View style={styles.priceInputWrapper}>
+            <View
+              style={[
+                styles.priceInputWrapper,
+                minFocused && { borderColor: colors.purple },
+              ]}
+            >
               <Text style={styles.priceInputPrefix}>{CURRENCY_SYMBOL}</Text>
               <TextInput
                 value={filters.priceMin != null ? String(filters.priceMin) : ''}
@@ -388,14 +480,21 @@ export function FeedFilterSheet({
                     priceMin: isNaN(n) ? null : n,
                   }));
                 }}
+                onFocus={() => setMinFocused(true)}
+                onBlur={() => setMinFocused(false)}
                 placeholder="Min"
-                placeholderTextColor={colors.mute}
+                placeholderTextColor={colors.muteSoft}
                 keyboardType="number-pad"
                 style={[styles.priceInput, { fontFamily: type.family.sansMedium }]}
               />
             </View>
             <Text style={styles.priceDivider}>to</Text>
-            <View style={styles.priceInputWrapper}>
+            <View
+              style={[
+                styles.priceInputWrapper,
+                maxFocused && { borderColor: colors.purple },
+              ]}
+            >
               <Text style={styles.priceInputPrefix}>{CURRENCY_SYMBOL}</Text>
               <TextInput
                 value={filters.priceMax != null ? String(filters.priceMax) : ''}
@@ -406,8 +505,10 @@ export function FeedFilterSheet({
                     priceMax: isNaN(n) ? null : n,
                   }));
                 }}
+                onFocus={() => setMaxFocused(true)}
+                onBlur={() => setMaxFocused(false)}
                 placeholder="Max"
-                placeholderTextColor={colors.mute}
+                placeholderTextColor={colors.muteSoft}
                 keyboardType="number-pad"
                 style={[styles.priceInput, { fontFamily: type.family.sansMedium }]}
               />
@@ -417,9 +518,7 @@ export function FeedFilterSheet({
 
         {/* 5. Sort Order Radio Chips */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { fontFamily: type.family.sansBold }]}>
-            Sort By
-          </Text>
+          <Text style={styles.sectionTitle}>Sort By</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -436,9 +535,10 @@ export function FeedFilterSheet({
                     }
                     setFilters((prev) => ({ ...prev, sort: sortOption.id }));
                   }}
-                  style={[
+                  style={({ pressed }) => [
                     styles.chip,
                     active && styles.chipActive,
+                    { transform: [{ scale: pressed ? 0.95 : 1 }] },
                   ]}
                   accessibilityRole="radio"
                   accessibilityState={{ selected: active }}
@@ -447,10 +547,11 @@ export function FeedFilterSheet({
                     style={[
                       styles.chipText,
                       {
-                        color: active ? colors.primary : colors.ink,
+                        color: active ? '#FFFFFF' : colors.ink,
                         fontFamily: active
                           ? type.family.sansBold
                           : type.family.sansMedium,
+                        fontWeight: active ? '700' : '500',
                       },
                     ]}
                   >
@@ -468,7 +569,7 @@ export function FeedFilterSheet({
 
 const styles = StyleSheet.create({
   container: {
-    gap: 20,
+    gap: 22,
   },
   headerReset: {
     paddingHorizontal: 8,
@@ -476,15 +577,29 @@ const styles = StyleSheet.create({
   },
   headerResetText: {
     fontSize: 13,
-    color: colors.primary,
-    fontWeight: '600',
+    color: colors.purple,
+    fontFamily: type.family.sansBold,
+    fontWeight: '700',
   },
   section: {
     gap: 10,
   },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   sectionTitle: {
-    fontSize: 14,
+    fontSize: 13.5,
+    fontFamily: type.family.sansBold,
+    fontWeight: '700',
     color: colors.ink,
+    letterSpacing: -0.1,
+  },
+  sectionActiveHint: {
+    fontSize: 12,
+    fontFamily: type.family.sansMedium,
+    color: colors.purple,
   },
   chipRow: {
     flexDirection: 'row',
@@ -495,50 +610,56 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    height: 44, // Minimum 44px mobile touch target
-    paddingHorizontal: 16,
+    height: 40,
+    paddingHorizontal: 15,
     borderRadius: radii.pill,
     backgroundColor: colors.white,
     borderWidth: 1,
     borderColor: colors.hairline,
   },
   chipActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primarySoft,
+    borderColor: colors.ink,
+    backgroundColor: colors.ink,
   },
   chipText: {
     fontSize: 13,
+    letterSpacing: -0.1,
   },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    marginTop: 4,
   },
   priceInputWrapper: {
     flex: 1,
-    height: 48,
+    height: 46,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.white,
     borderWidth: 1,
     borderColor: colors.hairline,
     borderRadius: radii.xl,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
   },
   priceInputPrefix: {
-    fontSize: 16,
-    color: colors.mute,
+    fontSize: 15,
+    fontFamily: type.family.sansBold,
+    color: colors.ink,
     marginRight: 6,
   },
   priceInput: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 14.5,
     color: colors.ink,
     padding: 0,
-  },
+    outlineStyle: 'none',
+    outlineWidth: 0,
+  } as any,
   priceDivider: {
     fontSize: 13,
-    color: colors.mute,
+    fontFamily: type.family.sansMedium,
+    color: colors.muteSoft,
   },
   footerRow: {
     flexDirection: 'row',

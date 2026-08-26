@@ -9,12 +9,14 @@
 
 import { memo, useCallback, useRef } from 'react';
 import { Platform, Pressable, View } from 'react-native';
+import { Image } from 'expo-image';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
 import { PressableScale } from '@/components/PressableScale';
 import { colors, radii, shadow, type as typography } from '@/lib/theme';
 import { formatPrice } from '@/lib/currency';
+import { buyerProtectionFee } from '@/lib/fees';
 import type { ChatMessage } from '@/lib/chat';
 import type { Anchor } from './ReactionPicker';
 import { bubbleStamp } from './format';
@@ -34,6 +36,8 @@ export type MessageRowProps = {
   /** Shown in the meta line of an incoming group, the way Plick attributes them. */
   senderName: string;
   listingId: string | null;
+  listingTitle?: string | null;
+  listingThumb?: string | null;
   listingPrice: number | null;
   listingSold: boolean;
   /** Every emoji on this message, in arrival order. */
@@ -170,6 +174,8 @@ function OfferBubble({
   mine,
   isSeller,
   listingId,
+  listingTitle,
+  listingThumb,
   listingPrice,
   listingSold,
   onAccept,
@@ -191,6 +197,7 @@ function OfferBubble({
   const awaitingPayment = !mine && isSeller && status === 'accepted' && !listingSold && !isPaid;
   const settled = status !== 'pending' ? OFFER_STATUS_COPY[status] : null;
   const showStruck = !!listingPrice && listingPrice > amount;
+  const savingsAmount = showStruck && listingPrice ? listingPrice - amount : 0;
   const discountPct =
     showStruck && listingPrice
       ? Math.round(((listingPrice - amount) / listingPrice) * 100)
@@ -198,30 +205,32 @@ function OfferBubble({
 
   const isAccepted = status === 'accepted';
   const isDeclined = status === 'declined';
+  const fee = buyerProtectionFee(amount);
 
   return (
     <View
       style={{
-        minWidth: 232,
-        backgroundColor: colors.surface,
+        minWidth: 260,
+        maxWidth: 320,
+        backgroundColor: colors.white,
         borderWidth: 1,
         borderColor: isAccepted
-          ? 'rgba(16,185,129,0.30)'
+          ? 'rgba(108,71,255,0.35)'
           : isDeclined
           ? 'rgba(239,68,68,0.25)'
           : colors.border,
-        borderRadius: 20,
-        padding: 15,
+        borderRadius: radii['2xl'],
+        padding: 16,
         ...shadow.sm,
       }}
     >
-      {/* ── Top Header: Badge + Status ── */}
+      {/* ── Top Header: Directional Tag + Status ── */}
       <View
         style={{
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: 10,
+          marginBottom: 12,
         }}
       >
         <View
@@ -229,25 +238,24 @@ function OfferBubble({
             flexDirection: 'row',
             alignItems: 'center',
             gap: 5,
-            paddingHorizontal: 8,
-            paddingVertical: 3.5,
+            paddingHorizontal: 9,
+            paddingVertical: 4,
             borderRadius: radii.pill,
-            backgroundColor: isAccepted
-              ? 'rgba(16,185,129,0.10)'
-              : colors.purpleSoft,
+            backgroundColor: isAccepted ? colors.purpleSoft : colors.surface,
           }}
         >
           <Feather
-            name={isAccepted ? 'check' : mine ? 'arrow-up-right' : 'tag'}
-            size={11}
-            color={isAccepted ? '#059669' : colors.purple}
+            name={isAccepted ? 'check' : mine ? 'arrow-up-right' : 'arrow-down-left'}
+            size={11.5}
+            color={isAccepted ? colors.purple : colors.ink}
           />
           <Text
             style={{
               fontFamily: typography.family.sansBold,
               fontSize: 10.5,
-              letterSpacing: 0.5,
-              color: isAccepted ? '#059669' : colors.purple,
+              fontWeight: '700',
+              letterSpacing: 0.6,
+              color: isAccepted ? colors.purple : colors.ink,
               textTransform: 'uppercase',
             }}
           >
@@ -261,22 +269,22 @@ function OfferBubble({
               flexDirection: 'row',
               alignItems: 'center',
               gap: 4,
-              paddingHorizontal: 7,
-              paddingVertical: 2.5,
+              paddingHorizontal: 8,
+              paddingVertical: 3,
               borderRadius: radii.pill,
               backgroundColor: isAccepted
-                ? 'rgba(16,185,129,0.12)'
+                ? colors.purpleSoft
                 : isDeclined
                 ? 'rgba(239,68,68,0.10)'
-                : colors.panel,
+                : colors.surface,
             }}
           >
             <Feather
               name={settled.icon}
-              size={11}
+              size={11.5}
               color={
                 isAccepted
-                  ? '#059669'
+                  ? colors.purple
                   : isDeclined
                   ? '#DC2626'
                   : colors.muteSoft
@@ -285,10 +293,11 @@ function OfferBubble({
             <Text
               style={{
                 fontFamily: typography.family.sansBold,
-                fontSize: 10.5,
+                fontSize: 11,
+                fontWeight: '700',
                 color:
                   isAccepted
-                    ? '#059669'
+                    ? colors.purple
                     : isDeclined
                     ? '#DC2626'
                     : colors.muteSoft,
@@ -302,25 +311,26 @@ function OfferBubble({
             style={{
               flexDirection: 'row',
               alignItems: 'center',
-              gap: 4,
-              paddingHorizontal: 7,
-              paddingVertical: 2.5,
+              gap: 5,
+              paddingHorizontal: 8,
+              paddingVertical: 3,
               borderRadius: radii.pill,
-              backgroundColor: colors.panel,
+              backgroundColor: colors.surface,
             }}
           >
             <View
               style={{
-                width: 5,
-                height: 5,
-                borderRadius: 2.5,
+                width: 6,
+                height: 6,
+                borderRadius: 3,
                 backgroundColor: colors.purple,
               }}
             />
             <Text
               style={{
                 fontFamily: typography.family.sansSemibold,
-                fontSize: 10.5,
+                fontSize: 11,
+                fontWeight: '600',
                 color: colors.mute,
               }}
             >
@@ -330,13 +340,79 @@ function OfferBubble({
         )}
       </View>
 
+      {/* ── Product Context Snippet (if available) ── */}
+      {listingTitle ? (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+            paddingBottom: 12,
+            marginBottom: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.hairline,
+          }}
+        >
+          {listingThumb ? (
+            <Image
+              source={{ uri: listingThumb }}
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: radii.md,
+                backgroundColor: colors.surface,
+              }}
+              contentFit="cover"
+            />
+          ) : (
+            <View
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: radii.md,
+                backgroundColor: colors.surface,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Feather name="tag" size={16} color={colors.mute} />
+            </View>
+          )}
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text
+              numberOfLines={1}
+              style={{
+                fontFamily: typography.family.sansBold,
+                fontSize: 13,
+                color: colors.ink,
+                letterSpacing: -0.1,
+              }}
+            >
+              {listingTitle}
+            </Text>
+            {listingPrice != null && (
+              <Text
+                style={{
+                  fontFamily: typography.family.sans,
+                  fontSize: 11.5,
+                  color: colors.muteSoft,
+                  marginTop: 1,
+                }}
+              >
+                Listed at {formatPrice(listingPrice)}
+              </Text>
+            )}
+          </View>
+        </View>
+      ) : null}
+
       {/* ── Hero Price Container ── */}
       <View
         style={{
-          backgroundColor: colors.panel,
-          borderRadius: radii.md,
-          paddingHorizontal: 12,
-          paddingVertical: 10,
+          backgroundColor: colors.surface,
+          borderRadius: radii.xl,
+          paddingHorizontal: 16,
+          paddingVertical: 14,
           borderWidth: 1,
           borderColor: colors.hairline,
         }}
@@ -345,9 +421,10 @@ function OfferBubble({
           style={{
             fontFamily: typography.family.sansSemibold,
             fontSize: 10.5,
+            fontWeight: '600',
             color: colors.muteSoft,
             textTransform: 'uppercase',
-            letterSpacing: 0.5,
+            letterSpacing: 0.6,
           }}
         >
           Offered Price
@@ -356,16 +433,17 @@ function OfferBubble({
           style={{
             flexDirection: 'row',
             alignItems: 'baseline',
-            gap: 7,
-            marginTop: 2,
+            gap: 8,
+            marginTop: 4,
             flexWrap: 'wrap',
           }}
         >
           <Text
             style={{
               fontFamily: typography.family.sansBold,
-              fontSize: 21,
-              letterSpacing: -0.4,
+              fontSize: 24,
+              fontWeight: '700',
+              letterSpacing: -0.5,
               color: colors.ink,
             }}
           >
@@ -375,7 +453,7 @@ function OfferBubble({
             <Text
               style={{
                 fontFamily: typography.family.sans,
-                fontSize: 12.5,
+                fontSize: 13.5,
                 color: colors.muteSoft,
                 textDecorationLine: 'line-through',
               }}
@@ -386,23 +464,48 @@ function OfferBubble({
           {discountPct > 0 && (
             <View
               style={{
-                backgroundColor: 'rgba(108,71,255,0.12)',
-                paddingHorizontal: 5.5,
-                paddingVertical: 1.5,
-                borderRadius: 5,
+                backgroundColor: colors.purpleSoft,
+                paddingHorizontal: 6,
+                paddingVertical: 2,
+                borderRadius: radii.sm,
               }}
             >
               <Text
                 style={{
                   fontFamily: typography.family.sansBold,
-                  fontSize: 10.5,
+                  fontSize: 11,
+                  fontWeight: '700',
                   color: colors.purple,
                 }}
               >
-                −{discountPct}%
+                −{discountPct}% ({formatPrice(savingsAmount)} off)
               </Text>
             </View>
           )}
+        </View>
+
+        {/* Protection fee helper line */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 5,
+            marginTop: 8,
+            paddingTop: 8,
+            borderTopWidth: 1,
+            borderTopColor: colors.hairline,
+          }}
+        >
+          <Feather name="shield" size={11} color={colors.purple} />
+          <Text
+            style={{
+              fontFamily: typography.family.sans,
+              fontSize: 11,
+              color: colors.mute,
+            }}
+          >
+            Includes {formatPrice(fee)} Buyer Protection
+          </Text>
         </View>
       </View>
 
@@ -412,21 +515,21 @@ function OfferBubble({
           style={{
             flexDirection: 'row',
             alignItems: 'flex-start',
-            gap: 6,
-            marginTop: 8,
-            paddingHorizontal: 10,
-            paddingVertical: 7,
-            backgroundColor: 'rgba(15,15,15,0.02)',
-            borderRadius: radii.sm,
-            borderLeftWidth: 2.5,
+            gap: 8,
+            marginTop: 10,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            backgroundColor: colors.surface,
+            borderRadius: radii.md,
+            borderLeftWidth: 3,
             borderLeftColor: colors.purple,
           }}
         >
           <Text
             style={{
               fontFamily: typography.family.sans,
-              fontSize: 12.5,
-              lineHeight: 17,
+              fontSize: 13,
+              lineHeight: 18,
               color: colors.ink,
               flex: 1,
             }}
@@ -438,13 +541,18 @@ function OfferBubble({
 
       {/* ── Action Buttons for Seller ── */}
       {canRespond && (
-        <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
           <PressableScale
-            onPress={onDecline}
+            onPress={() => {
+              if (Platform.OS !== 'web') {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+              }
+              onDecline();
+            }}
             accessibilityLabel="Decline offer"
             style={{
               flex: 1,
-              height: 38,
+              height: 42,
               borderRadius: radii.pill,
               borderWidth: 1,
               borderColor: colors.border,
@@ -457,6 +565,7 @@ function OfferBubble({
               style={{
                 fontFamily: typography.family.sansBold,
                 fontSize: 13,
+                fontWeight: '700',
                 color: colors.ink,
               }}
             >
@@ -464,17 +573,22 @@ function OfferBubble({
             </Text>
           </PressableScale>
           <PressableScale
-            onPress={onAccept}
+            onPress={() => {
+              if (Platform.OS !== 'web') {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+              }
+              onAccept();
+            }}
             accessibilityLabel="Accept offer"
             style={{
-              flex: 1.2,
-              height: 38,
+              flex: 1.3,
+              height: 42,
               borderRadius: radii.pill,
               backgroundColor: colors.purple,
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 5,
+              gap: 6,
               ...shadow.sm,
             }}
           >
@@ -483,6 +597,7 @@ function OfferBubble({
               style={{
                 fontFamily: typography.family.sansBold,
                 fontSize: 13,
+                fontWeight: '700',
                 color: '#FFFFFF',
               }}
             >
@@ -494,32 +609,59 @@ function OfferBubble({
 
       {/* ── CTA for Buyer to Pay ── */}
       {canPay && (
-        <PressableScale
-          onPress={() => onPay(amount)}
-          accessibilityLabel={`Pay ${formatPrice(amount)}`}
-          style={{
-            marginTop: 12,
-            height: 42,
-            borderRadius: radii.pill,
-            backgroundColor: colors.purple,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 7,
-            ...shadow.sm,
-          }}
-        >
-          <Feather name="credit-card" size={15} color="#FFFFFF" />
-          <Text
+        <View style={{ marginTop: 14 }}>
+          <PressableScale
+            onPress={() => {
+              if (Platform.OS !== 'web') {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+              }
+              onPay(amount);
+            }}
+            accessibilityLabel={`Pay ${formatPrice(amount)}`}
             style={{
-              fontFamily: typography.family.sansBold,
-              fontSize: 13.5,
-              color: '#FFFFFF',
+              height: 48,
+              borderRadius: radii.pill,
+              backgroundColor: colors.purple,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              ...shadow.sm,
             }}
           >
-            Pay {formatPrice(amount)}
-          </Text>
-        </PressableScale>
+            <Feather name="credit-card" size={15} color="#FFFFFF" />
+            <Text
+              style={{
+                fontFamily: typography.family.sansBold,
+                fontSize: 14,
+                fontWeight: '700',
+                color: '#FFFFFF',
+              }}
+            >
+              Complete Purchase · Pay {formatPrice(amount)}
+            </Text>
+          </PressableScale>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 5,
+              marginTop: 8,
+            }}
+          >
+            <Feather name="shield" size={11} color={colors.purple} />
+            <Text
+              style={{
+                fontFamily: typography.family.sansMedium,
+                fontSize: 11,
+                color: colors.muteSoft,
+              }}
+            >
+              Escrow Protected · Funds released after delivery
+            </Text>
+          </View>
+        </View>
       )}
 
       {/* ── Status Footers ── */}
@@ -528,20 +670,20 @@ function OfferBubble({
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            gap: 5,
-            marginTop: 9,
+            gap: 6,
+            marginTop: 12,
             paddingVertical: 2,
           }}
         >
-          <Feather name="clock" size={11.5} color={colors.muteSoft} />
+          <Feather name="clock" size={12} color={colors.muteSoft} />
           <Text
             style={{
-              fontFamily: typography.family.sans,
-              fontSize: 11,
+              fontFamily: typography.family.sansMedium,
+              fontSize: 11.5,
               color: colors.muteSoft,
             }}
           >
-            Waiting for buyer to complete payment
+            Waiting for buyer to complete checkout
           </Text>
         </View>
       )}
@@ -551,20 +693,21 @@ function OfferBubble({
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            gap: 5,
-            marginTop: 9,
+            gap: 6,
+            marginTop: 12,
             paddingVertical: 2,
           }}
         >
-          <Feather name="shield" size={12} color="#059669" />
+          <Feather name="shield" size={12.5} color={colors.purple} />
           <Text
             style={{
               fontFamily: typography.family.sansBold,
-              fontSize: 11,
-              color: '#059669',
+              fontSize: 11.5,
+              fontWeight: '700',
+              color: colors.purple,
             }}
           >
-            Paid · Covered by Buyer Protection
+            Paid · Covered by Buyer Protection 🛡️
           </Text>
         </View>
       )}

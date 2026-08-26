@@ -25,7 +25,28 @@ export function useSheetSearchFocus(ref: RefObject<TextInput | null>) {
   useEffect(() => {
     let cancelled = false;
     const focus = () => {
-      if (!cancelled) ref.current?.focus();
+      if (cancelled) return;
+      if (Platform.OS === 'web') {
+        if (typeof window !== 'undefined') {
+          window.scrollTo(0, 0);
+          document.body.scrollTop = 0;
+          document.documentElement.scrollTop = 0;
+        }
+        try {
+          (ref.current as any)?.focus?.({ preventScroll: true });
+        } catch {
+          ref.current?.focus();
+        }
+        if (typeof window !== 'undefined') {
+          requestAnimationFrame(() => {
+            window.scrollTo(0, 0);
+            document.body.scrollTop = 0;
+            document.documentElement.scrollTop = 0;
+          });
+        }
+      } else {
+        ref.current?.focus();
+      }
     };
 
     // Web takes focus the instant the field exists, rather than waiting for a

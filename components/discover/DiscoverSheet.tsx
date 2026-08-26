@@ -139,7 +139,7 @@ function KeyboardPrimer({ inputRef }: { inputRef: RefObject<TextInput | null> })
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       style={{
-        position: 'absolute',
+        position: 'fixed' as any,
         top: 0,
         left: 0,
         width: 1,
@@ -147,6 +147,7 @@ function KeyboardPrimer({ inputRef }: { inputRef: RefObject<TextInput | null> })
         opacity: 0,
         padding: 0,
         borderWidth: 0,
+        pointerEvents: 'none',
       }}
       {...({ tabIndex: -1, 'aria-hidden': true } as any)}
     />
@@ -165,6 +166,32 @@ export function DiscoverSheetProvider({ children }: { children: ReactNode }) {
   }, []);
   const close = useCallback(() => setVisible(false), []);
   const api = useMemo(() => ({ open }), [open]);
+
+  // Keep the viewport and document pinned to top (0, 0) when the soft keyboard
+  // opens on mobile web, preventing Safari from scrolling the search bar offscreen.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined' || !visible) return;
+    const lockScroll = () => {
+      if (window.scrollY !== 0 || window.scrollX !== 0) {
+        window.scrollTo(0, 0);
+      }
+      if (document.body.scrollTop !== 0) document.body.scrollTop = 0;
+      if (document.documentElement.scrollTop !== 0) document.documentElement.scrollTop = 0;
+    };
+    lockScroll();
+    window.addEventListener('scroll', lockScroll, { passive: true });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('scroll', lockScroll, { passive: true });
+      window.visualViewport.addEventListener('resize', lockScroll, { passive: true });
+    }
+    return () => {
+      window.removeEventListener('scroll', lockScroll);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('scroll', lockScroll);
+        window.visualViewport.removeEventListener('resize', lockScroll);
+      }
+    };
+  }, [visible]);
 
   return (
     <Ctx.Provider value={api}>
@@ -301,7 +328,22 @@ function SheetShell({
   }));
 
   return (
-    <View style={{ flex: 1 }}>
+    <View
+      style={[
+        { flex: 1 },
+        Platform.OS === 'web'
+          ? ({
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: '100%',
+              width: '100%',
+            } as any)
+          : null,
+      ]}
+    >
       <Animated.View
         pointerEvents="none"
         style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.28)' }, scrimStyle]}
@@ -463,6 +505,13 @@ function DiscoverSheetBody({ onClose }: { onClose: () => void }) {
             autoCapitalize="none"
             returnKeyType="search"
             accessibilityLabel={`Search ${BRAND}`}
+            onFocus={() => {
+              if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                window.scrollTo(0, 0);
+                document.body.scrollTop = 0;
+                document.documentElement.scrollTop = 0;
+              }
+            }}
             style={[
               {
                 flex: 1,

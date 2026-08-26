@@ -7,7 +7,7 @@ import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/lib/auth';
-import { colors, radii, type as typography } from '@/lib/theme';
+import { colors, radii, shadow, type as typography } from '@/lib/theme';
 import type { RecommendedListing } from '@/lib/recommendations';
 import type { PriceDropListing } from '@/lib/myFeed';
 import { PriceDropCard } from '@/components/PriceDropCard';
@@ -670,6 +670,7 @@ function FeedSearch({
             height: 44,
             borderWidth: 1,
             borderColor: focused ? colors.purple : colors.border,
+            ...shadow.sm,
           }}
         >
           <Feather
@@ -692,9 +693,9 @@ function FeedSearch({
                 flexShrink: 1,
                 marginLeft: 9,
                 marginRight: 6,
-                fontFamily: typography.family.sansSemibold,
-                fontSize: 13,
-                letterSpacing: -0.1,
+                fontFamily: typography.family.sansMedium,
+                fontSize: 13.5,
+                letterSpacing: -0.15,
                 color: colors.ink,
                 padding: 0,
                 outlineStyle: 'none',
@@ -717,15 +718,17 @@ function FeedSearch({
               accessibilityLabel="Clear search"
               style={({ pressed }) => ({
                 flexShrink: 0,
-                width: 24,
-                height: 24,
+                width: 26,
+                height: 26,
                 borderRadius: radii.pill,
+                backgroundColor: colors.panel,
                 alignItems: 'center',
                 justifyContent: 'center',
-                opacity: pressed ? 0.6 : 1,
+                opacity: pressed ? 0.7 : 1,
+                transform: [{ scale: pressed ? 0.92 : 1 }],
               })}
             >
-              <Feather name="x" size={16} color={colors.muteSoft} />
+              <Feather name="x" size={14} color={colors.ink} />
             </Pressable>
           ) : null}
         </View>
@@ -750,9 +753,10 @@ function FeedSearch({
             borderColor: hasFilters ? colors.purple : colors.border,
             backgroundColor: hasFilters ? colors.purpleSoft : colors.surface,
             transform: [{ scale: pressed ? 0.94 : 1 }],
+            ...shadow.sm,
           })}
         >
-          <Feather name="sliders" size={18} color={hasFilters ? colors.purple : colors.ink} />
+          <Feather name="sliders" size={17} color={hasFilters ? colors.purple : colors.ink} />
           {hasFilters ? (
             <View
               style={{
@@ -770,7 +774,14 @@ function FeedSearch({
                 justifyContent: 'center',
               }}
             >
-              <Text style={{ fontSize: 10.5, fontWeight: '800', color: colors.white }}>
+              <Text
+                style={{
+                  fontFamily: typography.family.sansBold,
+                  fontSize: 10.5,
+                  fontWeight: '800',
+                  color: '#FFFFFF',
+                }}
+              >
                 {filterCount}
               </Text>
             </View>
@@ -795,28 +806,30 @@ function FeedSearch({
             borderColor: savedActive ? colors.purple : colors.border,
             backgroundColor: savedActive ? colors.purpleSoft : colors.surface,
             transform: [{ scale: pressed ? 0.94 : 1 }],
+            ...shadow.sm,
           })}
         >
           <Feather
             name="bookmark"
-            size={18}
+            size={17}
             color={savedActive ? colors.purple : colors.ink}
           />
         </Pressable>
       </View>
-      {searching && resultCount !== null && resultCount > 0 ? (
+      {searching && resultCount !== null && (
         <Text
           style={{
             marginTop: 8,
-            marginLeft: 2,
+            marginLeft: 4,
+            fontFamily: typography.family.sansMedium,
             fontSize: 12,
             color: colors.muteSoft,
             letterSpacing: -0.1,
           }}
         >
-          {resultCount} {resultCount === 1 ? 'result' : 'results'}
+          {resultCount} {resultCount === 1 ? 'item found' : 'items found'}
         </Text>
-      ) : null}
+      )}
     </View>
   );
 }
