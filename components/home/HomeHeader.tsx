@@ -286,15 +286,19 @@ export const ChipRow = memo(function ChipRow({
           onSelectChip(FOR_YOU);
         }}
         style={({ pressed }) => ({
-          paddingHorizontal: 16,
+          paddingHorizontal: 14,
           paddingVertical: 8,
           borderRadius: radii.pill,
           backgroundColor: activeChip === FOR_YOU ? '#F2F4F7' : '#FFFFFF',
           borderWidth: activeChip === FOR_YOU ? 0 : 1,
           borderColor: activeChip === FOR_YOU ? 'transparent' : 'rgba(0, 0, 0, 0.1)',
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
           transform: [{ scale: pressed ? 0.96 : 1 }],
         })}
       >
+        <Feather name="zap" size={13} color={colors.ink} />
         <Text
           style={{
             fontFamily: typography.family.sansBold,
@@ -313,15 +317,19 @@ export const ChipRow = memo(function ChipRow({
           onSelectChip(TRENDING);
         }}
         style={({ pressed }) => ({
-          paddingHorizontal: 16,
+          paddingHorizontal: 14,
           paddingVertical: 8,
           borderRadius: radii.pill,
           backgroundColor: activeChip === TRENDING ? '#F2F4F7' : '#FFFFFF',
           borderWidth: activeChip === TRENDING ? 0 : 1,
           borderColor: activeChip === TRENDING ? 'transparent' : 'rgba(0, 0, 0, 0.1)',
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
           transform: [{ scale: pressed ? 0.96 : 1 }],
         })}
       >
+        <Feather name="trending-up" size={13} color={colors.ink} />
         <Text
           style={{
             fontFamily: typography.family.sansBold,
