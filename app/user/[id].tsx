@@ -40,7 +40,7 @@ import {
   formatCount,
 } from '@/components/profile';
 import { ListingCard } from '@/components/ListingCard';
-
+import { useUserSafetyActions } from '@/hooks/useUserSafetyActions';
 
 type SellerTab = 'shop' | 'details';
 
@@ -116,17 +116,15 @@ export default function UserProfileScreen() {
     }
   };
 
+  const safety = useUserSafetyActions({
+    onBlocked: () => {
+      safeBack();
+    },
+  });
+
   const handleMore = () => {
     if (!profile) return;
-    Alert.alert(`@${profile.username}`, undefined, [
-      {
-        text: 'Report user',
-        style: 'destructive',
-        onPress: () =>
-          toast.show('Thanks — our team will take a look', { variant: 'success', icon: 'flag' }),
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    safety.showSafetySheet(profile.id, profile.username);
   };
 
   const onRefresh = () => {
