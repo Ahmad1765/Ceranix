@@ -79,7 +79,7 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
         onPress: listing.brand
           ? () => {
               tap('selection');
-              router.push(`/(tabs)/discover?q=${encodeURIComponent(listing.brand!)}` as any);
+              router.push(`/discover?q=${encodeURIComponent(listing.brand!)}` as any);
             }
           : undefined,
         trailing: listing.brand ? <Feather name="chevron-right" size={18} color={colors.mute} /> : undefined,
@@ -200,7 +200,7 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
               <Pressable
                 onPress={() => {
                   tap('selection');
-                  router.push(`/(tabs)/discover?category=${encodeURIComponent(listing.category)}` as any);
+                  router.push(`/discover?category=${encodeURIComponent(listing.category)}` as any);
                 }}
                 style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
               >
@@ -220,7 +220,7 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
                     onPress={() => {
                       tap('selection');
                       router.push(
-                        `/(tabs)/discover?category=${encodeURIComponent(listing.category)}&sub=${encodeURIComponent(listing.subcategory!)}` as any,
+                        `/discover?category=${encodeURIComponent(listing.category)}&sub=${encodeURIComponent(listing.subcategory!)}` as any,
                       );
                     }}
                     style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
@@ -284,12 +284,12 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
         </View>
 
         {/* Tag Chips */}
-        {listing.tags && listing.tags.length > 0 && (
+        {Array.isArray(listing.tags) && listing.tags.length > 0 && (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 16, gap: 8, paddingHorizontal: 4 }}>
             {listing.tags.map((tag) => (
               <Pressable
                 key={tag}
-                onPress={() => router.push(`/(tabs)/discover?q=${encodeURIComponent(tag)}` as any)}
+                onPress={() => router.push(`/discover?q=${encodeURIComponent(tag)}` as any)}
                 style={({ pressed }) => ({
                   backgroundColor: colors.white,
                   borderWidth: 1,

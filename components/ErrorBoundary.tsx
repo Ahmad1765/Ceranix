@@ -100,6 +100,24 @@ export class ErrorBoundary extends Component<Props, State> {
           safe. Try again below.
         </Text>
 
+        {__DEV__ && error?.message && (
+          <View
+            style={{
+              marginTop: 12,
+              padding: 10,
+              borderRadius: 8,
+              backgroundColor: 'rgba(239, 68, 68, 0.08)',
+              borderWidth: 1,
+              borderColor: 'rgba(239, 68, 68, 0.2)',
+              maxWidth: 360,
+            }}
+          >
+            <Text style={{ fontSize: 11.5, color: '#DC2626', fontFamily: 'monospace' }}>
+              {error.message}
+            </Text>
+          </View>
+        )}
+
         <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
           <Pressable
             onPress={this.reset}

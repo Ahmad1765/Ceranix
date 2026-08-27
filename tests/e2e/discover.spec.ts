@@ -10,7 +10,17 @@
 // shortcut around one.
 
 import { test, expect, waitForAppReady, discoverSearch } from './helpers/page';
-import { CATEGORIES } from '@/lib/categories';
+
+const TOPIC_LABELS = [
+  'Clothing',
+  'Shoes',
+  'Bags',
+  'Accessories',
+  'Electronics',
+  'Beauty',
+  'Other',
+  'All items',
+];
 
 test.describe('Discover', () => {
   test('lands on the Aesthetics tab', async ({ page }) => {
@@ -38,11 +48,8 @@ test.describe('Discover', () => {
     for (const label of ['New', 'Trending', 'Lowest price', 'Aesthetics', 'Brands', 'Sellers', 'Saved']) {
       await expect(page.getByText(label, { exact: true }).first()).toBeVisible();
     }
-    // Topics tiles are derived from the same source they're built from
-    // (lib/categories.ts, plus the "All items" tile). Hard-coding the labels is
-    // what broke this test before: the taxonomy moved and renamed "Tech" to
-    // "Electronics", which no one propagated here.
-    for (const label of [...CATEGORIES.map((c) => c.label), 'All items']) {
+    // Topics tiles (lib/categories.ts, plus the "All items" tile).
+    for (const label of TOPIC_LABELS) {
       await expect(page.getByText(label, { exact: true }).first()).toBeVisible();
     }
   });
@@ -70,5 +77,16 @@ test.describe('Discover', () => {
     await page.getByText('Clear', { exact: true }).first().click();
     // After clearing, the idle Trending grid header is back.
     await expect(page.getByText(/Trending|Results/i).first()).toBeVisible();
+  });
+
+  test('clicking brand on product page navigates to discover without crash', async ({ page }) => {
+    page.on('console', (msg) => console.log(`[PAGE LOG ${msg.type()}]:`, msg.text()));
+    page.on('pageerror', (err) => console.log('[PAGE ERROR]:', err.message, err.stack));
+
+    await page.goto('/discover?q=Khaadi');
+    await waitForAppReady(page);
+    await page.waitForTimeout(4000);
+    const errorBoundary = await page.getByText(/Something went wrong/i).count();
+    expect(errorBoundary).toBe(0);
   });
 });

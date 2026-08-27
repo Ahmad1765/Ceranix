@@ -232,14 +232,15 @@ export function useDiscoverSearch({
 
   // ── Derived Results ──────────────────────────────────────────────────────
   const clientFiltered = useMemo(() => {
-    let rows = listings;
+    let rows = Array.isArray(listings) ? listings : [];
     const q = query.trim().toLowerCase();
     if (q.length > 0) {
       rows = rows.filter(
         (l) =>
-          l.title.toLowerCase().includes(q) ||
-          (l.brand?.toLowerCase().includes(q) ?? false) ||
-          (l.description?.toLowerCase().includes(q) ?? false),
+          l &&
+          ((l.title && l.title.toLowerCase().includes(q)) ||
+            (l.brand && l.brand.toLowerCase().includes(q)) ||
+            (l.description && l.description.toLowerCase().includes(q))),
       );
     }
     return rows;

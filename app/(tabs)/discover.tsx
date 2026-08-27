@@ -151,8 +151,10 @@ export default function DiscoverScreen() {
     } else {
       const counts = new Map<string, TagIndexEntry>();
       for (const l of listings) {
-        if (l.is_sold) continue;
-        for (const raw of l.tags ?? []) {
+        if (!l || l.is_sold) continue;
+        const tags = Array.isArray(l.tags) ? l.tags : [];
+        for (const raw of tags) {
+          if (typeof raw !== 'string') continue;
           const tag = raw.trim().toLowerCase();
           if (!tag) continue;
           const cur = counts.get(tag);
@@ -175,6 +177,7 @@ export default function DiscoverScreen() {
     } else {
       const counts = new Map<string, BrandEntry>();
       for (const l of listings) {
+        if (!l) continue;
         const name = l.brand?.trim();
         if (!name || l.is_sold) continue;
         const key = name.toLowerCase();

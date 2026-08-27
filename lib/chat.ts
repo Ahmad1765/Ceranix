@@ -276,8 +276,9 @@ export function subscribeToReactions(
   conversationId: string,
   onEvent: (e: ReactionEvent) => void,
 ): () => void {
+  const channelName = `reactions:${conversationId}:${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const channel = supabase
-    .channel(`reactions:${conversationId}`)
+    .channel(channelName)
     .on(
       'postgres_changes',
       {
@@ -315,8 +316,9 @@ export function subscribeToMessages(
   conversationId: string,
   onEvent: (e: MessageEvent) => void,
 ): () => void {
+  const channelName = `messages:${conversationId}:${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const channel = supabase
-    .channel(`messages:${conversationId}`)
+    .channel(channelName)
     .on(
       'postgres_changes',
       {
@@ -350,8 +352,9 @@ export function subscribeToInbox(
 ): () => void {
   // Conversations are bumped via trigger when a message lands. Re-listing on
   // any conversation change involving the user keeps the inbox live.
+  const channelName = `inbox:${userId}:${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const channel = supabase
-    .channel(`inbox:${userId}`)
+    .channel(channelName)
     .on(
       'postgres_changes',
       {
