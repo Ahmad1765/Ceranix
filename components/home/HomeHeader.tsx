@@ -341,6 +341,28 @@ export const ChipRow = memo(function ChipRow({
         </Text>
       </Pressable>
 
+      {/* Create Alert / Saved Search Circular Button */}
+      <Pressable
+        onPress={() => {
+          haptic();
+          onAdd();
+        }}
+        accessibilityLabel="Create alert"
+        style={({ pressed }) => ({
+          width: 34,
+          height: 34,
+          borderRadius: radii.pill,
+          backgroundColor: '#FFFFFF',
+          borderWidth: 1,
+          borderColor: 'rgba(0, 0, 0, 0.1)',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transform: [{ scale: pressed ? 0.96 : 1 }],
+        })}
+      >
+        <Feather name="plus" size={16} color={colors.ink} />
+      </Pressable>
+
       {/* Saved Searches Chips */}
       {savedSearches.map((s) => {
         const active = activeChip === s.id;
@@ -380,28 +402,6 @@ export const ChipRow = memo(function ChipRow({
           </Pressable>
         );
       })}
-
-      {/* Create Alert / Saved Search Circular Button */}
-      <Pressable
-        onPress={() => {
-          haptic();
-          onAdd();
-        }}
-        accessibilityLabel="Create alert"
-        style={({ pressed }) => ({
-          width: 34,
-          height: 34,
-          borderRadius: radii.pill,
-          backgroundColor: '#FFFFFF',
-          borderWidth: 1,
-          borderColor: 'rgba(0, 0, 0, 0.1)',
-          alignItems: 'center',
-          justifyContent: 'center',
-          transform: [{ scale: pressed ? 0.96 : 1 }],
-        })}
-      >
-        <Feather name="plus" size={16} color={colors.ink} />
-      </Pressable>
     </ScrollView>
   );
 });
