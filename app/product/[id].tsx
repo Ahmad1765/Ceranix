@@ -79,6 +79,7 @@ import {
   ProductDetailsTable,
   ProductHeaderNav,
   ProductHeroSection,
+  ProductOverviewHeader,
   ProductRelatedSection,
   ProductSellerProfileCard,
   useProductBundle,
@@ -540,35 +541,14 @@ export default function ProductScreen() {
           onOpenSaveList={engagement.handleOpenSaveList}
         />
 
-        {/* 3. Product Editorial Details Table */}
-        <ProductDetailsTable
+        {/* 3. Product Overview (Title, Metadata, Price & Buyer Protection) */}
+        <ProductOverviewHeader
           listing={listing}
           bpFee={bpFee}
-          descExpanded={descExpanded}
-          onToggleDescExpanded={() => {
-            tap('selection');
-            setDescExpanded((v) => !v);
-          }}
           onOpenBpSheet={() => engagement.setBpVisible(true)}
-          onShare={shareListing}
-          onReport={handleReport}
         />
 
-        {/* 4. Bundle Nudge Bar (Jumps to bundle builder) */}
-        {!isOwnListing && sellerItems.length > 0 ? (
-          <BundleProgressBar
-            listing={listing}
-            sellerItems={sellerItems}
-            selectedIds={bundle.selectedBundleIds}
-            onPress={() => {
-              tap('selection');
-              bundle.setRelatedTab('members');
-              requestAnimationFrame(() => mainScrollRef.current?.scrollToEnd({ animated: true }));
-            }}
-          />
-        ) : null}
-
-        {/* 5. Seller Profile Card */}
+        {/* 4. Seller Profile Card */}
         <ProductSellerProfileCard
           seller={listing.seller}
           createdAt={listing.created_at}
@@ -588,7 +568,33 @@ export default function ProductScreen() {
           }}
         />
 
-        {/* 6. Multi-Item Bundle Section & Related Grid */}
+        {/* 5. Product Editorial Details Table (Description, Details Box, Safety) */}
+        <ProductDetailsTable
+          listing={listing}
+          descExpanded={descExpanded}
+          onToggleDescExpanded={() => {
+            tap('selection');
+            setDescExpanded((v) => !v);
+          }}
+          onShare={shareListing}
+          onReport={handleReport}
+        />
+
+        {/* 6. Bundle Nudge Bar (Jumps to bundle builder) */}
+        {!isOwnListing && sellerItems.length > 0 ? (
+          <BundleProgressBar
+            listing={listing}
+            sellerItems={sellerItems}
+            selectedIds={bundle.selectedBundleIds}
+            onPress={() => {
+              tap('selection');
+              bundle.setRelatedTab('members');
+              requestAnimationFrame(() => mainScrollRef.current?.scrollToEnd({ animated: true }));
+            }}
+          />
+        ) : null}
+
+        {/* 7. Multi-Item Bundle Section & Related Grid */}
         <ProductRelatedSection
           listing={listing}
           relatedTab={bundle.relatedTab}

@@ -13,7 +13,6 @@ import { Text } from '@/lib/rnText';
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import { colors } from '@/lib/theme';
-import { formatPrice } from '@/lib/currency';
 import { categoryLabel, subcategoryLabel } from '@/lib/categories';
 import { itemColorLabel } from '@/lib/itemColors';
 import { ColorSwatch } from '@/components/ColorSwatch';
@@ -22,7 +21,6 @@ import {
   BRAND_PURPLE,
   CONDITION_LABELS,
   HAIRLINE,
-  conditionLabel,
   tap,
   timeAgo,
 } from '@/components/product/shared';
@@ -41,25 +39,19 @@ type DetailRow = {
 
 type ProductDetailsTableProps = {
   listing: Listing;
-  bpFee: number;
   descExpanded: boolean;
   onToggleDescExpanded: () => void;
-  onOpenBpSheet: () => void;
   onShare: () => void;
   onReport: () => void;
 };
 
 export const ProductDetailsTable = memo(function ProductDetailsTable({
   listing,
-  bpFee,
   descExpanded,
   onToggleDescExpanded,
-  onOpenBpSheet,
   onShare,
   onReport,
 }: ProductDetailsTableProps) {
-  const heartCount = Math.max(0, Number(listing.likes ?? 0));
-  const itemPrice = Number(listing.price ?? 0);
   const catSubLabel = listing.subcategory
     ? subcategoryLabel(listing.category, listing.subcategory)
     : '';
@@ -76,19 +68,6 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
   const descFull = useMemo(() => descParas.join('\n\n'), [descParas]);
   const descIsLong = descFull.length > 240 || descParas.length > 3;
   const hasDescription = descParas.length > 0;
-
-  // Metadata segments
-  const metaSegments = useMemo(() => {
-    const cond = conditionLabel(listing.condition);
-    const uploaded = listing.created_at ? timeAgo(listing.created_at) : '';
-    return [
-      listing.size ? { text: `Size ${listing.size}` } : null,
-      cond ? { text: cond } : null,
-      listing.brand ? { text: listing.brand, link: true } : null,
-      listing.seller?.location ? { text: listing.seller.location } : null,
-      uploaded ? { text: `Uploaded ${uploaded}` } : null,
-    ].filter(Boolean) as { text: string; link?: boolean }[];
-  }, [listing.size, listing.condition, listing.brand, listing.seller?.location, listing.created_at]);
 
   // Attribute Rows
   const detailRows: DetailRow[] = useMemo(
@@ -138,98 +117,6 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
 
   return (
     <>
-      {/* ── Title & Price Header ── */}
-      <View style={{ paddingHorizontal: 20, paddingTop: 22, paddingBottom: 14 }}>
-        {heartCount > 0 && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 6 }}>
-            <Feather name="heart" size={12} color={colors.mute} />
-            <Text style={{ fontSize: 12, color: colors.mute, fontFamily: 'Inter_500Medium' }}>
-              Liked by <Text style={{ fontFamily: 'Inter_700Bold', color: colors.ink }}>{heartCount} {heartCount === 1 ? 'person' : 'people'}</Text>
-            </Text>
-          </View>
-        )}
-
-        <Text
-          style={{
-            fontSize: 28,
-            fontFamily: 'Inter_700Bold',
-            color: colors.ink,
-            lineHeight: 33,
-            letterSpacing: -0.7,
-          }}
-          numberOfLines={2}
-        >
-          {listing.title}
-        </Text>
-
-        {metaSegments.length > 0 && (
-          <Text
-            numberOfLines={2}
-            style={{ marginTop: 10, fontSize: 14, lineHeight: 20, color: colors.mute, fontFamily: 'Inter_500Medium' }}
-          >
-            {metaSegments.map((s, i) => (
-              <Text key={i}>
-                {i > 0 ? <Text style={{ color: colors.muteSoft }}>{' · '}</Text> : null}
-                {s.link ? (
-                  <Text
-                    style={{
-                      color: BRAND_PURPLE,
-                      fontFamily: 'Inter_600SemiBold',
-                      textDecorationLine: 'underline',
-                    }}
-                    accessibilityRole="link"
-                    accessibilityLabel={`Shop more from ${s.text}`}
-                    onPress={() => {
-                      tap('selection');
-                      router.push(`/(tabs)/discover?q=${encodeURIComponent(listing.brand!)}` as any);
-                    }}
-                  >
-                    {s.text}
-                  </Text>
-                ) : (
-                  s.text
-                )}
-              </Text>
-            ))}
-          </Text>
-        )}
-
-        <View style={{ marginTop: 18 }}>
-          <Text
-            style={{
-              fontSize: 22,
-              fontFamily: 'Inter_700Bold',
-              color: colors.ink,
-              letterSpacing: -0.4,
-            }}
-          >
-            {formatPrice(itemPrice, { whole: true })}
-          </Text>
-          {bpFee > 0 ? (
-            <Pressable
-              onPress={() => { tap('selection'); onOpenBpSheet(); }}
-              accessibilityRole="button"
-              accessibilityLabel={`Plus ${formatPrice(bpFee)} Buyer Protection fee. See the breakdown.`}
-              hitSlop={8}
-              style={({ pressed }) => ({
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 7,
-                marginTop: 6,
-                alignSelf: 'flex-start',
-                minHeight: 28,
-                opacity: pressed ? 0.6 : 1,
-              })}
-            >
-              <Text style={{ fontSize: 14, fontFamily: 'Inter_500Medium', color: colors.mute }}>
-                +{formatPrice(bpFee)} Buyer Protection fee
-              </Text>
-              <Feather name="shield" size={15} color={BRAND_PURPLE} />
-            </Pressable>
-          ) : null}
-        </View>
-      </View>
-
       {/* ── Description + Details Box ── */}
       <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 6 }}>
         <View
