@@ -35,7 +35,7 @@ async function withTimeout<T>(p: PromiseLike<T>, label: string): Promise<T | { _
 
 const SELLER_COLS = 'id, username, full_name, avatar_url, is_verified, vacation_mode';
 const LISTING_COLS =
-  'id, seller_id, title, brand, size, price, category, gender, condition, images, thumbnails, is_sold, likes, created_at';
+  'id, seller_id, title, brand, size, price, category, subcategory, color, gender, condition, images, thumbnails, is_sold, views, likes, tags, created_at';
 
 // Price drops on listings the user has liked, within the last 30 days,
 // still active, seller not on vacation. Two-step query: first fetch the
