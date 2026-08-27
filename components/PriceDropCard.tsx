@@ -3,7 +3,7 @@ import { View, Pressable } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
+import { cardImageUrl, getOptimizedImageUrl, thumbWidthFor, IMAGE_TRANSITION } from '@/lib/images';
 import type { PriceDropListing } from '@/lib/myFeed';
 import { formatPrice as formatMoney } from '@/lib/currency';
 
@@ -18,8 +18,7 @@ function formatPrice(value: unknown): string {
 }
 
 export const PriceDropCard = memo(function PriceDropCard({ listing, width = 130 }: Props) {
-  const firstImage = Array.isArray(listing.images) ? (listing.images[0] ?? '') : '';
-  const src = getOptimizedImageUrl(firstImage, { width: thumbWidthFor(width) });
+  const src = getOptimizedImageUrl(cardImageUrl(listing, 0), { width: thumbWidthFor(width) });
   // Clamp negative pct to 0: if new_price > old_price (price went up) the
   // render guard `pct > 0` will hide the discount badge anyway, but the
   // clamp keeps the math honest for any future consumers of `pct`.
@@ -52,7 +51,7 @@ export const PriceDropCard = memo(function PriceDropCard({ listing, width = 130 
           style={{ width: '100%', height: '100%' }}
           contentFit="cover"
           cachePolicy="memory-disk"
-          transition={120}
+          transition={IMAGE_TRANSITION}
         />
         {pct > 0 ? (
           <View

@@ -69,6 +69,7 @@ export type MyOrder = Order & {
     id: string;
     title: string | null;
     images: string[] | null;
+    thumbnails?: string[] | null;
     price: number | string | null;
   } | null;
 };
@@ -94,7 +95,7 @@ export async function fetchMyOrders(userId: string): Promise<MyOrder[]> {
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "id, status, amount_cents, fee_cents, currency, payment_method, shipping_address, delivery_notes, created_at, listing_id, buyer_id, seller_id, listing:listings(id, title, images, price)",
+      "id, status, amount_cents, fee_cents, currency, payment_method, shipping_address, delivery_notes, created_at, listing_id, buyer_id, seller_id, listing:listings(id, title, images, thumbnails, price)",
     )
     .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
     .order("created_at", { ascending: false });

@@ -1,5 +1,13 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { cardImageUrl, getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
+import { cardImageUrl, getOptimizedImageUrl, thumbWidthFor, prefetchImages } from '@/lib/images';
+
+vi.mock('react-native', () => ({
+  Platform: { OS: 'ios', select: (obj: any) => obj.ios || obj.default },
+}));
+
+vi.mock('expo-image', () => ({
+  Image: { prefetch: vi.fn() },
+}));
 
 const SUPABASE_PUBLIC =
   'https://abc.supabase.co/storage/v1/object/public/listing-images/a/photo.jpg';
@@ -39,9 +47,50 @@ describe('getOptimizedImageUrl', () => {
     expect(out.searchParams.get('q')).toBe('70');
   });
 
+  it('rewrites Unsplash Plus URLs with sizing + format params', () => {
+    const out = new URL(
+      getOptimizedImageUrl('https://plus.unsplash.com/premium_photo-123', { width: 500, quality: 75 }),
+    );
+    expect(out.searchParams.get('w')).toBe('500');
+    expect(out.searchParams.get('q')).toBe('75');
+    expect(out.searchParams.get('auto')).toBe('format');
+    expect(out.searchParams.get('fit')).toBe('crop');
+  });
+
+  it('rewrites Pexels URLs with sizing params', () => {
+    const out = new URL(
+      getOptimizedImageUrl('https://images.pexels.com/photos/123/pexels-photo.jpeg', { width: 450 }),
+    );
+    expect(out.searchParams.get('w')).toBe('450');
+    expect(out.searchParams.get('auto')).toBe('compress');
+  });
+
+  it('rewrites Imgix URLs with sizing params', () => {
+    const out = new URL(
+      getOptimizedImageUrl('https://assets.imgix.net/photo.jpg', { width: 500, quality: 80 }),
+    );
+    expect(out.searchParams.get('w')).toBe('500');
+    expect(out.searchParams.get('q')).toBe('80');
+    expect(out.searchParams.get('auto')).toBe('format');
+  });
+
+  it('rewrites Cloudinary URLs by inserting transformation segment', () => {
+    const original = 'https://res.cloudinary.com/demo/image/upload/sample.jpg';
+    const optimized = getOptimizedImageUrl(original, { width: 400, quality: 80 });
+    expect(optimized).toContain('/image/upload/w_400,q_80,f_auto,c_limit/sample.jpg');
+  });
+
   it('leaves Supabase public URLs unchanged when the transform flag is off (default)', () => {
     // EXPO_PUBLIC_SUPABASE_IMAGE_TRANSFORM is unset in the test env.
     expect(getOptimizedImageUrl(SUPABASE_PUBLIC, { width: 600 })).toBe(SUPABASE_PUBLIC);
+  });
+});
+
+describe('prefetchImages', () => {
+  it('handles null, undefined, or empty arrays gracefully', () => {
+    expect(() => prefetchImages(null as any)).not.toThrow();
+    expect(() => prefetchImages([])).not.toThrow();
+    expect(() => prefetchImages(['', null as any, undefined as any])).not.toThrow();
   });
 });
 

@@ -20,7 +20,7 @@ import {
 import { enqueueOfflineAction, isNetworkError } from '@/lib/offlineSync';
 
 const LISTING_COLUMNS =
-  'id, seller_id, title, brand, size, price, category, gender, condition, images, is_sold, likes, tags, created_at';
+  'id, seller_id, title, brand, size, price, category, gender, condition, images, thumbnails, is_sold, likes, tags, created_at';
 
 export type SaveList = {
   id: string;

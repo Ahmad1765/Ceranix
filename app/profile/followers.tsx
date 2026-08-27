@@ -8,7 +8,7 @@ import { Image } from 'expo-image';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { safeBack } from '@/lib/nav';
-import { getOptimizedImageUrl } from '@/lib/images';
+import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 import { colors } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { Button, EmptyState } from '@/components/ui';
@@ -229,7 +229,13 @@ function UserRow({
         }}
       >
         {avatar ? (
-          <Image source={{ uri: avatar }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+          <Image
+            source={{ uri: avatar }}
+            style={{ width: '100%', height: '100%' }}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={IMAGE_TRANSITION}
+          />
         ) : (
           <Text style={{ fontSize: 18, fontWeight: '900', color: colors.primary }}>{initial}</Text>
         )}

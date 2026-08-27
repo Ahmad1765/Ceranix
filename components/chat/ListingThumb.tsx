@@ -11,6 +11,7 @@ import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
 import { colors, radii, type as typography } from '@/lib/theme';
+import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 
 export type ListingStatus = 'active' | 'sold' | 'removed';
 
@@ -36,6 +37,7 @@ export function ListingThumb({
 }) {
   const h = height ?? width;
   const label = status === 'sold' ? 'Sold' : status === 'removed' ? 'Removed' : null;
+  const optimizedUri = uri ? getOptimizedImageUrl(uri, { width: Math.round(width * 2) }) : null;
 
   return (
     <View
@@ -49,13 +51,13 @@ export function ListingThumb({
         justifyContent: 'center',
       }}
     >
-      {uri ? (
+      {optimizedUri ? (
         <Image
-          source={{ uri }}
+          source={{ uri: optimizedUri }}
           style={{ width: '100%', height: '100%' }}
           contentFit="cover"
           cachePolicy="memory-disk"
-          transition={120}
+          transition={IMAGE_TRANSITION}
         />
       ) : (
         <Feather name="image" size={Math.round(width * 0.3)} color={colors.muteSoft} />

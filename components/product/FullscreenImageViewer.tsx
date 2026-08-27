@@ -13,7 +13,7 @@ import {
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
 import { StatusBar } from 'expo-status-bar';
-import { getOptimizedImageUrl } from '@/lib/images';
+import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 import { Text } from '@/lib/rnText';
 import { tap } from './shared';
 
@@ -141,7 +141,7 @@ export function FullscreenImageViewer({
                 style={{ width: width * 0.94, height: height * 0.82 }}
                 contentFit="contain"
                 cachePolicy="memory-disk"
-                transition={150}
+                transition={IMAGE_TRANSITION}
                 priority={i === activeIndex ? 'high' : 'normal'}
               />
             </View>

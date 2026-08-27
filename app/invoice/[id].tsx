@@ -22,6 +22,7 @@ import { BRAND } from '@/lib/brand';
 import { OrderStepper } from '@/components/orders/OrderStepper';
 import { CancelOrderModal } from '@/components/orders/CancelOrderModal';
 import { MarkShippedModal } from '@/components/orders/MarkShippedModal';
+import { cardImageUrl, getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 
 const TEAL = '#007782';
 
@@ -214,7 +215,7 @@ export default function InvoiceScreen() {
   const invoiceNumber = deriveInvoiceNumber(listing.id);
   const buyerName = displayName(profile?.full_name, profile?.username);
   const status = deriveInvoiceStatus(order, confirming);
-  const heroImage = listing.images?.[0];
+  const heroImage = cardImageUrl(listing, 0);
   const mapsUrl = generateMapsLink(order?.shipping_address);
 
   const onShare = async () => {
@@ -478,7 +479,13 @@ export default function InvoiceScreen() {
               }}
             >
               {heroImage ? (
-                <Image source={{ uri: heroImage }} style={{ width: 64, height: 64 }} contentFit="cover" />
+                <Image
+                  source={{ uri: getOptimizedImageUrl(heroImage, { width: 140 }) }}
+                  style={{ width: 64, height: 64 }}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  transition={IMAGE_TRANSITION}
+                />
               ) : (
                 <Feather name="package" size={24} color="#9CA3AF" />
               )}

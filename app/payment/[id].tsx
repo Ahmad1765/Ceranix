@@ -14,7 +14,7 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, router, Redirect } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { getOptimizedImageUrl } from '@/lib/images';
+import { getOptimizedImageUrl, cardImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 import * as Haptics from 'expo-haptics';
 import { colors } from '@/lib/theme';
 import { useListingQuery } from '@/lib/queries';
@@ -92,7 +92,6 @@ export default function PaymentScreen() {
   }, [fulfillmentParam]);
 
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null);
-  const [addressLoading, setAddressLoading] = useState(true);
   const [addressSheetOpen, setAddressSheetOpen] = useState(false);
   const [paymentOptionsOpen, setPaymentOptionsOpen] = useState(false);
   const [bpSheetOpen, setBpSheetOpen] = useState(false);
@@ -101,7 +100,6 @@ export default function PaymentScreen() {
   // Fetch buyer's default shipping address
   useEffect(() => {
     if (!user?.id) {
-      setAddressLoading(false);
       return;
     }
 
@@ -133,8 +131,6 @@ export default function PaymentScreen() {
         }
       } catch {
         // ignore address fetch errors
-      } finally {
-        if (active) setAddressLoading(false);
       }
     })();
 
@@ -331,8 +327,8 @@ export default function PaymentScreen() {
     }
   };
 
-  const imageUrl = listing.images?.[0]
-    ? getOptimizedImageUrl(listing.images[0], { width: 240 })
+  const imageUrl = listing
+    ? getOptimizedImageUrl(cardImageUrl(listing, 0), { width: 240 })
     : null;
 
   return (
@@ -343,8 +339,8 @@ export default function PaymentScreen() {
           onPress={() => safeBack()}
           hitSlop={HIT_SLOP_8}
           accessibilityRole="button"
-          accessibilityLabel="Cancel payment"
-          style={({ pressed }) => [styles.closeButton, pressed && { opacity: 0.5 }]}
+          accessibilityLabel="Go back"
+          style={({ pressed }) => [styles.closeButton, pressed && { opacity: 0.6 }]}
         >
           <Feather name="x" size={22} color={colors.ink} />
         </Pressable>
@@ -365,6 +361,7 @@ export default function PaymentScreen() {
               style={styles.thumbnailImage}
               contentFit="cover"
               cachePolicy="memory-disk"
+              transition={IMAGE_TRANSITION}
             />
           ) : (
             <View style={[styles.thumbnailImage, styles.thumbnailPlaceholder]}>

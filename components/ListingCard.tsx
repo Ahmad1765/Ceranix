@@ -17,7 +17,7 @@ import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
 import { router } from 'expo-router';
 import { PressableScale } from '@/components/PressableScale';
-import { cardImageUrl, getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
+import { cardImageUrl, getOptimizedImageUrl, thumbWidthFor, IMAGE_TRANSITION } from '@/lib/images';
 import { peekLikedIds } from '@/lib/engagementCache';
 import { formatPrice } from '@/lib/currency';
 import { priceBreakdown } from '@/lib/fees';
@@ -309,7 +309,7 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
                   contentFit="cover"
                   cachePolicy="memory-disk"
                   recyclingKey={`${listing.id}-${i}`}
-                  transition={200}
+                  transition={IMAGE_TRANSITION}
                   priority={i === 0 ? 'high' : 'normal'}
                 />
               ) : (
@@ -324,7 +324,7 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
             contentFit="cover"
             cachePolicy="memory-disk"
             recyclingKey={listing.id}
-            transition={280}
+            transition={IMAGE_TRANSITION}
             priority="high"
           />
         )}

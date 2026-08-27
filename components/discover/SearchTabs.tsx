@@ -12,7 +12,7 @@ import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
 import { router } from 'expo-router';
-import { getOptimizedImageUrl } from '@/lib/images';
+import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 import { fetchFollowingMask, toggleFollow } from '@/lib/follows';
 import { useToast } from '@/lib/toast';
 import { colors, radii, type } from '@/lib/theme';
@@ -277,11 +277,11 @@ function TagTile({
         >
           {uri ? (
             <Image
-              source={{ uri }}
+              source={{ uri: getOptimizedImageUrl(uri, { width: 160 }) }}
               style={{ width: '100%', height: '100%' }}
               contentFit="cover"
               cachePolicy="memory-disk"
-              transition={150}
+              transition={IMAGE_TRANSITION}
             />
           ) : (
             <Feather name="hash" size={16} color={colors.purple} />
@@ -414,11 +414,11 @@ function BrandCard({ brand, onPress }: { brand: BrandEntry; onPress: () => void 
               >
                 {uri ? (
                   <Image
-                    source={{ uri }}
+                    source={{ uri: getOptimizedImageUrl(uri, { width: 160 }) }}
                     style={{ width: '100%', height: '100%' }}
                     contentFit="cover"
                     cachePolicy="memory-disk"
-                    transition={200}
+                    transition={IMAGE_TRANSITION}
                   />
                 ) : null}
               </View>
@@ -576,9 +576,11 @@ function UserRow({
       >
         {avatar ? (
           <Image
-            source={{ uri: avatar }}
+            source={{ uri: getOptimizedImageUrl(avatar, { width: 100 }) }}
             style={{ width: '100%', height: '100%' }}
             contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={IMAGE_TRANSITION}
           />
         ) : (
           <Text style={{ fontFamily: DISPLAY_BOLD, fontSize: 18, color: colors.purple }}>{initial}</Text>

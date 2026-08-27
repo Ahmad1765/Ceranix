@@ -51,6 +51,7 @@ import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { captureError } from '@/lib/sentry';
 import { getOrCreateConversation, sendOffer } from '@/lib/chat';
+import { cardImageUrl, prefetchImages } from '@/lib/images';
 import { SaveListSheet } from '@/components/SaveListSheet';
 import { colors } from '@/lib/theme';
 import { FullscreenImageViewer } from '@/components/product/FullscreenImageViewer';
@@ -121,6 +122,17 @@ export default function ProductScreen() {
   const similarItemsQ = useSimilarListingsQuery(productIdParam ?? null);
   const sellerItems = sellerItemsQ.data ?? EMPTY_LISTINGS;
   const similarItems = similarItemsQ.data ?? EMPTY_LISTINGS;
+
+  // Proactively warm up browser/disk cache with carousel photos and related item cards
+  useEffect(() => {
+    if (listing?.images && listing.images.length > 1) {
+      prefetchImages(listing.images.slice(1));
+    }
+    const related = [...sellerItems, ...similarItems].slice(0, 6);
+    if (related.length > 0) {
+      prefetchImages(related.map((l) => cardImageUrl(l, 0)));
+    }
+  }, [listing?.images, sellerItems, similarItems]);
 
   // ── Engagement Domain Hook (Likes, Saves, Modals) ────────────────────────
   const engagement = useProductEngagement({

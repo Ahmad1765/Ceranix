@@ -17,7 +17,7 @@ import { View, Pressable, useWindowDimensions } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
-import { getOptimizedImageUrl } from '@/lib/images';
+import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 import { CATEGORIES, type CategoryId } from '@/lib/categories';
 import { colors, radii, type } from '@/lib/theme';
 import type { SortKey } from '@/lib/listings';
@@ -235,7 +235,7 @@ const TopicTile = memo(function TopicTile({
         <Feather name={topic.icon} size={15} color={colors.purple} />
         {uri ? (
           <Image
-            source={{ uri }}
+            source={{ uri: getOptimizedImageUrl(uri, { width: 100 }) }}
             // borderRadius is repeated on the image, not just the parent:
             // Android does not reliably clip an absolutely-positioned child to
             // a rounded parent's `overflow: hidden`, which left the cover as a
@@ -243,7 +243,7 @@ const TopicTile = memo(function TopicTile({
             style={{ position: 'absolute', width: '100%', height: '100%', borderRadius: 17 }}
             contentFit="cover"
             cachePolicy="memory-disk"
-            transition={150}
+            transition={IMAGE_TRANSITION}
           />
         ) : null}
       </View>

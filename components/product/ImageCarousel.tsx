@@ -13,6 +13,7 @@ import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
 import { Text } from '@/lib/rnText';
 import { colors, radii } from '@/lib/theme';
+import { getOptimizedImageUrl, thumbWidthFor, IMAGE_TRANSITION, prefetchImages } from '@/lib/images';
 
 export interface ImageCarouselProps {
   images: string[];
@@ -39,6 +40,15 @@ export function ImageCarousel({
   const [carouselWidth, setCarouselWidth] = useState(windowWidth);
   const scrollRef = useRef<ScrollView>(null);
 
+  const validImages = (images || []).filter(Boolean);
+
+  // Proactively prefetch adjacent gallery images on mount so swipes are instantaneous
+  useEffect(() => {
+    if (validImages.length > 1) {
+      prefetchImages(validImages.slice(1));
+    }
+  }, [validImages]);
+
   useEffect(() => {
     setCarouselWidth(windowWidth);
   }, [windowWidth]);
@@ -51,12 +61,10 @@ export function ImageCarousel({
         animated: false,
       });
     }
-  }, [carouselWidth]);
+  }, [carouselWidth, activeIndex]);
 
   // Height based on aspect ratio
   const carouselHeight = aspectRatio === '1:1' ? carouselWidth : carouselWidth * 1.25;
-
-  const validImages = (images || []).filter(Boolean);
 
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -110,6 +118,7 @@ export function ImageCarousel({
           <CarouselSlide
             key={index}
             uri={uri}
+            index={index}
             width={carouselWidth}
             height={carouselHeight}
             onPress={onImagePress ? () => onImagePress(index) : undefined}
@@ -149,20 +158,24 @@ export function ImageCarousel({
 
 function CarouselSlide({
   uri,
+  index,
   width,
   height,
   onPress,
 }: {
   uri: string;
+  index: number;
   width: number;
   height: number;
   onPress?: () => void;
 }) {
+  const optimizedUri = getOptimizedImageUrl(uri, { width: thumbWidthFor(width) });
   const imageElement = (
     <Image
-      source={{ uri }}
+      source={{ uri: optimizedUri }}
       contentFit="cover"
-      transition={150}
+      transition={IMAGE_TRANSITION}
+      priority={index === 0 ? 'high' : 'normal'}
       cachePolicy="memory-disk"
       style={styles.image}
     />

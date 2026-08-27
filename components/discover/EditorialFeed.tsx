@@ -11,7 +11,7 @@ import Feather from '@expo/vector-icons/Feather';
 import { router } from 'expo-router';
 import { ListingCard } from '@/components/ListingCard';
 import { formatPrice } from '@/lib/currency';
-import { getOptimizedImageUrl } from '@/lib/images';
+import { getOptimizedImageUrl, cardImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 import { colors, radii, shadow, type } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import type { Listing } from '@/types';
@@ -193,7 +193,7 @@ function PromoCard({
               style={{ width: '100%', height: '100%' }}
               contentFit="cover"
               cachePolicy="memory-disk"
-              transition={250}
+              transition={IMAGE_TRANSITION}
             />
             {/* Brand tint — a single flat purple wash unifies any product photo
                 with the card. Not a gradient. */}
@@ -423,7 +423,7 @@ function EditCard({
             style={{ width: '100%', height: '100%' }}
             contentFit="cover"
             cachePolicy="memory-disk"
-            transition={200}
+            transition={IMAGE_TRANSITION}
           />
         ) : null}
       </View>
@@ -606,7 +606,7 @@ export function RecentlyViewedList({
 }
 
 function RecentRow({ listing }: { listing: Listing }) {
-  const img = listing.images?.[0] ? getOptimizedImageUrl(listing.images[0], { width: 160 }) : null;
+  const img = listing ? getOptimizedImageUrl(cardImageUrl(listing, 0), { width: 160 }) : null;
   return (
     <Pressable
       onPress={() => router.push(`/product/${listing.id}`)}
@@ -638,7 +638,7 @@ function RecentRow({ listing }: { listing: Listing }) {
             style={{ width: '100%', height: '100%' }}
             contentFit="cover"
             cachePolicy="memory-disk"
-            transition={150}
+            transition={IMAGE_TRANSITION}
           />
         ) : null}
       </View>
@@ -727,7 +727,7 @@ function BrandCard({ collection, onPress }: { collection: Collection; onPress: (
             style={{ width: '100%', height: '100%' }}
             contentFit="cover"
             cachePolicy="memory-disk"
-            transition={200}
+            transition={IMAGE_TRANSITION}
           />
         ) : null}
       </View>

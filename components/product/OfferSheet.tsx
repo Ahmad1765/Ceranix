@@ -14,10 +14,9 @@ import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, TextInput } from '@/lib/rnText';
 import { colors, radii, shadow, type } from '@/lib/theme';
-import { useTheme } from '@/context/ThemeContext';
 import { formatPrice, CURRENCY_SYMBOL } from '@/lib/currency';
 import { orderTotal } from '@/lib/fees';
-import { getOptimizedImageUrl } from '@/lib/images';
+import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 
 export interface OfferSheetProps {
   visible: boolean;
@@ -48,7 +47,6 @@ export function OfferSheet({
   offersLeftToday = 25,
 }: OfferSheetProps) {
   const insets = useSafeAreaInsets();
-  const { isDark } = useTheme();
   const inputRef = useRef<any>(null);
 
   const rawPrice = askingPriceProp ?? itemPriceProp ?? 0;
@@ -220,7 +218,8 @@ export function OfferSheet({
                     source={{ uri: optimizedThumb }}
                     style={styles.itemImage}
                     contentFit="cover"
-                    transition={150}
+                    cachePolicy="memory-disk"
+                    transition={IMAGE_TRANSITION}
                   />
                 ) : (
                   <View style={[styles.itemImagePlaceholder, { backgroundColor: colors.surface }]}>

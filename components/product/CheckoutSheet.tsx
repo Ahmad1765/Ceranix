@@ -14,6 +14,7 @@ import { Text } from '@/lib/rnText';
 import { colors, radii, type } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { buyerProtectionFee, formatPrice, DEFAULT_SHIPPING_FEE } from '@/lib/fees';
+import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 
 export type FulfillmentMethod = 'delivery' | 'handshake';
 export type PaymentMethodType = 'card' | 'cod';
@@ -116,8 +117,10 @@ export function CheckoutSheet({
         <View style={[styles.productCard, { backgroundColor: theme.panel }]}>
           {product?.imageUrl ? (
             <Image
-              source={{ uri: product.imageUrl }}
+              source={{ uri: getOptimizedImageUrl(product.imageUrl, { width: 160 }) }}
               contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={IMAGE_TRANSITION}
               style={styles.productThumb}
             />
           ) : (

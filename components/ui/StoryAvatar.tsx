@@ -3,6 +3,7 @@ import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
 import { colors } from '@/lib/theme';
+import { getOptimizedImageUrl, thumbWidthFor, IMAGE_TRANSITION } from '@/lib/images';
 
 type Props = {
   uri?: string | null;
@@ -13,6 +14,7 @@ type Props = {
 
 export function StoryAvatar({ uri, size = 56, ring = 'purple', initial }: Props) {
   const innerSize = ring === 'none' ? size : size - 6;
+  const optimizedUri = uri ? getOptimizedImageUrl(uri, { width: thumbWidthFor(innerSize) }) : null;
   const inner = (
     <View
       style={{
@@ -25,13 +27,13 @@ export function StoryAvatar({ uri, size = 56, ring = 'purple', initial }: Props)
         justifyContent: 'center',
       }}
     >
-      {uri ? (
+      {optimizedUri ? (
         <Image
-          source={{ uri }}
+          source={{ uri: optimizedUri }}
           style={{ width: '100%', height: '100%' }}
           contentFit="cover"
           cachePolicy="memory-disk"
-          transition={120}
+          transition={IMAGE_TRANSITION}
           accessible={true}
           accessibilityLabel="Profile picture"
         />

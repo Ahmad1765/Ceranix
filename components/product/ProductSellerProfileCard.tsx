@@ -16,7 +16,7 @@ import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { colors } from '@/lib/theme';
-import { getOptimizedImageUrl } from '@/lib/images';
+import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 import { timeAgo } from '@/components/product/shared';
 import type { Listing } from '@/types';
 
@@ -102,7 +102,7 @@ export const ProductSellerProfileCard = memo(function ProductSellerProfileCard({
                 style={{ width: 40, height: 40, borderRadius: 20 }}
                 contentFit="cover"
                 cachePolicy="memory-disk"
-                transition={150}
+                transition={IMAGE_TRANSITION}
               />
             ) : (
               <Feather name="user" size={18} color={colors.mute} />

@@ -3,7 +3,7 @@ import { View, ScrollView, Pressable } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
-import { getOptimizedImageUrl, thumbWidthFor } from '@/lib/images';
+import { getOptimizedImageUrl, thumbWidthFor, IMAGE_TRANSITION } from '@/lib/images';
 import { CARD_WIDTH, CARD_IMAGE_HEIGHT, type RelatedItem } from './shared';
 import { formatPrice } from '@/lib/currency';
 
@@ -55,7 +55,7 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
                   contentFit="cover"
                   cachePolicy="memory-disk"
                   recyclingKey={uri}
-                  transition={180}
+                  transition={IMAGE_TRANSITION}
                   priority={i === 0 ? 'normal' : 'low'}
                 />
               );
@@ -72,7 +72,7 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
             contentFit="cover"
             cachePolicy="memory-disk"
             recyclingKey={item.images && item.images.length > 0 ? item.images[0] : 'empty-placeholder'}
-            transition={180}
+            transition={IMAGE_TRANSITION}
           />
         )}
 

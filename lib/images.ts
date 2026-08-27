@@ -7,8 +7,13 @@
 // project is on Pro+ to flip on the rewrite. Default is off so requests don't
 // 400 on Free.
 
+import { Platform } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
+
 const SUPABASE_TRANSFORM_ENABLED =
   (process.env.EXPO_PUBLIC_SUPABASE_IMAGE_TRANSFORM ?? '').toLowerCase() === 'true';
+
+export const IMAGE_TRANSITION = Platform.OS === 'web' ? 0 : 120;
 
 type Opts = {
   width?: number;
@@ -22,18 +27,16 @@ export function getOptimizedImageUrl(
   if (!url) return '';
   const { width = 400, quality = 70 } = opts;
 
-  // Fast path. Only two hosts are ever rewritten below, and with the Supabase
-  // transform flag off (the default) that leaves just Unsplash — so for every
-  // other URL the whole `new URL(...)` parse + reserialize was built and thrown
-  // away. This runs once per image per render on a grid that recycles cards
-  // while scrolling, so the parse is worth skipping. Two substring scans decide
-  // it, and every case below still reaches the same code it did before. The
-  // Unsplash test is an origin prefix, not a bare `includes`, so a host like
-  // `images.unsplash.com.evil.test` can never reach the rewrite.
-  if (
-    !url.startsWith('https://images.unsplash.com/') &&
-    !(SUPABASE_TRANSFORM_ENABLED && url.includes('.supabase.co'))
-  ) {
+  // Fast check: only rewrite known CDN hosts that support parameter-based resizing
+  const isUnsplash =
+    url.startsWith('https://images.unsplash.com/') ||
+    url.startsWith('https://plus.unsplash.com/');
+  const isCloudinary = url.startsWith('https://res.cloudinary.com/');
+  const isPexels = url.startsWith('https://images.pexels.com/');
+  const isImgix = url.includes('.imgix.net');
+  const isSupabase = SUPABASE_TRANSFORM_ENABLED && url.includes('.supabase.co');
+
+  if (!isUnsplash && !isCloudinary && !isPexels && !isImgix && !isSupabase) {
     return url;
   }
 
@@ -55,11 +58,33 @@ export function getOptimizedImageUrl(
       return u.toString();
     }
 
-    if (u.hostname === 'images.unsplash.com') {
+    if (u.hostname === 'images.unsplash.com' || u.hostname === 'plus.unsplash.com') {
       u.searchParams.set('w', String(width));
       u.searchParams.set('q', String(quality));
       u.searchParams.set('auto', 'format');
       u.searchParams.set('fit', 'crop');
+      return u.toString();
+    }
+
+    if (u.hostname === 'images.pexels.com') {
+      u.searchParams.set('auto', 'compress');
+      u.searchParams.set('cs', 'tinysrgb');
+      u.searchParams.set('w', String(width));
+      return u.toString();
+    }
+
+    if (u.hostname.endsWith('.imgix.net')) {
+      u.searchParams.set('w', String(width));
+      u.searchParams.set('q', String(quality));
+      u.searchParams.set('auto', 'format');
+      return u.toString();
+    }
+
+    if (u.hostname === 'res.cloudinary.com' && u.pathname.includes('/image/upload/')) {
+      const transformSegment = `w_${width},q_${quality},f_auto,c_limit`;
+      if (!u.pathname.includes('w_') && !u.pathname.includes('c_limit')) {
+        u.pathname = u.pathname.replace('/image/upload/', `/image/upload/${transformSegment}/`);
+      }
       return u.toString();
     }
 
@@ -98,3 +123,28 @@ export function cardImageUrl(
 ): string {
   return listing.thumbnails?.[index] || listing.images?.[index] || '';
 }
+
+/**
+ * Safely prefetch an array of remote image URLs into memory and disk cache.
+ * Deduplicates inputs, skips empty entries, and bounds batch size.
+ */
+export function prefetchImages(urls: (string | undefined | null)[]): void {
+  if (!urls || !urls.length) return;
+  const valid = Array.from(
+    new Set(
+      urls.filter(
+        (u): u is string => typeof u === 'string' && u.trim().length > 0 && u.startsWith('http'),
+      ),
+    ),
+  ).slice(0, 12);
+
+  if (valid.length === 0) return;
+  try {
+    if (typeof ExpoImage?.prefetch === 'function') {
+      ExpoImage.prefetch(valid, 'memory-disk');
+    }
+  } catch {
+    // Non-fatal background optimization
+  }
+}
+

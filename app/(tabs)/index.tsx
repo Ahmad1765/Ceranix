@@ -14,7 +14,7 @@
 //    UI presentation is split between `HomeHeader`, `PriceDropRail`, and `GridRow`.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshControl } from 'react-native';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,6 +22,7 @@ import { useFocusEffect, router } from 'expo-router';
 import { useAuth } from '@/lib/auth';
 import { colors } from '@/lib/theme';
 import { useToast } from '@/lib/toast';
+import { cardImageUrl, getOptimizedImageUrl, prefetchImages } from '@/lib/images';
 import { DropAlertSheet } from '@/components/DropAlertSheet';
 import { FeedFilterSheet } from '@/components/navigation/FeedFilterSheet';
 import {
@@ -99,6 +100,16 @@ export default function HomeScreen() {
   const savedSearches = savedSearchesQ.data ?? EMPTY_SAVED_SEARCHES;
   const savedListings = savedListingsQ.data ?? EMPTY_LISTINGS;
   const loadingSaved = savedListingsQ.isLoading;
+
+  // Proactively warm up browser/disk cache with top visible cards
+  useEffect(() => {
+    const topList = (listings.length ? listings : trendingListings).slice(0, 8);
+    if (topList.length > 0) {
+      prefetchImages(
+        topList.map((l) => getOptimizedImageUrl(cardImageUrl(l, 0), { width: 400 })),
+      );
+    }
+  }, [listings, trendingListings]);
 
   const refreshing =
     feedQ.isRefetching ||

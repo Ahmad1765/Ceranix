@@ -3,6 +3,7 @@ import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
 import { useTheme } from '@/context/ThemeContext';
+import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 import type { User as Profile } from '@/types';
 
 export function SettingsHero({
@@ -89,9 +90,11 @@ export function SettingsHero({
           >
             {profile.avatar_url ? (
               <Image
-                source={{ uri: profile.avatar_url }}
+                source={{ uri: getOptimizedImageUrl(profile.avatar_url, { width: 120 }) }}
                 style={{ width: 56, height: 56 }}
                 contentFit="cover"
+                cachePolicy="memory-disk"
+                transition={IMAGE_TRANSITION}
               />
             ) : (
               <Text style={{ fontSize: 24, fontWeight: '900', color: iconColor }}>{initial}</Text>

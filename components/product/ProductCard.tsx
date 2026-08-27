@@ -18,6 +18,7 @@ import { Text } from '@/lib/rnText';
 import { colors, radii, type } from '@/lib/theme';
 import { formatPrice } from '@/lib/currency';
 import { router } from 'expo-router';
+import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 
 export interface ProductCardData {
   id: string;
@@ -131,9 +132,9 @@ export const ProductCard = memo(function ProductCard({
         ]}
       >
         <Image
-          source={{ uri: item.imageUrl }}
+          source={{ uri: getOptimizedImageUrl(item.imageUrl, { width: 450 }) }}
           contentFit="cover"
-          transition={Platform.OS === 'web' ? 0 : 120}
+          transition={IMAGE_TRANSITION}
           cachePolicy="memory-disk"
           priority="high"
           recyclingKey={item.id}

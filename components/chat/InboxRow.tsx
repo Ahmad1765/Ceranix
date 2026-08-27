@@ -9,7 +9,7 @@ import { memo } from 'react';
 import { View, Pressable } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
-import { getOptimizedImageUrl } from '@/lib/images';
+import { getOptimizedImageUrl, cardImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 import { colors, radii, type as typography } from '@/lib/theme';
 import { isConversationUnread, otherParticipant, type ConversationRow } from '@/lib/chat';
 import { ListingThumb, listingStatus } from './ListingThumb';
@@ -26,9 +26,8 @@ function InboxRowImpl({
 }) {
   const other = otherParticipant(conv, userId);
   const avatar = other?.avatar_url ? getOptimizedImageUrl(other.avatar_url, { width: 140 }) : null;
-  const thumb = conv.listing?.images?.[0]
-    ? getOptimizedImageUrl(conv.listing.images[0], { width: 240 })
-    : null;
+  const thumbUrl = conv.listing ? cardImageUrl(conv.listing, 0) : null;
+  const thumb = thumbUrl ? getOptimizedImageUrl(thumbUrl, { width: 160 }) : null;
 
   const unread = isConversationUnread(conv, userId);
   const fromMe = !!conv.last_sender_id && conv.last_sender_id === userId;
@@ -71,7 +70,7 @@ function InboxRowImpl({
             style={{ width: '100%', height: '100%' }}
             contentFit="cover"
             cachePolicy="memory-disk"
-            transition={120}
+            transition={IMAGE_TRANSITION}
           />
         ) : (
           <Text

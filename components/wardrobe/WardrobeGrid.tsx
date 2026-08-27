@@ -5,6 +5,7 @@ import { Image } from 'expo-image';
 import { FlashList } from '@shopify/flash-list';
 import Feather from '@expo/vector-icons/Feather';
 import { GRID_DRAW_DISTANCE } from '@/lib/responsive';
+import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 import type { WardrobePost } from '@/lib/wardrobe';
 
 const COLUMNS = 2;
@@ -120,10 +121,11 @@ const WardrobeTile = memo(function WardrobeTile({
       }}
     >
       <Image
-        source={{ uri: post.image_url }}
+        source={{ uri: getOptimizedImageUrl(post.image_url, { width: Math.round(tile * 1.5) }) }}
         style={{ width: '100%', height: '100%' }}
         contentFit="contain"
         cachePolicy="memory-disk"
+        transition={IMAGE_TRANSITION}
         recyclingKey={post.id}
       />
       <View

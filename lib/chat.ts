@@ -43,7 +43,7 @@ export interface ConversationRow {
   updated_at: string;
   buyer_last_read_at?: string | null;
   seller_last_read_at?: string | null;
-  listing?: Pick<Listing, 'id' | 'title' | 'price' | 'images' | 'is_sold'> | null;
+  listing?: Pick<Listing, 'id' | 'title' | 'price' | 'images' | 'thumbnails' | 'is_sold'> | null;
   buyer?: Pick<User, 'id' | 'username' | 'avatar_url' | 'full_name' | 'location' | 'rating' | 'total_sales'> | null;
   seller?: Pick<User, 'id' | 'username' | 'avatar_url' | 'full_name' | 'location' | 'rating' | 'total_sales'> | null;
 }
@@ -51,7 +51,7 @@ export interface ConversationRow {
 const CONVERSATION_SELECT = `
   id, listing_id, buyer_id, seller_id, last_message, last_sender_id, updated_at,
   buyer_last_read_at, seller_last_read_at,
-  listing:listings(id, title, price, images, is_sold),
+  listing:listings(id, title, price, images, thumbnails, is_sold),
   buyer:profiles!conversations_buyer_id_fkey(id, username, avatar_url, full_name, location, rating, total_sales),
   seller:profiles!conversations_seller_id_fkey(id, username, avatar_url, full_name, location, rating, total_sales)
 `;

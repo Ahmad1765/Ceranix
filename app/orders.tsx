@@ -19,7 +19,7 @@ import { RequireAuth } from '@/components/RequireAuth';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useSellSheet } from '@/components/sell/SellSheet';
 import { useMyOrdersQuery } from '@/lib/queries';
-import { getOptimizedImageUrl } from '@/lib/images';
+import { getOptimizedImageUrl, cardImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 import { buyerProtectionFee, formatPrice } from '@/lib/fees';
 import { deriveInvoiceAmounts } from '@/lib/invoiceStatus';
 import { partitionOrders, type OrderSide } from '@/lib/orders';
@@ -31,7 +31,7 @@ type FilterStatus = 'all' | 'in_progress' | 'canceled' | 'completed';
 
 function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
   const { total } = deriveInvoiceAmounts(order, order.listing?.price, buyerProtectionFee);
-  const image = order.listing?.images?.[0];
+  const image = order.listing ? cardImageUrl(order.listing, 0) : '';
   const isCanceled = order.status === 'canceled' || order.status === 'refunded';
   const isShipped = Boolean((order as any).shipped_at || (order as any).tracking_number);
 
@@ -60,6 +60,7 @@ function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
             style={styles.thumbnailImage}
             contentFit="cover"
             cachePolicy="memory-disk"
+            transition={IMAGE_TRANSITION}
           />
         ) : (
           <Feather name="package" size={20} color="#9CA3AF" />
