@@ -3,7 +3,7 @@ import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
 import { router } from 'expo-router';
-import { cardImageUrl, getOptimizedImageUrl } from '@/lib/images';
+import { getOptimizedImageUrl } from '@/lib/images';
 import { formatPrice } from '@/lib/currency';
 import type { Listing } from '@/types';
 import { colors } from '@/lib/theme';
@@ -75,18 +75,9 @@ export function BundleSection({
         ? brands.join(' · ').toUpperCase()
         : `${brands.slice(0, 3).join(' · ').toUpperCase()} + MORE`;
 
-  // Collage tiles are ~176px wide — thumbnails, not the 1440px originals.
-  const collageImages = [listing, ...sellerItems]
-    .map((l) => cardImageUrl(l))
-    .filter((u): u is string => typeof u === 'string' && u.length > 0)
-    .slice(0, 5);
-  const extraCount = Math.max(0, 1 + sellerItems.length - collageImages.length);
-
   return (
     <View style={{ paddingTop: 18 }}>
-      {/* Composition header — GRAILED-style collage. The editorial moment of
-          the section; the decluttering lives below it (slim progress strip,
-          summary only after selection). */}
+      {/* Composition header */}
       <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
         <Text
           style={{
@@ -106,12 +97,10 @@ export function BundleSection({
             fontWeight: '900',
             color: colors.ink,
             letterSpacing: -0.8,
-            marginBottom: 14,
           }}
         >
           Bundle from @{username}
         </Text>
-        <BundleCollage images={collageImages} extraCount={extraCount} />
       </View>
 
       {/* Slim progress strip: the bar carries the tier ladder via pips; one
@@ -407,105 +396,6 @@ function BaseItemCard({ item }: { item: ReturnType<typeof listingToRelated> }) {
   );
 }
 
-function BundleCollage({ images, extraCount }: { images: string[]; extraCount: number }) {
-  if (images.length === 0) {
-    return (
-      <View
-        style={{
-          height: 200,
-          borderRadius: 16,
-          backgroundColor: colors.panel,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Text style={{ fontSize: 12, color: colors.mute }}>No items yet</Text>
-      </View>
-    );
-  }
-
-  const top = images.slice(0, 2);
-  const bottom = images.slice(2, 5);
-  const LARGE_H = 220;
-  const SMALL_H = 120;
-
-  return (
-    <View style={{ gap: 6 }}>
-      <View style={{ flexDirection: 'row', gap: 6 }}>
-        {top.map((u, i) => (
-          <View
-            key={i}
-            style={{
-              flex: 1,
-              height: LARGE_H,
-              borderRadius: 14,
-              overflow: 'hidden',
-              backgroundColor: colors.panel,
-            }}
-          >
-            <Image
-              source={{ uri: getOptimizedImageUrl(u, { width: 600 }) }}
-              style={{ width: '100%', height: '100%' }}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-            />
-          </View>
-        ))}
-      </View>
-      {bottom.length > 0 && (
-        <View style={{ flexDirection: 'row', gap: 6 }}>
-          {bottom.map((u, i) => {
-            const isLast = i === bottom.length - 1 && extraCount > 0;
-            return (
-              <View
-                key={i}
-                style={{
-                  flex: 1,
-                  height: SMALL_H,
-                  borderRadius: 14,
-                  overflow: 'hidden',
-                  backgroundColor: colors.panel,
-                }}
-              >
-                <Image
-                  source={{ uri: getOptimizedImageUrl(u, { width: 400 }) }}
-                  style={{ width: '100%', height: '100%' }}
-                  contentFit="cover"
-                  cachePolicy="memory-disk"
-                />
-                {isLast && (
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      backgroundColor: 'rgba(0,0,0,0.65)',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        fontWeight: '800',
-                        color: 'white',
-                        letterSpacing: 1.2,
-                      }}
-                    >
-                      + {extraCount} more
-                    </Text>
-                  </View>
-                )}
-              </View>
-            );
-          })}
-        </View>
-      )}
-    </View>
-  );
-}
 
 function BundleSelectCard({
   item,
