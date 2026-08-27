@@ -431,9 +431,9 @@ export const HomeHeader = memo(function HomeHeader({
             router.push('/auth/login');
           }}
           style={{
-            marginHorizontal: 16,
-            marginTop: 10,
-            marginBottom: 4,
+            marginTop: -8,
+            marginHorizontal: 14,
+            marginBottom: 10,
             padding: 14,
             borderRadius: radii.md,
             backgroundColor: colors.purpleSoft,
@@ -455,9 +455,9 @@ export const HomeHeader = memo(function HomeHeader({
             router.push('/(tabs)/discover');
           }}
           style={{
-            marginHorizontal: 16,
-            marginTop: 10,
-            marginBottom: 4,
+            marginTop: -8,
+            marginHorizontal: 14,
+            marginBottom: 10,
             padding: 14,
             borderRadius: radii.md,
             backgroundColor: colors.purpleSoft,
