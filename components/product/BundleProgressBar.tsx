@@ -63,11 +63,6 @@ export function BundleProgressBar({
         paddingTop: 16,
         paddingBottom: 14,
         opacity: pressed && onPress ? 0.92 : 1,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: isDark ? 0.25 : 0.05,
-        shadowRadius: 8,
-        elevation: 2,
       })}
     >
       {/* Header Info */}

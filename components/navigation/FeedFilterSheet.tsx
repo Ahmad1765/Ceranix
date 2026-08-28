@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Pressable,
@@ -11,7 +11,8 @@ import * as Haptics from 'expo-haptics';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { ThumbButton } from '@/components/ui/ThumbButton';
 import { Text, TextInput } from '@/lib/rnText';
-import { colors, radii, shadow, type } from '@/lib/theme';
+import { radii, type, ThemeTokens } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { CURRENCY_SYMBOL } from '@/lib/currency';
 import type { Category, Condition } from '@/types';
 
@@ -64,12 +65,12 @@ const CONDITIONS: { id: Condition; label: string }[] = [
   { id: 'fair', label: 'Fair' },
 ];
 
-const SORTS: { id: FeedSort; label: string }[] = [
-  { id: 'relevance', label: 'Recommended' },
-  { id: 'newest', label: 'Newest' },
-  { id: 'price_asc', label: 'Price: Low to High' },
-  { id: 'price_desc', label: 'Price: High to Low' },
-  { id: 'popular', label: 'Most Liked' },
+const SORTS: { id: FeedSort; label: string; icon: keyof typeof Feather.glyphMap }[] = [
+  { id: 'relevance', label: 'Recommended', icon: 'star' },
+  { id: 'newest', label: 'Newest', icon: 'clock' },
+  { id: 'price_asc', label: 'Price: Low to High', icon: 'trending-up' },
+  { id: 'price_desc', label: 'Price: High to Low', icon: 'trending-down' },
+  { id: 'popular', label: 'Most Liked', icon: 'heart' },
 ];
 
 const PRICE_PRESETS: { label: string; min: number | null; max: number | null }[] = [
@@ -90,8 +91,8 @@ export interface FeedFilterSheetProps {
 
 /**
  * Mobile-First Discovery Filter Bottom Sheet.
- * Multi-criteria refinement with horizontal chip selectors, price bounding,
- * and zero-navigation instant list application.
+ * High-performance, theme-reactive multi-criteria refinement bottom sheet
+ * with wrap grids, dual-bound price inputs, and tactile micro-interactions.
  */
 export function FeedFilterSheet({
   visible,
@@ -100,6 +101,7 @@ export function FeedFilterSheet({
   onApply,
   resultCount,
 }: FeedFilterSheetProps) {
+  const { theme, isDark } = useTheme();
   const [filters, setFilters] = useState<FeedFilters>(initial);
   const prevVisibleRef = React.useRef(visible);
   const [minFocused, setMinFocused] = useState(false);
@@ -113,15 +115,7 @@ export function FeedFilterSheet({
     prevVisibleRef.current = visible;
   }, [visible, initial]);
 
-  const activeCount = useMemo(() => {
-    let count = 0;
-    if (filters.category) count += 1;
-    count += filters.conditions.length;
-    count += filters.sizes.length;
-    if (filters.priceMin != null || filters.priceMax != null) count += 1;
-    if (filters.sort !== 'relevance') count += 1;
-    return count;
-  }, [filters]);
+  const activeCount = useMemo(() => countActiveFilters(filters), [filters]);
 
   const isDirty = useMemo(() => {
     return (
@@ -136,20 +130,26 @@ export function FeedFilterSheet({
     );
   }, [filters, initial]);
 
-  const toggleCategory = (cat: Category) => {
+  const triggerHaptic = useCallback((type: 'selection' | 'impact' = 'selection') => {
     if (Platform.OS !== 'web') {
-      Haptics.selectionAsync().catch(() => {});
+      if (type === 'selection') {
+        Haptics.selectionAsync().catch(() => {});
+      } else {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      }
     }
+  }, []);
+
+  const toggleCategory = useCallback((cat: Category) => {
+    triggerHaptic('selection');
     setFilters((prev) => ({
       ...prev,
       category: prev.category === cat ? null : cat,
     }));
-  };
+  }, [triggerHaptic]);
 
-  const toggleCondition = (cond: Condition) => {
-    if (Platform.OS !== 'web') {
-      Haptics.selectionAsync().catch(() => {});
-    }
+  const toggleCondition = useCallback((cond: Condition) => {
+    triggerHaptic('selection');
     setFilters((prev) => {
       const exists = prev.conditions.includes(cond);
       return {
@@ -159,12 +159,10 @@ export function FeedFilterSheet({
           : [...prev.conditions, cond],
       };
     });
-  };
+  }, [triggerHaptic]);
 
-  const toggleSize = (size: string) => {
-    if (Platform.OS !== 'web') {
-      Haptics.selectionAsync().catch(() => {});
-    }
+  const toggleSize = useCallback((size: string) => {
+    triggerHaptic('selection');
     setFilters((prev) => {
       const exists = prev.sizes.includes(size);
       return {
@@ -174,30 +172,24 @@ export function FeedFilterSheet({
           : [...prev.sizes, size],
       };
     });
-  };
+  }, [triggerHaptic]);
 
-  const handleApplyPreset = (min: number | null, max: number | null) => {
-    if (Platform.OS !== 'web') {
-      Haptics.selectionAsync().catch(() => {});
-    }
+  const handleApplyPreset = useCallback((min: number | null, max: number | null) => {
+    triggerHaptic('selection');
     setFilters((prev) => ({
       ...prev,
       priceMin: min,
       priceMax: max,
     }));
-  };
+  }, [triggerHaptic]);
 
-  const handleReset = () => {
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    }
+  const handleReset = useCallback(() => {
+    triggerHaptic('impact');
     setFilters(EMPTY_FEED_FILTERS);
-  };
+  }, [triggerHaptic]);
 
-  const handleApply = () => {
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    }
+  const handleApply = useCallback(() => {
+    triggerHaptic('impact');
     let appliedFilters = filters;
     if (
       filters.priceMin != null &&
@@ -213,20 +205,44 @@ export function FeedFilterSheet({
     }
     onApply(appliedFilters);
     onClose();
-  };
+  }, [filters, onApply, onClose, triggerHaptic]);
+
+  const hasPriceConflict =
+    filters.priceMin != null &&
+    filters.priceMax != null &&
+    filters.priceMin > filters.priceMax;
+
+  // Dynamic Theme-Aware Styles
+  const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
 
   return (
     <BottomSheetModal
       visible={visible}
       onClose={onClose}
       title="Filter & Refine"
-      subtitle={activeCount > 0 ? `${activeCount} filter${activeCount > 1 ? 's' : ''} applied` : 'Browse all items'}
-      snapHeightRatio={0.88}
+      subtitle={
+        activeCount > 0
+          ? `${activeCount} filter${activeCount > 1 ? 's' : ''} active${
+              resultCount !== undefined ? ` · ${resultCount} items` : ''
+            }`
+          : 'Browse all items'
+      }
+      snapHeightRatio={0.9}
       scrollable
       headerRight={
         activeCount > 0 ? (
-          <Pressable onPress={handleReset} hitSlop={8} style={styles.headerReset}>
-            <Text style={styles.headerResetText}>Reset all</Text>
+          <Pressable
+            onPress={handleReset}
+            hitSlop={10}
+            style={({ pressed }) => [
+              styles.headerReset,
+              { opacity: pressed ? 0.7 : 1 },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Reset all filters"
+          >
+            <Feather name="rotate-ccw" size={13} color={theme.purple} style={{ marginRight: 4 }} />
+            <Text style={styles.headerResetText}>Reset</Text>
           </Pressable>
         ) : null
       }
@@ -246,7 +262,7 @@ export function FeedFilterSheet({
             <ThumbButton
               label={
                 !isDirty && resultCount !== undefined
-                  ? `Apply (${resultCount})`
+                  ? `Show ${resultCount} Results`
                   : activeCount > 0
                   ? `Apply (${activeCount})`
                   : 'Apply Filters'
@@ -261,18 +277,21 @@ export function FeedFilterSheet({
       }
     >
       <View style={styles.container}>
-        {/* 1. Category Horizontal Chips */}
+        {/* 1. Category Selector */}
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Category</Text>
             {filters.category ? (
-              <Text style={styles.sectionActiveHint}>1 selected</Text>
+              <View style={styles.activeBadge}>
+                <Text style={styles.activeBadgeText}>1 selected</Text>
+              </View>
             ) : null}
           </View>
+
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.chipRow}
+            contentContainerStyle={styles.scrollRow}
           >
             {CATEGORIES.map((cat) => {
               const active = filters.category === cat.id;
@@ -282,8 +301,8 @@ export function FeedFilterSheet({
                   onPress={() => toggleCategory(cat.id)}
                   style={({ pressed }) => [
                     styles.chip,
-                    active && styles.chipActive,
-                    { transform: [{ scale: pressed ? 0.95 : 1 }] },
+                    active ? styles.chipActive : styles.chipInactive,
+                    { transform: [{ scale: pressed ? 0.96 : 1 }] },
                   ]}
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: active }}
@@ -291,13 +310,13 @@ export function FeedFilterSheet({
                   <Feather
                     name={cat.icon}
                     size={14}
-                    color={active ? '#FFFFFF' : colors.ink}
+                    color={active ? '#FFFFFF' : theme.ink}
                   />
                   <Text
                     style={[
                       styles.chipText,
                       {
-                        color: active ? '#FFFFFF' : colors.ink,
+                        color: active ? '#FFFFFF' : theme.ink,
                         fontFamily: active
                           ? type.family.sansBold
                           : type.family.sansMedium,
@@ -307,25 +326,27 @@ export function FeedFilterSheet({
                   >
                     {cat.label}
                   </Text>
+                  {active && (
+                    <Feather name="check" size={12} color="#FFFFFF" style={{ marginLeft: 2 }} />
+                  )}
                 </Pressable>
               );
             })}
           </ScrollView>
         </View>
 
-        {/* 2. Size Horizontal Chips */}
+        {/* 2. Size Selector (Wrap Grid for instant scanning) */}
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Size</Text>
             {filters.sizes.length > 0 ? (
-              <Text style={styles.sectionActiveHint}>{filters.sizes.length} selected</Text>
+              <View style={styles.activeBadge}>
+                <Text style={styles.activeBadgeText}>{filters.sizes.length} selected</Text>
+              </View>
             ) : null}
           </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.chipRow}
-          >
+
+          <View style={styles.wrapGrid}>
             {SIZES.map((size) => {
               const active = filters.sizes.includes(size);
               return (
@@ -333,8 +354,8 @@ export function FeedFilterSheet({
                   key={size}
                   onPress={() => toggleSize(size)}
                   style={({ pressed }) => [
-                    styles.chip,
-                    active && styles.chipActive,
+                    styles.sizeChip,
+                    active ? styles.chipActive : styles.chipInactive,
                     { transform: [{ scale: pressed ? 0.95 : 1 }] },
                   ]}
                   accessibilityRole="checkbox"
@@ -342,9 +363,9 @@ export function FeedFilterSheet({
                 >
                   <Text
                     style={[
-                      styles.chipText,
+                      styles.sizeChipText,
                       {
-                        color: active ? '#FFFFFF' : colors.ink,
+                        color: active ? '#FFFFFF' : theme.ink,
                         fontFamily: active
                           ? type.family.sansBold
                           : type.family.sansMedium,
@@ -357,22 +378,21 @@ export function FeedFilterSheet({
                 </Pressable>
               );
             })}
-          </ScrollView>
+          </View>
         </View>
 
-        {/* 3. Condition Horizontal Chips */}
+        {/* 3. Condition Selector */}
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Condition</Text>
             {filters.conditions.length > 0 ? (
-              <Text style={styles.sectionActiveHint}>{filters.conditions.length} selected</Text>
+              <View style={styles.activeBadge}>
+                <Text style={styles.activeBadgeText}>{filters.conditions.length} selected</Text>
+              </View>
             ) : null}
           </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.chipRow}
-          >
+
+          <View style={styles.wrapGrid}>
             {CONDITIONS.map((cond) => {
               const active = filters.conditions.includes(cond.id);
               return (
@@ -381,17 +401,20 @@ export function FeedFilterSheet({
                   onPress={() => toggleCondition(cond.id)}
                   style={({ pressed }) => [
                     styles.chip,
-                    active && styles.chipActive,
-                    { transform: [{ scale: pressed ? 0.95 : 1 }] },
+                    active ? styles.chipActive : styles.chipInactive,
+                    { transform: [{ scale: pressed ? 0.96 : 1 }] },
                   ]}
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: active }}
                 >
+                  {active && (
+                    <Feather name="check" size={13} color="#FFFFFF" style={{ marginRight: 2 }} />
+                  )}
                   <Text
                     style={[
                       styles.chipText,
                       {
-                        color: active ? '#FFFFFF' : colors.ink,
+                        color: active ? '#FFFFFF' : theme.ink,
                         fontFamily: active
                           ? type.family.sansBold
                           : type.family.sansMedium,
@@ -404,23 +427,25 @@ export function FeedFilterSheet({
                 </Pressable>
               );
             })}
-          </ScrollView>
+          </View>
         </View>
 
-        {/* 4. Price Range Presets + Min/Max Inputs */}
+        {/* 4. Price Range (Presets + Custom Inputs) */}
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Price Range</Text>
             {filters.priceMin != null || filters.priceMax != null ? (
-              <Text style={styles.sectionActiveHint}>
-                {filters.priceMin != null && filters.priceMax != null
-                  ? `${CURRENCY_SYMBOL}${filters.priceMin} - ${CURRENCY_SYMBOL}${filters.priceMax}`
-                  : filters.priceMin != null
-                  ? `From ${CURRENCY_SYMBOL}${filters.priceMin}`
-                  : filters.priceMax != null
-                  ? `Up to ${CURRENCY_SYMBOL}${filters.priceMax}`
-                  : ''}
-              </Text>
+              <View style={styles.activeBadge}>
+                <Text style={styles.activeBadgeText}>
+                  {filters.priceMin != null && filters.priceMax != null
+                    ? `${CURRENCY_SYMBOL}${filters.priceMin} - ${CURRENCY_SYMBOL}${filters.priceMax}`
+                    : filters.priceMin != null
+                    ? `From ${CURRENCY_SYMBOL}${filters.priceMin}`
+                    : filters.priceMax != null
+                    ? `Up to ${CURRENCY_SYMBOL}${filters.priceMax}`
+                    : ''}
+                </Text>
+              </View>
             ) : null}
           </View>
 
@@ -428,7 +453,7 @@ export function FeedFilterSheet({
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.chipRow}
+            contentContainerStyle={styles.scrollRow}
           >
             {PRICE_PRESETS.map((preset, index) => {
               const isMatch =
@@ -439,15 +464,15 @@ export function FeedFilterSheet({
                   onPress={() => handleApplyPreset(preset.min, preset.max)}
                   style={({ pressed }) => [
                     styles.chip,
-                    isMatch && styles.chipActive,
-                    { transform: [{ scale: pressed ? 0.95 : 1 }] },
+                    isMatch ? styles.chipActive : styles.chipInactive,
+                    { transform: [{ scale: pressed ? 0.96 : 1 }] },
                   ]}
                 >
                   <Text
                     style={[
                       styles.chipText,
                       {
-                        color: isMatch ? '#FFFFFF' : colors.ink,
+                        color: isMatch ? '#FFFFFF' : theme.ink,
                         fontFamily: isMatch
                           ? type.family.sansBold
                           : type.family.sansMedium,
@@ -467,7 +492,7 @@ export function FeedFilterSheet({
             <View
               style={[
                 styles.priceInputWrapper,
-                minFocused && { borderColor: colors.purple },
+                minFocused && styles.priceInputWrapperFocused,
               ]}
             >
               <Text style={styles.priceInputPrefix}>{CURRENCY_SYMBOL}</Text>
@@ -483,16 +508,29 @@ export function FeedFilterSheet({
                 onFocus={() => setMinFocused(true)}
                 onBlur={() => setMinFocused(false)}
                 placeholder="Min"
-                placeholderTextColor={colors.muteSoft}
+                placeholderTextColor={theme.muteSoft}
                 keyboardType="number-pad"
-                style={[styles.priceInput, { fontFamily: type.family.sansMedium }]}
+                returnKeyType="done"
+                style={styles.priceInput}
               />
+              {filters.priceMin != null && (
+                <Pressable
+                  onPress={() => setFilters((prev) => ({ ...prev, priceMin: null }))}
+                  hitSlop={8}
+                  style={styles.inputClearButton}
+                  accessibilityLabel="Clear minimum price"
+                >
+                  <Feather name="x" size={13} color={theme.mute} />
+                </Pressable>
+              )}
             </View>
+
             <Text style={styles.priceDivider}>to</Text>
+
             <View
               style={[
                 styles.priceInputWrapper,
-                maxFocused && { borderColor: colors.purple },
+                maxFocused && styles.priceInputWrapperFocused,
               ]}
             >
               <Text style={styles.priceInputPrefix}>{CURRENCY_SYMBOL}</Text>
@@ -508,21 +546,44 @@ export function FeedFilterSheet({
                 onFocus={() => setMaxFocused(true)}
                 onBlur={() => setMaxFocused(false)}
                 placeholder="Max"
-                placeholderTextColor={colors.muteSoft}
+                placeholderTextColor={theme.muteSoft}
                 keyboardType="number-pad"
-                style={[styles.priceInput, { fontFamily: type.family.sansMedium }]}
+                returnKeyType="done"
+                style={styles.priceInput}
               />
+              {filters.priceMax != null && (
+                <Pressable
+                  onPress={() => setFilters((prev) => ({ ...prev, priceMax: null }))}
+                  hitSlop={8}
+                  style={styles.inputClearButton}
+                  accessibilityLabel="Clear maximum price"
+                >
+                  <Feather name="x" size={13} color={theme.mute} />
+                </Pressable>
+              )}
             </View>
           </View>
+
+          {hasPriceConflict && (
+            <View style={styles.priceWarningRow}>
+              <Feather name="info" size={12} color={theme.purple} />
+              <Text style={styles.priceWarningText}>
+                Min is greater than Max (will auto-adjust on apply)
+              </Text>
+            </View>
+          )}
         </View>
 
-        {/* 5. Sort Order Radio Chips */}
+        {/* 5. Sort Order Selector */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Sort By</Text>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Sort By</Text>
+          </View>
+
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.chipRow}
+            contentContainerStyle={styles.scrollRow}
           >
             {SORTS.map((sortOption) => {
               const active = filters.sort === sortOption.id;
@@ -530,24 +591,27 @@ export function FeedFilterSheet({
                 <Pressable
                   key={sortOption.id}
                   onPress={() => {
-                    if (Platform.OS !== 'web') {
-                      Haptics.selectionAsync().catch(() => {});
-                    }
+                    triggerHaptic('selection');
                     setFilters((prev) => ({ ...prev, sort: sortOption.id }));
                   }}
                   style={({ pressed }) => [
                     styles.chip,
-                    active && styles.chipActive,
-                    { transform: [{ scale: pressed ? 0.95 : 1 }] },
+                    active ? styles.chipActive : styles.chipInactive,
+                    { transform: [{ scale: pressed ? 0.96 : 1 }] },
                   ]}
                   accessibilityRole="radio"
                   accessibilityState={{ selected: active }}
                 >
+                  <Feather
+                    name={sortOption.icon}
+                    size={14}
+                    color={active ? '#FFFFFF' : theme.ink}
+                  />
                   <Text
                     style={[
                       styles.chipText,
                       {
-                        color: active ? '#FFFFFF' : colors.ink,
+                        color: active ? '#FFFFFF' : theme.ink,
                         fontFamily: active
                           ? type.family.sansBold
                           : type.family.sansMedium,
@@ -567,110 +631,173 @@ export function FeedFilterSheet({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    gap: 22,
-  },
-  headerReset: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  headerResetText: {
-    fontSize: 13,
-    color: colors.purple,
-    fontFamily: type.family.sansBold,
-    fontWeight: '700',
-  },
-  section: {
-    gap: 10,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  sectionTitle: {
-    fontSize: 13.5,
-    fontFamily: type.family.sansBold,
-    fontWeight: '700',
-    color: colors.ink,
-    letterSpacing: -0.1,
-  },
-  sectionActiveHint: {
-    fontSize: 12,
-    fontFamily: type.family.sansMedium,
-    color: colors.purple,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingVertical: 2,
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    height: 40,
-    paddingHorizontal: 15,
-    borderRadius: radii.pill,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.hairline,
-  },
-  chipActive: {
-    borderColor: colors.ink,
-    backgroundColor: colors.ink,
-  },
-  chipText: {
-    fontSize: 13,
-    letterSpacing: -0.1,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginTop: 4,
-  },
-  priceInputWrapper: {
-    flex: 1,
-    height: 46,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.hairline,
-    borderRadius: radii.xl,
-    paddingHorizontal: 14,
-  },
-  priceInputPrefix: {
-    fontSize: 15,
-    fontFamily: type.family.sansBold,
-    color: colors.ink,
-    marginRight: 6,
-  },
-  priceInput: {
-    flex: 1,
-    fontSize: 14.5,
-    color: colors.ink,
-    padding: 0,
-    outlineStyle: 'none',
-    outlineWidth: 0,
-  } as any,
-  priceDivider: {
-    fontSize: 13,
-    fontFamily: type.family.sansMedium,
-    color: colors.muteSoft,
-  },
-  footerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingBottom: 4,
-  },
-  resetButtonFlex: {
-    flex: 1,
-  },
-  applyButtonFlex: {
-    flex: 2,
-  },
-});
+function createStyles(theme: ThemeTokens, isDark: boolean) {
+  const inactiveChipBg = isDark ? '#222222' : '#F4F4F6';
+  const inactiveChipBorder = isDark ? 'rgba(255, 255, 255, 0.10)' : 'rgba(0, 0, 0, 0.07)';
+  const activeChipBg = isDark ? theme.purple : '#111111';
+  const activeChipBorder = isDark ? theme.purple : '#111111';
+  const inputBg = isDark ? '#1E1E20' : '#FFFFFF';
+  const inputBorder = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)';
+
+  return StyleSheet.create({
+    container: {
+      gap: 24,
+    },
+    headerReset: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: radii.sm,
+    },
+    headerResetText: {
+      fontSize: 13,
+      color: theme.purple,
+      fontFamily: type.family.sansBold,
+      fontWeight: '700',
+    },
+    section: {
+      gap: 12,
+    },
+    sectionHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    sectionTitle: {
+      fontSize: 14,
+      fontFamily: type.family.sansBold,
+      fontWeight: '700',
+      color: theme.ink,
+      letterSpacing: -0.15,
+    },
+    activeBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: radii.pill,
+      backgroundColor: isDark ? 'rgba(108, 71, 255, 0.25)' : theme.purpleSoft,
+    },
+    activeBadgeText: {
+      fontSize: 11.5,
+      fontFamily: type.family.sansBold,
+      fontWeight: '700',
+      color: isDark ? '#C4B5FD' : theme.purple,
+    },
+    scrollRow: {
+      flexDirection: 'row',
+      gap: 8,
+      paddingVertical: 2,
+    },
+    wrapGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    chip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 7,
+      height: 40,
+      paddingHorizontal: 14,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+    },
+    sizeChip: {
+      minWidth: 48,
+      height: 40,
+      paddingHorizontal: 14,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    sizeChipText: {
+      fontSize: 13,
+      letterSpacing: -0.1,
+    },
+    chipInactive: {
+      backgroundColor: inactiveChipBg,
+      borderColor: inactiveChipBorder,
+    },
+    chipActive: {
+      backgroundColor: activeChipBg,
+      borderColor: activeChipBorder,
+    },
+    chipText: {
+      fontSize: 13,
+      letterSpacing: -0.1,
+    },
+    priceRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      marginTop: 2,
+    },
+    priceInputWrapper: {
+      flex: 1,
+      height: 46,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: inputBg,
+      borderWidth: 1,
+      borderColor: inputBorder,
+      borderRadius: radii.xl,
+      paddingHorizontal: 12,
+    },
+    priceInputWrapperFocused: {
+      borderColor: theme.purple,
+    },
+    priceInputPrefix: {
+      fontSize: 14,
+      fontFamily: type.family.sansBold,
+      color: theme.mute,
+      marginRight: 6,
+    },
+    priceInput: {
+      flex: 1,
+      fontSize: 14.5,
+      color: theme.ink,
+      fontFamily: type.family.sansMedium,
+      padding: 0,
+      outlineStyle: 'none',
+      outlineWidth: 0,
+    } as any,
+    inputClearButton: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: 4,
+    },
+    priceDivider: {
+      fontSize: 13,
+      fontFamily: type.family.sansMedium,
+      color: theme.muteSoft,
+    },
+    priceWarningRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingTop: 4,
+    },
+    priceWarningText: {
+      fontSize: 11.5,
+      fontFamily: type.family.sansMedium,
+      color: isDark ? '#C4B5FD' : theme.purple,
+    },
+    footerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingBottom: 4,
+    },
+    resetButtonFlex: {
+      flex: 1,
+    },
+    applyButtonFlex: {
+      flex: 2,
+    },
+  });
+}

@@ -35,13 +35,6 @@ export const ProductHeaderNav = memo(function ProductHeaderNav({
     onBack();
   };
 
-  const handleShare = () => {
-    if (onShare) {
-      tap('light');
-      onShare();
-    }
-  };
-
   // Button disc styling tailored for floating over imagery vs sticky bar
   const buttonBg = showStickyHeader
     ? theme.surface
@@ -126,30 +119,8 @@ export const ProductHeaderNav = memo(function ProductHeaderNav({
           ) : null}
         </View>
 
-        {/* Right Slot: 40x40px Share Button (or Spacer for Perfect Symmetry) */}
-        <View style={styles.sideSlot}>
-          {onShare ? (
-            <Pressable
-              onPress={handleShare}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="Share this item"
-              style={({ pressed }) => [
-                styles.navButton,
-                {
-                  backgroundColor: buttonBg,
-                  borderColor: buttonBorder,
-                  transform: [{ scale: pressed ? 0.92 : 1 }],
-                  opacity: pressed ? 0.85 : 1,
-                },
-              ]}
-            >
-              <Feather name="share" size={17} color={theme.ink} />
-            </Pressable>
-          ) : (
-            <View style={styles.spacer} />
-          )}
-        </View>
+        {/* Right Slot: Spacer for Perfect Symmetry */}
+        <View style={styles.sideSlot} />
       </View>
     </View>
   );

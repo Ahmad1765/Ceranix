@@ -263,7 +263,6 @@ export default function UserProfileScreen() {
                         },
                         { icon: 'ellipsis-horizontal' as const, label: 'More options', onPress: handleMore },
                       ]),
-                  { icon: 'share-outline', label: 'Share profile', onPress: handleShare },
                 ]}
               />
 

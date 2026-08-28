@@ -204,7 +204,7 @@ export const FeedSearch = memo(function FeedSearch({
                     minWidth: 18,
                     height: 18,
                     borderRadius: 9,
-                    backgroundColor: theme.primary,
+                    backgroundColor: theme.purple,
                     alignItems: 'center',
                     justifyContent: 'center',
                     paddingHorizontal: 4,
