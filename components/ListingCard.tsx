@@ -405,24 +405,26 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
           >
             <View
               style={{
-                backgroundColor: '#D4FF00',
-                paddingHorizontal: 15,
+                backgroundColor: colors.ink,
+                paddingHorizontal: 14,
                 paddingVertical: 6,
-                borderRadius: 4,
+                borderRadius: radii.pill,
+                borderWidth: 1,
+                borderColor: colors.border,
                 shadowColor: '#000',
                 shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.18,
+                shadowOpacity: 0.22,
                 shadowRadius: 4,
                 elevation: 3,
               }}
             >
               <Text
                 style={{
-                  fontSize: 13.5,
-                  fontWeight: '900',
-                  color: '#000000',
-                  letterSpacing: -0.2,
+                  fontSize: 12,
                   fontFamily: 'Inter_700Bold',
+                  color: colors.background,
+                  letterSpacing: 0.4,
+                  textTransform: 'uppercase',
                 }}
               >
                 Sold

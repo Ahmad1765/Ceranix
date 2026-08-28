@@ -62,6 +62,34 @@ describe('SellFormSchema', () => {
     expect(nestedSlot.success).toBe(true);
   });
 
+  it('accepts a valid direct uri with an empty or incomplete original object', () => {
+    const directWithEmptyOriginal = SellFormSchema.safeParse({
+      ...validPayload,
+      slots: [{ uri: 'file://photo1.jpg', original: {} }],
+    });
+    expect(directWithEmptyOriginal.success).toBe(true);
+
+    const directWithEmptyOriginalUri = SellFormSchema.safeParse({
+      ...validPayload,
+      slots: [{ uri: 'file://photo1.jpg', original: { uri: '' } }],
+    });
+    expect(directWithEmptyOriginalUri.success).toBe(true);
+  });
+
+  it('accepts a valid original.uri with an empty or whitespace direct uri', () => {
+    const originalWithEmptyDirect = SellFormSchema.safeParse({
+      ...validPayload,
+      slots: [{ uri: '', original: { uri: 'file://photo1.jpg' } }],
+    });
+    expect(originalWithEmptyDirect.success).toBe(true);
+
+    const originalWithWhitespaceDirect = SellFormSchema.safeParse({
+      ...validPayload,
+      slots: [{ uri: '   ', original: { uri: 'file://photo1.jpg' } }],
+    });
+    expect(originalWithWhitespaceDirect.success).toBe(true);
+  });
+
   it('fails on empty title', () => {
     const result = SellFormSchema.safeParse({ ...validPayload, title: '   ' });
     expect(result.success).toBe(false);

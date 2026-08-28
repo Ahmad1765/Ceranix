@@ -18,6 +18,7 @@ import { ImageCarousel } from '@/components/product/ImageCarousel';
 import { PopIcon, type PopIconHandle } from '@/components/product/PopIcon';
 import { AnimatedNumber } from '@/components/AnimatedNumber';
 import { BRAND_PURPLE, HAIRLINE } from '@/components/product/shared';
+import { radii } from '@/lib/theme';
 
 type ProductHeroSectionProps = {
   images: string[];
@@ -75,24 +76,27 @@ export const ProductHeroSection = memo(function ProductHeroSection({
         >
           <View
             style={{
-              backgroundColor: '#D4FF00',
-              paddingHorizontal: 22,
-              paddingVertical: 10,
-              borderRadius: 6,
+              backgroundColor: theme.ink,
+              paddingHorizontal: 20,
+              paddingVertical: 8,
+              borderRadius: radii.pill,
+              borderWidth: 1,
+              borderColor: theme.border,
               shadowColor: '#000',
               shadowOffset: { width: 0, height: 3 },
-              shadowOpacity: 0.22,
+              shadowOpacity: 0.25,
               shadowRadius: 6,
               elevation: 4,
             }}
           >
             <Text
               style={{
-                fontSize: 18,
-                fontWeight: '900',
-                color: '#000000',
-                letterSpacing: -0.3,
+                fontSize: 15,
+                fontWeight: '700',
+                color: theme.background,
+                letterSpacing: 0.6,
                 fontFamily: 'Inter_700Bold',
+                textTransform: 'uppercase',
               }}
             >
               Sold

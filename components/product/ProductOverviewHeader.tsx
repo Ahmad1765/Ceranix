@@ -97,7 +97,7 @@ export const ProductOverviewHeader = memo(function ProductOverviewHeader({
                   accessibilityLabel={`Shop more from ${s.text}`}
                   onPress={() => {
                     tap('selection');
-                    router.push(`/discover?q=${encodeURIComponent(listing.brand!)}` as any);
+                    router.push(`/discover?q=${encodeURIComponent(s.text)}` as any);
                   }}
                 >
                   {s.text}

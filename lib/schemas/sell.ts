@@ -30,10 +30,10 @@ export type ParcelSize = (typeof PARCEL_SIZE_VALUES)[number];
 
 export const PhotoSlotSchema = z
   .object({
-    uri: z.string().trim().min(1, 'Photo URI cannot be empty').optional(),
+    uri: z.string().optional(),
     original: z
       .object({
-        uri: z.string().trim().min(1, 'Photo URI cannot be empty'),
+        uri: z.string().optional(),
       })
       .passthrough()
       .optional(),
@@ -41,8 +41,8 @@ export const PhotoSlotSchema = z
   .passthrough()
   .refine(
     (slot) => {
-      const uri = slot.uri || slot.original?.uri;
-      return typeof uri === 'string' && uri.trim().length > 0;
+      const uri = slot.uri?.trim() || slot.original?.uri?.trim();
+      return typeof uri === 'string' && uri.length > 0;
     },
     { message: 'Photo entry must have a non-empty uri' },
   );
