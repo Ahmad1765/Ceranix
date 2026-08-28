@@ -20,7 +20,7 @@ import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { uploadListingImages, deleteListingImages } from '@/lib/upload';
 import {
-  makeSlot, resolveImage,
+  makeSlot, resolveImage, type PhotoSlot,
 } from '@/lib/photoClean/slots';
 import { useToast } from '@/lib/toast';
 import { putCachedListing } from '@/lib/listingCache';
@@ -325,7 +325,7 @@ function SellForm({ onClose }: { onClose: () => void }) {
     let urls: string[] = [];
     let thumbs: string[] = [];
     try {
-      const chosen = formData.slots.map(resolveImage);
+      const chosen = (formData.slots as PhotoSlot[]).map(resolveImage);
       const uploaded = await uploadListingImages(chosen, user.id);
       urls = uploaded.map((u) => u.url);
       thumbs = uploaded.map((u) => u.thumbUrl);
@@ -525,7 +525,7 @@ function SellForm({ onClose }: { onClose: () => void }) {
                 </Pressable>
               ) : (
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-                  {slots.map((slot, i) => (
+                  {(slots as PhotoSlot[]).map((slot, i) => (
                     <View key={slot.id} style={{ width: tile, height: tile, position: 'relative' }}>
                       <Image
                         source={{ uri: resolveImage(slot).uri }}
@@ -554,7 +554,7 @@ function SellForm({ onClose }: { onClose: () => void }) {
                           if (Platform.OS !== 'web') {
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                           }
-                          const updated = slots.filter((s) => s.id !== slot.id);
+                          const updated = (slots as PhotoSlot[]).filter((s) => s.id !== slot.id);
                           setValue('slots', updated, { shouldValidate: true });
                         }}
                         hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}

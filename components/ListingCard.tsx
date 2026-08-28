@@ -247,7 +247,7 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
     width: srcWidth,
   });
 
-  const meta = [listing.size, conditionLabel(listing.condition)].filter(Boolean).join(' · ');
+  const meta = [listing.size?.trim(), conditionLabel(listing.condition)].filter(Boolean).join(' · ');
   const { item: itemPrice, total: totalPrice } = priceBreakdown(listing.price);
 
   return (

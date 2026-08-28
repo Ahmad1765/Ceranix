@@ -101,12 +101,12 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
 
         <TextInput
           ref={ref}
+          {...restProps}
           value={value}
           onChangeText={onChangeText}
           onBlur={onBlur}
           placeholder={placeholder}
           placeholderTextColor={theme.muteSoft ?? theme.mute}
-          editable={!disabled}
           multiline={multiline}
           maxLength={maxLength}
           textAlignVertical={multiline ? 'top' : 'center'}
@@ -114,6 +114,7 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
           accessibilityLabel={accessibilityLabel || label || placeholder}
           accessibilityHint={accessibilityHint}
           aria-invalid={hasError}
+          editable={!disabled}
           accessibilityState={{ ...restProps.accessibilityState, disabled }}
           style={[
             styles.input,
@@ -124,7 +125,6 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
             },
             inputStyle,
           ]}
-          {...restProps}
         />
 
         {rightElement ? <View style={styles.rightSlot}>{rightElement}</View> : null}

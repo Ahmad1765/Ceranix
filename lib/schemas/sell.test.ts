@@ -31,6 +31,37 @@ describe('SellFormSchema', () => {
     }
   });
 
+  it('fails if slots contain [null] or entries with empty uri', () => {
+    const nullSlot = SellFormSchema.safeParse({ ...validPayload, slots: [null] });
+    expect(nullSlot.success).toBe(false);
+
+    const emptyUri = SellFormSchema.safeParse({
+      ...validPayload,
+      slots: [{ uri: '' }],
+    });
+    expect(emptyUri.success).toBe(false);
+
+    const whitespaceUri = SellFormSchema.safeParse({
+      ...validPayload,
+      slots: [{ uri: '   ' }],
+    });
+    expect(whitespaceUri.success).toBe(false);
+
+    const emptyOriginalUri = SellFormSchema.safeParse({
+      ...validPayload,
+      slots: [{ original: { uri: '' } }],
+    });
+    expect(emptyOriginalUri.success).toBe(false);
+  });
+
+  it('accepts photo slots with nested original.uri structure', () => {
+    const nestedSlot = SellFormSchema.safeParse({
+      ...validPayload,
+      slots: [{ id: '1', original: { uri: 'file://photo1.jpg' } }],
+    });
+    expect(nestedSlot.success).toBe(true);
+  });
+
   it('fails on empty title', () => {
     const result = SellFormSchema.safeParse({ ...validPayload, title: '   ' });
     expect(result.success).toBe(false);

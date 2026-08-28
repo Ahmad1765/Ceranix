@@ -70,26 +70,33 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
   const descIsLong = descFull.length > 240 || descParas.length > 3;
   const hasDescription = descParas.length > 0;
 
-  // Attribute Rows
-  const detailRows: DetailRow[] = useMemo(
-    () => [
-      {
+  // Attribute Rows (only included when data is present)
+  const detailRows: DetailRow[] = useMemo(() => {
+    const rows: DetailRow[] = [];
+
+    if (listing.brand?.trim()) {
+      const brandVal = listing.brand.trim();
+      rows.push({
         label: 'Brand',
-        value: listing.brand,
-        link: !!listing.brand,
-        onPress: listing.brand
-          ? () => {
-              tap('selection');
-              router.push(`/discover?q=${encodeURIComponent(listing.brand!)}` as any);
-            }
-          : undefined,
-        trailing: listing.brand ? <Feather name="chevron-right" size={18} color={theme.mute} /> : undefined,
-      },
-      {
+        value: brandVal,
+        link: true,
+        onPress: () => {
+          tap('selection');
+          router.push(`/discover?q=${encodeURIComponent(brandVal)}` as any);
+        },
+        trailing: <Feather name="chevron-right" size={18} color={theme.mute} />,
+      });
+    }
+
+    if (listing.size?.trim()) {
+      rows.push({
         label: 'Size',
-        value: listing.size,
-      },
-      {
+        value: listing.size.trim(),
+      });
+    }
+
+    if (listing.condition) {
+      rows.push({
         label: 'Condition',
         value: CONDITION_LABELS[listing.condition] ?? listing.condition,
         onPress: () =>
@@ -101,20 +108,41 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
               'Fair — Noticeable wear, but still fully wearable',
           ),
         trailing: <Feather name="info" size={17} color={theme.mute} />,
-      },
-      ...(listing.color
-        ? [
-            {
-              label: 'Color',
-              value: itemColorLabel(listing.color),
-              trailing: <ColorSwatch colorId={listing.color} size={18} />,
-            },
-          ]
-        : []),
-      ...(listing.created_at ? [{ label: 'Uploaded', value: timeAgo(listing.created_at) }] : []),
-    ],
-    [listing.brand, listing.size, listing.condition, listing.color, listing.created_at, theme.mute],
-  );
+      });
+    }
+
+    if (listing.color?.trim()) {
+      rows.push({
+        label: 'Color',
+        value: itemColorLabel(listing.color.trim()),
+        trailing: <ColorSwatch colorId={listing.color.trim()} size={18} />,
+      });
+    }
+
+    if (listing.material?.trim()) {
+      rows.push({
+        label: 'Material',
+        value: listing.material.trim(),
+      });
+    }
+
+    if (listing.created_at) {
+      rows.push({
+        label: 'Uploaded',
+        value: timeAgo(listing.created_at),
+      });
+    }
+
+    return rows;
+  }, [
+    listing.brand,
+    listing.size,
+    listing.condition,
+    listing.color,
+    listing.material,
+    listing.created_at,
+    theme.mute,
+  ]);
 
   return (
     <>

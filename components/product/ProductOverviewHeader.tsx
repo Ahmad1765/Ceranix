@@ -37,15 +37,19 @@ export const ProductOverviewHeader = memo(function ProductOverviewHeader({
   const heartCount = Math.max(0, Number(listing.likes ?? 0));
   const itemPrice = Number(listing.price ?? 0);
 
-  // Metadata segments
+  // Metadata segments (only non-empty values)
   const metaSegments = useMemo(() => {
     const cond = conditionLabel(listing.condition);
     const uploaded = listing.created_at ? timeAgo(listing.created_at) : '';
+    const sizeVal = listing.size?.trim();
+    const brandVal = listing.brand?.trim();
+    const locationVal = listing.seller?.location?.trim();
+
     return [
-      listing.size ? { text: `Size ${listing.size}` } : null,
+      sizeVal ? { text: `Size ${sizeVal}` } : null,
       cond ? { text: cond } : null,
-      listing.brand ? { text: listing.brand, link: true } : null,
-      listing.seller?.location ? { text: listing.seller.location } : null,
+      brandVal ? { text: brandVal, link: true } : null,
+      locationVal ? { text: locationVal } : null,
       uploaded ? { text: `Uploaded ${uploaded}` } : null,
     ].filter(Boolean) as { text: string; link?: boolean }[];
   }, [listing.size, listing.condition, listing.brand, listing.seller?.location, listing.created_at]);

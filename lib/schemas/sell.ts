@@ -28,10 +28,29 @@ export const GENDER_VALUES: [Gender, ...Gender[]] = [
 export const PARCEL_SIZE_VALUES = ['small', 'medium', 'large'] as const;
 export type ParcelSize = (typeof PARCEL_SIZE_VALUES)[number];
 
+export const PhotoSlotSchema = z
+  .object({
+    uri: z.string().trim().min(1, 'Photo URI cannot be empty').optional(),
+    original: z
+      .object({
+        uri: z.string().trim().min(1, 'Photo URI cannot be empty'),
+      })
+      .passthrough()
+      .optional(),
+  })
+  .passthrough()
+  .refine(
+    (slot) => {
+      const uri = slot.uri || slot.original?.uri;
+      return typeof uri === 'string' && uri.trim().length > 0;
+    },
+    { message: 'Photo entry must have a non-empty uri' },
+  );
+
 export const SellFormSchema = z
   .object({
     slots: z
-      .array(z.any())
+      .array(PhotoSlotSchema)
       .min(1, 'Please add at least one photo of the item'),
     title: z
       .string({ required_error: 'Title is required' })
