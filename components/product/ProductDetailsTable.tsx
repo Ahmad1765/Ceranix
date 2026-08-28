@@ -12,7 +12,7 @@ import { View, Pressable, Alert } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
-import { colors } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { categoryLabel, subcategoryLabel } from '@/lib/categories';
 import { itemColorLabel } from '@/lib/itemColors';
 import { ColorSwatch } from '@/components/ColorSwatch';
@@ -52,6 +52,7 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
   onShare,
   onReport,
 }: ProductDetailsTableProps) {
+  const { theme } = useTheme();
   const catSubLabel = listing.subcategory
     ? subcategoryLabel(listing.category, listing.subcategory)
     : '';
@@ -82,7 +83,7 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
               router.push(`/discover?q=${encodeURIComponent(listing.brand!)}` as any);
             }
           : undefined,
-        trailing: listing.brand ? <Feather name="chevron-right" size={18} color={colors.mute} /> : undefined,
+        trailing: listing.brand ? <Feather name="chevron-right" size={18} color={theme.mute} /> : undefined,
       },
       {
         label: 'Size',
@@ -99,7 +100,7 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
               'Very good — Gently used, only minor signs of wear\n\n' +
               'Fair — Noticeable wear, but still fully wearable',
           ),
-        trailing: <Feather name="info" size={17} color={colors.mute} />,
+        trailing: <Feather name="info" size={17} color={theme.mute} />,
       },
       ...(listing.color
         ? [
@@ -112,7 +113,7 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
         : []),
       ...(listing.created_at ? [{ label: 'Uploaded', value: timeAgo(listing.created_at) }] : []),
     ],
-    [listing.brand, listing.size, listing.condition, listing.color, listing.created_at],
+    [listing.brand, listing.size, listing.condition, listing.color, listing.created_at, theme.mute],
   );
 
   return (
@@ -121,10 +122,10 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
       <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 6 }}>
         <View
           style={{
-            backgroundColor: colors.white,
+            backgroundColor: theme.white,
             borderRadius: 18,
             borderWidth: HAIRLINE,
-            borderColor: colors.border,
+            borderColor: theme.border,
             overflow: 'hidden',
           }}
         >
@@ -140,7 +141,7 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
                 numberOfLines={descIsLong && !descExpanded ? DESC_CLAMP_LINES : undefined}
                 style={{
                   fontSize: 15,
-                  color: colors.ink,
+                  color: theme.ink,
                   lineHeight: 24,
                   fontFamily: 'Inter_400Regular',
                 }}
@@ -182,7 +183,7 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
               paddingHorizontal: 18,
               paddingVertical: 16,
               borderTopWidth: hasDescription ? HAIRLINE : 0,
-              borderTopColor: colors.border,
+              borderTopColor: theme.border,
             }}
           >
             <Text
@@ -190,7 +191,7 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
                 width: LABEL_W,
                 fontFamily: 'Inter_600SemiBold',
                 fontSize: 15,
-                color: colors.ink,
+                color: theme.ink,
                 letterSpacing: 0.1,
               }}
             >
@@ -204,7 +205,7 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
                 }}
                 style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
               >
-                <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 15, color: colors.mute }}>
+                <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 15, color: theme.mute }}>
                   {categoryLabel(listing.category)}
                 </Text>
               </Pressable>
@@ -213,7 +214,7 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
                   <Feather
                     name="chevron-right"
                     size={14}
-                    color={colors.mute}
+                    color={theme.mute}
                     style={{ marginHorizontal: 3 }}
                   />
                   <Pressable
@@ -225,7 +226,7 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
                     }}
                     style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
                   >
-                    <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 15, color: colors.mute }}>
+                    <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 15, color: theme.mute }}>
                       {catSubLabel}
                     </Text>
                   </Pressable>
@@ -235,7 +236,7 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
             <Feather
               name="chevron-right"
               size={18}
-              color={colors.mute}
+              color={theme.mute}
               style={{ marginLeft: 10 }}
             />
           </View>
@@ -252,8 +253,8 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
                 paddingHorizontal: 18,
                 paddingVertical: 16,
                 borderTopWidth: HAIRLINE,
-                borderTopColor: colors.border,
-                backgroundColor: pressed && row.onPress ? colors.panel : colors.white,
+                borderTopColor: theme.border,
+                backgroundColor: pressed && row.onPress ? theme.panel : theme.white,
               })}
             >
               <Text
@@ -261,7 +262,7 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
                   width: LABEL_W,
                   fontSize: 15,
                   fontFamily: 'Inter_600SemiBold',
-                  color: colors.ink,
+                  color: theme.ink,
                   letterSpacing: 0.1,
                 }}
               >
@@ -272,7 +273,7 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
                   flex: 1,
                   fontSize: 15,
                   fontFamily: 'Inter_400Regular',
-                  color: row.link ? BRAND_PURPLE : colors.mute,
+                  color: row.link ? BRAND_PURPLE : theme.mute,
                 }}
                 numberOfLines={1}
               >
@@ -291,9 +292,9 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
                 key={tag}
                 onPress={() => router.push(`/discover?q=${encodeURIComponent(tag)}` as any)}
                 style={({ pressed }) => ({
-                  backgroundColor: colors.white,
+                  backgroundColor: theme.white,
                   borderWidth: 1,
-                  borderColor: colors.border,
+                  borderColor: theme.border,
                   borderRadius: 999,
                   paddingHorizontal: 12,
                   paddingVertical: 6,
@@ -303,7 +304,7 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
                 <Text
                   style={{
                     fontSize: 12,
-                    color: colors.ink,
+                    color: theme.ink,
                     fontFamily: 'Inter_500Medium',
                     letterSpacing: 0.1,
                   }}
@@ -338,11 +339,11 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
               opacity: pressed ? 0.6 : 1,
             })}
           >
-            <Feather name="share-2" size={16} color={colors.ink} />
+            <Feather name="share-2" size={16} color={theme.ink} />
             <Text
               style={{
                 fontSize: 13,
-                color: colors.ink,
+                color: theme.ink,
                 fontFamily: 'Inter_600SemiBold',
                 letterSpacing: 0.2,
               }}
@@ -377,11 +378,11 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
                 opacity: pressed ? 0.6 : 1,
               })}
             >
-              <Feather name="flag" size={16} color={colors.mute} />
+              <Feather name="flag" size={16} color={theme.mute} />
               <Text
                 style={{
                   fontSize: 13,
-                  color: colors.mute,
+                  color: theme.mute,
                   fontFamily: 'Inter_600SemiBold',
                   letterSpacing: 0.2,
                 }}
@@ -394,7 +395,7 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
           <Text
             style={{
               fontSize: 12,
-              color: colors.mute,
+              color: theme.mute,
               letterSpacing: 0.4,
               fontFamily: 'Inter_500Medium',
             }}

@@ -1,15 +1,10 @@
-// Buyer Protection breakdown — opens from the price row on the product page.
-// Shows exactly how the total is built (item + protection) and what the fee
-// buys, so the number the buyer sees is never a mystery. Read-only; the actual
-// charge is computed server-side from the same lib/fees math.
-
 import { View, Pressable, Modal, StyleSheet } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { priceBreakdown, formatPrice } from '@/lib/fees';
-import { colors } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { IS_IOS, tap, BRAND_PURPLE } from './shared';
 
 const COVERAGE = [
@@ -28,6 +23,7 @@ export function BuyerProtectionSheet({
   onClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const { theme, isDark } = useTheme();
   const { item, protection, total } = priceBreakdown(itemPrice);
 
   return (
@@ -41,7 +37,7 @@ export function BuyerProtectionSheet({
     >
       <Pressable onPress={onClose} style={{ flex: 1, justifyContent: 'flex-end' }}>
         {IS_IOS ? (
-          <BlurView intensity={22} tint="dark" style={StyleSheet.absoluteFill} />
+          <BlurView intensity={22} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
         ) : (
           <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} />
         )}
@@ -50,11 +46,11 @@ export function BuyerProtectionSheet({
         <Pressable
           onPress={() => {}}
           style={{
-            backgroundColor: colors.surface,
+            backgroundColor: theme.surface,
             borderTopLeftRadius: 28,
             borderTopRightRadius: 28,
             borderTopWidth: 1,
-            borderColor: colors.border,
+            borderColor: theme.border,
             paddingHorizontal: 24,
             paddingTop: 10,
             paddingBottom: (insets.bottom || 16) + 12,
@@ -67,7 +63,7 @@ export function BuyerProtectionSheet({
               width: 40,
               height: 5,
               borderRadius: 3,
-              backgroundColor: colors.border,
+              backgroundColor: theme.border,
               marginBottom: 20,
             }}
           />
@@ -79,7 +75,7 @@ export function BuyerProtectionSheet({
               width: 62,
               height: 62,
               borderRadius: 20,
-              backgroundColor: colors.purpleSoft,
+              backgroundColor: theme.purpleSoft,
               alignItems: 'center',
               justifyContent: 'center',
               marginBottom: 16,
@@ -92,7 +88,7 @@ export function BuyerProtectionSheet({
             style={{
               fontSize: 24,
               fontFamily: 'Inter_700Bold',
-              color: colors.ink,
+              color: theme.ink,
               textAlign: 'center',
               letterSpacing: -0.4,
               marginBottom: 8,
@@ -104,7 +100,7 @@ export function BuyerProtectionSheet({
             style={{
               fontSize: 14,
               fontFamily: 'Inter_400Regular',
-              color: colors.mute,
+              color: theme.mute,
               textAlign: 'center',
               lineHeight: 21,
               marginBottom: 22,
@@ -121,20 +117,20 @@ export function BuyerProtectionSheet({
             style={{
               borderRadius: 18,
               borderWidth: 1,
-              borderColor: colors.border,
-              backgroundColor: colors.panel,
+              borderColor: theme.border,
+              backgroundColor: theme.panel,
               paddingHorizontal: 16,
               paddingVertical: 4,
               marginBottom: 20,
             }}
           >
             <BreakdownRow label="Item price" value={formatPrice(item)} />
-            <View style={{ height: 1, backgroundColor: colors.border }} />
+            <View style={{ height: 1, backgroundColor: theme.border }} />
             <BreakdownRow
               label="Buyer Protection"
               value={protection > 0 ? formatPrice(protection) : 'Free'}
             />
-            <View style={{ height: 1, backgroundColor: colors.border }} />
+            <View style={{ height: 1, backgroundColor: theme.border }} />
             <BreakdownRow label="Total" value={formatPrice(total)} emphasize />
           </View>
 
@@ -147,7 +143,7 @@ export function BuyerProtectionSheet({
                     width: 34,
                     height: 34,
                     borderRadius: 12,
-                    backgroundColor: colors.purpleSoft,
+                    backgroundColor: theme.purpleSoft,
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
@@ -159,7 +155,7 @@ export function BuyerProtectionSheet({
                     flex: 1,
                     fontSize: 14,
                     fontFamily: 'Inter_500Medium',
-                    color: colors.mute,
+                    color: theme.mute,
                     lineHeight: 20,
                   }}
                 >
@@ -179,14 +175,14 @@ export function BuyerProtectionSheet({
             style={({ pressed }) => ({
               height: 54,
               borderRadius: 16,
-              backgroundColor: colors.ink,
+              backgroundColor: theme.ink,
               alignItems: 'center',
               justifyContent: 'center',
               opacity: pressed ? 0.9 : 1,
               transform: [{ scale: pressed ? 0.99 : 1 }],
             })}
           >
-            <Text style={{ fontSize: 16, fontFamily: 'Inter_700Bold', color: colors.background, letterSpacing: 0.2 }}>
+            <Text style={{ fontSize: 16, fontFamily: 'Inter_700Bold', color: theme.background, letterSpacing: 0.2 }}>
               Got it
             </Text>
           </Pressable>
@@ -197,6 +193,7 @@ export function BuyerProtectionSheet({
 }
 
 function BreakdownRow({ label, value, emphasize }: { label: string; value: string; emphasize?: boolean }) {
+  const { theme } = useTheme();
   return (
     <View
       style={{
@@ -210,7 +207,7 @@ function BreakdownRow({ label, value, emphasize }: { label: string; value: strin
         style={{
           fontSize: emphasize ? 15 : 14,
           fontFamily: emphasize ? 'Inter_700Bold' : 'Inter_500Medium',
-          color: emphasize ? colors.ink : colors.mute,
+          color: emphasize ? theme.ink : theme.mute,
         }}
       >
         {label}
@@ -219,7 +216,7 @@ function BreakdownRow({ label, value, emphasize }: { label: string; value: strin
         style={{
           fontSize: emphasize ? 17 : 14,
           fontFamily: 'Inter_700Bold',
-          color: colors.ink,
+          color: theme.ink,
           letterSpacing: emphasize ? -0.3 : 0,
         }}
       >

@@ -27,7 +27,8 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { PressableScale } from '@/components/PressableScale';
-import { colors, radii, type as typography } from '@/lib/theme';
+import { radii, type as typography } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 
 const BUTTON = 38;
 /** One line of text at the input's own lineHeight — the resting height. */
@@ -52,6 +53,7 @@ export function Composer({
   /** When set, the composer is replaced by this line — e.g. listing removed. */
   disabledReason?: string | null;
 }) {
+  const { theme } = useTheme();
   // Sends are optimistic: the message appears in the thread immediately and
   // reports its own delivery state there, so the button just disarms.
   const armed = value.trim().length > 0;
@@ -94,7 +96,7 @@ export function Composer({
   );
 
   const sendStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(t.value, [0, 1], [colors.panel, colors.purple]),
+    backgroundColor: interpolateColor(t.value, [0, 1], [theme.panel, theme.purple]),
   }));
   const idleIcon = useAnimatedStyle(() => ({ opacity: 1 - t.value }));
   const armedIcon = useAnimatedStyle(() => ({ opacity: t.value }));
@@ -106,7 +108,7 @@ export function Composer({
           style={{
             fontFamily: typography.family.sans,
             fontSize: 12.5,
-            color: colors.muteSoft,
+            color: theme.muteSoft,
             textAlign: 'center',
           }}
         >
@@ -125,7 +127,7 @@ export function Composer({
         paddingHorizontal: 12,
         paddingTop: 14,
         paddingBottom: 8,
-        backgroundColor: colors.surface,
+        backgroundColor: theme.surface,
       }}
     >
       <PressableScale
@@ -135,12 +137,12 @@ export function Composer({
           width: BUTTON,
           height: BUTTON,
           borderRadius: BUTTON / 2,
-          backgroundColor: colors.ink,
+          backgroundColor: theme.ink,
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
-        <Feather name="plus" size={20} color={colors.background} />
+        <Feather name="plus" size={20} color={theme.background} />
       </PressableScale>
 
       <View
@@ -148,9 +150,9 @@ export function Composer({
           flex: 1,
           minHeight: BUTTON,
           maxHeight: MAX_INPUT_HEIGHT + INPUT_PAD_V * 2,
-          backgroundColor: colors.panel,
+          backgroundColor: theme.panel,
           borderWidth: 1,
-          borderColor: colors.border,
+          borderColor: theme.border,
           borderRadius: radii['2xl'],
           paddingHorizontal: 14,
           paddingVertical: INPUT_PAD_V,
@@ -164,7 +166,7 @@ export function Composer({
             if (Platform.OS === 'web') webNode.current = (node as HTMLTextAreaElement) ?? null;
           }}
           placeholder={placeholder}
-          placeholderTextColor={colors.muteSoft}
+          placeholderTextColor={theme.muteSoft}
           value={value}
           onChangeText={onChangeText}
           onChange={
@@ -198,7 +200,7 @@ export function Composer({
               fontFamily: typography.family.sans,
               fontSize: 15,
               lineHeight: MIN_INPUT_HEIGHT,
-              color: colors.ink,
+              color: theme.ink,
               padding: 0,
               // Web's height is owned by measureWeb via the DOM, so React must
               // not also write one here or the two fight every keystroke.
@@ -229,7 +231,7 @@ export function Composer({
         ]}
       >
         <Animated.View style={[{ position: 'absolute' }, idleIcon]}>
-          <Ionicons name="arrow-up" size={20} color={colors.muteSoft} />
+          <Ionicons name="arrow-up" size={20} color={theme.muteSoft} />
         </Animated.View>
         <Animated.View style={[{ position: 'absolute' }, armedIcon]}>
           <Ionicons name="arrow-up" size={20} color="#FFFFFF" />

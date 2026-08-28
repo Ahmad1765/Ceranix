@@ -8,7 +8,8 @@ import { View, Pressable } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
-import { colors, type as typography } from '@/lib/theme';
+import { type as typography } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 
 export function ThreadHeader({
@@ -26,6 +27,7 @@ export function ThreadHeader({
   onPressIdentity?: () => void;
   onOverflow: () => void;
 }) {
+  const { theme } = useTheme();
   const initial = name.trim().charAt(0).toUpperCase() || 'U';
 
   return (
@@ -37,8 +39,8 @@ export function ThreadHeader({
         paddingTop: 4,
         paddingBottom: 8,
         borderBottomWidth: 1,
-        borderBottomColor: colors.border,
-        backgroundColor: colors.surface,
+        borderBottomColor: theme.border,
+        backgroundColor: theme.surface,
       }}
     >
       <Pressable
@@ -54,7 +56,7 @@ export function ThreadHeader({
           opacity: pressed ? 0.55 : 1,
         })}
       >
-        <Feather name="arrow-left" size={22} color={colors.ink} />
+        <Feather name="arrow-left" size={22} color={theme.ink} />
       </Pressable>
 
       <Pressable
@@ -79,7 +81,7 @@ export function ThreadHeader({
             width: 34,
             height: 34,
             borderRadius: 17,
-            backgroundColor: colors.primarySoft,
+            backgroundColor: theme.primarySoft,
             overflow: 'hidden',
             alignItems: 'center',
             justifyContent: 'center',
@@ -97,7 +99,7 @@ export function ThreadHeader({
               style={{
                 fontFamily: typography.family.sansBold,
                 fontSize: 14,
-                color: colors.primary,
+                color: theme.primary,
               }}
             >
               {initial}
@@ -112,7 +114,7 @@ export function ThreadHeader({
               fontFamily: typography.family.sansBold,
               fontSize: 15,
               letterSpacing: -0.2,
-              color: colors.ink,
+              color: theme.ink,
             }}
           >
             {name}
@@ -123,7 +125,7 @@ export function ThreadHeader({
               style={{
                 fontFamily: typography.family.sans,
                 fontSize: 11.5,
-                color: colors.muteSoft,
+                color: theme.muteSoft,
                 marginTop: 1,
               }}
             >
@@ -146,7 +148,7 @@ export function ThreadHeader({
           opacity: pressed ? 0.55 : 1,
         })}
       >
-        <Feather name="more-horizontal" size={22} color={colors.ink} />
+        <Feather name="more-horizontal" size={22} color={theme.ink} />
       </Pressable>
     </View>
   );

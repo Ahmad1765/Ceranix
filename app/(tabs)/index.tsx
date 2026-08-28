@@ -20,7 +20,7 @@ import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, router } from 'expo-router';
 import { useAuth } from '@/lib/auth';
-import { colors } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { useToast } from '@/lib/toast';
 import { cardImageUrl, getOptimizedImageUrl, prefetchImages } from '@/lib/images';
 import { DropAlertSheet } from '@/components/DropAlertSheet';
@@ -59,6 +59,7 @@ const EMPTY_SAVED_SEARCHES: SavedSearch[] = [];
 const EMPTY_PRICE_DROPS: PriceDropListing[] = [];
 
 export default function HomeScreen() {
+  const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const { user, loading: authLoading } = useAuth();
   const toast = useToast();
@@ -237,7 +238,7 @@ export default function HomeScreen() {
   );
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.background }}>
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.background }}>
       <FlashList
         ref={listRef}
         data={feedFilter.gridRows}
@@ -261,7 +262,7 @@ export default function HomeScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={colors.purple}
+            tintColor={theme.purple}
           />
         }
         contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 12) + tabClear + 16 }}

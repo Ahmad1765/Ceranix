@@ -11,7 +11,8 @@
 import { View, Pressable, StyleSheet } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
-import { colors, radii, type as typography } from '@/lib/theme';
+import { radii, type as typography } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
 import { buyerProtectionFee } from '@/lib/fees';
 import { ThumbButton } from '@/components/ui';
@@ -37,6 +38,7 @@ export function ConversationListingHeader({
   onPressListing,
   onPressBuyNow,
 }: ConversationListingHeaderProps) {
+  const { theme } = useTheme();
   if (!listingId) return null;
 
   return (
@@ -52,8 +54,8 @@ export function ConversationListingHeader({
         paddingHorizontal: 16,
         paddingVertical: 10,
         borderTopWidth: StyleSheet.hairlineWidth,
-        borderTopColor: colors.border,
-        backgroundColor: pressed ? colors.panel : colors.surface,
+        borderTopColor: theme.border,
+        backgroundColor: pressed ? theme.panel : theme.surface,
       })}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
@@ -64,7 +66,7 @@ export function ConversationListingHeader({
             style={{
               fontFamily: typography.family.sansBold,
               fontSize: 13.5,
-              color: colors.ink,
+              color: theme.ink,
             }}
           >
             {listing?.title ?? 'Listing removed'}
@@ -73,7 +75,7 @@ export function ConversationListingHeader({
             style={{
               fontFamily: typography.family.sansBold,
               fontSize: 12.5,
-              color: colors.ink,
+              color: theme.ink,
               marginTop: 2,
             }}
           >
@@ -85,7 +87,7 @@ export function ConversationListingHeader({
               style={{
                 fontFamily: typography.family.sans,
                 fontSize: 11.5,
-                color: colors.mute,
+                color: theme.mute,
                 marginTop: 1,
               }}
             >
@@ -106,7 +108,7 @@ export function ConversationListingHeader({
           />
         </View>
       ) : (
-        <Feather name="chevron-right" size={18} color={colors.muteSoft} />
+        <Feather name="chevron-right" size={18} color={theme.muteSoft} />
       )}
     </Pressable>
   );

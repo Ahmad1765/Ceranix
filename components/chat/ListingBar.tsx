@@ -8,7 +8,8 @@
 import { View, Pressable } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
-import { colors, radii, type as typography } from '@/lib/theme';
+import { radii, type as typography } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
 import { ListingThumb, type ListingStatus } from './ListingThumb';
 
@@ -25,6 +26,8 @@ export function ListingBar({
   status: ListingStatus;
   onPress: () => void;
 }) {
+  const { theme } = useTheme();
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -37,8 +40,8 @@ export function ListingBar({
         paddingHorizontal: 14,
         paddingVertical: 10,
         borderBottomWidth: 1,
-        borderBottomColor: colors.border,
-        backgroundColor: pressed ? colors.panel : colors.surface,
+        borderBottomColor: theme.border,
+        backgroundColor: pressed ? theme.panel : theme.surface,
       })}
     >
       <ListingThumb uri={thumb} width={52} height={44} status={status} radius={radii.sm} />
@@ -50,7 +53,7 @@ export function ListingBar({
             fontFamily: typography.family.sansBold,
             fontSize: 13.5,
             letterSpacing: -0.15,
-            color: colors.ink,
+            color: theme.ink,
           }}
         >
           {title}
@@ -60,7 +63,7 @@ export function ListingBar({
           style={{
             fontFamily: typography.family.sans,
             fontSize: 12,
-            color: colors.mute,
+            color: theme.mute,
             marginTop: 2,
           }}
         >
@@ -70,7 +73,7 @@ export function ListingBar({
         </Text>
       </View>
 
-      <Feather name="chevron-right" size={18} color={colors.muteSoft} />
+      <Feather name="chevron-right" size={18} color={theme.muteSoft} />
     </Pressable>
   );
 }

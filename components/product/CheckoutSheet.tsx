@@ -11,7 +11,7 @@ import * as Haptics from 'expo-haptics';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { ThumbButton } from '@/components/ui/ThumbButton';
 import { Text } from '@/lib/rnText';
-import { colors, radii, type } from '@/lib/theme';
+import { radii, type } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { buyerProtectionFee, formatPrice, DEFAULT_SHIPPING_FEE } from '@/lib/fees';
 import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
@@ -407,7 +407,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
-    backgroundColor: colors.panel,
     borderRadius: radii['2xl'],
     gap: 14,
   },
@@ -415,7 +414,6 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: radii.xl,
-    backgroundColor: colors.hairline,
   },
   productDetails: {
     flex: 1,
@@ -423,16 +421,13 @@ const styles = StyleSheet.create({
   },
   productTitle: {
     fontSize: 14,
-    color: colors.ink,
     lineHeight: 18,
   },
   sellerName: {
     fontSize: 12,
-    color: colors.mute,
   },
   itemPrice: {
     fontSize: 15,
-    color: colors.ink,
     marginTop: 2,
   },
   section: {
@@ -440,7 +435,6 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 14,
-    color: colors.ink,
     letterSpacing: 0.1,
   },
   fulfillmentGrid: {
@@ -452,14 +446,9 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: radii['2xl'],
     borderWidth: 1.5,
-    borderColor: colors.hairline,
-    backgroundColor: colors.white,
     gap: 4,
   },
-  fulfillmentCardActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primarySoft,
-  },
+  fulfillmentCardActive: {},
   fulfillmentHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -471,11 +460,9 @@ const styles = StyleSheet.create({
   },
   fulfillmentLabel: {
     fontSize: 13,
-    color: colors.ink,
   },
   fulfillmentHint: {
     fontSize: 11,
-    color: colors.mute,
   },
   paymentList: {
     gap: 8,
@@ -487,13 +474,8 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: radii.xl,
     borderWidth: 1,
-    borderColor: colors.hairline,
-    backgroundColor: colors.white,
   },
-  paymentRowActive: {
-    borderColor: colors.primary,
-    backgroundColor: 'rgba(108, 71, 255, 0.04)',
-  },
+  paymentRowActive: {},
   paymentLeft: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -503,7 +485,6 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: radii.md,
-    backgroundColor: colors.panel,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -512,18 +493,15 @@ const styles = StyleSheet.create({
   },
   paymentTitle: {
     fontSize: 13,
-    color: colors.ink,
   },
   paymentSubtitle: {
     fontSize: 11,
-    color: colors.mute,
   },
   radioCircle: {
     width: 20,
     height: 20,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: colors.hairline,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -531,11 +509,9 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: colors.white,
   },
   summaryCard: {
     padding: 14,
-    backgroundColor: colors.panel,
     borderRadius: radii['2xl'],
     gap: 8,
   },
@@ -551,26 +527,21 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: 13,
-    color: colors.mute,
   },
   summaryValue: {
     fontSize: 13,
-    color: colors.ink,
     fontWeight: '500',
   },
   totalRow: {
     paddingTop: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.hairline,
     marginTop: 4,
   },
   totalLabel: {
     fontSize: 15,
-    color: colors.ink,
   },
   totalValue: {
     fontSize: 18,
-    color: colors.primary,
   },
   footerInner: {
     width: '100%',

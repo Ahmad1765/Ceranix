@@ -15,7 +15,7 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { colors } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 import { timeAgo } from '@/components/product/shared';
 import type { Listing } from '@/types';
@@ -51,16 +51,17 @@ export const ProductSellerProfileCard = memo(function ProductSellerProfileCard({
   onMessagePress,
   onMoreOptionsPress,
 }: ProductSellerProfileCardProps) {
+  const { theme } = useTheme();
   if (!seller) return null;
 
   return (
     <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 }}>
       <View
         style={{
-          backgroundColor: colors.white,
+          backgroundColor: theme.white,
           borderRadius: 18,
           borderWidth: 1,
-          borderColor: colors.border,
+          borderColor: theme.border,
           paddingHorizontal: 14,
           paddingVertical: 12,
           flexDirection: 'row',
@@ -89,11 +90,11 @@ export const ProductSellerProfileCard = memo(function ProductSellerProfileCard({
               height: 42,
               borderRadius: 21,
               overflow: 'hidden',
-              backgroundColor: colors.panel,
+              backgroundColor: theme.panel,
               alignItems: 'center',
               justifyContent: 'center',
               borderWidth: 1,
-              borderColor: colors.border,
+              borderColor: theme.border,
             }}
           >
             {seller.avatar_url ? (
@@ -105,7 +106,7 @@ export const ProductSellerProfileCard = memo(function ProductSellerProfileCard({
                 transition={IMAGE_TRANSITION}
               />
             ) : (
-              <Feather name="user" size={18} color={colors.mute} />
+              <Feather name="user" size={18} color={theme.mute} />
             )}
           </View>
 
@@ -115,7 +116,7 @@ export const ProductSellerProfileCard = memo(function ProductSellerProfileCard({
               style={{
                 fontSize: 15,
                 fontWeight: '600',
-                color: colors.ink,
+                color: theme.ink,
                 letterSpacing: -0.2,
               }}
               numberOfLines={1}
@@ -125,7 +126,7 @@ export const ProductSellerProfileCard = memo(function ProductSellerProfileCard({
             <Text
               style={{
                 fontSize: 12.5,
-                color: colors.mute,
+                color: theme.mute,
                 marginTop: 1.5,
                 fontWeight: '400',
               }}
@@ -152,9 +153,9 @@ export const ProductSellerProfileCard = memo(function ProductSellerProfileCard({
                 paddingHorizontal: 13,
                 paddingVertical: 5.5,
                 borderRadius: 999,
-                backgroundColor: isSold ? colors.white : colors.ink,
+                backgroundColor: isSold ? theme.white : theme.ink,
                 borderWidth: 1,
-                borderColor: isSold ? colors.border : colors.ink,
+                borderColor: isSold ? theme.border : theme.ink,
                 alignItems: 'center',
                 justifyContent: 'center',
                 opacity: soldBusy ? 0.5 : pressed ? 0.85 : 1,
@@ -164,7 +165,7 @@ export const ProductSellerProfileCard = memo(function ProductSellerProfileCard({
                 style={{
                   fontSize: 12,
                   fontWeight: '600',
-                  color: isSold ? colors.ink : colors.background,
+                  color: isSold ? theme.ink : theme.background,
                 }}
               >
                 {isSold ? 'Available' : 'Mark sold'}
@@ -184,11 +185,11 @@ export const ProductSellerProfileCard = memo(function ProductSellerProfileCard({
                 borderRadius: 16,
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: pressed ? colors.panel : 'transparent',
+                backgroundColor: pressed ? theme.panel : 'transparent',
                 opacity: deleteBusy ? 0.5 : 1,
               })}
             >
-              <Feather name="trash-2" size={17} color={colors.danger} />
+              <Feather name="trash-2" size={17} color={theme.danger} />
             </Pressable>
           </View>
         ) : (
@@ -200,9 +201,9 @@ export const ProductSellerProfileCard = memo(function ProductSellerProfileCard({
                 paddingHorizontal: 12,
                 paddingVertical: 5.5,
                 borderRadius: 999,
-                backgroundColor: followed ? colors.white : colors.ink,
+                backgroundColor: followed ? theme.white : theme.ink,
                 borderWidth: 1,
-                borderColor: followed ? colors.border : colors.ink,
+                borderColor: followed ? theme.border : theme.ink,
                 alignItems: 'center',
                 justifyContent: 'center',
                 opacity: pressed ? 0.8 : 1,
@@ -212,7 +213,7 @@ export const ProductSellerProfileCard = memo(function ProductSellerProfileCard({
                 style={{
                   fontSize: 12,
                   fontWeight: '600',
-                  color: followed ? colors.ink : colors.background,
+                  color: followed ? theme.ink : theme.background,
                 }}
               >
                 {followed ? 'Following' : 'Follow'}
@@ -231,10 +232,10 @@ export const ProductSellerProfileCard = memo(function ProductSellerProfileCard({
                 borderRadius: 16,
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: pressed ? colors.panel : 'transparent',
+                backgroundColor: pressed ? theme.panel : 'transparent',
               })}
             >
-              <Ionicons name="chatbox-outline" size={18} color={colors.ink} />
+              <Ionicons name="chatbox-outline" size={18} color={theme.ink} />
             </Pressable>
 
             {/* More / Profile Options Icon */}
@@ -249,10 +250,10 @@ export const ProductSellerProfileCard = memo(function ProductSellerProfileCard({
                 borderRadius: 16,
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: pressed ? colors.panel : 'transparent',
+                backgroundColor: pressed ? theme.panel : 'transparent',
               })}
             >
-              <Feather name="more-vertical" size={18} color={colors.ink} />
+              <Feather name="more-vertical" size={18} color={theme.ink} />
             </Pressable>
           </View>
         )}

@@ -13,7 +13,8 @@ import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, TextInput } from '@/lib/rnText';
-import { colors, radii, shadow, type } from '@/lib/theme';
+import { radii, shadow, type } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { formatPrice, CURRENCY_SYMBOL } from '@/lib/currency';
 import { orderTotal } from '@/lib/fees';
 import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
@@ -46,37 +47,30 @@ export function OfferSheet({
   loading = false,
   offersLeftToday = 25,
 }: OfferSheetProps) {
+  const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const inputRef = useRef<any>(null);
 
-  const rawPrice = askingPriceProp ?? itemPriceProp ?? 0;
-  const askingPrice = typeof rawPrice === 'number' && Number.isFinite(rawPrice) ? rawPrice : 0;
+  // Normalize asking price
+  const askingPrice = Number(askingPriceProp ?? itemPriceProp ?? 0);
 
-  const [selectedCard, setSelectedCard] = useState<'tier10' | 'tier20' | 'custom'>('custom');
-  const [customAmount, setCustomAmount] = useState('15');
+  // 10% and 20% round numbers
+  const preset10 = useMemo(() => Math.round(askingPrice * 0.9), [askingPrice]);
+  const preset20 = useMemo(() => Math.round(askingPrice * 0.8), [askingPrice]);
+
+  const [selectedCard, setSelectedCard] = useState<'tier10' | 'tier20' | 'custom'>('tier20');
+  const [customAmount, setCustomAmount] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Preset tiers: 10% off and 20% off
-  const preset10 = useMemo(() => {
-    if (askingPrice <= 0) return 0;
-    return Math.max(1, Math.round(askingPrice * 0.9));
-  }, [askingPrice]);
+  const optimizedThumb = imageUrl
+    ? getOptimizedImageUrl(imageUrl, { width: 120 })
+    : null;
 
-  const preset20 = useMemo(() => {
-    if (askingPrice <= 0) return 0;
-    return Math.max(1, Math.round(askingPrice * 0.8));
-  }, [askingPrice]);
-
-  // Reset or initialize state on open
+  // Initialize selected tier on open
   useEffect(() => {
     if (visible) {
-      if (askingPrice > 0) {
-        setCustomAmount(String(preset20 || Math.round(askingPrice * 0.8)));
-        setSelectedCard('custom');
-      } else {
-        setCustomAmount('');
-        setSelectedCard('custom');
-      }
+      setSelectedCard('tier20');
+      setCustomAmount(preset20 > 0 ? String(preset20) : '');
       setSubmitting(false);
     }
   }, [visible, askingPrice, preset20]);
@@ -142,8 +136,6 @@ export function OfferSheet({
 
   if (!visible) return null;
 
-  const optimizedThumb = imageUrl ? getOptimizedImageUrl(imageUrl, { width: 100 }) : null;
-
   return (
     <Modal
       visible={visible}
@@ -153,7 +145,6 @@ export function OfferSheet({
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
-        {/* Backdrop dismiss */}
         <Pressable
           style={styles.backdrop}
           onPress={onClose}
@@ -161,7 +152,6 @@ export function OfferSheet({
           accessibilityLabel="Close offer modal"
         />
 
-        {/* Modal Sheet Container */}
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={{ width: '100%', maxWidth: 540, alignSelf: 'center' }}
@@ -170,17 +160,17 @@ export function OfferSheet({
             style={[
               styles.sheetContainer,
               {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
+                backgroundColor: theme.surface,
+                borderColor: theme.border,
                 paddingBottom: Math.max(insets.bottom, 24),
               },
             ]}
           >
             {/* Grab Handle */}
-            <View style={styles.grabHandle} />
+            <View style={[styles.grabHandle, { backgroundColor: theme.border }]} />
 
             {/* Header Bar */}
-            <View style={[styles.headerBar, { borderBottomColor: colors.hairline }]}>
+            <View style={[styles.headerBar, { borderBottomColor: theme.hairline }]}>
               <Pressable
                 onPress={onClose}
                 hitSlop={{ top: 12, bottom: 12, left: 16, right: 16 }}
@@ -188,19 +178,18 @@ export function OfferSheet({
                 accessibilityRole="button"
                 accessibilityLabel="Close"
               >
-                <Text style={[styles.closeText, { color: colors.muteSoft }]}>Cancel</Text>
+                <Text style={[styles.closeText, { color: theme.muteSoft }]}>Cancel</Text>
               </Pressable>
 
               <Text
                 style={[
                   styles.headerTitle,
-                  { color: colors.ink, fontFamily: type.family.sansBold },
+                  { color: theme.ink, fontFamily: type.family.sansBold },
                 ]}
               >
                 Make an Offer
               </Text>
 
-              {/* Spacer to keep title centered */}
               <View style={styles.headerSpacer} />
             </View>
 
@@ -210,7 +199,7 @@ export function OfferSheet({
               <View
                 style={[
                   styles.itemRow,
-                  { backgroundColor: colors.panel, borderColor: colors.hairline },
+                  { backgroundColor: theme.panel, borderColor: theme.hairline },
                 ]}
               >
                 {optimizedThumb ? (
@@ -222,8 +211,8 @@ export function OfferSheet({
                     transition={IMAGE_TRANSITION}
                   />
                 ) : (
-                  <View style={[styles.itemImagePlaceholder, { backgroundColor: colors.surface }]}>
-                    <Feather name="tag" size={20} color={colors.mute} />
+                  <View style={[styles.itemImagePlaceholder, { backgroundColor: theme.surface }]}>
+                    <Feather name="tag" size={20} color={theme.mute} />
                   </View>
                 )}
 
@@ -232,12 +221,12 @@ export function OfferSheet({
                     numberOfLines={1}
                     style={[
                       styles.itemTitle,
-                      { color: colors.ink, fontFamily: type.family.sansBold },
+                      { color: theme.ink, fontFamily: type.family.sansBold },
                     ]}
                   >
                     {title || 'Selected Item'}
                   </Text>
-                  <Text style={[styles.itemPrice, { color: colors.mute }]}>
+                  <Text style={[styles.itemPrice, { color: theme.mute }]}>
                     Listing price: {formatPrice(askingPrice)}
                   </Text>
                 </View>
@@ -252,9 +241,9 @@ export function OfferSheet({
                     styles.presetCard,
                     {
                       backgroundColor:
-                        selectedCard === 'tier10' ? colors.purpleSoft : colors.panel,
+                        selectedCard === 'tier10' ? theme.purpleSoft : theme.panel,
                       borderColor:
-                        selectedCard === 'tier10' ? colors.purple : colors.hairline,
+                        selectedCard === 'tier10' ? theme.purple : theme.hairline,
                       borderWidth: selectedCard === 'tier10' ? 1.5 : 1,
                       transform: [{ scale: pressed ? 0.96 : 1 }],
                     },
@@ -266,7 +255,7 @@ export function OfferSheet({
                     style={[
                       styles.cardTopText,
                       {
-                        color: selectedCard === 'tier10' ? colors.purple : colors.ink,
+                        color: selectedCard === 'tier10' ? theme.purple : theme.ink,
                         fontFamily: type.family.sansBold,
                       },
                     ]}
@@ -277,7 +266,7 @@ export function OfferSheet({
                     style={[
                       styles.cardBottomText,
                       {
-                        color: selectedCard === 'tier10' ? colors.purple : colors.muteSoft,
+                        color: selectedCard === 'tier10' ? theme.purple : theme.muteSoft,
                         fontFamily: type.family.sansMedium,
                       },
                     ]}
@@ -293,9 +282,9 @@ export function OfferSheet({
                     styles.presetCard,
                     {
                       backgroundColor:
-                        selectedCard === 'tier20' ? colors.purpleSoft : colors.panel,
+                        selectedCard === 'tier20' ? theme.purpleSoft : theme.panel,
                       borderColor:
-                        selectedCard === 'tier20' ? colors.purple : colors.hairline,
+                        selectedCard === 'tier20' ? theme.purple : theme.hairline,
                       borderWidth: selectedCard === 'tier20' ? 1.5 : 1,
                       transform: [{ scale: pressed ? 0.96 : 1 }],
                     },
@@ -307,7 +296,7 @@ export function OfferSheet({
                     style={[
                       styles.cardTopText,
                       {
-                        color: selectedCard === 'tier20' ? colors.purple : colors.ink,
+                        color: selectedCard === 'tier20' ? theme.purple : theme.ink,
                         fontFamily: type.family.sansBold,
                       },
                     ]}
@@ -318,7 +307,7 @@ export function OfferSheet({
                     style={[
                       styles.cardBottomText,
                       {
-                        color: selectedCard === 'tier20' ? colors.purple : colors.muteSoft,
+                        color: selectedCard === 'tier20' ? theme.purple : theme.muteSoft,
                         fontFamily: type.family.sansMedium,
                       },
                     ]}
@@ -334,9 +323,9 @@ export function OfferSheet({
                     styles.presetCard,
                     {
                       backgroundColor:
-                        selectedCard === 'custom' ? colors.purpleSoft : colors.panel,
+                        selectedCard === 'custom' ? theme.purpleSoft : theme.panel,
                       borderColor:
-                        selectedCard === 'custom' ? colors.purple : colors.hairline,
+                        selectedCard === 'custom' ? theme.purple : theme.hairline,
                       borderWidth: selectedCard === 'custom' ? 1.5 : 1,
                       transform: [{ scale: pressed ? 0.96 : 1 }],
                     },
@@ -348,7 +337,7 @@ export function OfferSheet({
                     style={[
                       styles.cardTopText,
                       {
-                        color: selectedCard === 'custom' ? colors.purple : colors.ink,
+                        color: selectedCard === 'custom' ? theme.purple : theme.ink,
                         fontFamily: type.family.sansBold,
                       },
                     ]}
@@ -359,7 +348,7 @@ export function OfferSheet({
                     style={[
                       styles.cardBottomText,
                       {
-                        color: selectedCard === 'custom' ? colors.purple : colors.muteSoft,
+                        color: selectedCard === 'custom' ? theme.purple : theme.muteSoft,
                         fontFamily: type.family.sansMedium,
                       },
                     ]}
@@ -378,14 +367,14 @@ export function OfferSheet({
                 style={[
                   styles.inputSection,
                   {
-                    backgroundColor: colors.panel,
-                    borderColor: selectedCard === 'custom' ? colors.purple : colors.hairline,
+                    backgroundColor: theme.panel,
+                    borderColor: selectedCard === 'custom' ? theme.purple : theme.hairline,
                   },
                 ]}
               >
-                <Text style={styles.inputEyebrow}>YOUR OFFER AMOUNT</Text>
+                <Text style={[styles.inputEyebrow, { color: theme.muteSoft }]}>YOUR OFFER AMOUNT</Text>
                 <View style={styles.displayRow}>
-                  <Text style={[styles.currencyPrefix, { color: colors.ink }]}>
+                  <Text style={[styles.currencyPrefix, { color: theme.ink }]}>
                     {CURRENCY_SYMBOL}
                   </Text>
                   <TextInput
@@ -393,13 +382,13 @@ export function OfferSheet({
                     value={customAmount}
                     onChangeText={handleCustomChange}
                     placeholder="0"
-                    placeholderTextColor={colors.muteSoft}
+                    placeholderTextColor={theme.muteSoft}
                     keyboardType="decimal-pad"
                     returnKeyType="done"
                     style={[
                       styles.amountInput,
                       {
-                        color: colors.ink,
+                        color: theme.ink,
                         fontFamily: type.family.sansBold,
                       },
                     ]}
@@ -407,9 +396,9 @@ export function OfferSheet({
                 </View>
 
                 {/* Fee breakdown helper text */}
-                <View style={styles.feeBreakdownRow}>
-                  <Feather name="shield" size={13} color={colors.purple} />
-                  <Text style={[styles.feeHelperText, { color: colors.mute }]}>
+                <View style={[styles.feeBreakdownRow, { borderTopColor: theme.hairline }]}>
+                  <Feather name="shield" size={13} color={theme.purple} />
+                  <Text style={[styles.feeHelperText, { color: theme.mute }]}>
                     {parsedAmount > 0
                       ? `${formatPrice(totalWithProtection)} incl. Buyer Protection`
                       : `Includes Buyer Protection guarantee`}
@@ -425,7 +414,7 @@ export function OfferSheet({
                   style={({ pressed }) => [
                     styles.actionButton,
                     {
-                      backgroundColor: colors.purple,
+                      backgroundColor: theme.purple,
                       opacity: !isValidOffer || submitting || loading ? 0.45 : pressed ? 0.88 : 1,
                       transform: [{ scale: pressed ? 0.98 : 1 }],
                       ...shadow.sm,
@@ -453,11 +442,11 @@ export function OfferSheet({
 
               {/* Subtext: "25 offers left for today. Learn why." */}
               <View style={styles.limitRow}>
-                <Text style={[styles.limitText, { color: colors.muteSoft }]}>
+                <Text style={[styles.limitText, { color: theme.muteSoft }]}>
                   {offersLeftToday} offers remaining today.{' '}
                 </Text>
                 <Pressable onPress={handleLearnWhy} hitSlop={6}>
-                  <Text style={[styles.learnWhyText, { color: colors.purple }]}>Learn why.</Text>
+                  <Text style={[styles.learnWhyText, { color: theme.purple }]}>Learn why.</Text>
                 </Pressable>
               </View>
             </View>
@@ -479,7 +468,6 @@ const styles = StyleSheet.create({
   },
   sheetContainer: {
     width: '100%',
-    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: radii['3xl'],
     borderTopRightRadius: radii['3xl'],
     overflow: 'hidden',
@@ -490,7 +478,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(15, 15, 15, 0.15)',
     alignSelf: 'center',
     marginTop: 10,
   },
@@ -591,7 +578,6 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontFamily: type.family.sansBold,
     fontWeight: '700',
-    color: colors.muteSoft,
     letterSpacing: 0.8,
     marginBottom: 6,
   },
@@ -621,7 +607,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: colors.hairline,
   },
   feeHelperText: {
     fontSize: 12.5,

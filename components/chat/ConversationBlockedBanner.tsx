@@ -9,7 +9,8 @@
 
 import { View, Pressable } from 'react-native';
 import { Text } from '@/lib/rnText';
-import { colors, radii, type as typography } from '@/lib/theme';
+import { radii, type as typography } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import type { BlockStatus } from './useConversationBlock';
 
 type ConversationBlockedBannerProps = {
@@ -21,6 +22,8 @@ export function ConversationBlockedBanner({
   blockStatus,
   onUnblock,
 }: ConversationBlockedBannerProps) {
+  const { theme } = useTheme();
+
   if (blockStatus === 'blocked') {
     return (
       <View
@@ -30,14 +33,14 @@ export function ConversationBlockedBanner({
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          backgroundColor: colors.panel,
+          backgroundColor: theme.panel,
         }}
       >
         <Text
           style={{
             fontFamily: typography.family.sans,
             fontSize: 13,
-            color: colors.muteSoft,
+            color: theme.muteSoft,
             flex: 1,
             marginRight: 12,
           }}
@@ -50,7 +53,7 @@ export function ConversationBlockedBanner({
             paddingHorizontal: 14,
             paddingVertical: 6,
             borderRadius: radii.pill,
-            backgroundColor: colors.ink,
+            backgroundColor: theme.ink,
             opacity: pressed ? 0.8 : 1,
           })}
         >
@@ -58,7 +61,7 @@ export function ConversationBlockedBanner({
             style={{
               fontFamily: typography.family.sansSemibold,
               fontSize: 12,
-              color: colors.white,
+              color: theme.background,
             }}
           >
             Unblock
@@ -81,7 +84,7 @@ export function ConversationBlockedBanner({
         style={{
           fontFamily: typography.family.sans,
           fontSize: 13,
-          color: colors.muteSoft,
+          color: theme.muteSoft,
         }}
       >
         {blockStatus === 'loading' ? 'Checking conversation status…' : 'Messaging is unavailable.'}

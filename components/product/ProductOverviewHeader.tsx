@@ -12,7 +12,7 @@ import { View, Pressable } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
-import { colors } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
 import {
   BRAND_PURPLE,
@@ -33,6 +33,7 @@ export const ProductOverviewHeader = memo(function ProductOverviewHeader({
   bpFee,
   onOpenBpSheet,
 }: ProductOverviewHeaderProps) {
+  const { theme } = useTheme();
   const heartCount = Math.max(0, Number(listing.likes ?? 0));
   const itemPrice = Number(listing.price ?? 0);
 
@@ -53,9 +54,9 @@ export const ProductOverviewHeader = memo(function ProductOverviewHeader({
     <View style={{ paddingHorizontal: 20, paddingTop: 22, paddingBottom: 14 }}>
       {heartCount > 0 && (
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 6 }}>
-          <Feather name="heart" size={12} color={colors.mute} />
-          <Text style={{ fontSize: 12, color: colors.mute, fontFamily: 'Inter_500Medium' }}>
-            Liked by <Text style={{ fontFamily: 'Inter_700Bold', color: colors.ink }}>{heartCount} {heartCount === 1 ? 'person' : 'people'}</Text>
+          <Feather name="heart" size={12} color={theme.mute} />
+          <Text style={{ fontSize: 12, color: theme.mute, fontFamily: 'Inter_500Medium' }}>
+            Liked by <Text style={{ fontFamily: 'Inter_700Bold', color: theme.ink }}>{heartCount} {heartCount === 1 ? 'person' : 'people'}</Text>
           </Text>
         </View>
       )}
@@ -64,7 +65,7 @@ export const ProductOverviewHeader = memo(function ProductOverviewHeader({
         style={{
           fontSize: 28,
           fontFamily: 'Inter_700Bold',
-          color: colors.ink,
+          color: theme.ink,
           lineHeight: 33,
           letterSpacing: -0.7,
         }}
@@ -76,11 +77,11 @@ export const ProductOverviewHeader = memo(function ProductOverviewHeader({
       {metaSegments.length > 0 && (
         <Text
           numberOfLines={2}
-          style={{ marginTop: 10, fontSize: 14, lineHeight: 20, color: colors.mute, fontFamily: 'Inter_500Medium' }}
+          style={{ marginTop: 10, fontSize: 14, lineHeight: 20, color: theme.mute, fontFamily: 'Inter_500Medium' }}
         >
           {metaSegments.map((s, i) => (
             <Text key={i}>
-              {i > 0 ? <Text style={{ color: colors.muteSoft }}>{' · '}</Text> : null}
+              {i > 0 ? <Text style={{ color: theme.muteSoft }}>{' · '}</Text> : null}
               {s.link ? (
                 <Text
                   style={{
@@ -110,7 +111,7 @@ export const ProductOverviewHeader = memo(function ProductOverviewHeader({
           style={{
             fontSize: 22,
             fontFamily: 'Inter_700Bold',
-            color: colors.ink,
+            color: theme.ink,
             letterSpacing: -0.4,
           }}
         >
@@ -132,7 +133,7 @@ export const ProductOverviewHeader = memo(function ProductOverviewHeader({
               opacity: pressed ? 0.6 : 1,
             })}
           >
-            <Text style={{ fontSize: 14, fontFamily: 'Inter_500Medium', color: colors.mute }}>
+            <Text style={{ fontSize: 14, fontFamily: 'Inter_500Medium', color: theme.mute }}>
               +{formatPrice(bpFee)} Buyer Protection fee
             </Text>
             <Feather name="shield" size={15} color={BRAND_PURPLE} />

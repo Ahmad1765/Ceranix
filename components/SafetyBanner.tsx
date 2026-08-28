@@ -9,7 +9,8 @@ import { View, Alert, Platform, type ViewStyle, type StyleProp } from 'react-nat
 import { Text } from '@/lib/rnText';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, type as typography } from '@/lib/theme';
+import { radii, type as typography } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 
 // Per-surface copy. Same trust mark and link everywhere; only the framing
 // changes so a seller listing an item never reads buyer-only wording.
@@ -64,6 +65,7 @@ export function explainCoverage() {
 }
 
 export function SafetyBanner({ context = 'shop', title, body, style, onLinkPress, bare = false }: Props) {
+  const { theme } = useTheme();
   const preset = PRESETS[context];
   const onLink = () => {
     if (Platform.OS === 'ios') Haptics.selectionAsync();
@@ -79,9 +81,9 @@ export function SafetyBanner({ context = 'shop', title, body, style, onLinkPress
           gap: 12,
           padding: bare ? 0 : 14,
           borderRadius: radii.xl,
-          backgroundColor: bare ? 'transparent' : colors.panel,
+          backgroundColor: bare ? 'transparent' : theme.panel,
           borderWidth: bare ? 0 : 1,
-          borderColor: colors.border,
+          borderColor: theme.border,
         },
         style,
       ]}
@@ -91,19 +93,19 @@ export function SafetyBanner({ context = 'shop', title, body, style, onLinkPress
           width: 34,
           height: 34,
           borderRadius: 17,
-          backgroundColor: colors.purpleSoft,
+          backgroundColor: theme.purpleSoft,
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
-        <Ionicons name="shield-checkmark" size={18} color={colors.purple} />
+        <Ionicons name="shield-checkmark" size={18} color={theme.purple} />
       </View>
       <View style={{ flex: 1 }}>
         <Text
           style={{
             fontFamily: typography.family.sansBold,
             fontSize: typography.size.md,
-            color: colors.ink,
+            color: theme.ink,
             marginBottom: 2,
             letterSpacing: -0.2,
           }}
@@ -115,7 +117,7 @@ export function SafetyBanner({ context = 'shop', title, body, style, onLinkPress
             fontFamily: typography.family.sans,
             fontSize: 13,
             lineHeight: 18,
-            color: colors.mute,
+            color: theme.mute,
           }}
         >
           {body ?? preset.body}{' '}
@@ -123,7 +125,7 @@ export function SafetyBanner({ context = 'shop', title, body, style, onLinkPress
             onPress={onLink}
             accessibilityRole="link"
             accessibilityLabel="How you're covered"
-            style={{ color: colors.purple, fontFamily: typography.family.sansSemibold }}
+            style={{ color: theme.purple, fontFamily: typography.family.sansSemibold }}
           >
             How you&apos;re covered
           </Text>

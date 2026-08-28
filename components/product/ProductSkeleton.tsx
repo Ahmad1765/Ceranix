@@ -7,7 +7,7 @@ import Animated, {
   withTiming,
   withSequence,
 } from 'react-native-reanimated';
-import { colors } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 
 export function SkeletonBlock({
   width,
@@ -20,6 +20,7 @@ export function SkeletonBlock({
   radius?: number;
   style?: any;
 }) {
+  const { theme } = useTheme();
   const opacity = useSharedValue(0.5);
   useEffect(() => {
     opacity.value = withRepeat(
@@ -39,7 +40,7 @@ export function SkeletonBlock({
           width,
           height,
           borderRadius: radius,
-          backgroundColor: colors.primarySoft,
+          backgroundColor: theme.primarySoft,
         },
         animStyle,
         style,
@@ -49,8 +50,9 @@ export function SkeletonBlock({
 }
 
 export function ProductSkeleton({ insetsTop }: { insetsTop: number }) {
+  const { theme } = useTheme();
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
       {/* Header (back button area) */}
       <View
         style={{
@@ -95,7 +97,7 @@ export function ProductSkeleton({ insetsTop }: { insetsTop: number }) {
             marginTop: 24,
             paddingTop: 20,
             borderTopWidth: 1,
-            borderTopColor: colors.primarySoft,
+            borderTopColor: theme.primarySoft,
           }}
         >
           <SkeletonBlock width={44} height={44} radius={22} />

@@ -91,7 +91,7 @@ const withFallbackSeller = (row: Listing | null): Listing | null =>
   row ? { ...row, seller: row.seller ?? (FALLBACK_SELLER as Listing['seller']) } : null;
 
 export default function ProductScreen() {
-  useTheme();
+  const { theme, isDark } = useTheme();
   const { id } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -514,8 +514,8 @@ export default function ProductScreen() {
   const images = listing.images ?? [];
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <StatusBar style="auto" animated />
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
+      <StatusBar style={isDark ? 'light' : 'dark'} animated />
 
       {/* 1. Floating Top Navigation Bar (Z: 30) */}
       <ProductHeaderNav

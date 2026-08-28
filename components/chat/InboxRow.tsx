@@ -10,7 +10,8 @@ import { View, Pressable } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import { getOptimizedImageUrl, cardImageUrl, IMAGE_TRANSITION } from '@/lib/images';
-import { colors, radii, type as typography } from '@/lib/theme';
+import { radii, type as typography } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { isConversationUnread, otherParticipant, type ConversationRow } from '@/lib/chat';
 import { ListingThumb, listingStatus } from './ListingThumb';
 import { relativeTime } from './format';
@@ -24,6 +25,7 @@ function InboxRowImpl({
   userId: string;
   onPress: () => void;
 }) {
+  const { theme } = useTheme();
   const other = otherParticipant(conv, userId);
   const avatar = other?.avatar_url ? getOptimizedImageUrl(other.avatar_url, { width: 140 }) : null;
   const thumbUrl = conv.listing ? cardImageUrl(conv.listing, 0) : null;
@@ -48,7 +50,7 @@ function InboxRowImpl({
         gap: 12,
         paddingHorizontal: 16,
         paddingVertical: 13,
-        backgroundColor: pressed ? colors.panel : 'transparent',
+        backgroundColor: pressed ? theme.panel : 'transparent',
       })}
     >
       <View
@@ -56,9 +58,9 @@ function InboxRowImpl({
           width: 54,
           height: 54,
           borderRadius: 27,
-          backgroundColor: colors.surface,
+          backgroundColor: theme.surface,
           borderWidth: 1,
-          borderColor: colors.border,
+          borderColor: theme.border,
           overflow: 'hidden',
           alignItems: 'center',
           justifyContent: 'center',
@@ -77,7 +79,7 @@ function InboxRowImpl({
             style={{
               fontFamily: typography.family.sansBold,
               fontSize: 19,
-              color: colors.purple,
+              color: theme.purple,
             }}
           >
             {initial}
@@ -92,7 +94,7 @@ function InboxRowImpl({
             fontFamily: typography.family.sansBold,
             fontSize: 15,
             letterSpacing: -0.2,
-            color: colors.ink,
+            color: theme.ink,
           }}
         >
           {displayName}
@@ -103,7 +105,7 @@ function InboxRowImpl({
             fontFamily: unread ? typography.family.sansSemibold : typography.family.sans,
             fontSize: 13.5,
             lineHeight: 19,
-            color: unread ? colors.ink : colors.mute,
+            color: unread ? theme.ink : theme.mute,
             marginTop: 1,
           }}
         >
@@ -116,7 +118,7 @@ function InboxRowImpl({
                 width: 6,
                 height: 6,
                 borderRadius: 3,
-                backgroundColor: colors.primary,
+                backgroundColor: theme.primary,
               }}
             />
           )}
@@ -124,7 +126,7 @@ function InboxRowImpl({
             style={{
               fontFamily: typography.family.sans,
               fontSize: 11.5,
-              color: colors.muteSoft,
+              color: theme.muteSoft,
             }}
           >
             {relativeTime(conv.updated_at)}
@@ -152,6 +154,7 @@ export const InboxRow = memo(InboxRowImpl);
 /** Placeholder rows for the first load. A skeleton that matches the real row's
  *  geometry beats a centred spinner: the list doesn't jump when data lands. */
 export function InboxSkeleton({ rows = 6 }: { rows?: number }) {
+  const { theme } = useTheme();
   return (
     <View>
       {Array.from({ length: rows }).map((_, i) => (
@@ -166,21 +169,21 @@ export function InboxSkeleton({ rows = 6 }: { rows?: number }) {
           }}
         >
           <View
-            style={{ width: 54, height: 54, borderRadius: 27, backgroundColor: colors.panel }}
+            style={{ width: 54, height: 54, borderRadius: 27, backgroundColor: theme.panel }}
           />
           <View style={{ flex: 1, gap: 7 }}>
             <View
-              style={{ height: 12, width: '38%', borderRadius: 6, backgroundColor: colors.panel }}
+              style={{ height: 12, width: '38%', borderRadius: 6, backgroundColor: theme.panel }}
             />
             <View
-              style={{ height: 11, width: '72%', borderRadius: 6, backgroundColor: colors.panel }}
+              style={{ height: 11, width: '72%', borderRadius: 6, backgroundColor: theme.panel }}
             />
             <View
-              style={{ height: 9, width: '24%', borderRadius: 5, backgroundColor: colors.panel }}
+              style={{ height: 9, width: '24%', borderRadius: 5, backgroundColor: theme.panel }}
             />
           </View>
           <View
-            style={{ width: 52, height: 66, borderRadius: radii.sm, backgroundColor: colors.panel }}
+            style={{ width: 52, height: 66, borderRadius: radii.sm, backgroundColor: theme.panel }}
           />
         </View>
       ))}

@@ -13,7 +13,8 @@ import { Text, TextInput } from '@/lib/rnText';
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
-import { colors, radii, shadow, type as typography } from '@/lib/theme';
+import { radii, shadow, type as typography } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { FOR_YOU, TRENDING } from './useHomeFeedFilters';
 import type { SavedSearch } from '@/lib/savedSearches';
 
@@ -46,6 +47,7 @@ export const FeedSearch = memo(function FeedSearch({
   savedActive,
   onToggleSaved,
 }: FeedSearchProps) {
+  const { theme } = useTheme();
   const inputRef = useRef<any>(null);
   const searching = value.trim().length > 0;
   const hasFilters = filterCount > 0;
@@ -58,19 +60,19 @@ export const FeedSearch = memo(function FeedSearch({
             flex: 1,
             flexDirection: 'row',
             alignItems: 'center',
-            backgroundColor: '#F1F2F6',
+            backgroundColor: theme.panel,
             borderRadius: radii.pill,
             paddingLeft: 14,
             paddingRight: 10,
             height: 44,
-            borderWidth: 0,
-            borderColor: 'transparent',
+            borderWidth: 1,
+            borderColor: theme.border,
           }}
         >
           <Feather
             name="search"
             size={16}
-            color="#6A6E76"
+            color={theme.mute}
             style={{ flexShrink: 0 }}
           />
           <TextInput
@@ -80,7 +82,7 @@ export const FeedSearch = memo(function FeedSearch({
             onFocus={onFocus}
             onBlur={onBlur}
             placeholder="Search"
-            placeholderTextColor="#6A6E76"
+            placeholderTextColor={theme.muteSoft}
             style={{
               flex: 1,
               minWidth: 0,
@@ -90,7 +92,7 @@ export const FeedSearch = memo(function FeedSearch({
               fontFamily: typography.family.sansMedium,
               fontSize: 13.5,
               letterSpacing: -0.15,
-              color: colors.ink,
+              color: theme.ink,
               padding: 0,
               outlineStyle: 'none',
               outlineWidth: 0,
@@ -109,13 +111,13 @@ export const FeedSearch = memo(function FeedSearch({
                 width: 20,
                 height: 20,
                 borderRadius: 10,
-                backgroundColor: 'rgba(0, 0, 0, 0.08)',
+                backgroundColor: theme.border,
                 alignItems: 'center',
                 justifyContent: 'center',
                 marginRight: 4,
               }}
             >
-              <Feather name="x" size={12} color="#6A6E76" />
+              <Feather name="x" size={12} color={theme.mute} />
             </Pressable>
           )}
           {resultCount != null && (
@@ -124,7 +126,7 @@ export const FeedSearch = memo(function FeedSearch({
                 paddingHorizontal: 8,
                 paddingVertical: 2,
                 borderRadius: radii.pill,
-                backgroundColor: colors.purpleSoft,
+                backgroundColor: theme.purpleSoft,
                 flexShrink: 0,
               }}
             >
@@ -132,7 +134,7 @@ export const FeedSearch = memo(function FeedSearch({
                 style={{
                   fontFamily: typography.family.sansBold,
                   fontSize: 11,
-                  color: colors.purple,
+                  color: theme.purple,
                   letterSpacing: -0.2,
                 }}
               >
@@ -159,7 +161,7 @@ export const FeedSearch = memo(function FeedSearch({
               style={{
                 fontFamily: typography.family.sansBold,
                 fontSize: 14,
-                color: colors.ink,
+                color: theme.ink,
               }}
             >
               Cancel
@@ -179,9 +181,9 @@ export const FeedSearch = memo(function FeedSearch({
                 width: 44,
                 height: 44,
                 borderRadius: 22,
-                backgroundColor: hasFilters ? colors.ink : colors.surface,
+                backgroundColor: hasFilters ? theme.ink : theme.surface,
                 borderWidth: 1,
-                borderColor: hasFilters ? colors.ink : colors.border,
+                borderColor: hasFilters ? theme.ink : theme.border,
                 alignItems: 'center',
                 justifyContent: 'center',
                 transform: [{ scale: pressed ? 0.94 : 1 }],
@@ -191,7 +193,7 @@ export const FeedSearch = memo(function FeedSearch({
               <Feather
                 name="sliders"
                 size={16}
-                color={hasFilters ? colors.white : colors.ink}
+                color={hasFilters ? theme.background : theme.ink}
               />
               {hasFilters && (
                 <View
@@ -202,17 +204,17 @@ export const FeedSearch = memo(function FeedSearch({
                     minWidth: 18,
                     height: 18,
                     borderRadius: 9,
-                    backgroundColor: colors.primary,
+                    backgroundColor: theme.primary,
                     alignItems: 'center',
                     justifyContent: 'center',
                     paddingHorizontal: 4,
                     borderWidth: 2,
-                    borderColor: colors.background,
+                    borderColor: theme.background,
                   }}
                 >
                   <Text
                     style={{
-                      color: colors.white,
+                      color: '#FFFFFF',
                       fontSize: 10,
                       fontWeight: '800',
                       lineHeight: 11,
@@ -236,9 +238,9 @@ export const FeedSearch = memo(function FeedSearch({
                 width: 44,
                 height: 44,
                 borderRadius: 22,
-                backgroundColor: savedActive ? colors.ink : colors.surface,
+                backgroundColor: savedActive ? theme.ink : theme.surface,
                 borderWidth: 1,
-                borderColor: savedActive ? colors.ink : colors.border,
+                borderColor: savedActive ? theme.ink : theme.border,
                 alignItems: 'center',
                 justifyContent: 'center',
                 transform: [{ scale: pressed ? 0.94 : 1 }],
@@ -248,7 +250,7 @@ export const FeedSearch = memo(function FeedSearch({
               <Feather
                 name="bookmark"
                 size={16}
-                color={savedActive ? colors.white : colors.ink}
+                color={savedActive ? theme.background : theme.ink}
               />
             </Pressable>
           </>
@@ -273,6 +275,8 @@ export const ChipRow = memo(function ChipRow({
   onDeleteChip,
   onAdd,
 }: ChipRowProps) {
+  const { theme } = useTheme();
+
   return (
     <ScrollView
       horizontal
@@ -289,21 +293,21 @@ export const ChipRow = memo(function ChipRow({
           paddingHorizontal: 14,
           paddingVertical: 8,
           borderRadius: radii.pill,
-          backgroundColor: activeChip === FOR_YOU ? '#F2F4F7' : '#FFFFFF',
-          borderWidth: activeChip === FOR_YOU ? 0 : 1,
-          borderColor: activeChip === FOR_YOU ? 'transparent' : 'rgba(0, 0, 0, 0.1)',
+          backgroundColor: activeChip === FOR_YOU ? theme.selected : theme.surface,
+          borderWidth: 1,
+          borderColor: activeChip === FOR_YOU ? theme.border : theme.border,
           flexDirection: 'row',
           alignItems: 'center',
           gap: 6,
           transform: [{ scale: pressed ? 0.96 : 1 }],
         })}
       >
-        <Feather name="zap" size={13} color={colors.ink} />
+        <Feather name="zap" size={13} color={theme.ink} />
         <Text
           style={{
             fontFamily: typography.family.sansBold,
             fontSize: 13,
-            color: colors.ink,
+            color: theme.ink,
           }}
         >
           For you
@@ -320,21 +324,21 @@ export const ChipRow = memo(function ChipRow({
           paddingHorizontal: 14,
           paddingVertical: 8,
           borderRadius: radii.pill,
-          backgroundColor: activeChip === TRENDING ? '#F2F4F7' : '#FFFFFF',
-          borderWidth: activeChip === TRENDING ? 0 : 1,
-          borderColor: activeChip === TRENDING ? 'transparent' : 'rgba(0, 0, 0, 0.1)',
+          backgroundColor: activeChip === TRENDING ? theme.selected : theme.surface,
+          borderWidth: 1,
+          borderColor: activeChip === TRENDING ? theme.border : theme.border,
           flexDirection: 'row',
           alignItems: 'center',
           gap: 6,
           transform: [{ scale: pressed ? 0.96 : 1 }],
         })}
       >
-        <Feather name="trending-up" size={13} color={colors.ink} />
+        <Feather name="trending-up" size={13} color={theme.ink} />
         <Text
           style={{
             fontFamily: typography.family.sansBold,
             fontSize: 13,
-            color: colors.ink,
+            color: theme.ink,
           }}
         >
           Trending
@@ -352,15 +356,15 @@ export const ChipRow = memo(function ChipRow({
           width: 34,
           height: 34,
           borderRadius: radii.pill,
-          backgroundColor: '#FFFFFF',
+          backgroundColor: theme.surface,
           borderWidth: 1,
-          borderColor: 'rgba(0, 0, 0, 0.1)',
+          borderColor: theme.border,
           alignItems: 'center',
           justifyContent: 'center',
           transform: [{ scale: pressed ? 0.96 : 1 }],
         })}
       >
-        <Feather name="plus" size={16} color={colors.ink} />
+        <Feather name="plus" size={16} color={theme.ink} />
       </Pressable>
 
       {/* Saved Searches Chips */}
@@ -381,9 +385,9 @@ export const ChipRow = memo(function ChipRow({
               paddingHorizontal: 14,
               paddingVertical: 8,
               borderRadius: radii.pill,
-              backgroundColor: active ? '#F2F4F7' : '#FFFFFF',
-              borderWidth: active ? 0 : 1,
-              borderColor: active ? 'transparent' : 'rgba(0, 0, 0, 0.1)',
+              backgroundColor: active ? theme.selected : theme.surface,
+              borderWidth: 1,
+              borderColor: active ? theme.border : theme.border,
               flexDirection: 'row',
               alignItems: 'center',
               gap: 6,
@@ -394,7 +398,7 @@ export const ChipRow = memo(function ChipRow({
               style={{
                 fontFamily: typography.family.sansMedium,
                 fontSize: 13,
-                color: colors.ink,
+                color: theme.ink,
               }}
             >
               {s.label ?? 'Saved'}
@@ -419,6 +423,8 @@ export const HomeHeader = memo(function HomeHeader({
   showColdStartBanner,
   showFollowCta,
 }: HomeHeaderProps) {
+  const { theme } = useTheme();
+
   return (
     <>
       <FeedSearch {...searchProps} />
@@ -436,13 +442,13 @@ export const HomeHeader = memo(function HomeHeader({
             marginBottom: 10,
             padding: 14,
             borderRadius: radii.md,
-            backgroundColor: colors.purpleSoft,
+            backgroundColor: theme.purpleSoft,
             flexDirection: 'row',
             alignItems: 'center',
           }}
         >
-          <Feather name="user-plus" size={16} color={colors.purple} style={{ marginRight: 10 }} />
-          <Text style={{ flex: 1, color: colors.purple, fontSize: 13, fontWeight: '600' }}>
+          <Feather name="user-plus" size={16} color={theme.purple} style={{ marginRight: 10 }} />
+          <Text style={{ flex: 1, color: theme.purple, fontSize: 13, fontWeight: '600' }}>
             Sign in and like a few items to see this feed personalize itself.
           </Text>
         </Pressable>
@@ -460,13 +466,13 @@ export const HomeHeader = memo(function HomeHeader({
             marginBottom: 10,
             padding: 14,
             borderRadius: radii.md,
-            backgroundColor: colors.purpleSoft,
+            backgroundColor: theme.purpleSoft,
             flexDirection: 'row',
             alignItems: 'center',
           }}
         >
-          <Feather name="compass" size={16} color={colors.purple} style={{ marginRight: 10 }} />
-          <Text style={{ flex: 1, color: colors.purple, fontSize: 13, fontWeight: '600' }}>
+          <Feather name="compass" size={16} color={theme.purple} style={{ marginRight: 10 }} />
+          <Text style={{ flex: 1, color: theme.purple, fontSize: 13, fontWeight: '600' }}>
             Follow some sellers or like a few items to start personalizing your feed.
           </Text>
         </Pressable>

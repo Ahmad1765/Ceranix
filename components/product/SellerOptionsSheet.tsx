@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import Feather from '@expo/vector-icons/Feather';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
-import { colors } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { BRAND, APP_URL } from '@/lib/brand';
 import { reportUser, SELLER_REPORT_REASONS } from '@/lib/reports';
 import { useAuth } from '@/lib/auth';
@@ -34,6 +34,7 @@ export function SellerOptionsSheet({
   seller,
   listingId,
 }: SellerOptionsSheetProps) {
+  const { theme } = useTheme();
   const { user } = useAuth();
   const toast = useToast();
   const [mode, setMode] = useState<'options' | 'report'>('options');
@@ -139,52 +140,52 @@ export function SellerOptionsSheet({
       {mode === 'options' ? (
         <View style={styles.container}>
           {/* Grouped Actions Card */}
-          <View style={styles.actionGroup}>
+          <View style={[styles.actionGroup, { backgroundColor: theme.panel }]}>
             {/* Share profile */}
             <Pressable
               onPress={handleShare}
-              style={({ pressed }) => [styles.actionRow, pressed && styles.actionRowPressed]}
+              style={({ pressed }) => [styles.actionRow, pressed && { backgroundColor: theme.primarySoft }]}
             >
-              <View style={[styles.iconCircle, { backgroundColor: colors.purpleSoft }]}>
-                <Feather name="share-2" size={17} color={colors.purple} />
+              <View style={[styles.iconCircle, { backgroundColor: theme.purpleSoft }]}>
+                <Feather name="share-2" size={17} color={theme.purple} />
               </View>
               <View style={styles.actionContent}>
-                <Text style={styles.actionTitle}>Share seller profile</Text>
-                <Text style={styles.actionDesc}>Copy link or share to other apps</Text>
+                <Text style={[styles.actionTitle, { color: theme.ink }]}>Share seller profile</Text>
+                <Text style={[styles.actionDesc, { color: theme.mute }]}>Copy link or share to other apps</Text>
               </View>
-              <Feather name="chevron-right" size={17} color={colors.mute} />
+              <Feather name="chevron-right" size={17} color={theme.mute} />
             </Pressable>
 
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: theme.divider }]} />
 
             {/* View shop */}
             <Pressable
               onPress={handleViewProfile}
-              style={({ pressed }) => [styles.actionRow, pressed && styles.actionRowPressed]}
+              style={({ pressed }) => [styles.actionRow, pressed && { backgroundColor: theme.primarySoft }]}
             >
-              <View style={[styles.iconCircle, { backgroundColor: colors.primarySoft }]}>
-                <Feather name="shopping-bag" size={17} color={colors.ink} />
+              <View style={[styles.iconCircle, { backgroundColor: theme.primarySoft }]}>
+                <Feather name="shopping-bag" size={17} color={theme.ink} />
               </View>
               <View style={styles.actionContent}>
-                <Text style={styles.actionTitle}>View full shop & listings</Text>
-                <Text style={styles.actionDesc}>Browse reviews, ratings, and items</Text>
+                <Text style={[styles.actionTitle, { color: theme.ink }]}>View full shop & listings</Text>
+                <Text style={[styles.actionDesc, { color: theme.mute }]}>Browse reviews, ratings, and items</Text>
               </View>
-              <Feather name="chevron-right" size={17} color={colors.mute} />
+              <Feather name="chevron-right" size={17} color={theme.mute} />
             </Pressable>
 
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: theme.divider }]} />
 
             {/* Report */}
             <Pressable
               onPress={() => setMode('report')}
-              style={({ pressed }) => [styles.actionRow, pressed && styles.actionRowPressed]}
+              style={({ pressed }) => [styles.actionRow, pressed && { backgroundColor: theme.primarySoft }]}
             >
               <View style={[styles.iconCircle, { backgroundColor: 'rgba(239,68,68,0.08)' }]}>
                 <Feather name="flag" size={17} color="#EF4444" />
               </View>
               <View style={styles.actionContent}>
                 <Text style={[styles.actionTitle, { color: '#EF4444' }]}>Report seller</Text>
-                <Text style={styles.actionDesc}>Flag suspicious activity or violations</Text>
+                <Text style={[styles.actionDesc, { color: theme.mute }]}>Flag suspicious activity or violations</Text>
               </View>
               <Feather name="chevron-right" size={17} color="#EF4444" />
             </Pressable>
@@ -195,8 +196,8 @@ export function SellerOptionsSheet({
         <View style={styles.container}>
           {submittingReport ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.purple} />
-              <Text style={styles.loadingText}>Submitting report...</Text>
+              <ActivityIndicator size="large" color={theme.purple} />
+              <Text style={[styles.loadingText, { color: theme.mute }]}>Submitting report...</Text>
             </View>
           ) : (
             <>
@@ -204,29 +205,31 @@ export function SellerOptionsSheet({
                 onPress={() => setMode('options')}
                 style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
               >
-                <Feather name="arrow-left" size={15} color={colors.ink} />
-                <Text style={styles.backBtnText}>Back to options</Text>
+                <Feather name="arrow-left" size={15} color={theme.ink} />
+                <Text style={[styles.backBtnText, { color: theme.ink }]}>Back to options</Text>
               </Pressable>
 
-              <View style={styles.reportGroup}>
+              <View style={[styles.reportGroup, { backgroundColor: theme.panel }]}>
                 {SELLER_REPORT_REASONS.map((r, idx) => (
                   <React.Fragment key={r.id}>
                     <Pressable
                       onPress={() => handleSelectReportReason(r.id)}
                       style={({ pressed }) => [
                         styles.reportReasonRow,
-                        pressed && styles.actionRowPressed,
+                        pressed && { backgroundColor: theme.primarySoft },
                       ]}
                     >
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.reportReasonLabel}>{r.label}</Text>
+                        <Text style={[styles.reportReasonLabel, { color: theme.ink }]}>{r.label}</Text>
                         {r.description ? (
-                          <Text style={styles.reportReasonDesc}>{r.description}</Text>
+                          <Text style={[styles.reportReasonDesc, { color: theme.mute }]}>{r.description}</Text>
                         ) : null}
                       </View>
-                      <Feather name="chevron-right" size={16} color={colors.mute} />
+                      <Feather name="chevron-right" size={16} color={theme.mute} />
                     </Pressable>
-                    {idx < SELLER_REPORT_REASONS.length - 1 && <View style={styles.divider} />}
+                    {idx < SELLER_REPORT_REASONS.length - 1 && (
+                      <View style={[styles.divider, { backgroundColor: theme.divider }]} />
+                    )}
                   </React.Fragment>
                 ))}
               </View>
@@ -245,7 +248,6 @@ const styles = StyleSheet.create({
     paddingTop: 2,
   },
   actionGroup: {
-    backgroundColor: colors.panel,
     borderRadius: 18,
     overflow: 'hidden',
   },
@@ -255,9 +257,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
     gap: 12,
-  },
-  actionRowPressed: {
-    backgroundColor: colors.primarySoft,
   },
   iconCircle: {
     width: 38,
@@ -272,17 +271,14 @@ const styles = StyleSheet.create({
   actionTitle: {
     fontSize: 14.5,
     fontWeight: '700',
-    color: colors.ink,
     letterSpacing: -0.2,
   },
   actionDesc: {
     fontSize: 12,
-    color: colors.mute,
     marginTop: 1.5,
   },
   divider: {
     height: 1,
-    backgroundColor: colors.divider,
     marginLeft: 64,
   },
   backBtn: {
@@ -296,10 +292,8 @@ const styles = StyleSheet.create({
   backBtnText: {
     fontSize: 13,
     fontWeight: '600',
-    color: colors.ink,
   },
   reportGroup: {
-    backgroundColor: colors.panel,
     borderRadius: 18,
     overflow: 'hidden',
   },
@@ -313,11 +307,9 @@ const styles = StyleSheet.create({
   reportReasonLabel: {
     fontSize: 13.5,
     fontWeight: '700',
-    color: colors.ink,
   },
   reportReasonDesc: {
     fontSize: 11.5,
-    color: colors.mute,
     marginTop: 1,
   },
   loadingContainer: {
@@ -328,7 +320,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 13.5,
-    color: colors.mute,
     fontWeight: '600',
   },
 });

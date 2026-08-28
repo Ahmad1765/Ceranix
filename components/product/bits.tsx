@@ -33,6 +33,7 @@ export function SectionEyebrow({ label, color }: { label: string; color?: string
 }
 
 export function StarRating({ rating }: { rating: number }) {
+  const { theme } = useTheme();
   const full = Math.round(rating);
   return (
     <View style={{ flexDirection: 'row', gap: 2 }}>
@@ -41,7 +42,7 @@ export function StarRating({ rating }: { rating: number }) {
           key={i}
           name={i < full ? 'star' : 'star-outline'}
           size={14}
-          color={i < full ? '#6C47FF' : 'rgba(15,15,15,0.18)'}
+          color={i < full ? '#6C47FF' : theme.border}
         />
       ))}
     </View>

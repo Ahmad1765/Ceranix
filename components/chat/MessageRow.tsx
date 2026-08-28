@@ -14,7 +14,8 @@ import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
 import { PressableScale } from '@/components/PressableScale';
-import { colors, radii, shadow, type as typography } from '@/lib/theme';
+import { radii, shadow, type as typography } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
 import type { ChatMessage } from '@/lib/chat';
 import type { Anchor } from './ReactionPicker';
@@ -59,11 +60,12 @@ function MetaLine({
   senderName,
   onRetry,
 }: Pick<MessageRowProps, 'msg' | 'mine' | 'senderName' | 'onRetry'>) {
+  const { theme } = useTheme();
   const base = {
     fontFamily: typography.family.sans,
     fontSize: 11,
     lineHeight: 14,
-    color: colors.muteSoft,
+    color: theme.muteSoft,
   } as const;
 
   if (mine && msg.failed) {
@@ -73,8 +75,8 @@ function MetaLine({
         accessibilityLabel="Retry sending message"
         style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}
       >
-        <Feather name="rotate-cw" size={10} color={colors.ink} />
-        <Text style={{ ...base, fontFamily: typography.family.sansSemibold, color: colors.ink }}>
+        <Feather name="rotate-cw" size={10} color={theme.ink} />
+        <Text style={{ ...base, fontFamily: typography.family.sansSemibold, color: theme.ink }}>
           Not sent · Tap to retry
         </Text>
       </PressableScale>
@@ -94,27 +96,24 @@ function MetaLine({
       <Text style={base}>
         {msg.pending ? 'Sending…' : bubbleStamp(msg.created_at)}
       </Text>
-      {mine && !msg.pending && <Feather name="check" size={11} color={colors.muteSoft} />}
+      {mine && !msg.pending && <Feather name="check" size={11} color={theme.muteSoft} />}
     </View>
   );
 }
 
 function SystemNotice({ msg }: { msg: ChatMessage }) {
+  const { theme } = useTheme();
   if (msg.metadata?.paid === true) {
     return (
       <View style={{ paddingHorizontal: 16, marginVertical: 12 }}>
         <View
           style={{
-            backgroundColor: '#FFFFFF',
+            backgroundColor: theme.white,
             borderRadius: 12,
             borderWidth: 1,
-            borderColor: '#E5E7EB',
+            borderColor: theme.border,
             padding: 14,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.05,
-            shadowRadius: 2,
-            elevation: 1,
+            ...shadow.sm,
           }}
         >
           <Text
@@ -122,7 +121,7 @@ function SystemNotice({ msg }: { msg: ChatMessage }) {
               fontFamily: typography.family.sansBold,
               fontSize: 14.5,
               fontWeight: '700',
-              color: '#111111',
+              color: theme.ink,
               marginBottom: 4,
             }}
           >
@@ -133,7 +132,7 @@ function SystemNotice({ msg }: { msg: ChatMessage }) {
               fontFamily: typography.family.sans,
               fontSize: 13,
               lineHeight: 18,
-              color: '#4B5563',
+              color: theme.mute,
             }}
           >
             {msg.content}
@@ -150,7 +149,7 @@ function SystemNotice({ msg }: { msg: ChatMessage }) {
           fontFamily: typography.family.sans,
           fontSize: 12,
           lineHeight: 17,
-          color: colors.muteSoft,
+          color: theme.mute,
           textAlign: 'center',
         }}
       >
@@ -175,6 +174,7 @@ function OutgoingOfferBubble({
   canPay: boolean;
   onPay: (amount: number) => void;
 }) {
+  const { theme, isDark } = useTheme();
   const amount = msg.metadata?.amount ?? 0;
   const status = msg.offer_status ?? 'pending';
   const showStruck = !!listingPrice && listingPrice > amount;
@@ -187,12 +187,12 @@ function OutgoingOfferBubble({
   return (
     <View
       style={{
-        backgroundColor: '#EDF2F7',
+        backgroundColor: theme.panel,
         borderRadius: 12,
         paddingHorizontal: 14,
         paddingVertical: 9,
         borderWidth: 1,
-        borderColor: 'rgba(0, 0, 0, 0.06)',
+        borderColor: theme.border,
       }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
@@ -201,7 +201,7 @@ function OutgoingOfferBubble({
             fontFamily: typography.family.sansBold,
             fontSize: 15,
             fontWeight: '700',
-            color: colors.ink,
+            color: theme.ink,
           }}
         >
           {formatPrice(amount)}
@@ -211,7 +211,7 @@ function OutgoingOfferBubble({
             style={{
               fontFamily: typography.family.sans,
               fontSize: 13,
-              color: colors.muteSoft,
+              color: theme.muteSoft,
               textDecorationLine: 'line-through',
             }}
           >
@@ -223,7 +223,7 @@ function OutgoingOfferBubble({
             style={{
               fontFamily: typography.family.sansMedium,
               fontSize: 13,
-              color: '#DC2626',
+              color: '#EF4444',
               marginLeft: 2,
             }}
           >
@@ -235,7 +235,7 @@ function OutgoingOfferBubble({
             style={{
               fontFamily: typography.family.sansBold,
               fontSize: 13,
-              color: '#059669',
+              color: '#10B981',
               marginLeft: 2,
             }}
           >
@@ -247,7 +247,7 @@ function OutgoingOfferBubble({
             style={{
               fontFamily: typography.family.sans,
               fontSize: 13,
-              color: colors.muteSoft,
+              color: theme.muteSoft,
               marginLeft: 2,
             }}
           >
@@ -261,7 +261,7 @@ function OutgoingOfferBubble({
           style={{
             fontFamily: typography.family.sans,
             fontSize: 12.5,
-            color: colors.mute,
+            color: theme.mute,
             marginTop: 4,
           }}
         >
@@ -348,6 +348,7 @@ function IncomingOfferCard({
   onCounterOffer?: () => void;
   onPay: (amount: number) => void;
 }) {
+  const { theme } = useTheme();
   const amount = msg.metadata?.amount ?? 0;
   const status = msg.offer_status ?? 'pending';
   const showStruck = !!listingPrice && listingPrice > amount;
@@ -361,9 +362,9 @@ function IncomingOfferCard({
       style={{
         minWidth: 240,
         maxWidth: 320,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: theme.white,
         borderWidth: 1,
-        borderColor: 'rgba(0, 0, 0, 0.08)',
+        borderColor: theme.border,
         borderRadius: 12,
         padding: 14,
         ...shadow.sm,
@@ -373,7 +374,7 @@ function IncomingOfferCard({
         style={{
           fontFamily: typography.family.sans,
           fontSize: 13.5,
-          color: '#374151',
+          color: theme.mute,
           marginBottom: 4,
         }}
       >
@@ -394,7 +395,7 @@ function IncomingOfferCard({
             fontFamily: typography.family.sansBold,
             fontSize: 16,
             fontWeight: '700',
-            color: colors.ink,
+            color: theme.ink,
           }}
         >
           {formatPrice(amount)}
@@ -404,7 +405,7 @@ function IncomingOfferCard({
             style={{
               fontFamily: typography.family.sans,
               fontSize: 13.5,
-              color: colors.muteSoft,
+              color: theme.muteSoft,
               textDecorationLine: 'line-through',
             }}
           >
@@ -416,7 +417,7 @@ function IncomingOfferCard({
             style={{
               fontFamily: typography.family.sansMedium,
               fontSize: 13.5,
-              color: '#6B7280',
+              color: '#EF4444',
               marginLeft: 2,
             }}
           >
@@ -428,7 +429,7 @@ function IncomingOfferCard({
             style={{
               fontFamily: typography.family.sansBold,
               fontSize: 13.5,
-              color: '#059669',
+              color: '#10B981',
               marginLeft: 2,
             }}
           >
@@ -440,7 +441,7 @@ function IncomingOfferCard({
             style={{
               fontFamily: typography.family.sans,
               fontSize: 13.5,
-              color: colors.muteSoft,
+              color: theme.muteSoft,
               marginLeft: 2,
             }}
           >
@@ -454,7 +455,7 @@ function IncomingOfferCard({
           style={{
             fontFamily: typography.family.sans,
             fontSize: 12.5,
-            color: colors.mute,
+            color: theme.mute,
             marginBottom: 8,
           }}
         >
@@ -479,8 +480,8 @@ function IncomingOfferCard({
                 height: 38,
                 borderRadius: 6,
                 borderWidth: 1,
-                borderColor: colors.border,
-                backgroundColor: '#FFFFFF',
+                borderColor: theme.border,
+                backgroundColor: theme.surface,
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
@@ -490,7 +491,7 @@ function IncomingOfferCard({
                   fontFamily: typography.family.sansBold,
                   fontSize: 13,
                   fontWeight: '700',
-                  color: colors.ink,
+                  color: theme.ink,
                   textAlign: 'center',
                 }}
               >
@@ -638,7 +639,7 @@ function IncomingOfferCard({
           style={{
             fontFamily: typography.family.sansMedium,
             fontSize: 12,
-            color: colors.muteSoft,
+            color: theme.muteSoft,
             marginTop: 4,
           }}
         >
@@ -730,14 +731,15 @@ function TextBubble({
   grouped,
   lastOfGroup,
 }: Pick<MessageRowProps, 'msg' | 'mine' | 'grouped' | 'lastOfGroup'>) {
+  const { theme } = useTheme();
   return (
     <View
       style={{
         paddingHorizontal: 14,
         paddingVertical: 9,
-        backgroundColor: mine ? colors.purple : colors.surface,
+        backgroundColor: mine ? theme.purple : theme.panel,
         borderWidth: mine ? 0 : 1,
-        borderColor: colors.border,
+        borderColor: theme.border,
         opacity: msg.pending ? 0.65 : 1,
         borderRadius: BUBBLE_RADIUS,
         // The tail sits on the sender's own side: tightened at the bottom of a
@@ -753,7 +755,7 @@ function TextBubble({
           fontFamily: typography.family.sans,
           fontSize: 15,
           lineHeight: 21,
-          color: mine ? '#FFFFFF' : colors.ink,
+          color: mine ? '#FFFFFF' : theme.ink,
         }}
       >
         {msg.content}
@@ -768,6 +770,7 @@ function TextBubble({
  *  it overlaps the corner so it reads as attached to that message and not as a
  *  new row in the thread. */
 function ReactionChip({ reactions, mine }: { reactions: string[]; mine: boolean }) {
+  const { theme } = useTheme();
   if (reactions.length === 0) return null;
 
   // Two people, one reaction each — so at most a couple of emoji, and counting
@@ -788,9 +791,9 @@ function ReactionChip({ reactions, mine }: { reactions: string[]; mine: boolean 
         paddingHorizontal: 7,
         paddingVertical: 3,
         borderRadius: radii.pill,
-        backgroundColor: colors.surface,
+        backgroundColor: theme.surface,
         borderWidth: 1,
-        borderColor: colors.border,
+        borderColor: theme.border,
       }}
     >
       {[...counts.entries()].map(([emoji, count]) => (
@@ -801,7 +804,7 @@ function ReactionChip({ reactions, mine }: { reactions: string[]; mine: boolean 
               style={{
                 fontFamily: typography.family.sansSemibold,
                 fontSize: 11,
-                color: colors.mute,
+                color: theme.mute,
               }}
             >
               {count}
@@ -816,6 +819,7 @@ function ReactionChip({ reactions, mine }: { reactions: string[]; mine: boolean 
 // ── Row ───────────────────────────────────────────────────────────────────
 
 function MessageRowImpl(props: MessageRowProps) {
+  const { theme } = useTheme();
   const { msg, mine, grouped, lastOfGroup, senderName, senderAvatar, reactions, onRetry, onLongPress } = props;
   const bubbleRef = useRef<View>(null);
 
@@ -868,14 +872,14 @@ function MessageRowImpl(props: MessageRowProps) {
                     width: 28,
                     height: 28,
                     borderRadius: 14,
-                    backgroundColor: '#F3F4F6',
+                    backgroundColor: theme.panel,
                     borderWidth: 1,
-                    borderColor: '#E5E7EB',
+                    borderColor: theme.border,
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <Feather name="user" size={15} color="#9CA3AF" />
+                  <Feather name="user" size={15} color={theme.mute} />
                 </View>
               )
             ) : null}

@@ -12,7 +12,7 @@ import { View, Pressable } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { colors } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { BundleSection } from '@/components/product/BundleSection';
 import { RelatedItemCard } from '@/components/product/RelatedItemCard';
 import {
@@ -48,6 +48,7 @@ export const ProductRelatedSection = memo(function ProductRelatedSection({
   onClearAllBundle,
   onSendBundleOffer,
 }: ProductRelatedSectionProps) {
+  const { theme } = useTheme();
   return (
     <View style={{ marginTop: 22 }}>
       {/* Tab Pills: Seller's Items vs Similar Items */}
@@ -67,23 +68,23 @@ export const ProductRelatedSection = memo(function ProductRelatedSection({
                 paddingHorizontal: 16,
                 paddingVertical: 9,
                 borderRadius: 999,
-                backgroundColor: active ? colors.selected : colors.white,
+                backgroundColor: active ? theme.selected : theme.white,
                 borderWidth: 1,
-                borderColor: colors.border,
+                borderColor: theme.border,
                 transform: [{ scale: pressed ? 0.96 : 1 }],
               })}
             >
               <Ionicons
                 name={tab === 'members' ? 'person' : 'sparkles'}
                 size={13}
-                color={colors.ink}
+                color={theme.ink}
                 style={{ marginRight: 6 }}
               />
               <Text
                 style={{
                   fontSize: 13,
                   fontWeight: '700',
-                  color: colors.ink,
+                  color: theme.ink,
                 }}
               >
                 {tab === 'members' ? "Seller's items" : 'Similar items'}
@@ -108,7 +109,7 @@ export const ProductRelatedSection = memo(function ProductRelatedSection({
         <View style={{ paddingTop: 18 }}>
           {similarItems.length === 0 ? (
             <View style={{ paddingHorizontal: 20, paddingVertical: 14 }}>
-              <Text style={{ fontSize: 13, color: colors.mute }}>
+              <Text style={{ fontSize: 13, color: theme.mute }}>
                 No similar items found yet — check back soon.
               </Text>
             </View>

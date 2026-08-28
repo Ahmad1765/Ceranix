@@ -13,7 +13,7 @@ import { memo } from 'react';
 import { View, Pressable } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Animated from 'react-native-reanimated';
-import { colors } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { ImageCarousel } from '@/components/product/ImageCarousel';
 import { PopIcon, type PopIconHandle } from '@/components/product/PopIcon';
 import { AnimatedNumber } from '@/components/AnimatedNumber';
@@ -46,6 +46,7 @@ export const ProductHeroSection = memo(function ProductHeroSection({
   onHeartPress,
   onOpenSaveList,
 }: ProductHeroSectionProps) {
+  const { theme } = useTheme();
   return (
     <View style={{ position: 'relative' }}>
       {/* Parallax / Stretch layer wraps only the carousel */}
@@ -110,11 +111,11 @@ export const ProductHeroSection = memo(function ProductHeroSection({
             width: 52,
             height: 52,
             borderRadius: 26,
-            backgroundColor: colors.white,
+            backgroundColor: theme.white,
             alignItems: 'center',
             justifyContent: 'center',
             borderWidth: HAIRLINE,
-            borderColor: colors.border,
+            borderColor: theme.border,
             boxShadow: '0px 4px 14px rgba(0,0,0,0.12)',
             transform: [{ scale: pressed ? 0.93 : 1 }],
           })}
@@ -125,12 +126,12 @@ export const ProductHeroSection = memo(function ProductHeroSection({
             active={liked}
             size={20}
             activeColor={BRAND_PURPLE}
-            inactiveColor={colors.ink}
+            inactiveColor={theme.ink}
           />
           <AnimatedNumber
             value={heartCount}
             height={13}
-            style={{ fontSize: 11, fontFamily: 'Inter_600SemiBold', color: colors.mute, marginTop: 1 }}
+            style={{ fontSize: 11, fontFamily: 'Inter_600SemiBold', color: theme.mute, marginTop: 1 }}
           />
         </Pressable>
 
@@ -144,11 +145,11 @@ export const ProductHeroSection = memo(function ProductHeroSection({
             width: 52,
             height: 52,
             borderRadius: 26,
-            backgroundColor: colors.white,
+            backgroundColor: theme.white,
             alignItems: 'center',
             justifyContent: 'center',
             borderWidth: HAIRLINE,
-            borderColor: colors.border,
+            borderColor: theme.border,
             boxShadow: '0px 4px 14px rgba(0,0,0,0.12)',
             transform: [{ scale: pressed ? 0.93 : 1 }],
           })}
@@ -159,7 +160,7 @@ export const ProductHeroSection = memo(function ProductHeroSection({
             active={saved}
             size={20}
             activeColor={BRAND_PURPLE}
-            inactiveColor={colors.ink}
+            inactiveColor={theme.ink}
           />
         </Pressable>
       </View>

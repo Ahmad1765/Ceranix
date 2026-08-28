@@ -10,7 +10,8 @@ import { View } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
-import { colors, radii, type as typography } from '@/lib/theme';
+import { radii, type as typography } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 
 export type ListingStatus = 'active' | 'sold' | 'removed';
@@ -35,6 +36,7 @@ export function ListingThumb({
   status?: ListingStatus;
   radius?: number;
 }) {
+  const { theme } = useTheme();
   const h = height ?? width;
   const label = status === 'sold' ? 'Sold' : status === 'removed' ? 'Removed' : null;
   const optimizedUri = uri ? getOptimizedImageUrl(uri, { width: Math.round(width * 2) }) : null;
@@ -46,7 +48,7 @@ export function ListingThumb({
         height: h,
         borderRadius: radius,
         overflow: 'hidden',
-        backgroundColor: colors.panel,
+        backgroundColor: theme.panel,
         alignItems: 'center',
         justifyContent: 'center',
       }}
@@ -60,7 +62,7 @@ export function ListingThumb({
           transition={IMAGE_TRANSITION}
         />
       ) : (
-        <Feather name="image" size={Math.round(width * 0.3)} color={colors.muteSoft} />
+        <Feather name="image" size={Math.round(width * 0.3)} color={theme.muteSoft} />
       )}
 
       {label && (
@@ -76,7 +78,7 @@ export function ListingThumb({
             bottom: 0,
             paddingVertical: 2.5,
             alignItems: 'center',
-            backgroundColor: colors.ink,
+            backgroundColor: theme.ink,
           }}
         >
           <Text
@@ -86,7 +88,7 @@ export function ListingThumb({
               fontSize: 9,
               lineHeight: 11,
               letterSpacing: 0.2,
-              color: colors.white,
+              color: theme.background,
             }}
           >
             {label}

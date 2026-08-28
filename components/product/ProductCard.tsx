@@ -15,7 +15,8 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { Text } from '@/lib/rnText';
-import { colors, radii, type } from '@/lib/theme';
+import { radii, type } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
 import { router } from 'expo-router';
 import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
@@ -53,6 +54,7 @@ export const ProductCard = memo(function ProductCard({
   aspectRatio = '4:5',
   style,
 }: ProductCardProps) {
+  const { theme } = useTheme();
   const [pendingLiked, setPendingLiked] = useState<boolean | null>(null);
 
   React.useEffect(() => {
@@ -119,15 +121,20 @@ export const ProductCard = memo(function ProductCard({
       onPress={handleCardPress}
       onPressIn={handleCardPressIn}
       onPressOut={handleCardPressOut}
-      style={[styles.container, cardAnimatedStyle, style]}
+      style={[
+        styles.container,
+        { backgroundColor: theme.white },
+        cardAnimatedStyle,
+        style,
+      ]}
       accessibilityRole={Platform.OS === 'web' ? 'link' : 'button'}
       accessibilityLabel={`${item.title}, ${formatPrice(item.price)}`}
     >
-
       {/* 1. Media Container with 4:5 Aspect Ratio */}
       <View
         style={[
           styles.imageContainer,
+          { backgroundColor: theme.panel },
           aspectRatio === '4:5' ? styles.ratio45 : styles.ratio11,
         ]}
       >
@@ -140,7 +147,6 @@ export const ProductCard = memo(function ProductCard({
           recyclingKey={item.id}
           style={styles.image}
         />
-
 
         {/* $44x44px Touch Target Like / Bookmark Action */}
         <Pressable
@@ -155,17 +161,20 @@ export const ProductCard = memo(function ProductCard({
             },
           ]}
         >
-
           <Animated.View
             style={[
               styles.likeCircle,
+              {
+                backgroundColor: theme.surface,
+                borderColor: theme.border,
+              },
               heartAnimatedStyle,
             ]}
           >
             <Feather
               name="heart"
               size={18}
-              color={isLiked ? colors.purple : colors.ink}
+              color={isLiked ? theme.purple : theme.ink}
             />
           </Animated.View>
         </Pressable>
@@ -173,10 +182,12 @@ export const ProductCard = memo(function ProductCard({
 
       {/* 2. Metadata Section (Price, Title, Brand/Size) */}
       <View style={styles.metaContainer}>
-
         <View style={styles.priceRow}>
           <Text
-            style={[styles.priceText, { fontFamily: type.family.sansBold }]}
+            style={[
+              styles.priceText,
+              { color: theme.ink, fontFamily: type.family.sansBold },
+            ]}
             numberOfLines={1}
           >
             {formatPrice(item.price)}
@@ -184,14 +195,17 @@ export const ProductCard = memo(function ProductCard({
         </View>
 
         <Text
-          style={[styles.titleText, { fontFamily: type.family.sansMedium }]}
+          style={[
+            styles.titleText,
+            { color: theme.ink, fontFamily: type.family.sansMedium },
+          ]}
           numberOfLines={1}
         >
           {item.title}
         </Text>
 
         {subtitle.length > 0 && (
-          <Text style={styles.subtitleText} numberOfLines={1}>
+          <Text style={[styles.subtitleText, { color: theme.mute }]} numberOfLines={1}>
             {subtitle}
           </Text>
         )}
@@ -204,14 +218,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     borderRadius: radii.xl,
-    backgroundColor: colors.white,
     overflow: 'hidden',
     marginBottom: 16,
     borderWidth: 0,
   },
   imageContainer: {
     width: '100%',
-    backgroundColor: colors.panel,
     borderRadius: radii.xl,
     overflow: 'hidden',
     position: 'relative',
@@ -242,9 +254,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
     ...Platform.select({
@@ -262,8 +272,6 @@ const styles = StyleSheet.create({
       },
     }),
   },
-
-
   metaContainer: {
     paddingTop: 8,
     paddingHorizontal: 2,
@@ -276,17 +284,14 @@ const styles = StyleSheet.create({
   },
   priceText: {
     fontSize: 16,
-    color: colors.ink,
     letterSpacing: -0.2,
   },
   titleText: {
     fontSize: 13,
-    color: colors.ink,
     lineHeight: 17,
   },
   subtitleText: {
     fontSize: 11,
-    color: colors.mute,
     marginTop: 1,
   },
 });

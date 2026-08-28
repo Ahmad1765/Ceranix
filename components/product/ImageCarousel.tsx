@@ -12,7 +12,8 @@ import {
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
 import { Text } from '@/lib/rnText';
-import { colors, radii } from '@/lib/theme';
+import { radii } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { getOptimizedImageUrl, thumbWidthFor, IMAGE_TRANSITION, prefetchImages } from '@/lib/images';
 
 export interface ImageCarouselProps {
@@ -35,6 +36,7 @@ export function ImageCarousel({
   className = '',
   style,
 }: ImageCarouselProps) {
+  const { theme } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
   const [activeIndex, setActiveIndex] = useState(0);
   const [carouselWidth, setCarouselWidth] = useState(windowWidth);
@@ -83,11 +85,11 @@ export function ImageCarousel({
         className={className}
         style={[
           styles.container,
-          { height: carouselHeight, alignItems: 'center', justifyContent: 'center' },
+          { height: carouselHeight, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.panel },
           style,
         ]}
       >
-        <Feather name="image" size={36} color={colors.mute} />
+        <Feather name="image" size={36} color={theme.mute} />
       </View>
     );
   }
@@ -95,7 +97,7 @@ export function ImageCarousel({
   return (
     <View
       className={className}
-      style={[styles.container, { height: carouselHeight }, style]}
+      style={[styles.container, { height: carouselHeight, backgroundColor: theme.panel }, style]}
       onLayout={(e) => {
         const w = e.nativeEvent.layout.width;
         if (w > 0 && w !== carouselWidth) {
@@ -145,7 +147,9 @@ export function ImageCarousel({
                 key={index}
                 style={[
                   styles.dot,
-                  isActive ? styles.dotActive : styles.dotInactive,
+                  isActive
+                    ? [styles.dotActive, { backgroundColor: theme.primary }]
+                    : styles.dotInactive,
                 ]}
               />
             );
@@ -211,7 +215,6 @@ function CarouselSlide({
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    backgroundColor: colors.panel,
     position: 'relative',
     overflow: 'hidden',
   },
@@ -240,7 +243,7 @@ const styles = StyleSheet.create({
   counterText: {
     fontSize: 11,
     fontWeight: '700',
-    color: colors.white,
+    color: '#FFFFFF',
     letterSpacing: 0.2,
   },
   paginationContainer: {
@@ -260,7 +263,6 @@ const styles = StyleSheet.create({
   },
   dotActive: {
     width: 20,
-    backgroundColor: colors.primary,
   },
   dotInactive: {
     width: 6,

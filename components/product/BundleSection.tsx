@@ -6,7 +6,7 @@ import { router } from 'expo-router';
 import { getOptimizedImageUrl } from '@/lib/images';
 import { formatPrice } from '@/lib/currency';
 import type { Listing } from '@/types';
-import { colors } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { BundleProgressBar } from './BundleProgressBar';
 import {
   computeBundlePricing,
@@ -35,6 +35,7 @@ export function BundleSection({
   onClearAll?: () => void;
   onSendBundleOffer: (totalAfterDiscount: number) => void;
 }) {
+  const { theme } = useTheme();
   const username = listing.seller.username;
   const baseItem = listingToRelated(listing);
   const selectedItems = sellerItems.filter((s) => selectedIds.has(s.id));
@@ -65,11 +66,11 @@ export function BundleSection({
       {/* Selectable seller items grid */}
       {sellerItems.length === 0 ? (
         <View style={{ paddingHorizontal: 20, paddingVertical: 20, alignItems: 'center' }}>
-          <Feather name="package" size={22} color="rgba(15,15,15,0.3)" />
+          <Feather name="package" size={22} color={theme.mute} />
           <Text
             style={{
               fontSize: 13,
-              color: 'rgba(15,15,15,0.62)',
+              color: theme.mute,
               marginTop: 8,
               textAlign: 'center',
               lineHeight: 19,
@@ -107,33 +108,28 @@ export function BundleSection({
         </View>
       )}
 
-      {/* Summary + CTA — only once the buyer has added something. With nothing
-          selected the guidance line above is the whole story; an empty checkout
-          card is just noise. Selecting any add-on always clears the discount
-          gate (base + 1 = 2 items), so the CTA here is always live. */}
+      {/* Summary + CTA — only once the buyer has added something. */}
       {selectedItems.length > 0 ? (
         <View
           style={{
             marginHorizontal: 16,
             marginTop: 18,
-            backgroundColor: colors.surface,
+            backgroundColor: theme.surface,
             borderWidth: 1,
-            borderColor: colors.border,
+            borderColor: theme.border,
             borderRadius: 18,
             padding: 16,
           }}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <Text style={{ fontSize: 14, fontWeight: '800', color: colors.ink, letterSpacing: -0.2 }}>
+            <Text style={{ fontSize: 14, fontWeight: '800', color: theme.ink, letterSpacing: -0.2 }}>
               Your bundle
             </Text>
-            <Text style={{ fontSize: 12.5, fontWeight: '600', color: colors.mute }}>
+            <Text style={{ fontSize: 12.5, fontWeight: '600', color: theme.mute }}>
               {bundleItemCount} items
             </Text>
           </View>
 
-          {/* Line-item breakdown so the discount is explicit, not just implied
-              by a struck-through number. */}
           <SummaryRow label="Subtotal" value={formatPrice(subtotal)} />
           {qualifies ? (
             <SummaryRow
@@ -142,10 +138,10 @@ export function BundleSection({
               accent
             />
           ) : null}
-          <View style={{ height: HAIRLINE_COLOR_H, backgroundColor: colors.border, marginVertical: 10 }} />
+          <View style={{ height: HAIRLINE_COLOR_H, backgroundColor: theme.border, marginVertical: 10 }} />
           <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
-            <Text style={{ fontSize: 14, fontWeight: '800', color: colors.ink }}>Total</Text>
-            <Text style={{ fontSize: 22, fontWeight: '900', color: colors.ink, letterSpacing: -0.5 }}>
+            <Text style={{ fontSize: 14, fontWeight: '800', color: theme.ink }}>Total</Text>
+            <Text style={{ fontSize: 22, fontWeight: '900', color: theme.ink, letterSpacing: -0.5 }}>
               {formatPrice(total)}
             </Text>
           </View>
@@ -176,7 +172,7 @@ export function BundleSection({
           <Text
             style={{
               fontSize: 11.5,
-              color: colors.mute,
+              color: theme.mute,
               textAlign: 'center',
               marginTop: 10,
             }}
@@ -192,21 +188,21 @@ export function BundleSection({
 const HAIRLINE_COLOR_H = 1;
 
 function SummaryRow({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  const { theme } = useTheme();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 3 }}>
-      <Text style={{ fontSize: 13, color: accent ? BRAND_PURPLE : colors.mute, fontWeight: accent ? '700' : '500' }}>
+      <Text style={{ fontSize: 13, color: accent ? BRAND_PURPLE : theme.mute, fontWeight: accent ? '700' : '500' }}>
         {label}
       </Text>
-      <Text style={{ fontSize: 13, color: accent ? BRAND_PURPLE : colors.ink, fontWeight: '700' }}>
+      <Text style={{ fontSize: 13, color: accent ? BRAND_PURPLE : theme.ink, fontWeight: '700' }}>
         {value}
       </Text>
     </View>
   );
 }
 
-// The item being viewed, shown as a locked-in bundle member. No toggle: it's
-// always included, which is exactly why the count/total make sense.
 function BaseItemCard({ item }: { item: ReturnType<typeof listingToRelated> }) {
+  const { theme } = useTheme();
   return (
     <View style={{ width: CARD_WIDTH, marginBottom: 14 }}>
       <View
@@ -215,7 +211,7 @@ function BaseItemCard({ item }: { item: ReturnType<typeof listingToRelated> }) {
           height: CARD_IMAGE_HEIGHT,
           borderRadius: 12,
           overflow: 'hidden',
-          backgroundColor: colors.panel,
+          backgroundColor: theme.panel,
           borderWidth: 2,
           borderColor: BRAND_PURPLE,
         }}
@@ -228,7 +224,6 @@ function BaseItemCard({ item }: { item: ReturnType<typeof listingToRelated> }) {
             cachePolicy="memory-disk"
           />
         )}
-        {/* "This item" pill instead of a toggle — communicates it's fixed. */}
         <View
           style={{
             position: 'absolute',
@@ -250,22 +245,21 @@ function BaseItemCard({ item }: { item: ReturnType<typeof listingToRelated> }) {
         </View>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-        <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: colors.ink }} numberOfLines={1}>
+        <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: theme.ink }} numberOfLines={1}>
           {item.brand}
         </Text>
-        <Text style={{ fontSize: 13, fontWeight: '800', color: colors.ink }}>
+        <Text style={{ fontSize: 13, fontWeight: '800', color: theme.ink }}>
           {formatPrice(item.price)}
         </Text>
       </View>
       {item.meta ? (
-        <Text style={{ fontSize: 11.5, color: colors.mute, marginTop: 2 }} numberOfLines={1}>
+        <Text style={{ fontSize: 11.5, color: theme.mute, marginTop: 2 }} numberOfLines={1}>
           {item.meta}
         </Text>
       ) : null}
     </View>
   );
 }
-
 
 function BundleSelectCard({
   item,
@@ -278,18 +272,16 @@ function BundleSelectCard({
   onToggle: () => void;
   onOpen: () => void;
 }) {
+  const { theme } = useTheme();
   return (
     <View style={{ width: CARD_WIDTH, marginBottom: 14 }}>
-      {/* Primary gesture is add-to-bundle — the whole tile toggles. Opening the
-          full listing is the secondary action, moved to its own button as a sibling
-          so a tap no longer navigates away and we avoid nested <button> elements. */}
       <View
         style={{
           width: CARD_WIDTH,
           height: CARD_IMAGE_HEIGHT,
           borderRadius: 12,
           overflow: 'hidden',
-          backgroundColor: colors.panel,
+          backgroundColor: theme.panel,
           borderWidth: 2,
           borderColor: selected ? BRAND_PURPLE : 'transparent',
           position: 'relative',
@@ -314,7 +306,6 @@ function BundleSelectCard({
               cachePolicy="memory-disk"
             />
           )}
-          {/* Selected wash — reinforces state beyond the border. */}
           {selected ? (
             <View
               style={{
@@ -329,7 +320,6 @@ function BundleSelectCard({
           ) : null}
         </Pressable>
 
-        {/* View full listing — the escape hatch to the product page. */}
         <Pressable
           onPress={onOpen}
           hitSlop={8}
@@ -342,19 +332,18 @@ function BundleSelectCard({
             width: 30,
             height: 30,
             borderRadius: 15,
-            backgroundColor: colors.surface,
+            backgroundColor: theme.surface,
             borderWidth: 1,
-            borderColor: colors.border,
+            borderColor: theme.border,
             alignItems: 'center',
             justifyContent: 'center',
             opacity: pressed ? 0.7 : 1,
             zIndex: 10,
           })}
         >
-          <Feather name="maximize-2" size={13} color={colors.ink} />
+          <Feather name="maximize-2" size={13} color={theme.ink} />
         </Pressable>
 
-        {/* Selection indicator — reflects state; the whole tile drives it. */}
         <View
           pointerEvents="none"
           style={{
@@ -364,30 +353,28 @@ function BundleSelectCard({
             width: 30,
             height: 30,
             borderRadius: 15,
-            backgroundColor: selected ? BRAND_PURPLE : colors.surface,
+            backgroundColor: selected ? BRAND_PURPLE : theme.surface,
             borderWidth: selected ? 0 : 1,
-            borderColor: colors.border,
+            borderColor: theme.border,
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 10,
           }}
         >
-          <Feather name={selected ? 'check' : 'plus'} size={16} color={selected ? 'white' : colors.ink} />
+          <Feather name={selected ? 'check' : 'plus'} size={16} color={selected ? 'white' : theme.ink} />
         </View>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-        <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: colors.ink }} numberOfLines={1}>
+        <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: theme.ink }} numberOfLines={1}>
           {item.brand}
         </Text>
-        <Text style={{ fontSize: 13, fontWeight: '800', color: colors.ink }}>
+        <Text style={{ fontSize: 13, fontWeight: '800', color: theme.ink }}>
           {formatPrice(item.price)}
         </Text>
       </View>
-      {/* Size · condition — buyers shouldn't have to open each item to know
-          whether it even fits before adding it to a bundle. */}
       {item.meta ? (
         <Text
-          style={{ fontSize: 11.5, color: colors.mute, marginTop: 2 }}
+          style={{ fontSize: 11.5, color: theme.mute, marginTop: 2 }}
           numberOfLines={1}
         >
           {item.meta}

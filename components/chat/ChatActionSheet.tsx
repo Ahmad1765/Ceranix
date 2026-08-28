@@ -10,7 +10,8 @@ import { Modal, Pressable, View } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import { SafeAreaProvider, SafeAreaView, initialWindowMetrics } from 'react-native-safe-area-context';
-import { colors, radii, type as typography } from '@/lib/theme';
+import { radii, type as typography } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 
 export type ChatAction = {
   id: string;
@@ -34,6 +35,8 @@ export function ChatActionSheet({
   actions: ChatAction[];
   onClose: () => void;
 }) {
+  const { theme } = useTheme();
+
   return (
     <Modal
       visible={visible}
@@ -50,16 +53,16 @@ export function ChatActionSheet({
         <Pressable
           accessibilityLabel="Close"
           onPress={onClose}
-          style={{ flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' }}
+          style={{ flex: 1, backgroundColor: theme.overlay, justifyContent: 'flex-end' }}
         >
-          <SafeAreaView edges={['bottom']} style={{ backgroundColor: colors.white }}>
+          <SafeAreaView edges={['bottom']} style={{ backgroundColor: theme.white }}>
             {/* Swallow taps inside the sheet so they don't reach the backdrop. */}
             <Pressable
               onPress={() => {}}
               style={{
                 borderTopLeftRadius: radii['4xl'],
                 borderTopRightRadius: radii['4xl'],
-                backgroundColor: colors.white,
+                backgroundColor: theme.white,
                 paddingTop: 10,
                 paddingBottom: 8,
               }}
@@ -70,7 +73,7 @@ export function ChatActionSheet({
                   width: 40,
                   height: 4,
                   borderRadius: 2,
-                  backgroundColor: colors.hairline,
+                  backgroundColor: theme.hairline,
                   marginBottom: title ? 14 : 8,
                 }}
               />
@@ -81,7 +84,7 @@ export function ChatActionSheet({
                     fontFamily: typography.family.sansBold,
                     fontSize: 12,
                     letterSpacing: 0.3,
-                    color: colors.muteSoft,
+                    color: theme.muteSoft,
                     paddingHorizontal: 20,
                     marginBottom: 4,
                   }}
@@ -105,7 +108,7 @@ export function ChatActionSheet({
                     gap: 14,
                     paddingHorizontal: 20,
                     paddingVertical: 14,
-                    backgroundColor: pressed ? colors.panel : 'transparent',
+                    backgroundColor: pressed ? theme.panel : 'transparent',
                   })}
                 >
                   <Feather
@@ -115,8 +118,8 @@ export function ChatActionSheet({
                       a.tone === 'destructive'
                         ? '#DC2626'
                         : a.tone === 'primary'
-                        ? colors.primary
-                        : colors.ink
+                        ? theme.primary
+                        : theme.ink
                     }
                   />
                   <View style={{ flex: 1, minWidth: 0 }}>
@@ -124,7 +127,7 @@ export function ChatActionSheet({
                       style={{
                         fontFamily: typography.family.sansSemibold,
                         fontSize: 15,
-                        color: a.tone === 'destructive' ? '#DC2626' : colors.ink,
+                        color: a.tone === 'destructive' ? '#DC2626' : theme.ink,
                       }}
                     >
                       {a.label}
@@ -134,7 +137,7 @@ export function ChatActionSheet({
                         style={{
                           fontFamily: typography.family.sans,
                           fontSize: 12,
-                          color: colors.muteSoft,
+                          color: theme.muteSoft,
                           marginTop: 1,
                         }}
                       >

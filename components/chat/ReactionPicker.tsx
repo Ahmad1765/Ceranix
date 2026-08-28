@@ -26,7 +26,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SafeAreaProvider, SafeAreaView, initialWindowMetrics } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/PressableScale';
-import { colors, radii, type as typography } from '@/lib/theme';
+import { radii, type as typography } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { REACTION_EMOJI } from '@/lib/chat';
 
 /** Where on screen the pressed bubble sits, in window coordinates. */
@@ -60,6 +61,7 @@ function Emoji({
   selected: boolean;
   onPress: () => void;
 }) {
+  const { theme } = useTheme();
   const reduceMotion = useReducedMotion();
   const t = useSharedValue(reduceMotion ? 1 : 0);
 
@@ -92,7 +94,7 @@ function Emoji({
           justifyContent: 'center',
           // The one you already picked stays marked, so a second long-press
           // shows you what you did instead of asking you to remember.
-          backgroundColor: selected ? colors.primarySoft : 'transparent',
+          backgroundColor: selected ? theme.primarySoft : 'transparent',
         }}
       >
         <Text style={{ fontSize: 26, lineHeight: 32 }}>{emoji}</Text>
@@ -118,6 +120,7 @@ export function ReactionPicker({
   onSelect: (emoji: string) => void;
   onClose: () => void;
 }) {
+  const { theme } = useTheme();
   const { width: screenW, height: screenH } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
   const t = useSharedValue(0);
@@ -173,7 +176,7 @@ export function ReactionPicker({
           onPress={onClose}
           // Lighter than the app's other sheets on purpose: you're reacting to
           // a specific message and need to still see it under the bar.
-          style={{ flex: 1, backgroundColor: colors.overlayLight, justifyContent: 'flex-end' }}
+          style={{ flex: 1, backgroundColor: theme.overlayLight, justifyContent: 'flex-end' }}
         >
           <Animated.View
             style={[
@@ -187,8 +190,10 @@ export function ReactionPicker({
                 alignItems: 'center',
                 padding: BAR_PAD,
                 borderRadius: BAR_HEIGHT / 2,
-                backgroundColor: colors.white,
-                shadowColor: colors.ink,
+                backgroundColor: theme.white,
+                borderWidth: 1,
+                borderColor: theme.border,
+                shadowColor: theme.ink,
                 shadowOpacity: 0.14,
                 shadowRadius: 20,
                 shadowOffset: { width: 0, height: 8 },
@@ -210,12 +215,14 @@ export function ReactionPicker({
           </Animated.View>
 
           {actions.length > 0 && (
-            <SafeAreaView edges={['bottom']} style={{ backgroundColor: colors.white }}>
+            <SafeAreaView edges={['bottom']} style={{ backgroundColor: theme.white }}>
               <View
                 style={{
                   borderTopLeftRadius: radii['4xl'],
                   borderTopRightRadius: radii['4xl'],
-                  backgroundColor: colors.white,
+                  backgroundColor: theme.white,
+                  borderTopWidth: 1,
+                  borderColor: theme.border,
                   paddingVertical: 6,
                 }}
               >
@@ -234,15 +241,15 @@ export function ReactionPicker({
                       justifyContent: 'center',
                       gap: 8,
                       paddingVertical: 16,
-                      backgroundColor: pressed ? colors.panel : 'transparent',
+                      backgroundColor: pressed ? theme.panel : 'transparent',
                     })}
                   >
-                    <Feather name={a.icon} size={17} color={colors.ink} />
+                    <Feather name={a.icon} size={17} color={theme.ink} />
                     <Text
                       style={{
                         fontFamily: typography.family.sansSemibold,
                         fontSize: 16,
-                        color: colors.ink,
+                        color: theme.ink,
                       }}
                     >
                       {a.label}

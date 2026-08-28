@@ -34,7 +34,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
-import { colors, type as typography } from '@/lib/theme';
+import { type as typography } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
 import { EmptyState, SafeContainer } from '@/components/ui';
 import { explainCoverage } from '@/components/SafetyBanner';
@@ -81,6 +82,7 @@ export default function ConversationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const conversationId = typeof id === 'string' ? id : '';
   const { user } = useAuth();
+  const { theme } = useTheme();
   const toast = useToast();
   const insets = useSafeAreaInsets();
   const keyboardUp = useKeyboardVisible();
@@ -246,7 +248,7 @@ export default function ConversationScreen() {
   // ── Loading & Empty Fallbacks ────────────────────────────────────────────
   if (thread.loading) {
     return (
-      <SafeContainer edges={['top', 'left', 'right']} backgroundColor={colors.background} style={{ flex: 1 }}>
+      <SafeContainer edges={['top', 'left', 'right']} backgroundColor={theme.background} style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6 }}>
           <Pressable
             onPress={() => safeBack()}
@@ -255,11 +257,11 @@ export default function ConversationScreen() {
             accessibilityLabel="Back"
             style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}
           >
-            <Feather name="arrow-left" size={22} color={colors.ink} />
+            <Feather name="arrow-left" size={22} color={theme.ink} />
           </Pressable>
         </View>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={colors.primary} />
+          <ActivityIndicator color={theme.primary} />
         </View>
       </SafeContainer>
     );
@@ -267,7 +269,7 @@ export default function ConversationScreen() {
 
   if (!thread.conv) {
     return (
-      <SafeContainer edges={['top', 'left', 'right']} backgroundColor={colors.background} style={{ flex: 1 }}>
+      <SafeContainer edges={['top', 'left', 'right']} backgroundColor={theme.background} style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6 }}>
           <Pressable
             onPress={() => safeBack()}
@@ -276,7 +278,7 @@ export default function ConversationScreen() {
             accessibilityLabel="Back"
             style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}
           >
-            <Feather name="arrow-left" size={22} color={colors.ink} />
+            <Feather name="arrow-left" size={22} color={theme.ink} />
           </Pressable>
         </View>
         <EmptyState
@@ -293,16 +295,16 @@ export default function ConversationScreen() {
       mode="keyboard-avoiding"
       noScroll
       edges={['top', 'left', 'right']}
-      backgroundColor={colors.background}
+      backgroundColor={theme.background}
       style={{ flex: 1 }}
     >
       {/* Pinned Sticky Header */}
       <View
         style={{
           zIndex: 30,
-          backgroundColor: colors.surface,
+          backgroundColor: theme.surface,
           borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: colors.border,
+          borderBottomColor: theme.border,
         }}
       >
         <ThreadHeader
@@ -357,7 +359,7 @@ export default function ConversationScreen() {
               style={{
                 fontFamily: typography.family.sans,
                 fontSize: 13,
-                color: colors.muteSoft,
+                color: theme.muteSoft,
                 textAlign: 'center',
               }}
             >
@@ -371,8 +373,8 @@ export default function ConversationScreen() {
       <View
         style={{
           borderTopWidth: 1,
-          borderTopColor: colors.border,
-          backgroundColor: colors.surface,
+          borderTopColor: theme.border,
+          backgroundColor: theme.surface,
           paddingBottom: keyboardUp ? DOCK_GAP_KEYBOARD : Math.max(insets.bottom, 12),
         }}
       >
