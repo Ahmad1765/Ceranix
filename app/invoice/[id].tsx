@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { View, Pressable, ScrollView, ActivityIndicator, Share, Platform, Linking, StyleSheet } from 'react-native';
+import { View, Pressable, ScrollView, ActivityIndicator, Share, Platform, Linking } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -24,8 +24,6 @@ import { OrderStepper } from '@/components/orders/OrderStepper';
 import { CancelOrderModal } from '@/components/orders/CancelOrderModal';
 import { MarkShippedModal } from '@/components/orders/MarkShippedModal';
 import { cardImageUrl, getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
-
-const TEAL = '#007782';
 
 function tap(style: 'light' | 'medium' = 'light') {
   if (Platform.OS !== 'ios') return;

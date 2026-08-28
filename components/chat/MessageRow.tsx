@@ -174,7 +174,7 @@ function OutgoingOfferBubble({
   canPay: boolean;
   onPay: (amount: number) => void;
 }) {
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
   const amount = msg.metadata?.amount ?? 0;
   const status = msg.offer_status ?? 'pending';
   const showStruck = !!listingPrice && listingPrice > amount;

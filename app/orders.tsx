@@ -26,8 +26,6 @@ import { deriveInvoiceAmounts } from '@/lib/invoiceStatus';
 import { partitionOrders, type OrderSide } from '@/lib/orders';
 import type { MyOrder } from '@/lib/payments';
 
-const TEAL = '#007782';
-
 type FilterStatus = 'all' | 'in_progress' | 'canceled' | 'completed';
 
 function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
