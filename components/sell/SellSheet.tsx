@@ -10,7 +10,7 @@ import {
 } from 'react';
 import { capture } from '@/lib/analytics';
 import { View, Pressable, ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, useWindowDimensions, Modal } from 'react-native';
-import { Text, TextInput } from '@/lib/rnText';
+import { Text, } from '@/lib/rnText';
 import { SafeAreaProvider, SafeAreaView, initialWindowMetrics, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
@@ -20,14 +20,14 @@ import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { uploadListingImages, deleteListingImages } from '@/lib/upload';
 import {
-  makeSlot, resolveImage, type PhotoSlot,
+  makeSlot, resolveImage,
 } from '@/lib/photoClean/slots';
 import { useToast } from '@/lib/toast';
 import { putCachedListing } from '@/lib/listingCache';
 import { emitListingCreated } from '@/lib/listingEvents';
 import { invalidateFresh } from '@/lib/freshness';
 import { router } from 'expo-router';
-import type { Category, Condition, Gender, Listing } from '@/types';
+import type {  Condition, Gender, Listing } from '@/types';
 import { CATEGORIES, categoryLabel, hasSubcategories, subcategoryLabel, suggestSubcategory } from '@/lib/categories';
 import { formatPrice } from '@/lib/currency';
 import { itemColorLabel } from '@/lib/itemColors';
@@ -38,6 +38,10 @@ import {
   SingleSelectSheet, TextFieldSheet, PriceSheet, ColorSheet, CategorySheet, TagsSheet,
   type SelectOption,
 } from '@/components/sell/PickerSheets';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { SellFormSchema, type SellFormValues } from '@/lib/schemas/sell';
+import { Input } from '@/components/ui/Input';
 
 const DISPLAY_BOLD = type.family.sansBold;
 
@@ -211,72 +215,57 @@ function RowField({
 }
 
 
-function UnderlineField({
-  label,
-  placeholder,
-  value,
-  onChangeText,
-  multiline,
-  maxLength,
-}: {
-  label: string;
-  placeholder: string;
-  value: string;
-  onChangeText: (t: string) => void;
-  multiline?: boolean;
-  maxLength?: number;
-}) {
-  return (
-    <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: multiline ? 20 : 14 }}>
-      <Text style={{ fontSize: 13, color: colors.mute, marginBottom: 6 }}>{label}</Text>
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={colors.mute}
-        multiline={multiline}
-        textAlignVertical={multiline ? 'top' : 'center'}
-        maxLength={maxLength}
-        style={
-          {
-            fontSize: 15.5,
-            color: colors.ink,
-            paddingBottom: 10,
-            minHeight: multiline ? 90 : undefined,
-            borderBottomWidth: 1,
-            borderBottomColor: colors.border,
-            outlineStyle: 'none',
-            outlineWidth: 0,
-          } as any
-        }
-      />
-    </View>
-  );
-}
-
 // ── The form itself ──────────────────────────────────────────────────────
+const DEFAULT_SELL_VALUES: SellFormValues = {
+  slots: [],
+  title: '',
+  description: '',
+  price: '',
+  brand: '',
+  size: '',
+  condition: 'good',
+  category: 'clothing',
+  subcategory: null,
+  color: null,
+  gender: 'women',
+  tags: [],
+  parcelSize: null,
+};
+
 function SellForm({ onClose }: { onClose: () => void }) {
   const { user, profile } = useAuth();
   const toast = useToast();
   const { width } = useWindowDimensions();
-  const [slots, setSlots] = useState<PhotoSlot[]>([]);
   const [publishing, setPublishing] = useState(false);
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
 
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [price, setPrice] = useState('');
-  const [brand, setBrand] = useState('');
-  const [size, setSize] = useState('');
-  const [condition, setCondition] = useState<Condition>('good');
-  const [category, setCategory] = useState<Category>('clothing');
-  const [subcategory, setSubcategory] = useState<string | null>(null);
-  const [color, setColor] = useState<string | null>(null);
-  const [gender, setGender] = useState<Gender>('women');
-  const [tags, setTags] = useState<string[]>([]);
-  const [parcelSize, setParcelSize] = useState<ParcelSize | null>(null);
+  const {
+    control,
+    handleSubmit,
+    setValue,
+    watch,
+    reset,
+    formState: { errors },
+  } = useForm<SellFormValues>({
+    resolver: zodResolver(SellFormSchema),
+    defaultValues: DEFAULT_SELL_VALUES,
+    mode: 'onTouched',
+  });
 
-  const suggestion = useMemo(() => suggestSubcategory(title), [title]);
+  const slots = watch('slots');
+  const title = watch('title');
+  const category = watch('category');
+  const subcategory = watch('subcategory');
+  const price = watch('price');
+  const brand = watch('brand');
+  const size = watch('size');
+  const condition = watch('condition');
+  const color = watch('color');
+  const gender = watch('gender');
+  const tags = watch('tags');
+  const parcelSize = watch('parcelSize');
+
+  const suggestion = useMemo(() => suggestSubcategory(title || ''), [title]);
   const showSuggestion =
     !!suggestion && (suggestion.category !== category || suggestion.sub.id !== subcategory);
 
@@ -306,63 +295,37 @@ function SellForm({ onClose }: { onClose: () => void }) {
         ),
         status: 'done' as const,
       }));
-      setSlots((prev) => [...prev, ...newSlots].slice(0, MAX_IMAGES));
+      const updatedSlots = [...slots, ...newSlots].slice(0, MAX_IMAGES);
+      setValue('slots', updatedSlots, { shouldValidate: true });
     }
   };
 
   const resetForm = () => {
-    setSlots([]);
-    setTitle('');
-    setDescription('');
-    setPrice('');
-    setBrand('');
-    setSize('');
-    setCondition('good');
-    setCategory('clothing');
-    setSubcategory(null);
-    setColor(null);
-    setGender('women');
-    setTags([]);
-    setParcelSize(null);
+    reset(DEFAULT_SELL_VALUES);
   };
 
   const canPublish =
-    title.trim().length > 0 &&
-    parseFloat(price) > 0 &&
+    title?.trim().length > 0 &&
+    parseFloat(price || '0') > 0 &&
     slots.length > 0 &&
     (!hasSubcategories(category) || !!subcategory);
 
-  const handlePublish = async () => {
+  const onValidSubmit = async (formData: SellFormValues) => {
     if (!user) {
       Alert.alert('Sign in required', 'Please sign in to publish a listing.');
       return;
     }
-    if (slots.length === 0) {
-      Alert.alert('Add photos', 'Please add at least one photo of the item.');
-      return;
-    }
-    if (!title.trim()) {
-      Alert.alert('Missing info', 'Please add a title.');
-      return;
-    }
-    const priceNum = parseFloat(price);
-    if (!Number.isFinite(priceNum) || priceNum <= 0) {
-      Alert.alert('Missing info', 'Enter a valid price.');
-      return;
-    }
-    if (hasSubcategories(category) && !subcategory) {
-      Alert.alert('Missing info', 'Please choose a category.');
-      return;
-    }
 
+    const priceNum = parseFloat(formData.price);
     setPublishing(true);
+
     // Each upload returns the full-size URL plus a card-sized copy; the two
     // arrays are written together and stay index-aligned (see the note on
     // listings.thumbnails in the migration).
     let urls: string[] = [];
     let thumbs: string[] = [];
     try {
-      const chosen = slots.map(resolveImage);
+      const chosen = formData.slots.map(resolveImage);
       const uploaded = await uploadListingImages(chosen, user.id);
       urls = uploaded.map((u) => u.url);
       thumbs = uploaded.map((u) => u.thumbUrl);
@@ -371,21 +334,21 @@ function SellForm({ onClose }: { onClose: () => void }) {
         .from('listings')
         .insert({
           seller_id: user.id,
-          title: title.trim(),
-          description: description.trim() || null,
+          title: formData.title.trim(),
+          description: formData.description?.trim() || null,
           price: priceNum,
-          category,
-          subcategory: subcategory || null,
-          color: color || null,
-          gender,
-          brand: brand.trim() || null,
-          size: size.trim() || null,
-          condition,
-          parcel_size: parcelSize,
+          category: formData.category,
+          subcategory: formData.subcategory || null,
+          color: formData.color || null,
+          gender: formData.gender,
+          brand: formData.brand?.trim() || null,
+          size: formData.size?.trim() || null,
+          condition: formData.condition,
+          parcel_size: formData.parcelSize || null,
           images: urls,
           thumbnails: thumbs,
           is_sold: false,
-          tags,
+          tags: formData.tags || [],
         })
         .select('id')
         .single();
@@ -413,23 +376,23 @@ function SellForm({ onClose }: { onClose: () => void }) {
         id: newId,
         seller_id: user.id,
         seller: sellerSeed,
-        title: title.trim(),
-        description: description.trim(),
+        title: formData.title.trim(),
+        description: formData.description?.trim() || '',
         price: priceNum,
-        category,
-        subcategory: subcategory || null,
-        color: color || null,
-        gender,
-        brand: brand.trim() || null,
-        size: size.trim() || null,
-        condition,
-        parcel_size: parcelSize,
+        category: formData.category,
+        subcategory: formData.subcategory || null,
+        color: formData.color || null,
+        gender: formData.gender,
+        brand: formData.brand?.trim() || null,
+        size: formData.size?.trim() || null,
+        condition: formData.condition,
+        parcel_size: formData.parcelSize || null,
         images: urls,
         thumbnails: thumbs,
         is_sold: false,
         views: 0,
         likes: 0,
-        tags,
+        tags: formData.tags || [],
         created_at: new Date().toISOString(),
       };
       putCachedListing(newListing);
@@ -445,6 +408,18 @@ function SellForm({ onClose }: { onClose: () => void }) {
       Alert.alert('Could not publish', e?.message ?? 'Unknown error');
     } finally {
       setPublishing(false);
+    }
+  };
+
+  const onInvalidSubmit = () => {
+    if (slots.length === 0) {
+      toast.show('Please add at least one photo', { variant: 'default', icon: 'alert-triangle' });
+    } else if (errors.subcategory) {
+      toast.show('Please choose a category and subcategory', { variant: 'default', icon: 'alert-triangle' });
+    } else if (errors.price) {
+      toast.show(errors.price.message ?? 'Please enter a valid price', { variant: 'default', icon: 'alert-triangle' });
+    } else if (errors.title) {
+      toast.show(errors.title.message ?? 'Please enter a title', { variant: 'default', icon: 'alert-triangle' });
     }
   };
 
@@ -514,7 +489,7 @@ function SellForm({ onClose }: { onClose: () => void }) {
               style={{
                 borderWidth: 1.5,
                 borderStyle: 'dashed',
-                borderColor: colors.border,
+                borderColor: errors.slots ? (colors.danger ?? '#EF4444') : colors.border,
                 borderRadius: radii.lg,
                 padding: slots.length === 0 ? 0 : 14,
                 minHeight: slots.length === 0 ? 128 : undefined,
@@ -528,6 +503,7 @@ function SellForm({ onClose }: { onClose: () => void }) {
                   onPress={handlePickImages}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   accessibilityRole="button"
+                  accessibilityLabel="Upload photos"
                   style={({ pressed }) => ({
                     flexDirection: 'row',
                     alignItems: 'center',
@@ -578,9 +554,12 @@ function SellForm({ onClose }: { onClose: () => void }) {
                           if (Platform.OS !== 'web') {
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                           }
-                          setSlots((prev) => prev.filter((s) => s.id !== slot.id));
+                          const updated = slots.filter((s) => s.id !== slot.id);
+                          setValue('slots', updated, { shouldValidate: true });
                         }}
                         hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                        accessibilityRole="button"
+                        accessibilityLabel="Remove photo"
                         style={({ pressed }) => ({
                           position: 'absolute',
                           top: 5,
@@ -602,6 +581,8 @@ function SellForm({ onClose }: { onClose: () => void }) {
                     <Pressable
                       onPress={handlePickImages}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Add more photos"
                       style={({ pressed }) => ({
                         width: tile,
                         height: tile,
@@ -620,38 +601,94 @@ function SellForm({ onClose }: { onClose: () => void }) {
                 </View>
               )}
             </View>
-            {slots.length > 0 && (
+            {errors.slots?.message ? (
+              <Text
+                accessibilityRole="alert"
+                style={{
+                  fontSize: 12,
+                  color: colors.danger ?? '#EF4444',
+                  marginTop: 6,
+                  fontFamily: type.family.sansMedium,
+                }}
+              >
+                {errors.slots.message}
+              </Text>
+            ) : slots.length > 0 ? (
               <Text style={{ fontSize: 12, color: colors.muteSoft, marginTop: 8 }}>
                 {slots.length} / {MAX_IMAGES} photos · first photo is the cover
               </Text>
-            )}
+            ) : null}
           </View>
 
           <SectionDivider />
 
           {/* About your item */}
           <SectionHeader>About your item</SectionHeader>
-          <UnderlineField
-            label="Title"
-            placeholder="Tell buyers what you're selling"
-            value={title}
-            onChangeText={(t) => setTitle(t.slice(0, TITLE_MAX))}
-            maxLength={TITLE_MAX}
-          />
-          <UnderlineField
-            label="Description"
-            placeholder="Tell buyers more about it"
-            value={description}
-            onChangeText={(t) => setDescription(t.slice(0, DESCRIPTION_MAX))}
-            maxLength={DESCRIPTION_MAX}
-            multiline
-          />
+          <View style={{ paddingHorizontal: 20 }}>
+            <Controller
+              control={control}
+              name="title"
+              render={({ field: { onChange, onBlur, value, ref }, fieldState: { error } }) => (
+                <Input
+                  ref={ref}
+                  label="Title"
+                  placeholder="Tell buyers what you're selling"
+                  value={value}
+                  onChangeText={(t) => onChange(t.slice(0, TITLE_MAX))}
+                  onBlur={onBlur}
+                  maxLength={TITLE_MAX}
+                  error={error?.message}
+                  variant="underline"
+                  containerStyle={{ marginVertical: 0 }}
+                />
+              )}
+            />
+            <Controller
+              control={control}
+              name="description"
+              render={({ field: { onChange, onBlur, value, ref }, fieldState: { error } }) => (
+                <Input
+                  ref={ref}
+                  label="Description"
+                  placeholder="Tell buyers more about it"
+                  value={value}
+                  onChangeText={(t) => onChange(t.slice(0, DESCRIPTION_MAX))}
+                  onBlur={onBlur}
+                  maxLength={DESCRIPTION_MAX}
+                  multiline
+                  error={error?.message}
+                  variant="underline"
+                  containerStyle={{ marginVertical: 0 }}
+                />
+              )}
+            />
+          </View>
 
           <SectionDivider />
 
           {/* Item details */}
           <SectionHeader>Item details</SectionHeader>
-          <RowField label="Category" value={categoryValue} placeholder="Add category" onPress={() => setActiveSheet('category')} />
+          <RowField
+            label="Category"
+            value={categoryValue}
+            placeholder="Add category"
+            onPress={() => setActiveSheet('category')}
+          />
+          {errors.subcategory?.message ? (
+            <Text
+              accessibilityRole="alert"
+              style={{
+                fontSize: 12,
+                color: colors.danger ?? '#EF4444',
+                paddingHorizontal: 20,
+                paddingTop: 4,
+                fontFamily: type.family.sansMedium,
+              }}
+            >
+              {errors.subcategory.message}
+            </Text>
+          ) : null}
+
           {showSuggestion ? (
             <View style={{ paddingHorizontal: 20, paddingTop: 10 }}>
               <Pressable
@@ -659,8 +696,8 @@ function SellForm({ onClose }: { onClose: () => void }) {
                   if (Platform.OS !== 'web') {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                   }
-                  setCategory(suggestion!.category);
-                  setSubcategory(suggestion!.sub.id);
+                  setValue('category', suggestion!.category, { shouldValidate: true });
+                  setValue('subcategory', suggestion!.sub.id, { shouldValidate: true });
                 }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 style={({ pressed }) => ({
@@ -720,6 +757,20 @@ function SellForm({ onClose }: { onClose: () => void }) {
             placeholder="Add price"
             onPress={() => setActiveSheet('price')}
           />
+          {errors.price?.message ? (
+            <Text
+              accessibilityRole="alert"
+              style={{
+                fontSize: 12,
+                color: colors.danger ?? '#EF4444',
+                paddingHorizontal: 20,
+                paddingTop: 4,
+                fontFamily: type.family.sansMedium,
+              }}
+            >
+              {errors.price.message}
+            </Text>
+          ) : null}
 
           <SectionDivider />
 
@@ -745,7 +796,7 @@ function SellForm({ onClose }: { onClose: () => void }) {
                 if (Platform.OS !== 'web') {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
                 }
-                handlePublish();
+                handleSubmit(onValidSubmit, onInvalidSubmit)();
               }}
               disabled={publishing || !canPublish}
               accessibilityRole="button"
@@ -781,15 +832,14 @@ function SellForm({ onClose }: { onClose: () => void }) {
         </ScrollView>
       </KeyboardAvoidingView>
 
-
       {/* Sheets */}
       <CategorySheet
         visible={activeSheet === 'category'}
         category={category}
-        subcategory={subcategory}
+        subcategory={subcategory ?? null}
         onChange={(c, s) => {
-          setCategory(c);
-          setSubcategory(s);
+          setValue('category', c, { shouldValidate: true });
+          setValue('subcategory', s, { shouldValidate: true });
         }}
         onClose={() => setActiveSheet(null)}
       />
@@ -798,7 +848,7 @@ function SellForm({ onClose }: { onClose: () => void }) {
         title="Brand"
         placeholder="e.g. Zara, Nike, Khaadi"
         value={brand}
-        onChange={setBrand}
+        onChange={(b) => setValue('brand', b, { shouldValidate: true })}
         onClose={() => setActiveSheet(null)}
       />
       <TextFieldSheet
@@ -806,7 +856,7 @@ function SellForm({ onClose }: { onClose: () => void }) {
         title="Size"
         placeholder="e.g. S, M, L, 42, Free"
         value={size}
-        onChange={setSize}
+        onChange={(s) => setValue('size', s, { shouldValidate: true })}
         onClose={() => setActiveSheet(null)}
       />
       <SingleSelectSheet
@@ -814,13 +864,13 @@ function SellForm({ onClose }: { onClose: () => void }) {
         title="Condition"
         options={CONDITIONS}
         value={condition}
-        onChange={setCondition}
+        onChange={(c) => setValue('condition', c, { shouldValidate: true })}
         onClose={() => setActiveSheet(null)}
       />
       <ColorSheet
         visible={activeSheet === 'colors'}
-        value={color}
-        onChange={setColor}
+        value={color ?? null}
+        onChange={(cl) => setValue('color', cl, { shouldValidate: true })}
         onClose={() => setActiveSheet(null)}
       />
       <SingleSelectSheet
@@ -828,29 +878,30 @@ function SellForm({ onClose }: { onClose: () => void }) {
         title="Gender"
         options={GENDERS}
         value={gender}
-        onChange={setGender}
+        onChange={(g) => setValue('gender', g, { shouldValidate: true })}
         onClose={() => setActiveSheet(null)}
       />
       <TagsSheet
         visible={activeSheet === 'tags'}
         value={tags}
-        onChange={setTags}
+        onChange={(t) => setValue('tags', t, { shouldValidate: true })}
         onClose={() => setActiveSheet(null)}
       />
       <PriceSheet
         visible={activeSheet === 'price'}
         value={price}
-        onChange={setPrice}
+        onChange={(p) => setValue('price', p, { shouldValidate: true })}
         onClose={() => setActiveSheet(null)}
       />
-      <SingleSelectSheet
+      <SingleSelectSheet<ParcelSize>
         visible={activeSheet === 'parcel'}
         title="Parcel size"
         options={PARCEL_SIZES}
-        value={parcelSize}
-        onChange={setParcelSize}
+        value={parcelSize ?? null}
+        onChange={(ps) => setValue('parcelSize', ps, { shouldValidate: true })}
         onClose={() => setActiveSheet(null)}
       />
     </SafeAreaView>
   );
 }
+

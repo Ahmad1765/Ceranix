@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Pressable,
@@ -8,6 +8,8 @@ import {
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { ThumbButton } from '@/components/ui/ThumbButton';
 import { Text } from '@/lib/rnText';
@@ -15,9 +17,14 @@ import { radii, type } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { buyerProtectionFee, formatPrice, DEFAULT_SHIPPING_FEE } from '@/lib/fees';
 import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
+import {
+  CheckoutFormSchema,
+  type CheckoutFormValues,
+  type FulfillmentMethod,
+  type PaymentMethodType,
+} from '@/lib/schemas/checkout';
 
-export type FulfillmentMethod = 'delivery' | 'handshake';
-export type PaymentMethodType = 'card' | 'cod';
+export type { FulfillmentMethod, PaymentMethodType };
 
 export interface CheckoutProduct {
   id: string;
@@ -54,8 +61,17 @@ export function CheckoutSheet({
   loading = false,
 }: CheckoutSheetProps) {
   const { theme, isDark } = useTheme();
-  const [fulfillment, setFulfillment] = useState<FulfillmentMethod>('delivery');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType>('cod');
+
+  const { handleSubmit, setValue, watch } = useForm<CheckoutFormValues>({
+    resolver: zodResolver(CheckoutFormSchema),
+    defaultValues: {
+      fulfillment: 'delivery',
+      paymentMethod: 'cod',
+    },
+  });
+
+  const fulfillment = watch('fulfillment');
+  const paymentMethod = watch('paymentMethod');
 
   const itemPrice = product?.price || 0;
   const shippingFee =
@@ -70,21 +86,21 @@ export function CheckoutSheet({
     if (Platform.OS !== 'web') {
       Haptics.selectionAsync().catch(() => {});
     }
-    setFulfillment(method);
+    setValue('fulfillment', method, { shouldValidate: true });
   };
 
   const handlePaymentChange = (method: PaymentMethodType) => {
     if (Platform.OS !== 'web') {
       Haptics.selectionAsync().catch(() => {});
     }
-    setPaymentMethod(method);
+    setValue('paymentMethod', method, { shouldValidate: true });
   };
 
-  const handlePayPress = () => {
+  const onSubmit = (data: CheckoutFormValues) => {
     if (loading) return;
     onConfirmPay({
-      fulfillment,
-      paymentMethod,
+      fulfillment: data.fulfillment,
+      paymentMethod: data.paymentMethod,
       totalAmount,
     });
   };
@@ -106,7 +122,7 @@ export function CheckoutSheet({
             loading={loading}
             disabled={loading}
             icon="lock"
-            onPress={handlePayPress}
+            onPress={handleSubmit(onSubmit)}
             accessibilityLabel={`Confirm and pay ${formatPrice(totalAmount)}`}
           />
         </View>
