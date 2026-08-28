@@ -4,7 +4,6 @@ import {
   View,
   Pressable,
   RefreshControl,
-  Alert,
   Share,
   ActivityIndicator,
 } from 'react-native';
@@ -58,6 +57,12 @@ export default function UserProfileScreen() {
   const [activeTab, setActiveTab] = useState<SellerTab>('shop');
 
   const fade = useFadeIn(0, 320);
+
+  useEffect(() => {
+    if (authUser?.id && userId && authUser.id === userId) {
+      router.replace('/(tabs)/profile' as any);
+    }
+  }, [authUser?.id, userId]);
 
   const { columns, cardWidth: cardW } = useGridDimensions({
     min: 2,

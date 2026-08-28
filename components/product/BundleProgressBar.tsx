@@ -22,7 +22,7 @@ export function BundleProgressBar({
   selectedIds: Set<string>;
   onPress?: () => void;
 }) {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const selectedItems = sellerItems.filter((s) => selectedIds.has(s.id));
   const { itemCount, pct, qualifies, progress, nextTier } = computeBundlePricing(
     listing.price,
@@ -31,46 +31,71 @@ export function BundleProgressBar({
   const maxPct = BUNDLE_TIERS[BUNDLE_TIERS.length - 1].pct;
   const remaining = nextTier ? nextTier.count - itemCount : 0;
 
-  const headline = qualifies ? `${pct}% bundle discount applied` : `Bundle & save up to ${maxPct}%`;
+  const headline = qualifies
+    ? `${pct}% bundle discount unlocked!`
+    : `Bundle & save up to ${maxPct}%`;
+
   const guidance = nextTier
     ? `Add ${remaining} more ${remaining === 1 ? 'item' : 'items'} to save ${nextTier.pct}%`
     : qualifies
-      ? 'Maximum discount reached'
-      : `${sellerItems.length} more from @${listing.seller.username}`;
+      ? 'Maximum discount reached for this order'
+      : sellerItems.length > 0
+        ? 'Select items below to unlock discounts'
+        : `@${listing.seller.username} has 1 item listed`;
+
+  // High-contrast, theme-aware background colors for the track
+  const trackBgColor = isDark ? 'rgba(255, 255, 255, 0.14)' : '#E5E7EB';
+  const trackBorderColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
+  const unreachedPipBg = isDark ? '#2C2C2E' : '#D1D5DB';
 
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${headline}. ${guidance}. Opens the bundle builder.`}
+      accessibilityLabel={`${headline}. ${guidance}.`}
       style={({ pressed }) => ({
         marginHorizontal: 16,
         backgroundColor: theme.white,
-        borderRadius: 16,
+        borderRadius: 18,
         borderWidth: HAIRLINE,
         borderColor: theme.border,
-        paddingHorizontal: 14,
-        paddingVertical: 14,
-        opacity: pressed ? 0.92 : 1,
+        paddingHorizontal: 16,
+        paddingTop: 16,
+        paddingBottom: 14,
+        opacity: pressed && onPress ? 0.92 : 1,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: isDark ? 0.25 : 0.05,
+        shadowRadius: 8,
+        elevation: 2,
       })}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+      {/* Header Info */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 }}>
         <View
           style={{
-            width: 32,
-            height: 32,
-            borderRadius: 10,
-            backgroundColor: 'rgba(108,71,255,0.12)',
+            width: 38,
+            height: 38,
+            borderRadius: 12,
+            backgroundColor: qualifies ? BRAND_PURPLE : 'rgba(108,71,255,0.12)',
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <Ionicons name="pricetags" size={15} color={BRAND_PURPLE} />
+          <Ionicons
+            name="pricetags"
+            size={18}
+            color={qualifies ? '#FFFFFF' : BRAND_PURPLE}
+          />
         </View>
         <View style={{ flex: 1 }}>
           <Text
-            style={{ fontSize: 14, fontWeight: '800', color: theme.ink, letterSpacing: -0.2 }}
-            numberOfLines={1}
+            style={{
+              fontSize: 14.5,
+              fontWeight: '800',
+              color: theme.ink,
+              letterSpacing: -0.2,
+            }}
           >
             {headline}
           </Text>
@@ -80,50 +105,132 @@ export function BundleProgressBar({
               color: qualifies ? BRAND_PURPLE : theme.mute,
               fontWeight: qualifies ? '700' : '500',
               marginTop: 2,
+              lineHeight: 17,
             }}
-            numberOfLines={1}
           >
             {guidance}
           </Text>
         </View>
-        <Feather name="chevron-down" size={18} color={theme.mute} />
       </View>
 
-      {/* Threshold track — distinct from the image pagination dots: a filled
-          purple bar with a pip at each discount tier. */}
-      <View style={{ height: 6, borderRadius: 99, backgroundColor: theme.panel, position: 'relative' }}>
+      {/* Visible Progress Bar Track Container */}
+      <View style={{ marginTop: 4, marginBottom: 8, paddingHorizontal: 4 }}>
+        {/* The Track with visible background & border */}
         <View
           style={{
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: `${progress * 100}%`,
-            backgroundColor: BRAND_PURPLE,
-            borderRadius: 99,
+            height: 8,
+            borderRadius: 999,
+            backgroundColor: trackBgColor,
+            borderWidth: 1,
+            borderColor: trackBorderColor,
+            position: 'relative',
+            justifyContent: 'center',
           }}
-        />
-        {BUNDLE_TIERS.map((tier, i) => {
-          // Endpoints are implied by the bar's start/end; only render the
-          // intermediate discount rungs as pips.
-          if (i === 0 || i === BUNDLE_TIERS.length - 1) return null;
-          const reached = itemCount >= tier.count;
-          return (
-            <View
-              key={i}
-              style={{
-                position: 'absolute',
-                left: `${(i / (BUNDLE_TIERS.length - 1)) * 100}%`,
-                top: 0,
-                width: 6,
-                height: 6,
-                marginLeft: -3,
-                borderRadius: 3,
-                backgroundColor: reached ? theme.white : theme.border,
-              }}
-            />
-          );
-        })}
+        >
+          {/* Filled Progress Segment */}
+          <View
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: `${Math.max(0, Math.min(100, progress * 100))}%`,
+              backgroundColor: BRAND_PURPLE,
+              borderRadius: 999,
+            }}
+          />
+
+          {/* Tier Milestone Step Markers (Pips) */}
+          {BUNDLE_TIERS.map((tier, i) => {
+            const reached = itemCount >= tier.count;
+            const isCurrent = itemCount === tier.count;
+            const positionPct = (i / (BUNDLE_TIERS.length - 1)) * 100;
+
+            return (
+              <View
+                key={tier.count}
+                style={{
+                  position: 'absolute',
+                  left: `${positionPct}%`,
+                  width: 14,
+                  height: 14,
+                  marginLeft: -7,
+                  borderRadius: 7,
+                  backgroundColor: reached
+                    ? BRAND_PURPLE
+                    : isCurrent
+                      ? theme.white
+                      : unreachedPipBg,
+                  borderWidth: 2.5,
+                  borderColor: reached || isCurrent ? BRAND_PURPLE : theme.white,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 2,
+                }}
+              >
+                {reached && tier.pct > 0 ? (
+                  <Feather name="check" size={8} color="#FFFFFF" />
+                ) : null}
+              </View>
+            );
+          })}
+        </View>
+
+        {/* Milestone Labels below the Track */}
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            marginTop: 10,
+          }}
+        >
+          {BUNDLE_TIERS.map((tier) => {
+            const reached = itemCount >= tier.count;
+            const isNext = nextTier?.count === tier.count;
+
+            return (
+              <View
+                key={tier.count}
+                style={{
+                  alignItems: 'center',
+                  minWidth: 44,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 11.5,
+                    fontWeight: reached ? '800' : isNext ? '700' : '600',
+                    color: reached
+                      ? BRAND_PURPLE
+                      : isNext
+                        ? theme.ink
+                        : theme.mute,
+                  }}
+                >
+                  {tier.pct === 0 ? '1 item' : `${tier.pct}% OFF`}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 10,
+                    fontWeight: reached ? '700' : '500',
+                    color: reached
+                      ? BRAND_PURPLE
+                      : isNext
+                        ? theme.ink
+                        : theme.muteSoft ?? theme.mute,
+                    marginTop: 1,
+                  }}
+                >
+                  {tier.count === 1
+                    ? 'Base'
+                    : tier.count === 5
+                      ? '5+ items'
+                      : `${tier.count} items`}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
       </View>
     </Pressable>
   );

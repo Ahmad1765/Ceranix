@@ -56,7 +56,7 @@ export function useProductBundle({
 
   const handleSelectAllBundle = useCallback(() => {
     tap('medium');
-    setSelectedBundleIds(new Set(sellerItems.map((s) => s.id)));
+    setSelectedBundleIds(new Set(sellerItems.filter((s) => !s.is_sold).map((s) => s.id)));
   }, [sellerItems]);
 
   const handleClearAllBundle = useCallback(() => {
@@ -76,6 +76,10 @@ export function useProductBundle({
         return;
       }
       if (!listing) return;
+      if (listing.is_sold) {
+        toast.show('This item is already sold', { variant: 'default', icon: 'info' });
+        return;
+      }
       if (listing.seller_id === user.id) {
         toast.show("That's your own listing", { variant: 'default', icon: 'info' });
         return;

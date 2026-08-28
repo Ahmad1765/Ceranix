@@ -71,9 +71,15 @@ export const ProductSellerProfileCard = memo(function ProductSellerProfileCard({
       >
         {/* Left: Avatar + Username & Subtitle */}
         <Pressable
-          onPress={() => router.push(`/user/${seller.id}` as any)}
+          onPress={() => {
+            if (isOwnListing) {
+              router.push('/(tabs)/profile' as any);
+            } else {
+              router.push(`/user/${seller.id}` as any);
+            }
+          }}
           accessibilityRole="button"
-          accessibilityLabel={`View @${seller.username}'s profile`}
+          accessibilityLabel={isOwnListing ? 'View your profile' : `View @${seller.username}'s profile`}
           style={({ pressed }) => ({
             flexDirection: 'row',
             alignItems: 'center',

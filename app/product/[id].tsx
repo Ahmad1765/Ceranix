@@ -119,8 +119,8 @@ export default function ProductScreen() {
     listing?.id ?? null,
   );
   const similarItemsQ = useSimilarListingsQuery(productIdParam ?? null);
-  const sellerItems = sellerItemsQ.data ?? EMPTY_LISTINGS;
-  const similarItems = similarItemsQ.data ?? EMPTY_LISTINGS;
+  const sellerItems = (sellerItemsQ.data ?? EMPTY_LISTINGS).filter((s) => !s.is_sold);
+  const similarItems = (similarItemsQ.data ?? EMPTY_LISTINGS).filter((s) => !s.is_sold);
 
   // Proactively warm up browser/disk cache with carousel photos and related item cards
   useEffect(() => {
@@ -523,6 +523,7 @@ export default function ProductScreen() {
         title={listing.title}
         price={listing.price}
         onBack={() => safeBack()}
+        onShare={shareListing}
       />
 
       <Animated.ScrollView

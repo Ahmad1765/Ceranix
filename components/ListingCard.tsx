@@ -390,8 +390,44 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
         </Pressable>
 
         {listing.is_sold && (
-          <View className="absolute inset-0 bg-black/40 items-center justify-center">
-            <Text className="text-white font-bold text-sm">SOLD</Text>
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 10,
+            }}
+          >
+            <View
+              style={{
+                backgroundColor: '#D4FF00',
+                paddingHorizontal: 15,
+                paddingVertical: 6,
+                borderRadius: 4,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.18,
+                shadowRadius: 4,
+                elevation: 3,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 13.5,
+                  fontWeight: '900',
+                  color: '#000000',
+                  letterSpacing: -0.2,
+                  fontFamily: 'Inter_700Bold',
+                }}
+              >
+                Sold
+              </Text>
+            </View>
           </View>
         )}
       </View>

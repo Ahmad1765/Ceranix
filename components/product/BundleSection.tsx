@@ -7,6 +7,7 @@ import { getOptimizedImageUrl } from '@/lib/images';
 import { formatPrice } from '@/lib/currency';
 import type { Listing } from '@/types';
 import { useTheme } from '@/context/ThemeContext';
+import { RelatedItemCard } from './RelatedItemCard';
 import { BundleProgressBar } from './BundleProgressBar';
 import {
   computeBundlePricing,
@@ -37,8 +38,58 @@ export function BundleSection({
 }) {
   const { theme } = useTheme();
   const username = listing.seller.username;
+  const isSold = listing.is_sold;
+
+  // Ensure sold items never appear in the bundle offers
+  const activeSellerItems = sellerItems.filter((s) => !s.is_sold);
   const baseItem = listingToRelated(listing);
-  const selectedItems = sellerItems.filter((s) => selectedIds.has(s.id));
+  const selectedItems = activeSellerItems.filter((s) => selectedIds.has(s.id));
+
+  // If the current listing is already sold, bundling is unavailable — show other available items to browse
+  if (isSold) {
+    return (
+      <View style={{ paddingTop: 18 }}>
+        {activeSellerItems.length === 0 ? (
+          <View style={{ paddingHorizontal: 20, paddingVertical: 20, alignItems: 'center' }}>
+            <Feather name="package" size={22} color={theme.mute} />
+            <Text
+              style={{
+                fontSize: 13,
+                color: theme.mute,
+                marginTop: 8,
+                textAlign: 'center',
+                lineHeight: 19,
+              }}
+            >
+              @{username} has no other available items right now.
+            </Text>
+          </View>
+        ) : (
+          <View
+            style={{
+              width: '100%',
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              paddingHorizontal: CARD_OUTER_PAD,
+              columnGap: CARD_GAP,
+            }}
+          >
+            {activeSellerItems.map((row) => {
+              const item = listingToRelated(row);
+              return (
+                <RelatedItemCard
+                  key={item.id}
+                  item={item}
+                  onPress={() => router.push(`/product/${item.id}`)}
+                />
+              );
+            })}
+          </View>
+        )}
+      </View>
+    );
+  }
+
   // All bundle money math lives in lib/bundle.ts (pure + unit-tested).
   const {
     itemCount: bundleItemCount,
@@ -58,13 +109,13 @@ export function BundleSection({
       <View style={{ marginBottom: 18 }}>
         <BundleProgressBar
           listing={listing}
-          sellerItems={sellerItems}
+          sellerItems={activeSellerItems}
           selectedIds={selectedIds}
         />
       </View>
 
       {/* Selectable seller items grid */}
-      {sellerItems.length === 0 ? (
+      {activeSellerItems.length === 0 ? (
         <View style={{ paddingHorizontal: 20, paddingVertical: 20, alignItems: 'center' }}>
           <Feather name="package" size={22} color={theme.mute} />
           <Text
@@ -76,7 +127,7 @@ export function BundleSection({
               lineHeight: 19,
             }}
           >
-            @{username} has nothing else listed right now.{'\n'}Follow them to catch their next drop.
+            @{username} has nothing else available to bundle right now.{'\n'}Follow them to catch their next drop.
           </Text>
         </View>
       ) : (
@@ -92,7 +143,7 @@ export function BundleSection({
           {/* The item being viewed is always part of the bundle — pin it first
               so the "N items" count and total are never a mystery. */}
           <BaseItemCard item={baseItem} />
-          {sellerItems.map((row) => {
+          {activeSellerItems.map((row) => {
             const item = listingToRelated(row);
             const isSelected = selectedIds.has(row.id);
             return (

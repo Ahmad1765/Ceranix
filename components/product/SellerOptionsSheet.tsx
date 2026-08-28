@@ -85,7 +85,11 @@ export function SellerOptionsSheet({
 
   const handleViewProfile = () => {
     onClose();
-    router.push(`/user/${seller.id}` as any);
+    if (user?.id === seller.id) {
+      router.push('/(tabs)/profile' as any);
+    } else {
+      router.push(`/user/${seller.id}` as any);
+    }
   };
 
   const handleSelectReportReason = async (reasonId: string) => {

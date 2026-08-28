@@ -58,32 +58,46 @@ export const ProductHeroSection = memo(function ProductHeroSection({
         />
       </Animated.View>
 
-      {/* Sold banner spanning across the bottom of the photo */}
+      {/* Centered Sold Badge overlay */}
       {isSold && (
         <View
+          pointerEvents="none"
           style={{
             position: 'absolute',
+            top: 0,
             left: 0,
             right: 0,
             bottom: 0,
-            height: 42,
-            backgroundColor: '#007782',
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 20,
           }}
         >
-          <Text
+          <View
             style={{
-              fontSize: 16,
-              fontWeight: '800',
-              color: '#FFFFFF',
-              letterSpacing: 0.5,
-              fontFamily: 'Inter_700Bold',
+              backgroundColor: '#D4FF00',
+              paddingHorizontal: 22,
+              paddingVertical: 10,
+              borderRadius: 6,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 3 },
+              shadowOpacity: 0.22,
+              shadowRadius: 6,
+              elevation: 4,
             }}
           >
-            Sold
-          </Text>
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: '900',
+                color: '#000000',
+                letterSpacing: -0.3,
+                fontFamily: 'Inter_700Bold',
+              }}
+            >
+              Sold
+            </Text>
+          </View>
         </View>
       )}
 

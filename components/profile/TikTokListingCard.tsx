@@ -78,22 +78,36 @@ export const TikTokListingCard = memo(function TikTokListingCard({ listing, widt
       {/* Sold badge overlay */}
       {listing.is_sold && (
         <View
+          pointerEvents="none"
           style={{
             ...StyleSheet.absoluteFillObject,
-            backgroundColor: 'rgba(0,0,0,0.5)',
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
           <View
             style={{
-              backgroundColor: colors.danger,
-              paddingHorizontal: 8,
-              paddingVertical: 3,
+              backgroundColor: '#D4FF00',
+              paddingHorizontal: 12,
+              paddingVertical: 5,
               borderRadius: 4,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.18,
+              shadowRadius: 4,
+              elevation: 3,
             }}
           >
-            <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '800' }}>SOLD</Text>
+            <Text
+              style={{
+                color: '#000000',
+                fontSize: 12,
+                fontWeight: '900',
+                fontFamily: 'Inter_700Bold',
+              }}
+            >
+              Sold
+            </Text>
           </View>
         </View>
       )}
