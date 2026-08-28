@@ -76,7 +76,7 @@
     "@emnapi/core": "1.11.1",
     "@emnapi/runtime": "1.11.1",
     "@playwright/test": "^1.49.1",
-    "@types/node": "^22.10.5",
+    "@types/node": "^26.3.0",
     "@types/react": "~19.1.10",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~10.0.0",
