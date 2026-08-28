@@ -20,7 +20,7 @@ export function BundleProgressBar({
   listing: Listing;
   sellerItems: Listing[];
   selectedIds: Set<string>;
-  onPress: () => void;
+  onPress?: () => void;
 }) {
   const { theme } = useTheme();
   const selectedItems = sellerItems.filter((s) => selectedIds.has(s.id));

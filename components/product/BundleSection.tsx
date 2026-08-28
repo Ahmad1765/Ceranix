@@ -7,8 +7,8 @@ import { getOptimizedImageUrl } from '@/lib/images';
 import { formatPrice } from '@/lib/currency';
 import type { Listing } from '@/types';
 import { colors } from '@/lib/theme';
+import { BundleProgressBar } from './BundleProgressBar';
 import {
-  BUNDLE_TIERS,
   computeBundlePricing,
   BRAND_PURPLE,
   CARD_OUTER_PAD,
@@ -37,7 +37,6 @@ export function BundleSection({
 }) {
   const username = listing.seller.username;
   const baseItem = listingToRelated(listing);
-  const allSelected = sellerItems.length > 0 && sellerItems.every((s) => selectedIds.has(s.id));
   const selectedItems = sellerItems.filter((s) => selectedIds.has(s.id));
   // All bundle money math lives in lib/bundle.ts (pure + unit-tested).
   const {
@@ -47,149 +46,20 @@ export function BundleSection({
     qualifies,
     savings,
     total,
-    progress: progressFraction,
-    nextTier,
   } = computeBundlePricing(
     listing.price,
     selectedItems.map((s) => Number(s.price ?? 0)),
   );
-  const guidance = qualifies
-    ? nextTier
-      ? `${bundlePct}% off unlocked · add ${nextTier.count - bundleItemCount} more for ${nextTier.pct}%`
-      : `${bundlePct}% off unlocked · max discount`
-    : nextTier
-      ? `Add ${nextTier.count - bundleItemCount} more ${nextTier.count - bundleItemCount === 1 ? 'item' : 'items'} to save ${nextTier.pct}%`
-      : '';
-
-  const brands = Array.from(
-    new Set(
-      [listing, ...sellerItems]
-        .map((l) => (l.brand ?? '').trim())
-        .filter((b) => b.length > 0),
-    ),
-  );
-  const brandLabel =
-    brands.length === 0
-      ? `${sellerItems.length + 1} items`
-      : brands.length <= 3
-        ? brands.join(' · ').toUpperCase()
-        : `${brands.slice(0, 3).join(' · ').toUpperCase()} + MORE`;
 
   return (
     <View style={{ paddingTop: 18 }}>
-      {/* Composition header */}
-      <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
-        <Text
-          style={{
-            fontSize: 11,
-            fontWeight: '700',
-            letterSpacing: 1.4,
-            color: colors.mute,
-            marginBottom: 6,
-          }}
-          numberOfLines={1}
-        >
-          {brandLabel}
-        </Text>
-        <Text
-          style={{
-            fontSize: 26,
-            fontWeight: '900',
-            color: colors.ink,
-            letterSpacing: -0.8,
-          }}
-        >
-          Bundle from @{username}
-        </Text>
-      </View>
-
-      {/* Slim progress strip: the bar carries the tier ladder via pips; one
-          dynamic line replaces the old five-column tier table. */}
-      <View style={{ marginHorizontal: 16, marginBottom: 18 }}>
-        <View style={{ height: 8, position: 'relative' }}>
-          <View
-            style={{
-              position: 'absolute',
-              left: 0,
-              right: 0,
-              top: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(108,71,255,0.16)',
-              borderRadius: 99,
-            }}
-          />
-          {BUNDLE_TIERS.map((tier, i) => {
-            if (i === 0 || i === BUNDLE_TIERS.length - 1) return null;
-            const reached = bundleItemCount >= tier.count;
-            return (
-              <View
-                key={i}
-                style={{
-                  position: 'absolute',
-                  left: `${(i / (BUNDLE_TIERS.length - 1)) * 100}%`,
-                  top: 1,
-                  width: 6,
-                  height: 6,
-                  marginLeft: -3,
-                  borderRadius: 3,
-                  backgroundColor: reached ? 'rgba(255,255,255,0.85)' : 'rgba(108,71,255,0.4)',
-                  zIndex: 2,
-                }}
-              />
-            );
-          })}
-          <View
-            style={{
-              position: 'absolute',
-              left: 0,
-              top: 0,
-              bottom: 0,
-              width: `${progressFraction * 100}%`,
-              backgroundColor: BRAND_PURPLE,
-              borderRadius: 99,
-            }}
-          />
-        </View>
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginTop: 8,
-            gap: 12,
-          }}
-        >
-          {guidance ? (
-            <Text
-              style={{
-                flex: 1,
-                fontSize: 12.5,
-                fontWeight: qualifies ? '700' : '600',
-                color: qualifies ? BRAND_PURPLE : colors.mute,
-              }}
-              numberOfLines={1}
-            >
-              {guidance}
-            </Text>
-          ) : (
-            <View style={{ flex: 1 }} />
-          )}
-          {/* Bulk select — the fast path to the top tier. Flips to Clear once
-              everything is in the bundle. */}
-          {sellerItems.length > 1 && (onSelectAll || onClearAll) ? (
-            <Pressable
-              onPress={allSelected ? onClearAll : onSelectAll}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel={allSelected ? 'Clear bundle selection' : 'Add all items to bundle'}
-              style={({ pressed }) => ({ opacity: pressed ? 0.55 : 1, paddingVertical: 2 })}
-            >
-              <Text style={{ fontSize: 12.5, fontWeight: '700', color: BRAND_PURPLE }}>
-                {allSelected ? 'Clear' : `Add all ${sellerItems.length}`}
-              </Text>
-            </Pressable>
-          ) : null}
-        </View>
+      {/* Bundle Progress Banner */}
+      <View style={{ marginBottom: 18 }}>
+        <BundleProgressBar
+          listing={listing}
+          sellerItems={sellerItems}
+          selectedIds={selectedIds}
+        />
       </View>
 
       {/* Selectable seller items grid */}

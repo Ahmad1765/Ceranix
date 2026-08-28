@@ -61,7 +61,6 @@ import { CheckoutSheet } from '@/components/product/CheckoutSheet';
 import { OfferSheet } from '@/components/product/OfferSheet';
 import type { PopIconHandle } from '@/components/product/PopIcon';
 import { ProductSkeleton } from '@/components/product/ProductSkeleton';
-import { BundleProgressBar } from '@/components/product/BundleProgressBar';
 import {
   tap,
   IMAGE_HEIGHT,
@@ -592,21 +591,7 @@ export default function ProductScreen() {
           onReport={handleReport}
         />
 
-        {/* 6. Bundle Nudge Bar (Jumps to bundle builder) */}
-        {!isOwnListing && sellerItems.length > 0 ? (
-          <BundleProgressBar
-            listing={listing}
-            sellerItems={sellerItems}
-            selectedIds={bundle.selectedBundleIds}
-            onPress={() => {
-              tap('selection');
-              bundle.setRelatedTab('members');
-              requestAnimationFrame(() => mainScrollRef.current?.scrollToEnd({ animated: true }));
-            }}
-          />
-        ) : null}
-
-        {/* 7. Multi-Item Bundle Section & Related Grid */}
+        {/* 6. Multi-Item Bundle Section & Related Grid */}
         <ProductRelatedSection
           listing={listing}
           relatedTab={bundle.relatedTab}
