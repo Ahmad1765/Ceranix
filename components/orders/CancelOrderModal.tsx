@@ -8,13 +8,13 @@ import {
   ActivityIndicator,
   Platform,
   StyleSheet,
-  ViewStyle,
-  TextStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import { tap } from '@/lib/haptics';
+import { useTheme } from '@/context/ThemeContext';
+import { type as typography } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 
 export const CANCELLATION_REASONS = [
@@ -48,6 +48,7 @@ export function CancelOrderModal({
   isSeller = false,
 }: CancelOrderModalProps) {
   const insets = useSafeAreaInsets();
+  const { theme, isDark } = useTheme();
   const reasons = isSeller ? SELLER_CANCELLATION_REASONS : CANCELLATION_REASONS;
   const [selectedReason, setSelectedReason] = useState<string>(
     isSeller ? SELLER_CANCELLATION_REASONS[0] : CANCELLATION_REASONS[0],
@@ -88,7 +89,15 @@ export function CancelOrderModal({
       onRequestClose={cancelling ? undefined : onClose}
       statusBarTranslucent
     >
-      <View style={styles.overlay}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: theme.overlay,
+          justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end',
+          alignItems: 'center',
+          paddingHorizontal: Platform.OS === 'web' ? 16 : 0,
+        }}
+      >
         <Pressable
           style={StyleSheet.absoluteFill}
           onPress={cancelling ? undefined : onClose}
@@ -97,17 +106,53 @@ export function CancelOrderModal({
 
         <View
           style={[
-            styles.sheetContainer,
+            {
+              width: '100%',
+              maxWidth: 480,
+              maxHeight: '88%',
+              backgroundColor: theme.white,
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              borderRadius: Platform.OS === 'web' ? 24 : 0,
+              borderWidth: 1,
+              borderColor: theme.border,
+              paddingTop: 18,
+              paddingHorizontal: 20,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: -4 },
+              shadowOpacity: 0.12,
+              shadowRadius: 16,
+              elevation: 10,
+              overflow: 'hidden',
+            },
             {
               paddingBottom: Math.max(insets.bottom, 20),
             },
           ]}
         >
           {/* Header */}
-          <View style={styles.header}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.title}>{isSeller ? 'Cancel sale' : 'Cancel order'}</Text>
-              <Text style={styles.subtitle}>
+              <Text
+                style={{
+                  fontSize: 18,
+                  fontWeight: '700',
+                  color: theme.ink,
+                  fontFamily: typography.family.sansBold,
+                  letterSpacing: -0.3,
+                }}
+              >
+                {isSeller ? 'Cancel sale' : 'Cancel order'}
+              </Text>
+              <Text
+                style={{
+                  fontSize: 12.5,
+                  color: theme.mute,
+                  fontFamily: typography.family.sans,
+                  marginTop: 4,
+                  lineHeight: 17,
+                }}
+              >
                 {isSeller
                   ? 'The buyer will be notified and this listing will be unlocked.'
                   : 'Please select a reason. The item will be relisted and the seller will be notified.'}
@@ -117,14 +162,25 @@ export function CancelOrderModal({
               disabled={cancelling}
               onPress={onClose}
               hitSlop={HIT_SLOP_8}
-              style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.6 }]}
+              style={({ pressed }) => [
+                {
+                  width: 32,
+                  height: 32,
+                  borderRadius: 16,
+                  backgroundColor: theme.panel,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginLeft: 10,
+                },
+                pressed && { opacity: 0.6 },
+              ]}
             >
-              <Feather name="x" size={18} color="#111111" />
+              <Feather name="x" size={18} color={theme.ink} />
             </Pressable>
           </View>
 
           {/* Reason Selection List */}
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 10 }}>
             {reasons.map((r) => {
               const active = selectedReason === r;
               return (
@@ -135,49 +191,110 @@ export function CancelOrderModal({
                     setSelectedReason(r);
                   }}
                   style={({ pressed }) => [
-                    styles.reasonRow,
-                    active && styles.reasonRowActive,
+                    {
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingVertical: 12,
+                      paddingHorizontal: 12,
+                      borderRadius: 10,
+                      marginBottom: 6,
+                      backgroundColor: active
+                        ? isDark
+                          ? 'rgba(239, 68, 68, 0.15)'
+                          : '#FEF2F2'
+                        : theme.panel,
+                      borderWidth: 1,
+                      borderColor: active ? '#EF4444' : theme.border,
+                    },
                     pressed && { opacity: 0.8 },
                   ]}
                 >
-                  <View style={[styles.radioOuter, active && styles.radioOuterActive]}>
-                    {active && <View style={styles.radioInner} />}
+                  <View
+                    style={[
+                      {
+                        width: 20,
+                        height: 20,
+                        borderRadius: 10,
+                        borderWidth: 1.8,
+                        borderColor: theme.border,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginRight: 12,
+                      },
+                      active && { borderColor: '#EF4444' },
+                    ]}
+                  >
+                    {active && <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#EF4444' }} />}
                   </View>
-                  <Text style={[styles.reasonText, active && styles.reasonTextActive]}>{r}</Text>
+                  <Text
+                    style={{
+                      fontSize: 13.5,
+                      fontWeight: active ? '700' : '500',
+                      color: active ? '#EF4444' : theme.ink,
+                      fontFamily: active ? typography.family.sansBold : typography.family.sansMedium,
+                    }}
+                  >
+                    {r}
+                  </Text>
                 </Pressable>
               );
             })}
 
             {/* Optional Custom Input if 'Other' */}
             {selectedReason === 'Other reason' && (
-              <View style={styles.customInputContainer}>
+              <View style={{ marginTop: 6, marginBottom: 10 }}>
                 <TextInput
                   value={customReason}
                   onChangeText={setCustomReason}
                   placeholder="Please specify why you are cancelling..."
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={theme.muteSoft}
                   multiline
                   numberOfLines={2}
-                  style={styles.customInput}
+                  style={{
+                    backgroundColor: theme.panel,
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    borderRadius: 8,
+                    padding: 10,
+                    fontSize: 13.5,
+                    color: theme.ink,
+                    fontFamily: typography.family.sans,
+                    minHeight: 60,
+                    textAlignVertical: 'top',
+                  }}
                 />
               </View>
             )}
           </ScrollView>
 
           {/* Action Buttons */}
-          <View style={styles.actionsContainer}>
+          <View style={{ paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border }}>
             <Pressable
               disabled={cancelling}
               onPress={handleConfirm}
               style={({ pressed }) => [
-                styles.confirmBtn,
+                {
+                  height: 48,
+                  backgroundColor: '#DC2626',
+                  borderRadius: 10,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 8,
+                },
                 pressed && { opacity: 0.85, transform: [{ scale: 0.99 }] },
               ]}
             >
               {cancelling ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
-                <Text style={styles.confirmBtnText}>
+                <Text
+                  style={{
+                    fontSize: 14.5,
+                    fontWeight: '700',
+                    color: '#FFFFFF',
+                    fontFamily: typography.family.sansBold,
+                  }}
+                >
                   {isSeller ? 'Confirm Cancellation' : 'Cancel Order'}
                 </Text>
               )}
@@ -186,9 +303,25 @@ export function CancelOrderModal({
             <Pressable
               disabled={cancelling}
               onPress={onClose}
-              style={({ pressed }) => [styles.keepBtn, pressed && { opacity: 0.6 }]}
+              style={({ pressed }) => [
+                {
+                  paddingVertical: 10,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                },
+                pressed && { opacity: 0.6 },
+              ]}
             >
-              <Text style={styles.keepBtnText}>Keep order</Text>
+              <Text
+                style={{
+                  fontSize: 13.5,
+                  fontWeight: '600',
+                  color: theme.mute,
+                  fontFamily: typography.family.sansSemibold,
+                }}
+              >
+                Keep order
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -196,155 +329,3 @@ export function CancelOrderModal({
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end',
-    alignItems: 'center',
-    paddingHorizontal: Platform.OS === 'web' ? 16 : 0,
-  } as ViewStyle,
-  sheetContainer: {
-    width: '100%',
-    maxWidth: 480,
-    maxHeight: '88%',
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderRadius: Platform.OS === 'web' ? 24 : 0,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingTop: 18,
-    paddingHorizontal: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 10,
-    overflow: 'hidden',
-  } as ViewStyle,
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  } as ViewStyle,
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111111',
-    fontFamily: 'Inter_700Bold',
-    letterSpacing: -0.3,
-  } as TextStyle,
-  subtitle: {
-    fontSize: 12.5,
-    color: '#6B7280',
-    fontFamily: 'Inter_400Regular',
-    marginTop: 4,
-    lineHeight: 17,
-  } as TextStyle,
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 10,
-  } as ViewStyle,
-  scrollContent: {
-    paddingBottom: 10,
-  } as ViewStyle,
-  reasonRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    marginBottom: 6,
-    backgroundColor: '#F9FAFB',
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-  } as ViewStyle,
-  reasonRowActive: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FCA5A5',
-  } as ViewStyle,
-  radioOuter: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 1.8,
-    borderColor: '#D1D5DB',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  } as ViewStyle,
-  radioOuterActive: {
-    borderColor: '#EF4444',
-  } as ViewStyle,
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#EF4444',
-  } as ViewStyle,
-  reasonText: {
-    fontSize: 13.5,
-    fontWeight: '500',
-    color: '#374151',
-    fontFamily: 'Inter_500Medium',
-  } as TextStyle,
-  reasonTextActive: {
-    fontWeight: '700',
-    color: '#DC2626',
-    fontFamily: 'Inter_700Bold',
-  } as TextStyle,
-  customInputContainer: {
-    marginTop: 6,
-    marginBottom: 10,
-  } as ViewStyle,
-  customInput: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 13.5,
-    color: '#111111',
-    fontFamily: 'Inter_400Regular',
-    minHeight: 60,
-    textAlignVertical: 'top',
-  } as TextStyle,
-  actionsContainer: {
-    paddingTop: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E5E7EB',
-  } as ViewStyle,
-  confirmBtn: {
-    height: 48,
-    backgroundColor: '#DC2626',
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  } as ViewStyle,
-  confirmBtnText: {
-    fontSize: 14.5,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    fontFamily: 'Inter_700Bold',
-  } as TextStyle,
-  keepBtn: {
-    paddingVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  } as ViewStyle,
-  keepBtnText: {
-    fontSize: 13.5,
-    fontWeight: '600',
-    color: '#6B7280',
-    fontFamily: 'Inter_600SemiBold',
-  } as TextStyle,
-});

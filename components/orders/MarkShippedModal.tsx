@@ -8,17 +8,16 @@ import {
   ActivityIndicator,
   Platform,
   StyleSheet,
-  ViewStyle,
-  TextStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import { tap } from '@/lib/haptics';
+import { useTheme } from '@/context/ThemeContext';
+import { type as typography } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 
 const COURIER_PRESETS = ['TCS', 'Leopards', 'Trax', 'M&P', 'PostEx', 'USPS', 'FedEx', 'Other'];
-const TEAL = '#007782';
 
 interface MarkShippedModalProps {
   visible: boolean;
@@ -32,6 +31,7 @@ export function MarkShippedModal({
   onConfirmShipped,
 }: MarkShippedModalProps) {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
   const [courier, setCourier] = useState<string>(COURIER_PRESETS[0]);
   const [customCourier, setCustomCourier] = useState('');
   const [trackingNumber, setTrackingNumber] = useState('');
@@ -68,7 +68,15 @@ export function MarkShippedModal({
       onRequestClose={saving ? undefined : onClose}
       statusBarTranslucent
     >
-      <View style={styles.overlay}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: theme.overlay,
+          justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end',
+          alignItems: 'center',
+          paddingHorizontal: Platform.OS === 'web' ? 16 : 0,
+        }}
+      >
         <Pressable
           style={StyleSheet.absoluteFill}
           onPress={saving ? undefined : onClose}
@@ -77,17 +85,53 @@ export function MarkShippedModal({
 
         <View
           style={[
-            styles.sheetContainer,
+            {
+              width: '100%',
+              maxWidth: 480,
+              maxHeight: '85%',
+              backgroundColor: theme.white,
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              borderRadius: Platform.OS === 'web' ? 24 : 0,
+              borderWidth: 1,
+              borderColor: theme.border,
+              paddingTop: 18,
+              paddingHorizontal: 20,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: -4 },
+              shadowOpacity: 0.12,
+              shadowRadius: 16,
+              elevation: 10,
+              overflow: 'hidden',
+            },
             {
               paddingBottom: Math.max(insets.bottom, 20),
             },
           ]}
         >
           {/* Header */}
-          <View style={styles.header}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.title}>Mark as shipped</Text>
-              <Text style={styles.subtitle}>
+              <Text
+                style={{
+                  fontSize: 18,
+                  fontWeight: '700',
+                  color: theme.ink,
+                  fontFamily: typography.family.sansBold,
+                  letterSpacing: -0.3,
+                }}
+              >
+                Mark as shipped
+              </Text>
+              <Text
+                style={{
+                  fontSize: 12.5,
+                  color: theme.mute,
+                  fontFamily: typography.family.sans,
+                  marginTop: 4,
+                  lineHeight: 17,
+                }}
+              >
                 Provide tracking details to keep the buyer updated on their parcel.
               </Text>
             </View>
@@ -95,16 +139,37 @@ export function MarkShippedModal({
               disabled={saving}
               onPress={onClose}
               hitSlop={HIT_SLOP_8}
-              style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.6 }]}
+              style={({ pressed }) => [
+                {
+                  width: 32,
+                  height: 32,
+                  borderRadius: 16,
+                  backgroundColor: theme.panel,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginLeft: 10,
+                },
+                pressed && { opacity: 0.6 },
+              ]}
             >
-              <Feather name="x" size={18} color="#111111" />
+              <Feather name="x" size={18} color={theme.ink} />
             </Pressable>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 10 }}>
             {/* Quick Courier Select */}
-            <Text style={styles.label}>Select Courier</Text>
-            <View style={styles.courierRow}>
+            <Text
+              style={{
+                fontSize: 12.5,
+                fontWeight: '600',
+                color: theme.mute,
+                fontFamily: typography.family.sansSemibold,
+                marginBottom: 8,
+              }}
+            >
+              Select Courier
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
               {COURIER_PRESETS.map((c) => {
                 const active = courier === c;
                 return (
@@ -114,9 +179,25 @@ export function MarkShippedModal({
                       tap('light');
                       setCourier(c);
                     }}
-                    style={[styles.courierPill, active && styles.courierPillActive]}
+                    style={[
+                      {
+                        paddingHorizontal: 12,
+                        paddingVertical: 7,
+                        borderRadius: 20,
+                        backgroundColor: active ? theme.purpleSoft : theme.panel,
+                        borderWidth: 1,
+                        borderColor: active ? theme.purple : theme.border,
+                      },
+                    ]}
                   >
-                    <Text style={[styles.courierPillText, active && styles.courierPillTextActive]}>
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: active ? '700' : '600',
+                        color: active ? theme.purple : theme.mute,
+                        fontFamily: active ? typography.family.sansBold : typography.family.sansSemibold,
+                      }}
+                    >
                       {c}
                     </Text>
                   </Pressable>
@@ -131,39 +212,84 @@ export function MarkShippedModal({
                   value={customCourier}
                   onChangeText={setCustomCourier}
                   placeholder="Enter courier name"
-                  placeholderTextColor="#9CA3AF"
-                  style={styles.textInput}
+                  placeholderTextColor={theme.muteSoft}
+                  style={{
+                    height: 44,
+                    backgroundColor: theme.panel,
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    borderRadius: 8,
+                    paddingHorizontal: 12,
+                    fontSize: 14,
+                    color: theme.ink,
+                    fontFamily: typography.family.sansMedium,
+                  }}
                 />
               </View>
             )}
 
             {/* Tracking Number Input */}
             <View style={{ marginTop: 8, marginBottom: 14 }}>
-              <Text style={styles.label}>Tracking / Consignment # (Optional)</Text>
+              <Text
+                style={{
+                  fontSize: 12.5,
+                  fontWeight: '600',
+                  color: theme.mute,
+                  fontFamily: typography.family.sansSemibold,
+                  marginBottom: 8,
+                }}
+              >
+                Tracking / Consignment # (Optional)
+              </Text>
               <TextInput
                 value={trackingNumber}
                 onChangeText={setTrackingNumber}
                 placeholder="e.g. 7748920193"
-                placeholderTextColor="#9CA3AF"
-                style={styles.textInput}
+                placeholderTextColor={theme.muteSoft}
+                style={{
+                  height: 44,
+                  backgroundColor: theme.panel,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                  borderRadius: 8,
+                  paddingHorizontal: 12,
+                  fontSize: 14,
+                  color: theme.ink,
+                  fontFamily: typography.family.sansMedium,
+                }}
               />
             </View>
           </ScrollView>
 
           {/* Action Buttons */}
-          <View style={styles.actionsContainer}>
+          <View style={{ paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border }}>
             <Pressable
               disabled={saving}
               onPress={handleConfirm}
               style={({ pressed }) => [
-                styles.confirmBtn,
+                {
+                  height: 48,
+                  backgroundColor: theme.ink,
+                  borderRadius: 10,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                },
                 pressed && { opacity: 0.85, transform: [{ scale: 0.99 }] },
               ]}
             >
               {saving ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
+                <ActivityIndicator color={theme.background} size="small" />
               ) : (
-                <Text style={styles.confirmBtnText}>Confirm Shipment</Text>
+                <Text
+                  style={{
+                    fontSize: 14.5,
+                    fontWeight: '700',
+                    color: theme.background,
+                    fontFamily: typography.family.sansBold,
+                  }}
+                >
+                  Confirm Shipment
+                </Text>
               )}
             </Pressable>
           </View>
@@ -172,128 +298,3 @@ export function MarkShippedModal({
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end',
-    alignItems: 'center',
-    paddingHorizontal: Platform.OS === 'web' ? 16 : 0,
-  } as ViewStyle,
-  sheetContainer: {
-    width: '100%',
-    maxWidth: 480,
-    maxHeight: '85%',
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderRadius: Platform.OS === 'web' ? 24 : 0,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingTop: 18,
-    paddingHorizontal: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 10,
-    overflow: 'hidden',
-  } as ViewStyle,
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  } as ViewStyle,
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111111',
-    fontFamily: 'Inter_700Bold',
-    letterSpacing: -0.3,
-  } as TextStyle,
-  subtitle: {
-    fontSize: 12.5,
-    color: '#6B7280',
-    fontFamily: 'Inter_400Regular',
-    marginTop: 4,
-    lineHeight: 17,
-  } as TextStyle,
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 10,
-  } as ViewStyle,
-  scrollContent: {
-    paddingBottom: 10,
-  } as ViewStyle,
-  label: {
-    fontSize: 12.5,
-    fontWeight: '600',
-    color: '#4B5563',
-    fontFamily: 'Inter_600SemiBold',
-    marginBottom: 8,
-  } as TextStyle,
-  courierRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 14,
-  } as ViewStyle,
-  courierPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F6',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  } as ViewStyle,
-  courierPillActive: {
-    backgroundColor: '#E6F5F6',
-    borderColor: TEAL,
-  },
-  courierPillText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#4B5563',
-    fontFamily: 'Inter_600SemiBold',
-  } as TextStyle,
-  courierPillTextActive: {
-    color: TEAL,
-    fontWeight: '700',
-  } as TextStyle,
-  textInput: {
-    height: 44,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    fontSize: 14,
-    color: '#111111',
-    fontFamily: 'Inter_500Medium',
-  } as TextStyle,
-  actionsContainer: {
-    paddingTop: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E5E7EB',
-  } as ViewStyle,
-  confirmBtn: {
-    height: 48,
-    backgroundColor: '#111111',
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  } as ViewStyle,
-  confirmBtnText: {
-    fontSize: 14.5,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    fontFamily: 'Inter_700Bold',
-  } as TextStyle,
-});

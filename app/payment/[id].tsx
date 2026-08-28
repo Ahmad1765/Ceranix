@@ -16,7 +16,8 @@ import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { getOptimizedImageUrl, cardImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 import * as Haptics from 'expo-haptics';
-import { colors } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
+import { type as typography } from '@/lib/theme';
 import { useListingQuery } from '@/lib/queries';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
@@ -37,8 +38,6 @@ import { getOrCreateConversation } from '@/lib/chat';
 import { setListingSold } from '@/lib/listings';
 import type { ShippingAddress } from '@/types';
 
-const TEAL = '#007782';
-
 function tap(style: 'light' | 'medium' = 'light') {
   if (Platform.OS !== 'ios') return;
   Haptics.impactAsync(
@@ -49,6 +48,7 @@ function tap(style: 'light' | 'medium' = 'light') {
 }
 
 export default function PaymentScreen() {
+  const { theme, isDark } = useTheme();
   const { id, offer, fulfillment: fulfillmentParam, paymentMethod: paymentMethodParam } = useLocalSearchParams<{
     id: string;
     offer?: string;
@@ -146,8 +146,8 @@ export default function PaymentScreen() {
 
   if (authLoading) {
     return (
-      <SafeAreaView style={styles.centerContainer}>
-        <ActivityIndicator color={TEAL} />
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <ActivityIndicator color={theme.purple} />
       </SafeAreaView>
     );
   }
@@ -158,19 +158,30 @@ export default function PaymentScreen() {
 
   if (!listing && id && listingQ.isPending) {
     return (
-      <SafeAreaView style={styles.centerContainer}>
-        <ActivityIndicator color={TEAL} />
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <ActivityIndicator color={theme.purple} />
       </SafeAreaView>
     );
   }
 
   if (!listing) {
     return (
-      <SafeAreaView style={styles.centerContainer}>
-        <Feather name="alert-circle" size={32} color={colors.mute} />
-        <Text style={styles.errorTitle}>Item unavailable</Text>
-        <Pressable onPress={() => safeBack()} style={styles.goBackButton}>
-          <Text style={styles.goBackButtonText}>Go back</Text>
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <Feather name="alert-circle" size={32} color={theme.mute} />
+        <Text style={{ fontSize: 17, fontWeight: '700', color: theme.ink, marginTop: 12, fontFamily: typography.family.sansBold }}>Item unavailable</Text>
+        <Pressable
+          onPress={() => safeBack()}
+          style={{
+            marginTop: 16,
+            height: 44,
+            borderRadius: 10,
+            paddingHorizontal: 20,
+            backgroundColor: theme.ink,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text style={{ color: theme.background, fontWeight: '700', fontSize: 14, fontFamily: typography.family.sansBold }}>Go back</Text>
         </Pressable>
       </SafeAreaView>
     );
@@ -332,74 +343,114 @@ export default function PaymentScreen() {
     : null;
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top', 'bottom']}>
       {/* ── Top Header: [X] Payment ── */}
-      <View style={styles.header}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: 16,
+          paddingTop: 12,
+          paddingBottom: 12,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: theme.border,
+          backgroundColor: theme.surface,
+        }}
+      >
         <Pressable
           onPress={() => safeBack()}
           hitSlop={HIT_SLOP_8}
           accessibilityRole="button"
           accessibilityLabel="Go back"
-          style={({ pressed }) => [styles.closeButton, pressed && { opacity: 0.6 }]}
+          style={({ pressed }) => [
+            {
+              width: 36,
+              height: 36,
+              alignItems: 'center',
+              justifyContent: 'center',
+            },
+            pressed && { opacity: 0.6 },
+          ]}
         >
-          <Feather name="x" size={22} color={colors.ink} />
+          <Feather name="x" size={22} color={theme.ink} />
         </Pressable>
-        <Text style={styles.headerTitle}>Payment</Text>
-        <View style={styles.headerPlaceholder} />
+        <Text style={{ fontSize: 16, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+          Payment
+        </Text>
+        <View style={{ width: 36 }} />
       </View>
 
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 18, paddingBottom: 30 }}
         showsVerticalScrollIndicator={false}
       >
         {/* ── Centered Item Thumbnail ── */}
-        <View style={styles.thumbnailContainer}>
+        <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 22 }}>
           {imageUrl ? (
             <Image
               source={{ uri: imageUrl }}
-              style={styles.thumbnailImage}
+              style={{
+                width: 76,
+                height: 76,
+                borderRadius: 8,
+                backgroundColor: theme.panel,
+                borderWidth: 1,
+                borderColor: theme.border,
+              }}
               contentFit="cover"
               cachePolicy="memory-disk"
               transition={IMAGE_TRANSITION}
             />
           ) : (
-            <View style={[styles.thumbnailImage, styles.thumbnailPlaceholder]}>
-              <Feather name="image" size={24} color={colors.mute} />
+            <View
+              style={{
+                width: 76,
+                height: 76,
+                borderRadius: 8,
+                backgroundColor: theme.panel,
+                borderWidth: 1,
+                borderColor: theme.border,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Feather name="image" size={24} color={theme.mute} />
             </View>
           )}
         </View>
 
         {/* ── Price Breakdown Rows ── */}
-        <View style={styles.breakdownSection}>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Order</Text>
-            <Text style={styles.breakdownValue}>{formatPrice(itemPrice)}</Text>
+        <View style={{ marginBottom: 20 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4.5 }}>
+            <Text style={{ fontSize: 14, color: theme.mute, fontFamily: typography.family.sans }}>Order</Text>
+            <Text style={{ fontSize: 14, color: theme.ink, fontFamily: typography.family.sansMedium }}>{formatPrice(itemPrice)}</Text>
           </View>
 
-          <View style={styles.breakdownRow}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4.5 }}>
             <Pressable
               onPress={() => setBpSheetOpen(true)}
-              style={styles.labelWithInfoPressable}
+              style={{ flexDirection: 'row', alignItems: 'center' }}
               hitSlop={6}
             >
-              <Text style={styles.breakdownLabel}>Buyer protection fee</Text>
-              <Feather name="info" size={13} color="#767676" style={{ marginLeft: 4 }} />
+              <Text style={{ fontSize: 14, color: theme.mute, fontFamily: typography.family.sans }}>Buyer protection fee</Text>
+              <Feather name="info" size={13} color={theme.muteSoft} style={{ marginLeft: 4 }} />
             </Pressable>
-            <Text style={[styles.breakdownValue, bpFee === 0 && { color: '#059669', fontWeight: '600' }]}>
+            <Text style={[{ fontSize: 14, color: theme.ink, fontFamily: typography.family.sansMedium }, bpFee === 0 && { color: '#10B981', fontWeight: '600' }]}>
               {bpFee > 0 ? formatPrice(bpFee) : 'Free'}
             </Text>
           </View>
 
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Shipping</Text>
-            <Text style={[styles.breakdownValue, deliveryFee === 0 && { color: '#059669', fontWeight: '600' }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4.5 }}>
+            <Text style={{ fontSize: 14, color: theme.mute, fontFamily: typography.family.sans }}>Shipping</Text>
+            <Text style={[{ fontSize: 14, color: theme.ink, fontFamily: typography.family.sansMedium }, deliveryFee === 0 && { color: '#10B981', fontWeight: '600' }]}>
               {deliveryFee > 0 ? formatPrice(deliveryFee) : 'Free'}
             </Text>
           </View>
 
           {salesTax > 0 ? (
-            <View style={styles.breakdownRow}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4.5 }}>
               <Pressable
                 onPress={() =>
                   Alert.alert(
@@ -407,36 +458,38 @@ export default function PaymentScreen() {
                     'Standard state and local sales tax calculated based on your shipping address.',
                   )
                 }
-                style={styles.labelWithInfoPressable}
+                style={{ flexDirection: 'row', alignItems: 'center' }}
                 hitSlop={6}
               >
-                <Text style={styles.breakdownLabel}>Sales tax</Text>
-                <Feather name="info" size={13} color="#767676" style={{ marginLeft: 4 }} />
+                <Text style={{ fontSize: 14, color: theme.mute, fontFamily: typography.family.sans }}>Sales tax</Text>
+                <Feather name="info" size={13} color={theme.muteSoft} style={{ marginLeft: 4 }} />
               </Pressable>
-              <Text style={styles.breakdownValue}>{formatPrice(salesTax)}</Text>
+              <Text style={{ fontSize: 14, color: theme.ink, fontFamily: typography.family.sansMedium }}>{formatPrice(salesTax)}</Text>
             </View>
           ) : null}
 
-          <View style={styles.thinDivider} />
+          <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.border, marginVertical: 10 }} />
 
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total to pay</Text>
-            <Text style={styles.totalValue}>{formatPrice(totalAmount)}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 2 }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>Total to pay</Text>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>{formatPrice(totalAmount)}</Text>
           </View>
         </View>
 
         {/* ── Section: Address ── */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionHeader}>Address</Text>
-          <View style={styles.sectionCard}>
-            <View style={styles.addressInfo}>
-              <Text style={styles.addressName}>
+        <View style={{ marginTop: 18 }}>
+          <Text style={{ fontSize: 12.5, fontWeight: '600', color: theme.muteSoft, fontFamily: typography.family.sansSemibold, marginBottom: 8 }}>
+            Address
+          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}>
+            <View style={{ flex: 1, paddingRight: 10 }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold, marginBottom: 2 }}>
                 {shippingAddress?.recipient_name || profile?.full_name || ''}
               </Text>
-              <Text style={styles.addressLine}>
+              <Text style={{ fontSize: 13.5, color: theme.mute, fontFamily: typography.family.sans, lineHeight: 18 }}>
                 {shippingAddress?.line1 || ''}
               </Text>
-              <Text style={styles.addressLine}>
+              <Text style={{ fontSize: 13.5, color: theme.mute, fontFamily: typography.family.sans }}>
                 {shippingAddress
                   ? `${shippingAddress.postal_code || ''} ${shippingAddress.city || ''}${
                       shippingAddress.state ? `, ${shippingAddress.state}` : ''
@@ -449,31 +502,53 @@ export default function PaymentScreen() {
               hitSlop={HIT_SLOP_8}
               accessibilityRole="button"
               accessibilityLabel="Edit shipping address"
-              style={({ pressed }) => [styles.editIconPressable, pressed && { opacity: 0.6 }]}
+              style={({ pressed }) => [
+                {
+                  width: 32,
+                  height: 32,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                },
+                pressed && { opacity: 0.6 },
+              ]}
             >
-              <Feather name="edit-2" size={18} color="#767676" />
+              <Feather name="edit-2" size={18} color={theme.mute} />
             </Pressable>
           </View>
         </View>
 
         {/* ── Section: Delivery details ── */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionHeader}>Delivery details</Text>
-          <View style={styles.deliveryCard}>
-            <View style={styles.deliveryHeaderRow}>
-              <View style={styles.deliveryCarrierRow}>
-                <View style={styles.carrierIconWrapper}>
+        <View style={{ marginTop: 18 }}>
+          <Text style={{ fontSize: 12.5, fontWeight: '600', color: theme.muteSoft, fontFamily: typography.family.sansSemibold, marginBottom: 8 }}>
+            Delivery details
+          </Text>
+          <View style={{ paddingVertical: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 4,
+                    backgroundColor: theme.purple,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: 8,
+                  }}
+                >
                   <Feather name={fulfillment === 'handshake' ? 'map-pin' : 'package'} size={14} color="#FFFFFF" />
                 </View>
-                <Text style={styles.carrierName}>{fulfillment === 'handshake' ? 'In-Person Meetup (Handshake)' : 'Standard Delivery'}</Text>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+                  {fulfillment === 'handshake' ? 'In-Person Meetup (Handshake)' : 'Standard Delivery'}
+                </Text>
               </View>
-              <Text style={[styles.deliveryPrice, deliveryFee === 0 && { color: '#059669', fontWeight: '600' }]}>
+              <Text style={[{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }, deliveryFee === 0 && { color: '#10B981', fontWeight: '600' }]}>
                 {deliveryFee > 0 ? formatPrice(deliveryFee) : 'Free'}
               </Text>
             </View>
-            <View style={styles.deliveryTimeRow}>
-              <Feather name="clock" size={13} color="#767676" style={{ marginRight: 6 }} />
-              <Text style={styles.deliveryTimeText}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
+              <Feather name="clock" size={13} color={theme.muteSoft} style={{ marginRight: 6 }} />
+              <Text style={{ fontSize: 13, color: theme.mute, fontFamily: typography.family.sans }}>
                 {fulfillment === 'handshake' ? 'Meet seller directly in public safe zone' : 'Home delivery, 1 - 3 business days'}
               </Text>
             </View>
@@ -481,72 +556,140 @@ export default function PaymentScreen() {
         </View>
 
         {/* ── Section: Payment ── */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionHeader}>Payment</Text>
+        <View style={{ marginTop: 18 }}>
+          <Text style={{ fontSize: 12.5, fontWeight: '600', color: theme.muteSoft, fontFamily: typography.family.sansSemibold, marginBottom: 8 }}>
+            Payment
+          </Text>
 
           {!hasChosenMethod || (selectedMethod === 'card' && !cardLast4) ? (
             /* Choose Payment Method Row */
             <Pressable
               onPress={() => setPaymentOptionsOpen(true)}
-              style={({ pressed }) => [styles.choosePaymentRow, pressed && { opacity: 0.7 }]}
+              style={({ pressed }) => [
+                {
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingVertical: 10,
+                },
+                pressed && { opacity: 0.7 },
+              ]}
             >
-              <Text style={styles.choosePaymentText}>Choose payment method</Text>
-              <Feather name="plus" size={20} color={colors.ink} />
+              <Text style={{ fontSize: 14, fontWeight: '600', color: theme.ink, fontFamily: typography.family.sansSemibold }}>
+                Choose payment method
+              </Text>
+              <Feather name="plus" size={20} color={theme.ink} />
             </Pressable>
           ) : (
             /* Selected Payment Method Card */
             <View>
-              <View style={styles.selectedPaymentCard}>
-                <View style={styles.cardInfoRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   {selectedMethod === 'card' ? (
                     <>
-                      <View style={styles.visaSmallBadge}>
-                        <Text style={styles.visaSmallText}>{(cardBrand ?? 'VISA').toUpperCase()}</Text>
+                      <View
+                        style={{
+                          paddingHorizontal: 5,
+                          paddingVertical: 2,
+                          borderRadius: 3,
+                          backgroundColor: '#FFFFFF',
+                          borderWidth: 1,
+                          borderColor: '#E0E0E0',
+                          marginRight: 10,
+                        }}
+                      >
+                        <Text style={{ fontSize: 10, fontWeight: '900', color: '#1A1F71', fontStyle: 'italic' }}>
+                          {(cardBrand ?? 'VISA').toUpperCase()}
+                        </Text>
                       </View>
-                      <Text style={styles.cardLast4Text}>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: theme.ink, fontFamily: typography.family.sansSemibold }}>
                         {cardBrand || 'Card'} ending with {cardLast4}
                       </Text>
                     </>
                   ) : selectedMethod === 'apple_pay' ? (
                     <>
-                      <View style={styles.applePaySmallBadge}>
-                        <Ionicons name="logo-apple" size={13} color="#000" />
-                        <Text style={styles.applePaySmallText}>Pay</Text>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingHorizontal: 5,
+                          paddingVertical: 2,
+                          borderRadius: 3,
+                          backgroundColor: isDark ? '#000000' : '#FFFFFF',
+                          borderWidth: 1,
+                          borderColor: isDark ? theme.border : '#111111',
+                          marginRight: 10,
+                        }}
+                      >
+                        <Ionicons name="logo-apple" size={13} color={isDark ? '#FFFFFF' : '#000000'} />
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: isDark ? '#FFFFFF' : '#000000', marginLeft: 2 }}>Pay</Text>
                       </View>
-                      <Text style={styles.cardLast4Text}>Apple Pay</Text>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: theme.ink, fontFamily: typography.family.sansSemibold }}>Apple Pay</Text>
                     </>
                   ) : (
                     <>
-                      <Feather name="package" size={16} color={colors.ink} style={{ marginRight: 8 }} />
-                      <Text style={styles.cardLast4Text}>Cash on Delivery</Text>
+                      <Feather name="package" size={16} color={theme.ink} style={{ marginRight: 8 }} />
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: theme.ink, fontFamily: typography.family.sansSemibold }}>Cash on Delivery</Text>
                     </>
                   )}
                 </View>
                 <Pressable
                   onPress={() => setPaymentOptionsOpen(true)}
                   hitSlop={HIT_SLOP_8}
-                  style={({ pressed }) => [styles.editIconPressable, pressed && { opacity: 0.6 }]}
+                  style={({ pressed }) => [
+                    {
+                      width: 32,
+                      height: 32,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    },
+                    pressed && { opacity: 0.6 },
+                  ]}
                 >
-                  <Feather name="edit-2" size={18} color="#767676" />
+                  <Feather name="edit-2" size={18} color={theme.mute} />
                 </Pressable>
               </View>
 
               {/* Save Card Checkbox Container */}
               {selectedMethod === 'card' && (
-                <View style={styles.saveCardContainer}>
+                <View
+                  style={{
+                    backgroundColor: theme.purpleSoft,
+                    borderRadius: 8,
+                    padding: 12,
+                    marginTop: 10,
+                  }}
+                >
                   <Pressable
                     onPress={() => {
                       tap('light');
                       setSaveCard(!saveCard);
                     }}
-                    style={styles.saveCardRow}
+                    style={{ flexDirection: 'row', alignItems: 'flex-start' }}
                   >
-                    <View style={[styles.checkboxOuter, saveCard && styles.checkboxOuterActive]}>
+                    <View
+                      style={[
+                        {
+                          width: 18,
+                          height: 18,
+                          borderRadius: 4,
+                          borderWidth: 1.5,
+                          borderColor: theme.border,
+                          backgroundColor: theme.surface,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginTop: 1,
+                        },
+                        saveCard && { backgroundColor: theme.purple, borderColor: theme.purple },
+                      ]}
+                    >
                       {saveCard && <Feather name="check" size={12} color="#FFFFFF" />}
                     </View>
                     <View style={{ flex: 1, marginLeft: 10 }}>
-                      <Text style={styles.saveCardTitle}>Save card details for future payments</Text>
-                      <Text style={styles.saveCardSubtitle}>
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: theme.ink, fontFamily: typography.family.sansSemibold }}>
+                        Save card details for future payments
+                      </Text>
+                      <Text style={{ fontSize: 11.5, color: theme.mute, fontFamily: typography.family.sans, marginTop: 2, lineHeight: 15 }}>
                         You can remove the card anytime in Settings, under Payments.
                       </Text>
                     </View>
@@ -559,24 +702,43 @@ export default function PaymentScreen() {
       </ScrollView>
 
       {/* ── Fixed Footer: Trust Note + Pay Button ── */}
-      <View style={styles.footer}>
-        <View style={styles.trustNoteRow}>
-          <Feather name="lock" size={11} color="#8E8E93" style={{ marginRight: 5 }} />
-          <Text style={styles.trustNoteText}>This is a secure encrypted payment</Text>
+      <View
+        style={{
+          paddingHorizontal: 20,
+          paddingTop: 10,
+          paddingBottom: Platform.OS === 'ios' ? 12 : 18,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: theme.border,
+          backgroundColor: theme.surface,
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+          <Feather name="lock" size={11} color={theme.muteSoft} style={{ marginRight: 5 }} />
+          <Text style={{ fontSize: 11.5, color: theme.muteSoft, fontFamily: typography.family.sans }}>
+            This is a secure encrypted payment
+          </Text>
         </View>
 
         <Pressable
           onPress={handlePay}
           disabled={paying}
           style={({ pressed }) => [
-            styles.payButton,
+            {
+              height: 48,
+              backgroundColor: theme.purple,
+              borderRadius: 10,
+              alignItems: 'center',
+              justifyContent: 'center',
+            },
             (pressed || paying) && { opacity: 0.88, transform: [{ scale: 0.99 }] },
           ]}
         >
           {paying ? (
             <ActivityIndicator color="#FFFFFF" size="small" />
           ) : (
-            <Text style={styles.payButtonText}>Pay</Text>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF', fontFamily: typography.family.sansBold, letterSpacing: 0.2 }}>
+              Pay
+            </Text>
           )}
         </Pressable>
       </View>
@@ -606,344 +768,3 @@ export default function PaymentScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  centerContainer: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  errorTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: colors.ink,
-    marginTop: 12,
-  },
-  goBackButton: {
-    marginTop: 16,
-    height: 44,
-    borderRadius: 10,
-    paddingHorizontal: 20,
-    backgroundColor: colors.ink,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  goBackButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#EBEBEB',
-  },
-  closeButton: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111111',
-    fontFamily: 'Inter_700Bold',
-  },
-  headerPlaceholder: {
-    width: 36,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 30,
-  },
-  thumbnailContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 22,
-  },
-  thumbnailImage: {
-    width: 76,
-    height: 76,
-    borderRadius: 8,
-    backgroundColor: '#F3F4F6',
-  },
-  thumbnailPlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  breakdownSection: {
-    marginBottom: 20,
-  },
-  breakdownRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 4.5,
-  },
-  labelWithInfoPressable: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  breakdownLabel: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontFamily: 'Inter_400Regular',
-  },
-  breakdownValue: {
-    fontSize: 14,
-    color: '#111111',
-    fontFamily: 'Inter_400Regular',
-  },
-  thinDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: '#EBEBEB',
-    marginVertical: 10,
-  },
-  totalRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 2,
-  },
-  totalLabel: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#111111',
-    fontFamily: 'Inter_700Bold',
-  },
-  totalValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111111',
-    fontFamily: 'Inter_700Bold',
-  },
-  sectionContainer: {
-    marginTop: 18,
-  },
-  sectionHeader: {
-    fontSize: 12.5,
-    fontWeight: '600',
-    color: '#8E8E93',
-    fontFamily: 'Inter_600SemiBold',
-    marginBottom: 8,
-  },
-  sectionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-  },
-  addressInfo: {
-    flex: 1,
-    paddingRight: 10,
-  },
-  addressName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#111111',
-    fontFamily: 'Inter_700Bold',
-    marginBottom: 2,
-  },
-  addressLine: {
-    fontSize: 13.5,
-    color: '#4B5563',
-    fontFamily: 'Inter_400Regular',
-    lineHeight: 18,
-  },
-  editIconPressable: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deliveryCard: {
-    paddingVertical: 6,
-  },
-  deliveryHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  deliveryCarrierRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  carrierIconWrapper: {
-    width: 22,
-    height: 22,
-    borderRadius: 4,
-    backgroundColor: '#0F2C59',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-  },
-  carrierName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#111111',
-    fontFamily: 'Inter_700Bold',
-  },
-  deliveryPrice: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#111111',
-    fontFamily: 'Inter_700Bold',
-  },
-  deliveryTimeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 6,
-  },
-  deliveryTimeText: {
-    fontSize: 13,
-    color: '#6B7280',
-    fontFamily: 'Inter_400Regular',
-  },
-  choosePaymentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-  },
-  choosePaymentText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#111111',
-    fontFamily: 'Inter_600SemiBold',
-  },
-  selectedPaymentCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-  },
-  cardInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  visaSmallBadge: {
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 3,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    marginRight: 10,
-  },
-  visaSmallText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#1A1F71',
-    fontStyle: 'italic',
-  },
-  applePaySmallBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 3,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#111111',
-    marginRight: 10,
-  },
-  applePaySmallText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#000000',
-    marginLeft: 2,
-  },
-  cardLast4Text: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#111111',
-    fontFamily: 'Inter_600SemiBold',
-  },
-  saveCardContainer: {
-    backgroundColor: '#F3F8F8',
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 10,
-  },
-  saveCardRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  checkboxOuter: {
-    width: 18,
-    height: 18,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    borderColor: '#9CA3AF',
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 1,
-  },
-  checkboxOuterActive: {
-    backgroundColor: TEAL,
-    borderColor: TEAL,
-  },
-  saveCardTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#111111',
-    fontFamily: 'Inter_600SemiBold',
-  },
-  saveCardSubtitle: {
-    fontSize: 11.5,
-    color: '#6B7280',
-    fontFamily: 'Inter_400Regular',
-    marginTop: 2,
-    lineHeight: 15,
-  },
-  footer: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: Platform.OS === 'ios' ? 12 : 18,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#EBEBEB',
-    backgroundColor: '#FFFFFF',
-  },
-  trustNoteRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-  },
-  trustNoteText: {
-    fontSize: 11.5,
-    color: '#8E8E93',
-    fontFamily: 'Inter_400Regular',
-  },
-  payButton: {
-    height: 48,
-    backgroundColor: TEAL,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  payButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    fontFamily: 'Inter_700Bold',
-    letterSpacing: 0.2,
-  },
-});

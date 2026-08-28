@@ -13,7 +13,8 @@ import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import { tap } from '@/lib/haptics';
-import { colors } from '@/lib/theme';
+import { type as typography } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/lib/auth';
 import { RequireAuth } from '@/components/RequireAuth';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -30,6 +31,7 @@ const TEAL = '#007782';
 type FilterStatus = 'all' | 'in_progress' | 'canceled' | 'completed';
 
 function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
+  const { theme } = useTheme();
   const { total } = deriveInvoiceAmounts(order, order.listing?.price, buyerProtectionFee);
   const image = order.listing ? cardImageUrl(order.listing, 0) : '';
   const isCanceled = order.status === 'canceled' || order.status === 'refunded';
@@ -48,45 +50,84 @@ function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
       testID="order-row"
       accessibilityRole="button"
       style={({ pressed }) => [
-        styles.orderRow,
+        {
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+        },
         pressed && { opacity: 0.75 },
       ]}
     >
       {/* Thumbnail */}
-      <View style={styles.thumbnailContainer}>
+      <View
+        style={{
+          width: 58,
+          height: 58,
+          borderRadius: 8,
+          backgroundColor: theme.panel,
+          borderWidth: 1,
+          borderColor: theme.border,
+          overflow: 'hidden',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginRight: 14,
+        }}
+      >
         {image ? (
           <Image
             source={{ uri: getOptimizedImageUrl(image, { width: 160 }) }}
-            style={styles.thumbnailImage}
+            style={{ width: '100%', height: '100%' }}
             contentFit="cover"
             cachePolicy="memory-disk"
             transition={IMAGE_TRANSITION}
           />
         ) : (
-          <Feather name="package" size={20} color="#9CA3AF" />
+          <Feather name="package" size={20} color={theme.muteSoft} />
         )}
       </View>
 
       {/* Item info */}
-      <View style={styles.orderInfo}>
-        <Text style={styles.orderTitle} numberOfLines={1}>
+      <View style={{ flex: 1, marginRight: 10 }}>
+        <Text
+          style={{
+            fontSize: 14.5,
+            fontWeight: '700',
+            color: theme.ink,
+            fontFamily: typography.family.sansBold,
+            marginBottom: 2,
+          }}
+          numberOfLines={1}
+        >
           {order.listing?.title ?? 'Order'}
         </Text>
-        <Text style={styles.orderPrice}>
+        <Text
+          style={{
+            fontSize: 13.5,
+            color: theme.mute,
+            fontFamily: typography.family.sansMedium,
+            marginBottom: 3,
+          }}
+        >
           {formatPrice(total)}
         </Text>
-        <View style={styles.statusRow}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <Feather
             name={isCanceled ? 'x-circle' : isShipped ? 'truck' : 'check-circle'}
             size={12}
-            color={isCanceled ? '#DC2626' : isShipped ? TEAL : '#059669'}
+            color={isCanceled ? '#EF4444' : isShipped ? theme.purple : '#10B981'}
             style={{ marginRight: 4 }}
           />
           <Text
             style={[
-              styles.statusText,
-              isCanceled && { color: '#DC2626' },
-              isShipped && { color: TEAL },
+              {
+                fontSize: 12,
+                fontWeight: '600',
+                color: '#10B981',
+                fontFamily: typography.family.sansSemibold,
+              },
+              isCanceled && { color: '#EF4444' },
+              isShipped && { color: theme.purple },
             ]}
           >
             {isCanceled
@@ -101,21 +142,38 @@ function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
       </View>
 
       {/* Chevron */}
-      <Feather name="chevron-right" size={18} color="#9CA3AF" />
+      <Feather name="chevron-right" size={18} color={theme.muteSoft} />
     </Pressable>
   );
 }
 
 function OrdersSkeleton() {
+  const { theme } = useTheme();
   return (
     <View style={{ paddingVertical: 6 }}>
       {[0, 1, 2].map((i) => (
-        <View key={i} style={styles.skeletonRow}>
-          <View style={styles.skeletonThumb} />
-          <View style={styles.skeletonContent}>
-            <View style={[styles.skeletonBar, { width: '60%', height: 14 }]} />
-            <View style={[styles.skeletonBar, { width: '30%', height: 13 }]} />
-            <View style={[styles.skeletonBar, { width: '45%', height: 12 }]} />
+        <View
+          key={i}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 16,
+            paddingVertical: 14,
+          }}
+        >
+          <View
+            style={{
+              width: 58,
+              height: 58,
+              borderRadius: 8,
+              backgroundColor: theme.panel,
+              marginRight: 14,
+            }}
+          />
+          <View style={{ flex: 1, gap: 6 }}>
+            <View style={{ width: '60%', height: 14, borderRadius: 4, backgroundColor: theme.panel }} />
+            <View style={{ width: '30%', height: 13, borderRadius: 4, backgroundColor: theme.panel }} />
+            <View style={{ width: '45%', height: 12, borderRadius: 4, backgroundColor: theme.panel }} />
           </View>
         </View>
       ))}
@@ -126,6 +184,7 @@ function OrdersSkeleton() {
 function OrdersScreen() {
   const { user } = useAuth();
   const sell = useSellSheet();
+  const { theme } = useTheme();
   const { side: sideParam, justPaid, title: itemTitleParam, amount: amountParam, listingId: listingIdParam } = useLocalSearchParams<{
     side?: string;
     justPaid?: string;
@@ -212,35 +271,94 @@ function OrdersScreen() {
   }, [showToast]);
 
   return (
-    <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
+    <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: theme.background }}>
       {/* ── Top Header: [<] My orders ── */}
-      <View style={styles.header}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: 16,
+          paddingTop: 12,
+          paddingBottom: 12,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: theme.border,
+          backgroundColor: theme.surface,
+        }}
+      >
         <Pressable
           onPress={() => router.push('/(tabs)' as any)}
           hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel="Go back"
-          style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.5 }]}
+          style={({ pressed }) => ({
+            width: 36,
+            height: 36,
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: pressed ? 0.5 : 1,
+          })}
         >
-          <Feather name="arrow-left" size={22} color={colors.ink} />
+          <Feather name="arrow-left" size={22} color={theme.ink} />
         </Pressable>
-        <Text style={styles.headerTitle}>My orders</Text>
-        <View style={styles.headerPlaceholder} />
+        <Text
+          style={{
+            fontSize: 16,
+            fontWeight: '700',
+            color: theme.ink,
+            fontFamily: typography.family.sansBold,
+          }}
+        >
+          My orders
+        </Text>
+        <View style={{ width: 36 }} />
       </View>
 
       {/* ── Segmented Tabs: Sold | Bought ── */}
-      <View style={styles.tabBar}>
+      <View
+        style={{
+          flexDirection: 'row',
+          borderBottomWidth: 1,
+          borderBottomColor: theme.border,
+          backgroundColor: theme.surface,
+        }}
+      >
         <Pressable
           onPress={() => {
             tap();
             setSide('sold');
           }}
-          style={styles.tabButton}
+          style={{
+            flex: 1,
+            paddingVertical: 13,
+            alignItems: 'center',
+            justifyContent: 'center',
+            position: 'relative',
+          }}
         >
-          <Text style={[styles.tabText, side === 'sold' && styles.tabTextActive]}>
+          <Text
+            style={{
+              fontSize: 14.5,
+              fontWeight: side === 'sold' ? '700' : '500',
+              color: side === 'sold' ? theme.ink : theme.mute,
+              fontFamily: side === 'sold' ? typography.family.sansBold : typography.family.sansMedium,
+            }}
+          >
             Sold
           </Text>
-          {side === 'sold' && <View style={styles.tabUnderline} />}
+          {side === 'sold' && (
+            <View
+              style={{
+                position: 'absolute',
+                bottom: -1,
+                left: 24,
+                right: 24,
+                height: 2.5,
+                backgroundColor: theme.purple,
+                borderRadius: 1.5,
+              }}
+            />
+          )}
         </Pressable>
 
         <Pressable
@@ -248,17 +366,53 @@ function OrdersScreen() {
             tap();
             setSide('bought');
           }}
-          style={styles.tabButton}
+          style={{
+            flex: 1,
+            paddingVertical: 13,
+            alignItems: 'center',
+            justifyContent: 'center',
+            position: 'relative',
+          }}
         >
-          <Text style={[styles.tabText, side === 'bought' && styles.tabTextActive]}>
+          <Text
+            style={{
+              fontSize: 14.5,
+              fontWeight: side === 'bought' ? '700' : '500',
+              color: side === 'bought' ? theme.ink : theme.mute,
+              fontFamily: side === 'bought' ? typography.family.sansBold : typography.family.sansMedium,
+            }}
+          >
             Bought
           </Text>
-          {side === 'bought' && <View style={styles.tabUnderline} />}
+          {side === 'bought' && (
+            <View
+              style={{
+                position: 'absolute',
+                bottom: -1,
+                left: 24,
+                right: 24,
+                height: 2.5,
+                backgroundColor: theme.purple,
+                borderRadius: 1.5,
+              }}
+            />
+          )}
         </Pressable>
       </View>
 
       {/* ── Filter Pills: All | In progress | Canceled | Completed ── */}
-      <View style={styles.filterRow}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+          gap: 8,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: theme.border,
+          backgroundColor: theme.surface,
+        }}
+      >
         {(
           [
             { key: 'all', label: 'All' },
@@ -276,12 +430,25 @@ function OrdersScreen() {
                 setFilter(item.key);
               }}
               style={({ pressed }) => [
-                styles.filterPill,
-                active ? styles.filterPillActive : styles.filterPillInactive,
+                {
+                  paddingHorizontal: 14,
+                  paddingVertical: 6.5,
+                  borderRadius: 20,
+                  borderWidth: 1,
+                  backgroundColor: active ? theme.purpleSoft : theme.panel,
+                  borderColor: active ? theme.purple : theme.border,
+                },
                 pressed && { opacity: 0.75 },
               ]}
             >
-              <Text style={[styles.filterPillText, active && styles.filterPillTextActive]}>
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: active ? '700' : '500',
+                  color: active ? theme.purple : theme.mute,
+                  fontFamily: active ? typography.family.sansBold : typography.family.sansMedium,
+                }}
+              >
                 {item.label}
               </Text>
             </Pressable>
@@ -293,7 +460,7 @@ function OrdersScreen() {
       {q.isPending && (side === 'sold' ? sold.length === 0 : allBoughtOrders.length === 0) ? (
         <OrdersSkeleton />
       ) : rows.length === 0 ? (
-        <View style={styles.emptyContainer}>
+        <View style={{ flex: 1, justifyContent: 'center', padding: 24 }}>
           <EmptyState
             icon="shopping-bag"
             title={
@@ -326,32 +493,67 @@ function OrdersScreen() {
           data={rows}
           keyExtractor={(o) => o.id}
           renderItem={({ item }) => <OrderRow order={item} side={side} />}
-          ItemSeparatorComponent={() => <View style={styles.rowDivider} />}
-          contentContainerStyle={styles.listContent}
+          ItemSeparatorComponent={() => (
+            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.border, marginLeft: 88 }} />
+          )}
+          contentContainerStyle={{ paddingVertical: 4, paddingBottom: 40 }}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
               refreshing={q.isRefetching}
               onRefresh={onRefresh}
-              tintColor={TEAL}
+              tintColor={theme.purple}
             />
           }
         />
       )}
 
-      {/* ── Toast Popup Banner at Bottom (Image 2 Screen 2) ── */}
+      {/* ── Toast Popup Banner at Bottom ── */}
       {showToast && (
-        <View style={styles.toastContainer}>
-          <View style={styles.toastCard}>
+        <View
+          style={{
+            position: 'absolute',
+            left: 16,
+            right: 16,
+            bottom: Platform.OS === 'ios' ? 24 : 16,
+            zIndex: 99,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: theme.panel,
+              borderWidth: 1,
+              borderColor: theme.border,
+              borderRadius: 10,
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 8,
+              elevation: 6,
+            }}
+          >
             <View style={{ flex: 1 }}>
-              <Text style={styles.toastText}>
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: '500',
+                  color: theme.ink,
+                  fontFamily: typography.family.sansMedium,
+                  lineHeight: 18,
+                }}
+              >
                 {justPaid === '1'
                   ? "Thank you, we have received your payment. It's being processed."
                   : "Your order has been placed. It's being processed."}
               </Text>
             </View>
             <Pressable onPress={() => setShowToast(false)} hitSlop={8} style={{ paddingLeft: 10 }}>
-              <Feather name="x" size={16} color="#FFFFFF" />
+              <Feather name="x" size={16} color={theme.ink} />
             </Pressable>
           </View>
         </View>
@@ -367,212 +569,3 @@ export default function Orders() {
     </RequireAuth>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#EBEBEB',
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111111',
-    fontFamily: 'Inter_700Bold',
-  },
-  headerPlaceholder: {
-    width: 36,
-  },
-  tabBar: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#EBEBEB',
-    backgroundColor: '#FFFFFF',
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  tabText: {
-    fontSize: 14.5,
-    fontWeight: '500',
-    color: '#767676',
-    fontFamily: 'Inter_500Medium',
-  },
-  tabTextActive: {
-    fontWeight: '700',
-    color: '#111111',
-    fontFamily: 'Inter_700Bold',
-  },
-  tabUnderline: {
-    position: 'absolute',
-    bottom: -1,
-    left: 24,
-    right: 24,
-    height: 2.5,
-    backgroundColor: TEAL,
-    borderRadius: 1.5,
-  },
-  filterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#F0F0F0',
-  },
-  filterPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 6.5,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  filterPillActive: {
-    backgroundColor: '#E6F5F6',
-    borderColor: TEAL,
-  },
-  filterPillInactive: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E0E0E0',
-  },
-  filterPillText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#4B5563',
-    fontFamily: 'Inter_500Medium',
-  },
-  filterPillTextActive: {
-    fontWeight: '700',
-    color: TEAL,
-    fontFamily: 'Inter_700Bold',
-  },
-  listContent: {
-    paddingVertical: 4,
-    paddingBottom: 40,
-  },
-  orderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  thumbnailContainer: {
-    width: 58,
-    height: 58,
-    borderRadius: 8,
-    backgroundColor: '#F3F4F6',
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-  },
-  thumbnailImage: {
-    width: '100%',
-    height: '100%',
-  },
-  orderInfo: {
-    flex: 1,
-    marginRight: 10,
-  },
-  orderTitle: {
-    fontSize: 14.5,
-    fontWeight: '700',
-    color: '#111111',
-    fontFamily: 'Inter_700Bold',
-    marginBottom: 2,
-  },
-  orderPrice: {
-    fontSize: 13.5,
-    color: '#4B5563',
-    fontFamily: 'Inter_500Medium',
-    marginBottom: 3,
-  },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#059669',
-    fontFamily: 'Inter_600SemiBold',
-  },
-  rowDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: '#EBEBEB',
-    marginLeft: 88,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 24,
-  },
-  skeletonRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  skeletonThumb: {
-    width: 58,
-    height: 58,
-    borderRadius: 8,
-    backgroundColor: '#F3F4F6',
-    marginRight: 14,
-  },
-  skeletonContent: {
-    flex: 1,
-    gap: 6,
-  },
-  skeletonBar: {
-    borderRadius: 4,
-    backgroundColor: '#F3F4F6',
-  },
-  toastContainer: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: Platform.OS === 'ios' ? 24 : 16,
-    zIndex: 99,
-  },
-  toastCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#1E293B',
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  toastText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#FFFFFF',
-    fontFamily: 'Inter_500Medium',
-    lineHeight: 18,
-  },
-});

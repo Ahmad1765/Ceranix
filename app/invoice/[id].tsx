@@ -6,7 +6,8 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
-import { colors } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
+import { type as typography } from '@/lib/theme';
 import { useListingQuery } from '@/lib/queries';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
@@ -70,6 +71,7 @@ export default function InvoiceScreen() {
   }>();
   const { profile, user } = useAuth();
   const toast = useToast();
+  const { theme, isDark } = useTheme();
 
   const listingQ = useListingQuery(id ? String(id) : null);
   const listing = listingQ.data ?? null;
@@ -141,9 +143,9 @@ export default function InvoiceScreen() {
 
   if (!listing && id && listingQ.isPending) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={colors.ink} />
+          <ActivityIndicator color={theme.ink} />
         </View>
       </SafeAreaView>
     );
@@ -151,7 +153,7 @@ export default function InvoiceScreen() {
 
   if (!listing) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }}>
         <View
           style={{
             flex: 1,
@@ -160,12 +162,12 @@ export default function InvoiceScreen() {
             paddingHorizontal: 32,
           }}
         >
-          <Feather name="file-text" size={28} color={colors.mute} />
+          <Feather name="file-text" size={28} color={theme.mute} />
           <Text
             style={{
               fontSize: 17,
               fontWeight: '800',
-              color: colors.ink,
+              color: theme.ink,
               marginTop: 14,
               letterSpacing: -0.3,
             }}
@@ -175,7 +177,7 @@ export default function InvoiceScreen() {
           <Text
             style={{
               fontSize: 13,
-              color: colors.mute,
+              color: theme.mute,
               marginTop: 6,
               textAlign: 'center',
               lineHeight: 19,
@@ -190,13 +192,13 @@ export default function InvoiceScreen() {
               height: 48,
               borderRadius: 14,
               paddingHorizontal: 24,
-              backgroundColor: colors.ink,
+              backgroundColor: theme.ink,
               alignItems: 'center',
               justifyContent: 'center',
               opacity: pressed ? 0.85 : 1,
             })}
           >
-            <Text style={{ color: colors.white, fontWeight: '800', fontSize: 14 }}>
+            <Text style={{ color: theme.background, fontWeight: '800', fontSize: 14 }}>
               Go back
             </Text>
           </Pressable>
@@ -386,7 +388,7 @@ export default function InvoiceScreen() {
   const isShipped = Boolean(order?.shipped_at || (order as any)?.tracking_number);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F9FAFB' }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top']}>
       {/* Top bar */}
       <View
         style={{
@@ -396,9 +398,9 @@ export default function InvoiceScreen() {
           paddingHorizontal: 20,
           paddingTop: 6,
           paddingBottom: 14,
-          backgroundColor: '#FFFFFF',
+          backgroundColor: theme.surface,
           borderBottomWidth: 1,
-          borderBottomColor: '#E5E7EB',
+          borderBottomColor: theme.border,
         }}
       >
         <Pressable
@@ -413,10 +415,10 @@ export default function InvoiceScreen() {
             opacity: pressed ? 0.55 : 1,
           })}
         >
-          <Feather name="arrow-left" size={20} color={colors.ink} />
+          <Feather name="arrow-left" size={20} color={theme.ink} />
         </Pressable>
 
-        <Text style={{ fontSize: 17, fontWeight: '700', color: colors.ink, fontFamily: 'Inter_700Bold' }}>
+        <Text style={{ fontSize: 17, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
           Order Details
         </Text>
 
@@ -432,7 +434,7 @@ export default function InvoiceScreen() {
             opacity: pressed ? 0.55 : 1,
           })}
         >
-          <Feather name="share" size={18} color={colors.ink} />
+          <Feather name="share" size={18} color={theme.ink} />
         </Pressable>
       </View>
 
@@ -457,11 +459,11 @@ export default function InvoiceScreen() {
         <View
           style={{
             marginHorizontal: 16,
-            backgroundColor: '#FFFFFF',
+            backgroundColor: theme.white,
             borderRadius: 16,
             padding: 16,
             borderWidth: 1,
-            borderColor: '#E5E7EB',
+            borderColor: theme.border,
             marginBottom: 14,
           }}
         >
@@ -471,7 +473,9 @@ export default function InvoiceScreen() {
                 width: 64,
                 height: 64,
                 borderRadius: 12,
-                backgroundColor: '#F3F4F6',
+                backgroundColor: theme.panel,
+                borderWidth: 1,
+                borderColor: theme.border,
                 overflow: 'hidden',
                 marginRight: 14,
                 alignItems: 'center',
@@ -487,18 +491,18 @@ export default function InvoiceScreen() {
                   transition={IMAGE_TRANSITION}
                 />
               ) : (
-                <Feather name="package" size={24} color="#9CA3AF" />
+                <Feather name="package" size={24} color={theme.muteSoft} />
               )}
             </View>
 
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: '#111111', fontFamily: 'Inter_700Bold' }} numberOfLines={1}>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }} numberOfLines={1}>
                 {listing.title}
               </Text>
-              <Text style={{ fontSize: 13, color: '#6B7280', marginTop: 2, textTransform: 'capitalize' }}>
+              <Text style={{ fontSize: 13, color: theme.mute, marginTop: 2, textTransform: 'capitalize', fontFamily: typography.family.sans }}>
                 {listing.category} · Ref #{invoiceNumber}
               </Text>
-              <Text style={{ fontSize: 16, fontWeight: '800', color: TEAL, marginTop: 4, fontFamily: 'Inter_700Bold' }}>
+              <Text style={{ fontSize: 16, fontWeight: '800', color: theme.purple, marginTop: 4, fontFamily: typography.family.sansBold }}>
                 {formatPrice(itemPrice)}
               </Text>
             </View>
@@ -510,32 +514,32 @@ export default function InvoiceScreen() {
           <View
             style={{
               marginHorizontal: 16,
-              backgroundColor: '#FFFFFF',
+              backgroundColor: theme.white,
               borderRadius: 16,
               padding: 16,
               borderWidth: 1,
-              borderColor: '#E5E7EB',
+              borderColor: theme.border,
               marginBottom: 14,
             }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-              <Feather name="map-pin" size={16} color={TEAL} style={{ marginRight: 8 }} />
-              <Text style={{ fontSize: 14, fontWeight: '700', color: '#111111', fontFamily: 'Inter_700Bold' }}>
+              <Feather name="map-pin" size={16} color={theme.purple} style={{ marginRight: 8 }} />
+              <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
                 Delivery Address
               </Text>
             </View>
 
-            <Text style={{ fontSize: 14, fontWeight: '600', color: '#111111', marginBottom: 2 }}>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: theme.ink, fontFamily: typography.family.sansSemibold, marginBottom: 2 }}>
               {order.shipping_address.recipient_name || buyerName}
             </Text>
-            <Text style={{ fontSize: 13, color: '#4B5563', lineHeight: 18 }}>
+            <Text style={{ fontSize: 13, color: theme.mute, fontFamily: typography.family.sans, lineHeight: 18 }}>
               {[order.shipping_address.line1, order.shipping_address.line2].filter(Boolean).join(', ')}
             </Text>
-            <Text style={{ fontSize: 13, color: '#4B5563' }}>
+            <Text style={{ fontSize: 13, color: theme.mute, fontFamily: typography.family.sans }}>
               {[order.shipping_address.city, order.shipping_address.state, order.shipping_address.postal_code, order.shipping_address.country].filter(Boolean).join(', ')}
             </Text>
             {order.shipping_address.phone ? (
-              <Text style={{ fontSize: 12.5, color: '#6B7280', marginTop: 4 }}>
+              <Text style={{ fontSize: 12.5, color: theme.muteSoft, fontFamily: typography.family.sans, marginTop: 4 }}>
                 📞 {order.shipping_address.phone}
               </Text>
             ) : null}
@@ -545,8 +549,8 @@ export default function InvoiceScreen() {
                 onPress={() => Linking.openURL(mapsUrl)}
                 style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10 }}
               >
-                <Feather name="external-link" size={13} color={TEAL} style={{ marginRight: 4 }} />
-                <Text style={{ fontSize: 12.5, fontWeight: '600', color: TEAL }}>
+                <Feather name="external-link" size={13} color={theme.purple} style={{ marginRight: 4 }} />
+                <Text style={{ fontSize: 12.5, fontWeight: '600', color: theme.purple, fontFamily: typography.family.sansSemibold }}>
                   Open in Google Maps
                 </Text>
               </Pressable>
@@ -558,42 +562,42 @@ export default function InvoiceScreen() {
         <View
           style={{
             marginHorizontal: 16,
-            backgroundColor: '#FFFFFF',
+            backgroundColor: theme.white,
             borderRadius: 16,
             padding: 16,
             borderWidth: 1,
-            borderColor: '#E5E7EB',
+            borderColor: theme.border,
             marginBottom: 14,
           }}
         >
-          <Text style={{ fontSize: 14, fontWeight: '700', color: '#111111', fontFamily: 'Inter_700Bold', marginBottom: 12 }}>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold, marginBottom: 12 }}>
             Payment Summary
           </Text>
 
-          <MetaRow label="Item Price">
-            <Text style={MetaValue}>{formatPrice(itemPrice)}</Text>
+          <MetaRow label="Item Price" theme={theme}>
+            <Text style={{ fontSize: 13.5, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>{formatPrice(itemPrice)}</Text>
           </MetaRow>
-          <MetaRow label="Buyer Protection">
-            <Text style={[MetaValue, { color: '#059669' }]}>Free</Text>
+          <MetaRow label="Buyer Protection" theme={theme}>
+            <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#10B981', fontFamily: typography.family.sansBold }}>Free</Text>
           </MetaRow>
-          <MetaRow label="Standard Shipping">
-            <Text style={[MetaValue, { color: '#059669' }]}>Free</Text>
-          </MetaRow>
-
-          <View style={{ height: 1, backgroundColor: '#E5E7EB', marginVertical: 10 }} />
-
-          <MetaRow label="Total Amount">
-            <Text style={[MetaValue, { fontSize: 16, color: '#111111' }]}>{formatPrice(total)}</Text>
+          <MetaRow label="Standard Shipping" theme={theme}>
+            <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#10B981', fontFamily: typography.family.sansBold }}>Free</Text>
           </MetaRow>
 
-          <MetaRow label="Payment Method">
+          <View style={{ height: 1, backgroundColor: theme.border, marginVertical: 10 }} />
+
+          <MetaRow label="Total Amount" theme={theme}>
+            <Text style={{ fontSize: 16, fontWeight: '800', color: theme.ink, fontFamily: typography.family.sansBold }}>{formatPrice(total)}</Text>
+          </MetaRow>
+
+          <MetaRow label="Payment Method" theme={theme}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Feather
                 name={order?.payment_method === 'cod' ? 'truck' : 'credit-card'}
                 size={14}
-                color={TEAL}
+                color={theme.purple}
               />
-              <Text style={MetaValue}>
+              <Text style={{ fontSize: 13.5, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
                 {order?.payment_method === 'cod' ? 'Cash on Delivery' : 'Card Payment'}
               </Text>
             </View>
@@ -606,12 +610,21 @@ export default function InvoiceScreen() {
           <Pressable
             onPress={handleContactOtherUser}
             style={({ pressed }) => [
-              styles.secondaryActionBtn,
+              {
+                height: 46,
+                borderRadius: 12,
+                backgroundColor: theme.surface,
+                borderWidth: 1,
+                borderColor: theme.border,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+              },
               pressed && { opacity: 0.75 },
             ]}
           >
-            <Feather name="message-circle" size={16} color="#111111" style={{ marginRight: 8 }} />
-            <Text style={styles.secondaryActionBtnText}>
+            <Feather name="message-circle" size={16} color={theme.ink} style={{ marginRight: 8 }} />
+            <Text style={{ fontSize: 14, fontWeight: '600', color: theme.ink, fontFamily: typography.family.sansSemibold }}>
               {isSeller ? 'Message Buyer' : 'Message Seller'}
             </Text>
           </Pressable>
@@ -621,12 +634,21 @@ export default function InvoiceScreen() {
             <Pressable
               onPress={onShareDispatchSlip}
               style={({ pressed }) => [
-                styles.secondaryActionBtn,
+                {
+                  height: 46,
+                  borderRadius: 12,
+                  backgroundColor: theme.surface,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                },
                 pressed && { opacity: 0.75 },
               ]}
             >
-              <Feather name="printer" size={16} color="#111111" style={{ marginRight: 8 }} />
-              <Text style={styles.secondaryActionBtnText}>Share Dispatch Slip</Text>
+              <Feather name="printer" size={16} color={theme.ink} style={{ marginRight: 8 }} />
+              <Text style={{ fontSize: 14, fontWeight: '600', color: theme.ink, fontFamily: typography.family.sansSemibold }}>Share Dispatch Slip</Text>
             </Pressable>
           )}
 
@@ -635,12 +657,22 @@ export default function InvoiceScreen() {
             <Pressable
               onPress={() => setShowCancelModal(true)}
               style={({ pressed }) => [
-                styles.cancelOrderBtn,
+                {
+                  height: 44,
+                  borderRadius: 12,
+                  backgroundColor: isDark ? 'rgba(239, 68, 68, 0.12)' : '#FEF2F2',
+                  borderWidth: 1,
+                  borderColor: isDark ? 'rgba(239, 68, 68, 0.25)' : '#FECACA',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginTop: 4,
+                },
                 pressed && { opacity: 0.75 },
               ]}
             >
-              <Feather name="x-octagon" size={15} color="#DC2626" style={{ marginRight: 6 }} />
-              <Text style={styles.cancelOrderBtnText}>
+              <Feather name="x-octagon" size={15} color="#EF4444" style={{ marginRight: 6 }} />
+              <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#EF4444', fontFamily: typography.family.sansBold }}>
                 {isSeller ? 'Cancel Sale' : 'Cancel Order'}
               </Text>
             </Pressable>
@@ -649,27 +681,63 @@ export default function InvoiceScreen() {
       </ScrollView>
 
       {/* ── Fixed Bottom Primary Action Bar ── */}
-      <View style={styles.bottomBar}>
+      <View
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          backgroundColor: theme.surface,
+          borderTopWidth: 1,
+          borderTopColor: theme.border,
+          paddingHorizontal: 16,
+          paddingTop: 12,
+          paddingBottom: Platform.OS === 'ios' ? 28 : 16,
+        }}
+      >
         {status === 'canceled' || order?.status === 'canceled' ? (
-          <View style={styles.statusBannerCanceled}>
-            <Feather name="x-circle" size={16} color="#DC2626" />
-            <Text style={styles.statusBannerCanceledText}>This order is canceled</Text>
+          <View
+            style={{
+              height: 48,
+              borderRadius: 12,
+              backgroundColor: theme.panel,
+              borderWidth: 1,
+              borderColor: theme.border,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+            }}
+          >
+            <Feather name="x-circle" size={16} color="#EF4444" />
+            <Text style={{ fontSize: 14, fontWeight: '700', color: theme.mute, fontFamily: typography.family.sansBold }}>
+              This order is canceled
+            </Text>
           </View>
         ) : isSeller && order?.payment_method === 'cod' && order?.status === 'pending' ? (
           <Pressable
             onPress={handleCompleteCodOrder}
             disabled={completingCod}
             style={({ pressed }) => [
-              styles.primaryBtn,
+              {
+                height: 48,
+                borderRadius: 12,
+                backgroundColor: theme.ink,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+              },
               pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
             ]}
           >
             {completingCod ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
+              <ActivityIndicator color={theme.background} size="small" />
             ) : (
               <>
-                <Feather name="check-circle" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
-                <Text style={styles.primaryBtnText}>Mark CoD Delivered & Paid</Text>
+                <Feather name="check-circle" size={16} color={theme.background} style={{ marginRight: 8 }} />
+                <Text style={{ fontSize: 15, fontWeight: '700', color: theme.background, fontFamily: typography.family.sansBold }}>
+                  Mark CoD Delivered & Paid
+                </Text>
               </>
             )}
           </Pressable>
@@ -677,19 +745,35 @@ export default function InvoiceScreen() {
           <Pressable
             onPress={() => setShowShipModal(true)}
             style={({ pressed }) => [
-              styles.primaryBtn,
+              {
+                height: 48,
+                borderRadius: 12,
+                backgroundColor: theme.ink,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+              },
               pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
             ]}
           >
-            <Feather name="truck" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
-            <Text style={styles.primaryBtnText}>Mark as Shipped</Text>
+            <Feather name="truck" size={16} color={theme.background} style={{ marginRight: 8 }} />
+            <Text style={{ fontSize: 15, fontWeight: '700', color: theme.background, fontFamily: typography.family.sansBold }}>
+              Mark as Shipped
+            </Text>
           </Pressable>
         ) : isBuyer && isShipped && order?.status !== 'completed' ? (
           <Pressable
             onPress={handleConfirmReceived}
             disabled={completingReceipt}
             style={({ pressed }) => [
-              styles.primaryBtnTeal,
+              {
+                height: 48,
+                borderRadius: 12,
+                backgroundColor: theme.purple,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+              },
               pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
             ]}
           >
@@ -698,7 +782,9 @@ export default function InvoiceScreen() {
             ) : (
               <>
                 <Feather name="check" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
-                <Text style={styles.primaryBtnText}>Confirm Delivery (Everything is OK)</Text>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF', fontFamily: typography.family.sansBold }}>
+                  Confirm Delivery (Everything is OK)
+                </Text>
               </>
             )}
           </Pressable>
@@ -706,12 +792,19 @@ export default function InvoiceScreen() {
           <Pressable
             onPress={handleContactOtherUser}
             style={({ pressed }) => [
-              styles.primaryBtn,
+              {
+                height: 48,
+                borderRadius: 12,
+                backgroundColor: theme.ink,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+              },
               pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
             ]}
           >
-            <Feather name="message-circle" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
-            <Text style={styles.primaryBtnText}>
+            <Feather name="message-circle" size={16} color={theme.background} style={{ marginRight: 8 }} />
+            <Text style={{ fontSize: 15, fontWeight: '700', color: theme.background, fontFamily: typography.family.sansBold }}>
               {isSeller ? 'Chat with Buyer' : 'Chat with Seller'}
             </Text>
           </Pressable>
@@ -736,7 +829,7 @@ export default function InvoiceScreen() {
   );
 }
 
-function MetaRow({ label, children }: { label: string; children: React.ReactNode }) {
+function MetaRow({ label, children, theme }: { label: string; children: React.ReactNode; theme: any }) {
   return (
     <View
       style={{
@@ -746,106 +839,8 @@ function MetaRow({ label, children }: { label: string; children: React.ReactNode
         paddingVertical: 8,
       }}
     >
-      <Text style={MetaLabel}>{label}</Text>
+      <Text style={{ fontSize: 13.5, color: theme.mute, fontFamily: typography.family.sansMedium }}>{label}</Text>
       {children}
     </View>
   );
 }
-
-const MetaLabel = {
-  fontSize: 13.5,
-  color: '#6B7280',
-  fontFamily: 'Inter_500Medium',
-};
-
-const MetaValue = {
-  fontSize: 13.5,
-  fontWeight: '700' as const,
-  color: '#111111',
-  fontFamily: 'Inter_700Bold',
-};
-
-const styles = StyleSheet.create({
-  secondaryActionBtn: {
-    height: 46,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  secondaryActionBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#111111',
-    fontFamily: 'Inter_600SemiBold',
-  },
-  cancelOrderBtn: {
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
-  },
-  cancelOrderBtnText: {
-    fontSize: 13.5,
-    fontWeight: '700',
-    color: '#DC2626',
-    fontFamily: 'Inter_700Bold',
-  },
-  bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 16,
-  },
-  primaryBtn: {
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: '#111111',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryBtnTeal: {
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: TEAL,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryBtnText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    fontFamily: 'Inter_700Bold',
-  },
-  statusBannerCanceled: {
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: '#F3F4F6',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  statusBannerCanceledText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#6B7280',
-    fontFamily: 'Inter_700Bold',
-  },
-});

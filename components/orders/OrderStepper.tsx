@@ -1,9 +1,9 @@
 import React from 'react';
-import { View, StyleSheet, ViewStyle, TextStyle } from 'react-native';
+import { View } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
-
-const TEAL = '#007782';
+import { useTheme } from '@/context/ThemeContext';
+import { type as typography } from '@/lib/theme';
 
 export interface OrderStepperProps {
   status: 'pending' | 'paid' | 'shipped' | 'delivered' | 'completed' | 'canceled' | 'refunded' | 'refund_due' | 'failed' | string;
@@ -24,16 +24,41 @@ export function OrderStepper({
   cancelReason,
   isSeller = false,
 }: OrderStepperProps) {
+  const { theme, isDark } = useTheme();
+
   if (status === 'canceled' || status === 'refunded' || status === 'failed') {
     return (
-      <View style={styles.canceledCard}>
-        <View style={styles.canceledHeader}>
-          <Feather name="x-circle" size={20} color="#DC2626" style={{ marginRight: 8 }} />
-          <Text style={styles.canceledTitle}>
+      <View
+        style={{
+          backgroundColor: isDark ? 'rgba(239, 68, 68, 0.12)' : '#FEF2F2',
+          borderRadius: 14,
+          borderWidth: 1,
+          borderColor: isDark ? 'rgba(239, 68, 68, 0.25)' : '#FECACA',
+          padding: 14,
+          marginBottom: 16,
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+          <Feather name="x-circle" size={20} color="#EF4444" style={{ marginRight: 8 }} />
+          <Text
+            style={{
+              fontSize: 15,
+              fontWeight: '700',
+              color: '#EF4444',
+              fontFamily: typography.family.sansBold,
+            }}
+          >
             {status === 'refunded' ? 'Order Refunded' : status === 'failed' ? 'Order Failed' : 'Order Canceled'}
           </Text>
         </View>
-        <Text style={styles.canceledSubtitle}>
+        <Text
+          style={{
+            fontSize: 12.5,
+            color: isDark ? '#FCA5A5' : '#991B1B',
+            fontFamily: typography.family.sans,
+            lineHeight: 17,
+          }}
+        >
           {cancelReason
             ? `Reason: ${cancelReason}`
             : status === 'failed'
@@ -77,8 +102,17 @@ export function OrderStepper({
   ];
 
   return (
-    <View style={styles.container}>
-      <View style={styles.stepsRow}>
+    <View
+      style={{
+        backgroundColor: theme.white,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: theme.border,
+        padding: 16,
+        marginBottom: 16,
+      }}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         {steps.map((step, index) => {
           const stepNum = index + 1;
           const isDone = stepNum < currentStage;
@@ -88,28 +122,72 @@ export function OrderStepper({
           return (
             <React.Fragment key={step.title}>
               {/* Step Circle + Labels */}
-              <View style={styles.stepColumn}>
+              <View style={{ alignItems: 'center', width: 68 }}>
                 <View
                   style={[
-                    styles.circle,
-                    isDone && styles.circleDone,
-                    isCurrent && styles.circleCurrent,
-                    isUpcoming && styles.circleUpcoming,
+                    {
+                      width: 26,
+                      height: 26,
+                      borderRadius: 13,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: 6,
+                    },
+                    isDone && { backgroundColor: '#10B981' },
+                    isCurrent && {
+                      backgroundColor: theme.purpleSoft,
+                      borderWidth: 2,
+                      borderColor: theme.purple,
+                    },
+                    isUpcoming && { backgroundColor: theme.panel },
                   ]}
                 >
                   {isDone ? (
                     <Feather name="check" size={12} color="#FFFFFF" />
                   ) : isCurrent ? (
-                    <View style={styles.activeDot} />
+                    <View
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 4,
+                        backgroundColor: theme.purple,
+                      }}
+                    />
                   ) : (
-                    <Text style={styles.stepNumText}>{stepNum}</Text>
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: '600',
+                        color: theme.muteSoft,
+                        fontFamily: typography.family.sansSemibold,
+                      }}
+                    >
+                      {stepNum}
+                    </Text>
                   )}
                 </View>
 
-                <Text style={[styles.stepTitle, isCurrent && styles.stepTitleCurrent]}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: isCurrent ? '800' : '600',
+                    color: isCurrent ? theme.ink : theme.mute,
+                    fontFamily: isCurrent ? typography.family.sansBold : typography.family.sansSemibold,
+                    textAlign: 'center',
+                  }}
+                >
                   {step.title}
                 </Text>
-                <Text style={styles.stepSubtitle} numberOfLines={1}>
+                <Text
+                  style={{
+                    fontSize: 10.5,
+                    color: theme.muteSoft,
+                    fontFamily: typography.family.sans,
+                    textAlign: 'center',
+                    marginTop: 2,
+                  }}
+                  numberOfLines={1}
+                >
                   {step.subtitle}
                 </Text>
               </View>
@@ -117,10 +195,13 @@ export function OrderStepper({
               {/* Connecting Line between steps */}
               {index < steps.length - 1 && (
                 <View
-                  style={[
-                    styles.connectorLine,
-                    stepNum < currentStage && styles.connectorLineDone,
-                  ]}
+                  style={{
+                    flex: 1,
+                    height: 2,
+                    backgroundColor: stepNum < currentStage ? '#10B981' : theme.border,
+                    marginTop: 12,
+                    marginHorizontal: -4,
+                  }}
                 />
               )}
             </React.Fragment>
@@ -130,9 +211,26 @@ export function OrderStepper({
 
       {/* Tracking info badge if shipped */}
       {trackingNumber ? (
-        <View style={styles.trackingBadge}>
-          <Feather name="truck" size={14} color={TEAL} style={{ marginRight: 6 }} />
-          <Text style={styles.trackingText}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            alignSelf: 'center',
+            backgroundColor: theme.purpleSoft,
+            borderRadius: 20,
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+            marginTop: 14,
+          }}
+        >
+          <Feather name="truck" size={14} color={theme.purple} style={{ marginRight: 6 }} />
+          <Text
+            style={{
+              fontSize: 12,
+              color: theme.purple,
+              fontFamily: typography.family.sansMedium,
+            }}
+          >
             {courierName ? `${courierName}: ` : ''}
             <Text style={{ fontWeight: '700' }}>{trackingNumber}</Text>
           </Text>
@@ -141,123 +239,3 @@ export function OrderStepper({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    padding: 16,
-    marginBottom: 16,
-  } as ViewStyle,
-  stepsRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-  } as ViewStyle,
-  stepColumn: {
-    alignItems: 'center',
-    width: 68,
-  } as ViewStyle,
-  circle: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-  } as ViewStyle,
-  circleDone: {
-    backgroundColor: '#059669',
-  } as ViewStyle,
-  circleCurrent: {
-    backgroundColor: '#E6F5F6',
-    borderWidth: 2,
-    borderColor: TEAL,
-  } as ViewStyle,
-  circleUpcoming: {
-    backgroundColor: '#F3F4F6',
-  } as ViewStyle,
-  activeDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: TEAL,
-  } as ViewStyle,
-  stepNumText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#9CA3AF',
-    fontFamily: 'Inter_600SemiBold',
-  } as TextStyle,
-  connectorLine: {
-    flex: 1,
-    height: 2,
-    backgroundColor: '#E5E7EB',
-    marginTop: 12,
-    marginHorizontal: -4,
-  } as ViewStyle,
-  connectorLineDone: {
-    backgroundColor: '#059669',
-  } as ViewStyle,
-  stepTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6B7280',
-    fontFamily: 'Inter_600SemiBold',
-    textAlign: 'center',
-  } as TextStyle,
-  stepTitleCurrent: {
-    fontWeight: '800',
-    color: '#111111',
-    fontFamily: 'Inter_700Bold',
-  } as TextStyle,
-  stepSubtitle: {
-    fontSize: 10.5,
-    color: '#9CA3AF',
-    fontFamily: 'Inter_400Regular',
-    textAlign: 'center',
-    marginTop: 2,
-  } as TextStyle,
-  canceledCard: {
-    backgroundColor: '#FEF2F2',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    padding: 14,
-    marginBottom: 16,
-  } as ViewStyle,
-  canceledHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  } as ViewStyle,
-  canceledTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#DC2626',
-    fontFamily: 'Inter_700Bold',
-  } as TextStyle,
-  canceledSubtitle: {
-    fontSize: 12.5,
-    color: '#991B1B',
-    fontFamily: 'Inter_400Regular',
-    lineHeight: 17,
-  } as TextStyle,
-  trackingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'center',
-    backgroundColor: '#E6F5F6',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginTop: 14,
-  } as ViewStyle,
-  trackingText: {
-    fontSize: 12,
-    color: TEAL,
-    fontFamily: 'Inter_500Medium',
-  } as TextStyle,
-});
