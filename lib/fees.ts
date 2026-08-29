@@ -4,21 +4,28 @@
 // derive its numbers from here so the buyer is never shown one price and
 // charged another.
 //
-// Formula: a flat fee, the same on every order regardless of item price
-// (Rs 5,000 item → Rs 100 fee → Rs 5,100 total; Rs 50,000 item → Rs 100 fee
-// → Rs 50,100 total). Deliberately NOT a percentage: the buyer can read the
-// fee off the product page once and it holds for every basket, and expensive
-// items aren't penalised for being expensive.
+// Fee mode:
+//   'flat'       — a fixed PKR amount on every order (e.g. Rs 5 flat).
+//   'percentage' — a % of the item price (e.g. 5% of Rs 2,000 → Rs 100).
 //
-// This replaced a $0.70 + 5% model that survived the switch to PKR — under
-// PKR those constants meant a Rs 0.70 base (rounding noise) with the 5% doing
-// all the work, so a Rs 50,000 coat carried a Rs 2,500 fee.
+// Switch BUYER_PROTECTION_MODE to whichever model you want. Only that
+// constant's partner value is used; the other is ignored.
 //
 // IMPORTANT: the edge function re-implements this same math in Deno
 // (supabase/functions/create-checkout-session). Keep the two in sync.
 
-/** The flat Buyer Protection fee, in PKR (set to 0 to waive fee). */
-export const BUYER_PROTECTION_FEE = 0;
+/** Choose 'flat' for a fixed fee, or 'percentage' for a % of item price. */
+export const BUYER_PROTECTION_MODE: 'flat' | 'percentage' = 'percentage';
+
+/** Flat Buyer Protection fee in PKR. Used when BUYER_PROTECTION_MODE = 'flat'. */
+export const BUYER_PROTECTION_FEE = 6;
+
+/**
+ * Percentage Buyer Protection fee (0–100). Used when
+ * BUYER_PROTECTION_MODE = 'percentage'.
+ * Example: set to 5 for a 5% fee.
+ */
+export const BUYER_PROTECTION_PERCENTAGE = 6;
 
 /** Default shipping fee in PKR (free / zero-fee basis). */
 export const DEFAULT_SHIPPING_FEE = 0;
@@ -40,13 +47,15 @@ function safePrice(itemPrice: number | string | null | undefined): number {
 /**
  * The Buyer Protection fee added to a given item price, in PKR.
  *
- * Flat, so the argument only decides whether there's an order at all — a
- * missing or non-positive price means there's nothing to protect, and
- * charging a fee on it would show "Rs 100" against a blank item row.
+ * Calculates either a flat fee or a percentage of the item price,
+ * depending on BUYER_PROTECTION_MODE.
  */
 export function buyerProtectionFee(itemPrice: number | string | null | undefined): number {
   const price = safePrice(itemPrice);
   if (price <= 0) return 0;
+  if (BUYER_PROTECTION_MODE === 'percentage') {
+    return round2(price * (BUYER_PROTECTION_PERCENTAGE / 100));
+  }
   return BUYER_PROTECTION_FEE;
 }
 
