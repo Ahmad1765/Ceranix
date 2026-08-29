@@ -15,7 +15,6 @@ import Feather from '@expo/vector-icons/Feather';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { useTheme } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
-import { BUYER_PROTECTION_MODE, BUYER_PROTECTION_PERCENTAGE } from '@/lib/fees';
 import {
   BRAND_PURPLE,
   conditionLabel,

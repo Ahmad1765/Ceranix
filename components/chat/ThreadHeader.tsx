@@ -1,8 +1,5 @@
-// Conversation header: back, who you're talking to, overflow.
-//
-// The identity block is one tap target that opens their profile — in a
-// marketplace, "who is this person" is the question a buyer asks most often,
-// so it gets the whole name row rather than a separate icon button.
+// Conversation header: back chevron in a circle, identity pill with avatar +
+// online dot + name. Matches the rounded, modern chat-header reference.
 
 import { View, Pressable } from 'react-native';
 import { Text } from '@/lib/rnText';
@@ -35,30 +32,31 @@ export function ThreadHeader({
       style={{
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 8,
-        paddingTop: 4,
-        paddingBottom: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.border,
-        backgroundColor: theme.surface,
+        paddingHorizontal: 12,
+        paddingTop: 6,
+        paddingBottom: 10,
+        gap: 10,
       }}
     >
+      {/* ── Back button: chevron inside a circular container ──────────── */}
       <Pressable
         onPress={onBack}
         hitSlop={HIT_SLOP_8}
         accessibilityRole="button"
         accessibilityLabel="Back"
         style={({ pressed }) => ({
-          width: 36,
-          height: 36,
+          width: 40,
+          height: 40,
+          borderRadius: 20,
           alignItems: 'center',
           justifyContent: 'center',
           opacity: pressed ? 0.55 : 1,
         })}
       >
-        <Feather name="arrow-left" size={22} color={theme.ink} />
+        <Feather name="chevron-left" size={22} color={theme.ink} />
       </Pressable>
 
+      {/* ── Identity pill: avatar + online dot + name ─────────────────── */}
       <Pressable
         onPress={onPressIdentity}
         disabled={!onPressIdentity}
@@ -66,75 +64,78 @@ export function ThreadHeader({
         accessibilityLabel={`View ${name}'s profile`}
         style={({ pressed }) => ({
           flex: 1,
-          minWidth: 0,
           flexDirection: 'row',
           alignItems: 'center',
           gap: 10,
-          paddingLeft: 2,
-          paddingRight: 8,
           paddingVertical: 4,
+          paddingLeft: 2,
           opacity: pressed ? 0.6 : 1,
         })}
       >
-        <View
-          style={{
-            width: 34,
-            height: 34,
-            borderRadius: 17,
-            backgroundColor: theme.primarySoft,
-            overflow: 'hidden',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          {avatar ? (
-            <Image
-              source={{ uri: avatar }}
-              style={{ width: '100%', height: '100%' }}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-            />
-          ) : (
-            <Text
-              style={{
-                fontFamily: typography.family.sansBold,
-                fontSize: 14,
-                color: theme.primary,
-              }}
-            >
-              {initial}
-            </Text>
-          )}
-        </View>
-
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text
-            numberOfLines={1}
+        {/* Avatar with online dot */}
+        <View style={{ position: 'relative' }}>
+          <View
             style={{
-              fontFamily: typography.family.sansBold,
-              fontSize: 15,
-              letterSpacing: -0.2,
-              color: theme.ink,
+              width: 34,
+              height: 34,
+              borderRadius: 10,
+              backgroundColor: theme.ink,
+              overflow: 'hidden',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
-            {name}
-          </Text>
-          {subtitle ? (
-            <Text
-              numberOfLines={1}
-              style={{
-                fontFamily: typography.family.sans,
-                fontSize: 11.5,
-                color: theme.muteSoft,
-                marginTop: 1,
-              }}
-            >
-              {subtitle}
-            </Text>
-          ) : null}
+            {avatar ? (
+              <Image
+                source={{ uri: avatar }}
+                style={{ width: '100%', height: '100%' }}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+              />
+            ) : (
+              <Text
+                style={{
+                  fontFamily: typography.family.sansBold,
+                  fontSize: 14,
+                  color: '#FFFFFF',
+                }}
+              >
+                {initial}
+              </Text>
+            )}
+          </View>
+
+          {/* Green online dot */}
+          <View
+            style={{
+              position: 'absolute',
+              bottom: -2,
+              right: -2,
+              width: 12,
+              height: 12,
+              borderRadius: 6,
+              backgroundColor: '#00C853',
+              borderWidth: 2,
+              borderColor: theme.background,
+            }}
+          />
         </View>
+
+        {/* Name */}
+        <Text
+          numberOfLines={1}
+          style={{
+            fontFamily: typography.family.sansBold,
+            fontSize: 16,
+            letterSpacing: -0.2,
+            color: theme.ink,
+          }}
+        >
+          {name}
+        </Text>
       </Pressable>
 
+      {/* ── Overflow menu (three dots) ───────────────────────────────── */}
       <Pressable
         onPress={onOverflow}
         hitSlop={HIT_SLOP_8}
