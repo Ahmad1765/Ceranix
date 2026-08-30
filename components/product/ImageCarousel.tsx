@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
-import { Text } from '@/lib/rnText';
 import { useTheme } from '@/context/ThemeContext';
 import { getOptimizedImageUrl, thumbWidthFor, IMAGE_TRANSITION, prefetchImages } from '@/lib/images';
 
@@ -127,13 +126,19 @@ export function ImageCarousel({
         ))}
       </ScrollView>
 
-      {/* Page indicator pill (bottom center) */}
+      {/* Bar-style page indicators (bottom center) */}
       {validImages.length > 1 && (
         <View style={styles.indicatorWrapper} pointerEvents="none">
-          <View style={styles.pageIndicator}>
-            <Text style={styles.pageIndicatorText}>
-              {activeIndex + 1} / {validImages.length}
-            </Text>
+          <View style={styles.barContainer}>
+            {validImages.map((_, i) => (
+              <View
+                key={i}
+                style={[
+                  styles.bar,
+                  i === activeIndex ? styles.barActive : styles.barInactive,
+                ]}
+              />
+            ))}
           </View>
         </View>
       )}
@@ -220,16 +225,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 10,
   },
-  pageIndicator: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 20,
-    backgroundColor: 'rgba(15, 15, 15, 0.55)',
+  barContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   },
-  pageIndicatorText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    letterSpacing: 0.3,
+  bar: {
+    height: 4,
+    borderRadius: 2,
+  },
+  barActive: {
+    width: 20,
+    backgroundColor: '#FFFFFF',
+  },
+  barInactive: {
+    width: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.45)',
   },
 });
