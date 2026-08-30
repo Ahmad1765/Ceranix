@@ -1,7 +1,7 @@
 // Conversation header: back chevron in a circle, identity pill with avatar +
 // online dot + name. Matches the rounded, modern chat-header reference.
 
-import { View, Pressable } from 'react-native';
+import { View, Pressable, Platform, StyleSheet } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
@@ -28,6 +28,8 @@ export function ThreadHeader({
 }) {
   const { theme } = useTheme();
   const initial = name.trim().charAt(0).toUpperCase() || 'U';
+
+  const btnShadow = styles.shadow;
 
   return (
     <View
@@ -56,6 +58,7 @@ export function ThreadHeader({
           alignItems: 'center',
           justifyContent: 'center',
           opacity: pressed ? 0.55 : 1,
+          ...btnShadow,
         })}
       >
         <Feather name="chevron-left" size={22} color={theme.ink} />
@@ -80,6 +83,7 @@ export function ThreadHeader({
           paddingLeft: 6,
           paddingRight: 16,
           opacity: pressed ? 0.6 : 1,
+          ...btnShadow,
         })}
       >
         {/* Avatar with online dot */}
@@ -88,7 +92,7 @@ export function ThreadHeader({
             style={{
               width: 34,
               height: 34,
-              borderRadius: 10,
+              borderRadius: 17,
               backgroundColor: theme.ink,
               overflow: 'hidden',
               alignItems: 'center',
@@ -167,6 +171,7 @@ export function ThreadHeader({
           alignItems: 'center',
           justifyContent: 'center',
           opacity: pressed ? 0.55 : 1,
+          ...btnShadow,
         })}
       >
         <Feather name="more-horizontal" size={22} color={theme.ink} />
@@ -174,3 +179,21 @@ export function ThreadHeader({
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  shadow: {
+    // iOS
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.10,
+    shadowRadius: 6,
+    // Android
+    elevation: 4,
+    // Web
+    ...Platform.select({
+      web: {
+        boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+      } as any,
+    }),
+  },
+});

@@ -9,23 +9,18 @@ import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
 import { useTheme } from '@/context/ThemeContext';
-import { formatPrice } from '@/lib/currency';
-import { BRAND_PURPLE, HAIRLINE, tap } from './shared';
+import { HAIRLINE, tap } from './shared';
 
 type ProductHeaderNavProps = {
   showStickyHeader: boolean;
   title?: string | null;
-  price?: number | null;
   onBack: () => void;
-  onShare?: () => void;
 };
 
 export const ProductHeaderNav = memo(function ProductHeaderNav({
   showStickyHeader,
   title,
-  price,
   onBack,
-  onShare,
 }: ProductHeaderNavProps) {
   const insets = useSafeAreaInsets();
   const { theme, isDark } = useTheme();
@@ -35,18 +30,13 @@ export const ProductHeaderNav = memo(function ProductHeaderNav({
     onBack();
   };
 
-  // Button disc styling tailored for floating over imagery vs sticky bar
-  const buttonBg = showStickyHeader
-    ? theme.surface
-    : isDark
-      ? 'rgba(20, 20, 20, 0.72)'
-      : 'rgba(255, 255, 255, 0.88)';
-
-  const buttonBorder = showStickyHeader
-    ? theme.border
-    : isDark
-      ? 'rgba(255, 255, 255, 0.15)'
-      : 'rgba(0, 0, 0, 0.08)';
+  // ── Floating mode: translucent disc over imagery ──────────────────────
+  const floatingBg = isDark
+    ? 'rgba(20, 20, 20, 0.72)'
+    : 'rgba(255, 255, 255, 0.88)';
+  const floatingBorder = isDark
+    ? 'rgba(255, 255, 255, 0.15)'
+    : 'rgba(0, 0, 0, 0.08)';
 
   return (
     <View
@@ -77,7 +67,7 @@ export const ProductHeaderNav = memo(function ProductHeaderNav({
       )}
 
       <View style={styles.navRow}>
-        {/* Left Slot: 40x40px Back Button Disc */}
+        {/* Left Slot: Back Button */}
         <View style={styles.sideSlot}>
           <Pressable
             onPress={handleBack}
@@ -85,41 +75,38 @@ export const ProductHeaderNav = memo(function ProductHeaderNav({
             accessibilityRole="button"
             accessibilityLabel="Go back"
             style={({ pressed }) => [
-              styles.navButton,
+              showStickyHeader ? styles.flatButton : styles.navButton,
+              !showStickyHeader && {
+                backgroundColor: floatingBg,
+                borderColor: floatingBorder,
+              },
               {
-                backgroundColor: buttonBg,
-                borderColor: buttonBorder,
                 transform: [{ scale: pressed ? 0.92 : 1 }],
                 opacity: pressed ? 0.85 : 1,
               },
             ]}
           >
-            <Feather name="arrow-left" size={20} color={theme.ink} />
+            <Feather
+              name="arrow-left"
+              size={showStickyHeader ? 22 : 20}
+              color={theme.ink}
+            />
           </Pressable>
         </View>
 
-        {/* Center Slot: Product Title & Price (Sticky Mode Only) */}
+        {/* Center Slot: Product Title (Sticky Mode Only) */}
         <View style={styles.centerSlot}>
-          {showStickyHeader ? (
-            <View style={styles.titleContainer}>
-              {title ? (
-                <Text
-                  style={[styles.title, { color: theme.ink }]}
-                  numberOfLines={1}
-                >
-                  {title}
-                </Text>
-              ) : null}
-              {price != null ? (
-                <Text style={[styles.price, { color: BRAND_PURPLE }]}>
-                  {formatPrice(price, { whole: true })}
-                </Text>
-              ) : null}
-            </View>
+          {showStickyHeader && title ? (
+            <Text
+              style={[styles.title, { color: theme.ink }]}
+              numberOfLines={2}
+            >
+              {title}
+            </Text>
           ) : null}
         </View>
 
-        {/* Right Slot: Spacer for Perfect Symmetry */}
+        {/* Right Slot: Spacer for symmetry */}
         <View style={styles.sideSlot} />
       </View>
     </View>
@@ -147,10 +134,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  spacer: {
-    width: 40,
-    height: 40,
-  },
+  /* Floating-over-image disc button */
   navButton: {
     width: 40,
     height: 40,
@@ -164,15 +148,19 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
+  /* Sticky-bar flat button — no disc, no background */
+  flatButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   centerSlot: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 10,
-  },
-  titleContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   title: {
     fontSize: 14.5,
@@ -180,11 +168,5 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
     textAlign: 'center',
   },
-  price: {
-    fontSize: 12.5,
-    fontWeight: '800',
-    letterSpacing: -0.2,
-    marginTop: 1,
-    textAlign: 'center',
-  },
 });
+

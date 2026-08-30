@@ -521,9 +521,7 @@ export default function ProductScreen() {
       <ProductHeaderNav
         showStickyHeader={showStickyHeader}
         title={listing.title}
-        price={listing.price}
         onBack={() => safeBack()}
-        onShare={shareListing}
       />
 
       <Animated.ScrollView

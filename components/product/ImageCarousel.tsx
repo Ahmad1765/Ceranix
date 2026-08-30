@@ -12,7 +12,6 @@ import {
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
 import { Text } from '@/lib/rnText';
-import { radii } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { getOptimizedImageUrl, thumbWidthFor, IMAGE_TRANSITION, prefetchImages } from '@/lib/images';
 
@@ -128,32 +127,14 @@ export function ImageCarousel({
         ))}
       </ScrollView>
 
-      {/* Floating Counter Pill (Top Right) */}
+      {/* Page indicator pill (bottom center) */}
       {validImages.length > 1 && (
-        <View style={styles.counterBadge}>
-          <Text style={styles.counterText}>
-            {activeIndex + 1} / {validImages.length}
-          </Text>
-        </View>
-      )}
-
-      {/* Active Pagination Indicator Dots (Bottom Center) */}
-      {validImages.length > 1 && (
-        <View style={styles.paginationContainer} pointerEvents="none">
-          {validImages.map((_, index) => {
-            const isActive = index === activeIndex;
-            return (
-              <View
-                key={index}
-                style={[
-                  styles.dot,
-                  isActive
-                    ? [styles.dotActive, { backgroundColor: theme.primary }]
-                    : styles.dotInactive,
-                ]}
-              />
-            );
-          })}
+        <View style={styles.indicatorWrapper} pointerEvents="none">
+          <View style={styles.pageIndicator}>
+            <Text style={styles.pageIndicatorText}>
+              {activeIndex + 1} / {validImages.length}
+            </Text>
+          </View>
         </View>
       )}
     </View>
@@ -230,42 +211,25 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  counterBadge: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: radii.pill,
-    backgroundColor: 'rgba(15, 15, 15, 0.65)',
-    zIndex: 10,
-  },
-  counterText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: 0.2,
-  },
-  paginationContainer: {
+  indicatorWrapper: {
     position: 'absolute',
     bottom: 14,
     left: 0,
     right: 0,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
     zIndex: 10,
   },
-  dot: {
-    height: 6,
-    borderRadius: 3,
+  pageIndicator: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    backgroundColor: 'rgba(15, 15, 15, 0.55)',
   },
-  dotActive: {
-    width: 20,
-  },
-  dotInactive: {
-    width: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+  pageIndicatorText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
   },
 });
