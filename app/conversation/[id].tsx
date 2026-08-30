@@ -28,6 +28,7 @@ import {
 } from 'react-native';
 import { Text } from '@/lib/rnText';
 import * as Clipboard from 'expo-clipboard';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, router } from 'expo-router';
 import { safeBack } from '@/lib/nav';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -299,14 +300,15 @@ export default function ConversationScreen() {
       style={{ flex: 1 }}
     >
       {/* Floating Header — absolutely positioned like the product page */}
-      <View
+      <LinearGradient
+        colors={['rgba(255,255,255,1)', 'rgba(255,255,255,0.85)', 'rgba(255,255,255,0)']}
+        locations={[0, 0.6, 1]}
         style={{
           position: 'absolute',
           top: 0,
           left: 0,
           right: 0,
           zIndex: 30,
-          backgroundColor: 'rgba(0, 0, 0, 0)',
           borderBottomWidth: 0,
         }}
         pointerEvents="box-none"
@@ -319,7 +321,7 @@ export default function ConversationScreen() {
           onPressIdentity={thread.other?.id ? () => router.push(`/user/${thread.other!.id}` as any) : undefined}
           onOverflow={() => setOverflowOpen(true)}
         />
-      </View>
+      </LinearGradient>
 
       {/* Message Thread FlatList */}
       <FlatList
