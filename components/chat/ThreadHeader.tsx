@@ -48,6 +48,9 @@ export function ThreadHeader({
           width: 40,
           height: 40,
           borderRadius: 20,
+          backgroundColor: '#FFFFFF',
+          borderWidth: 1,
+          borderColor: 'rgba(0, 0, 0, 0.08)',
           alignItems: 'center',
           justifyContent: 'center',
           opacity: pressed ? 0.55 : 1,
@@ -63,12 +66,16 @@ export function ThreadHeader({
         accessibilityRole="button"
         accessibilityLabel={`View ${name}'s profile`}
         style={({ pressed }) => ({
-          flex: 1,
           flexDirection: 'row',
           alignItems: 'center',
           gap: 10,
-          paddingVertical: 4,
-          paddingLeft: 2,
+          backgroundColor: '#FFFFFF',
+          borderWidth: 1,
+          borderColor: 'rgba(0, 0, 0, 0.08)',
+          borderRadius: 24,
+          paddingVertical: 6,
+          paddingLeft: 6,
+          paddingRight: 16,
           opacity: pressed ? 0.6 : 1,
         })}
       >
@@ -135,6 +142,9 @@ export function ThreadHeader({
         </Text>
       </Pressable>
 
+      {/* Spacer pushes overflow to the right edge */}
+      <View style={{ flex: 1 }} />
+
       {/* ── Overflow menu (three dots) ───────────────────────────────── */}
       <Pressable
         onPress={onOverflow}
@@ -142,8 +152,12 @@ export function ThreadHeader({
         accessibilityRole="button"
         accessibilityLabel="Conversation options"
         style={({ pressed }) => ({
-          width: 36,
-          height: 36,
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          backgroundColor: '#FFFFFF',
+          borderWidth: 1,
+          borderColor: 'rgba(0, 0, 0, 0.08)',
           alignItems: 'center',
           justifyContent: 'center',
           opacity: pressed ? 0.55 : 1,

@@ -298,14 +298,18 @@ export default function ConversationScreen() {
       backgroundColor={theme.background}
       style={{ flex: 1 }}
     >
-      {/* Pinned Sticky Header */}
+      {/* Floating Header — absolutely positioned like the product page */}
       <View
         style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
           zIndex: 30,
-          backgroundColor: theme.surface,
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: theme.border,
+          backgroundColor: 'rgba(0, 0, 0, 0)',
+          borderBottomWidth: 0,
         }}
+        pointerEvents="box-none"
       >
         <ThreadHeader
           name={thread.senderName}
@@ -315,16 +319,6 @@ export default function ConversationScreen() {
           onPressIdentity={thread.other?.id ? () => router.push(`/user/${thread.other!.id}` as any) : undefined}
           onOverflow={() => setOverflowOpen(true)}
         />
-
-        <ConversationListingHeader
-          listing={thread.conv.listing}
-          listingId={thread.convListingId}
-          listingThumb={thread.listingThumb}
-          status={thread.status}
-          isSeller={thread.isSeller}
-          onPressListing={openListing}
-          onPressBuyNow={() => router.push(`/payment/${thread.convListingId}` as any)}
-        />
       </View>
 
       {/* Message Thread FlatList */}
@@ -333,7 +327,7 @@ export default function ConversationScreen() {
         data={thread.rows}
         keyExtractor={(row) => row.key}
         renderItem={renderRow}
-        contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end', paddingBottom: 12 }}
+        contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end', paddingBottom: 12, paddingTop: 64 }}
         onContentSizeChange={thread.followEnd}
         onScroll={thread.onScroll}
         scrollEventThrottle={16}
@@ -367,6 +361,17 @@ export default function ConversationScreen() {
             </Text>
           </View>
         }
+      />
+
+      {/* Listing Header — docked above the composer */}
+      <ConversationListingHeader
+        listing={thread.conv.listing}
+        listingId={thread.convListingId}
+        listingThumb={thread.listingThumb}
+        status={thread.status}
+        isSeller={thread.isSeller}
+        onPressListing={openListing}
+        onPressBuyNow={() => router.push(`/payment/${thread.convListingId}` as any)}
       />
 
       {/* Bottom Composer / Block Banner Dock */}
