@@ -13,6 +13,7 @@ export function ThreadHeader({
   name,
   subtitle,
   avatar,
+  online,
   onBack,
   onPressIdentity,
   onOverflow,
@@ -20,6 +21,7 @@ export function ThreadHeader({
   name: string;
   subtitle?: string | null;
   avatar: string | null;
+  online?: boolean;
   onBack: () => void;
   onPressIdentity?: () => void;
   onOverflow: () => void;
@@ -66,6 +68,7 @@ export function ThreadHeader({
         accessibilityRole="button"
         accessibilityLabel={`View ${name}'s profile`}
         style={({ pressed }) => ({
+          flexShrink: 1,
           flexDirection: 'row',
           alignItems: 'center',
           gap: 10,
@@ -112,26 +115,29 @@ export function ThreadHeader({
             )}
           </View>
 
-          {/* Green online dot */}
-          <View
-            style={{
-              position: 'absolute',
-              bottom: -2,
-              right: -2,
-              width: 12,
-              height: 12,
-              borderRadius: 6,
-              backgroundColor: '#00C853',
-              borderWidth: 2,
-              borderColor: theme.background,
-            }}
-          />
+          {/* Green online dot — only when participant is online */}
+          {online && (
+            <View
+              style={{
+                position: 'absolute',
+                bottom: -2,
+                right: -2,
+                width: 12,
+                height: 12,
+                borderRadius: 6,
+                backgroundColor: '#00C853',
+                borderWidth: 2,
+                borderColor: '#FFFFFF',
+              }}
+            />
+          )}
         </View>
 
         {/* Name */}
         <Text
           numberOfLines={1}
           style={{
+            flexShrink: 1,
             fontFamily: typography.family.sansBold,
             fontSize: 16,
             letterSpacing: -0.2,

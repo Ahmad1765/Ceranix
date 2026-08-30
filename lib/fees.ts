@@ -54,7 +54,7 @@ export function buyerProtectionFee(itemPrice: number | string | null | undefined
   const price = safePrice(itemPrice);
   if (price <= 0) return 0;
   if (BUYER_PROTECTION_MODE === 'percentage') {
-    return round2(price * (BUYER_PROTECTION_PERCENTAGE / 100));
+    return round2(round2(price) * (BUYER_PROTECTION_PERCENTAGE / 100));
   }
   return BUYER_PROTECTION_FEE;
 }
