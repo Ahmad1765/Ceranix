@@ -1,41 +1,28 @@
-// The message composer: attach button, growing input, send.
-//
-// The send button cross-fades between its idle and armed states over 160ms
-// rather than snapping — it's the one control on this screen that changes
-// appearance while you're looking straight at it, so the change should read as
-// the button waking up, not as a repaint.
+// The message composer: circular action button and floating pill input with send button.
 //
 // The input is measured, not guessed. react-native-web renders a multiline
-// TextInput as a <textarea>, which (a) ignores textAlignVertical — upstream
-// closed that wontfix, a textarea just can't centre its own text — and (b)
-// defaults to rows=2, so the pill rendered two lines tall with one line of text
-// sitting at the top of it. Both go away once the input is exactly as tall as
+// TextInput as a <textarea>, which (a) ignores textAlignVertical and (b)
+// defaults to rows=2. Both go away once the input is exactly as tall as
 // its content: one line of text is one line tall, and the wrapper's
 // justifyContent:'center' then has something real to centre. Growth comes from
 // the same measurement, capped at MAX_INPUT_HEIGHT before it starts scrolling.
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { View, Platform, type NativeSyntheticEvent, type TextInputContentSizeChangeEventData } from 'react-native';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { View, Platform, StyleSheet, type NativeSyntheticEvent, type TextInputContentSizeChangeEventData } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import Animated, {
-  Easing,
-  interpolateColor,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated';
+import Animated, { ZoomIn, ZoomOut } from 'react-native-reanimated';
 import { PressableScale } from '@/components/PressableScale';
-import { radii, type as typography } from '@/lib/theme';
+import { type as typography } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 
-const BUTTON = 38;
+const PLUS_BUTTON_SIZE = 40;
+const SEND_BUTTON_SIZE = 32;
 /** One line of text at the input's own lineHeight — the resting height. */
 const MIN_INPUT_HEIGHT = 20;
 /** Five lines. Past this the input stops growing and starts scrolling. */
 const MAX_INPUT_HEIGHT = 100;
-const INPUT_PAD_V = 9;
 
 export function Composer({
   value,
@@ -54,56 +41,45 @@ export function Composer({
   disabledReason?: string | null;
 }) {
   const { theme } = useTheme();
-  // Sends are optimistic: the message appears in the thread immediately and
-  // reports its own delivery state there, so the button just disarms.
   const armed = value.trim().length > 0;
-  const t = useSharedValue(0);
-
-  useEffect(() => {
-    t.value = withTiming(armed ? 1 : 0, { duration: 160, easing: Easing.out(Easing.quad) });
-  }, [armed, t]);
 
   // ── Auto-sizing ────────────────────────────────────────────────────────
   // Native reports its own content size. Web has to be asked: collapse the
   // textarea to zero, read scrollHeight (which is then the content height, not
-  // the box height), and write the clamped result back. Reading scrollHeight
-  // without the collapse only ever grows — a textarea already 3 lines tall
-  // reports 3 lines even when you delete back down to one.
+  // the box height), and write the clamped result back.
   const [height, setHeight] = useState(MIN_INPUT_HEIGHT);
   const webNode = useRef<HTMLTextAreaElement | null>(null);
 
   const measureWeb = useCallback(() => {
     const el = webNode.current;
     if (!el) return;
+    const currentScrollTop = el.scrollTop;
     el.style.height = '0px';
-    el.style.height = `${Math.min(Math.max(el.scrollHeight, MIN_INPUT_HEIGHT), MAX_INPUT_HEIGHT)}px`;
+    const contentH = el.scrollHeight;
+    const clampedH = Math.min(Math.max(contentH, MIN_INPUT_HEIGHT), MAX_INPUT_HEIGHT);
+    el.style.height = `${clampedH}px`;
+    el.scrollTop = currentScrollTop;
+    setHeight(clampedH);
   }, []);
 
-  // Runs on every value change, so a send that clears the input collapses it
-  // back to one line — an onChange-only hook would leave it stuck open, since
-  // clearing state isn't typing.
   useLayoutEffect(() => {
     if (Platform.OS === 'web') measureWeb();
   }, [value, measureWeb]);
 
   const onContentSize = useCallback(
     (e: NativeSyntheticEvent<TextInputContentSizeChangeEventData>) => {
-      if (Platform.OS === 'web') return; // web is driven by measureWeb
+      if (Platform.OS === 'web') return;
       const h = e.nativeEvent.contentSize.height;
       setHeight(Math.min(Math.max(h, MIN_INPUT_HEIGHT), MAX_INPUT_HEIGHT));
     },
     [],
   );
 
-  const sendStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(t.value, [0, 1], [theme.panel, theme.purple]),
-  }));
-  const idleIcon = useAnimatedStyle(() => ({ opacity: 1 - t.value }));
-  const armedIcon = useAnimatedStyle(() => ({ opacity: t.value }));
+  const btnShadow = styles.shadow;
 
   if (disabledReason) {
     return (
-      <View style={{ paddingHorizontal: 16, paddingVertical: 18, alignItems: 'center' }}>
+      <View style={{ paddingHorizontal: 16, paddingVertical: 18, alignItems: 'center', backgroundColor: 'transparent' }}>
         <Text
           style={{
             fontFamily: typography.family.sans,
@@ -123,120 +99,161 @@ export function Composer({
       style={{
         flexDirection: 'row',
         alignItems: 'flex-end',
-        gap: 8,
+        gap: 10,
         paddingHorizontal: 12,
-        paddingTop: 14,
-        paddingBottom: 8,
-        backgroundColor: theme.surface,
+        paddingTop: 6,
+        paddingBottom: 6,
+        backgroundColor: 'transparent',
       }}
     >
+      {/* Standalone Circular "+" Button */}
       <PressableScale
         onPress={onPlus}
+        scaleTo={0.92}
         accessibilityLabel="More actions"
-        style={{
-          width: BUTTON,
-          height: BUTTON,
-          borderRadius: BUTTON / 2,
-          backgroundColor: theme.ink,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Feather name="plus" size={20} color={theme.background} />
-      </PressableScale>
-
-      <View
-        style={{
-          flex: 1,
-          minHeight: BUTTON,
-          maxHeight: MAX_INPUT_HEIGHT + INPUT_PAD_V * 2,
-          backgroundColor: theme.panel,
-          borderWidth: 1,
-          borderColor: theme.border,
-          borderRadius: radii['2xl'],
-          paddingHorizontal: 14,
-          paddingVertical: INPUT_PAD_V,
-          justifyContent: 'center',
-        }}
-      >
-        <TextInput
-          // On web this ref is the <textarea> itself; `e.target` from the first
-          // keystroke is the same node and backs it up if the ref never lands.
-          ref={(node: any) => {
-            if (Platform.OS === 'web') webNode.current = (node as HTMLTextAreaElement) ?? null;
-          }}
-          placeholder={placeholder}
-          placeholderTextColor={theme.muteSoft}
-          value={value}
-          onChangeText={onChangeText}
-          onChange={
-            Platform.OS === 'web'
-              ? (e: any) => {
-                  webNode.current = e?.target ?? webNode.current;
-                  measureWeb();
-                }
-              : undefined
-          }
-          onContentSizeChange={onContentSize}
-          multiline
-          // Without this the browser gives a textarea two rows by default, so
-          // the pill opens a line taller than it should and never settles.
-          {...(Platform.OS === 'web' ? { rows: 1 } : null)}
-          accessibilityLabel="Message"
-          // Enter sends on web, where a hardware keyboard is the norm and a
-          // newline is the rarer intent. Shift+Enter still breaks the line.
-          onKeyPress={
-            Platform.OS === 'web'
-              ? (e: any) => {
-                  if (e.nativeEvent?.key === 'Enter' && !e.nativeEvent?.shiftKey) {
-                    e.preventDefault?.();
-                    if (armed) onSend();
-                  }
-                }
-              : undefined
-          }
-          style={
-            {
-              fontFamily: typography.family.sans,
-              fontSize: 15,
-              lineHeight: MIN_INPUT_HEIGHT,
-              color: theme.ink,
-              padding: 0,
-              // Web's height is owned by measureWeb via the DOM, so React must
-              // not also write one here or the two fight every keystroke.
-              ...(Platform.OS === 'web' ? null : { height }),
-              // Android still top-aligns inside whatever box it's given.
-              textAlignVertical: 'center' as const,
-              // RN-Web: kill the browser's default input focus ring.
-              outlineStyle: 'none',
-              outlineWidth: 0,
-            } as any
-          }
-        />
-      </View>
-
-      <PressableScale
-        onPress={onSend}
-        disabled={!armed}
-        accessibilityLabel="Send message"
         style={[
           {
-            width: BUTTON,
-            height: BUTTON,
-            borderRadius: BUTTON / 2,
+            width: PLUS_BUTTON_SIZE,
+            height: PLUS_BUTTON_SIZE,
+            borderRadius: PLUS_BUTTON_SIZE / 2,
+            backgroundColor: theme.panel,
+            borderWidth: 1,
+            borderColor: theme.hairline,
             alignItems: 'center',
             justifyContent: 'center',
+            marginBottom: 0,
           },
-          sendStyle,
+          btnShadow,
         ]}
       >
-        <Animated.View style={[{ position: 'absolute' }, idleIcon]}>
-          <Ionicons name="arrow-up" size={20} color={theme.muteSoft} />
-        </Animated.View>
-        <Animated.View style={[{ position: 'absolute' }, armedIcon]}>
-          <Ionicons name="arrow-up" size={20} color="#FFFFFF" />
-        </Animated.View>
+        <Feather name="plus" size={20} color={theme.ink} />
       </PressableScale>
+
+      {/* Unified Capsule / Rounded Input Container */}
+      <View
+        style={[
+          {
+            flex: 1,
+            minHeight: PLUS_BUTTON_SIZE,
+            maxHeight: MAX_INPUT_HEIGHT + 16,
+            backgroundColor: theme.panel,
+            borderWidth: 1,
+            borderColor: theme.hairline,
+            borderRadius: 22,
+            paddingLeft: 14,
+            paddingRight: armed ? 4 : 14,
+            paddingVertical: 4,
+            flexDirection: 'row',
+            alignItems: 'flex-end',
+          },
+          btnShadow,
+        ]}
+      >
+        <View
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            paddingVertical: Platform.OS === 'web' ? 6 : 4,
+            marginRight: armed ? 6 : 0,
+          }}
+        >
+          <TextInput
+            ref={(node: any) => {
+              if (Platform.OS === 'web') webNode.current = (node as HTMLTextAreaElement) ?? null;
+            }}
+            placeholder={placeholder}
+            placeholderTextColor={theme.muteSoft}
+            value={value}
+            onChangeText={onChangeText}
+            onChange={
+              Platform.OS === 'web'
+                ? (e: any) => {
+                    webNode.current = e?.target ?? webNode.current;
+                    measureWeb();
+                  }
+                : undefined
+            }
+            onContentSizeChange={onContentSize}
+            multiline
+            {...(Platform.OS === 'web' ? { rows: 1 } : null)}
+            accessibilityLabel="Message"
+            onKeyPress={
+              Platform.OS === 'web'
+                ? (e: any) => {
+                    if (e.nativeEvent?.key === 'Enter' && !e.nativeEvent?.shiftKey) {
+                      e.preventDefault?.();
+                      if (armed) onSend();
+                    }
+                  }
+                : undefined
+            }
+            style={
+              {
+                fontFamily: typography.family.sans,
+                fontSize: 15,
+                lineHeight: MIN_INPUT_HEIGHT,
+                color: theme.ink,
+                padding: 0,
+                margin: 0,
+                ...(Platform.OS === 'web'
+                  ? {
+                      overflowY: height >= MAX_INPUT_HEIGHT ? 'auto' : 'hidden',
+                      scrollbarWidth: 'thin',
+                      scrollbarColor: `${theme.muteSoft} transparent`,
+                      resize: 'none',
+                    }
+                  : { height }),
+                textAlignVertical: 'center' as const,
+                outlineStyle: 'none',
+                outlineWidth: 0,
+              } as any
+            }
+          />
+        </View>
+
+        {/* Send button with delightful spring popup animation */}
+        {armed && (
+          <Animated.View
+            entering={ZoomIn.springify().damping(12).stiffness(240).mass(0.6)}
+            exiting={ZoomOut.duration(120)}
+            style={{ marginBottom: 0 }}
+          >
+            <PressableScale
+              onPress={onSend}
+              scaleTo={0.90}
+              accessibilityLabel="Send message"
+              style={{
+                width: SEND_BUTTON_SIZE,
+                height: SEND_BUTTON_SIZE,
+                borderRadius: SEND_BUTTON_SIZE / 2,
+                backgroundColor: theme.ink,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Ionicons name="arrow-up" size={18} color={theme.panel} />
+            </PressableScale>
+          </Animated.View>
+        )}
+      </View>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  shadow: {
+    // iOS
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    // Android
+    elevation: 2,
+    // Web
+    ...Platform.select({
+      web: {
+        boxShadow: '0 1px 4px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.06)',
+      } as any,
+    }),
+  },
+});

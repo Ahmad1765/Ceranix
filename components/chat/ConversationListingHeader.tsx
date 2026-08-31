@@ -8,7 +8,7 @@
 // sticky listing context bar. This allows effortless UI testing and reusability.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { View, Pressable, StyleSheet } from 'react-native';
+import { View, Pressable, Platform, StyleSheet } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import { radii, type as typography } from '@/lib/theme';
@@ -46,26 +46,23 @@ export function ConversationListingHeader({
       accessibilityRole="button"
       accessibilityLabel={`Open listing ${listing?.title ?? 'Listing'}`}
       onPress={onPressListing}
-      style={({ pressed }) => ({
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 12,
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderTopWidth: StyleSheet.hairlineWidth,
-        borderTopColor: theme.border,
-        backgroundColor: pressed ? theme.panel : theme.surface,
-      })}
+      style={({ pressed }) => [
+        styles.card,
+        {
+          backgroundColor: theme.panel,
+          borderColor: theme.hairline,
+          opacity: pressed ? 0.92 : 1,
+        },
+      ]}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
-        <ListingThumb uri={listingThumb} width={44} height={44} status={status ?? 'active'} radius={radii.sm} />
+        <ListingThumb uri={listingThumb} width={42} height={42} status={status ?? 'active'} radius={radii.sm} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text
             numberOfLines={1}
             style={{
               fontFamily: typography.family.sansBold,
-              fontSize: 13.5,
+              fontSize: 13,
               color: theme.ink,
             }}
           >
@@ -74,9 +71,9 @@ export function ConversationListingHeader({
           <Text
             style={{
               fontFamily: typography.family.sansBold,
-              fontSize: 12.5,
+              fontSize: 12,
               color: theme.ink,
-              marginTop: 2,
+              marginTop: 1,
             }}
           >
             {listing?.price != null ? formatPrice(listing.price) : '—'}
@@ -86,7 +83,7 @@ export function ConversationListingHeader({
               numberOfLines={1}
               style={{
                 fontFamily: typography.family.sans,
-                fontSize: 11.5,
+                fontSize: 11,
                 color: theme.mute,
                 marginTop: 1,
               }}
@@ -98,7 +95,7 @@ export function ConversationListingHeader({
       </View>
 
       {!isSeller && status === 'active' ? (
-        <View style={{ width: 94 }}>
+        <View style={{ width: 90 }}>
           <ThumbButton
             label="Buy Now"
             variant="primary"
@@ -113,3 +110,31 @@ export function ConversationListingHeader({
     </Pressable>
   );
 }
+
+const styles = StyleSheet.create({
+  card: {
+    marginHorizontal: 12,
+    marginBottom: 6,
+    borderRadius: radii.xl,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    borderWidth: 1,
+    // iOS shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    // Android elevation
+    elevation: 2,
+    // Web shadow
+    ...Platform.select({
+      web: {
+        boxShadow: '0 1px 4px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.06)',
+      } as any,
+    }),
+  },
+});

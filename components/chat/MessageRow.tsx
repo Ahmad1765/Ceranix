@@ -756,6 +756,9 @@ function TextBubble({
           fontSize: 15,
           lineHeight: 21,
           color: mine ? '#FFFFFF' : theme.ink,
+          ...(Platform.OS === 'web'
+            ? ({ wordBreak: 'break-word', overflowWrap: 'break-word' } as any)
+            : null),
         }}
       >
         {msg.content}

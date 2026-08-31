@@ -329,7 +329,12 @@ export default function ConversationScreen() {
         data={thread.rows}
         keyExtractor={(row) => row.key}
         renderItem={renderRow}
-        contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end', paddingBottom: 12, paddingTop: 64 }}
+        contentContainerStyle={{
+          flexGrow: 1,
+          justifyContent: 'flex-end',
+          paddingBottom: (thread.convListingId ? 140 : 80) + (keyboardUp ? DOCK_GAP_KEYBOARD : Math.max(insets.bottom, 12)),
+          paddingTop: 64,
+        }}
         onContentSizeChange={thread.followEnd}
         onScroll={thread.onScroll}
         scrollEventThrottle={16}
@@ -365,26 +370,30 @@ export default function ConversationScreen() {
         }
       />
 
-      {/* Listing Header — docked above the composer */}
-      <ConversationListingHeader
-        listing={thread.conv.listing}
-        listingId={thread.convListingId}
-        listingThumb={thread.listingThumb}
-        status={thread.status}
-        isSeller={thread.isSeller}
-        onPressListing={openListing}
-        onPressBuyNow={() => router.push(`/payment/${thread.convListingId}` as any)}
-      />
-
-      {/* Bottom Composer / Block Banner Dock */}
+      {/* Floating Bottom Composer / Block Banner Dock */}
       <View
         style={{
-          borderTopWidth: 1,
-          borderTopColor: theme.border,
-          backgroundColor: theme.surface,
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          zIndex: 30,
+          backgroundColor: 'transparent',
           paddingBottom: keyboardUp ? DOCK_GAP_KEYBOARD : Math.max(insets.bottom, 12),
         }}
+        pointerEvents="box-none"
       >
+        {/* Listing Header — floating card docked above the composer */}
+        <ConversationListingHeader
+          listing={thread.conv.listing}
+          listingId={thread.convListingId}
+          listingThumb={thread.listingThumb}
+          status={thread.status}
+          isSeller={thread.isSeller}
+          onPressListing={openListing}
+          onPressBuyNow={() => router.push(`/payment/${thread.convListingId}` as any)}
+        />
+
         {block.blockStatus === 'unblocked' ? (
           <Composer
             value={thread.input}
