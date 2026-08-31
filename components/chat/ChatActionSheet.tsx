@@ -45,10 +45,13 @@ export function ChatActionSheet({
   const translateY = useRef(new Animated.Value(450)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const isClosingRef = useRef(false);
+  const animGenerationRef = useRef(0);
 
   const dismiss = useCallback(() => {
     if (isClosingRef.current) return;
     isClosingRef.current = true;
+    const animId = ++animGenerationRef.current;
+
     Animated.parallel([
       Animated.timing(translateY, {
         toValue: 450,
@@ -60,7 +63,8 @@ export function ChatActionSheet({
         duration: 150,
         useNativeDriver: Platform.OS !== 'web',
       }),
-    ]).start(() => {
+    ]).start(({ finished }) => {
+      if (animId !== animGenerationRef.current) return;
       setInternalVisible(false);
       isClosingRef.current = false;
       onClose();
@@ -70,6 +74,7 @@ export function ChatActionSheet({
   useEffect(() => {
     if (visible) {
       isClosingRef.current = false;
+      const animId = ++animGenerationRef.current;
       setInternalVisible(true);
       translateY.setValue(450);
       backdropOpacity.setValue(0);
