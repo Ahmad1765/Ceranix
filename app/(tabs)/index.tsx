@@ -47,6 +47,7 @@ import {
   GridPlaceholder,
   GridRow,
   HomeHeader,
+  HomeSearchView,
   PriceDropRail,
   SAVED,
   useHomeFeedFilters,
@@ -64,6 +65,7 @@ export default function HomeScreen() {
   const { user, loading: authLoading } = useAuth();
   const toast = useToast();
   const [alertSheetOpen, setAlertSheetOpen] = useState(false);
+  const [searchModeOpen, setSearchModeOpen] = useState(false);
 
   const listRef = useRef<FlashListRef<Listing[]>>(null);
   const scrollToTop = useCallback(() => {
@@ -205,6 +207,7 @@ export default function HomeScreen() {
           focused: feedFilter.searchFocused,
           onFocus: () => feedFilter.setSearchFocused(true),
           onBlur: () => feedFilter.setSearchFocused(false),
+          onPressSearch: () => setSearchModeOpen(true),
           resultCount:
             feedFilter.isSearching || feedFilter.activeFilterCount > 0
               ? feedFilter.filteredListings.length
@@ -236,6 +239,32 @@ export default function HomeScreen() {
       <PriceDropRail show={showRails} priceDrops={priceDrops} />
     </>
   );
+
+  if (searchModeOpen) {
+    return (
+      <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+        <HomeSearchView
+          onClose={() => setSearchModeOpen(false)}
+          onOpenSavedAlerts={() => {
+            if (!user?.id) {
+              toast.show('Sign in to create drop alerts', { variant: 'info', icon: 'log-in' });
+              router.push('/auth/login');
+              return;
+            }
+            setAlertSheetOpen(true);
+          }}
+        />
+        {user?.id ? (
+          <DropAlertSheet
+            visible={alertSheetOpen}
+            userId={user.id}
+            onClose={() => setAlertSheetOpen(false)}
+            onCreated={() => searchesRefetch()}
+          />
+        ) : null}
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.background }}>

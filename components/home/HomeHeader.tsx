@@ -28,6 +28,7 @@ type FeedSearchProps = {
   focused: boolean;
   onFocus: () => void;
   onBlur: () => void;
+  onPressSearch?: () => void;
   resultCount: number | null;
   filterCount: number;
   onOpenFilter: () => void;
@@ -41,6 +42,7 @@ export const FeedSearch = memo(function FeedSearch({
   focused,
   onFocus,
   onBlur,
+  onPressSearch,
   resultCount,
   filterCount,
   onOpenFilter,
@@ -55,8 +57,16 @@ export const FeedSearch = memo(function FeedSearch({
   return (
     <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <View
-          style={{
+        <Pressable
+          onPress={() => {
+            haptic();
+            if (onPressSearch) {
+              onPressSearch();
+            } else {
+              inputRef.current?.focus();
+            }
+          }}
+          style={({ pressed }) => ({
             flex: 1,
             flexDirection: 'row',
             alignItems: 'center',
@@ -67,7 +77,8 @@ export const FeedSearch = memo(function FeedSearch({
             height: 44,
             borderWidth: 1,
             borderColor: theme.border,
-          }}
+            opacity: pressed && onPressSearch ? 0.85 : 1,
+          })}
         >
           <Feather
             name="search"
@@ -79,10 +90,19 @@ export const FeedSearch = memo(function FeedSearch({
             ref={inputRef}
             value={value}
             onChangeText={onChangeText}
-            onFocus={onFocus}
+            onFocus={() => {
+              if (onPressSearch) {
+                inputRef.current?.blur();
+                onPressSearch();
+              } else {
+                onFocus();
+              }
+            }}
             onBlur={onBlur}
             placeholder="Search"
             placeholderTextColor={theme.muteSoft}
+            editable={!onPressSearch}
+            pointerEvents={onPressSearch ? 'none' : 'auto'}
             style={{
               flex: 1,
               minWidth: 0,
@@ -142,7 +162,7 @@ export const FeedSearch = memo(function FeedSearch({
               </Text>
             </View>
           )}
-        </View>
+        </Pressable>
 
         {focused ? (
           <Pressable

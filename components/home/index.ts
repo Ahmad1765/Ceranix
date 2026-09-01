@@ -1,4 +1,5 @@
 export { HomeHeader, FeedSearch, ChipRow } from './HomeHeader';
+export { HomeSearchView } from './HomeSearchView';
 export { PriceDropRail } from './PriceDropRail';
 export { GridRow, GridPlaceholder } from './HomeGridComponents';
 export {
@@ -8,3 +9,4 @@ export {
   TRENDING,
   SAVED,
 } from './useHomeFeedFilters';
+
