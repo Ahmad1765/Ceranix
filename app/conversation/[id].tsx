@@ -24,7 +24,6 @@ import {
   Platform,
   Pressable,
   ActivityIndicator,
-  StyleSheet,
 } from 'react-native';
 import { Text } from '@/lib/rnText';
 import * as Clipboard from 'expo-clipboard';
@@ -61,7 +60,7 @@ import {
 } from '@/components/chat';
 
 /** Breathing room under composer when software keyboard is up */
-const DOCK_GAP_KEYBOARD = 6;
+const DOCK_GAP_KEYBOARD = 10;
 const EMPTY_REACTIONS: string[] = [];
 
 function useKeyboardVisible(): boolean {
@@ -332,7 +331,7 @@ export default function ConversationScreen() {
         contentContainerStyle={{
           flexGrow: 1,
           justifyContent: 'flex-end',
-          paddingBottom: (thread.convListingId ? 140 : 80) + (keyboardUp ? DOCK_GAP_KEYBOARD : Math.max(insets.bottom, 12)),
+          paddingBottom: (thread.convListingId ? 140 : 80) + (keyboardUp ? DOCK_GAP_KEYBOARD : Math.max(insets.bottom + 10, 20)),
           paddingTop: 64,
         }}
         onContentSizeChange={thread.followEnd}
@@ -379,7 +378,7 @@ export default function ConversationScreen() {
           right: 0,
           zIndex: 30,
           backgroundColor: 'transparent',
-          paddingBottom: keyboardUp ? DOCK_GAP_KEYBOARD : Math.max(insets.bottom, 12),
+          paddingBottom: keyboardUp ? DOCK_GAP_KEYBOARD : Math.max(insets.bottom + 10, 20),
         }}
         pointerEvents="box-none"
       >

@@ -12,7 +12,6 @@ import { View, Platform, StyleSheet, type NativeSyntheticEvent, type TextInputCo
 import { Text, TextInput } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import Animated, { ZoomIn, ZoomOut } from 'react-native-reanimated';
 import { PressableScale } from '@/components/PressableScale';
 import { type as typography } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
@@ -40,7 +39,7 @@ export function Composer({
   /** When set, the composer is replaced by this line — e.g. listing removed. */
   disabledReason?: string | null;
 }) {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const armed = value.trim().length > 0;
 
   // ── Auto-sizing ────────────────────────────────────────────────────────
@@ -97,12 +96,15 @@ export function Composer({
   return (
     <View
       style={{
+        width: '100%',
+        maxWidth: 500,
+        alignSelf: 'center',
         flexDirection: 'row',
         alignItems: 'flex-end',
         gap: 10,
-        paddingHorizontal: 12,
+        paddingHorizontal: 16,
         paddingTop: 6,
-        paddingBottom: 6,
+        paddingBottom: 8,
         backgroundColor: 'transparent',
       }}
     >
@@ -141,7 +143,7 @@ export function Composer({
             borderColor: theme.hairline,
             borderRadius: 22,
             paddingLeft: 14,
-            paddingRight: armed ? 4 : 14,
+            paddingRight: 4,
             paddingVertical: 4,
             flexDirection: 'row',
             alignItems: 'flex-end',
@@ -154,7 +156,7 @@ export function Composer({
             flex: 1,
             justifyContent: 'center',
             paddingVertical: Platform.OS === 'web' ? 6 : 4,
-            marginRight: armed ? 6 : 0,
+            marginRight: 6,
           }}
         >
           <TextInput
@@ -175,6 +177,7 @@ export function Composer({
             }
             onContentSizeChange={onContentSize}
             multiline
+            {...({ enableAccessoryView: false } as any)}
             {...(Platform.OS === 'web' ? { rows: 1 } : null)}
             accessibilityLabel="Message"
             onKeyPress={
@@ -211,30 +214,39 @@ export function Composer({
           />
         </View>
 
-        {/* Send button with delightful spring popup animation */}
-        {armed && (
-          <Animated.View
-            entering={ZoomIn.springify().damping(12).stiffness(240).mass(0.6)}
-            exiting={ZoomOut.duration(120)}
-            style={{ marginBottom: 0 }}
-          >
-            <PressableScale
-              onPress={onSend}
-              scaleTo={0.90}
-              accessibilityLabel="Send message"
-              style={{
-                width: SEND_BUTTON_SIZE,
-                height: SEND_BUTTON_SIZE,
-                borderRadius: SEND_BUTTON_SIZE / 2,
-                backgroundColor: theme.ink,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Ionicons name="arrow-up" size={18} color={theme.panel} />
-            </PressableScale>
-          </Animated.View>
-        )}
+        {/* Send button: always visible, greyed out when disabled, black when armed */}
+        <PressableScale
+          onPress={armed ? onSend : undefined}
+          disabled={!armed}
+          scaleTo={armed ? 0.90 : 1}
+          accessibilityLabel="Send message"
+          accessibilityRole="button"
+          accessibilityState={{ disabled: !armed }}
+          style={{
+            width: SEND_BUTTON_SIZE,
+            height: SEND_BUTTON_SIZE,
+            borderRadius: SEND_BUTTON_SIZE / 2,
+            backgroundColor: armed
+              ? theme.ink
+              : isDark
+                ? 'rgba(255, 255, 255, 0.12)'
+                : '#E5E7EB',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Ionicons
+            name="arrow-up"
+            size={18}
+            color={
+              armed
+                ? theme.panel
+                : isDark
+                  ? 'rgba(255, 255, 255, 0.4)'
+                  : '#9CA3AF'
+            }
+          />
+        </PressableScale>
       </View>
     </View>
   );

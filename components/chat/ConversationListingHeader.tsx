@@ -113,7 +113,10 @@ export function ConversationListingHeader({
 
 const styles = StyleSheet.create({
   card: {
-    marginHorizontal: 12,
+    width: '100%',
+    maxWidth: 500,
+    alignSelf: 'center',
+    marginHorizontal: 'auto',
     marginBottom: 6,
     borderRadius: radii.xl,
     paddingHorizontal: 12,
