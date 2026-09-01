@@ -11,6 +11,7 @@ const subscribers = new Set<(history: string[]) => void>();
 
 function notifySubscribers(next: string[]) {
   memoryHistory = next;
+  isHydrated = true;
   subscribers.forEach((fn) => fn(next));
   AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch((e) =>
     console.warn('[useSearchHistory] Failed to persist search history', e),
@@ -23,9 +24,12 @@ async function hydrateHistory(): Promise<string[]> {
     hydrationPromise = (async () => {
       try {
         const stored = await AsyncStorage.getItem(STORAGE_KEY);
+        if (isHydrated) {
+          return memoryHistory;
+        }
         if (stored !== null) {
           const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) {
+          if (Array.isArray(parsed)) {
             memoryHistory = parsed;
             isHydrated = true;
             return parsed;
@@ -34,7 +38,9 @@ async function hydrateHistory(): Promise<string[]> {
       } catch (err) {
         console.warn('[useSearchHistory] Failed to load search history', err);
       }
-      isHydrated = true;
+      if (!isHydrated) {
+        isHydrated = true;
+      }
       return memoryHistory;
     })();
   }

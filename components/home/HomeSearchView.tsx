@@ -275,9 +275,6 @@ export const HomeSearchView = memo(function HomeSearchView({
 
           if (listingsResult.ok && listingsResult.rows) {
             setListingResults(listingsResult.rows);
-            if (trimmed.length >= 2) {
-              addSearch(trimmed);
-            }
           } else {
             setListingResults([]);
           }
@@ -490,7 +487,7 @@ export const HomeSearchView = memo(function HomeSearchView({
         </Pressable>
       );
     },
-    [toast, theme, isDark],
+    [toast, theme, isDark, query, addSearch],
   );
 
   // ── Render Idle Landing Content for Listings Tab (Image 1) ─────────────────
