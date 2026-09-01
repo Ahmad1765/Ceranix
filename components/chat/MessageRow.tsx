@@ -748,6 +748,7 @@ function TextBubble({
         borderTopLeftRadius: !mine && grouped ? TAIL_RADIUS : BUBBLE_RADIUS,
         borderBottomRightRadius: mine && lastOfGroup ? TAIL_RADIUS : BUBBLE_RADIUS,
         borderBottomLeftRadius: !mine && lastOfGroup ? TAIL_RADIUS : BUBBLE_RADIUS,
+        alignSelf: mine ? 'flex-end' : 'flex-start',
       }}
     >
       <Text
@@ -757,7 +758,11 @@ function TextBubble({
           lineHeight: 21,
           color: mine ? '#FFFFFF' : theme.ink,
           ...(Platform.OS === 'web'
-            ? ({ wordBreak: 'break-word', overflowWrap: 'break-word' } as any)
+            ? ({
+                wordBreak: 'normal',
+                overflowWrap: 'break-word',
+                wordWrap: 'break-word',
+              } as any)
             : null),
         }}
       >
@@ -856,6 +861,7 @@ function MessageRowImpl(props: MessageRowProps) {
         style={{
           flexDirection: 'row',
           alignItems: 'flex-end',
+          justifyContent: mine ? 'flex-end' : 'flex-start',
           gap: 8,
           maxWidth: '100%',
         }}
@@ -900,6 +906,7 @@ function MessageRowImpl(props: MessageRowProps) {
           style={{
             maxWidth: msg.kind === 'offer' ? (mine ? '86%' : '82%') : '78%',
             alignItems: mine ? 'flex-end' : 'flex-start',
+            alignSelf: mine ? 'flex-end' : 'flex-start',
           }}
         >
           {msg.kind === 'offer' ? <OfferBubble {...props} /> : <TextBubble {...props} />}
