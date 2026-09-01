@@ -98,6 +98,7 @@ export const HomeSearchView = memo(function HomeSearchView({
   const [loading, setLoading] = useState(false);
 
   const scrollX = useRef(new Animated.Value(initialTab === 'listings' ? 0 : screenWidth)).current;
+  const searchRequestIdRef = useRef(0);
 
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
@@ -120,10 +121,19 @@ export const HomeSearchView = memo(function HomeSearchView({
     extrapolate: 'clamp',
   });
 
+  // Re-sync scrollX and pager offset on resize or activeTab change
+  useEffect(() => {
+    const targetX = activeTab === 'listings' ? 0 : screenWidth;
+    scrollX.setValue(targetX);
+    pagerRef.current?.scrollTo({ x: targetX, animated: false });
+  }, [screenWidth, activeTab, scrollX]);
+
   // ── Core Search Execution ───────────────────────────────────────────────────
   const runSearch = useCallback(
     async (searchTerm: string) => {
       const trimmed = searchTerm.trim();
+      const requestId = ++searchRequestIdRef.current;
+
       if (!trimmed) {
         setSellerResults([]);
         setListingResults([]);
@@ -139,20 +149,34 @@ export const HomeSearchView = memo(function HomeSearchView({
           searchListings({ query: trimmed, limit: 40 }).catch(() => ({ ok: false, rows: [] })),
         ]);
 
+        if (searchRequestIdRef.current !== requestId) return;
+
         let combinedSellers: SellerResult[] = [];
 
         // Real profiles from Supabase
         if (usersResult && usersResult.length > 0) {
           const userIds = usersResult.map((u) => u.id);
-          const { data: listingsData } = await supabase
-            .from('listings')
-            .select('seller_id')
-            .in('seller_id', userIds)
-            .eq('is_sold', false);
+
+          // Head-only exact count requests per seller (zero listing row payload)
+          const countPromises = userIds.map(async (id) => {
+            try {
+              const { count } = await supabase
+                .from('listings')
+                .select('id', { count: 'exact', head: true })
+                .eq('seller_id', id)
+                .eq('is_sold', false);
+              return { id, count: count ?? 0 };
+            } catch {
+              return { id, count: 0 };
+            }
+          });
+
+          const countResults = await Promise.all(countPromises);
+          if (searchRequestIdRef.current !== requestId) return;
 
           const countsMap: Record<string, number> = {};
-          (listingsData ?? []).forEach((row: any) => {
-            countsMap[row.seller_id] = (countsMap[row.seller_id] ?? 0) + 1;
+          countResults.forEach((r) => {
+            countsMap[r.id] = r.count;
           });
 
           combinedSellers = usersResult.map((u) => ({
@@ -164,31 +188,39 @@ export const HomeSearchView = memo(function HomeSearchView({
           }));
         }
 
-        // Match seed mock sellers (case-insensitive substring match)
-        const qLower = trimmed.toLowerCase();
-        const matchingSeeds = SEED_SELLERS.filter(
-          (m) =>
-            m.username.toLowerCase().includes(qLower) ||
-            m.full_name.toLowerCase().includes(qLower),
-        );
+        // Match seed mock sellers in development builds only (__DEV__)
+        if (__DEV__) {
+          const qLower = trimmed.toLowerCase();
+          const matchingSeeds = SEED_SELLERS.filter(
+            (m) =>
+              m.username.toLowerCase().includes(qLower) ||
+              m.full_name.toLowerCase().includes(qLower),
+          );
 
-        for (const seed of matchingSeeds) {
-          if (!combinedSellers.some((s) => s.username.toLowerCase() === seed.username.toLowerCase())) {
-            combinedSellers.push(seed);
+          for (const seed of matchingSeeds) {
+            if (!combinedSellers.some((s) => s.username.toLowerCase() === seed.username.toLowerCase())) {
+              combinedSellers.push(seed);
+            }
           }
         }
 
-        setSellerResults(combinedSellers);
+        if (searchRequestIdRef.current === requestId) {
+          setSellerResults(combinedSellers);
 
-        if (listingsResult.ok && listingsResult.rows) {
-          setListingResults(listingsResult.rows);
-        } else {
-          setListingResults([]);
+          if (listingsResult.ok && listingsResult.rows) {
+            setListingResults(listingsResult.rows);
+          } else {
+            setListingResults([]);
+          }
         }
       } catch (err) {
-        console.warn('[HomeSearchView] Search error', err);
+        if (searchRequestIdRef.current === requestId) {
+          console.warn('[HomeSearchView] Search error', err);
+        }
       } finally {
-        setLoading(false);
+        if (searchRequestIdRef.current === requestId) {
+          setLoading(false);
+        }
       }
     },
     [],
@@ -286,19 +318,18 @@ export const HomeSearchView = memo(function HomeSearchView({
       haptic();
       setQuery(term);
       addSearch(term);
-      runSearch(term);
       Keyboard.dismiss();
     },
-    [addSearch, runSearch],
+    [addSearch],
   );
 
   const handleSubmitSearch = useCallback(() => {
-    if (query.trim().length > 0) {
-      addSearch(query.trim());
-      runSearch(query.trim());
+    const trimmed = query.trim();
+    if (trimmed.length > 0) {
+      addSearch(trimmed);
       Keyboard.dismiss();
     }
-  }, [query, addSearch, runSearch]);
+  }, [query, addSearch]);
 
   const handleCameraPress = useCallback(async () => {
     haptic();
@@ -328,12 +359,11 @@ export const HomeSearchView = memo(function HomeSearchView({
         });
         setQuery('vintage');
         addSearch('Visual Search');
-        runSearch('vintage');
       }
     } catch {
       toast.show('Could not open image library', { variant: 'info', icon: 'alert-circle' });
     }
-  }, [toast, addSearch, runSearch]);
+  }, [toast, addSearch]);
 
   // ── Render Seller Row (Exact match to Image 2) ─────────────────────────────
   const renderSellerItem = useCallback(({ item }: { item: SellerResult }) => {
@@ -585,8 +615,8 @@ export const HomeSearchView = memo(function HomeSearchView({
   return (
     <View
       style={{ flex: 1, backgroundColor: '#FFFFFF' }}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
+      onTouchStart={Platform.OS === 'web' ? handleTouchStart : undefined}
+      onTouchEnd={Platform.OS === 'web' ? handleTouchEnd : undefined}
     >
       {/* ── Top Header Row ─────────────────────────────────────────────────── */}
       <View
@@ -658,8 +688,10 @@ export const HomeSearchView = memo(function HomeSearchView({
               onPress={() => {
                 haptic();
                 setQuery('');
+                ++searchRequestIdRef.current;
                 setSellerResults([]);
                 setListingResults([]);
+                setLoading(false);
               }}
               hitSlop={10}
               accessibilityLabel="Clear search"
@@ -760,6 +792,7 @@ export const HomeSearchView = memo(function HomeSearchView({
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
+        contentOffset={{ x: initialTab === 'listings' ? 0 : screenWidth, y: 0 }}
         onScroll={handleScroll}
         onMomentumScrollEnd={handleMomentumScrollEnd}
         scrollEventThrottle={16}

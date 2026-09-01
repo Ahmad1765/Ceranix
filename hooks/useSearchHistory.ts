@@ -14,9 +14,9 @@ export function useSearchHistory() {
     (async () => {
       try {
         const stored = await AsyncStorage.getItem(STORAGE_KEY);
-        if (stored) {
+        if (stored !== null) {
           const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) {
+          if (Array.isArray(parsed)) {
             if (mounted) setPreviousSearches(parsed);
             return;
           }
@@ -35,36 +35,31 @@ export function useSearchHistory() {
     };
   }, []);
 
-  const addSearch = useCallback(async (term: string) => {
+  // Persist to AsyncStorage whenever previousSearches changes after initial load
+  useEffect(() => {
+    if (!isLoaded) return;
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(previousSearches)).catch((e) =>
+      console.warn('[useSearchHistory] Save error', e),
+    );
+  }, [previousSearches, isLoaded]);
+
+  const addSearch = useCallback((term: string) => {
     const trimmed = term.trim();
     if (!trimmed) return;
 
     setPreviousSearches((prev) => {
       const filtered = prev.filter((t) => t.toLowerCase() !== trimmed.toLowerCase());
-      const updated = [trimmed, ...filtered].slice(0, 15);
-      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated)).catch((e) =>
-        console.warn('[useSearchHistory] Save error', e),
-      );
-      return updated;
+      return [trimmed, ...filtered].slice(0, 15);
     });
   }, []);
 
-  const removeSearch = useCallback(async (term: string) => {
+  const removeSearch = useCallback((term: string) => {
     const trimmed = term.trim();
-    setPreviousSearches((prev) => {
-      const updated = prev.filter((t) => t.toLowerCase() !== trimmed.toLowerCase());
-      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated)).catch((e) =>
-        console.warn('[useSearchHistory] Remove error', e),
-      );
-      return updated;
-    });
+    setPreviousSearches((prev) => prev.filter((t) => t.toLowerCase() !== trimmed.toLowerCase()));
   }, []);
 
-  const clearAll = useCallback(async () => {
+  const clearAll = useCallback(() => {
     setPreviousSearches([]);
-    await AsyncStorage.removeItem(STORAGE_KEY).catch((e) =>
-      console.warn('[useSearchHistory] Clear error', e),
-    );
   }, []);
 
   return {

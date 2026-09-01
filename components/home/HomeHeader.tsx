@@ -58,6 +58,8 @@ export const FeedSearch = memo(function FeedSearch({
     <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={value.trim() ? `Search: ${value}` : 'Search listings and sellers'}
           onPress={() => {
             haptic();
             if (onPressSearch) {

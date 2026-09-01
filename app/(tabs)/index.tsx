@@ -15,7 +15,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { RefreshControl } from 'react-native';
+import { RefreshControl, BackHandler, StyleSheet, View } from 'react-native';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, router } from 'expo-router';
@@ -158,6 +158,17 @@ export default function HomeScreen() {
     ]);
   }, [feedRefetch, trendingRefetch, dropsRefetch, searchesRefetch, savedRefetch, userId]);
 
+  // ── BackHandler listener for search mode ────────────────────────────────
+  useEffect(() => {
+    if (!searchModeOpen) return;
+    const onBackPress = () => {
+      setSearchModeOpen(false);
+      return true;
+    };
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, [searchModeOpen]);
+
   // ── Multi-Tier Client Filter Hook ────────────────────────────────────────
   const feedFilter = useHomeFeedFilters({
     listings,
@@ -240,32 +251,6 @@ export default function HomeScreen() {
     </>
   );
 
-  if (searchModeOpen) {
-    return (
-      <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-        <HomeSearchView
-          onClose={() => setSearchModeOpen(false)}
-          onOpenSavedAlerts={() => {
-            if (!user?.id) {
-              toast.show('Sign in to create drop alerts', { variant: 'info', icon: 'log-in' });
-              router.push('/auth/login');
-              return;
-            }
-            setAlertSheetOpen(true);
-          }}
-        />
-        {user?.id ? (
-          <DropAlertSheet
-            visible={alertSheetOpen}
-            userId={user.id}
-            onClose={() => setAlertSheetOpen(false)}
-            onCreated={() => searchesRefetch()}
-          />
-        ) : null}
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.background }}>
       <FlashList
@@ -296,6 +281,22 @@ export default function HomeScreen() {
         }
         contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 12) + tabClear + 16 }}
       />
+
+      {searchModeOpen && (
+        <View style={StyleSheet.absoluteFillObject}>
+          <HomeSearchView
+            onClose={() => setSearchModeOpen(false)}
+            onOpenSavedAlerts={() => {
+              if (!user?.id) {
+                toast.show('Sign in to create drop alerts', { variant: 'info', icon: 'log-in' });
+                router.push('/auth/login');
+                return;
+              }
+              setAlertSheetOpen(true);
+            }}
+          />
+        </View>
+      )}
 
       <FeedFilterSheet
         visible={feedFilter.filterOpen}
