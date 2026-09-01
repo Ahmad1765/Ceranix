@@ -179,12 +179,23 @@ export async function searchListings(opts: {
   if (!safe) return { ok: true, rows: [] };
 
   try {
+    const orConditions = [
+      `title.ilike.%${safe}%`,
+      `brand.ilike.%${safe}%`,
+      `description.ilike.%${safe}%`,
+      `category.ilike.%${safe}%`,
+      `subcategory.ilike.%${safe}%`,
+    ];
+    if (/^[a-zA-Z0-9_-]+$/.test(safe)) {
+      orConditions.push(`tags.cs.{${safe}}`);
+    }
+
     let q = supabase
       .from('listings')
       .select(SELECT_FEED)
       .eq('is_sold', false)
       .eq('seller.vacation_mode', false)
-      .or(`title.ilike.%${safe}%,brand.ilike.%${safe}%,description.ilike.%${safe}%,tags.cs.{${safe}}`);
+      .or(orConditions.join(','));
     if (category) q = q.eq('category', category);
     if (subcategory) q = q.eq('subcategory', subcategory);
     const { data, error } = await q

@@ -2,64 +2,89 @@ import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORAGE_KEY = '@ceranix/previous_searches';
-const DEFAULT_PREVIOUS_SEARCHES = ['Antiques & Design', 'Antikviteter', 'Bilar'];
+export const DEFAULT_PREVIOUS_SEARCHES = ['Vintage', 'Sneakers', 'Jackets'];
 
-export function useSearchHistory() {
-  const [previousSearches, setPreviousSearches] = useState<string[]>(DEFAULT_PREVIOUS_SEARCHES);
-  const [isLoaded, setIsLoaded] = useState(false);
+let memoryHistory: string[] = [...DEFAULT_PREVIOUS_SEARCHES];
+let isHydrated = false;
+let hydrationPromise: Promise<string[]> | null = null;
+const subscribers = new Set<(history: string[]) => void>();
 
-  // Load from AsyncStorage on mount
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
+function notifySubscribers(next: string[]) {
+  memoryHistory = next;
+  subscribers.forEach((fn) => fn(next));
+  AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch((e) =>
+    console.warn('[useSearchHistory] Failed to persist search history', e),
+  );
+}
+
+async function hydrateHistory(): Promise<string[]> {
+  if (isHydrated) return memoryHistory;
+  if (!hydrationPromise) {
+    hydrationPromise = (async () => {
       try {
         const stored = await AsyncStorage.getItem(STORAGE_KEY);
         if (stored !== null) {
           const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed)) {
-            if (mounted) setPreviousSearches(parsed);
-            return;
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            memoryHistory = parsed;
+            isHydrated = true;
+            return parsed;
           }
         }
-        // If nothing stored yet, initialize with defaults
-        if (mounted) setPreviousSearches(DEFAULT_PREVIOUS_SEARCHES);
       } catch (err) {
-        console.warn('[useSearchHistory] Failed to load previous searches', err);
-      } finally {
-        if (mounted) setIsLoaded(true);
+        console.warn('[useSearchHistory] Failed to load search history', err);
       }
+      isHydrated = true;
+      return memoryHistory;
     })();
+  }
+  return hydrationPromise;
+}
+
+// Pre-hydrate on module evaluation
+hydrateHistory();
+
+export function useSearchHistory() {
+  const [previousSearches, setPreviousSearches] = useState<string[]>(memoryHistory);
+  const [isLoaded, setIsLoaded] = useState(isHydrated);
+
+  useEffect(() => {
+    let mounted = true;
+    const handleChange = (history: string[]) => {
+      if (mounted) setPreviousSearches(history);
+    };
+    subscribers.add(handleChange);
+
+    hydrateHistory().then((history) => {
+      if (mounted) {
+        setPreviousSearches(history);
+        setIsLoaded(true);
+      }
+    });
 
     return () => {
       mounted = false;
+      subscribers.delete(handleChange);
     };
   }, []);
-
-  // Persist to AsyncStorage whenever previousSearches changes after initial load
-  useEffect(() => {
-    if (!isLoaded) return;
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(previousSearches)).catch((e) =>
-      console.warn('[useSearchHistory] Save error', e),
-    );
-  }, [previousSearches, isLoaded]);
 
   const addSearch = useCallback((term: string) => {
     const trimmed = term.trim();
     if (!trimmed) return;
 
-    setPreviousSearches((prev) => {
-      const filtered = prev.filter((t) => t.toLowerCase() !== trimmed.toLowerCase());
-      return [trimmed, ...filtered].slice(0, 15);
-    });
+    const filtered = memoryHistory.filter((t) => t.toLowerCase() !== trimmed.toLowerCase());
+    const next = [trimmed, ...filtered].slice(0, 15);
+    notifySubscribers(next);
   }, []);
 
   const removeSearch = useCallback((term: string) => {
     const trimmed = term.trim();
-    setPreviousSearches((prev) => prev.filter((t) => t.toLowerCase() !== trimmed.toLowerCase()));
+    const next = memoryHistory.filter((t) => t.toLowerCase() !== trimmed.toLowerCase());
+    notifySubscribers(next);
   }, []);
 
   const clearAll = useCallback(() => {
-    setPreviousSearches([]);
+    notifySubscribers([]);
   }, []);
 
   return {

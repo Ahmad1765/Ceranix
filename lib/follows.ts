@@ -128,10 +128,12 @@ export async function fetchSuggestedFollows(
 // Edge rows joined to the profile on each side. Two queries because PostgREST
 // embedded selects on the same FK pair are fiddly; the second roundtrip is
 // cheap for the page sizes a follow list realistically renders.
-type FollowListRow = Pick<
+export type FollowListRow = Pick<
   import('@/types').User,
   'id' | 'username' | 'full_name' | 'avatar_url' | 'is_verified' | 'followers_count'
->;
+> & {
+  listingCount?: number;
+};
 
 async function fetchProfilesByIds(ids: string[]): Promise<FollowListRow[]> {
   if (ids.length === 0) return [];
@@ -218,7 +220,8 @@ export async function searchUsers(query: string, limit = 20): Promise<FollowList
   if (!safe) return [];
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, username, full_name, avatar_url, is_verified, followers_count')
+    .select('id, username, full_name, avatar_url, is_verified, followers_count, listings(count)')
+    .eq('listings.is_sold', false)
     .or(`username.ilike.%${safe}%,full_name.ilike.%${safe}%`)
     .order('followers_count', { ascending: false, nullsFirst: false })
     .limit(limit);
@@ -226,7 +229,17 @@ export async function searchUsers(query: string, limit = 20): Promise<FollowList
     console.warn('[follows] searchUsers', error.message);
     return [];
   }
-  return (data ?? []) as unknown as FollowListRow[];
+  return (data ?? []).map((row: any) => ({
+    id: row.id,
+    username: row.username,
+    full_name: row.full_name,
+    avatar_url: row.avatar_url,
+    is_verified: row.is_verified,
+    followers_count: row.followers_count,
+    listingCount: Array.isArray(row.listings)
+      ? (row.listings[0]?.count ?? 0)
+      : (row.listings?.count ?? 0),
+  }));
 }
 
 // Given a list of target profile ids, return the subset the current viewer
