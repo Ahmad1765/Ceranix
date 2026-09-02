@@ -12,7 +12,7 @@ import { View, Pressable } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
-import Svg, { Circle, Path } from 'react-native-svg';
+import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { useTheme } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
 import {
@@ -145,19 +145,9 @@ export const ProductOverviewHeader = memo(function ProductOverviewHeader({
                 : ''} */}
             </Text>
             {/* Shield icon matching the reference — purple circle + shield outline + checkmark */}
-            <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-              <Circle cx="12" cy="12" r="12" fill="#F2F3FE" />
-              <Path
-                d="M12.033 6.80005C12.033 6.80005 9.1033 8.22413 6.2 8.22413V8.39167C6.2 9.22937 6.24402 10.0252 6.35408 10.7582C6.68425 13.2294 7.58671 15.1561 9.08349 16.7686C9.1055 16.7896 9.12751 16.8315 9.14952 16.8524C9.74383 17.4807 10.4042 17.9833 11.0865 18.3812C11.2846 18.5069 12.011 18.8 12.011 18.8C12.011 18.8 12.7374 18.5069 12.9355 18.3812C13.6398 18.0042 14.2782 17.4807 14.8725 16.8524L14.9385 16.7686C15.9731 15.6587 16.7214 14.3812 17.1837 12.8943C17.4038 12.2241 17.5138 11.533 17.6239 10.7582C17.712 10.0252 17.8 9.22937 17.8 8.39167V8.22413C14.9671 8.22413 12.033 6.80005 12.033 6.80005Z"
-                stroke="#5356EE"
-              />
-              <Path
-                d="M9.39999 12.0127L11.332 13.8001L15 10.4001"
-                stroke="#5356EE"
-                strokeLinecap="round"
-              />
-            </Svg>
+            <ShieldCheckIcon size={20} />
           </Pressable>
+
         ) : null}
       </View>
     </View>

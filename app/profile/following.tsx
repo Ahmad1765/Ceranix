@@ -12,6 +12,7 @@ import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 import { colors } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { Button, EmptyState } from '@/components/ui';
+import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import {
   useFollowingMaskQuery,
   useFollowingQuery,
@@ -242,8 +243,9 @@ function UserRow({
           <Text style={{ fontSize: 14, fontWeight: '800', color: colors.ink }} numberOfLines={1}>
             {row.full_name || row.username}
           </Text>
-          {row.is_verified && <Feather name="check-circle" size={12} color={colors.primary} />}
+          {row.is_verified && <ShieldCheckIcon size={14} />}
         </View>
+
         <Text style={{ fontSize: 12.5, color: colors.mute, marginTop: 1 }} numberOfLines={1}>
           @{row.username}
         </Text>

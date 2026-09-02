@@ -13,6 +13,7 @@ import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, TextInput } from '@/lib/rnText';
+import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { radii, shadow, type } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { formatPrice, CURRENCY_SYMBOL } from '@/lib/currency';
@@ -397,13 +398,14 @@ export function OfferSheet({
 
                 {/* Fee breakdown helper text */}
                 <View style={[styles.feeBreakdownRow, { borderTopColor: theme.hairline }]}>
-                  <Feather name="shield" size={13} color={theme.purple} />
+                  <ShieldCheckIcon size={14} />
                   <Text style={[styles.feeHelperText, { color: theme.mute }]}>
                     {parsedAmount > 0
                       ? `${formatPrice(totalWithProtection)} incl. Buyer Protection`
                       : `Includes Buyer Protection guarantee`}
                   </Text>
                 </View>
+
               </Pressable>
 
               {/* Action Button: "Offer $15.00" */}

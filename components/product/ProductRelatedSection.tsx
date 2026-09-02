@@ -14,13 +14,14 @@ import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '@/context/ThemeContext';
 import { BundleSection } from '@/components/product/BundleSection';
-import { RelatedItemCard } from '@/components/product/RelatedItemCard';
+import { ListingCard } from '@/components/ListingCard';
 import {
   CARD_GAP,
   CARD_OUTER_PAD,
-  listingToRelated,
+  CARD_WIDTH,
   tap,
 } from '@/components/product/shared';
+
 import type { Listing } from '@/types';
 
 type ProductRelatedSectionProps = {
@@ -121,18 +122,14 @@ export const ProductRelatedSection = memo(function ProductRelatedSection({
                 flexWrap: 'wrap',
                 paddingHorizontal: CARD_OUTER_PAD,
                 columnGap: CARD_GAP,
+                rowGap: 16,
               }}
             >
-              {similarItems.map((row) => {
-                const item = listingToRelated(row);
-                return (
-                  <RelatedItemCard
-                    key={item.id}
-                    item={item}
-                    onPress={() => router.push(`/product/${item.id}`)}
-                  />
-                );
-              })}
+              {similarItems.map((item) => (
+                <View key={item.id} style={{ width: CARD_WIDTH }}>
+                  <ListingCard listing={item} width={CARD_WIDTH} />
+                </View>
+              ))}
             </View>
           )}
         </View>
@@ -140,3 +137,4 @@ export const ProductRelatedSection = memo(function ProductRelatedSection({
     </View>
   );
 });
+

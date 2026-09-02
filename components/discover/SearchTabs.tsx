@@ -15,6 +15,7 @@ import { router } from 'expo-router';
 import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 import { fetchFollowingMask, toggleFollow } from '@/lib/follows';
 import { useToast } from '@/lib/toast';
+import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { colors, radii, type } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import type { TagIndexEntry } from '@/lib/searchIndex';
@@ -594,8 +595,9 @@ function UserRow({
           >
             {user.full_name || user.username}
           </Text>
-          {user.is_verified && <Feather name="check-circle" size={12} color={colors.purple} />}
+          {user.is_verified && <ShieldCheckIcon size={14} />}
         </View>
+
         <Text style={{ fontSize: 12.5, color: colors.mute, marginTop: 1 }} numberOfLines={1}>
           @{user.username}
           {followers > 0 ? ` · ${followers} ${followers === 1 ? 'follower' : 'followers'}` : ''}

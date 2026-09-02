@@ -518,10 +518,11 @@ export const HomeSearchView = memo(function HomeSearchView({
           borderRadius: 0,
           paddingVertical: 14,
           paddingHorizontal: 14,
-          backgroundColor: theme.surface,
+          backgroundColor: 'transparent',
           gap: 14,
           opacity: pressed ? 0.88 : 1,
         })}
+
       >
         <BinocularsIcon width={48} height={42} />
 
@@ -729,7 +730,7 @@ export const HomeSearchView = memo(function HomeSearchView({
                 marginLeft: 9,
                 marginRight: 6,
                 fontFamily: typography.family.sansMedium,
-                fontSize: 13.5,
+                fontSize: 16,
                 letterSpacing: -0.15,
                 color: theme.ink,
                 padding: 0,

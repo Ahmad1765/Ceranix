@@ -1,7 +1,9 @@
 import { View } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
+import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { colors } from '@/lib/theme';
+
 
 export type Credential = {
   key: string;
@@ -27,19 +29,24 @@ export function CredentialList({ rows }: { rows: Credential[] }) {
             <View style={{ height: 1, backgroundColor: colors.hairline, marginVertical: 10 }} />
           ) : null}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <View
-              style={{
-                width: 26,
-                height: 26,
-                borderRadius: 13,
-                backgroundColor: colors.purpleSoft,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Feather name={row.icon} size={12} color={colors.purple} />
-            </View>
+            {row.key === 'verified' || row.icon === 'shield' ? (
+              <ShieldCheckIcon size={26} />
+            ) : (
+              <View
+                style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: 13,
+                  backgroundColor: colors.purpleSoft,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Feather name={row.icon} size={12} color={colors.purple} />
+              </View>
+            )}
             <Text
+
               style={{ flex: 1, fontSize: 13.5, color: colors.ink, fontWeight: '600' }}
               numberOfLines={2}
             >

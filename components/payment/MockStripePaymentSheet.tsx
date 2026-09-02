@@ -8,7 +8,9 @@ import {
 } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
+import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { colors } from '@/lib/theme';
+
 import { formatPrice } from '@/lib/fees';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 
@@ -318,7 +320,7 @@ export function MockStripePaymentSheet({
               paddingHorizontal: 4,
             }}
           >
-            <Feather name="shield" size={14} color={colors.mute} />
+            <ShieldCheckIcon size={16} />
             <Text
               style={{
                 fontSize: 11.5,
@@ -330,6 +332,7 @@ export function MockStripePaymentSheet({
               PCI-DSS Compliant. Direct integration ready for @stripe/stripe-react-native.
             </Text>
           </View>
+
 
           {/* Simulate Payment Button */}
           <Pressable

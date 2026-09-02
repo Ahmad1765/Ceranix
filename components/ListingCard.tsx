@@ -16,8 +16,8 @@ import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
 import { router } from 'expo-router';
-import { PressableScale } from '@/components/PressableScale';
 import { cardImageUrl, getOptimizedImageUrl, thumbWidthFor, IMAGE_TRANSITION } from '@/lib/images';
+
 import { peekLikedIds } from '@/lib/engagementCache';
 import { formatPrice } from '@/lib/currency';
 import { priceBreakdown } from '@/lib/fees';
@@ -26,6 +26,7 @@ import { useToast } from '@/lib/toast';
 import { isLiked as fetchIsLiked, toggleLike } from '@/lib/listings';
 import { useGuestGate } from '@/components/GuestGate';
 import { PopIcon, type PopIconHandle } from '@/components/product/PopIcon';
+import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { BRAND_PURPLE, conditionLabel } from '@/components/product/shared';
 import { colors, radii, shadow } from '@/lib/theme';
 import type { Listing } from '@/types';
@@ -252,13 +253,14 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
 
   return (
     <View style={{ flex: 1, marginBottom: 16 }}>
-    <PressableScale
+    <Pressable
       onPress={() => router.push(`/product/${listing.id}`)}
       accessibilityRole="link"
       accessibilityLabel={`${listing.brand || listing.title}${listing.size ? `, size ${listing.size}` : ''}, ${formatPrice(listing.price)}`}
       accessibilityHint="Opens listing details"
-      style={{ flex: 1 }}
+      style={({ pressed }) => ({ flex: 1, opacity: pressed ? 0.94 : 1 })}
     >
+
       {/* Outer wrapper carries the shadow — the inner view below needs
           overflow: hidden to clip the image/carousel to its rounded corners,
           and on iOS/Android that same clip silently eats a shadow applied to
@@ -451,10 +453,11 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
           <Text className="text-[12px] font-bold text-ink">
             {formatPrice(totalPrice, { whole: true })} incl.
           </Text>
-          <Feather name="check-circle" size={11} color={BRAND_PURPLE} />
+          <ShieldCheckIcon size={12} />
         </View>
+
       </View>
-    </PressableScale>
+    </Pressable>
     </View>
   );
 });

@@ -112,7 +112,7 @@ export const FeedSearch = memo(function FeedSearch({
               marginLeft: 9,
               marginRight: 6,
               fontFamily: typography.family.sansMedium,
-              fontSize: 13.5,
+              fontSize: 16,
               letterSpacing: -0.15,
               color: theme.ink,
               padding: 0,

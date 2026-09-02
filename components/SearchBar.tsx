@@ -62,7 +62,7 @@ export function SearchBar({
             marginLeft: 9,
             marginRight: 6,
             fontFamily: typography.family.sansMedium,
-            fontSize: 13.5,
+            fontSize: 16,
             letterSpacing: -0.15,
             color: colors.ink,
             padding: 0,

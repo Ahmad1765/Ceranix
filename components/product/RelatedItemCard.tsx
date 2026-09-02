@@ -6,6 +6,8 @@ import Feather from '@expo/vector-icons/Feather';
 import { getOptimizedImageUrl, thumbWidthFor, IMAGE_TRANSITION } from '@/lib/images';
 import { CARD_WIDTH, CARD_IMAGE_HEIGHT, type RelatedItem } from './shared';
 import { formatPrice } from '@/lib/currency';
+import { priceBreakdown } from '@/lib/fees';
+import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { useTheme } from '@/context/ThemeContext';
 
 export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress: () => void }) {
@@ -14,9 +16,12 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
   const [carouselArmed, setCarouselArmed] = useState(false);
   const hasMultiple = item.images.length > 1;
   const srcWidth = thumbWidthFor(CARD_WIDTH);
+  const { total: totalPrice } = priceBreakdown(item.price);
+
   const armCarousel = () => {
     if (!carouselArmed) setCarouselArmed(true);
   };
+
   return (
     <Pressable onPress={onPress} style={{ width: CARD_WIDTH, marginBottom: 18 }}>
       <View
@@ -108,7 +113,7 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
         <View
           style={{
             position: 'absolute',
-            top: 8,
+            bottom: 8,
             right: 8,
             backgroundColor: theme.surface,
             borderWidth: 1,
@@ -126,16 +131,24 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
         </View>
       </View>
 
-      <View style={{ marginTop: 10 }}>
+      <View style={{ marginTop: 6, width: '100%' }}>
         <Text style={{ fontSize: 13, fontWeight: '700', color: theme.ink }} numberOfLines={1}>
           {item.brand}
         </Text>
-        <Text style={{ fontSize: 11, color: theme.mute, marginTop: 2 }} numberOfLines={1}>
-          {item.meta}
-        </Text>
-        <Text style={{ fontSize: 14, fontWeight: '800', color: theme.ink, marginTop: 4 }}>
+        {!!item.meta && (
+          <Text style={{ fontSize: 11, color: theme.mute, marginTop: 2 }} numberOfLines={1}>
+            {item.meta}
+          </Text>
+        )}
+        <Text style={{ fontSize: 11, color: theme.mute, marginTop: 4 }}>
           {formatPrice(item.price, { whole: true })}
         </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2, gap: 3 }}>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: theme.ink }}>
+            {formatPrice(totalPrice, { whole: true })} incl.
+          </Text>
+          <ShieldCheckIcon size={12} />
+        </View>
       </View>
     </Pressable>
   );

@@ -2,7 +2,10 @@ import { View, Pressable, ActivityIndicator } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
+import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { useTheme } from '@/context/ThemeContext';
+
+
 import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 import type { User as Profile } from '@/types';
 
@@ -107,10 +110,11 @@ export function SettingsHero({
               </Text>
               {profile.is_verified && (
                 <View style={{ marginLeft: 6 }}>
-                  <Feather name="check-circle" size={14} color={cardText} />
+                  <ShieldCheckIcon size={16} />
                 </View>
               )}
             </View>
+
             <Text
               style={{ fontSize: 13, color: cardMuted, marginTop: 2 }}
               numberOfLines={1}

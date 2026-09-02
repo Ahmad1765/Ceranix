@@ -5,9 +5,11 @@ import Feather from '@expo/vector-icons/Feather';
 import { router } from 'expo-router';
 import { getOptimizedImageUrl } from '@/lib/images';
 import { formatPrice } from '@/lib/currency';
+import { priceBreakdown } from '@/lib/fees';
+import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
+import { ListingCard } from '@/components/ListingCard';
 import type { Listing } from '@/types';
 import { useTheme } from '@/context/ThemeContext';
-import { RelatedItemCard } from './RelatedItemCard';
 import { BundleProgressBar } from './BundleProgressBar';
 import {
   computeBundlePricing,
@@ -16,7 +18,7 @@ import {
   CARD_GAP,
   CARD_WIDTH,
   CARD_IMAGE_HEIGHT,
-  listingToRelated,
+  conditionLabel,
 } from './shared';
 
 export function BundleSection({
@@ -42,7 +44,6 @@ export function BundleSection({
 
   // Ensure sold items never appear in the bundle offers
   const activeSellerItems = sellerItems.filter((s) => !s.is_sold);
-  const baseItem = listingToRelated(listing);
   const selectedItems = activeSellerItems.filter((s) => selectedIds.has(s.id));
 
   // If the current listing is already sold, bundling is unavailable — show other available items to browse
@@ -72,18 +73,14 @@ export function BundleSection({
               flexWrap: 'wrap',
               paddingHorizontal: CARD_OUTER_PAD,
               columnGap: CARD_GAP,
+              rowGap: 16,
             }}
           >
-            {activeSellerItems.map((row) => {
-              const item = listingToRelated(row);
-              return (
-                <RelatedItemCard
-                  key={item.id}
-                  item={item}
-                  onPress={() => router.push(`/product/${item.id}`)}
-                />
-              );
-            })}
+            {activeSellerItems.map((item) => (
+              <View key={item.id} style={{ width: CARD_WIDTH }}>
+                <ListingCard listing={item} width={CARD_WIDTH} />
+              </View>
+            ))}
           </View>
         )}
       </View>
@@ -138,20 +135,19 @@ export function BundleSection({
             flexWrap: 'wrap',
             paddingHorizontal: CARD_OUTER_PAD,
             columnGap: CARD_GAP,
+            rowGap: 16,
           }}
         >
-          {/* The item being viewed is always part of the bundle — pin it first
-              so the "N items" count and total are never a mystery. */}
-          <BaseItemCard item={baseItem} />
-          {activeSellerItems.map((row) => {
-            const item = listingToRelated(row);
-            const isSelected = selectedIds.has(row.id);
+          {/* The item being viewed is always part of the bundle — pin it first */}
+          <BaseItemCard item={listing} />
+          {activeSellerItems.map((item) => {
+            const isSelected = selectedIds.has(item.id);
             return (
               <BundleSelectCard
                 key={item.id}
                 item={item}
                 selected={isSelected}
-                onToggle={() => onToggle(row.id)}
+                onToggle={() => onToggle(item.id)}
                 onOpen={() => router.push(`/product/${item.id}`)}
               />
             );
@@ -252,29 +248,33 @@ function SummaryRow({ label, value, accent }: { label: string; value: string; ac
   );
 }
 
-function BaseItemCard({ item }: { item: ReturnType<typeof listingToRelated> }) {
+function BaseItemCard({ item }: { item: Listing }) {
   const { theme } = useTheme();
+  const meta = [item.size, conditionLabel(item.condition)].filter(Boolean).join(' · ');
+  const itemPrice = Number(item.price ?? 0);
+  const { total: totalPrice } = priceBreakdown(itemPrice);
+
   return (
-    <View style={{ width: CARD_WIDTH, marginBottom: 14 }}>
+    <View style={{ width: CARD_WIDTH, marginBottom: 4 }}>
       <View
         style={{
           width: CARD_WIDTH,
           height: CARD_IMAGE_HEIGHT,
-          borderRadius: 12,
+          borderRadius: 14,
           overflow: 'hidden',
           backgroundColor: theme.panel,
           borderWidth: 2,
           borderColor: BRAND_PURPLE,
         }}
       >
-        {item.images[0] && (
+        {item.images?.[0] ? (
           <Image
             source={{ uri: getOptimizedImageUrl(item.images[0], { width: 500 }) }}
             style={{ width: '100%', height: '100%' }}
             contentFit="cover"
             cachePolicy="memory-disk"
           />
-        )}
+        ) : null}
         <View
           style={{
             position: 'absolute',
@@ -295,19 +295,26 @@ function BaseItemCard({ item }: { item: ReturnType<typeof listingToRelated> }) {
           </Text>
         </View>
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-        <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: theme.ink }} numberOfLines={1}>
-          {item.brand}
+
+      <View style={{ marginTop: 6, width: '100%' }}>
+        <Text style={{ fontSize: 13, fontWeight: '700', color: theme.ink }} numberOfLines={1}>
+          {item.brand || item.title}
         </Text>
-        <Text style={{ fontSize: 13, fontWeight: '800', color: theme.ink }}>
-          {formatPrice(item.price)}
+        {!!meta && (
+          <Text style={{ fontSize: 11, color: theme.mute, marginTop: 2 }} numberOfLines={1}>
+            {meta}
+          </Text>
+        )}
+        <Text style={{ fontSize: 11, color: theme.mute, marginTop: 4 }}>
+          {formatPrice(itemPrice, { whole: true })}
         </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2, gap: 3 }}>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: theme.ink }}>
+            {formatPrice(totalPrice, { whole: true })} incl.
+          </Text>
+          <ShieldCheckIcon size={12} />
+        </View>
       </View>
-      {item.meta ? (
-        <Text style={{ fontSize: 11.5, color: theme.mute, marginTop: 2 }} numberOfLines={1}>
-          {item.meta}
-        </Text>
-      ) : null}
     </View>
   );
 }
@@ -318,19 +325,23 @@ function BundleSelectCard({
   onToggle,
   onOpen,
 }: {
-  item: ReturnType<typeof listingToRelated>;
+  item: Listing;
   selected: boolean;
   onToggle: () => void;
   onOpen: () => void;
 }) {
   const { theme } = useTheme();
+  const meta = [item.size, conditionLabel(item.condition)].filter(Boolean).join(' · ');
+  const itemPrice = Number(item.price ?? 0);
+  const { total: totalPrice } = priceBreakdown(itemPrice);
+
   return (
-    <View style={{ width: CARD_WIDTH, marginBottom: 14 }}>
+    <View style={{ width: CARD_WIDTH, marginBottom: 4 }}>
       <View
         style={{
           width: CARD_WIDTH,
           height: CARD_IMAGE_HEIGHT,
-          borderRadius: 12,
+          borderRadius: 14,
           overflow: 'hidden',
           backgroundColor: theme.panel,
           borderWidth: 2,
@@ -342,21 +353,21 @@ function BundleSelectCard({
           onPress={onToggle}
           accessibilityRole="button"
           accessibilityState={{ selected }}
-          accessibilityLabel={`${selected ? 'Remove' : 'Add'} ${item.brand || 'item'} ${selected ? 'from' : 'to'} bundle`}
+          accessibilityLabel={`${selected ? 'Remove' : 'Add'} ${item.brand || item.title} ${selected ? 'from' : 'to'} bundle`}
           style={({ pressed }) => ({
             width: '100%',
             height: '100%',
             transform: [{ scale: pressed ? 0.98 : 1 }],
           })}
         >
-          {item.images[0] && (
+          {item.images?.[0] ? (
             <Image
               source={{ uri: getOptimizedImageUrl(item.images[0], { width: 500 }) }}
               style={{ width: '100%', height: '100%' }}
               contentFit="cover"
               cachePolicy="memory-disk"
             />
-          )}
+          ) : null}
           {selected ? (
             <View
               style={{
@@ -375,7 +386,7 @@ function BundleSelectCard({
           onPress={onOpen}
           hitSlop={8}
           accessibilityRole="button"
-          accessibilityLabel={`Open ${item.brand || 'item'}`}
+          accessibilityLabel={`Open ${item.brand || item.title}`}
           style={({ pressed }) => ({
             position: 'absolute',
             top: 8,
@@ -395,8 +406,11 @@ function BundleSelectCard({
           <Feather name="maximize-2" size={13} color={theme.ink} />
         </Pressable>
 
-        <View
-          pointerEvents="none"
+        <Pressable
+          onPress={onToggle}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={`${selected ? 'Remove' : 'Add'} ${item.brand || item.title}`}
           style={{
             position: 'absolute',
             top: 8,
@@ -413,24 +427,28 @@ function BundleSelectCard({
           }}
         >
           <Feather name={selected ? 'check' : 'plus'} size={16} color={selected ? 'white' : theme.ink} />
+        </Pressable>
+      </View>
+
+      <View style={{ marginTop: 6, width: '100%' }}>
+        <Text style={{ fontSize: 13, fontWeight: '700', color: theme.ink }} numberOfLines={1}>
+          {item.brand || item.title}
+        </Text>
+        {!!meta && (
+          <Text style={{ fontSize: 11, color: theme.mute, marginTop: 2 }} numberOfLines={1}>
+            {meta}
+          </Text>
+        )}
+        <Text style={{ fontSize: 11, color: theme.mute, marginTop: 4 }}>
+          {formatPrice(itemPrice, { whole: true })}
+        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2, gap: 3 }}>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: theme.ink }}>
+            {formatPrice(totalPrice, { whole: true })} incl.
+          </Text>
+          <ShieldCheckIcon size={12} />
         </View>
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-        <Text style={{ flex: 1, fontSize: 13, fontWeight: '700', color: theme.ink }} numberOfLines={1}>
-          {item.brand}
-        </Text>
-        <Text style={{ fontSize: 13, fontWeight: '800', color: theme.ink }}>
-          {formatPrice(item.price)}
-        </Text>
-      </View>
-      {item.meta ? (
-        <Text
-          style={{ fontSize: 11.5, color: theme.mute, marginTop: 2 }}
-          numberOfLines={1}
-        >
-          {item.meta}
-        </Text>
-      ) : null}
     </View>
   );
 }

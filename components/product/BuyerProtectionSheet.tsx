@@ -5,6 +5,7 @@ import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { priceBreakdown, formatPrice } from '@/lib/fees';
 import { useTheme } from '@/context/ThemeContext';
+import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { IS_IOS, tap, BRAND_PURPLE } from './shared';
 
 const COVERAGE = [
@@ -72,17 +73,12 @@ export function BuyerProtectionSheet({
           <View
             style={{
               alignSelf: 'center',
-              width: 62,
-              height: 62,
-              borderRadius: 20,
-              backgroundColor: theme.purpleSoft,
-              alignItems: 'center',
-              justifyContent: 'center',
               marginBottom: 16,
             }}
           >
-            <Feather name="shield" size={28} color={BRAND_PURPLE} />
+            <ShieldCheckIcon size={64} />
           </View>
+
 
           <Text
             style={{

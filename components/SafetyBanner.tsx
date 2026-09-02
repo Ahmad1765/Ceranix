@@ -7,8 +7,8 @@
 // coverage explainer stay identical across surfaces.
 import { View, Alert, Platform, type ViewStyle, type StyleProp } from 'react-native';
 import { Text } from '@/lib/rnText';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
+import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { radii, type as typography } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -88,18 +88,8 @@ export function SafetyBanner({ context = 'shop', title, body, style, onLinkPress
         style,
       ]}
     >
-      <View
-        style={{
-          width: 34,
-          height: 34,
-          borderRadius: 17,
-          backgroundColor: theme.purpleSoft,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Ionicons name="shield-checkmark" size={18} color={theme.purple} />
-      </View>
+      <ShieldCheckIcon size={34} />
+
       <View style={{ flex: 1 }}>
         <Text
           style={{

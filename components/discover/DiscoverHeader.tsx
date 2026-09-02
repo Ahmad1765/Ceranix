@@ -123,7 +123,7 @@ export const DiscoverHeader = memo(function DiscoverHeader({
               flexShrink: 1,
               marginLeft: 10,
               marginRight: 6,
-              fontSize: 14.5,
+              fontSize: 16,
               color: colors.ink,
               padding: 0,
               outlineStyle: 'none',

@@ -31,6 +31,7 @@ import { APP_URL, BRAND } from '@/lib/brand';
 import type { Listing } from '@/types';
 import { EmptyState } from '@/components/ui';
 import { SafeContainer } from '@/components/ui/SafeContainer';
+import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import {
   ProfileBanner,
   InfoCard,
@@ -291,9 +292,10 @@ export default function UserProfileScreen() {
                     @{profile.username}
                   </Text>
                   {profile.is_verified && (
-                    <Ionicons name="checkmark-circle" size={14} color="#20D5EC" />
+                    <ShieldCheckIcon size={15} />
                   )}
                 </View>
+
               </View>
 
               {/* Stats Row (TikTok Style: Following, Followers, Likes) */}

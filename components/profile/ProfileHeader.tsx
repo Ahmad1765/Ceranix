@@ -13,6 +13,7 @@ import { Text } from '@/lib/rnText';
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { colors } from '@/lib/theme';
 import { ProfileBanner } from './ProfileBanner';
 import type { User as Profile } from '@/types';
@@ -83,8 +84,9 @@ export const ProfileHeader = memo(function ProfileHeader({
             @{profile.username}
           </Text>
           {profile.is_verified && (
-            <Ionicons name="checkmark-circle" size={14} color="#20D5EC" />
+            <ShieldCheckIcon size={15} />
           )}
+
         </View>
       </View>
 

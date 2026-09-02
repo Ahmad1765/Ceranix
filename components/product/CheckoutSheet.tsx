@@ -12,6 +12,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { ThumbButton } from '@/components/ui/ThumbButton';
+import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { Text } from '@/lib/rnText';
 import { radii, type } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
@@ -314,11 +315,12 @@ export function CheckoutSheet({
             <View style={styles.summaryRow}>
               <View style={styles.labelWithIcon}>
                 <Text style={[styles.summaryLabel, { color: theme.mute }]}>Buyer protection</Text>
-                <Feather name="shield" size={12} color={isDark ? '#A78BFA' : theme.purple} />
+                <ShieldCheckIcon size={14} />
               </View>
               <Text style={[styles.summaryValue, { color: theme.ink }]}>{formatPrice(protectionFee)}</Text>
             </View>
           ) : null}
+
           <View style={styles.summaryRow}>
             <Text style={[styles.summaryLabel, { color: theme.mute }]}>Shipping</Text>
             <Text style={[styles.summaryValue, { color: theme.ink }]}>

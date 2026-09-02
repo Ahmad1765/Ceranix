@@ -1,8 +1,8 @@
 import { View, Pressable, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { Text } from '@/lib/rnText';
-import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { colors, shadow } from '@/lib/theme';
 import { CONTENT_MAX_WIDTH } from '@/lib/responsive';
 import { getOptimizedImageUrl } from '@/lib/images';
@@ -172,21 +172,17 @@ export function ProfileBanner({
               accessibilityLabel="Verified account"
               style={{
                 position: 'absolute',
-                right: 2,
-                bottom: 2,
-                width: 24,
-                height: 24,
-                borderRadius: 12,
-                backgroundColor: colors.purple,
-                alignItems: 'center',
-                justifyContent: 'center',
+                right: 0,
+                bottom: 0,
+                borderRadius: 14,
                 borderWidth: 2,
                 borderColor: colors.background,
               }}
             >
-              <Feather name="check" size={12} color="#FFFFFF" />
+              <ShieldCheckIcon size={24} />
             </View>
           ) : null}
+
         </Pressable>
       </View>
     </View>
