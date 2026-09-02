@@ -75,16 +75,22 @@ export function patchListingInCache(
     return old;
   };
 
-  // Synchronously update all feed and listing queries in memory:
-  qc.setQueriesData({ queryKey: ['myFeedListings'] }, patchData);
-  qc.setQueriesData({ queryKey: ['homeFeed'] }, patchData);
-  qc.setQueriesData({ queryKey: ['feedListings'] }, patchData);
-  qc.setQueriesData({ queryKey: ['userListings'] }, patchData);
-  qc.setQueriesData({ queryKey: ['savedListings'] }, patchData);
-  qc.setQueriesData({ queryKey: ['likedListings'] }, patchData);
-  qc.setQueriesData({ queryKey: ['sellerOtherListings'] }, patchData);
-  qc.setQueriesData({ queryKey: ['similarListings'] }, patchData);
-  qc.setQueriesData({ queryKey: ['tagListings'] }, patchData);
-  qc.setQueriesData({ queryKey: ['priceDrops'] }, patchData);
-  qc.setQueriesData({ queryKey: ['newFromFollowed'] }, patchData);
+  // Synchronously update all feed and listing queries in memory by deriving prefixes from qk factory:
+  const listingPrefixes = [
+    qk.myFeedListings(null)[0],
+    qk.homeFeed('for_you', null)[0],
+    qk.feedListings('for_you', null, null, null)[0],
+    qk.userListings('')[0],
+    qk.savedListings(null)[0],
+    qk.likedListings(null)[0],
+    qk.sellerOtherListings(null, null)[0],
+    qk.similarListings(null)[0],
+    qk.tagListings(null)[0],
+    qk.priceDrops(null)[0],
+    qk.newFromFollowed(null)[0],
+  ];
+
+  for (const prefix of listingPrefixes) {
+    qc.setQueriesData({ queryKey: [prefix] }, patchData);
+  }
 }

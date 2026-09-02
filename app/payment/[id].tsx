@@ -79,29 +79,70 @@ export default function PaymentScreen() {
   const isBundle = bundleItemIds.length > 0;
 
   const [bundledListings, setBundledListings] = useState<Listing[]>([]);
+  const [bundleFetchStatus, setBundleFetchStatus] = useState<'idle' | 'loading' | 'success' | 'error'>(
+    isBundle ? 'loading' : 'idle',
+  );
+  const [bundleFetchError, setBundleFetchError] = useState<string | null>(null);
+
   useEffect(() => {
     if (bundleItemIds.length === 0) {
       setBundledListings([]);
+      setBundleFetchStatus('idle');
+      setBundleFetchError(null);
       return;
     }
     let active = true;
+    setBundleFetchStatus('loading');
+    setBundleFetchError(null);
+
     (async () => {
       try {
         const { data, error } = await supabase
           .from('listings')
           .select(SELECT_LISTING_WITH_SELLER)
           .in('id', bundleItemIds);
-        if (active && !error && data) {
-          setBundledListings(data as unknown as Listing[]);
+
+        if (!active) return;
+
+        if (error) {
+          console.warn('[payment] Error fetching bundle listings', error.message);
+          setBundleFetchStatus('error');
+          setBundleFetchError(error.message || 'Failed to load bundle listings.');
+          toast.show('Failed to load bundle items. Please try again.', {
+            variant: 'default',
+            icon: 'alert-triangle',
+          });
+          return;
         }
-      } catch {
-        // ignore
+
+        const rows = (data as unknown as Listing[]) ?? [];
+        if (rows.length !== bundleItemIds.length) {
+          setBundleFetchStatus('error');
+          setBundleFetchError('One or more bundled items are no longer available.');
+          toast.show('Some items in this bundle are no longer available.', {
+            variant: 'default',
+            icon: 'alert-triangle',
+          });
+          return;
+        }
+
+        setBundledListings(rows);
+        setBundleFetchStatus('success');
+      } catch (err: any) {
+        if (!active) return;
+        setBundleFetchStatus('error');
+        setBundleFetchError(err?.message || 'Error loading bundle items.');
+        toast.show('Error loading bundle items.', {
+          variant: 'default',
+          icon: 'alert-triangle',
+        });
       }
     })();
+
     return () => {
       active = false;
     };
-  }, [bundleIdsParam, bundleItemIds]);
+  }, [bundleIdsParam, bundleItemIds, toast]);
 
   const allOrderItems = useMemo(
     () => (listing ? [listing, ...bundledListings] : []),
@@ -259,40 +300,59 @@ export default function PaymentScreen() {
   const totalAmount = Math.round((itemPrice + bpFee + deliveryFee + salesTax) * 100) / 100;
 
   const handleSaveAddress = async (form: AddressForm) => {
+    let validated: any;
     try {
       const normalized = normalizeAddressInput(form);
-      const validated = ShippingAddressSchema.parse(normalized);
+      validated = ShippingAddressSchema.parse(normalized);
+    } catch {
+      toast.show('Please fill in required address fields', {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
+      return;
+    }
 
-      const payload = {
-        user_id: user.id,
-        recipient_name: validated.recipientName.trim(),
-        line1: validated.line1.trim(),
-        line2: validated.line2?.trim() || null,
-        city: validated.city.trim(),
-        state: validated.state?.trim() || null,
-        postal_code: validated.postalCode.trim(),
-        country: validated.country.trim(),
-        phone: validated.phone?.trim() || null,
-        is_default: true,
-      };
+    const payload = {
+      user_id: user.id,
+      recipient_name: validated.recipientName.trim(),
+      line1: validated.line1.trim(),
+      line2: validated.line2?.trim() || null,
+      city: validated.city.trim(),
+      state: validated.state?.trim() || null,
+      postal_code: validated.postalCode.trim(),
+      country: validated.country.trim(),
+      phone: validated.phone?.trim() || null,
+      is_default: true,
+    };
 
-      const mockAddress: ShippingAddress = {
-        id: `mock_addr_${Date.now()}`,
-        ...payload,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      setShippingAddress(mockAddress);
-      setAddressSheetOpen(false);
+    const previousAddress = shippingAddress;
+    const mockAddress: ShippingAddress = {
+      id: `mock_addr_${Date.now()}`,
+      ...payload,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
 
-      const { error } = await (supabase
+    setShippingAddress(mockAddress);
+    setAddressSheetOpen(false);
+
+    try {
+      const { data, error } = await (supabase
         .from('shipping_addresses')
-        .upsert(payload, { onConflict: 'user_id' }) as any);
+        .upsert(payload, { onConflict: 'user_id' })
+        .select()
+        .single() as any);
+
       if (error) {
         throw error;
       }
-    } catch {
-      toast.show('Please fill in required address fields', {
+      if (data) {
+        setShippingAddress(data as ShippingAddress);
+      }
+      toast.show('Shipping address saved', { variant: 'default', icon: 'check' });
+    } catch (err: any) {
+      setShippingAddress(previousAddress);
+      toast.show(err?.message || 'Could not save address. Please try again.', {
         variant: 'default',
         icon: 'alert-triangle',
       });
@@ -312,6 +372,19 @@ export default function PaymentScreen() {
 
   const handlePay = async () => {
     if (paying) return;
+
+    if (isBundle && bundleFetchStatus !== 'success') {
+      toast.show(
+        bundleFetchStatus === 'error'
+          ? (bundleFetchError || 'Unable to checkout: some bundle items could not be loaded.')
+          : 'Please wait for bundle items to load.',
+        {
+          variant: 'default',
+          icon: 'alert-circle',
+        },
+      );
+      return;
+    }
 
     if (!shippingAddress) {
       toast.show('Please confirm your delivery address', {
@@ -463,41 +536,62 @@ export default function PaymentScreen() {
         contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 18, paddingBottom: 30 }}
         showsVerticalScrollIndicator={false}
       >
-        {isBundle && allOrderItems.length > 1 ? (
+        {isBundle ? (
           <View style={{ marginBottom: 22 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
               <Feather name="package" size={16} color={theme.purple} />
               <Text style={{ fontSize: 15, fontWeight: '800', color: theme.ink, fontFamily: typography.family.sansBold }}>
-                Bundle ({allOrderItems.length} items)
+                Bundle ({1 + bundleItemIds.length} items)
               </Text>
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
-              {allOrderItems.map((item) => (
-                <View
-                  key={item.id}
-                  style={{
-                    width: 130,
-                    padding: 8,
-                    borderRadius: 12,
-                    backgroundColor: theme.panel,
-                    borderWidth: 1,
-                    borderColor: theme.border,
-                  }}
-                >
-                  <Image
-                    source={{ uri: getOptimizedImageUrl(cardImageUrl(item, 0), { width: 260 }) }}
-                    style={{ width: '100%', height: 100, borderRadius: 8, backgroundColor: theme.panel }}
-                    contentFit="cover"
-                  />
-                  <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '700', color: theme.ink, marginTop: 6 }}>
-                    {item.brand || item.title}
-                  </Text>
-                  <Text style={{ fontSize: 11, color: theme.mute, marginTop: 2 }}>
-                    {formatPrice(Number(item.price ?? 0))}
-                  </Text>
-                </View>
-              ))}
-            </ScrollView>
+            {bundleFetchStatus === 'loading' ? (
+              <View style={{ paddingVertical: 20, alignItems: 'center', justifyContent: 'center' }}>
+                <ActivityIndicator color={theme.purple} />
+                <Text style={{ fontSize: 13, color: theme.mute, marginTop: 8 }}>Loading bundle items...</Text>
+              </View>
+            ) : bundleFetchStatus === 'error' ? (
+              <View
+                style={{
+                  padding: 12,
+                  borderRadius: 10,
+                  backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEE2E2',
+                  borderWidth: 1,
+                  borderColor: isDark ? '#EF4444' : '#FCA5A5',
+                }}
+              >
+                <Text style={{ fontSize: 13, color: isDark ? '#FCA5A5' : '#991B1B', fontWeight: '600' }}>
+                  {bundleFetchError || 'Could not load bundle items. Please go back and try again.'}
+                </Text>
+              </View>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+                {allOrderItems.map((item) => (
+                  <View
+                    key={item.id}
+                    style={{
+                      width: 130,
+                      padding: 8,
+                      borderRadius: 12,
+                      backgroundColor: theme.panel,
+                      borderWidth: 1,
+                      borderColor: theme.border,
+                    }}
+                  >
+                    <Image
+                      source={{ uri: getOptimizedImageUrl(cardImageUrl(item, 0), { width: 260 }) }}
+                      style={{ width: '100%', height: 100, borderRadius: 8, backgroundColor: theme.panel }}
+                      contentFit="cover"
+                    />
+                    <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '700', color: theme.ink, marginTop: 6 }}>
+                      {item.brand || item.title}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: theme.mute, marginTop: 2 }}>
+                      {formatPrice(Number(item.price ?? 0))}
+                    </Text>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
           </View>
         ) : (
           <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 22 }}>
@@ -861,23 +955,26 @@ export default function PaymentScreen() {
 
         <Pressable
           onPress={handlePay}
-          disabled={paying}
-          style={({ pressed }) => [
-            {
-              height: 48,
-              backgroundColor: theme.purple,
-              borderRadius: 10,
-              alignItems: 'center',
-              justifyContent: 'center',
-            },
-            (pressed || paying) && { opacity: 0.88, transform: [{ scale: 0.99 }] },
-          ]}
+          disabled={paying || (isBundle && bundleFetchStatus !== 'success')}
+          style={({ pressed }) => {
+            const isBlocked = paying || (isBundle && bundleFetchStatus !== 'success');
+            return [
+              {
+                height: 48,
+                backgroundColor: isBlocked && !paying ? (isDark ? '#374151' : '#D1D5DB') : theme.purple,
+                borderRadius: 10,
+                alignItems: 'center',
+                justifyContent: 'center',
+              },
+              (pressed || paying) && !isBlocked && { opacity: 0.88, transform: [{ scale: 0.99 }] },
+            ];
+          }}
         >
           {paying ? (
             <ActivityIndicator color="#FFFFFF" size="small" />
           ) : (
             <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF', fontFamily: typography.family.sansBold, letterSpacing: 0.2 }}>
-              Pay
+              {isBundle && bundleFetchStatus === 'loading' ? 'Loading bundle...' : 'Pay'}
             </Text>
           )}
         </Pressable>

@@ -167,6 +167,7 @@ export const ProductSellerProfileCard = memo(function ProductSellerProfileCard({
                   alignItems: 'center',
                   justifyContent: 'center',
                   backgroundColor: pressed ? theme.panel : 'transparent',
+                  opacity: ownerBusy ? 0.5 : 1,
                 })}
               >
                 <Feather name="edit-2" size={16} color={theme.ink} />

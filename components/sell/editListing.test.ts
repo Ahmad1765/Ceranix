@@ -176,4 +176,57 @@ describe('patchListingInCache', () => {
     const updatedUserListings = qc.getQueryData<Listing[]>(qk.userListings('seller-1'));
     expect(updatedUserListings?.[0]?.price).toBe(2500);
   });
+
+  it('synchronously updates infinite-query paginated cache with pages and pageParams', () => {
+    const qc = new QueryClient();
+
+    const originalListing: Listing = {
+      id: 'item-888',
+      seller_id: 'seller-1',
+      seller: {} as any,
+      title: 'Original Title',
+      description: 'Original Desc',
+      price: 1000,
+      category: 'clothing',
+      gender: 'women',
+      condition: 'good',
+      brand: null,
+      size: null,
+      images: ['https://example.com/img1.jpg'],
+      is_sold: false,
+      views: 10,
+      likes: 2,
+      created_at: '2026-01-01T00:00:00Z',
+    };
+
+    const infiniteData = {
+      pages: [
+        [
+          { id: 'other-1', title: 'Other Item', price: 500 } as Listing,
+          originalListing,
+        ],
+        [
+          { id: 'other-2', title: 'Second Page Item', price: 800 } as Listing,
+        ],
+      ],
+      pageParams: [0, 1],
+    };
+
+    qc.setQueryData(qk.homeFeed('for_you', 'user-1'), infiniteData);
+
+    const updatedListing: Listing = {
+      ...originalListing,
+      title: 'Updated Title',
+      price: 2500,
+    };
+
+    patchListingInCache('item-888', updatedListing, qc);
+
+    const updatedCache = qc.getQueryData<typeof infiniteData>(qk.homeFeed('for_you', 'user-1'));
+    expect(updatedCache?.pageParams).toEqual([0, 1]);
+    expect(updatedCache?.pages[0]?.[1]?.title).toBe('Updated Title');
+    expect(updatedCache?.pages[0]?.[1]?.price).toBe(2500);
+    expect(updatedCache?.pages[0]?.[0]?.title).toBe('Other Item');
+    expect(updatedCache?.pages[1]?.[0]?.title).toBe('Second Page Item');
+  });
 });

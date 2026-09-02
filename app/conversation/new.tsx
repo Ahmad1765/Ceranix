@@ -95,23 +95,31 @@ export default function NewConversationScreen() {
   const messageRef = useRef<any>(null);
   const amountRef = useRef<any>(null);
 
+  // Base price reference for offer presets: bundle total when isBundle is true, or listing.price
+  const baseReferencePrice = useMemo(() => {
+    if (isBundle && initialAmountRaw && parseFloat(initialAmountRaw) > 0) {
+      return parseFloat(initialAmountRaw);
+    }
+    return Number(listing?.price ?? 0);
+  }, [isBundle, initialAmountRaw, listing?.price]);
+
   // Preset tiers: 10% and 20%
   const preset10 = useMemo(() => {
-    if (!listing || listing.price <= 0) return 0;
-    return Math.max(1, Math.round(listing.price * 0.9));
-  }, [listing]);
+    if (baseReferencePrice <= 0) return 0;
+    return Math.max(1, Math.round(baseReferencePrice * 0.9));
+  }, [baseReferencePrice]);
 
   const preset20 = useMemo(() => {
-    if (!listing || listing.price <= 0) return 0;
-    return Math.max(1, Math.round(listing.price * 0.8));
-  }, [listing]);
+    if (baseReferencePrice <= 0) return 0;
+    return Math.max(1, Math.round(baseReferencePrice * 0.8));
+  }, [baseReferencePrice]);
 
   useEffect(() => {
-    if (listing && listing.price > 0 && !amount) {
-      setAmount(String(preset20 || Math.round(listing.price * 0.8)));
+    if (baseReferencePrice > 0 && !amount) {
+      setAmount(String(preset20 || Math.round(baseReferencePrice * 0.8)));
       setSelectedCard('custom');
     }
-  }, [listing, preset20]);
+  }, [baseReferencePrice, preset20]);
 
   const handleSelectCard = (card: 'tier10' | 'tier20' | 'custom') => {
     if (Platform.OS !== 'web') {
