@@ -59,11 +59,23 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
 
 export default function NewConversationScreen() {
   const { theme, isDark } = useTheme();
-  const params = useLocalSearchParams<{ listing?: string; mode?: string; amount?: string }>();
+  const params = useLocalSearchParams<{
+    listing?: string;
+    mode?: string;
+    amount?: string;
+    bundle_ids?: string;
+  }>();
   const listingId = typeof params.listing === 'string' ? params.listing : '';
   const initialMode: Mode = params.mode === 'offer' ? 'offer' : 'message';
   const initialAmountRaw = typeof params.amount === 'string' ? params.amount : '';
   const initialAmount = initialAmountRaw ? String(parseFloat(initialAmountRaw) || '') : '';
+  const bundleIdsParam = typeof params.bundle_ids === 'string' ? params.bundle_ids : '';
+  const bundleItemIds = useMemo(
+    () => bundleIdsParam.split(',').filter(Boolean),
+    [bundleIdsParam],
+  );
+  const isBundle = bundleItemIds.length > 0;
+  const bundleCount = 1 + bundleItemIds.length;
 
   const { user } = useAuth();
   const toast = useToast();
@@ -130,7 +142,11 @@ export default function NewConversationScreen() {
   }, [loadError]);
 
   const amountNum = parseFloat(amount) || 0;
-  const offerValid = mode === 'offer' && Number.isFinite(amountNum) && amountNum > 0 && (!listing || amountNum < listing.price);
+  const offerValid =
+    mode === 'offer' &&
+    Number.isFinite(amountNum) &&
+    amountNum > 0 &&
+    (!listing || amountNum < listing.price || isBundle);
   const msgValid = mode === 'message' && message.trim().length > 0;
   const canSend = (offerValid || msgValid) && !sending;
 
@@ -169,6 +185,9 @@ export default function NewConversationScreen() {
           senderId: user.id,
           amount: amountNum,
           note: note.trim() || undefined,
+          isBundle: isBundle,
+          bundleItemIds: isBundle ? bundleItemIds : undefined,
+          bundleCount: isBundle ? bundleCount : undefined,
         });
         ok = !!saved;
       } else {
@@ -184,7 +203,7 @@ export default function NewConversationScreen() {
         Alert.alert('Could not send', 'Please try again.');
         return;
       }
-      toast.show(mode === 'offer' ? 'Offer sent' : 'Message sent', {
+      toast.show(mode === 'offer' ? (isBundle ? 'Bundle offer sent' : 'Offer sent') : 'Message sent', {
         variant: 'success',
         icon: 'check',
       });
@@ -329,17 +348,33 @@ export default function NewConversationScreen() {
             )}
 
             <View style={styles.itemDetails}>
-              <Text
-                numberOfLines={1}
-                style={[
-                  styles.itemTitle,
-                  { color: isDark ? theme.ink : '#15191A', fontFamily: type.family.sansBold },
-                ]}
-              >
-                {listing.title}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.itemTitle,
+                    { flex: 1, color: isDark ? theme.ink : '#15191A', fontFamily: type.family.sansBold },
+                  ]}
+                >
+                  {listing.title}
+                </Text>
+                {isBundle && (
+                  <View
+                    style={{
+                      paddingHorizontal: 8,
+                      paddingVertical: 2,
+                      borderRadius: 6,
+                      backgroundColor: '#5356EE',
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#FFFFFF' }}>
+                      Bundle · {bundleCount} items
+                    </Text>
+                  </View>
+                )}
+              </View>
               <Text style={[styles.itemPrice, { color: isDark ? theme.mute : '#5A6566' }]}>
-                Item price: {formatPrice(listing.price)}
+                {isBundle ? `Base item price: ${formatPrice(listing.price)}` : `Item price: ${formatPrice(listing.price)}`}
               </Text>
             </View>
           </View>

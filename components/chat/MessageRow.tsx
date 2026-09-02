@@ -46,7 +46,7 @@ export type MessageRowProps = {
   onAccept: () => void;
   onDecline: () => void;
   onCounterOffer?: () => void;
-  onPay: (amount: number) => void;
+  onPay: (amount: number, bundleIds?: string[]) => void;
   onRetry: () => void;
   /** Long-press: opens the reaction bar over the measured bubble. */
   onLongPress: (anchor: Anchor) => void;
@@ -172,12 +172,14 @@ function OutgoingOfferBubble({
   msg: ChatMessage;
   listingPrice: number | null;
   canPay: boolean;
-  onPay: (amount: number) => void;
+  onPay: (amount: number, bundleIds?: string[]) => void;
 }) {
   const { theme } = useTheme();
   const amount = msg.metadata?.amount ?? 0;
   const status = msg.offer_status ?? 'pending';
-  const showStruck = !!listingPrice && listingPrice > amount;
+  const isBundle = Boolean(msg.metadata?.is_bundle);
+  const bundleCount = msg.metadata?.bundle_count ?? (msg.metadata?.bundle_item_ids ? msg.metadata.bundle_item_ids.length + 1 : 1);
+  const showStruck = !isBundle && !!listingPrice && listingPrice > amount;
   const isPaid = Boolean(
     msg.metadata?.paid ||
     msg.metadata?.order_status === 'paid' ||
@@ -195,6 +197,27 @@ function OutgoingOfferBubble({
         borderColor: theme.border,
       }}
     >
+      {isBundle && (
+        <View
+          style={{
+            alignSelf: 'flex-start',
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+            paddingHorizontal: 7,
+            paddingVertical: 2,
+            borderRadius: 6,
+            backgroundColor: '#5356EE',
+            marginBottom: 6,
+          }}
+        >
+          <Feather name="package" size={11} color="#FFFFFF" />
+          <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#FFFFFF' }}>
+            Bundle · {bundleCount} items
+          </Text>
+        </View>
+      )}
+
       <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
         <Text
           style={{
@@ -275,7 +298,7 @@ function OutgoingOfferBubble({
             if (Platform.OS !== 'web') {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
             }
-            onPay(amount);
+            onPay(amount, msg.metadata?.bundle_item_ids);
           }}
           accessibilityLabel={`Pay ${formatPrice(amount)}`}
           style={{
@@ -304,16 +327,18 @@ function OutgoingOfferBubble({
       )}
 
       {isPaid && (
-        <Text
-          style={{
-            fontFamily: typography.family.sansBold,
-            fontSize: 11.5,
-            color: TEAL_BRAND,
-            marginTop: 4,
-          }}
-        >
-          Paid · Protected 🛡️
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+          <Feather name="check" size={13} color="#10B981" />
+          <Text
+            style={{
+              fontFamily: typography.family.sansBold,
+              fontSize: 12,
+              color: '#10B981',
+            }}
+          >
+            Paid
+          </Text>
+        </View>
       )}
     </View>
   );
@@ -346,12 +371,14 @@ function IncomingOfferCard({
   onAccept: () => void;
   onDecline: () => void;
   onCounterOffer?: () => void;
-  onPay: (amount: number) => void;
+  onPay: (amount: number, bundleIds?: string[]) => void;
 }) {
   const { theme } = useTheme();
   const amount = msg.metadata?.amount ?? 0;
   const status = msg.offer_status ?? 'pending';
-  const showStruck = !!listingPrice && listingPrice > amount;
+  const isBundle = Boolean(msg.metadata?.is_bundle);
+  const bundleCount = msg.metadata?.bundle_count ?? (msg.metadata?.bundle_item_ids ? msg.metadata.bundle_item_ids.length + 1 : 1);
+  const showStruck = !isBundle && !!listingPrice && listingPrice > amount;
   const isDeclined = status === 'declined';
   const isAccepted = status === 'accepted';
   const isExpired = status === 'expired';
@@ -370,6 +397,27 @@ function IncomingOfferCard({
         ...shadow.sm,
       }}
     >
+      {isBundle && (
+        <View
+          style={{
+            alignSelf: 'flex-start',
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+            paddingHorizontal: 7,
+            paddingVertical: 2,
+            borderRadius: 6,
+            backgroundColor: '#5356EE',
+            marginBottom: 6,
+          }}
+        >
+          <Feather name="package" size={11} color="#FFFFFF" />
+          <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#FFFFFF' }}>
+            Bundle Offer · {bundleCount} items
+          </Text>
+        </View>
+      )}
+
       <Text
         style={{
           fontFamily: typography.family.sans,
@@ -378,7 +426,7 @@ function IncomingOfferCard({
           marginBottom: 4,
         }}
       >
-        {senderName} made you a new offer:
+        {isBundle ? `${senderName} made a bundle offer:` : `${senderName} made you a new offer:`}
       </Text>
 
       <View
@@ -606,7 +654,7 @@ function IncomingOfferCard({
             if (Platform.OS !== 'web') {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
             }
-            onPay(amount);
+            onPay(amount, msg.metadata?.bundle_item_ids);
           }}
           accessibilityLabel={`Buy now for ${formatPrice(amount)}`}
           style={{

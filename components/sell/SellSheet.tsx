@@ -18,6 +18,7 @@ import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { updateListing, type UpdateListingInput } from '@/lib/listings';
 import { uploadListingImages, deleteListingImages, type LocalImage } from '@/lib/upload';
 import {
   makeSlot, resolveImage, type PhotoSlot,
@@ -374,7 +375,29 @@ function SellForm({
           }
         });
 
-        // Best-effort cleanup for removed images from the original listing
+        const updatePayload: UpdateListingInput = {
+          title: formData.title.trim(),
+          description: formData.description?.trim() || null,
+          price: priceNum,
+          category: formData.category,
+          subcategory: formData.subcategory || null,
+          color: formData.color || null,
+          gender: formData.gender,
+          brand: formData.brand?.trim() || null,
+          size: formData.size?.trim() || null,
+          condition: formData.condition,
+          parcel_size: formData.parcelSize || null,
+          images: finalUrls,
+          thumbnails: finalThumbs,
+          tags: formData.tags || [],
+        };
+
+        const result = await updateListing(editingListing.id, updatePayload);
+        if (!result.ok) {
+          throw new Error(result.error || 'Failed to update listing');
+        }
+
+        // Best-effort cleanup for removed images from the original listing after successful update
         const currentUrlSet = new Set(finalUrls);
         const removedUrls = (editingListing.images ?? []).filter((url) => !currentUrlSet.has(url));
         if (removedUrls.length > 0) {
@@ -382,28 +405,6 @@ function SellForm({
             console.warn('[sell] Failed to clean up removed images', err);
           });
         }
-
-        const { error } = await supabase
-          .from('listings')
-          .update({
-            title: formData.title.trim(),
-            description: formData.description?.trim() || null,
-            price: priceNum,
-            category: formData.category,
-            subcategory: formData.subcategory || null,
-            color: formData.color || null,
-            gender: formData.gender,
-            brand: formData.brand?.trim() || null,
-            size: formData.size?.trim() || null,
-            condition: formData.condition,
-            parcel_size: formData.parcelSize || null,
-            images: finalUrls,
-            thumbnails: finalThumbs,
-            tags: formData.tags || [],
-          })
-          .eq('id', editingListing.id);
-
-        if (error) throw error;
 
         const updatedListing: Listing = {
           ...editingListing,

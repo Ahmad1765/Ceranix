@@ -28,6 +28,7 @@ export function BundleSection({
   onToggle,
   onSelectAll,
   onClearAll,
+  onBuyBundle,
   onSendBundleOffer,
 }: {
   listing: Listing;
@@ -36,7 +37,8 @@ export function BundleSection({
   onToggle: (id: string) => void;
   onSelectAll?: () => void;
   onClearAll?: () => void;
-  onSendBundleOffer: (totalAfterDiscount: number) => void;
+  onBuyBundle: (total: number, selectedIds: string[]) => void;
+  onSendBundleOffer: (totalAfterDiscount: number, selectedIds: string[]) => void;
 }) {
   const { theme } = useTheme();
   const username = listing.seller.username;
@@ -45,6 +47,7 @@ export function BundleSection({
   // Ensure sold items never appear in the bundle offers
   const activeSellerItems = sellerItems.filter((s) => !s.is_sold);
   const selectedItems = activeSellerItems.filter((s) => selectedIds.has(s.id));
+  const selectedItemIds = selectedItems.map((s) => s.id);
 
   // If the current listing is already sold, bundling is unavailable — show other available items to browse
   if (isSold) {
@@ -98,6 +101,7 @@ export function BundleSection({
   } = computeBundlePricing(
     listing.price,
     selectedItems.map((s) => Number(s.price ?? 0)),
+    listing.seller.bundle_discount_pct,
   );
 
   return (
@@ -193,28 +197,54 @@ export function BundleSection({
             </Text>
           </View>
 
-          <Pressable
-            onPress={() => onSendBundleOffer(total)}
-            accessibilityRole="button"
-            accessibilityLabel={`Send a bundle offer of ${formatPrice(total)} to the seller`}
-            style={({ pressed }) => ({
-              marginTop: 14,
-              backgroundColor: BRAND_PURPLE,
-              borderRadius: 14,
-              paddingVertical: 14,
-              alignItems: 'center',
-              flexDirection: 'row',
-              justifyContent: 'center',
-              gap: 7,
-              opacity: pressed ? 0.85 : 1,
-              transform: [{ scale: pressed ? 0.98 : 1 }],
-            })}
-          >
-            <Feather name="send" size={14} color="white" />
-            <Text style={{ fontSize: 14, fontWeight: '800', color: 'white' }}>
-              Send bundle offer · {formatPrice(total)}
-            </Text>
-          </Pressable>
+          {/* Action Buttons: Buy Bundle + Make an Offer */}
+          <View style={{ marginTop: 14, gap: 8 }}>
+            <Pressable
+              onPress={() => onBuyBundle(total, selectedItemIds)}
+              accessibilityRole="button"
+              accessibilityLabel={`Buy bundle for ${formatPrice(total)}`}
+              style={({ pressed }) => ({
+                backgroundColor: BRAND_PURPLE,
+                borderRadius: 14,
+                paddingVertical: 14,
+                alignItems: 'center',
+                flexDirection: 'row',
+                justifyContent: 'center',
+                gap: 7,
+                opacity: pressed ? 0.85 : 1,
+                transform: [{ scale: pressed ? 0.98 : 1 }],
+              })}
+            >
+              <Feather name="shopping-bag" size={15} color="white" />
+              <Text style={{ fontSize: 14, fontWeight: '800', color: 'white' }}>
+                Buy bundle · {formatPrice(total)}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => onSendBundleOffer(total, selectedItemIds)}
+              accessibilityRole="button"
+              accessibilityLabel={`Make a bundle offer on ${bundleItemCount} items`}
+              style={({ pressed }) => ({
+                borderRadius: 14,
+                borderWidth: 1.5,
+                borderColor: theme.border,
+                backgroundColor: theme.panel,
+                paddingVertical: 12,
+                alignItems: 'center',
+                flexDirection: 'row',
+                justifyContent: 'center',
+                gap: 7,
+                opacity: pressed ? 0.85 : 1,
+                transform: [{ scale: pressed ? 0.98 : 1 }],
+              })}
+            >
+              <Feather name="tag" size={14} color={theme.ink} />
+              <Text style={{ fontSize: 13.5, fontWeight: '700', color: theme.ink }}>
+                Make an offer
+              </Text>
+            </Pressable>
+          </View>
 
           <Text
             style={{
@@ -224,7 +254,7 @@ export function BundleSection({
               marginTop: 10,
             }}
           >
-            The seller reviews your offer. Buyer Protection is added at checkout.
+            Buyer Protection covers all items in your bundle.
           </Text>
         </View>
       ) : null}

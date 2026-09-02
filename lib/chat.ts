@@ -23,6 +23,9 @@ export interface ChatMessage {
     order_status?: string;
     payment_status?: string;
     paid?: boolean;
+    is_bundle?: boolean;
+    bundle_item_ids?: string[];
+    bundle_count?: number;
   } | null;
   offer_status: OfferStatus | null;
   created_at: string;
@@ -173,17 +176,33 @@ export async function sendOffer(args: {
   senderId: string;
   amount: number;
   note?: string;
+  isBundle?: boolean;
+  bundleItemIds?: string[];
+  bundleCount?: number;
 }): Promise<ChatMessage | null> {
   if (!Number.isFinite(args.amount) || args.amount <= 0) return null;
   const amountValue = Number(args.amount.toFixed(2));
+  const isBundle = Boolean(args.isBundle || (args.bundleItemIds && args.bundleItemIds.length > 0));
+  const count = args.bundleCount ?? (args.bundleItemIds ? args.bundleItemIds.length + 1 : 1);
+  const defaultNote = isBundle
+    ? `Bundle offer (${count} items): ${formatPrice(amountValue)}`
+    : `Offer: ${formatPrice(amountValue)}`;
+
   const { data, error } = await supabase
     .from('messages')
     .insert({
       conversation_id: args.conversationId,
       sender_id: args.senderId,
-      content: args.note?.trim() || `Offer: ${formatPrice(amountValue)}`,
+      content: args.note?.trim() || defaultNote,
       kind: 'offer',
-      metadata: { amount: amountValue, currency: 'PKR', note: args.note?.trim() || null },
+      metadata: {
+        amount: amountValue,
+        currency: 'PKR',
+        note: args.note?.trim() || null,
+        is_bundle: isBundle,
+        bundle_item_ids: args.bundleItemIds ?? null,
+        bundle_count: count,
+      },
       offer_status: 'pending',
     })
     .select('id, conversation_id, sender_id, content, kind, metadata, offer_status, created_at, updated_at')

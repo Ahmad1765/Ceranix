@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Pressable,
@@ -25,6 +25,7 @@ import { safeBack } from '@/lib/nav';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { supabase } from '@/lib/supabase';
 import { buyerProtectionFee, formatPrice, shippingFee } from '@/lib/fees';
+import { computeBundlePricing } from '@/lib/bundle';
 import { AddressSheet, type AddressForm } from '@/components/settings/AddressSheet';
 import { BuyerProtectionSheet } from '@/components/product/BuyerProtectionSheet';
 import {
@@ -35,8 +36,8 @@ import {
 import { paymentService, normalizeAddressInput } from '@/lib/paymentService';
 import { ShippingAddressSchema } from '@/lib/schemas/order';
 import { getOrCreateConversation } from '@/lib/chat';
-import { setListingSold } from '@/lib/listings';
-import type { ShippingAddress } from '@/types';
+import { setListingSold, SELECT_LISTING_WITH_SELLER } from '@/lib/listings';
+import type { ShippingAddress, Listing } from '@/types';
 
 function tap(style: 'light' | 'medium' = 'light') {
   if (Platform.OS !== 'ios') return;
@@ -49,9 +50,18 @@ function tap(style: 'light' | 'medium' = 'light') {
 
 export default function PaymentScreen() {
   const { theme, isDark } = useTheme();
-  const { id, offer, fulfillment: fulfillmentParam, paymentMethod: paymentMethodParam } = useLocalSearchParams<{
+  const {
+    id,
+    offer,
+    bundle_ids,
+    bundle_total,
+    fulfillment: fulfillmentParam,
+    paymentMethod: paymentMethodParam,
+  } = useLocalSearchParams<{
     id: string;
     offer?: string;
+    bundle_ids?: string;
+    bundle_total?: string;
     fulfillment?: string;
     paymentMethod?: string;
   }>();
@@ -60,6 +70,43 @@ export default function PaymentScreen() {
 
   const listingQ = useListingQuery(id ? String(id) : null);
   const listing = listingQ.data ?? null;
+
+  const bundleIdsParam = typeof bundle_ids === 'string' ? bundle_ids : '';
+  const bundleItemIds = useMemo(
+    () => bundleIdsParam.split(',').filter(Boolean),
+    [bundleIdsParam],
+  );
+  const isBundle = bundleItemIds.length > 0;
+
+  const [bundledListings, setBundledListings] = useState<Listing[]>([]);
+  useEffect(() => {
+    if (bundleItemIds.length === 0) {
+      setBundledListings([]);
+      return;
+    }
+    let active = true;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('listings')
+          .select(SELECT_LISTING_WITH_SELLER)
+          .in('id', bundleItemIds);
+        if (active && !error && data) {
+          setBundledListings(data as unknown as Listing[]);
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [bundleIdsParam, bundleItemIds]);
+
+  const allOrderItems = useMemo(
+    () => (listing ? [listing, ...bundledListings] : []),
+    [listing, bundledListings],
+  );
 
   // Checkout states
   const initialMethod: PaymentMethodOption =
@@ -117,7 +164,6 @@ export default function PaymentScreen() {
           if (!error && data) {
             setShippingAddress(data as ShippingAddress);
           } else {
-            // Fallback: fetch any shipping address for this user
             const { data: anyAddr } = await supabase
               .from('shipping_addresses')
               .select('*')
@@ -143,6 +189,16 @@ export default function PaymentScreen() {
     const n = Number(offer);
     return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
   })();
+
+  const bundleCalculation = useMemo(() => {
+    if (!listing) return null;
+    const addOnPrices = bundledListings.map((b) => Number(b.price ?? 0));
+    return computeBundlePricing(listing.price, addOnPrices, listing.seller?.bundle_discount_pct);
+  }, [listing, bundledListings]);
+
+  const bundleSavings = bundleCalculation?.savings ?? 0;
+  const bundleSubtotal = bundleCalculation?.subtotal ?? Number(listing?.price ?? 0);
+  const bundleDiscountPct = bundleCalculation?.pct ?? 0;
 
   if (authLoading) {
     return (
@@ -187,10 +243,18 @@ export default function PaymentScreen() {
     );
   }
 
-  // Price breakdown calculations without extra fees
-  const itemPrice = offerAmount ?? Number(listing.price ?? 0);
-  const bpFee = buyerProtectionFee(itemPrice); // 0 (waived)
-  const deliveryFee = fulfillment === 'handshake' ? 0 : shippingFee(itemPrice); // 0 (free standard shipping or handshake)
+  // Price breakdown calculations
+  const explicitBundleTotal = bundle_total ? Number(bundle_total) : null;
+  const itemPrice =
+    offerAmount ??
+    (isBundle
+      ? explicitBundleTotal && explicitBundleTotal > 0
+        ? explicitBundleTotal
+        : bundleCalculation?.total ?? Number(listing.price ?? 0)
+      : Number(listing.price ?? 0));
+
+  const bpFee = buyerProtectionFee(itemPrice);
+  const deliveryFee = fulfillment === 'handshake' ? 0 : shippingFee(itemPrice);
   const salesTax = 0;
   const totalAmount = Math.round((itemPrice + bpFee + deliveryFee + salesTax) * 100) / 100;
 
@@ -221,15 +285,14 @@ export default function PaymentScreen() {
       setShippingAddress(mockAddress);
       setAddressSheetOpen(false);
 
-      const { error } = await supabase.rpc('upsert_shipping_address_with_default', {
-        p_payload: payload,
-      });
+      const { error } = await (supabase
+        .from('shipping_addresses')
+        .upsert(payload, { onConflict: 'user_id' }) as any);
       if (error) {
         throw error;
       }
-      toast.show('Shipping address updated', { variant: 'default', icon: 'check' });
-    } catch (e: any) {
-      toast.show(e?.message ?? 'Please check address details', {
+    } catch {
+      toast.show('Please fill in required address fields', {
         variant: 'default',
         icon: 'alert-triangle',
       });
@@ -244,6 +307,7 @@ export default function PaymentScreen() {
     if (selected.method !== 'card' || selected.cardLast4) {
       setHasChosenMethod(true);
     }
+    setPaymentOptionsOpen(false);
   };
 
   const handlePay = async () => {
@@ -272,26 +336,41 @@ export default function PaymentScreen() {
     setPaying(true);
 
     try {
-      // 1. Process Checkout
       const result = await paymentService.checkout({
         listingId: String(listing.id),
         paymentMethod: selectedMethod === 'cod' ? 'cod' : 'card',
         buyerId: user.id,
         sellerId: listing.seller_id,
         listingPrice: Number(listing.price),
-        offerAmount: offerAmount ?? undefined,
+        offerAmount: itemPrice,
         shippingAddress,
       });
 
-      // 2. Mark listing sold in background
+      // Mark all items sold
+      const allItemIds = [String(listing.id), ...bundleItemIds];
       try {
-        await setListingSold(listing.id, true);
+        await Promise.all(
+          allItemIds.map(async (itemId) => {
+            try {
+              await setListingSold(itemId, true);
+            } catch {
+              // ignore
+            }
+          }),
+        );
       } catch {
         // ignore fallback
       }
 
-      // 3. Create or get conversation and post order confirmation system message
       const isPaid = result.status === 'paid';
+      const allTitles = allOrderItems.map((item) => item.title).filter(Boolean);
+      const orderMessageContent =
+        isBundle && allTitles.length > 1
+          ? `Done!\nThank you, your order for a ${allTitles.length}-item bundle (${allTitles.join(', ')}) has been received.`
+          : isPaid
+            ? "Done!\nThank you, we have received your payment. It's being processed."
+            : "Done!\nYour order has been placed. It's being processed.";
+
       try {
         const conv = await getOrCreateConversation({
           buyerId: user.id,
@@ -302,15 +381,15 @@ export default function PaymentScreen() {
           await supabase.from('messages').insert({
             conversation_id: conv.id,
             sender_id: user.id,
-            content: isPaid
-              ? "Done!\nThank you, we have received your payment. It's being processed."
-              : "Done!\nYour order has been placed. It's being processed.",
+            content: orderMessageContent,
             kind: 'system',
             metadata: {
               paid: isPaid,
               payment_status: isPaid ? 'paid' : result.status,
               order_status: result.status,
               amount: totalAmount,
+              is_bundle: isBundle,
+              bundle_item_ids: isBundle ? bundleItemIds : null,
             },
           });
         }
@@ -318,13 +397,12 @@ export default function PaymentScreen() {
         // chat confirmation fallback
       }
 
-      // 4. Navigate directly to My Orders screen with toast banner
       router.replace({
         pathname: '/orders',
         params: {
           side: 'bought',
           justPaid: isPaid ? '1' : '0',
-          title: listing.title,
+          title: isBundle && allTitles.length > 1 ? `Bundle (${allTitles.length} items)` : listing.title,
           amount: String(totalAmount),
         },
       } as any);
@@ -344,7 +422,6 @@ export default function PaymentScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top', 'bottom']}>
-      {/* ── Top Header: [X] Payment ── */}
       <View
         style={{
           flexDirection: 'row',
@@ -376,7 +453,7 @@ export default function PaymentScreen() {
           <Feather name="x" size={22} color={theme.ink} />
         </Pressable>
         <Text style={{ fontSize: 16, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
-          Payment
+          {isBundle ? 'Bundle Checkout' : 'Payment'}
         </Text>
         <View style={{ width: 36 }} />
       </View>
@@ -386,47 +463,110 @@ export default function PaymentScreen() {
         contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 18, paddingBottom: 30 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Centered Item Thumbnail ── */}
-        <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 22 }}>
-          {imageUrl ? (
-            <Image
-              source={{ uri: imageUrl }}
-              style={{
-                width: 76,
-                height: 76,
-                borderRadius: 8,
-                backgroundColor: theme.panel,
-                borderWidth: 1,
-                borderColor: theme.border,
-              }}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-              transition={IMAGE_TRANSITION}
-            />
+        {isBundle && allOrderItems.length > 1 ? (
+          <View style={{ marginBottom: 22 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+              <Feather name="package" size={16} color={theme.purple} />
+              <Text style={{ fontSize: 15, fontWeight: '800', color: theme.ink, fontFamily: typography.family.sansBold }}>
+                Bundle ({allOrderItems.length} items)
+              </Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+              {allOrderItems.map((item) => (
+                <View
+                  key={item.id}
+                  style={{
+                    width: 130,
+                    padding: 8,
+                    borderRadius: 12,
+                    backgroundColor: theme.panel,
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                  }}
+                >
+                  <Image
+                    source={{ uri: getOptimizedImageUrl(cardImageUrl(item, 0), { width: 260 }) }}
+                    style={{ width: '100%', height: 100, borderRadius: 8, backgroundColor: theme.panel }}
+                    contentFit="cover"
+                  />
+                  <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '700', color: theme.ink, marginTop: 6 }}>
+                    {item.brand || item.title}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: theme.mute, marginTop: 2 }}>
+                    {formatPrice(Number(item.price ?? 0))}
+                  </Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        ) : (
+          <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 22 }}>
+            {imageUrl ? (
+              <Image
+                source={{ uri: imageUrl }}
+                style={{
+                  width: 76,
+                  height: 76,
+                  borderRadius: 8,
+                  backgroundColor: theme.panel,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                }}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                transition={IMAGE_TRANSITION}
+              />
+            ) : (
+              <View
+                style={{
+                  width: 76,
+                  height: 76,
+                  borderRadius: 8,
+                  backgroundColor: theme.panel,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Feather name="image" size={24} color={theme.mute} />
+              </View>
+            )}
+          </View>
+        )}
+
+        <View style={{ marginBottom: 20 }}>
+          {isBundle && !offerAmount ? (
+            <>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4.5 }}>
+                <Text style={{ fontSize: 14, color: theme.mute, fontFamily: typography.family.sans }}>
+                  Subtotal ({allOrderItems.length} items)
+                </Text>
+                <Text style={{ fontSize: 14, color: theme.ink, fontFamily: typography.family.sansMedium }}>
+                  {formatPrice(bundleSubtotal)}
+                </Text>
+              </View>
+              {bundleSavings > 0 && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4.5 }}>
+                  <Text style={{ fontSize: 14, color: theme.purple, fontFamily: typography.family.sansBold }}>
+                    Bundle discount ({bundleDiscountPct}%)
+                  </Text>
+                  <Text style={{ fontSize: 14, color: theme.purple, fontFamily: typography.family.sansBold }}>
+                    − {formatPrice(bundleSavings)}
+                  </Text>
+                </View>
+              )}
+            </>
           ) : (
-            <View
-              style={{
-                width: 76,
-                height: 76,
-                borderRadius: 8,
-                backgroundColor: theme.panel,
-                borderWidth: 1,
-                borderColor: theme.border,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Feather name="image" size={24} color={theme.mute} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4.5 }}>
+              <Text style={{ fontSize: 14, color: theme.mute, fontFamily: typography.family.sans }}>
+                {offerAmount ? (isBundle ? 'Bundle offer' : 'Offer price') : 'Order'}
+              </Text>
+              <Text style={{ fontSize: 14, color: theme.ink, fontFamily: typography.family.sansMedium }}>
+                {formatPrice(itemPrice)}
+              </Text>
             </View>
           )}
-        </View>
-
-        {/* ── Price Breakdown Rows ── */}
-        <View style={{ marginBottom: 20 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4.5 }}>
-            <Text style={{ fontSize: 14, color: theme.mute, fontFamily: typography.family.sans }}>Order</Text>
-            <Text style={{ fontSize: 14, color: theme.ink, fontFamily: typography.family.sansMedium }}>{formatPrice(itemPrice)}</Text>
-          </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4.5 }}>
             <Pressable

@@ -10,16 +10,16 @@ import {
 } from '@/lib/fees';
 
 describe('buyerProtectionFee', () => {
-  it('is zero when fee is waived', () => {
-    expect(buyerProtectionFee(500)).toBe(0);
-    expect(buyerProtectionFee(5_000)).toBe(0);
-    expect(buyerProtectionFee(50_000)).toBe(0);
-    expect(buyerProtectionFee(1)).toBe(0);
+  it('calculates percentage fee correctly', () => {
+    expect(buyerProtectionFee(500)).toBe(30);
+    expect(buyerProtectionFee(5_000)).toBe(300);
+    expect(buyerProtectionFee(50_000)).toBe(3000);
+    expect(buyerProtectionFee(1)).toBe(0.06);
   });
 
-  it('never scales with the item price', () => {
-    expect(buyerProtectionFee(100_000)).toBe(buyerProtectionFee(100));
-    expect(buyerProtectionFee(3.33)).toBe(0);
+  it('scales proportionally with item price', () => {
+    expect(buyerProtectionFee(100_000)).toBe(6000);
+    expect(buyerProtectionFee(100)).toBe(6);
   });
 
   it('is zero for empty, zero, or invalid prices', () => {
@@ -31,15 +31,15 @@ describe('buyerProtectionFee', () => {
   });
 
   it('accepts numeric strings', () => {
-    expect(buyerProtectionFee('1200')).toBe(0);
+    expect(buyerProtectionFee('1200')).toBe(72);
   });
 });
 
 describe('orderTotal', () => {
-  it('is item price plus the flat buyer protection fee', () => {
-    expect(orderTotal(500)).toBe(500);
-    expect(orderTotal(5_000)).toBe(5_000);
-    expect(orderTotal(50_000)).toBe(50_000);
+  it('is item price plus the buyer protection fee', () => {
+    expect(orderTotal(500)).toBe(530);
+    expect(orderTotal(5_000)).toBe(5_300);
+    expect(orderTotal(50_000)).toBe(53_000);
   });
 
   it('is zero for invalid prices', () => {
@@ -52,8 +52,8 @@ describe('priceBreakdown', () => {
   it('returns item, protection, and total that add up', () => {
     const { item, protection, total } = priceBreakdown(2_499);
     expect(item).toBe(2_499);
-    expect(protection).toBe(0);
-    expect(total).toBe(2_499);
+    expect(protection).toBe(149.94);
+    expect(total).toBe(2648.94);
     expect(item + protection).toBe(total);
   });
 

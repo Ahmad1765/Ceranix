@@ -38,6 +38,24 @@ describe('bundle discount policy', () => {
     expect(computeBundlePricing(50, []).qualifies).toBe(false); // 1 item
     expect(computeBundlePricing(50, [50]).qualifies).toBe(BUNDLE_MIN_ITEMS <= 2);
   });
+
+  it('respects seller custom bundle discount rate when higher than standard tier', () => {
+    // 2 items: standard tier is 5%, but seller configured 15%
+    const p = computeBundlePricing(100, [100], 15);
+    expect(p.itemCount).toBe(2);
+    expect(p.pct).toBe(15);
+    expect(p.qualifies).toBe(true);
+    expect(p.savings).toBe(30); // 15% of 200
+    expect(p.total).toBe(170);
+  });
+
+  it('uses highest between standard tier and custom seller discount', () => {
+    // 5 items: standard tier is 20%, seller configured 10% -> should be 20%
+    const p = computeBundlePricing(100, [100, 100, 100, 100], 10);
+    expect(p.itemCount).toBe(5);
+    expect(p.pct).toBe(20);
+    expect(p.savings).toBe(100);
+  });
 });
 
 describe('bundle money math', () => {

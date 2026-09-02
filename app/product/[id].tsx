@@ -602,6 +602,7 @@ export default function ProductScreen() {
           onToggleBundleItem={bundle.handleToggleBundleItem}
           onSelectAllBundle={bundle.handleSelectAllBundle}
           onClearAllBundle={bundle.handleClearAllBundle}
+          onBuyBundle={bundle.handleBuyBundle}
           onSendBundleOffer={bundle.handleSendBundleOffer}
         />
       </Animated.ScrollView>

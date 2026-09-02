@@ -233,10 +233,17 @@ export default function ConversationScreen() {
           onAccept={() => thread.handleOfferResponse(item.msg, 'accepted')}
           onDecline={() => thread.handleOfferResponse(item.msg, 'declined')}
           onCounterOffer={() => setOfferVisible(true)}
-          onPay={(amount) =>
-            thread.convListingId &&
-            router.push(`/payment/${thread.convListingId}?offer=${amount}` as any)
-          }
+          onPay={(amount, bundleIds) => {
+            if (!thread.convListingId) return;
+            const params: Record<string, string> = { offer: String(amount) };
+            if (bundleIds && bundleIds.length > 0) {
+              params.bundle_ids = bundleIds.join(',');
+            }
+            router.push({
+              pathname: `/payment/${thread.convListingId}`,
+              params,
+            } as any);
+          }}
           onRetry={() => thread.handleRetry(item.msg)}
           onLongPress={(anchor) => setPressed({ msg: item.msg, anchor })}
         />

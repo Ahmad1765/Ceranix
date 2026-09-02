@@ -434,16 +434,21 @@ export type UpdateListingInput = {
 export async function updateListing(
   listingId: string,
   input: UpdateListingInput,
-): Promise<{ ok: boolean; error?: string }> {
-  const { error } = await supabase
+): Promise<{ ok: boolean; error?: string; count?: number }> {
+  const { data, error } = await supabase
     .from('listings')
     .update(input)
-    .eq('id', listingId);
+    .eq('id', listingId)
+    .select('id');
   if (error) {
     console.warn('[listings] updateListing', error.message);
     return { ok: false, error: error.message };
   }
-  return { ok: true };
+  const count = data?.length ?? 0;
+  if (count === 0) {
+    return { ok: false, error: 'Listing not found or update not permitted', count: 0 };
+  }
+  return { ok: true, count };
 }
 
 export async function toggleLike(

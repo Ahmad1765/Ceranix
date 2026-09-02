@@ -7,7 +7,6 @@ import type { Listing } from '@/types';
 import {
   BUNDLE_TIERS,
   computeBundlePricing,
-  BRAND_PURPLE,
   HAIRLINE,
 } from './shared';
 import { useTheme } from '@/context/ThemeContext';
@@ -42,6 +41,7 @@ export function BundleProgressBar({
   const { itemCount, pct, qualifies, progress, nextTier } = computeBundlePricing(
     listing.price,
     selectedItems.map((s) => Number(s.price ?? 0)),
+    listing.seller.bundle_discount_pct,
   );
   const maxPct = BUNDLE_TIERS[BUNDLE_TIERS.length - 1].pct;
   const remaining = nextTier ? nextTier.count - itemCount : 0;

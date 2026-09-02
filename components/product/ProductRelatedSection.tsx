@@ -10,7 +10,6 @@
 import { memo } from 'react';
 import { View, Pressable } from 'react-native';
 import { Text } from '@/lib/rnText';
-import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '@/context/ThemeContext';
 import { BundleSection } from '@/components/product/BundleSection';
@@ -34,7 +33,8 @@ type ProductRelatedSectionProps = {
   onToggleBundleItem: (id: string) => void;
   onSelectAllBundle: () => void;
   onClearAllBundle: () => void;
-  onSendBundleOffer: (amount: number) => void;
+  onBuyBundle: (total: number, selectedIds: string[]) => void;
+  onSendBundleOffer: (amount: number, selectedIds: string[]) => void;
 };
 
 export const ProductRelatedSection = memo(function ProductRelatedSection({
@@ -47,6 +47,7 @@ export const ProductRelatedSection = memo(function ProductRelatedSection({
   onToggleBundleItem,
   onSelectAllBundle,
   onClearAllBundle,
+  onBuyBundle,
   onSendBundleOffer,
 }: ProductRelatedSectionProps) {
   const { theme } = useTheme();
@@ -104,6 +105,7 @@ export const ProductRelatedSection = memo(function ProductRelatedSection({
           onToggle={onToggleBundleItem}
           onSelectAll={onSelectAllBundle}
           onClearAll={onClearAllBundle}
+          onBuyBundle={onBuyBundle}
           onSendBundleOffer={onSendBundleOffer}
         />
       ) : (

@@ -55,6 +55,7 @@ function money(v: number): number {
 export function computeBundlePricing(
   basePrice: number,
   addOnPrices: number[],
+  sellerDiscountPct?: number | null,
 ): BundlePricing {
   const itemCount = 1 + addOnPrices.length;
   const subtotal =
@@ -62,7 +63,13 @@ export function computeBundlePricing(
 
   // Walk tiers high→low so the first match is the largest qualifying discount.
   const tier = [...BUNDLE_TIERS].reverse().find((t) => itemCount >= t.count) ?? BUNDLE_TIERS[0];
-  const pct = tier.pct;
+
+  const customPct =
+    sellerDiscountPct != null && Number.isFinite(sellerDiscountPct) && sellerDiscountPct > 0
+      ? Math.min(30, Math.max(0, sellerDiscountPct))
+      : 0;
+
+  const pct = customPct > 0 ? Math.max(tier.pct, customPct) : tier.pct;
   const qualifies = itemCount >= BUNDLE_MIN_ITEMS && pct > 0;
   // Round to cents so the buyer is never charged a fraction of a cent.
   const savings = qualifies ? Math.round(((subtotal * pct) / 100) * 100) / 100 : 0;

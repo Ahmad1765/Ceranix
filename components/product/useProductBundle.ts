@@ -64,8 +64,43 @@ export function useProductBundle({
     setSelectedBundleIds(new Set());
   }, []);
 
+  const handleBuyBundle = useCallback(
+    (total: number, selectedItemIds?: string[]) => {
+      tap('medium');
+      if (!user) {
+        guestGate.prompt({
+          title: 'Buy bundle',
+          message: 'Create a free account to bundle items and check out.',
+          icon: 'shopping-bag',
+        });
+        return;
+      }
+      if (!listing) return;
+      if (listing.is_sold) {
+        toast.show('This item is already sold', { variant: 'default', icon: 'info' });
+        return;
+      }
+      if (listing.seller_id === user.id) {
+        toast.show("That's your own listing", { variant: 'default', icon: 'info' });
+        return;
+      }
+      const ids = selectedItemIds ?? Array.from(selectedBundleIds);
+      const params: Record<string, string> = {
+        bundle_total: total.toFixed(2),
+      };
+      if (ids.length > 0) {
+        params.bundle_ids = ids.join(',');
+      }
+      router.push({
+        pathname: `/payment/${listing.id}`,
+        params,
+      } as any);
+    },
+    [user, listing, selectedBundleIds, guestGate, toast],
+  );
+
   const handleSendBundleOffer = useCallback(
-    (amount: number) => {
+    (amount: number, selectedItemIds?: string[]) => {
       tap('medium');
       if (!user) {
         guestGate.prompt({
@@ -84,16 +119,21 @@ export function useProductBundle({
         toast.show("That's your own listing", { variant: 'default', icon: 'info' });
         return;
       }
+      const ids = selectedItemIds ?? Array.from(selectedBundleIds);
+      const params: Record<string, string> = {
+        listing: listing.id,
+        mode: 'offer',
+        amount: amount.toFixed(2),
+      };
+      if (ids.length > 0) {
+        params.bundle_ids = ids.join(',');
+      }
       router.push({
         pathname: '/conversation/new',
-        params: {
-          listing: listing.id,
-          mode: 'offer',
-          amount: amount.toFixed(2),
-        },
+        params,
       } as any);
     },
-    [user, listing, guestGate, toast],
+    [user, listing, selectedBundleIds, guestGate, toast],
   );
 
   return {
@@ -104,6 +144,7 @@ export function useProductBundle({
     handleToggleBundleItem,
     handleSelectAllBundle,
     handleClearAllBundle,
+    handleBuyBundle,
     handleSendBundleOffer,
   };
 }
