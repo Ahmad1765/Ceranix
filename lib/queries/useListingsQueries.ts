@@ -35,6 +35,7 @@ import {
   fetchSimilarListings,
   setListingSold,
   toggleLike,
+  updateListing,
   SELECT_LISTING_WITH_SELLER,
 } from '@/lib/listings';
 import {
@@ -185,6 +186,28 @@ export function useDeleteListing(sellerId: string | null) {
       qc.removeQueries({ queryKey: qk.listing(listingId) });
       if (sellerId) qc.invalidateQueries({ queryKey: qk.userListings(sellerId) });
       qc.invalidateQueries({ queryKey: ['sellerOtherListings'] });
+    },
+  });
+}
+
+/**
+ * Owner action: update listing fields and update cache.
+ */
+export function useUpdateListing(sellerId?: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ listingId, input }: { listingId: string; input: Parameters<typeof updateListing>[1] }) =>
+      updateListing(listingId, input),
+    onSuccess: (res, { listingId, input }) => {
+      if (!res.ok) return;
+      patchListing(qc, listingId, input as Partial<Listing>);
+      qc.invalidateQueries({ queryKey: qk.listing(listingId) });
+      if (sellerId) qc.invalidateQueries({ queryKey: qk.userListings(sellerId) });
+      qc.invalidateQueries({ queryKey: ['sellerOtherListings'] });
+      qc.invalidateQueries({ queryKey: ['similarListings'] });
+      qc.invalidateQueries({ queryKey: ['feedListings'] });
+      qc.invalidateQueries({ queryKey: ['homeFeed'] });
+      qc.invalidateQueries({ queryKey: ['tagListings'] });
     },
   });
 }

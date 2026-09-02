@@ -31,6 +31,7 @@ type ProductSellerProfileCardProps = {
   followed: boolean;
   onToggleSold: () => void;
   onDelete: () => void;
+  onEdit?: () => void;
   onFollowPress: () => void;
   onMessagePress: () => void;
   onMoreOptionsPress: () => void;
@@ -47,6 +48,7 @@ export const ProductSellerProfileCard = memo(function ProductSellerProfileCard({
   followed,
   onToggleSold,
   onDelete,
+  onEdit,
   onFollowPress,
   onMessagePress,
   onMoreOptionsPress,
@@ -151,6 +153,26 @@ export const ProductSellerProfileCard = memo(function ProductSellerProfileCard({
         {/* Right Actions: Owner vs Buyer Controls */}
         {isOwnListing ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {onEdit && (
+              <Pressable
+                onPress={onEdit}
+                disabled={ownerBusy}
+                accessibilityRole="button"
+                accessibilityLabel="Edit listing"
+                hitSlop={8}
+                style={({ pressed }) => ({
+                  width: 32,
+                  height: 32,
+                  borderRadius: 16,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: pressed ? theme.panel : 'transparent',
+                })}
+              >
+                <Feather name="edit-2" size={16} color={theme.ink} />
+              </Pressable>
+            )}
+
             <Pressable
               onPress={onToggleSold}
               disabled={ownerBusy}

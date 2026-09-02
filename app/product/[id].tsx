@@ -570,6 +570,7 @@ export default function ProductScreen() {
           followed={followed}
           onToggleSold={handleToggleSold}
           onDelete={handleDelete}
+          onEdit={() => openSellSheet(listing)}
           onFollowPress={handleFollowPress}
           onMessagePress={() => openChat('message')}
           onMoreOptionsPress={() => {
@@ -619,7 +620,7 @@ export default function ProductScreen() {
         onBuyPress={() => {
           tap('medium');
           if (isOwnListing) {
-            openSellSheet();
+            openSellSheet(listing);
             return;
           }
           if (!user) {

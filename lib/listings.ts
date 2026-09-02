@@ -412,6 +412,40 @@ export async function deleteListing(listingId: string): Promise<boolean> {
   return true;
 }
 
+export type UpdateListingInput = {
+  title?: string;
+  description?: string | null;
+  price?: number;
+  category?: Listing['category'];
+  subcategory?: string | null;
+  color?: string | null;
+  gender?: Listing['gender'];
+  brand?: string | null;
+  size?: string | null;
+  condition?: Listing['condition'];
+  parcel_size?: string | null;
+  images?: string[];
+  thumbnails?: string[];
+  tags?: string[];
+};
+
+// Owner action: update listing fields. RLS only allows the seller to update
+// their own listing.
+export async function updateListing(
+  listingId: string,
+  input: UpdateListingInput,
+): Promise<{ ok: boolean; error?: string }> {
+  const { error } = await supabase
+    .from('listings')
+    .update(input)
+    .eq('id', listingId);
+  if (error) {
+    console.warn('[listings] updateListing', error.message);
+    return { ok: false, error: error.message };
+  }
+  return { ok: true };
+}
+
 export async function toggleLike(
   listingId: string,
   userId: string,

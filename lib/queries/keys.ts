@@ -14,11 +14,13 @@
 // clear: `qc.invalidateQueries({ queryKey: qk.profile(userId) })`.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { listingKey } from '@/lib/listingCache';
-import { likedIdsKey, savedIdsKey } from '@/lib/engagementCache';
-import type { FeedTab, SortKey } from '@/lib/listings';
-
+export type FeedTab = 'for_you' | 'popular';
+export type SortKey = 'newest' | 'price_asc' | 'price_desc' | 'popular';
 export type HomeFeedTab = FeedTab | 'following';
+
+export const listingKey = (id: string) => ['listing', id] as const;
+export const likedIdsKey = (userId: string) => ['likedIds', userId] as const;
+export const savedIdsKey = (userId: string) => ['savedIds', userId] as const;
 
 /**
  * Centralized, strictly-typed query keys for all cache operations in Ceranix.

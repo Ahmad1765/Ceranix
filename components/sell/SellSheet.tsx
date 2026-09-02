@@ -18,7 +18,7 @@ import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
-import { uploadListingImages, deleteListingImages } from '@/lib/upload';
+import { uploadListingImages, deleteListingImages, type LocalImage } from '@/lib/upload';
 import {
   makeSlot, resolveImage, type PhotoSlot,
 } from '@/lib/photoClean/slots';
@@ -42,6 +42,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { SellFormSchema, type SellFormValues } from '@/lib/schemas/sell';
 import { Input } from '@/components/ui/Input';
+import { DEFAULT_SELL_VALUES, listingToSellFormValues, patchListingInCache } from './editHelpers';
 
 const DISPLAY_BOLD = type.family.sansBold;
 
@@ -74,7 +75,10 @@ type ActiveSheet =
   | 'price' | 'parcel' | null;
 
 // ── Context ──────────────────────────────────────────────────────────────
-type SellSheetApi = { open: () => boolean; close: () => void };
+type SellSheetApi = {
+  open: (listingToEdit?: Listing | null) => boolean;
+  close: () => void;
+};
 const Ctx = createContext<SellSheetApi | undefined>(undefined);
 
 export function useSellSheet(): SellSheetApi {
@@ -87,14 +91,16 @@ export function useSellSheet(): SellSheetApi {
 export function SellSheetProvider({ children }: { children: ReactNode }) {
   const [visible, setVisible] = useState(false);
   const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
+  const [editingListing, setEditingListing] = useState<Listing | null>(null);
   const { user } = useAuth();
 
-  const open = useCallback(() => {
+  const open = useCallback((listingToEdit?: Listing | null) => {
     if (!user?.id) {
       router.push('/auth/login');
       return false;
     }
     setOwnerUserId(user.id);
+    setEditingListing(listingToEdit ?? null);
     setVisible(true);
     return true;
   }, [user]);
@@ -102,6 +108,7 @@ export function SellSheetProvider({ children }: { children: ReactNode }) {
   const close = useCallback(() => {
     setVisible(false);
     setOwnerUserId(null);
+    setEditingListing(null);
   }, []);
 
   // Close and unmount form whenever user becomes unauthenticated or user ID changes
@@ -134,7 +141,7 @@ export function SellSheetProvider({ children }: { children: ReactNode }) {
             Same fix as DiscoverSheet; see its header note. */}
         {visible ? (
           <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-            <SellForm onClose={close} />
+            <SellForm editingListing={editingListing} onClose={close} />
           </SafeAreaProvider>
         ) : null}
       </Modal>
@@ -214,30 +221,24 @@ function RowField({
   );
 }
 
-
-// ── The form itself ──────────────────────────────────────────────────────
-const DEFAULT_SELL_VALUES: SellFormValues = {
-  slots: [],
-  title: '',
-  description: '',
-  price: '',
-  brand: '',
-  size: '',
-  condition: 'good',
-  category: 'clothing',
-  subcategory: null,
-  color: null,
-  gender: 'women',
-  tags: [],
-  parcelSize: null,
-};
-
-function SellForm({ onClose }: { onClose: () => void }) {
+function SellForm({
+  editingListing,
+  onClose,
+}: {
+  editingListing?: Listing | null;
+  onClose: () => void;
+}) {
   const { user, profile } = useAuth();
   const toast = useToast();
   const { width } = useWindowDimensions();
   const [publishing, setPublishing] = useState(false);
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
+
+  const isEditing = !!editingListing;
+  const initialValues = useMemo(
+    () => listingToSellFormValues(editingListing),
+    [editingListing],
+  );
 
   const {
     control,
@@ -248,9 +249,13 @@ function SellForm({ onClose }: { onClose: () => void }) {
     formState: { errors },
   } = useForm<SellFormValues>({
     resolver: zodResolver(SellFormSchema),
-    defaultValues: DEFAULT_SELL_VALUES,
+    defaultValues: initialValues,
     mode: 'onTouched',
   });
+
+  useEffect(() => {
+    reset(initialValues);
+  }, [initialValues, reset]);
 
   const slots = watch('slots');
   const title = watch('title');
@@ -318,6 +323,124 @@ function SellForm({ onClose }: { onClose: () => void }) {
 
     const priceNum = parseFloat(formData.price);
     setPublishing(true);
+
+    if (isEditing && editingListing) {
+      try {
+        const photoSlots = formData.slots as PhotoSlot[];
+        const resolvedImages = photoSlots.map(resolveImage);
+        const isRemoteUrl = (uri: string) => uri.startsWith('http://') || uri.startsWith('https://');
+
+        // Map existing images to their corresponding thumbnails
+        const existingImageToThumb = new Map<string, string>();
+        (editingListing.images ?? []).forEach((imgUrl, idx) => {
+          const thumb = editingListing.thumbnails?.[idx] || imgUrl;
+          existingImageToThumb.set(imgUrl, thumb);
+        });
+
+        // Separate local images that need uploading
+        const newImagesToUpload: { index: number; image: LocalImage }[] = [];
+        resolvedImages.forEach((img, idx) => {
+          if (!isRemoteUrl(img.uri)) {
+            newImagesToUpload.push({ index: idx, image: img });
+          }
+        });
+
+        let uploadedNewImages: { index: number; url: string; thumbUrl: string }[] = [];
+        if (newImagesToUpload.length > 0) {
+          const uploaded = await uploadListingImages(
+            newImagesToUpload.map((n) => n.image),
+            user.id,
+          );
+          uploadedNewImages = uploaded.map((u, i) => ({
+            index: newImagesToUpload[i].index,
+            url: u.url,
+            thumbUrl: u.thumbUrl,
+          }));
+        }
+
+        const finalUrls: string[] = [];
+        const finalThumbs: string[] = [];
+
+        resolvedImages.forEach((img, idx) => {
+          if (isRemoteUrl(img.uri)) {
+            finalUrls.push(img.uri);
+            finalThumbs.push(existingImageToThumb.get(img.uri) || img.uri);
+          } else {
+            const uploadedItem = uploadedNewImages.find((u) => u.index === idx);
+            if (uploadedItem) {
+              finalUrls.push(uploadedItem.url);
+              finalThumbs.push(uploadedItem.thumbUrl);
+            }
+          }
+        });
+
+        // Best-effort cleanup for removed images from the original listing
+        const currentUrlSet = new Set(finalUrls);
+        const removedUrls = (editingListing.images ?? []).filter((url) => !currentUrlSet.has(url));
+        if (removedUrls.length > 0) {
+          deleteListingImages(removedUrls).catch((err) => {
+            console.warn('[sell] Failed to clean up removed images', err);
+          });
+        }
+
+        const { error } = await supabase
+          .from('listings')
+          .update({
+            title: formData.title.trim(),
+            description: formData.description?.trim() || null,
+            price: priceNum,
+            category: formData.category,
+            subcategory: formData.subcategory || null,
+            color: formData.color || null,
+            gender: formData.gender,
+            brand: formData.brand?.trim() || null,
+            size: formData.size?.trim() || null,
+            condition: formData.condition,
+            parcel_size: formData.parcelSize || null,
+            images: finalUrls,
+            thumbnails: finalThumbs,
+            tags: formData.tags || [],
+          })
+          .eq('id', editingListing.id);
+
+        if (error) throw error;
+
+        const updatedListing: Listing = {
+          ...editingListing,
+          title: formData.title.trim(),
+          description: formData.description?.trim() || '',
+          price: priceNum,
+          category: formData.category,
+          subcategory: formData.subcategory || null,
+          color: formData.color || null,
+          gender: formData.gender,
+          brand: formData.brand?.trim() || null,
+          size: formData.size?.trim() || null,
+          condition: formData.condition,
+          parcel_size: formData.parcelSize || null,
+          images: finalUrls,
+          thumbnails: finalThumbs,
+          tags: formData.tags || [],
+        };
+
+        patchListingInCache(editingListing.id, updatedListing);
+        invalidateFresh();
+
+        capture('listing_updated', {
+          listing_id: editingListing.id,
+          category: updatedListing.category,
+          price: updatedListing.price,
+        });
+
+        toast.show('Listing updated', { variant: 'success', icon: 'check' });
+        onClose();
+      } catch (e: any) {
+        Alert.alert('Could not save changes', e?.message ?? 'Unknown error');
+      } finally {
+        setPublishing(false);
+      }
+      return;
+    }
 
     // Each upload returns the full-size URL plus a card-sized copy; the two
     // arrays are written together and stay index-aligned (see the note on
@@ -472,7 +595,9 @@ function SellForm({ onClose }: { onClose: () => void }) {
         >
           <Feather name="x" size={22} color={colors.ink} />
         </Pressable>
-        <Text style={{ fontSize: 16, fontFamily: DISPLAY_BOLD, color: colors.ink }}>Sell an item</Text>
+        <Text style={{ fontSize: 16, fontFamily: DISPLAY_BOLD, color: colors.ink }}>
+          {isEditing ? 'Edit listing' : 'Sell an item'}
+        </Text>
         <View style={{ width: 44 }} />
       </View>
 
@@ -800,7 +925,11 @@ function SellForm({ onClose }: { onClose: () => void }) {
               }}
               disabled={publishing || !canPublish}
               accessibilityRole="button"
-              accessibilityLabel={publishing ? 'Uploading listing' : 'Upload listing'}
+              accessibilityLabel={
+                publishing
+                  ? (isEditing ? 'Saving changes' : 'Uploading listing')
+                  : (isEditing ? 'Save changes' : 'Upload listing')
+              }
               accessibilityState={{ disabled: publishing || !canPublish, busy: publishing }}
               style={({ pressed }) => ({
                 height: 52,
@@ -824,7 +953,7 @@ function SellForm({ onClose }: { onClose: () => void }) {
                     letterSpacing: 0.2,
                   }}
                 >
-                  Upload
+                  {isEditing ? 'Save changes' : 'Upload'}
                 </Text>
               )}
             </Pressable>
