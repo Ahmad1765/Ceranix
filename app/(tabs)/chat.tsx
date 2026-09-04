@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, FlatList, Pressable, RefreshControl, Animated, Platform, useWindowDimensions, NativeSyntheticEvent, NativeScrollEvent, LayoutChangeEvent, ScrollView } from 'react-native';
+import { View, FlatList, Pressable, RefreshControl, Animated, Platform, useWindowDimensions, NativeSyntheticEvent, NativeScrollEvent, LayoutChangeEvent, ScrollView, Alert } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -284,20 +284,26 @@ function SupportPage({
   const [startingChat, setStartingChat] = useState(false);
 
   const handleStartSupportChat = async (prompt?: string) => {
+    if (startingChat) return;
     haptic();
     setStartingChat(true);
     try {
       const conv = await getOrCreateSupportConversation(userId);
       if (conv) {
         if (prompt) {
-          // If prompt given, navigate to new message with preset or conversation
-          router.push(`/conversation/${conv.id}` as any);
+          router.push({
+            pathname: `/conversation/${conv.id}`,
+            params: { prefill: prompt },
+          } as any);
         } else {
           router.push(`/conversation/${conv.id}` as any);
         }
+      } else {
+        Alert.alert('Unable to start support chat', 'Please check your connection and try again.');
       }
     } catch (e) {
       console.warn('[support] failed to start', e);
+      Alert.alert('Support unavailable', 'Failed to connect to Ceranix Support. Please try again later.');
     } finally {
       setStartingChat(false);
     }
@@ -426,6 +432,7 @@ function SupportPage({
           {SUPPORT_TOPICS.map((topic) => (
             <PressableScale
               key={topic.id}
+              disabled={startingChat}
               onPress={() => handleStartSupportChat(topic.prompt)}
               style={{
                 flexDirection: 'row',
@@ -437,6 +444,7 @@ function SupportPage({
                 paddingHorizontal: 14,
                 paddingVertical: 12,
                 gap: 12,
+                opacity: startingChat ? 0.6 : 1,
                 ...shadow.sm,
               }}
             >

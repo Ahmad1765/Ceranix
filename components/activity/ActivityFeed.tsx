@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { View, Pressable, ScrollView, ActivityIndicator, Alert, RefreshControl } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { router, useFocusEffect } from 'expo-router';
@@ -16,12 +16,14 @@ import {
 } from '@/lib/queries';
 import { type SavedSearch } from '@/lib/savedSearches';
 import { isSupportConversation } from '@/lib/support';
+import { type ConversationRow } from '@/lib/chat';
 import { InboxRow } from '@/components/chat/InboxRow';
 
 type ActivityTab = 'following' | 'foryou' | 'searches';
 
 const EMPTY_SEARCHES: SavedSearch[] = [];
 const EMPTY_COUNTS: Record<string, number> = {};
+const EMPTY_CONVERSATIONS: ConversationRow[] = [];
 
 type Props = {
   bottomInset?: number;
@@ -40,11 +42,12 @@ export function ActivityFeed({ bottomInset = 24 }: Props) {
   const deleteSearch = useDeleteSavedSearch(userId);
 
   const inboxQ = useInboxQuery(userId);
-  const conversations = inboxQ.data ?? [];
+  const conversations = inboxQ.data ?? EMPTY_CONVERSATIONS;
 
   // Filter direct profile messages (conversations without a listing, not support bot)
-  const directMessages = conversations.filter(
-    (c) => !c.listing_id && !isSupportConversation(c),
+  const directMessages = useMemo(
+    () => conversations.filter((c) => !c.listing_id && !isSupportConversation(c)),
+    [conversations],
   );
 
   const { refetch: searchesRefetch, isStale: searchesStale } = searchesQ;

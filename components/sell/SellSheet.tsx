@@ -72,6 +72,7 @@ const PARCEL_SIZES: SelectOption<ParcelSize>[] = [
 const MAX_IMAGES = 7;
 const TITLE_MAX = 80;
 const DESCRIPTION_MAX = 1000;
+const CONTENT_MAX_WIDTH = 600;
 
 type ActiveSheet =
   | 'category' | 'brand' | 'size' | 'condition' | 'colors' | 'gender' | 'tags'
@@ -361,7 +362,7 @@ function SellForm({
     const pagePad = 16 * 2;
     const cardPad = 14 * 2;
     const gaps = 10 * 2;
-    const usable = Math.min(width, 560) - pagePad - cardPad;
+    const usable = Math.min(width, CONTENT_MAX_WIDTH) - pagePad - cardPad;
     return Math.floor((usable - gaps) / 3);
   }, [width]);
 
@@ -692,7 +693,7 @@ function SellForm({
             paddingHorizontal: 16,
             paddingTop: 4,
             paddingBottom: Math.max(insets.bottom, 24) + 36,
-            maxWidth: 600,
+            maxWidth: CONTENT_MAX_WIDTH,
             width: '100%',
             alignSelf: 'center',
           }}

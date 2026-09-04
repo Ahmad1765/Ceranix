@@ -37,8 +37,7 @@ import { getOptimizedImageUrl } from '@/lib/images';
 import { reportListing } from '@/lib/reports';
 import {
   isSupportConversation,
-  generateSupportResponse,
-  SUPPORT_BOT_USER_ID,
+  sendSupportBotReply,
   SUPPORT_BOT_NAME,
   SUPPORT_BOT_AVATAR,
 } from '@/lib/support';
@@ -60,7 +59,11 @@ import {
 } from '@/lib/chat';
 import { buildThreadRows, listingStatus, type ThreadRow } from '@/components/chat';
 
-export function useConversationThread(conversationId: string, user: AuthUser | null) {
+export function useConversationThread(
+  conversationId: string,
+  user: AuthUser | null,
+  initialInput: string = '',
+) {
   const toast = useToast();
   const queryClient = useQueryClient();
   const listRef = useRef<FlatList<ThreadRow>>(null);
@@ -70,7 +73,13 @@ export function useConversationThread(conversationId: string, user: AuthUser | n
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [reactions, setReactions] = useState<MessageReaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState(initialInput);
+
+  useEffect(() => {
+    if (initialInput) {
+      setInput(initialInput);
+    }
+  }, [initialInput]);
 
   // ── Initial Parallel Fetch ────────────────────────────────────────────────
   useEffect(() => {
@@ -249,21 +258,7 @@ export function useConversationThread(conversationId: string, user: AuthUser | n
 
         // Trigger intelligent support concierge automated response if talking to Support
         if (isSupport) {
-          setTimeout(async () => {
-            try {
-              const replyText = generateSupportResponse(text);
-              const botMsg = await sendMessage({
-                conversationId,
-                senderId: SUPPORT_BOT_USER_ID,
-                content: replyText,
-              });
-              if (botMsg) {
-                setMessages((prev) => (prev.some((m) => m.id === botMsg.id) ? prev : [...prev, botMsg]));
-              }
-            } catch (err) {
-              console.warn('[support] bot reply failed', err);
-            }
-          }, 650);
+          void sendSupportBotReply(conversationId, text);
         }
         return;
       }

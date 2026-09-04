@@ -41,6 +41,7 @@ import {
   useSettingsManager,
   TERMS_URL,
   PRIVACY_URL,
+  SUPPORT_EMAIL,
 } from '@/components/settings';
 
 export default function SettingsScreen() {
@@ -335,8 +336,14 @@ export default function SettingsScreen() {
         >
           <Row
             label="Contact support"
-            desc="Chat with 24/7 Ceranix Concierge"
-            onPress={() => router.push('/conversation/new?support=true' as any)}
+            desc={session ? 'Chat with 24/7 Ceranix Concierge' : SUPPORT_EMAIL}
+            onPress={() => {
+              if (session) {
+                router.push('/conversation/new?support=true' as any);
+              } else {
+                Linking.openURL(`mailto:${SUPPORT_EMAIL}`).catch(() => {});
+              }
+            }}
             chevron
           />
           <Divider />

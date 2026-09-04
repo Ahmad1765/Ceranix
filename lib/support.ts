@@ -1,5 +1,11 @@
 import { supabase } from '@/lib/supabase';
-import { getOrCreateConversation, sendMessage, type ConversationRow } from '@/lib/chat';
+import {
+  getOrCreateConversation,
+  sendMessage,
+  CONVERSATION_SELECT,
+  type ConversationRow,
+  type ChatMessage,
+} from '@/lib/chat';
 
 export const SUPPORT_BOT_USER_ID = '00000000-0000-0000-0000-000000000001';
 export const SUPPORT_BOT_NAME = 'Ceranix Support';
@@ -170,13 +176,7 @@ export async function getOrCreateSupportConversation(userId: string): Promise<Co
   // Find existing conversation with support bot
   const { data: existing } = await supabase
     .from('conversations')
-    .select(`
-      id, listing_id, buyer_id, seller_id, last_message, last_sender_id, updated_at,
-      buyer_last_read_at, seller_last_read_at,
-      listing:listings(id, title, price, images, thumbnails, is_sold),
-      buyer:profiles!conversations_buyer_id_fkey(id, username, avatar_url, full_name, location, rating, total_sales),
-      seller:profiles!conversations_seller_id_fkey(id, username, avatar_url, full_name, location, rating, total_sales)
-    `)
+    .select(CONVERSATION_SELECT)
     .is('listing_id', null)
     .or(`and(buyer_id.eq.${userId},seller_id.eq.${SUPPORT_BOT_USER_ID}),and(buyer_id.eq.${SUPPORT_BOT_USER_ID},seller_id.eq.${userId})`)
     .maybeSingle();
@@ -202,4 +202,18 @@ export async function getOrCreateSupportConversation(userId: string): Promise<Co
   }
 
   return created;
+}
+
+export async function sendSupportBotReply(conversationId: string, userMessage: string): Promise<ChatMessage | null> {
+  try {
+    const replyText = generateSupportResponse(userMessage);
+    return await sendMessage({
+      conversationId,
+      senderId: SUPPORT_BOT_USER_ID,
+      content: replyText,
+    });
+  } catch (err) {
+    console.warn('[support] bot reply failed', err);
+    return null;
+  }
 }

@@ -130,12 +130,15 @@ export default function NewConversationScreen() {
     return Math.max(1, Math.round(baseReferencePrice * 0.8));
   }, [baseReferencePrice]);
 
+  const hasInitializedAmount = useRef(Boolean(initialAmount));
+
   useEffect(() => {
-    if (baseReferencePrice > 0 && !amount) {
+    if (baseReferencePrice > 0 && !hasInitializedAmount.current) {
+      hasInitializedAmount.current = true;
       setAmount(String(preset20 || Math.round(baseReferencePrice * 0.8)));
       setSelectedCard('custom');
     }
-  }, [baseReferencePrice, preset20, amount]);
+  }, [baseReferencePrice, preset20]);
 
   const handleSelectCard = (card: 'tier10' | 'tier20' | 'custom') => {
     if (Platform.OS !== 'web') {

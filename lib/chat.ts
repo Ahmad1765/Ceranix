@@ -51,7 +51,7 @@ export interface ConversationRow {
   seller?: Pick<User, 'id' | 'username' | 'avatar_url' | 'full_name' | 'location' | 'rating' | 'total_sales'> | null;
 }
 
-const CONVERSATION_SELECT = `
+export const CONVERSATION_SELECT = `
   id, listing_id, buyer_id, seller_id, last_message, last_sender_id, updated_at,
   buyer_last_read_at, seller_last_read_at,
   listing:listings(id, title, price, images, thumbnails, is_sold),

@@ -79,8 +79,9 @@ function useKeyboardVisible(): boolean {
 }
 
 export default function ConversationScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, prefill } = useLocalSearchParams<{ id: string; prefill?: string }>();
   const conversationId = typeof id === 'string' ? id : '';
+  const prefillParam = typeof prefill === 'string' ? prefill : '';
   const { user } = useAuth();
   const { theme } = useTheme();
   const toast = useToast();
@@ -88,7 +89,7 @@ export default function ConversationScreen() {
   const keyboardUp = useKeyboardVisible();
 
   // ── Custom Domain Hooks ──────────────────────────────────────────────────
-  const thread = useConversationThread(conversationId, user);
+  const thread = useConversationThread(conversationId, user, prefillParam);
   const block = useConversationBlock(user, thread.other);
 
   // ── Sheet & Context Menu Visibility States ───────────────────────────────
