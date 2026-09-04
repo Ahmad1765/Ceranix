@@ -9,8 +9,11 @@ import {
   createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode,
 } from 'react';
 import { capture } from '@/lib/analytics';
-import { View, Pressable, ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, useWindowDimensions, Modal } from 'react-native';
-import { Text, } from '@/lib/rnText';
+import {
+  View, Pressable, ScrollView, Alert, ActivityIndicator,
+  KeyboardAvoidingView, Platform, useWindowDimensions, Modal,
+} from 'react-native';
+import { Text, TextInput } from '@/lib/rnText';
 import { SafeAreaProvider, SafeAreaView, initialWindowMetrics, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
@@ -28,13 +31,13 @@ import { putCachedListing } from '@/lib/listingCache';
 import { emitListingCreated } from '@/lib/listingEvents';
 import { invalidateFresh } from '@/lib/freshness';
 import { router } from 'expo-router';
-import type {  Condition, Gender, Listing } from '@/types';
+import type { Condition, Gender, Listing } from '@/types';
 import { CATEGORIES, categoryLabel, hasSubcategories, subcategoryLabel, suggestSubcategory } from '@/lib/categories';
-import { formatPrice } from '@/lib/currency';
+import { formatPrice, CURRENCY_SYMBOL } from '@/lib/currency';
 import { itemColorLabel } from '@/lib/itemColors';
 import { SafetyBanner } from '@/components/SafetyBanner';
-import { colors, radii, type } from '@/lib/theme';
-import { SELL_TEAL, SELL_TEAL_DARK, SELL_TEAL_SOFT } from '@/components/sell/theme';
+import { radii, type as typography } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import {
   SingleSelectSheet, TextFieldSheet, PriceSheet, ColorSheet, CategorySheet, TagsSheet,
   type SelectOption,
@@ -42,10 +45,9 @@ import {
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { SellFormSchema, type SellFormValues } from '@/lib/schemas/sell';
-import { Input } from '@/components/ui/Input';
 import { DEFAULT_SELL_VALUES, listingToSellFormValues, patchListingInCache } from './editHelpers';
 
-const DISPLAY_BOLD = type.family.sansBold;
+const DISPLAY_BOLD = typography.family.sansBold;
 
 const CONDITIONS: SelectOption<Condition>[] = [
   { label: 'New with tags', value: 'new_with_tags', hint: 'Unworn, original tags attached' },
@@ -84,7 +86,6 @@ const Ctx = createContext<SellSheetApi | undefined>(undefined);
 
 export function useSellSheet(): SellSheetApi {
   const ctx = useContext(Ctx);
-  // Soft fallback outside the provider: keep old behaviour (route to auth).
   if (!ctx) return { open: () => { router.push('/auth/login'); return false; }, close: () => {} };
   return ctx;
 }
@@ -112,7 +113,6 @@ export function SellSheetProvider({ children }: { children: ReactNode }) {
     setEditingListing(null);
   }, []);
 
-  // Close and unmount form whenever user becomes unauthenticated or user ID changes
   useEffect(() => {
     if (visible && (!user?.id || user.id !== ownerUserId)) {
       close();
@@ -124,9 +124,6 @@ export function SellSheetProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={api}>
       {children}
-      {/* Android edge-to-edge (mandatory from Expo SDK 54) needs BOTH translucency
-          flags, or the modal window stops at the navigation bar and this
-          "full screen" sheet renders short while web looks correct. */}
       <Modal
         visible={visible}
         animationType="slide"
@@ -134,12 +131,6 @@ export function SellSheetProvider({ children }: { children: ReactNode }) {
         statusBarTranslucent
         navigationBarTranslucent
       >
-        {/* SellForm's <SafeAreaView edges={['top','bottom']}> measures against the
-            nearest provider, and the app-root one lives outside this modal's
-            window — so without a provider in here it reads zeros on Android and
-            the form runs under the status and gesture bars. initialMetrics seeds
-            the first frame with real insets so nothing jumps mid slide-up.
-            Same fix as DiscoverSheet; see its header note. */}
         {visible ? (
           <SafeAreaProvider initialMetrics={initialWindowMetrics}>
             <SellForm editingListing={editingListing} onClose={close} />
@@ -150,40 +141,85 @@ export function SellSheetProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// ── Small presentational pieces ─────────────────────────────────────────────
-function SectionHeader({ children }: { children: React.ReactNode }) {
+// ── Visual Structure Components ───────────────────────────────────────────
+
+function SectionHeaderTitle({
+  title,
+  badge,
+  icon,
+}: {
+  title: string;
+  badge?: string;
+  icon?: keyof typeof Feather.glyphMap;
+}) {
+  const { theme } = useTheme();
   return (
-    <Text
+    <View
       style={{
-        fontSize: 15.5,
-        fontFamily: DISPLAY_BOLD,
-        color: colors.ink,
-        letterSpacing: -0.1,
-        paddingHorizontal: 20,
-        paddingTop: 22,
-        paddingBottom: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 4,
+        marginBottom: 10,
+        marginTop: 18,
       }}
     >
-      {children}
-    </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        {icon && <Feather name={icon} size={16} color={theme.ink} />}
+        <Text
+          style={{
+            fontSize: 15,
+            fontFamily: DISPLAY_BOLD,
+            color: theme.ink,
+            letterSpacing: -0.2,
+          }}
+        >
+          {title}
+        </Text>
+      </View>
+      {badge && (
+        <View
+          style={{
+            paddingHorizontal: 8,
+            paddingVertical: 3,
+            borderRadius: radii.pill,
+            backgroundColor: theme.panel,
+            borderWidth: 1,
+            borderColor: theme.border,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 11,
+              fontFamily: DISPLAY_BOLD,
+              color: theme.mute,
+              letterSpacing: 0.2,
+            }}
+          >
+            {badge}
+          </Text>
+        </View>
+      )}
+    </View>
   );
 }
 
-function SectionDivider() {
-  return <View style={{ height: 8, backgroundColor: colors.panel, marginTop: 16 }} />;
-}
-
 function RowField({
+  icon,
   label,
   value,
   placeholder,
   onPress,
+  isLast = false,
 }: {
+  icon?: keyof typeof Feather.glyphMap;
   label: string;
   value: string;
   placeholder: string;
   onPress: () => void;
+  isLast?: boolean;
 }) {
+  const { theme } = useTheme();
   const handlePress = () => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -191,32 +227,76 @@ function RowField({
     onPress();
   };
 
+  const hasValue = Boolean(value);
+
   return (
     <Pressable
       onPress={handlePress}
-      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
       accessibilityRole="button"
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingVertical: 15,
-        minHeight: 50,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
-        backgroundColor: pressed ? colors.panel : 'transparent',
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        minHeight: 52,
+        borderBottomWidth: isLast ? 0 : 1,
+        borderBottomColor: theme.border,
+        backgroundColor: pressed ? (theme.primarySoft ?? 'rgba(0,0,0,0.04)') : 'transparent',
       })}
     >
-      <Text style={{ fontSize: 14.5, fontFamily: DISPLAY_BOLD, color: colors.ink }}>{label}</Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1, marginLeft: 12 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        {icon && <Feather name={icon} size={16} color={theme.mute} />}
         <Text
-          numberOfLines={1}
-          style={{ fontSize: 14, color: value ? colors.ink : colors.mute, flexShrink: 1 }}
+          style={{
+            fontSize: 14.5,
+            fontFamily: typography.family.sansSemibold,
+            color: theme.ink,
+          }}
         >
-          {value || placeholder}
+          {label}
         </Text>
-        <Feather name="chevron-right" size={17} color={colors.mute} />
+      </View>
+
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1, marginLeft: 12 }}>
+        {hasValue ? (
+          <View
+            style={{
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+              borderRadius: radii.sm,
+              backgroundColor: theme.surface,
+              borderWidth: 1,
+              borderColor: theme.border,
+              maxWidth: 180,
+            }}
+          >
+            <Text
+              numberOfLines={1}
+              style={{
+                fontSize: 13,
+                fontFamily: typography.family.sansMedium,
+                color: theme.ink,
+              }}
+            >
+              {value}
+            </Text>
+          </View>
+        ) : (
+          <Text
+            numberOfLines={1}
+            style={{
+              fontSize: 13.5,
+              fontFamily: typography.family.sans,
+              color: theme.muteSoft ?? theme.mute,
+              flexShrink: 1,
+            }}
+          >
+            {placeholder}
+          </Text>
+        )}
+        <Feather name="chevron-right" size={16} color={theme.mute} />
       </View>
     </Pressable>
   );
@@ -229,6 +309,7 @@ function SellForm({
   editingListing?: Listing | null;
   onClose: () => void;
 }) {
+  const { theme } = useTheme();
   const { user, profile } = useAuth();
   const toast = useToast();
   const { width } = useWindowDimensions();
@@ -260,6 +341,7 @@ function SellForm({
 
   const slots = watch('slots');
   const title = watch('title');
+  const description = watch('description');
   const category = watch('category');
   const subcategory = watch('subcategory');
   const price = watch('price');
@@ -276,10 +358,10 @@ function SellForm({
     !!suggestion && (suggestion.category !== category || suggestion.sub.id !== subcategory);
 
   const tile = useMemo(() => {
-    const pagePad = 20 * 2;
-    const boxPad = 14 * 2;
+    const pagePad = 16 * 2;
+    const cardPad = 14 * 2;
     const gaps = 10 * 2;
-    const usable = Math.min(width, 560) - pagePad - boxPad;
+    const usable = Math.min(width, 560) - pagePad - cardPad;
     return Math.floor((usable - gaps) / 3);
   }, [width]);
 
@@ -331,14 +413,12 @@ function SellForm({
         const resolvedImages = photoSlots.map(resolveImage);
         const isRemoteUrl = (uri: string) => uri.startsWith('http://') || uri.startsWith('https://');
 
-        // Map existing images to their corresponding thumbnails
         const existingImageToThumb = new Map<string, string>();
         (editingListing.images ?? []).forEach((imgUrl, idx) => {
           const thumb = editingListing.thumbnails?.[idx] || imgUrl;
           existingImageToThumb.set(imgUrl, thumb);
         });
 
-        // Separate local images that need uploading
         const newImagesToUpload: { index: number; image: LocalImage }[] = [];
         resolvedImages.forEach((img, idx) => {
           if (!isRemoteUrl(img.uri)) {
@@ -397,7 +477,6 @@ function SellForm({
           throw new Error(result.error || 'Failed to update listing');
         }
 
-        // Best-effort cleanup for removed images from the original listing after successful update
         const currentUrlSet = new Set(finalUrls);
         const removedUrls = (editingListing.images ?? []).filter((url) => !currentUrlSet.has(url));
         if (removedUrls.length > 0) {
@@ -443,9 +522,6 @@ function SellForm({
       return;
     }
 
-    // Each upload returns the full-size URL plus a card-sized copy; the two
-    // arrays are written together and stay index-aligned (see the note on
-    // listings.thumbnails in the migration).
     let urls: string[] = [];
     let thumbs: string[] = [];
     try {
@@ -537,21 +613,16 @@ function SellForm({
 
   const onInvalidSubmit = () => {
     if (slots.length === 0) {
-      toast.show('Please add at least one photo', { variant: 'default', icon: 'alert-triangle' });
+      toast.show('Please add at least one photo', { variant: 'default', icon: 'camera' });
     } else if (errors.subcategory) {
-      toast.show('Please choose a category and subcategory', { variant: 'default', icon: 'alert-triangle' });
+      toast.show('Please choose a category and subcategory', { variant: 'default', icon: 'grid' });
     } else if (errors.price) {
-      toast.show(errors.price.message ?? 'Please enter a valid price', { variant: 'default', icon: 'alert-triangle' });
+      toast.show(errors.price.message ?? 'Please enter a valid price', { variant: 'default', icon: 'dollar-sign' });
     } else if (errors.title) {
-      toast.show(errors.title.message ?? 'Please enter a title', { variant: 'default', icon: 'alert-triangle' });
+      toast.show(errors.title.message ?? 'Please enter a title', { variant: 'default', icon: 'edit-2' });
     }
   };
 
-  // A category with subcategories (e.g. Clothing) isn't actually "set" until
-  // one is picked — canPublish requires it. Showing the top-level label here
-  // regardless made the row look complete when it wasn't, so Upload silently
-  // stayed disabled with no visible reason. Fall back to the placeholder
-  // until there's a real subcategory (or the category has none to pick).
   const categoryValue = subcategory
     ? subcategoryLabel(category, subcategory)
     : hasSubcategories(category)
@@ -568,8 +639,8 @@ function SellForm({
   };
 
   return (
-    <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Header */}
+    <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: theme.background }}>
+      {/* Top Header */}
       <View
         style={{
           flexDirection: 'row',
@@ -578,7 +649,8 @@ function SellForm({
           paddingHorizontal: 16,
           paddingVertical: 14,
           borderBottomWidth: 1,
-          borderBottomColor: colors.border,
+          borderBottomColor: theme.border,
+          backgroundColor: theme.background,
         }}
       >
         <Pressable
@@ -587,75 +659,154 @@ function SellForm({
           accessibilityRole="button"
           accessibilityLabel="Close"
           style={({ pressed }) => ({
-            minWidth: 44,
-            minHeight: 44,
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            backgroundColor: pressed ? theme.panel : 'transparent',
             alignItems: 'center',
             justifyContent: 'center',
-            opacity: pressed ? 0.55 : 1,
           })}
         >
-          <Feather name="x" size={22} color={colors.ink} />
+          <Feather name="x" size={20} color={theme.ink} />
         </Pressable>
-        <Text style={{ fontSize: 16, fontFamily: DISPLAY_BOLD, color: colors.ink }}>
+
+        <Text
+          style={{
+            fontSize: 16,
+            fontFamily: DISPLAY_BOLD,
+            color: theme.ink,
+            letterSpacing: -0.2,
+          }}
+        >
           {isEditing ? 'Edit listing' : 'Sell an item'}
         </Text>
-        <View style={{ width: 44 }} />
+
+        <View style={{ width: 36 }} />
       </View>
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 24) + 32 }}
+          contentContainerStyle={{
+            paddingHorizontal: 16,
+            paddingTop: 4,
+            paddingBottom: Math.max(insets.bottom, 24) + 36,
+            maxWidth: 600,
+            width: '100%',
+            alignSelf: 'center',
+          }}
         >
-          {/* Photos */}
-          <SectionHeader>Photos</SectionHeader>
-          <View style={{ paddingHorizontal: 20 }}>
-            <View
-              style={{
-                borderWidth: 1.5,
-                borderStyle: 'dashed',
-                borderColor: errors.slots ? (colors.danger ?? '#EF4444') : colors.border,
-                borderRadius: radii.lg,
-                padding: slots.length === 0 ? 0 : 14,
-                minHeight: slots.length === 0 ? 128 : undefined,
-                alignItems: slots.length === 0 ? 'center' : undefined,
-                justifyContent: slots.length === 0 ? 'center' : undefined,
-                backgroundColor: colors.surface,
-              }}
-            >
-              {slots.length === 0 ? (
-                <Pressable
-                  onPress={handlePickImages}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  accessibilityRole="button"
-                  accessibilityLabel="Upload photos"
-                  style={({ pressed }) => ({
+          {/* Photos Studio Section */}
+          <SectionHeaderTitle
+            title="Photos"
+            badge={`${slots.length} / ${MAX_IMAGES}`}
+            icon="camera"
+          />
+
+          <View
+            style={{
+              borderRadius: radii['2xl'],
+              borderWidth: 1,
+              borderColor: errors.slots ? (theme.danger ?? '#EF4444') : theme.border,
+              backgroundColor: theme.surface,
+              padding: slots.length === 0 ? 24 : 14,
+              overflow: 'hidden',
+            }}
+          >
+            {slots.length === 0 ? (
+              <Pressable
+                onPress={handlePickImages}
+                accessibilityRole="button"
+                accessibilityLabel="Upload photos"
+                style={({ pressed }) => ({
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingVertical: 18,
+                  opacity: pressed ? 0.75 : 1,
+                  transform: [{ scale: pressed ? 0.98 : 1 }],
+                })}
+              >
+                <View
+                  style={{
+                    width: 58,
+                    height: 58,
+                    borderRadius: 29,
+                    backgroundColor: theme.panel,
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 12,
+                  }}
+                >
+                  <Feather name="image" size={24} color={theme.ink} />
+                </View>
+                <Text
+                  style={{
+                    fontSize: 15.5,
+                    fontFamily: DISPLAY_BOLD,
+                    color: theme.ink,
+                    marginBottom: 4,
+                    letterSpacing: -0.2,
+                  }}
+                >
+                  Add up to {MAX_IMAGES} photos
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 12.5,
+                    color: theme.mute,
+                    textAlign: 'center',
+                    marginBottom: 16,
+                    lineHeight: 18,
+                  }}
+                >
+                  Bright, clear photos on a clean background sell fastest
+                </Text>
+                <View
+                  style={{
                     flexDirection: 'row',
                     alignItems: 'center',
-                    gap: 8,
-                    paddingHorizontal: 22,
-                    paddingVertical: 13,
-                    minHeight: 48,
+                    gap: 6,
+                    paddingHorizontal: 18,
+                    paddingVertical: 10,
                     borderRadius: radii.pill,
-                    borderWidth: 1.5,
-                    borderColor: SELL_TEAL,
-                    backgroundColor: colors.surface,
-                    transform: [{ scale: pressed ? 0.97 : 1 }],
-                  })}
+                    backgroundColor: theme.primary,
+                  }}
                 >
-                  <Feather name="plus" size={18} color={SELL_TEAL} />
-                  <Text style={{ fontSize: 15, fontFamily: DISPLAY_BOLD, color: SELL_TEAL }}>
-                    Upload photos
+                  <Feather name="plus" size={15} color={theme.background} />
+                  <Text
+                    style={{
+                      fontSize: 13.5,
+                      fontFamily: DISPLAY_BOLD,
+                      color: theme.background,
+                    }}
+                  >
+                    Select photos
                   </Text>
-                </Pressable>
-              ) : (
+                </View>
+              </Pressable>
+            ) : (
+              <View>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
                   {(slots as PhotoSlot[]).map((slot, i) => (
-                    <View key={slot.id} style={{ width: tile, height: tile, position: 'relative' }}>
+                    <View
+                      key={slot.id}
+                      style={{
+                        width: tile,
+                        height: tile,
+                        borderRadius: radii.xl,
+                        overflow: 'hidden',
+                        position: 'relative',
+                        backgroundColor: theme.panel,
+                        borderWidth: 1,
+                        borderColor: theme.border,
+                      }}
+                    >
                       <Image
                         source={{ uri: resolveImage(slot).uri }}
-                        style={{ width: '100%', height: '100%', borderRadius: 12 }}
+                        style={{ width: '100%', height: '100%' }}
                         contentFit="cover"
                       />
                       {i === 0 && (
@@ -664,13 +815,20 @@ function SellForm({
                             position: 'absolute',
                             top: 6,
                             left: 6,
-                            paddingHorizontal: 7,
+                            paddingHorizontal: 8,
                             paddingVertical: 3,
                             borderRadius: radii.pill,
-                            backgroundColor: SELL_TEAL,
+                            backgroundColor: theme.ink,
                           }}
                         >
-                          <Text style={{ color: 'white', fontSize: 9, fontFamily: DISPLAY_BOLD, letterSpacing: 0.4 }}>
+                          <Text
+                            style={{
+                              color: theme.background,
+                              fontSize: 9,
+                              fontFamily: DISPLAY_BOLD,
+                              letterSpacing: 0.6,
+                            }}
+                          >
                             COVER
                           </Text>
                         </View>
@@ -683,17 +841,17 @@ function SellForm({
                           const updated = (slots as PhotoSlot[]).filter((s) => s.id !== slot.id);
                           setValue('slots', updated, { shouldValidate: true });
                         }}
-                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         accessibilityRole="button"
                         accessibilityLabel="Remove photo"
                         style={({ pressed }) => ({
                           position: 'absolute',
-                          top: 5,
-                          right: 5,
+                          top: 6,
+                          right: 6,
                           width: 24,
                           height: 24,
-                          borderRadius: 999,
-                          backgroundColor: 'rgba(15,15,15,0.78)',
+                          borderRadius: 12,
+                          backgroundColor: 'rgba(0,0,0,0.7)',
                           alignItems: 'center',
                           justifyContent: 'center',
                           opacity: pressed ? 0.7 : 1,
@@ -703,262 +861,446 @@ function SellForm({
                       </Pressable>
                     </View>
                   ))}
+
                   {slots.length < MAX_IMAGES && (
                     <Pressable
                       onPress={handlePickImages}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       accessibilityRole="button"
                       accessibilityLabel="Add more photos"
                       style={({ pressed }) => ({
                         width: tile,
                         height: tile,
-                        borderRadius: 12,
+                        borderRadius: radii.xl,
                         borderWidth: 1.5,
                         borderStyle: 'dashed',
-                        borderColor: SELL_TEAL,
+                        borderColor: theme.border,
+                        backgroundColor: theme.panel,
                         alignItems: 'center',
                         justifyContent: 'center',
+                        gap: 4,
                         opacity: pressed ? 0.7 : 1,
                       })}
                     >
-                      <Feather name="plus" size={20} color={SELL_TEAL} />
+                      <Feather name="plus" size={18} color={theme.ink} />
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          fontFamily: DISPLAY_BOLD,
+                          color: theme.mute,
+                        }}
+                      >
+                        {slots.length}/{MAX_IMAGES}
+                      </Text>
                     </Pressable>
                   )}
                 </View>
-              )}
+
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: theme.mute,
+                    marginTop: 12,
+                    paddingHorizontal: 2,
+                  }}
+                >
+                  First photo is the cover image shown on feeds and search results.
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {errors.slots?.message ? (
+            <Text
+              accessibilityRole="alert"
+              style={{
+                fontSize: 12,
+                color: theme.danger ?? '#EF4444',
+                marginTop: 6,
+                paddingHorizontal: 4,
+                fontFamily: typography.family.sansMedium,
+              }}
+            >
+              {errors.slots.message}
+            </Text>
+          ) : null}
+
+          {/* About Your Item Section */}
+          <SectionHeaderTitle title="About your item" icon="edit-3" />
+
+          <View
+            style={{
+              borderRadius: radii['2xl'],
+              borderWidth: 1,
+              borderColor: theme.border,
+              backgroundColor: theme.panel,
+              padding: 16,
+              gap: 16,
+            }}
+          >
+            {/* Title Input */}
+            <View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text
+                  style={{
+                    fontSize: 13.5,
+                    fontFamily: typography.family.sansSemibold,
+                    color: theme.ink,
+                  }}
+                >
+                  Title
+                </Text>
+                <Text style={{ fontSize: 11.5, color: theme.mute }}>
+                  {(title || '').length}/{TITLE_MAX}
+                </Text>
+              </View>
+              <Controller
+                control={control}
+                name="title"
+                render={({ field: { onChange, onBlur, value, ref }, fieldState: { error } }) => (
+                  <View
+                    style={{
+                      borderWidth: 1,
+                      borderColor: error ? (theme.danger ?? '#EF4444') : theme.border,
+                      borderRadius: radii.md,
+                      backgroundColor: theme.surface,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                    }}
+                  >
+                    <TextInput
+                      ref={ref}
+                      value={value}
+                      onChangeText={(t) => onChange(t.slice(0, TITLE_MAX))}
+                      onBlur={onBlur}
+                      placeholder="e.g. Vintage Oversized Denim Jacket"
+                      placeholderTextColor={theme.muteSoft ?? theme.mute}
+                      maxLength={TITLE_MAX}
+                      style={
+                        {
+                          fontSize: 14.5,
+                          color: theme.ink,
+                          padding: 0,
+                          outlineStyle: 'none',
+                          outlineWidth: 0,
+                        } as any
+                      }
+                    />
+                  </View>
+                )}
+              />
+              {errors.title?.message ? (
+                <Text
+                  accessibilityRole="alert"
+                  style={{
+                    fontSize: 12,
+                    color: theme.danger ?? '#EF4444',
+                    marginTop: 4,
+                    fontFamily: typography.family.sansMedium,
+                  }}
+                >
+                  {errors.title.message}
+                </Text>
+              ) : null}
             </View>
-            {errors.slots?.message ? (
-              <Text
-                accessibilityRole="alert"
+
+            {/* Description Input */}
+            <View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text
+                  style={{
+                    fontSize: 13.5,
+                    fontFamily: typography.family.sansSemibold,
+                    color: theme.ink,
+                  }}
+                >
+                  Description
+                </Text>
+                <Text style={{ fontSize: 11.5, color: theme.mute }}>
+                  {(description || '').length}/{DESCRIPTION_MAX}
+                </Text>
+              </View>
+              <Controller
+                control={control}
+                name="description"
+                render={({ field: { onChange, onBlur, value, ref }, fieldState: { error } }) => (
+                  <View
+                    style={{
+                      borderWidth: 1,
+                      borderColor: error ? (theme.danger ?? '#EF4444') : theme.border,
+                      borderRadius: radii.md,
+                      backgroundColor: theme.surface,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                    }}
+                  >
+                    <TextInput
+                      ref={ref}
+                      value={value}
+                      onChangeText={(t) => onChange(t.slice(0, DESCRIPTION_MAX))}
+                      onBlur={onBlur}
+                      placeholder="Describe fit, condition, measurements, material, and any flaws..."
+                      placeholderTextColor={theme.muteSoft ?? theme.mute}
+                      maxLength={DESCRIPTION_MAX}
+                      multiline
+                      textAlignVertical="top"
+                      style={
+                        {
+                          fontSize: 14.5,
+                          color: theme.ink,
+                          minHeight: 76,
+                          padding: 0,
+                          outlineStyle: 'none',
+                          outlineWidth: 0,
+                        } as any
+                      }
+                    />
+                  </View>
+                )}
+              />
+              {errors.description?.message ? (
+                <Text
+                  accessibilityRole="alert"
+                  style={{
+                    fontSize: 12,
+                    color: theme.danger ?? '#EF4444',
+                    marginTop: 4,
+                    fontFamily: typography.family.sansMedium,
+                  }}
+                >
+                  {errors.description.message}
+                </Text>
+              ) : null}
+            </View>
+          </View>
+
+          {/* Item Details Card */}
+          <SectionHeaderTitle title="Item details" icon="tag" />
+
+          <View
+            style={{
+              borderRadius: radii['2xl'],
+              borderWidth: 1,
+              borderColor: errors.subcategory ? (theme.danger ?? '#EF4444') : theme.border,
+              backgroundColor: theme.panel,
+              overflow: 'hidden',
+            }}
+          >
+            <RowField
+              icon="grid"
+              label="Category"
+              value={categoryValue}
+              placeholder="Select category"
+              onPress={() => setActiveSheet('category')}
+            />
+
+            {showSuggestion ? (
+              <View
                 style={{
-                  fontSize: 12,
-                  color: colors.danger ?? '#EF4444',
-                  marginTop: 6,
-                  fontFamily: type.family.sansMedium,
+                  paddingHorizontal: 16,
+                  paddingVertical: 10,
+                  backgroundColor: theme.surface,
+                  borderBottomWidth: 1,
+                  borderBottomColor: theme.border,
                 }}
               >
-                {errors.slots.message}
-              </Text>
-            ) : slots.length > 0 ? (
-              <Text style={{ fontSize: 12, color: colors.muteSoft, marginTop: 8 }}>
-                {slots.length} / {MAX_IMAGES} photos · first photo is the cover
-              </Text>
+                <Pressable
+                  onPress={() => {
+                    if (Platform.OS !== 'web') {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                    }
+                    setValue('category', suggestion!.category, { shouldValidate: true });
+                    setValue('subcategory', suggestion!.sub.id, { shouldValidate: true });
+                  }}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    borderRadius: radii.lg,
+                    backgroundColor: theme.panel,
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    opacity: pressed ? 0.7 : 1,
+                  })}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                    <Feather name="zap" size={13} color={theme.ink} />
+                    <Text
+                      numberOfLines={1}
+                      style={{ fontSize: 12.5, fontFamily: DISPLAY_BOLD, color: theme.ink }}
+                    >
+                      Suggested: {CATEGORIES.find((c) => c.id === suggestion!.category)?.label} ▸{' '}
+                      {suggestion!.sub.label}
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 12, fontFamily: DISPLAY_BOLD, color: theme.mute }}>
+                    Apply
+                  </Text>
+                </Pressable>
+              </View>
             ) : null}
+
+            <RowField
+              icon="bookmark"
+              label="Brand"
+              value={brand}
+              placeholder="Add brand"
+              onPress={() => setActiveSheet('brand')}
+            />
+
+            <RowField
+              icon="maximize-2"
+              label="Size"
+              value={size}
+              placeholder="Add size"
+              onPress={() => setActiveSheet('size')}
+            />
+
+            <RowField
+              icon="shield"
+              label="Condition"
+              value={CONDITIONS.find((c) => c.value === condition)?.label ?? ''}
+              placeholder="Add condition"
+              onPress={() => setActiveSheet('condition')}
+            />
+
+            <RowField
+              icon="droplet"
+              label="Color"
+              value={color ? itemColorLabel(color) : ''}
+              placeholder="Add color"
+              onPress={() => setActiveSheet('colors')}
+            />
+
+            <RowField
+              icon="users"
+              label="Gender"
+              value={GENDERS.find((g) => g.value === gender)?.label ?? ''}
+              placeholder="Add gender"
+              onPress={() => setActiveSheet('gender')}
+            />
+
+            <RowField
+              icon="hash"
+              label="Tags"
+              value={tags.length ? `${tags.length} tag${tags.length === 1 ? '' : 's'}` : ''}
+              placeholder="Add discovery tags"
+              onPress={() => setActiveSheet('tags')}
+              isLast
+            />
           </View>
 
-          <SectionDivider />
-
-          {/* About your item */}
-          <SectionHeader>About your item</SectionHeader>
-          <View style={{ paddingHorizontal: 20 }}>
-            <Controller
-              control={control}
-              name="title"
-              render={({ field: { onChange, onBlur, value, ref }, fieldState: { error } }) => (
-                <Input
-                  ref={ref}
-                  label="Title"
-                  placeholder="Tell buyers what you're selling"
-                  value={value}
-                  onChangeText={(t) => onChange(t.slice(0, TITLE_MAX))}
-                  onBlur={onBlur}
-                  maxLength={TITLE_MAX}
-                  error={error?.message}
-                  variant="underline"
-                  containerStyle={{ marginVertical: 0 }}
-                />
-              )}
-            />
-            <Controller
-              control={control}
-              name="description"
-              render={({ field: { onChange, onBlur, value, ref }, fieldState: { error } }) => (
-                <Input
-                  ref={ref}
-                  label="Description"
-                  placeholder="Tell buyers more about it"
-                  value={value}
-                  onChangeText={(t) => onChange(t.slice(0, DESCRIPTION_MAX))}
-                  onBlur={onBlur}
-                  maxLength={DESCRIPTION_MAX}
-                  multiline
-                  error={error?.message}
-                  variant="underline"
-                  containerStyle={{ marginVertical: 0 }}
-                />
-              )}
-            />
-          </View>
-
-          <SectionDivider />
-
-          {/* Item details */}
-          <SectionHeader>Item details</SectionHeader>
-          <RowField
-            label="Category"
-            value={categoryValue}
-            placeholder="Add category"
-            onPress={() => setActiveSheet('category')}
-          />
           {errors.subcategory?.message ? (
             <Text
               accessibilityRole="alert"
               style={{
                 fontSize: 12,
-                color: colors.danger ?? '#EF4444',
-                paddingHorizontal: 20,
+                color: theme.danger ?? '#EF4444',
+                paddingHorizontal: 4,
                 paddingTop: 4,
-                fontFamily: type.family.sansMedium,
+                fontFamily: typography.family.sansMedium,
               }}
             >
               {errors.subcategory.message}
             </Text>
           ) : null}
 
-          {showSuggestion ? (
-            <View style={{ paddingHorizontal: 20, paddingTop: 10 }}>
-              <Pressable
-                onPress={() => {
-                  if (Platform.OS !== 'web') {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                  }
-                  setValue('category', suggestion!.category, { shouldValidate: true });
-                  setValue('subcategory', suggestion!.sub.id, { shouldValidate: true });
-                }}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                style={({ pressed }) => ({
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 6,
-                  alignSelf: 'flex-start',
-                  paddingHorizontal: 12,
-                  paddingVertical: 8,
-                  borderRadius: radii.pill,
-                  backgroundColor: SELL_TEAL_SOFT,
-                  opacity: pressed ? 0.7 : 1,
-                })}
-              >
-                <Feather name="zap" size={12} color={SELL_TEAL} />
-                <Text style={{ fontSize: 12.5, fontFamily: DISPLAY_BOLD, color: SELL_TEAL }}>
-                  Suggested: {CATEGORIES.find((c) => c.id === suggestion!.category)?.label} ▸{' '}
-                  {suggestion!.sub.label}
-                </Text>
-              </Pressable>
-            </View>
-          ) : null}
-          <RowField label="Brand" value={brand} placeholder="Add brand" onPress={() => setActiveSheet('brand')} />
-          <RowField label="Size" value={size} placeholder="Add size" onPress={() => setActiveSheet('size')} />
-          <RowField
-            label="Condition"
-            value={CONDITIONS.find((c) => c.value === condition)?.label ?? ''}
-            placeholder="Add condition"
-            onPress={() => setActiveSheet('condition')}
-          />
-          <RowField
-            label="Colors"
-            value={color ? itemColorLabel(color) : ''}
-            placeholder="Add color"
-            onPress={() => setActiveSheet('colors')}
-          />
-          <RowField
-            label="Gender"
-            value={GENDERS.find((g) => g.value === gender)?.label ?? ''}
-            placeholder="Add gender"
-            onPress={() => setActiveSheet('gender')}
-          />
-          <RowField
-            label="Tags"
-            value={tags.length ? `${tags.length} tag${tags.length === 1 ? '' : 's'}` : ''}
-            placeholder="Add tags"
-            onPress={() => setActiveSheet('tags')}
-          />
+          {/* Pricing & Shipping Card */}
+          <SectionHeaderTitle title="Pricing & Shipping" icon="dollar-sign" />
 
-          <SectionDivider />
+          <View
+            style={{
+              borderRadius: radii['2xl'],
+              borderWidth: 1,
+              borderColor: errors.price ? (theme.danger ?? '#EF4444') : theme.border,
+              backgroundColor: theme.panel,
+              overflow: 'hidden',
+            }}
+          >
+            <RowField
+              icon="dollar-sign"
+              label="Price"
+              value={price ? formatPrice(parseFloat(price), { whole: true }) : ''}
+              placeholder={`Set price (${CURRENCY_SYMBOL})`}
+              onPress={() => setActiveSheet('price')}
+            />
 
-          {/* Pricing */}
-          <SectionHeader>Pricing</SectionHeader>
-          <RowField
-            label="Price"
-            value={price ? formatPrice(parseFloat(price), { whole: true }) : ''}
-            placeholder="Add price"
-            onPress={() => setActiveSheet('price')}
-          />
+            <RowField
+              icon="package"
+              label="Parcel size"
+              value={PARCEL_SIZES.find((p) => p.value === parcelSize)?.label ?? ''}
+              placeholder="Select parcel size"
+              onPress={() => setActiveSheet('parcel')}
+              isLast
+            />
+          </View>
+
           {errors.price?.message ? (
             <Text
               accessibilityRole="alert"
               style={{
                 fontSize: 12,
-                color: colors.danger ?? '#EF4444',
-                paddingHorizontal: 20,
+                color: theme.danger ?? '#EF4444',
+                paddingHorizontal: 4,
                 paddingTop: 4,
-                fontFamily: type.family.sansMedium,
+                fontFamily: typography.family.sansMedium,
               }}
             >
               {errors.price.message}
             </Text>
           ) : null}
 
-          <SectionDivider />
-
-          {/* Shipping */}
-          <SectionHeader>Shipping</SectionHeader>
-          <RowField
-            label="Parcel size"
-            value={PARCEL_SIZES.find((p) => p.value === parcelSize)?.label ?? ''}
-            placeholder="Add parcel size"
-            onPress={() => setActiveSheet('parcel')}
-          />
-          <Text style={{ fontSize: 12, color: colors.muteSoft, paddingHorizontal: 20, paddingTop: 8 }}>
-            The buyer always pays for shipping
+          <Text style={{ fontSize: 12, color: theme.mute, paddingHorizontal: 4, paddingTop: 6 }}>
+            The buyer pays for shipping automatically at checkout.
           </Text>
 
-          <View style={{ paddingHorizontal: 20 }}>
-            <SafetyBanner context="sell" style={{ marginTop: 24 }} />
+          {/* Safety Banner */}
+          <SafetyBanner context="sell" style={{ marginTop: 20 }} />
 
-            {/* Upload — scrolls with the rest of the form, right after the
-                safety banner, instead of sitting in a sticky footer. */}
-            <Pressable
-              onPress={() => {
-                if (Platform.OS !== 'web') {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-                }
-                handleSubmit(onValidSubmit, onInvalidSubmit)();
-              }}
-              disabled={publishing || !canPublish}
-              accessibilityRole="button"
-              accessibilityLabel={
-                publishing
-                  ? (isEditing ? 'Saving changes' : 'Uploading listing')
-                  : (isEditing ? 'Save changes' : 'Upload listing')
+          {/* Submit CTA */}
+          <Pressable
+            onPress={() => {
+              if (Platform.OS !== 'web') {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
               }
-              accessibilityState={{ disabled: publishing || !canPublish, busy: publishing }}
-              style={({ pressed }) => ({
-                height: 52,
-                borderRadius: radii.md,
-                backgroundColor: canPublish ? SELL_TEAL_DARK : colors.hairline,
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginTop: 20,
-                opacity: publishing ? 0.85 : 1,
-                transform: [{ scale: pressed && canPublish ? 0.985 : 1 }],
-              })}
-            >
-              {publishing ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text
-                  style={{
-                    fontSize: 16,
-                    fontFamily: DISPLAY_BOLD,
-                    color: canPublish ? '#FFFFFF' : colors.muteSoft,
-                    letterSpacing: 0.2,
-                  }}
-                >
-                  {isEditing ? 'Save changes' : 'Upload'}
-                </Text>
-              )}
-            </Pressable>
-          </View>
+              handleSubmit(onValidSubmit, onInvalidSubmit)();
+            }}
+            disabled={publishing || !canPublish}
+            accessibilityRole="button"
+            accessibilityLabel={
+              publishing
+                ? (isEditing ? 'Saving changes' : 'Uploading listing')
+                : (isEditing ? 'Save changes' : 'Upload listing')
+            }
+            accessibilityState={{ disabled: publishing || !canPublish, busy: publishing }}
+            style={({ pressed }) => ({
+              height: 52,
+              borderRadius: radii.xl,
+              backgroundColor: canPublish ? theme.primary : theme.border,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginTop: 22,
+              opacity: publishing ? 0.85 : 1,
+              transform: [{ scale: pressed && canPublish ? 0.985 : 1 }],
+            })}
+          >
+            {publishing ? (
+              <ActivityIndicator color={theme.background} />
+            ) : (
+              <Text
+                style={{
+                  fontSize: 16,
+                  fontFamily: DISPLAY_BOLD,
+                  color: canPublish ? theme.background : theme.mute,
+                  letterSpacing: -0.1,
+                }}
+              >
+                {isEditing ? 'Save changes' : 'Upload item'}
+              </Text>
+            )}
+          </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -976,7 +1318,7 @@ function SellForm({
       <TextFieldSheet
         visible={activeSheet === 'brand'}
         title="Brand"
-        placeholder="e.g. Zara, Nike, Khaadi"
+        placeholder="e.g. Zara, Nike, Vintage"
         value={brand}
         onChange={(b) => setValue('brand', b, { shouldValidate: true })}
         onClose={() => setActiveSheet(null)}
@@ -984,7 +1326,7 @@ function SellForm({
       <TextFieldSheet
         visible={activeSheet === 'size'}
         title="Size"
-        placeholder="e.g. S, M, L, 42, Free"
+        placeholder="e.g. S, M, L, 42, One Size"
         value={size}
         onChange={(s) => setValue('size', s, { shouldValidate: true })}
         onClose={() => setActiveSheet(null)}
@@ -1034,4 +1376,5 @@ function SellForm({
     </SafeAreaView>
   );
 }
+
 

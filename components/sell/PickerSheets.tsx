@@ -1,41 +1,51 @@
 import { useEffect, useState } from 'react';
-import { View, Pressable } from 'react-native';
+import { View, Pressable, Platform } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
-import { colors, radii, type } from '@/lib/theme';
+import { radii, type } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { CATEGORIES, hasSubcategories } from '@/lib/categories';
 import { ITEM_COLORS } from '@/lib/itemColors';
 import { ColorSwatch } from '@/components/ColorSwatch';
 import { CURRENCY_SYMBOL, CURRENCY_CODE } from '@/lib/currency';
 import type { Category } from '@/types';
 import { BottomSheet } from './BottomSheet';
-import { SELL_TEAL, SELL_TEAL_SOFT } from './theme';
+import * as Haptics from 'expo-haptics';
 
 const DISPLAY_BOLD = type.family.sansBold;
 
 function SaveButton({ onPress, label = 'Save' }: { onPress: () => void; label?: string }) {
+  const { theme } = useTheme();
   return (
     <View
       style={{
         paddingHorizontal: 20,
         paddingTop: 12,
-        paddingBottom: 30,
+        paddingBottom: 28,
         borderTopWidth: 1,
-        borderTopColor: colors.hairline,
+        borderTopColor: theme.border,
+        backgroundColor: theme.surface,
       }}
     >
       <Pressable
-        onPress={onPress}
+        onPress={() => {
+          if (Platform.OS !== 'web') {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+          }
+          onPress();
+        }}
         accessibilityRole="button"
         style={({ pressed }) => ({
-          paddingVertical: 15,
+          paddingVertical: 14,
           borderRadius: radii.md,
-          backgroundColor: SELL_TEAL,
+          backgroundColor: theme.primary,
           alignItems: 'center',
+          justifyContent: 'center',
           opacity: pressed ? 0.88 : 1,
+          transform: [{ scale: pressed ? 0.99 : 1 }],
         })}
       >
-        <Text style={{ fontSize: 14.5, fontFamily: DISPLAY_BOLD, color: '#FFFFFF', letterSpacing: -0.1 }}>
+        <Text style={{ fontSize: 15, fontFamily: DISPLAY_BOLD, color: theme.background, letterSpacing: -0.1 }}>
           {label}
         </Text>
       </Pressable>
@@ -65,15 +75,20 @@ export function SingleSelectSheet<T extends string>({
   onChange: (v: T) => void;
   onClose: () => void;
 }) {
+  const { theme } = useTheme();
+
   return (
     <BottomSheet visible={visible} title={title} onClose={onClose}>
-      <View style={{ gap: 8 }}>
+      <View style={{ gap: 10 }}>
         {options.map((o) => {
           const active = value === o.value;
           return (
             <Pressable
               key={o.value}
               onPress={() => {
+                if (Platform.OS !== 'web') {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                }
                 onChange(o.value);
                 onClose();
               }}
@@ -82,21 +97,57 @@ export function SingleSelectSheet<T extends string>({
               style={({ pressed }) => ({
                 flexDirection: 'row',
                 alignItems: 'center',
-                padding: 14,
+                paddingHorizontal: 16,
+                paddingVertical: 14,
                 borderRadius: radii.lg,
                 borderWidth: 1,
-                borderColor: active ? SELL_TEAL : colors.border,
-                backgroundColor: active ? SELL_TEAL_SOFT : colors.surface,
+                borderColor: active ? theme.ink : theme.border,
+                backgroundColor: active ? (theme.primarySoft ?? 'rgba(0,0,0,0.06)') : theme.panel,
                 opacity: pressed ? 0.85 : 1,
+                transform: [{ scale: pressed ? 0.99 : 1 }],
               })}
             >
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontFamily: DISPLAY_BOLD, color: colors.ink }}>{o.label}</Text>
+              <View style={{ flex: 1, paddingRight: 12 }}>
+                <Text
+                  style={{
+                    fontSize: 15,
+                    fontFamily: active ? DISPLAY_BOLD : type.family.sansSemibold,
+                    color: theme.ink,
+                    letterSpacing: -0.2,
+                  }}
+                >
+                  {o.label}
+                </Text>
                 {o.hint ? (
-                  <Text style={{ fontSize: 12, color: colors.mute, marginTop: 1 }}>{o.hint}</Text>
+                  <Text style={{ fontSize: 12.5, color: theme.mute, marginTop: 3, lineHeight: 17 }}>
+                    {o.hint}
+                  </Text>
                 ) : null}
               </View>
-              {active ? <Feather name="check" size={18} color={SELL_TEAL} /> : null}
+              {active ? (
+                <View
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: 13,
+                    backgroundColor: theme.ink,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Feather name="check" size={15} color={theme.background} />
+                </View>
+              ) : (
+                <View
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 11,
+                    borderWidth: 1.5,
+                    borderColor: theme.border,
+                  }}
+                />
+              )}
             </Pressable>
           );
         })}
@@ -105,7 +156,7 @@ export function SingleSelectSheet<T extends string>({
   );
 }
 
-// ── Free-text field (Brand, Size, Material) ─────────────────────────────────
+// ── Free-text field (Brand, Size) ──────────────────────────────────────────
 export function TextFieldSheet({
   visible,
   title,
@@ -123,6 +174,7 @@ export function TextFieldSheet({
   onClose: () => void;
   multiline?: boolean;
 }) {
+  const { theme } = useTheme();
   const [draft, setDraft] = useState(value);
   useEffect(() => {
     if (visible) setDraft(value);
@@ -135,27 +187,36 @@ export function TextFieldSheet({
 
   return (
     <BottomSheet visible={visible} title={title} onClose={onClose} footer={<SaveButton onPress={save} />}>
-      <TextInput
-        value={draft}
-        onChangeText={setDraft}
-        placeholder={placeholder}
-        placeholderTextColor={colors.mute}
-        autoFocus
-        multiline={multiline}
-        textAlignVertical={multiline ? 'top' : 'center'}
-        style={
-          {
-            fontSize: 16,
-            color: colors.ink,
-            borderBottomWidth: 1,
-            borderBottomColor: colors.border,
-            paddingVertical: 10,
-            minHeight: multiline ? 90 : undefined,
-            outlineStyle: 'none',
-            outlineWidth: 0,
-          } as any
-        }
-      />
+      <View
+        style={{
+          borderWidth: 1,
+          borderColor: theme.border,
+          borderRadius: radii.md,
+          backgroundColor: theme.panel,
+          paddingHorizontal: 14,
+          paddingVertical: 10,
+        }}
+      >
+        <TextInput
+          value={draft}
+          onChangeText={setDraft}
+          placeholder={placeholder}
+          placeholderTextColor={theme.muteSoft ?? theme.mute}
+          autoFocus
+          multiline={multiline}
+          textAlignVertical={multiline ? 'top' : 'center'}
+          style={
+            {
+              fontSize: 16,
+              color: theme.ink,
+              minHeight: multiline ? 90 : 28,
+              padding: 0,
+              outlineStyle: 'none',
+              outlineWidth: 0,
+            } as any
+          }
+        />
+      </View>
     </BottomSheet>
   );
 }
@@ -172,6 +233,7 @@ export function PriceSheet({
   onChange: (v: string) => void;
   onClose: () => void;
 }) {
+  const { theme } = useTheme();
   const [draft, setDraft] = useState(value);
   useEffect(() => {
     if (visible) setDraft(value);
@@ -184,34 +246,69 @@ export function PriceSheet({
 
   return (
     <BottomSheet visible={visible} title="Price" onClose={onClose} footer={<SaveButton onPress={save} />}>
-      <View style={{ flexDirection: 'row', alignItems: 'baseline', paddingVertical: 20 }}>
-        <Text style={{ fontSize: 24, fontFamily: DISPLAY_BOLD, color: SELL_TEAL, marginRight: 8 }}>
-          {CURRENCY_SYMBOL}
-        </Text>
-        <TextInput
-          value={draft}
-          onChangeText={setDraft}
-          placeholder="0"
-          placeholderTextColor={colors.mute}
-          keyboardType="decimal-pad"
-          autoFocus
-          style={
-            {
-              fontSize: 34,
+      <View
+        style={{
+          borderWidth: 1,
+          borderColor: theme.border,
+          borderRadius: radii.xl,
+          backgroundColor: theme.panel,
+          paddingHorizontal: 18,
+          paddingVertical: 18,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+          <Text
+            style={{
+              fontSize: 22,
               fontFamily: DISPLAY_BOLD,
-              color: colors.ink,
-              flex: 1,
-              minWidth: 0,
-              padding: 0,
-              outlineStyle: 'none',
-              outlineWidth: 0,
-            } as any
-          }
-        />
-        <Text style={{ fontSize: 13, fontFamily: type.family.sansMedium, color: colors.mute, marginLeft: 8 }}>
-          {CURRENCY_CODE}
-        </Text>
+              color: theme.mute,
+              marginRight: 8,
+            }}
+          >
+            {CURRENCY_SYMBOL}
+          </Text>
+          <TextInput
+            value={draft}
+            onChangeText={setDraft}
+            placeholder="0"
+            placeholderTextColor={theme.muteSoft ?? theme.mute}
+            keyboardType="decimal-pad"
+            autoFocus
+            style={
+              {
+                fontSize: 32,
+                fontFamily: DISPLAY_BOLD,
+                color: theme.ink,
+                flex: 1,
+                minWidth: 0,
+                padding: 0,
+                outlineStyle: 'none',
+                outlineWidth: 0,
+              } as any
+            }
+          />
+        </View>
+        <View
+          style={{
+            paddingHorizontal: 10,
+            paddingVertical: 5,
+            borderRadius: radii.sm,
+            backgroundColor: theme.surface,
+            borderWidth: 1,
+            borderColor: theme.border,
+          }}
+        >
+          <Text style={{ fontSize: 12, fontFamily: DISPLAY_BOLD, color: theme.ink }}>
+            {CURRENCY_CODE}
+          </Text>
+        </View>
       </View>
+      <Text style={{ fontSize: 12.5, color: theme.mute, marginTop: 10, paddingHorizontal: 4 }}>
+        Set a fair price based on condition and brand to sell quickly.
+      </Text>
     </BottomSheet>
   );
 }
@@ -228,38 +325,62 @@ export function ColorSheet({
   onChange: (v: string | null) => void;
   onClose: () => void;
 }) {
+  const { theme } = useTheme();
+
   return (
-    <BottomSheet visible={visible} title="Colors" onClose={onClose}>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>
+    <BottomSheet visible={visible} title="Color" onClose={onClose}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
         {ITEM_COLORS.map((c) => {
           const active = value === c.id;
           return (
             <Pressable
               key={c.id}
               onPress={() => {
+                if (Platform.OS !== 'web') {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                }
                 onChange(active ? null : c.id);
                 onClose();
               }}
               accessibilityRole="button"
               accessibilityLabel={c.label}
               accessibilityState={{ selected: active }}
-              style={{ alignItems: 'center', width: 64 }}
+              style={({ pressed }) => ({
+                alignItems: 'center',
+                width: 68,
+                paddingVertical: 8,
+                borderRadius: radii.md,
+                backgroundColor: active ? (theme.primarySoft ?? 'rgba(0,0,0,0.06)') : 'transparent',
+                borderWidth: active ? 1 : 1,
+                borderColor: active ? theme.ink : 'transparent',
+                opacity: pressed ? 0.8 : 1,
+              })}
             >
               <View
-                style={({
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  borderWidth: active ? 2 : 0,
-                  borderColor: SELL_TEAL,
+                  borderWidth: active ? 2 : 1,
+                  borderColor: active ? theme.ink : theme.border,
                   marginBottom: 6,
-                } as any)}
+                }}
               >
-                <ColorSwatch colorId={c.id} size={active ? 30 : 34} />
+                <ColorSwatch colorId={c.id} size={active ? 26 : 32} />
               </View>
-              <Text style={{ fontSize: 11.5, color: colors.ink, textAlign: 'center' }}>{c.label}</Text>
+              <Text
+                numberOfLines={1}
+                style={{
+                  fontSize: 12,
+                  fontFamily: active ? DISPLAY_BOLD : type.family.sansMedium,
+                  color: theme.ink,
+                  textAlign: 'center',
+                }}
+              >
+                {c.label}
+              </Text>
             </Pressable>
           );
         })}
@@ -282,6 +403,7 @@ export function CategorySheet({
   onChange: (category: Category, subcategory: string | null) => void;
   onClose: () => void;
 }) {
+  const { theme } = useTheme();
   const [cat, setCat] = useState<Category>(category);
   const [query, setQuery] = useState('');
   useEffect(() => {
@@ -298,13 +420,17 @@ export function CategorySheet({
 
   return (
     <BottomSheet visible={visible} title="Category" onClose={onClose}>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+      {/* Category Pills */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
         {CATEGORIES.map((c) => {
           const active = cat === c.id;
           return (
             <Pressable
               key={c.id}
               onPress={() => {
+                if (Platform.OS !== 'web') {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                }
                 setCat(c.id);
                 setQuery('');
                 if (!hasSubcategories(c.id)) {
@@ -316,17 +442,23 @@ export function CategorySheet({
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 6,
-                paddingHorizontal: 12,
-                paddingVertical: 8,
+                paddingHorizontal: 14,
+                paddingVertical: 9,
                 borderRadius: radii.pill,
                 borderWidth: 1,
-                borderColor: active ? colors.ink : colors.border,
-                backgroundColor: active ? colors.ink : colors.surface,
+                borderColor: active ? theme.ink : theme.border,
+                backgroundColor: active ? theme.ink : theme.panel,
                 transform: [{ scale: pressed ? 0.97 : 1 }],
               })}
             >
-              <Feather name={c.icon} size={13} color={active ? colors.background : colors.ink} />
-              <Text style={{ fontSize: 13, fontFamily: DISPLAY_BOLD, color: active ? colors.background : colors.ink }}>
+              <Feather name={c.icon} size={14} color={active ? theme.background : theme.ink} />
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontFamily: DISPLAY_BOLD,
+                  color: active ? theme.background : theme.ink,
+                }}
+              >
                 {c.label}
               </Text>
             </Pressable>
@@ -334,31 +466,39 @@ export function CategorySheet({
         })}
       </View>
 
-      {subs.length > 8 ? (
+      {/* Subcategory Search (if many subcategories) */}
+      {def && def.subs.length > 6 ? (
         <View
           style={{
             flexDirection: 'row',
             alignItems: 'center',
             gap: 8,
             borderWidth: 1,
-            borderColor: colors.border,
+            borderColor: theme.border,
             borderRadius: radii.md,
+            backgroundColor: theme.panel,
             paddingHorizontal: 12,
             height: 42,
-            marginBottom: 12,
+            marginBottom: 14,
           }}
         >
-          <Feather name="search" size={15} color={colors.mute} />
+          <Feather name="search" size={15} color={theme.mute} />
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder={`Search ${def?.label.toLowerCase() ?? ''}`}
-            placeholderTextColor={colors.mute}
-            style={{ flex: 1, minWidth: 0, fontSize: 14, color: colors.ink }}
+            placeholder={`Search ${def?.label.toLowerCase() ?? ''}…`}
+            placeholderTextColor={theme.muteSoft ?? theme.mute}
+            style={{ flex: 1, minWidth: 0, fontSize: 14, color: theme.ink, padding: 0, outlineStyle: 'none' } as any}
           />
+          {query.length > 0 && (
+            <Pressable onPress={() => setQuery('')} hitSlop={8}>
+              <Feather name="x" size={14} color={theme.mute} />
+            </Pressable>
+          )}
         </View>
       ) : null}
 
+      {/* Subcategories grid */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         {subs.map((s) => {
           const active = subcategory === s.id && category === cat;
@@ -366,24 +506,31 @@ export function CategorySheet({
             <Pressable
               key={s.id}
               onPress={() => {
+                if (Platform.OS !== 'web') {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                }
                 onChange(cat, s.id);
                 onClose();
               }}
               style={({ pressed }) => ({
-                paddingHorizontal: 12,
-                paddingVertical: 8,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                paddingHorizontal: 14,
+                paddingVertical: 9,
                 borderRadius: radii.pill,
                 borderWidth: 1,
-                borderColor: active ? SELL_TEAL : colors.border,
-                backgroundColor: active ? SELL_TEAL_SOFT : colors.surface,
+                borderColor: active ? theme.ink : theme.border,
+                backgroundColor: active ? (theme.primarySoft ?? 'rgba(0,0,0,0.06)') : theme.panel,
                 transform: [{ scale: pressed ? 0.97 : 1 }],
               })}
             >
+              {active && <Feather name="check" size={13} color={theme.ink} />}
               <Text
                 style={{
                   fontSize: 13,
                   fontFamily: active ? DISPLAY_BOLD : type.family.sansMedium,
-                  color: colors.ink,
+                  color: theme.ink,
                 }}
               >
                 {s.label}
@@ -398,20 +545,22 @@ export function CategorySheet({
               onClose();
             }}
             style={({ pressed }) => ({
-              paddingHorizontal: 14,
+              paddingHorizontal: 16,
               paddingVertical: 10,
               borderRadius: radii.pill,
-              backgroundColor: SELL_TEAL,
+              backgroundColor: theme.primary,
               opacity: pressed ? 0.85 : 1,
             })}
           >
-            <Text style={{ fontSize: 13, fontFamily: DISPLAY_BOLD, color: colors.white }}>
+            <Text style={{ fontSize: 13, fontFamily: DISPLAY_BOLD, color: theme.background }}>
               Use {def.label}
             </Text>
           </Pressable>
         ) : null}
         {def && def.subs.length > 0 && subs.length === 0 ? (
-          <Text style={{ fontSize: 13, color: colors.mute, paddingVertical: 6 }}>No matches</Text>
+          <Text style={{ fontSize: 13, color: theme.mute, paddingVertical: 12 }}>
+            No matching subcategory
+          </Text>
         ) : null}
       </View>
     </BottomSheet>
@@ -430,6 +579,7 @@ export function TagsSheet({
   onChange: (v: string[]) => void;
   onClose: () => void;
 }) {
+  const { theme } = useTheme();
   const [tags, setTags] = useState<string[]>(value);
   const [draft, setDraft] = useState('');
   useEffect(() => {
@@ -454,38 +604,42 @@ export function TagsSheet({
 
   return (
     <BottomSheet visible={visible} title="Tags" onClose={onClose} footer={<SaveButton onPress={save} />}>
-      <Text style={{ fontSize: 12.5, color: colors.mute, marginBottom: 10 }}>
-        Help buyers find this item. Up to 10.
+      <Text style={{ fontSize: 13, color: theme.mute, marginBottom: 12 }}>
+        Add keywords like style, aesthetics, or fit to help buyers discover your item (up to 10).
       </Text>
       <View
         style={{
           flexDirection: 'row',
           flexWrap: 'wrap',
-          gap: 6,
+          gap: 8,
           alignItems: 'center',
           borderWidth: 1,
-          borderColor: colors.border,
+          borderColor: theme.border,
           borderRadius: radii.md,
-          padding: 10,
-          minHeight: 46,
+          backgroundColor: theme.panel,
+          padding: 12,
+          minHeight: 52,
         }}
       >
         {tags.map((t) => (
           <Pressable
             key={t}
             onPress={() => setTags((prev) => prev.filter((x) => x !== t))}
-            style={{
-              backgroundColor: SELL_TEAL,
+            style={({ pressed }) => ({
+              backgroundColor: theme.ink,
               borderRadius: radii.pill,
-              paddingHorizontal: 10,
-              paddingVertical: 4,
+              paddingHorizontal: 12,
+              paddingVertical: 6,
               flexDirection: 'row',
               alignItems: 'center',
-              gap: 4,
-            }}
+              gap: 6,
+              opacity: pressed ? 0.7 : 1,
+            })}
           >
-            <Text style={{ fontSize: 12, fontFamily: DISPLAY_BOLD, color: '#FFFFFF' }}>#{t}</Text>
-            <Feather name="x" size={11} color="#FFFFFF" />
+            <Text style={{ fontSize: 12.5, fontFamily: DISPLAY_BOLD, color: theme.background }}>
+              #{t}
+            </Text>
+            <Feather name="x" size={12} color={theme.background} />
           </Pressable>
         ))}
         <TextInput
@@ -503,17 +657,17 @@ export function TagsSheet({
               setTags((prev) => prev.slice(0, -1));
             }
           }}
-          placeholder={tags.length === 0 ? 'e.g. vintage denim oversized' : 'add tag…'}
-          placeholderTextColor={colors.mute}
+          placeholder={tags.length === 0 ? 'e.g. vintage, y2k, oversized' : 'add tag…'}
+          placeholderTextColor={theme.muteSoft ?? theme.mute}
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="done"
           style={
             {
               flexGrow: 1,
-              minWidth: 80,
+              minWidth: 90,
               fontSize: 14,
-              color: colors.ink,
+              color: theme.ink,
               padding: 0,
               outlineStyle: 'none',
               outlineWidth: 0,
@@ -524,3 +678,4 @@ export function TagsSheet({
     </BottomSheet>
   );
 }
+

@@ -1,6 +1,10 @@
-// Scoped color exception for the sell/upload flow only — matches the Lekondo
-// reference (teal accent) rather than the app-wide purple/white/black system.
-// Do not import these outside components/sell/**.
-export const SELL_TEAL = '#0F9488';
-export const SELL_TEAL_DARK = '#0B6D63';
-export const SELL_TEAL_SOFT = 'rgba(15,148,136,0.08)';
+// Sell flow design tokens aligned with Carrinex monotone aesthetic.
+export const SELL_ACCENT = '#111111';
+export const SELL_ACCENT_DARK = '#000000';
+export const SELL_ACCENT_SOFT = 'rgba(0,0,0,0.06)';
+
+// Backward compatibility aliases
+export const SELL_TEAL = SELL_ACCENT;
+export const SELL_TEAL_DARK = SELL_ACCENT_DARK;
+export const SELL_TEAL_SOFT = SELL_ACCENT_SOFT;
+
