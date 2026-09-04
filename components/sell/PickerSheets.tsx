@@ -589,8 +589,9 @@ export function TagsSheet({
     }
   }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const addFromDraft = () => {
-    const raw = draft.trim().replace(/[,#]/g, '').toLowerCase();
+  const addFromDraft = (candidate?: string) => {
+    const textToUse = typeof candidate === 'string' ? candidate : draft;
+    const raw = textToUse.trim().replace(/[,#]/g, '').toLowerCase();
     if (raw && !tags.includes(raw) && tags.length < 10) {
       setTags((prev) => [...prev, raw]);
     }
@@ -646,12 +647,12 @@ export function TagsSheet({
           value={draft}
           onChangeText={(text) => {
             if (/[ ,]$/.test(text)) {
-              addFromDraft();
+              addFromDraft(text);
             } else {
               setDraft(text);
             }
           }}
-          onSubmitEditing={addFromDraft}
+          onSubmitEditing={() => addFromDraft()}
           onKeyPress={(e) => {
             if (e.nativeEvent.key === 'Backspace' && draft.length === 0 && tags.length > 0) {
               setTags((prev) => prev.slice(0, -1));

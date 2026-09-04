@@ -159,9 +159,146 @@ function SystemNotice({ msg }: { msg: ChatMessage }) {
   );
 }
 
-// ── Offer ─────────────────────────────────────────────────────────────────
+// ── Modern AI / Grok-Inspired Offer UI ──────────────────────────────────────
 
-const TEAL_BRAND = '#007782';
+function OfferStatusPill({ status, isPaid }: { status: string; isPaid: boolean }) {
+  const { theme } = useTheme();
+
+  if (isPaid) {
+    return (
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 4,
+          paddingHorizontal: 8,
+          paddingVertical: 3,
+          borderRadius: radii.pill,
+          backgroundColor: 'rgba(16, 185, 129, 0.12)',
+        }}
+      >
+        <Feather name="shield" size={10} color="#10B981" />
+        <Text
+          style={{
+            fontFamily: typography.family.sansBold,
+            fontSize: 11,
+            color: '#10B981',
+            letterSpacing: 0.2,
+          }}
+        >
+          Paid
+        </Text>
+      </View>
+    );
+  }
+
+  if (status === 'accepted') {
+    return (
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 4,
+          paddingHorizontal: 8,
+          paddingVertical: 3,
+          borderRadius: radii.pill,
+          backgroundColor: 'rgba(16, 185, 129, 0.12)',
+        }}
+      >
+        <Feather name="check" size={10} color="#10B981" />
+        <Text
+          style={{
+            fontFamily: typography.family.sansBold,
+            fontSize: 11,
+            color: '#10B981',
+            letterSpacing: 0.2,
+          }}
+        >
+          Accepted
+        </Text>
+      </View>
+    );
+  }
+
+  if (status === 'declined') {
+    return (
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 4,
+          paddingHorizontal: 8,
+          paddingVertical: 3,
+          borderRadius: radii.pill,
+          backgroundColor: 'rgba(239, 68, 68, 0.10)',
+        }}
+      >
+        <Feather name="x" size={10} color="#EF4444" />
+        <Text
+          style={{
+            fontFamily: typography.family.sansBold,
+            fontSize: 11,
+            color: '#EF4444',
+            letterSpacing: 0.2,
+          }}
+        >
+          Declined
+        </Text>
+      </View>
+    );
+  }
+
+  if (status === 'expired') {
+    return (
+      <View
+        style={{
+          paddingHorizontal: 8,
+          paddingVertical: 3,
+          borderRadius: radii.pill,
+          backgroundColor: theme.panel,
+          borderWidth: 1,
+          borderColor: theme.border,
+        }}
+      >
+        <Text
+          style={{
+            fontFamily: typography.family.sansMedium,
+            fontSize: 11,
+            color: theme.muteSoft,
+          }}
+        >
+          Expired
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: radii.pill,
+        backgroundColor: 'rgba(245, 158, 11, 0.12)',
+      }}
+    >
+      <Feather name="clock" size={10} color="#D97706" />
+      <Text
+        style={{
+          fontFamily: typography.family.sansBold,
+          fontSize: 11,
+          color: '#D97706',
+          letterSpacing: 0.2,
+        }}
+      >
+        Pending
+      </Text>
+    </View>
+  );
+}
 
 function OutgoingOfferBubble({
   msg,
@@ -180,6 +317,7 @@ function OutgoingOfferBubble({
   const isBundle = Boolean(msg.metadata?.is_bundle);
   const bundleCount = msg.metadata?.bundle_count ?? (msg.metadata?.bundle_item_ids ? msg.metadata.bundle_item_ids.length + 1 : 1);
   const showStruck = !isBundle && !!listingPrice && listingPrice > amount;
+  const discountPercent = showStruck && listingPrice ? Math.round(((listingPrice - amount) / listingPrice) * 100) : 0;
   const isPaid = Boolean(
     msg.metadata?.paid ||
     msg.metadata?.order_status === 'paid' ||
@@ -189,41 +327,49 @@ function OutgoingOfferBubble({
   return (
     <View
       style={{
+        minWidth: 220,
+        maxWidth: 320,
         backgroundColor: theme.panel,
-        borderRadius: 12,
-        paddingHorizontal: 14,
-        paddingVertical: 9,
+        borderRadius: 18,
+        padding: 14,
         borderWidth: 1,
         borderColor: theme.border,
+        ...shadow.sm,
       }}
     >
-      {isBundle && (
-        <View
-          style={{
-            alignSelf: 'flex-start',
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 4,
-            paddingHorizontal: 7,
-            paddingVertical: 2,
-            borderRadius: 6,
-            backgroundColor: '#5356EE',
-            marginBottom: 6,
-          }}
-        >
-          <Feather name="package" size={11} color="#FFFFFF" />
-          <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#FFFFFF' }}>
-            Bundle · {bundleCount} items
+      {/* Top Header: Type & Status */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 8,
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+          <Feather name={isBundle ? 'package' : 'tag'} size={12} color={theme.primary} />
+          <Text
+            style={{
+              fontFamily: typography.family.sansBold,
+              fontSize: 11,
+              letterSpacing: 0.6,
+              textTransform: 'uppercase',
+              color: theme.mute,
+            }}
+          >
+            {isBundle ? `Bundle (${bundleCount})` : 'Your Offer'}
           </Text>
         </View>
-      )}
+        <OfferStatusPill status={status} isPaid={isPaid} />
+      </View>
 
+      {/* Main Price Row */}
       <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
         <Text
           style={{
             fontFamily: typography.family.sansBold,
-            fontSize: 15,
-            fontWeight: '700',
+            fontSize: 20,
+            letterSpacing: -0.3,
             color: theme.ink,
           }}
         >
@@ -233,7 +379,7 @@ function OutgoingOfferBubble({
           <Text
             style={{
               fontFamily: typography.family.sans,
-              fontSize: 13,
+              fontSize: 13.5,
               color: theme.muteSoft,
               textDecorationLine: 'line-through',
             }}
@@ -241,57 +387,55 @@ function OutgoingOfferBubble({
             {formatPrice(listingPrice)}
           </Text>
         )}
-        {status === 'declined' && (
-          <Text
+        {discountPercent > 0 && (
+          <View
             style={{
-              fontFamily: typography.family.sansMedium,
-              fontSize: 13,
-              color: '#EF4444',
-              marginLeft: 2,
+              paddingHorizontal: 6,
+              paddingVertical: 1,
+              borderRadius: radii.pill,
+              backgroundColor: theme.primarySoft,
             }}
           >
-            Declined
-          </Text>
-        )}
-        {status === 'accepted' && (
-          <Text
-            style={{
-              fontFamily: typography.family.sansBold,
-              fontSize: 13,
-              color: '#10B981',
-              marginLeft: 2,
-            }}
-          >
-            Accepted
-          </Text>
-        )}
-        {status === 'expired' && (
-          <Text
-            style={{
-              fontFamily: typography.family.sans,
-              fontSize: 13,
-              color: theme.muteSoft,
-              marginLeft: 2,
-            }}
-          >
-            Expired
-          </Text>
+            <Text
+              style={{
+                fontFamily: typography.family.sansBold,
+                fontSize: 10.5,
+                color: theme.primary,
+              }}
+            >
+              -{discountPercent}%
+            </Text>
+          </View>
         )}
       </View>
 
+      {/* Note Callout if provided */}
       {msg.metadata?.note ? (
-        <Text
+        <View
           style={{
-            fontFamily: typography.family.sans,
-            fontSize: 12.5,
-            color: theme.mute,
-            marginTop: 4,
+            marginTop: 8,
+            paddingHorizontal: 10,
+            paddingVertical: 6,
+            borderRadius: radii.lg,
+            backgroundColor: theme.surface,
+            borderLeftWidth: 2,
+            borderLeftColor: theme.primary,
           }}
         >
-          {`"${msg.metadata.note}"`}
-        </Text>
+          <Text
+            style={{
+              fontFamily: typography.family.sans,
+              fontSize: 12,
+              lineHeight: 16,
+              color: theme.ink,
+            }}
+          >
+            {msg.metadata.note}
+          </Text>
+        </View>
       ) : null}
 
+      {/* Pay Now Button (if Accepted) */}
       {canPay && (
         <PressableScale
           onPress={() => {
@@ -302,41 +446,45 @@ function OutgoingOfferBubble({
           }}
           accessibilityLabel={`Pay ${formatPrice(amount)}`}
           style={{
-            marginTop: 8,
-            height: 38,
-            borderRadius: 6,
-            backgroundColor: TEAL_BRAND,
+            marginTop: 10,
+            height: 40,
+            borderRadius: radii.pill,
+            backgroundColor: theme.primary,
+            flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'center',
-            paddingHorizontal: 12,
+            gap: 6,
+            paddingHorizontal: 14,
             alignSelf: 'stretch',
+            ...shadow.sm,
           }}
         >
+          <Feather name="credit-card" size={14} color="#FFFFFF" />
           <Text
             style={{
               fontFamily: typography.family.sansBold,
-              fontSize: 13,
-              fontWeight: '700',
+              fontSize: 13.5,
               color: '#FFFFFF',
-              textAlign: 'center',
+              letterSpacing: 0.1,
             }}
           >
-            Buy now · Pay {formatPrice(amount)}
+            Buy now · {formatPrice(amount)}
           </Text>
         </PressableScale>
       )}
 
+      {/* Paid Guarantee note */}
       {isPaid && (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
-          <Feather name="check" size={13} color="#10B981" />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8 }}>
+          <Feather name="check-circle" size={12} color="#10B981" />
           <Text
             style={{
-              fontFamily: typography.family.sansBold,
-              fontSize: 12,
+              fontFamily: typography.family.sansMedium,
+              fontSize: 11.5,
               color: '#10B981',
             }}
           >
-            Paid
+            Paid · Buyer Protection active 🛡️
           </Text>
         </View>
       )}
@@ -379,8 +527,8 @@ function IncomingOfferCard({
   const isBundle = Boolean(msg.metadata?.is_bundle);
   const bundleCount = msg.metadata?.bundle_count ?? (msg.metadata?.bundle_item_ids ? msg.metadata.bundle_item_ids.length + 1 : 1);
   const showStruck = !isBundle && !!listingPrice && listingPrice > amount;
+  const discountPercent = showStruck && listingPrice ? Math.round(((listingPrice - amount) / listingPrice) * 100) : 0;
   const isDeclined = status === 'declined';
-  const isAccepted = status === 'accepted';
   const isExpired = status === 'expired';
   const canMakeCounter = (isDeclined || isExpired) && !listingSold && !!onCounterOffer;
 
@@ -389,60 +537,57 @@ function IncomingOfferCard({
       style={{
         minWidth: 240,
         maxWidth: 320,
-        backgroundColor: theme.white,
+        backgroundColor: theme.surface,
         borderWidth: 1,
         borderColor: theme.border,
-        borderRadius: 12,
+        borderRadius: 18,
         padding: 14,
         ...shadow.sm,
       }}
     >
-      {isBundle && (
-        <View
-          style={{
-            alignSelf: 'flex-start',
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 4,
-            paddingHorizontal: 7,
-            paddingVertical: 2,
-            borderRadius: 6,
-            backgroundColor: '#5356EE',
-            marginBottom: 6,
-          }}
-        >
-          <Feather name="package" size={11} color="#FFFFFF" />
-          <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#FFFFFF' }}>
-            Bundle Offer · {bundleCount} items
-          </Text>
-        </View>
-      )}
-
-      <Text
+      {/* Top Header: Sender & Status */}
+      <View
         style={{
-          fontFamily: typography.family.sans,
-          fontSize: 13.5,
-          color: theme.mute,
-          marginBottom: 4,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 6,
         }}
       >
-        {isBundle ? `${senderName} made a bundle offer:` : `${senderName} made you a new offer:`}
-      </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1, minWidth: 0 }}>
+          <Feather name={isBundle ? 'package' : 'tag'} size={12} color={theme.primary} />
+          <Text
+            numberOfLines={1}
+            style={{
+              fontFamily: typography.family.sansBold,
+              fontSize: 11,
+              letterSpacing: 0.6,
+              textTransform: 'uppercase',
+              color: theme.mute,
+            }}
+          >
+            {isBundle ? `Bundle Offer · ${bundleCount} items` : `${senderName}'s Offer`}
+          </Text>
+        </View>
+        <OfferStatusPill status={status} isPaid={isPaid} />
+      </View>
 
+      {/* Main Price Row */}
       <View
         style={{
           flexDirection: 'row',
           alignItems: 'baseline',
           gap: 6,
           flexWrap: 'wrap',
+          marginTop: 2,
           marginBottom: canRespond || canPay || canMakeCounter || awaitingPayment || isPaid ? 10 : 0,
         }}
       >
         <Text
           style={{
             fontFamily: typography.family.sansBold,
-            fontSize: 16,
-            fontWeight: '700',
+            fontSize: 20,
+            letterSpacing: -0.3,
             color: theme.ink,
           }}
         >
@@ -460,60 +605,57 @@ function IncomingOfferCard({
             {formatPrice(listingPrice)}
           </Text>
         )}
-        {isDeclined && (
-          <Text
+        {discountPercent > 0 && (
+          <View
             style={{
-              fontFamily: typography.family.sansMedium,
-              fontSize: 13.5,
-              color: '#EF4444',
-              marginLeft: 2,
+              paddingHorizontal: 6,
+              paddingVertical: 1,
+              borderRadius: radii.pill,
+              backgroundColor: theme.primarySoft,
             }}
           >
-            Declined
-          </Text>
-        )}
-        {isAccepted && (
-          <Text
-            style={{
-              fontFamily: typography.family.sansBold,
-              fontSize: 13.5,
-              color: '#10B981',
-              marginLeft: 2,
-            }}
-          >
-            Accepted
-          </Text>
-        )}
-        {isExpired && (
-          <Text
-            style={{
-              fontFamily: typography.family.sans,
-              fontSize: 13.5,
-              color: theme.muteSoft,
-              marginLeft: 2,
-            }}
-          >
-            Expired
-          </Text>
+            <Text
+              style={{
+                fontFamily: typography.family.sansBold,
+                fontSize: 10.5,
+                color: theme.primary,
+              }}
+            >
+              -{discountPercent}%
+            </Text>
+          </View>
         )}
       </View>
 
+      {/* Note Callout */}
       {msg.metadata?.note ? (
-        <Text
+        <View
           style={{
-            fontFamily: typography.family.sans,
-            fontSize: 12.5,
-            color: theme.mute,
-            marginBottom: 8,
+            marginBottom: 10,
+            paddingHorizontal: 10,
+            paddingVertical: 6,
+            borderRadius: radii.lg,
+            backgroundColor: theme.panel,
+            borderLeftWidth: 2,
+            borderLeftColor: theme.primary,
           }}
         >
-          {`"${msg.metadata.note}"`}
-        </Text>
+          <Text
+            style={{
+              fontFamily: typography.family.sans,
+              fontSize: 12,
+              lineHeight: 16,
+              color: theme.ink,
+            }}
+          >
+            {msg.metadata.note}
+          </Text>
+        </View>
       ) : null}
 
-      {/* Seller Action Buttons for Pending Offer */}
+      {/* Seller Action Buttons for Pending Offer (Minimal AI Pill layout) */}
       {canRespond && (
-        <View style={{ gap: 8, marginTop: 4 }}>
+        <View style={{ gap: 8, marginTop: 2 }}>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <PressableScale
               onPress={() => {
@@ -526,10 +668,10 @@ function IncomingOfferCard({
               style={{
                 flex: 1,
                 height: 38,
-                borderRadius: 6,
+                borderRadius: radii.pill,
                 borderWidth: 1,
                 borderColor: theme.border,
-                backgroundColor: theme.surface,
+                backgroundColor: theme.panel,
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
@@ -538,7 +680,6 @@ function IncomingOfferCard({
                 style={{
                   fontFamily: typography.family.sansBold,
                   fontSize: 13,
-                  fontWeight: '700',
                   color: theme.ink,
                   textAlign: 'center',
                 }}
@@ -546,6 +687,7 @@ function IncomingOfferCard({
                 Decline
               </Text>
             </PressableScale>
+
             <PressableScale
               onPress={() => {
                 if (Platform.OS !== 'web') {
@@ -557,18 +699,18 @@ function IncomingOfferCard({
               style={{
                 flex: 1,
                 height: 38,
-                borderRadius: 6,
-                backgroundColor: TEAL_BRAND,
+                borderRadius: radii.pill,
+                backgroundColor: theme.ink,
                 alignItems: 'center',
                 justifyContent: 'center',
+                ...shadow.sm,
               }}
             >
               <Text
                 style={{
                   fontFamily: typography.family.sansBold,
                   fontSize: 13,
-                  fontWeight: '700',
-                  color: '#FFFFFF',
+                  color: theme.panel,
                   textAlign: 'center',
                 }}
               >
@@ -587,33 +729,35 @@ function IncomingOfferCard({
               }}
               accessibilityLabel="Offer your price"
               style={{
-                height: 38,
-                borderRadius: 6,
+                height: 36,
+                borderRadius: radii.pill,
                 borderWidth: 1,
-                borderColor: TEAL_BRAND,
+                borderColor: theme.hairline,
                 backgroundColor: 'transparent',
+                flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'center',
+                gap: 5,
                 alignSelf: 'stretch',
               }}
             >
+              <Feather name="refresh-cw" size={11} color={theme.primary} />
               <Text
                 style={{
                   fontFamily: typography.family.sansBold,
-                  fontSize: 13,
-                  fontWeight: '700',
-                  color: TEAL_BRAND,
+                  fontSize: 12.5,
+                  color: theme.primary,
                   textAlign: 'center',
                 }}
               >
-                Offer your price
+                Counter with new price
               </Text>
             </PressableScale>
           )}
         </View>
       )}
 
-      {/* Offer your price button when declined or counterable */}
+      {/* Counter offer button when declined or expired */}
       {canMakeCounter && (
         <PressableScale
           onPress={() => {
@@ -622,27 +766,31 @@ function IncomingOfferCard({
             }
             onCounterOffer?.();
           }}
-          accessibilityLabel="Offer your price"
+          accessibilityLabel="Make a new offer"
           style={{
-            height: 40,
-            borderRadius: 6,
-            backgroundColor: TEAL_BRAND,
+            height: 38,
+            borderRadius: radii.pill,
+            borderWidth: 1,
+            borderColor: theme.primary,
+            backgroundColor: theme.primarySoft,
+            flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'center',
+            gap: 6,
             marginTop: 4,
             alignSelf: 'stretch',
           }}
         >
+          <Feather name="refresh-cw" size={12} color={theme.primary} />
           <Text
             style={{
               fontFamily: typography.family.sansBold,
-              fontSize: 13.5,
-              fontWeight: '700',
-              color: '#FFFFFF',
+              fontSize: 13,
+              color: theme.primary,
               textAlign: 'center',
             }}
           >
-            Offer your price
+            Make a new offer
           </Text>
         </PressableScale>
       )}
@@ -659,19 +807,22 @@ function IncomingOfferCard({
           accessibilityLabel={`Buy now for ${formatPrice(amount)}`}
           style={{
             height: 42,
-            borderRadius: 6,
-            backgroundColor: TEAL_BRAND,
+            borderRadius: radii.pill,
+            backgroundColor: theme.primary,
+            flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'center',
+            gap: 6,
             marginTop: 4,
             alignSelf: 'stretch',
+            ...shadow.sm,
           }}
         >
+          <Feather name="credit-card" size={14} color="#FFFFFF" />
           <Text
             style={{
               fontFamily: typography.family.sansBold,
               fontSize: 13.5,
-              fontWeight: '700',
               color: '#FFFFFF',
               textAlign: 'center',
             }}
@@ -683,30 +834,34 @@ function IncomingOfferCard({
 
       {/* Awaiting buyer checkout notice */}
       {awaitingPayment && (
-        <Text
-          style={{
-            fontFamily: typography.family.sansMedium,
-            fontSize: 12,
-            color: theme.muteSoft,
-            marginTop: 4,
-          }}
-        >
-          Waiting for buyer to complete checkout
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
+          <Feather name="clock" size={12} color={theme.muteSoft} />
+          <Text
+            style={{
+              fontFamily: typography.family.sansMedium,
+              fontSize: 12,
+              color: theme.muteSoft,
+            }}
+          >
+            Waiting for buyer to complete checkout
+          </Text>
+        </View>
       )}
 
       {/* Paid confirmation */}
       {isPaid && (
-        <Text
-          style={{
-            fontFamily: typography.family.sansBold,
-            fontSize: 12,
-            color: TEAL_BRAND,
-            marginTop: 4,
-          }}
-        >
-          Paid · Covered by Buyer Protection 🛡️
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
+          <Feather name="shield" size={12} color="#10B981" />
+          <Text
+            style={{
+              fontFamily: typography.family.sansBold,
+              fontSize: 12,
+              color: '#10B981',
+            }}
+          >
+            Paid · Protected by Buyer Protection 🛡️
+          </Text>
+        </View>
       )}
     </View>
   );

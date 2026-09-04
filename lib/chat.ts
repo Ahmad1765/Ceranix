@@ -86,49 +86,84 @@ export async function getConversation(conversationId: string): Promise<Conversat
 }
 
 // Finds an existing conversation between (buyerId, sellerId, listingId)
-// or creates a new one. Buyer initiates from a listing.
+// or creates a new one. Supports both listing-specific chats and direct profile chats.
 export async function getOrCreateConversation(args: {
   buyerId: string;
   sellerId: string;
-  listingId: string;
+  listingId?: string | null;
 }): Promise<ConversationRow | null> {
-  const { buyerId, sellerId, listingId } = args;
+  const { buyerId, sellerId, listingId = null } = args;
   if (buyerId === sellerId) {
     console.warn('[chat] cannot message yourself');
     return null;
   }
 
+  if (listingId) {
+    const { data: existing } = await supabase
+      .from('conversations')
+      .select(CONVERSATION_SELECT)
+      .eq('listing_id', listingId)
+      .eq('buyer_id', buyerId)
+      .eq('seller_id', sellerId)
+      .maybeSingle();
+    if (existing) return existing as unknown as ConversationRow;
+
+    const { data: created, error } = await supabase
+      .from('conversations')
+      .insert({
+        listing_id: listingId,
+        buyer_id: buyerId,
+        seller_id: sellerId,
+      })
+      .select(CONVERSATION_SELECT)
+      .single();
+    if (error) {
+      // Unique violation means another tab/race created it — refetch.
+      if (error.code === '23505') {
+        const { data: again } = await supabase
+          .from('conversations')
+          .select(CONVERSATION_SELECT)
+          .eq('listing_id', listingId)
+          .eq('buyer_id', buyerId)
+          .eq('seller_id', sellerId)
+          .maybeSingle();
+        return (again as unknown as ConversationRow) ?? null;
+      }
+      console.warn('[chat] getOrCreateConversation', error.message);
+      return null;
+    }
+    return created as unknown as ConversationRow;
+  }
+
+  // Direct user-to-user conversation (no listing)
   const { data: existing } = await supabase
     .from('conversations')
     .select(CONVERSATION_SELECT)
-    .eq('listing_id', listingId)
-    .eq('buyer_id', buyerId)
-    .eq('seller_id', sellerId)
+    .is('listing_id', null)
+    .or(`and(buyer_id.eq.${buyerId},seller_id.eq.${sellerId}),and(buyer_id.eq.${sellerId},seller_id.eq.${buyerId})`)
     .maybeSingle();
   if (existing) return existing as unknown as ConversationRow;
 
   const { data: created, error } = await supabase
     .from('conversations')
     .insert({
-      listing_id: listingId,
+      listing_id: null,
       buyer_id: buyerId,
       seller_id: sellerId,
     })
     .select(CONVERSATION_SELECT)
     .single();
   if (error) {
-    // Unique violation means another tab/race created it — refetch.
     if (error.code === '23505') {
       const { data: again } = await supabase
         .from('conversations')
         .select(CONVERSATION_SELECT)
-        .eq('listing_id', listingId)
-        .eq('buyer_id', buyerId)
-        .eq('seller_id', sellerId)
+        .is('listing_id', null)
+        .or(`and(buyer_id.eq.${buyerId},seller_id.eq.${sellerId}),and(buyer_id.eq.${sellerId},seller_id.eq.${buyerId})`)
         .maybeSingle();
       return (again as unknown as ConversationRow) ?? null;
     }
-    console.warn('[chat] getOrCreateConversation', error.message);
+    console.warn('[chat] getOrCreateConversation direct', error.message);
     return null;
   }
   return created as unknown as ConversationRow;

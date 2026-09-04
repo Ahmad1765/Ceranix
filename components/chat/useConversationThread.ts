@@ -36,6 +36,13 @@ import { maybeSoftAskForPush } from '@/lib/notifications';
 import { getOptimizedImageUrl } from '@/lib/images';
 import { reportListing } from '@/lib/reports';
 import {
+  isSupportConversation,
+  generateSupportResponse,
+  SUPPORT_BOT_USER_ID,
+  SUPPORT_BOT_NAME,
+  SUPPORT_BOT_AVATAR,
+} from '@/lib/support';
+import {
   fetchMessages,
   fetchReactions,
   getConversation,
@@ -156,6 +163,7 @@ export function useConversationThread(conversationId: string, user: AuthUser | n
   }, []);
 
   // ── Derived Participant & Listing State ──────────────────────────────────
+  const isSupport = useMemo(() => isSupportConversation(conv), [conv]);
   const other = useMemo(() => (user && conv ? otherParticipant(conv, user.id) : null), [user, conv]);
   const isSeller = !!user && !!conv && conv.seller_id === user.id;
   const rows = useMemo(() => buildThreadRows(messages), [messages]);
@@ -166,8 +174,12 @@ export function useConversationThread(conversationId: string, user: AuthUser | n
   const status = conv?.listing ? listingStatus(conv.listing) : null;
   const canOffer = !isSeller && !!conv?.listing_id && status === 'active';
 
-  const senderName = other?.full_name || other?.username || 'User';
-  const otherAvatar = other?.avatar_url
+  const senderName = isSupport
+    ? SUPPORT_BOT_NAME
+    : other?.full_name || other?.username || 'User';
+  const otherAvatar = isSupport
+    ? SUPPORT_BOT_AVATAR
+    : other?.avatar_url
     ? getOptimizedImageUrl(other.avatar_url, { width: 120 })
     : null;
   const listingThumb = conv?.listing?.images?.[0]
@@ -234,6 +246,25 @@ export function useConversationThread(conversationId: string, user: AuthUser | n
           if (prev.some((m) => m.id === delivered.id)) return prev.filter((m) => m.id !== tempId);
           return prev.map((m) => (m.id === tempId ? delivered : m));
         });
+
+        // Trigger intelligent support concierge automated response if talking to Support
+        if (isSupport) {
+          setTimeout(async () => {
+            try {
+              const replyText = generateSupportResponse(text);
+              const botMsg = await sendMessage({
+                conversationId,
+                senderId: SUPPORT_BOT_USER_ID,
+                content: replyText,
+              });
+              if (botMsg) {
+                setMessages((prev) => (prev.some((m) => m.id === botMsg.id) ? prev : [...prev, botMsg]));
+              }
+            } catch (err) {
+              console.warn('[support] bot reply failed', err);
+            }
+          }, 650);
+        }
         return;
       }
 
@@ -242,7 +273,7 @@ export function useConversationThread(conversationId: string, user: AuthUser | n
         prev.map((m) => (m.id === tempId ? { ...m, pending: false, failed: true } : m)),
       );
     },
-    [conversationId, user],
+    [conversationId, isSupport, user],
   );
 
   const handleSend = useCallback(() => {

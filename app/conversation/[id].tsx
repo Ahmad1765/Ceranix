@@ -183,7 +183,7 @@ export default function ConversationScreen() {
         icon: 'shield' as const,
         onPress: explainCoverage,
       },
-      ...(thread.convListingId
+      ...(thread.convListingId || thread.other?.id
         ? [
             {
               id: 'report',
@@ -307,8 +307,8 @@ export default function ConversationScreen() {
     >
       {/* Floating Header — absolutely positioned like the product page */}
       <LinearGradient
-        colors={['rgba(255,255,255,1)', 'rgba(255,255,255,0.85)', 'rgba(255,255,255,0)']}
-        locations={[0, 0.6, 1]}
+        colors={[theme.background, theme.background, 'transparent']}
+        locations={[0, 0.65, 1]}
         style={{
           position: 'absolute',
           top: 0,

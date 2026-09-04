@@ -373,7 +373,7 @@ export function useDiscoverSearch({
   }, []);
 
   const sortOnly = !hasQuery && !browseCat && !!sort;
-  const idle = !hasQuery && !browseCat && !sortOnly;
+  const idle = !hasQuery && !browseCat && !sortOnly && activeFilterCount === 0;
 
   // In-place theme sorting for the idle grid
   const gridResults = useMemo(() => {

@@ -18,38 +18,45 @@ import Feather from '@expo/vector-icons/Feather';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/lib/auth';
-import { useListingQuery } from '@/lib/queries';
+import { useListingQuery, useProfileQuery } from '@/lib/queries';
 import { getOrCreateConversation, sendMessage, sendOffer } from '@/lib/chat';
-import { getOptimizedImageUrl } from '@/lib/images';
+import { getOrCreateSupportConversation, SUPPORT_BOT_USER_ID, SUPPORT_BOT_NAME, SUPPORT_BOT_AVATAR } from '@/lib/support';
+import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 import { formatPrice } from '@/lib/currency';
 import { orderTotal } from '@/lib/fees';
 import { useToast } from '@/lib/toast';
 import { captureError } from '@/lib/sentry';
-import { colors, radii, type } from '@/lib/theme';
+import { radii, shadow, type } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
-import { BRAND } from '@/lib/brand';
+import { PressableScale } from '@/components/PressableScale';
 
 type Mode = 'message' | 'offer';
 
-const TEAL_BRAND = '#007782';
-
-const QUICK_REPLIES = [
+const QUICK_REPLIES_LISTING = [
   'Hi! Is this still available?',
-  'Could you send more photos?',
+  'Could you share more details or photos?',
   'Would you bundle this with another item?',
   'Is the price negotiable?',
 ];
 
+const QUICK_REPLIES_PROFILE = [
+  'Hi! Love your closet.',
+  'Hi! Do you do discounts on bundles?',
+  'Hi! Are you open to offers?',
+  'Hi! When do you usually dispatch orders?',
+];
+
 function Eyebrow({ children }: { children: React.ReactNode }) {
+  const { theme } = useTheme();
   return (
     <Text
       style={{
         fontSize: 11,
         fontFamily: type.family.sansBold,
-        letterSpacing: 1.2,
+        letterSpacing: 1.0,
         textTransform: 'uppercase',
-        marginBottom: 10,
-        color: colors.mute,
+        marginBottom: 8,
+        color: theme.muteSoft,
       }}
     >
       {children}
@@ -58,15 +65,21 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
 }
 
 export default function NewConversationScreen() {
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
   const params = useLocalSearchParams<{
     listing?: string;
+    user?: string;
+    support?: string;
     mode?: string;
     amount?: string;
     bundle_ids?: string;
   }>();
+
   const listingId = typeof params.listing === 'string' ? params.listing : '';
-  const initialMode: Mode = params.mode === 'offer' ? 'offer' : 'message';
+  const targetUserId = typeof params.user === 'string' ? params.user : '';
+  const isSupport = params.support === 'true' || targetUserId === SUPPORT_BOT_USER_ID;
+
+  const initialMode: Mode = params.mode === 'offer' && !!listingId ? 'offer' : 'message';
   const initialAmountRaw = typeof params.amount === 'string' ? params.amount : '';
   const initialAmount = initialAmountRaw ? String(parseFloat(initialAmountRaw) || '') : '';
   const bundleIdsParam = typeof params.bundle_ids === 'string' ? params.bundle_ids : '';
@@ -85,10 +98,13 @@ export default function NewConversationScreen() {
 
   const listingQ = useListingQuery(listingId || null);
   const listing = listingQ.data ?? null;
+
+  const targetProfileQ = useProfileQuery(!listingId && targetUserId ? targetUserId : '');
+  const targetProfile = targetProfileQ.data ?? null;
+
   const [mode, setMode] = useState<Mode>(initialMode);
   const [message, setMessage] = useState('');
   const [amount, setAmount] = useState(initialAmount);
-  const [note, setNote] = useState('');
   const [sending, setSending] = useState(false);
   const [selectedCard, setSelectedCard] = useState<'tier10' | 'tier20' | 'custom'>('custom');
 
@@ -119,7 +135,7 @@ export default function NewConversationScreen() {
       setAmount(String(preset20 || Math.round(baseReferencePrice * 0.8)));
       setSelectedCard('custom');
     }
-  }, [baseReferencePrice, preset20]);
+  }, [baseReferencePrice, preset20, amount]);
 
   const handleSelectCard = (card: 'tier10' | 'tier20' | 'custom') => {
     if (Platform.OS !== 'web') {
@@ -144,11 +160,6 @@ export default function NewConversationScreen() {
     setAmount(clean);
   };
 
-  const loadError = listingQ.error;
-  useEffect(() => {
-    if (loadError) captureError(loadError, { fn: 'conversationNew.fetchListing' });
-  }, [loadError]);
-
   const amountNum = parseFloat(amount) || 0;
   const offerValid =
     mode === 'offer' &&
@@ -156,7 +167,6 @@ export default function NewConversationScreen() {
     amountNum > 0 &&
     (!listing || amountNum < listing.price || isBundle);
   const msgValid = mode === 'message' && message.trim().length > 0;
-  const canSend = (offerValid || msgValid) && !sending;
 
   const totalWithProtection = useMemo(() => {
     if (amountNum <= 0) return 0;
@@ -168,6 +178,65 @@ export default function NewConversationScreen() {
       Alert.alert('Sign in required', 'Please sign in to send messages or offers.');
       return;
     }
+
+    if (isSupport) {
+      setSending(true);
+      try {
+        const conv = await getOrCreateSupportConversation(user.id);
+        if (!conv) {
+          Alert.alert('Could not connect to support', 'Please try again.');
+          return;
+        }
+        await sendMessage({
+          conversationId: conv.id,
+          senderId: user.id,
+          content: message.trim(),
+        });
+        toast.show('Message sent to Support', { variant: 'success', icon: 'check' });
+        router.replace(`/conversation/${conv.id}` as any);
+      } catch (err) {
+        captureError(err, { fn: 'conversationNew.sendSupport' });
+        Alert.alert('Error', 'Could not send message. Please try again.');
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
+
+    // Direct user messaging without listing
+    if (!listingId && targetUserId) {
+      if (targetUserId === user.id) {
+        Alert.alert('Heads up', "You can't message yourself.");
+        return;
+      }
+      setSending(true);
+      try {
+        const conv = await getOrCreateConversation({
+          buyerId: user.id,
+          sellerId: targetUserId,
+          listingId: null,
+        });
+        if (!conv) {
+          Alert.alert('Could not start chat', 'Please try again.');
+          return;
+        }
+        await sendMessage({
+          conversationId: conv.id,
+          senderId: user.id,
+          content: message.trim(),
+        });
+        toast.show('Message sent', { variant: 'success', icon: 'check' });
+        router.replace(`/conversation/${conv.id}` as any);
+      } catch (err) {
+        captureError(err, { fn: 'conversationNew.sendDirect' });
+        Alert.alert('Error', 'Could not start conversation. Please try again.');
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
+
+    // Listing-based messaging or offer
     if (!listing) return;
     if (listing.seller_id === user.id) {
       Alert.alert('Heads up', "You can't message yourself.");
@@ -192,7 +261,7 @@ export default function NewConversationScreen() {
           conversationId: conv.id,
           senderId: user.id,
           amount: amountNum,
-          note: note.trim() || undefined,
+          note: undefined,
           isBundle: isBundle,
           bundleItemIds: isBundle ? bundleItemIds : undefined,
           bundleCount: isBundle ? bundleCount : undefined,
@@ -202,7 +271,7 @@ export default function NewConversationScreen() {
         const saved = await sendMessage({
           conversationId: conv.id,
           senderId: user.id,
-          content: message,
+          content: message.trim(),
         });
         ok = !!saved;
       }
@@ -232,23 +301,25 @@ export default function NewConversationScreen() {
     );
   };
 
-  if (!listing && listingId && listingQ.isPending) {
+  // Loading state
+  if ((listingId && listingQ.isPending) || (targetUserId && targetProfileQ.isPending && !isSupport)) {
     return (
       <SafeAreaView
         edges={['top']}
-        style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}
+        style={{ flex: 1, backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center' }}
       >
-        <ActivityIndicator color={TEAL_BRAND} />
+        <ActivityIndicator color={theme.primary} />
       </SafeAreaView>
     );
   }
 
-  if (!listing) {
+  // Unavailable state if no listing and no target user
+  if (!listing && !targetUserId && !isSupport) {
     return (
-      <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.background }}>
+      <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.background }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12 }}>
           <Pressable onPress={() => safeBack()} hitSlop={12}>
-            <Feather name="x" size={24} color={colors.ink} />
+            <Feather name="x" size={24} color={theme.ink} />
           </Pressable>
         </View>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
@@ -256,34 +327,42 @@ export default function NewConversationScreen() {
             style={{
               width: 56,
               height: 56,
-              borderRadius: 999,
-              backgroundColor: colors.panel,
+              borderRadius: 28,
+              backgroundColor: theme.panel,
               alignItems: 'center',
               justifyContent: 'center',
               marginBottom: 16,
             }}
           >
-            <Feather name="alert-circle" size={24} color={colors.mute} />
+            <Feather name="alert-circle" size={24} color={theme.mute} />
           </View>
-          <Text style={{ fontSize: 18, fontFamily: type.family.sansBold, color: colors.ink }}>
-            Listing unavailable
+          <Text style={{ fontSize: 18, fontFamily: type.family.sansBold, color: theme.ink }}>
+            Conversation unavailable
           </Text>
           <Text
-            style={{ fontSize: 14, marginTop: 6, textAlign: 'center', lineHeight: 20, color: colors.mute }}
+            style={{ fontSize: 14, marginTop: 6, textAlign: 'center', lineHeight: 20, color: theme.mute }}
           >
-            This item may have been removed or is no longer for sale.
+            The selected item or profile is no longer accessible.
           </Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  const thumb = listing.images?.[0] ? getOptimizedImageUrl(listing.images[0], { width: 240 }) : null;
+  const thumb = listing?.images?.[0] ? getOptimizedImageUrl(listing.images[0], { width: 240 }) : null;
+  const targetName = isSupport
+    ? SUPPORT_BOT_NAME
+    : targetProfile?.full_name || targetProfile?.username || (listing?.seller ? (listing.seller as any).username : 'User');
+  const targetAvatar = isSupport
+    ? SUPPORT_BOT_AVATAR
+    : targetProfile?.avatar_url
+    ? getOptimizedImageUrl(targetProfile.avatar_url, { width: 120 })
+    : null;
 
   return (
     <SafeAreaView
       edges={['top']}
-      style={{ flex: 1, backgroundColor: isDark ? theme.background : '#FFFFFF', overflow: 'hidden' }}
+      style={{ flex: 1, backgroundColor: theme.background, overflow: 'hidden' }}
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -293,7 +372,7 @@ export default function NewConversationScreen() {
         <View
           style={[
             styles.headerBar,
-            { borderBottomColor: isDark ? theme.hairline : '#E5E7EB' },
+            { borderBottomColor: theme.hairline },
           ]}
         >
           <Pressable
@@ -303,25 +382,26 @@ export default function NewConversationScreen() {
             accessibilityRole="button"
             accessibilityLabel="Close"
           >
-            <Text style={[styles.closeText, { color: isDark ? theme.ink : '#15191A' }]}>Close</Text>
+            <Text style={[styles.closeText, { color: theme.muteSoft }]}>Cancel</Text>
           </Pressable>
 
           <Text
+            numberOfLines={1}
             style={[
               styles.headerTitle,
-              { color: isDark ? theme.ink : '#15191A', fontFamily: type.family.sansBold },
+              { color: theme.ink, fontFamily: type.family.sansBold },
             ]}
           >
-            {mode === 'offer' ? 'Make an offer' : 'Send a message'}
+            {mode === 'offer' ? 'Make an offer' : `Message ${targetName}`}
           </Text>
 
-          {mode === 'message' ? (
+          {listing && mode === 'message' ? (
             <Pressable
               onPress={() => setMode('offer')}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               style={styles.modeSwitchBtn}
             >
-              <Text style={[styles.modeSwitchText, { color: TEAL_BRAND, fontFamily: type.family.sansMedium }]}>
+              <Text style={[styles.modeSwitchText, { color: theme.primary, fontFamily: type.family.sansBold }]}>
                 Offer
               </Text>
             </Pressable>
@@ -340,54 +420,126 @@ export default function NewConversationScreen() {
             paddingBottom: Math.max(insets.bottom, 24) + 80,
           }}
         >
-          {/* Item Card Row */}
-          <View style={styles.itemRow}>
-            {thumb ? (
-              <Image
-                source={{ uri: thumb }}
-                style={styles.itemImage}
-                contentFit="cover"
-                transition={150}
-              />
-            ) : (
-              <View style={[styles.itemImagePlaceholder, { backgroundColor: isDark ? theme.panel : '#F3F4F6' }]}>
-                <Feather name="tag" size={22} color={theme.mute} />
-              </View>
-            )}
+          {/* Listing Context Card (if from a listing) */}
+          {listing && (
+            <View style={[styles.itemRow, { backgroundColor: theme.panel, borderColor: theme.hairline }]}>
+              {thumb ? (
+                <Image
+                  source={{ uri: thumb }}
+                  style={styles.itemImage}
+                  contentFit="cover"
+                  transition={IMAGE_TRANSITION}
+                />
+              ) : (
+                <View style={[styles.itemImagePlaceholder, { backgroundColor: theme.surface }]}>
+                  <Feather name="tag" size={20} color={theme.mute} />
+                </View>
+              )}
 
-            <View style={styles.itemDetails}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text
-                  numberOfLines={1}
-                  style={[
-                    styles.itemTitle,
-                    { flex: 1, color: isDark ? theme.ink : '#15191A', fontFamily: type.family.sansBold },
-                  ]}
-                >
-                  {listing.title}
-                </Text>
-                {isBundle && (
-                  <View
-                    style={{
-                      paddingHorizontal: 8,
-                      paddingVertical: 2,
-                      borderRadius: 6,
-                      backgroundColor: '#5356EE',
-                    }}
+              <View style={styles.itemDetails}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.itemTitle,
+                      { flex: 1, color: theme.ink, fontFamily: type.family.sansBold },
+                    ]}
                   >
-                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#FFFFFF' }}>
-                      Bundle · {bundleCount} items
-                    </Text>
-                  </View>
+                    {listing.title}
+                  </Text>
+                  {isBundle && (
+                    <View
+                      style={{
+                        paddingHorizontal: 8,
+                        paddingVertical: 2,
+                        borderRadius: radii.pill,
+                        backgroundColor: theme.primary,
+                      }}
+                    >
+                      <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#FFFFFF' }}>
+                        Bundle · {bundleCount} items
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={[styles.itemPrice, { color: theme.mute }]}>
+                  {isBundle ? `Base total: ${formatPrice(baseReferencePrice)}` : `Item price: ${formatPrice(listing.price)}`}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Profile Context Card (if direct messaging a user or support) */}
+          {!listing && (
+            <View
+              style={[
+                styles.itemRow,
+                { backgroundColor: theme.panel, borderColor: theme.hairline },
+              ]}
+            >
+              <View
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 24,
+                  backgroundColor: theme.surface,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                  overflow: 'hidden',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {targetAvatar ? (
+                  <Image
+                    source={{ uri: targetAvatar }}
+                    style={{ width: '100%', height: '100%' }}
+                    contentFit="cover"
+                  />
+                ) : (
+                  <Feather name="user" size={22} color={theme.primary} />
                 )}
               </View>
-              <Text style={[styles.itemPrice, { color: isDark ? theme.mute : '#5A6566' }]}>
-                {isBundle ? `Base item price: ${formatPrice(listing.price)}` : `Item price: ${formatPrice(listing.price)}`}
-              </Text>
-            </View>
-          </View>
 
-          {mode === 'offer' ? (
+              <View style={styles.itemDetails}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.itemTitle,
+                      { color: theme.ink, fontFamily: type.family.sansBold },
+                    ]}
+                  >
+                    {targetName}
+                  </Text>
+                  {isSupport && (
+                    <View
+                      style={{
+                        paddingHorizontal: 7,
+                        paddingVertical: 1.5,
+                        borderRadius: radii.pill,
+                        backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                      }}
+                    >
+                      <Text style={{ fontSize: 10, fontFamily: type.family.sansBold, color: '#10B981' }}>
+                        OFFICIAL SUPPORT
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={[styles.itemPrice, { color: theme.muteSoft }]}>
+                  {isSupport
+                    ? '24/7 Live Customer Concierge'
+                    : targetProfile?.username
+                    ? `@${targetProfile.username} · Active Seller`
+                    : 'Direct Conversation'}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Offer Mode (for Listings) */}
+          {mode === 'offer' && listing ? (
             <>
               {/* 3 Preset Tier Cards */}
               <View style={styles.cardsRow}>
@@ -397,9 +549,9 @@ export default function NewConversationScreen() {
                   style={[
                     styles.presetCard,
                     {
-                      backgroundColor: isDark ? theme.panel : '#FFFFFF',
-                      borderColor: selectedCard === 'tier10' ? TEAL_BRAND : isDark ? theme.border : '#E5E7EB',
-                      borderWidth: selectedCard === 'tier10' ? 2 : 1,
+                      backgroundColor: selectedCard === 'tier10' ? theme.primarySoft : theme.panel,
+                      borderColor: selectedCard === 'tier10' ? theme.primary : theme.border,
+                      borderWidth: selectedCard === 'tier10' ? 1.5 : 1,
                     },
                   ]}
                   accessibilityRole="button"
@@ -408,12 +560,12 @@ export default function NewConversationScreen() {
                   <Text
                     style={[
                       styles.cardTopText,
-                      { color: isDark ? theme.ink : '#15191A', fontFamily: type.family.sansBold },
+                      { color: selectedCard === 'tier10' ? theme.primary : theme.ink, fontFamily: type.family.sansBold },
                     ]}
                   >
                     {formatPrice(preset10)}
                   </Text>
-                  <Text style={[styles.cardBottomText, { color: TEAL_BRAND, fontFamily: type.family.sansMedium }]}>
+                  <Text style={[styles.cardBottomText, { color: selectedCard === 'tier10' ? theme.primary : theme.muteSoft, fontFamily: type.family.sansMedium }]}>
                     10% off
                   </Text>
                 </Pressable>
@@ -424,9 +576,9 @@ export default function NewConversationScreen() {
                   style={[
                     styles.presetCard,
                     {
-                      backgroundColor: isDark ? theme.panel : '#FFFFFF',
-                      borderColor: selectedCard === 'tier20' ? TEAL_BRAND : isDark ? theme.border : '#E5E7EB',
-                      borderWidth: selectedCard === 'tier20' ? 2 : 1,
+                      backgroundColor: selectedCard === 'tier20' ? theme.primarySoft : theme.panel,
+                      borderColor: selectedCard === 'tier20' ? theme.primary : theme.border,
+                      borderWidth: selectedCard === 'tier20' ? 1.5 : 1,
                     },
                   ]}
                   accessibilityRole="button"
@@ -435,12 +587,12 @@ export default function NewConversationScreen() {
                   <Text
                     style={[
                       styles.cardTopText,
-                      { color: isDark ? theme.ink : '#15191A', fontFamily: type.family.sansBold },
+                      { color: selectedCard === 'tier20' ? theme.primary : theme.ink, fontFamily: type.family.sansBold },
                     ]}
                   >
                     {formatPrice(preset20)}
                   </Text>
-                  <Text style={[styles.cardBottomText, { color: TEAL_BRAND, fontFamily: type.family.sansMedium }]}>
+                  <Text style={[styles.cardBottomText, { color: selectedCard === 'tier20' ? theme.primary : theme.muteSoft, fontFamily: type.family.sansMedium }]}>
                     20% off
                   </Text>
                 </Pressable>
@@ -451,9 +603,9 @@ export default function NewConversationScreen() {
                   style={[
                     styles.presetCard,
                     {
-                      backgroundColor: isDark ? theme.panel : '#FFFFFF',
-                      borderColor: selectedCard === 'custom' ? TEAL_BRAND : isDark ? theme.border : '#E5E7EB',
-                      borderWidth: selectedCard === 'custom' ? 2 : 1,
+                      backgroundColor: selectedCard === 'custom' ? theme.primarySoft : theme.panel,
+                      borderColor: selectedCard === 'custom' ? theme.primary : theme.border,
+                      borderWidth: selectedCard === 'custom' ? 1.5 : 1,
                     },
                   ]}
                   accessibilityRole="button"
@@ -462,77 +614,70 @@ export default function NewConversationScreen() {
                   <Text
                     style={[
                       styles.cardTopText,
-                      { color: isDark ? theme.ink : '#15191A', fontFamily: type.family.sansBold },
+                      { color: selectedCard === 'custom' ? theme.primary : theme.ink, fontFamily: type.family.sansBold },
                     ]}
                   >
                     Custom
                   </Text>
-                  <Text style={[styles.cardBottomText, { color: TEAL_BRAND, fontFamily: type.family.sansMedium }]}>
+                  <Text style={[styles.cardBottomText, { color: selectedCard === 'custom' ? theme.primary : theme.muteSoft, fontFamily: type.family.sansMedium }]}>
                     Set a price
                   </Text>
                 </Pressable>
               </View>
 
-              {/* Input Section with underline */}
+              {/* Input Section */}
               <Pressable
                 onPress={() => {
                   setSelectedCard('custom');
                   amountRef.current?.focus?.();
                 }}
-                style={styles.inputSection}
+                style={[
+                  styles.inputSection,
+                  {
+                    backgroundColor: theme.panel,
+                    borderColor: selectedCard === 'custom' ? theme.primary : theme.border,
+                  },
+                ]}
               >
+                <Text style={[styles.inputEyebrow, { color: theme.muteSoft }]}>YOUR OFFER AMOUNT</Text>
                 <View style={styles.displayRow}>
                   <TextInput
                     ref={amountRef}
                     value={amount}
                     onChangeText={handleCustomChange}
                     placeholder="0"
-                    placeholderTextColor={isDark ? theme.mute : '#9CA3AF'}
+                    placeholderTextColor={theme.muteSoft}
                     keyboardType="decimal-pad"
                     returnKeyType="done"
                     style={[
                       styles.amountInput,
                       {
-                        color: isDark ? theme.ink : '#15191A',
+                        color: theme.ink,
                         fontFamily: type.family.sansBold,
                       },
                     ]}
                   />
                 </View>
 
-                {/* Underline */}
-                <View
-                  style={[
-                    styles.underline,
-                    {
-                      backgroundColor:
-                        selectedCard === 'custom'
-                          ? TEAL_BRAND
-                          : isDark
-                          ? '#4B5563'
-                          : '#6B7280',
-                    },
-                  ]}
-                />
-
                 {/* Fee breakdown helper text */}
-                <Text style={[styles.feeHelperText, { color: isDark ? theme.mute : '#5A6566' }]}>
+                <Text style={[styles.feeHelperText, { color: theme.mute }]}>
                   {amountNum > 0
                     ? `${formatPrice(totalWithProtection)} incl. Buyer Protection fee`
-                    : `incl. Buyer Protection fee`}
+                    : `Includes Buyer Protection guarantee`}
                 </Text>
               </Pressable>
 
-              {/* Action Button: "Offer $15.00" */}
+              {/* Action Button */}
               <View style={styles.actionButtonContainer}>
-                <Pressable
+                <PressableScale
                   onPress={handleSend}
                   disabled={!offerValid || sending}
-                  style={({ pressed }) => [
+                  style={[
                     styles.actionButton,
                     {
-                      backgroundColor: TEAL_BRAND,
-                      opacity: !offerValid || sending ? 0.5 : pressed ? 0.88 : 1,
+                      backgroundColor: theme.primary,
+                      opacity: !offerValid || sending ? 0.45 : 1,
+                      ...shadow.sm,
                     },
                   ]}
                   accessibilityRole="button"
@@ -549,87 +694,93 @@ export default function NewConversationScreen() {
                     {sending
                       ? 'Sending offer…'
                       : amountNum > 0
-                      ? `Offer ${formatPrice(amountNum)}`
+                      ? `Send Offer · ${formatPrice(amountNum)}`
                       : 'Make an offer'}
                   </Text>
-                </Pressable>
+                </PressableScale>
               </View>
 
-              {/* Subtext: "25 offers left for today. Learn why." */}
+              {/* Limit Subtext */}
               <View style={styles.limitRow}>
-                <Text style={[styles.limitText, { color: isDark ? theme.mute : '#5A6566' }]}>
+                <Text style={[styles.limitText, { color: theme.muteSoft }]}>
                   25 offers left for today.{' '}
                 </Text>
                 <Pressable onPress={handleLearnWhy} hitSlop={6}>
-                  <Text style={styles.learnWhyText}>Learn why.</Text>
+                  <Text style={[styles.learnWhyText, { color: theme.primary }]}>Learn why.</Text>
                 </Pressable>
               </View>
             </>
           ) : (
             <>
-              {/* Message mode */}
-              <View style={{ marginTop: 16 }}>
+              {/* Message Mode */}
+              <View style={{ marginTop: 12 }}>
                 <Eyebrow>Your message</Eyebrow>
                 <View
                   style={{
-                    borderRadius: 12,
+                    borderRadius: radii.xl,
                     paddingHorizontal: 14,
                     paddingVertical: 12,
                     minHeight: compact ? 120 : 140,
-                    backgroundColor: isDark ? theme.panel : colors.surface,
+                    backgroundColor: theme.panel,
                     borderWidth: 1,
-                    borderColor: isDark ? theme.border : colors.border,
+                    borderColor: theme.border,
                   }}
                 >
                   <TextInput
                     ref={messageRef}
-                    placeholder="Hi! I have a question about this item…"
+                    placeholder={
+                      isSupport
+                        ? 'Describe your question or issue…'
+                        : `Hi ${targetName}! I have a question…`
+                    }
                     value={message}
                     onChangeText={setMessage}
                     multiline
                     textAlignVertical="top"
-                    placeholderTextColor={colors.mute}
+                    placeholderTextColor={theme.muteSoft}
                     style={{
                       fontSize: 15,
-                      color: isDark ? theme.ink : colors.ink,
+                      color: theme.ink,
                       padding: 0,
                       minHeight: compact ? 100 : 120,
-                    }}
+                      fontFamily: type.family.sans,
+                      outlineStyle: 'none',
+                      outlineWidth: 0,
+                    } as any}
                   />
                 </View>
               </View>
 
               {/* Quick replies */}
-              <View style={{ marginTop: 20 }}>
-                <Eyebrow>Quick replies</Eyebrow>
+              <View style={{ marginTop: 18 }}>
+                <Eyebrow>Quick starters</Eyebrow>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                  {QUICK_REPLIES.map((q) => {
+                  {(listing ? QUICK_REPLIES_LISTING : QUICK_REPLIES_PROFILE).map((q) => {
                     const active = message === q;
                     return (
-                      <Pressable
+                      <PressableScale
                         key={q}
                         onPress={() => setMessage(q)}
-                        style={({ pressed }) => ({
-                          paddingHorizontal: 12,
-                          paddingVertical: 9,
-                          borderRadius: 999,
+                        style={{
+                          paddingHorizontal: 13,
+                          paddingVertical: 8,
+                          borderRadius: radii.pill,
                           borderWidth: 1,
-                          borderColor: active ? TEAL_BRAND : isDark ? theme.border : colors.border,
-                          backgroundColor: active ? TEAL_BRAND : isDark ? theme.panel : colors.surface,
-                          transform: [{ scale: pressed ? 0.97 : 1 }],
-                        })}
+                          borderColor: active ? theme.primary : theme.border,
+                          backgroundColor: active ? theme.primarySoft : theme.panel,
+                        }}
                       >
                         <Text
                           style={{
                             fontSize: 13,
-                            fontFamily: type.family.sansSemibold,
-                            color: active ? '#FFFFFF' : isDark ? theme.ink : colors.ink,
+                            fontFamily: type.family.sansMedium,
+                            color: active ? theme.primary : theme.ink,
                           }}
                           numberOfLines={1}
                         >
                           {q}
                         </Text>
-                      </Pressable>
+                      </PressableScale>
                     );
                   })}
                 </View>
@@ -637,14 +788,15 @@ export default function NewConversationScreen() {
 
               {/* Message Send Button */}
               <View style={{ marginTop: 24 }}>
-                <Pressable
+                <PressableScale
                   onPress={handleSend}
                   disabled={!msgValid || sending}
-                  style={({ pressed }) => [
+                  style={[
                     styles.actionButton,
                     {
-                      backgroundColor: TEAL_BRAND,
-                      opacity: !msgValid || sending ? 0.5 : pressed ? 0.88 : 1,
+                      backgroundColor: theme.primary,
+                      opacity: !msgValid || sending ? 0.45 : 1,
+                      ...shadow.sm,
                     },
                   ]}
                 >
@@ -656,7 +808,7 @@ export default function NewConversationScreen() {
                   >
                     {sending ? 'Sending message…' : 'Send message'}
                   </Text>
-                </Pressable>
+                </PressableScale>
               </View>
             </>
           )}
@@ -672,9 +824,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E5E7EB',
   },
   closeButton: {
     paddingVertical: 4,
@@ -682,13 +833,13 @@ const styles = StyleSheet.create({
     minWidth: 50,
   },
   closeText: {
-    fontSize: 16,
-    color: '#15191A',
+    fontSize: 15,
   },
   headerTitle: {
-    fontSize: 17,
-    color: '#15191A',
+    fontSize: 16,
     textAlign: 'center',
+    letterSpacing: -0.2,
+    maxWidth: 200,
   },
   headerSpacer: {
     minWidth: 50,
@@ -706,17 +857,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
+    padding: 10,
+    borderRadius: radii.xl,
+    borderWidth: 1,
   },
   itemImage: {
     width: 48,
     height: 48,
-    borderRadius: 6,
-    backgroundColor: '#F3F4F6',
+    borderRadius: radii.md,
   },
   itemImagePlaceholder: {
     width: 48,
     height: 48,
-    borderRadius: 6,
+    borderRadius: radii.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -726,75 +879,78 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   itemTitle: {
-    fontSize: 16,
-    color: '#15191A',
-    marginBottom: 3,
+    fontSize: 15,
+    marginBottom: 2,
+    letterSpacing: -0.1,
   },
   itemPrice: {
-    fontSize: 14,
-    color: '#5A6566',
+    fontSize: 13,
   },
   cardsRow: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   presetCard: {
     flex: 1,
     paddingVertical: 12,
     paddingHorizontal: 6,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF',
+    borderRadius: radii.xl,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cardTopText: {
     fontSize: 15,
-    color: '#15191A',
     marginBottom: 2,
     textAlign: 'center',
+    letterSpacing: -0.2,
   },
   cardBottomText: {
-    fontSize: 12.5,
+    fontSize: 12,
     textAlign: 'center',
   },
   inputSection: {
-    marginBottom: 20,
+    marginBottom: 18,
+    padding: 14,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+  },
+  inputEyebrow: {
+    fontSize: 10.5,
+    fontFamily: type.family.sansBold,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    marginBottom: 6,
   },
   displayRow: {
     paddingVertical: 2,
   },
   amountInput: {
     fontSize: 24,
-    color: '#15191A',
     padding: 0,
     margin: 0,
-    height: 34,
-  },
-  underline: {
-    height: 1.5,
-    backgroundColor: '#6B7280',
-    marginTop: 4,
-    marginBottom: 6,
-    width: '100%',
-  },
+    height: 36,
+    outlineStyle: 'none',
+    outlineWidth: 0,
+  } as any,
   feeHelperText: {
-    fontSize: 13,
-    color: '#5A6566',
+    fontSize: 12.5,
+    marginTop: 6,
   },
   actionButtonContainer: {
     marginBottom: 12,
   },
   actionButton: {
     height: 48,
-    borderRadius: 6,
+    borderRadius: radii.pill,
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
   },
   actionButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#FFFFFF',
+    letterSpacing: 0.1,
   },
   limitRow: {
     flexDirection: 'row',
@@ -803,12 +959,11 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   limitText: {
-    fontSize: 13,
-    color: '#5A6566',
+    fontSize: 12.5,
   },
   learnWhyText: {
-    fontSize: 13,
-    color: TEAL_BRAND,
+    fontSize: 12.5,
+    fontFamily: type.family.sansBold,
     textDecorationLine: 'underline',
   },
 });

@@ -39,7 +39,6 @@ import {
   ThemeSheet,
   SubscriptionSheet,
   useSettingsManager,
-  SUPPORT_EMAIL,
   TERMS_URL,
   PRIVACY_URL,
 } from '@/components/settings';
@@ -336,8 +335,8 @@ export default function SettingsScreen() {
         >
           <Row
             label="Contact support"
-            desc={SUPPORT_EMAIL}
-            onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`).catch(() => {})}
+            desc="Chat with 24/7 Ceranix Concierge"
+            onPress={() => router.push('/conversation/new?support=true' as any)}
             chevron
           />
           <Divider />

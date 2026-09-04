@@ -52,9 +52,9 @@ export function ThreadHeader({
           width: 40,
           height: 40,
           borderRadius: 20,
-          backgroundColor: '#FFFFFF',
+          backgroundColor: theme.surface,
           borderWidth: 1,
-          borderColor: 'rgba(0, 0, 0, 0.08)',
+          borderColor: theme.hairline,
           alignItems: 'center',
           justifyContent: 'center',
           opacity: pressed ? 0.55 : 1,
@@ -75,9 +75,9 @@ export function ThreadHeader({
           flexDirection: 'row',
           alignItems: 'center',
           gap: 10,
-          backgroundColor: '#FFFFFF',
+          backgroundColor: theme.surface,
           borderWidth: 1,
-          borderColor: 'rgba(0, 0, 0, 0.08)',
+          borderColor: theme.hairline,
           borderRadius: 24,
           paddingVertical: 6,
           paddingLeft: 6,
@@ -111,7 +111,7 @@ export function ThreadHeader({
                 style={{
                   fontFamily: typography.family.sansBold,
                   fontSize: 14,
-                  color: '#FFFFFF',
+                  color: theme.panel,
                 }}
               >
                 {initial}
@@ -131,7 +131,7 @@ export function ThreadHeader({
                 borderRadius: 6,
                 backgroundColor: '#00C853',
                 borderWidth: 2,
-                borderColor: '#FFFFFF',
+                borderColor: theme.surface,
               }}
             />
           )}
@@ -165,9 +165,9 @@ export function ThreadHeader({
           width: 40,
           height: 40,
           borderRadius: 20,
-          backgroundColor: '#FFFFFF',
+          backgroundColor: theme.surface,
           borderWidth: 1,
-          borderColor: 'rgba(0, 0, 0, 0.08)',
+          borderColor: theme.hairline,
           alignItems: 'center',
           justifyContent: 'center',
           opacity: pressed ? 0.55 : 1,

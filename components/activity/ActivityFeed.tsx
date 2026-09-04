@@ -3,7 +3,8 @@ import { View, Pressable, ScrollView, ActivityIndicator, Alert, RefreshControl }
 import { Text } from '@/lib/rnText';
 import { router, useFocusEffect } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
-import { colors, radii } from '@/lib/theme';
+import { radii, shadow, type as typography } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { Tabs, EmptyState } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
@@ -11,37 +12,23 @@ import {
   useDeleteSavedSearch,
   useSavedSearchMatchesQuery,
   useSavedSearchesQuery,
+  useInboxQuery,
 } from '@/lib/queries';
 import { type SavedSearch } from '@/lib/savedSearches';
+import { isSupportConversation } from '@/lib/support';
+import { InboxRow } from '@/components/chat/InboxRow';
 
 type ActivityTab = 'following' | 'foryou' | 'searches';
 
-// Stable references so the query fallbacks below don't churn on every render.
 const EMPTY_SEARCHES: SavedSearch[] = [];
 const EMPTY_COUNTS: Record<string, number> = {};
 
 type Props = {
-  /**
-   * Padding under the last row. The standalone /news route sits above nothing
-   * and passes the default; the Inbox's Activity page passes the floating tab
-   * dock's clearance so the final saved search isn't parked behind it.
-   */
   bottomInset?: number;
 };
 
-/**
- * The Activity body: pill tabs over "Following", "For you" and saved searches.
- *
- * Lives apart from any one screen because it has two mounts — the standalone
- * /news route (still linked from Discover's save-search flow) and the Activity
- * page of the Inbox pager, which is how you actually reach it now that the
- * profile's bell is gone.
- *
- * Both the rows and their "N new" counts come from shared React Query caches,
- * which is also what the Inbox's Activity badge sums — so the badge and this
- * list always read the same numbers.
- */
 export function ActivityFeed({ bottomInset = 24 }: Props) {
+  const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState<ActivityTab>('following');
   const { user } = useAuth();
   const userId = user?.id ?? null;
@@ -52,23 +39,30 @@ export function ActivityFeed({ bottomInset = 24 }: Props) {
   const matchCounts = matchesQ.data?.counts ?? EMPTY_COUNTS;
   const deleteSearch = useDeleteSavedSearch(userId);
 
+  const inboxQ = useInboxQuery(userId);
+  const conversations = inboxQ.data ?? [];
+
+  // Filter direct profile messages (conversations without a listing, not support bot)
+  const directMessages = conversations.filter(
+    (c) => !c.listing_id && !isSupportConversation(c),
+  );
+
   const { refetch: searchesRefetch, isStale: searchesStale } = searchesQ;
   const { refetch: matchesRefetch, isStale: matchesStale } = matchesQ;
+  const { refetch: inboxRefetch, isStale: inboxStale } = inboxQ;
 
-  // Revalidate on focus, but only what's actually stale — returning from a
-  // saved search that was just marked seen should drop its count, while idly
-  // re-focusing the Inbox shouldn't re-run N match RPCs.
   useFocusEffect(
     useCallback(() => {
       if (!userId) return;
       if (searchesStale) searchesRefetch();
       if (matchesStale) matchesRefetch();
-    }, [userId, searchesStale, searchesRefetch, matchesStale, matchesRefetch]),
+      if (inboxStale) inboxRefetch();
+    }, [userId, searchesStale, searchesRefetch, matchesStale, matchesRefetch, inboxStale, inboxRefetch]),
   );
 
   const onRefresh = useCallback(async () => {
-    await Promise.all([searchesRefetch(), matchesRefetch()]);
-  }, [searchesRefetch, matchesRefetch]);
+    await Promise.all([searchesRefetch(), matchesRefetch(), inboxRefetch()]);
+  }, [searchesRefetch, matchesRefetch, inboxRefetch]);
 
   const applySearch = useCallback((s: SavedSearch) => {
     const params = new URLSearchParams();
@@ -80,14 +74,11 @@ export function ActivityFeed({ bottomInset = 24 }: Props) {
 
   const confirmDelete = useCallback(
     (s: SavedSearch) => {
-      // Alert.alert works on both native and web (shim installed in _layout).
       Alert.alert('Delete saved search?', s.label ?? '', [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
-          // The mutation drops the row from cache optimistically and rolls
-          // back if the server rejects.
           onPress: () => deleteSearch.mutate(s.id),
         },
       ]);
@@ -96,17 +87,20 @@ export function ActivityFeed({ bottomInset = 24 }: Props) {
   );
 
   return (
-    <View style={{ flex: 1 }}>
-      {/* Tabs — pills, deliberately a different shape from the Inbox's
-          underline tabs above them so the two rows don't read as rival tab
-          bars when this is embedded there. */}
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
+      {/* Tabs */}
       <View style={{ marginTop: 12 }}>
         <Tabs
           variant="pill"
           value={activeTab}
           onChange={setActiveTab}
           tabs={[
-            { value: 'following', label: 'Following', icon: 'users' },
+            {
+              value: 'following',
+              label: 'Following',
+              icon: 'users',
+              count: directMessages.length > 0 ? directMessages.length : undefined,
+            },
             { value: 'foryou', label: 'For you', icon: 'compass' },
             { value: 'searches', label: 'Saved', icon: 'bookmark', count: searches.length },
           ]}
@@ -116,31 +110,92 @@ export function ActivityFeed({ bottomInset = 24 }: Props) {
       {/* Content */}
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: bottomInset }}
+        contentContainerStyle={{ paddingBottom: bottomInset + 30 }}
         refreshControl={
           <RefreshControl
-            refreshing={searchesQ.isRefetching || matchesQ.isRefetching}
+            refreshing={searchesQ.isRefetching || matchesQ.isRefetching || inboxQ.isRefetching}
             onRefresh={onRefresh}
-            tintColor={colors.purple}
+            tintColor={theme.primary}
           />
         }
       >
         {activeTab === 'following' && (
-          <EmptyState
-            icon="users"
-            title="Quiet on this side"
-            description="Once people you follow post or sell, you'll see it here."
-          />
+          <View style={{ paddingTop: 10 }}>
+            {directMessages.length > 0 ? (
+              <View>
+                <View
+                  style={{
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontFamily: typography.family.sansBold,
+                      fontSize: 11.5,
+                      letterSpacing: 0.8,
+                      textTransform: 'uppercase',
+                      color: theme.muteSoft,
+                    }}
+                  >
+                    Direct Profile Messages
+                  </Text>
+                  <Text
+                    style={{
+                      fontFamily: typography.family.sansMedium,
+                      fontSize: 12,
+                      color: theme.primary,
+                    }}
+                  >
+                    {directMessages.length} {directMessages.length === 1 ? 'chat' : 'chats'}
+                  </Text>
+                </View>
+
+                {directMessages.map((conv) => (
+                  <View key={conv.id} style={{ borderBottomWidth: 1, borderBottomColor: theme.hairline }}>
+                    <InboxRow
+                      conv={conv}
+                      userId={userId || ''}
+                      onPress={() => router.push(`/conversation/${conv.id}` as any)}
+                    />
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <EmptyState
+                icon="users"
+                title="No direct messages yet"
+                description="When you message creators directly through their profile or people you follow message you, they'll appear here."
+                cta={{
+                  label: 'Find Sellers to Follow',
+                  icon: 'search',
+                  onPress: () => router.push('/discover' as any),
+                }}
+              />
+            )}
+          </View>
         )}
+
         {activeTab === 'foryou' && (
-          <EmptyState
-            icon="bell"
-            title="Nothing for you yet"
-            description="We'll surface listings you'll love based on what you save and search."
-          />
+          <View style={{ paddingTop: 14 }}>
+            <EmptyState
+              icon="bell"
+              title="Nothing new for you yet"
+              description="We'll surface special price drops and curated updates from your favorite categories here."
+              cta={{
+                label: 'Explore Discover',
+                icon: 'compass',
+                onPress: () => router.push('/discover' as any),
+              }}
+            />
+          </View>
         )}
+
         {activeTab === 'searches' && (
-          <View>
+          <View style={{ paddingTop: 6 }}>
             {!user ? (
               <EmptyState
                 icon="bookmark"
@@ -154,13 +209,13 @@ export function ActivityFeed({ bottomInset = 24 }: Props) {
               />
             ) : searchesQ.isLoading ? (
               <View style={{ paddingVertical: 32, alignItems: 'center' }}>
-                <ActivityIndicator color={colors.purple} />
+                <ActivityIndicator color={theme.primary} />
               </View>
             ) : searches.length === 0 ? (
               <EmptyState
                 icon="bookmark"
                 title="No saved searches"
-                description="Save a search and we'll alert you when something matches."
+                description="Save a search in Discover and we'll alert you whenever new pieces match."
                 cta={{
                   label: 'Search now',
                   icon: 'search',
@@ -177,12 +232,13 @@ export function ActivityFeed({ bottomInset = 24 }: Props) {
                       style={{
                         flexDirection: 'row',
                         alignItems: 'center',
-                        backgroundColor: colors.white,
+                        backgroundColor: theme.surface,
                         borderWidth: 1,
-                        borderColor: colors.hairline,
+                        borderColor: theme.hairline,
                         borderRadius: radii.xl,
                         paddingHorizontal: 12,
                         paddingVertical: 12,
+                        ...shadow.sm,
                       }}
                     >
                       <Pressable
@@ -194,25 +250,25 @@ export function ActivityFeed({ bottomInset = 24 }: Props) {
                             width: 40,
                             height: 40,
                             borderRadius: 20,
-                            backgroundColor: colors.purpleSoft,
+                            backgroundColor: theme.primarySoft,
                             alignItems: 'center',
                             justifyContent: 'center',
                           }}
                         >
-                          <Feather name="search" size={16} color={colors.purple} />
+                          <Feather name="search" size={16} color={theme.primary} />
                         </View>
                         <View style={{ flex: 1, minWidth: 0 }}>
                           <Text
                             style={{
+                              fontFamily: typography.family.sansBold,
                               fontSize: 14,
-                              fontWeight: '800',
-                              color: colors.ink,
+                              color: theme.ink,
                             }}
                             numberOfLines={1}
                           >
                             {s.label ?? s.query ?? 'Saved search'}
                           </Text>
-                          <Text style={{ fontSize: 12, color: colors.mute, marginTop: 2 }}>
+                          <Text style={{ fontFamily: typography.family.sans, fontSize: 12, color: theme.mute, marginTop: 2 }}>
                             {count > 0
                               ? `${count} new match${count === 1 ? '' : 'es'}`
                               : 'No new matches'}
@@ -232,7 +288,7 @@ export function ActivityFeed({ bottomInset = 24 }: Props) {
                           opacity: pressed ? 0.6 : 1,
                         })}
                       >
-                        <Feather name="x" size={14} color={colors.mute} />
+                        <Feather name="x" size={14} color={theme.mute} />
                       </Pressable>
                     </View>
                   );

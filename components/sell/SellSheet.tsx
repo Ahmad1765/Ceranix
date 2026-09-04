@@ -1222,7 +1222,7 @@ function SellForm({
             <RowField
               icon="dollar-sign"
               label="Price"
-              value={price ? formatPrice(parseFloat(price), { whole: true }) : ''}
+              value={price && Number.isFinite(parseFloat(price)) ? formatPrice(parseFloat(price), { whole: true }) : ''}
               placeholder={`Set price (${CURRENCY_SYMBOL})`}
               onPress={() => setActiveSheet('price')}
             />

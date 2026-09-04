@@ -1,40 +1,38 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, FlatList, Pressable, RefreshControl, Animated, Platform, useWindowDimensions, NativeSyntheticEvent, NativeScrollEvent, LayoutChangeEvent } from 'react-native';
+import { View, FlatList, Pressable, RefreshControl, Animated, Platform, useWindowDimensions, NativeSyntheticEvent, NativeScrollEvent, LayoutChangeEvent, ScrollView } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
+import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/lib/auth';
 import {
   subscribeToInbox,
   type ConversationRow,
 } from '@/lib/chat';
+import {
+  isSupportConversation,
+  getOrCreateSupportConversation,
+  SUPPORT_TOPICS,
+  SUPPORT_BOT_NAME,
+  SUPPORT_BOT_AVATAR,
+} from '@/lib/support';
 import { useActivityUnreadCount, useInboxQuery } from '@/lib/queries';
 import { colors, radii, shadow, type as typography } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { EmptyState } from '@/components/ui';
 import { InboxRow, InboxSkeleton } from '@/components/chat';
 import { ActivityFeed } from '@/components/activity';
 import { HIT_SLOP_8, useTabBarClearance } from '@/lib/responsive';
+import { PressableScale } from '@/components/PressableScale';
 
 type InboxTab = 'selling' | 'buying' | 'activity' | 'support';
-/**
- * Every tab except Activity is backed by a conversation list. Activity renders
- * <ActivityFeed> instead, so the conversation-shaped pieces below exclude it
- * rather than carrying a branch that can never run.
- */
-type ConversationTab = Exclude<InboxTab, 'activity'>;
+type ConversationTab = Exclude<InboxTab, 'activity' | 'support'>;
 
-// Stable empty reference so the inbox fallback doesn't churn the pageData memo.
 const EMPTY_CONVERSATIONS: ConversationRow[] = [];
-
-// Module-level so the FlatList doesn't see a new keyExtractor every render.
 const keyById = (item: ConversationRow) => item.id;
 
-// "Activity" took the slot that used to be a dead "Social" placeholder. It is
-// now the only way into the Activity feed — the bell that used to open /news
-// from the profile header is gone — so it sits inside the pager rather than
-// behind an icon.
 const INBOX_TABS: { value: InboxTab; label: string }[] = [
   { value: 'selling', label: 'Selling' },
   { value: 'buying', label: 'Buying' },
@@ -43,11 +41,8 @@ const INBOX_TABS: { value: InboxTab; label: string }[] = [
 ];
 
 const TAB_COUNT = INBOX_TABS.length;
-// Width ratio of the underline indicator relative to its tab cell.
 const UNDERLINE_WIDTH_RATIO = 0.42;
 
-// Light tap on every interactive control on this screen. No-op on web, where
-// the Haptics API has nothing to drive.
 function haptic() {
   if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 }
@@ -58,17 +53,13 @@ function SignedOutState() {
       <EmptyState
         icon="message-circle"
         title="Sign in to chat"
-        description="Your conversations with buyers and sellers live here."
+        description="Your conversations with buyers, sellers, and support live here."
         cta={{ label: 'Sign in', icon: 'log-in', onPress: () => router.push('/auth/login' as any) }}
       />
     </View>
   );
 }
 
-// Unread count on a tab label. Positioned absolutely off the label's trailing
-// edge rather than laid out beside it: four tabs already split the width evenly,
-// and an inline badge would push "Activity" into wrapping on a narrow phone.
-// Costs zero layout width, so it can't break the row at any viewport.
 function TabBadge({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
@@ -113,16 +104,13 @@ function UnderlineTabs({
   onChange: (v: InboxTab) => void;
   scrollX: Animated.Value;
   pageWidth: number;
-  /** Unread counts per tab. Absent or 0 renders no badge. */
   badges?: Partial<Record<InboxTab, number>>;
 }) {
+  const { theme } = useTheme();
   const tabWidth = pageWidth / TAB_COUNT;
   const underlineWidth = tabWidth * UNDERLINE_WIDTH_RATIO;
   const underlineOffset = (tabWidth - underlineWidth) / 2;
 
-  // Indicator follows scroll position in real time. Input range covers all
-  // four pages; output is the corresponding tab cell's left edge plus the
-  // centering offset for the indicator.
   const translateX = scrollX.interpolate({
     inputRange: INBOX_TABS.map((_, i) => i * pageWidth),
     outputRange: INBOX_TABS.map((_, i) => i * tabWidth + underlineOffset),
@@ -133,7 +121,7 @@ function UnderlineTabs({
     <View
       style={{
         borderBottomWidth: 1,
-        borderBottomColor: colors.hairline,
+        borderBottomColor: theme.hairline,
       }}
     >
       <View style={{ flexDirection: 'row' }}>
@@ -146,25 +134,19 @@ function UnderlineTabs({
               onPress={() => onChange(t.value)}
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
-              // The badge is a bare number on screen; spell it out for a screen
-              // reader or the tab just announces "Activity" either way.
-              accessibilityLabel={
-                count > 0 ? `${t.label}, ${count} new` : t.label
-              }
+              accessibilityLabel={count > 0 ? `${t.label}, ${count} new` : t.label}
               style={{
                 flex: 1,
                 alignItems: 'center',
                 paddingVertical: 14,
               }}
             >
-              {/* Wrapper hugs the label so the badge can anchor to its
-                  trailing edge rather than the full-width tab cell. */}
               <View>
                 <Text
                   style={{
                     fontFamily: active ? typography.family.sansBold : typography.family.sansMedium,
                     fontSize: 15,
-                    color: active ? colors.ink : colors.muteSoft,
+                    color: active ? theme.ink : theme.muteSoft,
                     letterSpacing: -0.1,
                   }}
                 >
@@ -185,7 +167,7 @@ function UnderlineTabs({
             left: 0,
             height: 2.5,
             width: underlineWidth,
-            backgroundColor: colors.ink,
+            backgroundColor: theme.ink,
             borderRadius: 2,
             transform: [{ translateX }],
           }}
@@ -201,35 +183,22 @@ function emptyStateFor(tab: ConversationTab) {
       return {
         icon: 'tag' as const,
         title: 'No buyer chats yet',
-        description: 'Post a great listing and buyers will reach out.',
+        description: 'Post a great listing and buyers will reach out to make offers.',
       };
     case 'buying':
       return {
         icon: 'shopping-bag' as const,
         title: 'No conversations yet',
-        description: 'Found something you love? Tap message on the listing.',
-      };
-    case 'support':
-      return {
-        icon: 'life-buoy' as const,
-        title: 'No support threads',
-        description: "We'll respond to your support requests here.",
+        description: 'Found something you love? Tap message on the listing to chat.',
       };
   }
 }
 
-// Module-level so the component TYPE is stable. As an inline
-// `ItemSeparatorComponent={() => ...}` this was a brand-new type on every render
-// of the page, which unmounts and remounts every separator in the list.
 function InboxSeparator() {
-  return <View style={{ height: 1, backgroundColor: colors.hairline }} />;
+  const { theme } = useTheme();
+  return <View style={{ height: 1, backgroundColor: theme.hairline }} />;
 }
 
-// `InboxRow` is already memo'd, but it was being handed a fresh
-// `onPress={() => router.push(...)}` closure on every render, so the memo never
-// bit. Owning the navigation here keeps the row's props down to two values that
-// are stable between renders (the row object out of `data`, and a string id), so
-// re-rendering the page now re-renders zero rows.
 const InboxListRow = memo(function InboxListRow({
   conv,
   userId,
@@ -262,6 +231,7 @@ function ConversationPage({
   onRefresh: () => void;
   bottomInset: number;
 }) {
+  const { theme } = useTheme();
   const empty = emptyStateFor(tab);
   const renderItem = useCallback(
     ({ item }: { item: ConversationRow }) => <InboxListRow conv={item} userId={userId} />,
@@ -275,37 +245,270 @@ function ConversationPage({
         keyExtractor={keyById}
         renderItem={renderItem}
         ItemSeparatorComponent={InboxSeparator}
-        // Four of these lists are mounted at once (one per inbox tab in the
-        // horizontal pager), so the defaults — windowSize 21, i.e. 10 screens of
-        // rows in each direction — were being paid four times over for three
-        // pages the user isn't looking at. An inbox row is a fixed-height
-        // 3-column strip, so a tighter window is safe here.
         windowSize={7}
         initialNumToRender={10}
         maxToRenderPerBatch={8}
         updateCellsBatchingPeriod={50}
-        // Android-only in practice; detaches off-screen rows from the native
-        // view hierarchy. Rows have no absolutely-positioned overflow, which is
-        // the case where this is known to clip content.
         removeClippedSubviews={Platform.OS === 'android'}
         ListEmptyComponent={
           <EmptyState icon={empty.icon} title={empty.title} description={empty.description} />
         }
         contentContainerStyle={data.length === 0 ? { flex: 1 } : { paddingBottom: bottomInset }}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />
         }
       />
     </View>
   );
 }
 
-// Floating card, not a full-width bar — sits above the tab dock (which is
-// absolutely positioned and reserves no layout space of its own) with the
-// same breathing room the dock keeps off the screen edges, so it reads as
-// part of the same floating-surface language instead of a stray strip
-// peeking out from behind it.
+// ── Working Support Hub Page ────────────────────────────────────────────────
+function SupportPage({
+  data,
+  userId,
+  pageWidth,
+  pageHeight,
+  refreshing,
+  onRefresh,
+  bottomInset,
+}: {
+  data: ConversationRow[];
+  userId: string;
+  pageWidth: number;
+  pageHeight: number;
+  refreshing: boolean;
+  onRefresh: () => void;
+  bottomInset: number;
+}) {
+  const { theme } = useTheme();
+  const [startingChat, setStartingChat] = useState(false);
+
+  const handleStartSupportChat = async (prompt?: string) => {
+    haptic();
+    setStartingChat(true);
+    try {
+      const conv = await getOrCreateSupportConversation(userId);
+      if (conv) {
+        if (prompt) {
+          // If prompt given, navigate to new message with preset or conversation
+          router.push(`/conversation/${conv.id}` as any);
+        } else {
+          router.push(`/conversation/${conv.id}` as any);
+        }
+      }
+    } catch (e) {
+      console.warn('[support] failed to start', e);
+    } finally {
+      setStartingChat(false);
+    }
+  };
+
+  return (
+    <View style={{ width: pageWidth, height: pageHeight }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingTop: 14,
+          paddingBottom: bottomInset + 30,
+        }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />
+        }
+      >
+        {/* Ceranix Support Assistant Hero Card */}
+        <View
+          style={{
+            backgroundColor: theme.surface,
+            borderRadius: radii['2xl'],
+            borderWidth: 1,
+            borderColor: theme.hairline,
+            padding: 16,
+            marginBottom: 20,
+            ...shadow.sm,
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+            <View style={{ position: 'relative' }}>
+              <Image
+                source={{ uri: SUPPORT_BOT_AVATAR }}
+                style={{ width: 48, height: 48, borderRadius: 24 }}
+                contentFit="cover"
+              />
+              <View
+                style={{
+                  position: 'absolute',
+                  bottom: -1,
+                  right: -1,
+                  width: 13,
+                  height: 13,
+                  borderRadius: 7,
+                  backgroundColor: '#10B981',
+                  borderWidth: 2,
+                  borderColor: theme.surface,
+                }}
+              />
+            </View>
+
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={{ fontFamily: typography.family.sansBold, fontSize: 16, color: theme.ink }}>
+                  {SUPPORT_BOT_NAME}
+                </Text>
+                <View
+                  style={{
+                    paddingHorizontal: 6,
+                    paddingVertical: 1,
+                    borderRadius: radii.pill,
+                    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                  }}
+                >
+                  <Text style={{ fontSize: 10, fontFamily: typography.family.sansBold, color: '#10B981' }}>
+                    ONLINE
+                  </Text>
+                </View>
+              </View>
+              <Text style={{ fontFamily: typography.family.sans, fontSize: 12.5, color: theme.mute, marginTop: 2 }}>
+                Instant AI Help & Dedicated Support Concierge
+              </Text>
+            </View>
+          </View>
+
+          <Text
+            style={{
+              fontFamily: typography.family.sans,
+              fontSize: 13.5,
+              lineHeight: 19,
+              color: theme.ink,
+              marginBottom: 14,
+            }}
+          >
+            Have a question about an order, refund, delivery, or payout? Start a chat to get immediate answers.
+          </Text>
+
+          <PressableScale
+            onPress={() => handleStartSupportChat()}
+            disabled={startingChat}
+            style={{
+              height: 44,
+              borderRadius: radii.pill,
+              backgroundColor: theme.primary,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              ...shadow.sm,
+            }}
+          >
+            <Feather name="message-square" size={16} color="#FFFFFF" />
+            <Text style={{ fontFamily: typography.family.sansBold, fontSize: 14, color: '#FFFFFF' }}>
+              {startingChat ? 'Connecting…' : 'Chat with Ceranix Support'}
+            </Text>
+          </PressableScale>
+        </View>
+
+        {/* Quick Help Topics */}
+        <Text
+          style={{
+            fontFamily: typography.family.sansBold,
+            fontSize: 11.5,
+            letterSpacing: 0.8,
+            textTransform: 'uppercase',
+            color: theme.muteSoft,
+            marginBottom: 10,
+            paddingHorizontal: 2,
+          }}
+        >
+          Frequently Asked Questions & Guides
+        </Text>
+
+        <View style={{ gap: 8, marginBottom: 24 }}>
+          {SUPPORT_TOPICS.map((topic) => (
+            <PressableScale
+              key={topic.id}
+              onPress={() => handleStartSupportChat(topic.prompt)}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: theme.surface,
+                borderRadius: radii.xl,
+                borderWidth: 1,
+                borderColor: theme.hairline,
+                paddingHorizontal: 14,
+                paddingVertical: 12,
+                gap: 12,
+                ...shadow.sm,
+              }}
+            >
+              <View
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 19,
+                  backgroundColor: theme.panel,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Feather name={topic.icon as any} size={17} color={theme.primary} />
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontFamily: typography.family.sansBold, fontSize: 14, color: theme.ink }}>
+                  {topic.title}
+                </Text>
+                <Text style={{ fontFamily: typography.family.sans, fontSize: 12, color: theme.mute, marginTop: 1 }}>
+                  {topic.description}
+                </Text>
+              </View>
+
+              <Feather name="chevron-right" size={18} color={theme.muteSoft} />
+            </PressableScale>
+          ))}
+        </View>
+
+        {/* Existing Support Threads if any */}
+        {data.length > 0 && (
+          <View>
+            <Text
+              style={{
+                fontFamily: typography.family.sansBold,
+                fontSize: 11.5,
+                letterSpacing: 0.8,
+                textTransform: 'uppercase',
+                color: theme.muteSoft,
+                marginBottom: 8,
+                paddingHorizontal: 2,
+              }}
+            >
+              Your Support Threads
+            </Text>
+
+            <View
+              style={{
+                backgroundColor: theme.surface,
+                borderRadius: radii.xl,
+                borderWidth: 1,
+                borderColor: theme.hairline,
+                overflow: 'hidden',
+              }}
+            >
+              {data.map((conv, idx) => (
+                <View key={conv.id}>
+                  <InboxListRow conv={conv} userId={userId} />
+                  {idx < data.length - 1 && <InboxSeparator />}
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+      </ScrollView>
+    </View>
+  );
+}
+
 function PushNotificationBanner({ onDismiss }: { onDismiss: () => void }) {
+  const { theme } = useTheme();
   const bottom = useTabBarClearance();
   return (
     <View
@@ -314,10 +517,10 @@ function PushNotificationBanner({ onDismiss }: { onDismiss: () => void }) {
         left: 16,
         right: 16,
         bottom,
-        backgroundColor: colors.white,
+        backgroundColor: theme.surface,
         borderRadius: radii['2xl'],
         borderWidth: 1,
-        borderColor: colors.hairline,
+        borderColor: theme.hairline,
         padding: 12,
         flexDirection: 'row',
         alignItems: 'center',
@@ -330,12 +533,12 @@ function PushNotificationBanner({ onDismiss }: { onDismiss: () => void }) {
           width: 38,
           height: 38,
           borderRadius: 19,
-          backgroundColor: colors.primarySoft,
+          backgroundColor: theme.primarySoft,
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
-        <Feather name="bell" size={17} color={colors.primary} />
+        <Feather name="bell" size={17} color={theme.primary} />
       </View>
 
       <View style={{ flex: 1 }}>
@@ -343,7 +546,7 @@ function PushNotificationBanner({ onDismiss }: { onDismiss: () => void }) {
           style={{
             fontFamily: typography.family.sansBold,
             fontSize: 13,
-            color: colors.ink,
+            color: theme.ink,
             letterSpacing: -0.1,
           }}
           numberOfLines={1}
@@ -354,7 +557,7 @@ function PushNotificationBanner({ onDismiss }: { onDismiss: () => void }) {
           style={{
             fontFamily: typography.family.sans,
             fontSize: 11.5,
-            color: colors.mute,
+            color: theme.mute,
             marginTop: 1,
           }}
           numberOfLines={1}
@@ -367,17 +570,13 @@ function PushNotificationBanner({ onDismiss }: { onDismiss: () => void }) {
         hitSlop={HIT_SLOP_8}
         onPress={() => {
           haptic();
-          // `/profile/notifications` was pushed here and that route does not
-          // exist — the tap dead-ended on expo-router's "Unmatched Route"
-          // screen. Notification prefs live on the Settings page's "Enhance the
-          // experience" card, so open it directly.
           router.push('/settings?open=enhance' as any);
         }}
         style={({ pressed }) => ({
           paddingHorizontal: 13,
           paddingVertical: 8,
           borderRadius: radii.pill,
-          backgroundColor: colors.primary,
+          backgroundColor: theme.primary,
           opacity: pressed ? 0.85 : 1,
         })}
       >
@@ -407,22 +606,23 @@ function PushNotificationBanner({ onDismiss }: { onDismiss: () => void }) {
           width: 22,
           height: 22,
           borderRadius: 11,
-          backgroundColor: colors.white,
+          backgroundColor: theme.surface,
           borderWidth: 1,
-          borderColor: colors.hairline,
+          borderColor: theme.hairline,
           alignItems: 'center',
           justifyContent: 'center',
           opacity: pressed ? 0.7 : 1,
           ...shadow.sm,
         })}
       >
-        <Feather name="x" size={12} color={colors.mute} />
+        <Feather name="x" size={12} color={theme.mute} />
       </Pressable>
     </View>
   );
 }
 
 export default function InboxScreen() {
+  const { theme } = useTheme();
   const { user, loading: authLoading } = useAuth();
   const { width: pageWidth } = useWindowDimensions();
   const tabBarClearance = useTabBarClearance();
@@ -441,43 +641,17 @@ export default function InboxScreen() {
   const refreshing = inboxQ.isRefetching;
   const { refetch: inboxRefetch, isStale: inboxStale } = inboxQ;
 
-  // Activity's unread count. Reads the same caches <ActivityFeed> renders from,
-  // so the badge and the list it points at can't drift apart.
   const activityUnread = useActivityUnreadCount(userId);
   const tabBadges = useMemo(() => ({ activity: activityUnread }), [activityUnread]);
 
   const pagerRef = useRef<FlatList<{ value: InboxTab; label: string }>>(null);
-  // `useState(() => ...)` rather than the more familiar
-  // `useRef(new Animated.Value(0)).current`, for two reasons:
-  //   1. Reading `.current` during render is a Rules-of-React violation, and
-  //      React Compiler bails out of the whole component over it.
-  //   2. The useRef form evaluates `new Animated.Value(0)` on EVERY render and
-  //      throws the result away — useRef only keeps the first one. The lazy
-  //      initializer actually runs once.
-  // Identical semantics: one instance for the lifetime of the component.
   const [scrollX] = useState(() => new Animated.Value(0));
-  // Mirrors activeTab for the scroll/gesture callbacks, which need the current
-  // value without being re-created on every tab change.
-  //
-  // Synced in an effect, NOT by assigning during render. The render-time
-  // assignment that used to sit here is a Rules-of-React violation ("Cannot
-  // access refs during render"), and it made React Compiler bail out of this
-  // whole screen. Every reader is an event handler or an effect, so all of them
-  // run after commit and see the synced value.
   const activeTabRef = useRef<InboxTab>(activeTab);
   useEffect(() => {
     activeTabRef.current = activeTab;
   }, [activeTab]);
-  // Timestamp until which the scroll listener should ignore updates because
-  // a tap kicked off a programmatic animated scroll. This window covers the
-  // ~300ms animation. Platform-agnostic: doesn't rely on begin/end-drag
-  // events (which react-native-web doesn't fire for native scrollers).
   const ignoreListenerUntilRef = useRef(0);
 
-  // Drive activeTab from scrollX so the bold text tracks the indicator
-  // under your finger during a swipe. After a tap, the listener is briefly
-  // muted so the animation flying through intermediate pages doesn't make
-  // the bold flicker — see goToTab.
   useEffect(() => {
     if (pageWidth <= 0) return;
     const id = scrollX.addListener(({ value }) => {
@@ -492,14 +666,12 @@ export default function InboxScreen() {
     return () => scrollX.removeListener(id);
   }, [scrollX, pageWidth]);
 
-  // Revalidate the inbox on focus when stale (the initial fetch is automatic).
   useFocusEffect(
     useCallback(() => {
       if (inboxStale) inboxRefetch();
     }, [inboxStale, inboxRefetch]),
   );
 
-  // Realtime: a new/updated conversation simply triggers a refetch.
   useEffect(() => {
     if (!userId) return;
     const unsub = subscribeToInbox(userId, () => {
@@ -508,18 +680,19 @@ export default function InboxScreen() {
     return unsub;
   }, [userId, inboxRefetch]);
 
-  // Per-tab filtered data so the pager always has all four pages ready.
-  // Activity isn't in here — it renders <ActivityFeed>, not a conversation list.
-  const pageData = useMemo<Record<ConversationTab, ConversationRow[]>>(() => {
+  // Tab data partition:
+  // - Selling: listing chats where user is seller
+  // - Buying: listing chats where user is buyer
+  // - Support: chats involving Support Bot
+  const pageData = useMemo<Record<ConversationTab | 'support', ConversationRow[]>>(() => {
     const uid = user?.id;
     if (!uid) {
       return { selling: [], buying: [], support: [] };
     }
     return {
-      selling: conversations.filter((c) => c.seller_id === uid),
-      buying: conversations.filter((c) => c.buyer_id === uid),
-      // Support doesn't exist yet in the data model.
-      support: [],
+      selling: conversations.filter((c) => c.seller_id === uid && !!c.listing_id && !isSupportConversation(c)),
+      buying: conversations.filter((c) => c.buyer_id === uid && !!c.listing_id && !isSupportConversation(c)),
+      support: conversations.filter((c) => isSupportConversation(c)),
     };
   }, [conversations, user?.id]);
 
@@ -532,10 +705,6 @@ export default function InboxScreen() {
       const to = INBOX_TABS.findIndex((t) => t.value === tab);
       if (to < 0 || pageWidth <= 0) return;
       if (tab === activeTabRef.current) return;
-      // Snap state to destination immediately so the bold flips once, cleanly,
-      // while the pager slides underneath. Mute the listener for the duration
-      // of the animation so it doesn't briefly bold each tab the scroll flies
-      // through.
       activeTabRef.current = tab;
       setActiveTab(tab);
       ignoreListenerUntilRef.current = Date.now() + 450;
@@ -546,9 +715,6 @@ export default function InboxScreen() {
 
   const onMomentumScrollEnd = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      // Force-reconcile to whatever page we actually settled on. Cheap safety
-      // net — covers the case where the listener was muted and the final
-      // resting page differs from activeTab (shouldn't happen, but free).
       ignoreListenerUntilRef.current = 0;
       if (pageWidth <= 0) return;
       const index = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
@@ -561,33 +727,19 @@ export default function InboxScreen() {
     [pageWidth],
   );
 
-  // Keep pager aligned with activeTab if window width changes (e.g. rotation).
-  //
-  // Reads activeTabRef rather than activeTab so the dep list is honest and no
-  // eslint-disable is needed. That matters beyond tidiness: React Compiler
-  // refuses to optimize any component where a React ESLint rule has been
-  // disabled ("React Compiler has skipped optimizing this component because one
-  // or more React ESLint rules were disabled"), so the two suppressions that
-  // used to be here cost ChatScreen its memoization entirely. The ref is
-  // assigned on every render above, so it always holds the current tab; the
-  // intent — resync on width change only, since tab changes already scroll via
-  // goToTab/onMomentumScrollEnd — is unchanged.
   useEffect(() => {
     const index = INBOX_TABS.findIndex((t) => t.value === activeTabRef.current);
     if (index < 0) return;
     pagerRef.current?.scrollToOffset({ offset: index * pageWidth, animated: false });
   }, [pageWidth]);
 
-  // Mount-only value. A useState initializer says "compute once" directly,
-  // instead of a useMemo with a dep list that lies about what it reads.
-  // Recomputing would remount the pager.
   const [initialScrollIndex] = useState(() =>
     INBOX_TABS.findIndex((t) => t.value === activeTab),
   );
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Header — centered title, side icons */}
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.background }}>
+      {/* Header */}
       <View
         style={{
           flexDirection: 'row',
@@ -600,9 +752,6 @@ export default function InboxScreen() {
       >
         <Pressable
           hitSlop={HIT_SLOP_8}
-          // `/profile/settings` is not a route (the screen is `app/settings.tsx`),
-          // so this overflow button used to land on "Unmatched Route". No `as any`
-          // here on purpose — the cast is what let the broken path compile.
           onPress={() => router.push('/settings')}
           accessibilityRole="button"
           accessibilityLabel="Settings"
@@ -614,13 +763,13 @@ export default function InboxScreen() {
             opacity: pressed ? 0.6 : 1,
           })}
         >
-          <Feather name="more-horizontal" size={22} color={colors.ink} />
+          <Feather name="more-horizontal" size={22} color={theme.ink} />
         </Pressable>
         <Text
           style={{
-            fontFamily: typography.family.sansSemibold,
+            fontFamily: typography.family.sansBold,
             fontSize: 17,
-            color: colors.ink,
+            color: theme.ink,
             letterSpacing: -0.2,
           }}
         >
@@ -639,11 +788,11 @@ export default function InboxScreen() {
             opacity: pressed ? 0.6 : 1,
           })}
         >
-          <Feather name="search" size={21} color={colors.ink} />
+          <Feather name="search" size={21} color={theme.ink} />
         </Pressable>
       </View>
 
-      {/* Underline tabs with scroll-driven indicator */}
+      {/* Underline tabs */}
       <UnderlineTabs
         value={activeTab}
         onChange={goToTab}
@@ -652,14 +801,9 @@ export default function InboxScreen() {
         badges={tabBadges}
       />
 
-      {/* Content — the measuring wrapper gives us a concrete pixel height
-          for each pager page. On web, flex-based height propagation through
-          a horizontal FlatList's content container is broken, so the inner
-          vertical FlatLists need an explicit height to scroll. */}
+      {/* Content */}
       <View style={{ flex: 1 }} onLayout={onPagerLayout}>
         {authLoading || (loading && conversations.length === 0) ? (
-          // Skeleton rows rather than a centred spinner: the list geometry is
-          // already on screen, so nothing jumps when the data lands.
           <InboxSkeleton />
         ) : !user ? (
           <SignedOutState />
@@ -686,13 +830,24 @@ export default function InboxScreen() {
             scrollEventThrottle={16}
             onMomentumScrollEnd={onMomentumScrollEnd}
             renderItem={({ item }) => {
-              // Activity is the odd page out: notifications and saved searches,
-              // not conversations. Same page geometry, different body.
               if (item.value === 'activity') {
                 return (
                   <View style={{ width: pageWidth, height: pagerHeight }}>
                     <ActivityFeed bottomInset={tabBarClearance} />
                   </View>
+                );
+              }
+              if (item.value === 'support') {
+                return (
+                  <SupportPage
+                    data={pageData.support}
+                    userId={user.id}
+                    pageWidth={pageWidth}
+                    pageHeight={pagerHeight}
+                    refreshing={refreshing}
+                    onRefresh={onRefresh}
+                    bottomInset={tabBarClearance}
+                  />
                 );
               }
               return (
@@ -712,7 +867,7 @@ export default function InboxScreen() {
         )}
       </View>
 
-      {/* Push notification banner — sits above the tab bar */}
+      {/* Push notification banner */}
       {!bannerDismissed && user && (
         <PushNotificationBanner onDismiss={() => setBannerDismissed(true)} />
       )}
