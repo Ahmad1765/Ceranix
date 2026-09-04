@@ -1,4 +1,4 @@
-import React, { memo, useState, useEffect, useCallback, useRef } from 'react';
+import React, { memo, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Pressable,
@@ -25,7 +25,6 @@ import { Text, TextInput } from '@/lib/rnText';
 import { router } from 'expo-router';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { useToast } from '@/lib/toast';
 import { useTheme } from '@/context/ThemeContext';
@@ -33,6 +32,13 @@ import { useSearchHistory } from '@/hooks/useSearchHistory';
 import { BinocularsIcon } from '@/components/ui/BinocularsIcon';
 import { searchUsers } from '@/lib/follows';
 import { searchListings } from '@/lib/listings';
+import { getSearchSuggestions } from '@/lib/searchSuggestions';
+import { PreSearchSuggestions } from './PreSearchSuggestions';
+import {
+  SearchFilterChips,
+  type SearchFilterState,
+  EMPTY_SEARCH_FILTERS,
+} from '@/components/discover';
 import { ListingCard } from '@/components/ListingCard';
 import { useGridDimensions } from '@/lib/responsive';
 import { radii, type as typography } from '@/lib/theme';
@@ -104,10 +110,21 @@ export const HomeSearchView = memo(function HomeSearchView({
 
   const [query, setQuery] = useState(initialQuery);
   const [activeTab, setActiveTab] = useState<SearchTab>(initialTab);
+  const [hasSubmitted, setHasSubmitted] = useState(initialQuery.trim().length > 0);
   const { previousSearches, addSearch, removeSearch } = useSearchHistory();
+
+  const suggestions = useMemo(
+    () =>
+      getSearchSuggestions(query, {
+        recentSearches: previousSearches,
+        limit: 12,
+      }),
+    [query, previousSearches],
+  );
 
   const [sellerResults, setSellerResults] = useState<SellerResult[]>([]);
   const [listingResults, setListingResults] = useState<Listing[]>([]);
+  const [searchFilters, setSearchFilters] = useState<SearchFilterState>(EMPTY_SEARCH_FILTERS);
   const [loading, setLoading] = useState(false);
 
   const scrollX = useRef(new RNAnimated.Value(initialTab === 'listings' ? 0 : screenWidth)).current;
@@ -163,22 +180,12 @@ export const HomeSearchView = memo(function HomeSearchView({
     opacity: interpolate(animProgress.value, [0, 0.15, 1], [0, 0.9, 1]),
   }));
 
-  const backButtonAnimatedStyle = useAnimatedStyle(() => {
-    const translateX = interpolate(animProgress.value, [0, 1], [-20, 0]);
-    const opacity = interpolate(animProgress.value, [0, 0.3, 1], [0, 0, 1]);
-    const scale = interpolate(animProgress.value, [0, 1], [0.8, 1]);
+  const searchBarAnimatedStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(animProgress.value, [0, 0.3, 1], [0, 0.8, 1]);
+    const translateY = interpolate(animProgress.value, [0, 1], [-8, 0]);
     return {
       opacity,
-      transform: [{ translateX }, { scale }],
-    };
-  });
-
-  const searchBarAnimatedStyle = useAnimatedStyle(() => {
-    const translateX = interpolate(animProgress.value, [0, 1], [-24, 0]);
-    const marginRight = interpolate(animProgress.value, [0, 1], [40, 0]);
-    return {
-      transform: [{ translateX }],
-      marginRight,
+      transform: [{ translateY }],
     };
   });
 
@@ -209,6 +216,62 @@ export const HomeSearchView = memo(function HomeSearchView({
     outputRange: [0, tabWidth],
     extrapolate: 'clamp',
   });
+
+  // Real-time multi-criteria filtering on listingResults
+  const displayListings = useMemo(() => {
+    let list = listingResults;
+
+    if (searchFilters.category) {
+      list = list.filter((l) => l && l.category === searchFilters.category);
+    }
+    if (searchFilters.subcategory) {
+      list = list.filter((l) => l && l.subcategory === searchFilters.subcategory);
+    }
+    if (searchFilters.brand) {
+      const bLower = searchFilters.brand.toLowerCase();
+      list = list.filter((l) => l && l.brand && l.brand.toLowerCase().includes(bLower));
+    }
+    if (searchFilters.sizes.length > 0) {
+      list = list.filter((l) => l && l.size && searchFilters.sizes.includes(l.size));
+    }
+    if (searchFilters.conditions.length > 0) {
+      list = list.filter((l) => l && l.condition && searchFilters.conditions.includes(l.condition));
+    }
+    if (searchFilters.priceMin != null) {
+      list = list.filter((l) => l && l.price >= searchFilters.priceMin!);
+    }
+    if (searchFilters.priceMax != null) {
+      list = list.filter((l) => l && l.price <= searchFilters.priceMax!);
+    }
+    if (searchFilters.color) {
+      const colLower = searchFilters.color.toLowerCase();
+      list = list.filter((l) => l && l.color && l.color.toLowerCase() === colLower);
+    }
+    if (searchFilters.material) {
+      const matLower = searchFilters.material.toLowerCase();
+      list = list.filter(
+        (l) =>
+          l &&
+          ((l.description && l.description.toLowerCase().includes(matLower)) ||
+            (Array.isArray(l.tags) &&
+              l.tags.some((t) => typeof t === 'string' && t.toLowerCase().includes(matLower)))),
+      );
+    }
+    if (searchFilters.sort) {
+      list = [...list];
+      if (searchFilters.sort === 'price_asc') {
+        list.sort((a, b) => a.price - b.price);
+      } else if (searchFilters.sort === 'price_desc') {
+        list.sort((a, b) => b.price - a.price);
+      } else if (searchFilters.sort === 'newest') {
+        list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      } else if (searchFilters.sort === 'popular') {
+        list.sort((a, b) => (b.likes ?? 0) - (a.likes ?? 0));
+      }
+    }
+
+    return list;
+  }, [listingResults, searchFilters]);
 
   // Re-sync scrollX and pager offset on resize or activeTab change
   useEffect(() => {
@@ -381,24 +444,55 @@ export const HomeSearchView = memo(function HomeSearchView({
     [activeTab, handleTabPress],
   );
 
+  // Suggestion selection from pre-search suggestions list
+  const handleSelectSuggestion = useCallback(
+    (term: string) => {
+      haptic();
+      setQuery(term);
+      addSearch(term);
+      setHasSubmitted(true);
+      Keyboard.dismiss();
+      const requestId = ++searchRequestIdRef.current;
+      runSearch(term, requestId);
+    },
+    [addSearch, runSearch],
+  );
+
+  // Arrow click to populate search bar for query refinement
+  const handlePopulateSuggestion = useCallback(
+    (term: string) => {
+      haptic();
+      setQuery(term.trim() + ' ');
+      setHasSubmitted(false);
+      inputRef.current?.focus?.();
+    },
+    [],
+  );
+
   // Tag selection from Previous searches / Popular searches
   const handleSelectTag = useCallback(
     (term: string) => {
       haptic();
       setQuery(term);
       addSearch(term);
+      setHasSubmitted(true);
       Keyboard.dismiss();
+      const requestId = ++searchRequestIdRef.current;
+      runSearch(term, requestId);
     },
-    [addSearch],
+    [addSearch, runSearch],
   );
 
   const handleSubmitSearch = useCallback(() => {
     const trimmed = query.trim();
     if (trimmed.length > 0) {
       addSearch(trimmed);
+      setHasSubmitted(true);
       Keyboard.dismiss();
+      const requestId = ++searchRequestIdRef.current;
+      runSearch(trimmed, requestId);
     }
-  }, [query, addSearch]);
+  }, [query, addSearch, runSearch]);
 
   // ── Render Seller Row (Exact match to Image 2) ─────────────────────────────
   const renderSellerItem = useCallback(
@@ -672,21 +766,6 @@ export const HomeSearchView = memo(function HomeSearchView({
           gap: 10,
         }}
       >
-        {/* Back Button '<' */}
-        <Animated.View style={backButtonAnimatedStyle}>
-          <Pressable
-            onPress={handleClose}
-            hitSlop={12}
-            accessibilityLabel="Back to feed"
-            style={({ pressed }) => ({
-              padding: 4,
-              opacity: pressed ? 0.6 : 1,
-            })}
-          >
-            <Ionicons name="chevron-back" size={28} color={theme.text} />
-          </Pressable>
-        </Animated.View>
-
         {/* Search Input Box */}
         <Animated.View
           style={[
@@ -694,13 +773,13 @@ export const HomeSearchView = memo(function HomeSearchView({
               flex: 1,
               flexDirection: 'row',
               alignItems: 'center',
-              backgroundColor: theme.surface,
+              backgroundColor: isDark ? '#1C2327' : theme.surface,
               borderRadius: radii.pill,
               paddingLeft: 14,
               paddingRight: 10,
               height: 44,
               borderWidth: 1,
-              borderColor: theme.border,
+              borderColor: isDark ? '#2B353B' : theme.border,
             },
             searchBarAnimatedStyle,
           ]}
@@ -708,16 +787,24 @@ export const HomeSearchView = memo(function HomeSearchView({
           <Feather
             name="search"
             size={16}
-            color={theme.mute}
+            color={isDark ? '#9CA3AF' : theme.mute}
             style={{ flexShrink: 0 }}
           />
           <TextInput
             ref={inputRef}
             value={query}
-            onChangeText={setQuery}
+            onChangeText={(text) => {
+              setQuery(text);
+              setHasSubmitted(false);
+            }}
+            onFocus={() => {
+              if (query.trim().length > 0 && hasSubmitted) {
+                setHasSubmitted(false);
+              }
+            }}
             onSubmitEditing={handleSubmitSearch}
             placeholder="Search"
-            placeholderTextColor={theme.muteSoft}
+            placeholderTextColor={isDark ? '#6B7280' : theme.muteSoft}
             autoFocus
             returnKeyType="search"
             autoCapitalize="none"
@@ -732,7 +819,7 @@ export const HomeSearchView = memo(function HomeSearchView({
                 fontFamily: typography.family.sansMedium,
                 fontSize: 16,
                 letterSpacing: -0.15,
-                color: theme.ink,
+                color: isDark ? '#FFFFFF' : theme.ink,
                 padding: 0,
                 outlineStyle: 'none',
                 outlineWidth: 0,
@@ -745,6 +832,7 @@ export const HomeSearchView = memo(function HomeSearchView({
               onPress={() => {
                 haptic();
                 setQuery('');
+                setHasSubmitted(false);
                 ++searchRequestIdRef.current;
                 setSellerResults([]);
                 setListingResults([]);
@@ -756,30 +844,53 @@ export const HomeSearchView = memo(function HomeSearchView({
                 width: 20,
                 height: 20,
                 borderRadius: 10,
-                backgroundColor: theme.border,
+                backgroundColor: isDark ? '#2F3C43' : theme.border,
                 alignItems: 'center',
                 justifyContent: 'center',
                 marginRight: 2,
               }}
             >
-              <Feather name="x" size={12} color={theme.mute} />
+              <Feather name="x" size={12} color={isDark ? '#D1D5DB' : theme.mute} />
             </Pressable>
           )}
         </Animated.View>
+
+        {/* Close Text Button (Matching Screenshot) */}
+        <Pressable
+          onPress={handleClose}
+          hitSlop={8}
+          accessibilityLabel="Close search"
+          style={({ pressed }) => ({
+            paddingVertical: 6,
+            paddingHorizontal: 4,
+            opacity: pressed ? 0.7 : 1,
+          })}
+        >
+          <Text
+            style={{
+              fontSize: 15,
+              fontWeight: '500',
+              color: isDark ? '#EDEDED' : theme.text,
+              letterSpacing: -0.2,
+            }}
+          >
+            Close
+          </Text>
+        </Pressable>
       </View>
 
       <Animated.View style={contentAnimatedStyle}>
-        {/* ── Tab Switcher ('Listings' & 'Seller') ────────────────────────────── */}
+        {/* ── Tab Switcher ('Items' & 'Members') ────────────────────────────── */}
         <View
           style={{
             flexDirection: 'row',
             borderBottomWidth: 1,
-            borderBottomColor: theme.border,
+            borderBottomColor: isDark ? '#242D31' : theme.border,
             marginTop: 4,
             position: 'relative',
           }}
         >
-          {/* Listings Tab */}
+          {/* Items Tab */}
           <Pressable
             onPress={() => handleTabPress('listings')}
             style={{
@@ -792,18 +903,18 @@ export const HomeSearchView = memo(function HomeSearchView({
               style={{
                 fontSize: 15.5,
                 fontWeight: activeTab === 'listings' ? '600' : '400',
-                color: activeTab === 'listings' ? theme.text : theme.mute,
+                color: activeTab === 'listings' ? (isDark ? '#FFFFFF' : theme.text) : (isDark ? '#9CA3AF' : theme.mute),
                 fontFamily:
                   activeTab === 'listings'
                     ? 'Inklination-SemiBold, "Inklination SemiBold", "Inklination", Inter_600SemiBold, sans-serif'
                     : 'Eina03-Regular, "Eina 03 Regular", "Eina 03", "Eina03", Inter_400Regular, sans-serif',
               }}
             >
-              Listings
+              Items
             </Text>
           </Pressable>
 
-          {/* Seller Tab */}
+          {/* Members Tab */}
           <Pressable
             onPress={() => handleTabPress('seller')}
             style={{
@@ -816,14 +927,14 @@ export const HomeSearchView = memo(function HomeSearchView({
               style={{
                 fontSize: 15.5,
                 fontWeight: activeTab === 'seller' ? '600' : '400',
-                color: activeTab === 'seller' ? theme.text : theme.mute,
+                color: activeTab === 'seller' ? (isDark ? '#FFFFFF' : theme.text) : (isDark ? '#9CA3AF' : theme.mute),
                 fontFamily:
                   activeTab === 'seller'
                     ? 'Inklination-SemiBold, "Inklination SemiBold", "Inklination", Inter_600SemiBold, sans-serif'
                     : 'Eina03-Regular, "Eina 03 Regular", "Eina 03", "Eina03", Inter_400Regular, sans-serif',
               }}
             >
-              Seller
+              Members
             </Text>
           </Pressable>
 
@@ -834,7 +945,7 @@ export const HomeSearchView = memo(function HomeSearchView({
               bottom: -1,
               left: 0,
               width: tabWidth,
-              height: 3.5,
+              height: 3,
               alignItems: 'center',
               justifyContent: 'center',
               transform: [{ translateX: indicatorTranslateX }],
@@ -843,15 +954,15 @@ export const HomeSearchView = memo(function HomeSearchView({
             <View
               style={{
                 width: '85%',
-                height: 3.5,
-                backgroundColor: isDark ? '#22C55E' : '#0A3B2C',
+                height: 3,
+                backgroundColor: isDark ? '#2FD5C6' : '#0A3B2C',
                 borderRadius: 2,
               }}
             />
           </RNAnimated.View>
         </View>
 
-        {/* ── Horizontal Swipeable Pager for Listings & Seller ───────────────── */}
+        {/* ── Horizontal Swipeable Pager for Items & Members ───────────────── */}
         <ScrollView
           ref={pagerRef}
           horizontal
@@ -870,7 +981,7 @@ export const HomeSearchView = memo(function HomeSearchView({
           ]}
           contentContainerStyle={{ width: screenWidth * 2 }}
         >
-          {/* ── Page 0: Listings ──────────────────────────────────────────────── */}
+          {/* ── Page 0: Items ──────────────────────────────────────────────── */}
           <View
             style={[
               { width: screenWidth, flex: 1, backgroundColor: theme.background },
@@ -883,41 +994,57 @@ export const HomeSearchView = memo(function HomeSearchView({
           >
             {!hasQuery ? (
               renderListingsIdleLanding
+            ) : !hasSubmitted ? (
+              <PreSearchSuggestions
+                suggestions={suggestions}
+                onSelect={handleSelectSuggestion}
+                onPopulate={handlePopulateSuggestion}
+              />
             ) : loading ? (
               <View style={{ paddingVertical: 40, alignItems: 'center' }}>
-                <ActivityIndicator size="small" color={isDark ? theme.purple : '#0A3B2C'} />
+                <ActivityIndicator size="small" color={isDark ? '#2FD5C6' : '#0A3B2C'} />
               </View>
-            ) : listingResults.length > 0 ? (
+            ) : (
               <ScrollView
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
                 contentContainerStyle={{
-                  paddingHorizontal: 16,
-                  paddingTop: 12,
                   paddingBottom: 40,
                 }}
               >
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    flexWrap: 'wrap',
-                    gap: 10,
-                  }}
-                >
-                  {listingResults.map((item) => (
-                    <View key={item.id} style={{ width: cardWidth }}>
-                      <ListingCard listing={item} width={cardWidth} />
-                    </View>
-                  ))}
-                </View>
+                <SearchFilterChips
+                  filters={searchFilters}
+                  onUpdateFilter={setSearchFilters}
+                  onResetFilters={() => setSearchFilters(EMPTY_SEARCH_FILTERS)}
+                  resultCount={displayListings.length}
+                />
+
+                {displayListings.length > 0 ? (
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      flexWrap: 'wrap',
+                      gap: 10,
+                      paddingHorizontal: 16,
+                      paddingTop: 8,
+                    }}
+                  >
+                    {displayListings.map((item) => (
+                      <View key={item.id} style={{ width: cardWidth }}>
+                        <ListingCard listing={item} width={cardWidth} />
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <View style={{ paddingVertical: 48, paddingHorizontal: 20, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 14, color: theme.mute, textAlign: 'center' }}>
+                      No listings found matching “{query}”
+                    </Text>
+                  </View>
+                )}
               </ScrollView>
-            ) : (
-              <View style={{ paddingVertical: 48, paddingHorizontal: 20, alignItems: 'center' }}>
-                <Text style={{ fontSize: 14, color: theme.mute, textAlign: 'center' }}>
-                  No listings found matching “{query}”
-                </Text>
-              </View>
             )}
+
           </View>
 
           {/* ── Page 1: Seller ────────────────────────────────────────────────── */}

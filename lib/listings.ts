@@ -165,6 +165,78 @@ export async function fetchFollowingListingsResult(
 // client-side, which silently missed anything outside that window. Escapes
 // PostgREST `or()` metacharacters and ilike wildcards so user input can't
 // break the filter expression.
+const SEARCH_STOP_WORDS = new Set([
+  'for',
+  'with',
+  'and',
+  'the',
+  'a',
+  'an',
+  'in',
+  'on',
+  'at',
+  'of',
+  'to',
+  'by',
+  'from',
+]);
+
+function getSearchTokenVariants(token: string): string[] {
+  const t = token.toLowerCase().trim();
+  if (!t) return [];
+  const variants = new Set<string>([t]);
+
+  if (t.endsWith('ies') && t.length > 4) {
+    variants.add(t.slice(0, -3) + 'y');
+  } else if (t.endsWith('es') && t.length > 3) {
+    variants.add(t.slice(0, -2));
+    variants.add(t.slice(0, -1));
+  } else if (t.endsWith('s') && t.length > 3 && !t.endsWith('ss')) {
+    variants.add(t.slice(0, -1));
+  } else {
+    variants.add(t + 's');
+  }
+  return Array.from(variants);
+}
+
+function scoreListingRelevance(listing: Listing, rawQuery: string, tokens: string[]): number {
+  let score = 0;
+  const qLower = rawQuery.toLowerCase();
+  const title = (listing.title ?? '').toLowerCase();
+  const brand = (listing.brand ?? '').toLowerCase();
+  const desc = (listing.description ?? '').toLowerCase();
+  const sub = (listing.subcategory ?? '').toLowerCase();
+  const cat = (listing.category ?? '').toLowerCase();
+  const tags = Array.isArray(listing.tags)
+    ? listing.tags.map((t) => (typeof t === 'string' ? t.toLowerCase() : ''))
+    : [];
+
+  // Exact phrase matches
+  if (title.includes(qLower)) score += 100;
+  if (brand.includes(qLower)) score += 80;
+
+  // Individual token matches
+  for (const token of tokens) {
+    const variants = getSearchTokenVariants(token);
+    const inTitle = variants.some((v) => title.includes(v));
+    const inBrand = variants.some((v) => brand.includes(v));
+    const inTags = variants.some((v) => tags.some((tag) => tag.includes(v)));
+    const inSub = variants.some((v) => sub.includes(v) || cat.includes(v));
+    const inDesc = variants.some((v) => desc.includes(v));
+
+    if (inTitle) score += 35;
+    if (inBrand) score += 30;
+    if (inTags) score += 25;
+    if (inSub) score += 20;
+    if (inDesc) score += 10;
+  }
+
+  score += Math.min(15, (listing.likes ?? 0) * 0.1);
+  return score;
+}
+
+// Server-side search across the WHOLE catalog (title, brand, description, tags, category, subcategory).
+// Supports multi-token conjunctions, word stemming, and client-side relevance scoring.
 export async function searchListings(opts: {
   query: string;
   category?: string | null;
@@ -174,39 +246,108 @@ export async function searchListings(opts: {
   const { query, category = null, subcategory = null, limit = 60 } = opts;
   const raw = query.trim();
   if (!raw) return { ok: true, rows: [] };
-  // Neutralize PostgREST or() delimiters + escape LIKE wildcards (see lib/search).
-  const safe = escapeSearchQuery(raw);
-  if (!safe) return { ok: true, rows: [] };
+
+  const rawTokens = raw.split(/\s+/).filter((t) => t.length > 0);
+  const significantTokens = rawTokens.filter((t) => !SEARCH_STOP_WORDS.has(t.toLowerCase()));
+  const tokens = significantTokens.length > 0 ? significantTokens : rawTokens;
 
   try {
-    const orConditions = [
-      `title.ilike.%${safe}%`,
-      `brand.ilike.%${safe}%`,
-      `description.ilike.%${safe}%`,
-      `category.ilike.%${safe}%`,
-      `subcategory.ilike.%${safe}%`,
-    ];
-    if (/^[a-zA-Z0-9_-]+$/.test(safe)) {
-      orConditions.push(`tags.cs.{${safe}}`);
-    }
-
     let q = supabase
       .from('listings')
       .select(SELECT_FEED)
       .eq('is_sold', false)
-      .eq('seller.vacation_mode', false)
-      .or(orConditions.join(','));
+      .eq('seller.vacation_mode', false);
+
     if (category) q = q.eq('category', category);
     if (subcategory) q = q.eq('subcategory', subcategory);
-    const { data, error } = await q
+
+    // Apply tokenized conjunction filters (each token must match one of the listing fields)
+    for (const token of tokens) {
+      const variants = getSearchTokenVariants(token);
+      const tokenConds: string[] = [];
+
+      for (const variant of variants) {
+        const safe = escapeSearchQuery(variant);
+        if (!safe) continue;
+        tokenConds.push(`title.ilike.%${safe}%`);
+        tokenConds.push(`brand.ilike.%${safe}%`);
+        tokenConds.push(`description.ilike.%${safe}%`);
+        tokenConds.push(`category.ilike.%${safe}%`);
+        tokenConds.push(`subcategory.ilike.%${safe}%`);
+        if (/^[a-zA-Z0-9_-]+$/.test(safe)) {
+          tokenConds.push(`tags.cs.{${safe}}`);
+        }
+      }
+
+      if (tokenConds.length > 0) {
+        q = q.or(tokenConds.join(','));
+      }
+    }
+
+    let { data, error } = await q
       .order('likes', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
       .limit(limit);
+
+    // Fallback: If strict multi-token AND returned 0 results, fall back to matching primary token
+    if ((!data || data.length === 0) && tokens.length > 1) {
+      const primaryToken = tokens[0];
+      const variants = getSearchTokenVariants(primaryToken);
+      const primaryConds: string[] = [];
+      for (const variant of variants) {
+        const safe = escapeSearchQuery(variant);
+        if (!safe) continue;
+        primaryConds.push(`title.ilike.%${safe}%`);
+        primaryConds.push(`brand.ilike.%${safe}%`);
+        primaryConds.push(`description.ilike.%${safe}%`);
+        primaryConds.push(`category.ilike.%${safe}%`);
+        primaryConds.push(`subcategory.ilike.%${safe}%`);
+        if (/^[a-zA-Z0-9_-]+$/.test(safe)) {
+          primaryConds.push(`tags.cs.{${safe}}`);
+        }
+      }
+
+      if (primaryConds.length > 0) {
+        let fallbackQ = supabase
+          .from('listings')
+          .select(SELECT_FEED)
+          .eq('is_sold', false)
+          .eq('seller.vacation_mode', false)
+          .or(primaryConds.join(','));
+
+        if (category) fallbackQ = fallbackQ.eq('category', category);
+        if (subcategory) fallbackQ = fallbackQ.eq('subcategory', subcategory);
+
+        const fallbackRes = await fallbackQ
+          .order('likes', { ascending: false, nullsFirst: false })
+          .order('created_at', { ascending: false })
+          .limit(limit);
+
+        if (!fallbackRes.error && fallbackRes.data) {
+          data = fallbackRes.data;
+        }
+      }
+    }
+
     if (error) {
       console.warn('[listings] searchListings', error.message);
       return { ok: false };
     }
-    const rows = (data ?? []) as unknown as Listing[];
+
+    let rows = (data ?? []) as unknown as Listing[];
+
+    // Relevance scoring and ranking
+    if (rows.length > 1) {
+      rows = [...rows].sort((a, b) => {
+        const scoreA = scoreListingRelevance(a, raw, tokens);
+        const scoreB = scoreListingRelevance(b, raw, tokens);
+        if (scoreB !== scoreA) {
+          return scoreB - scoreA;
+        }
+        return (b.likes ?? 0) - (a.likes ?? 0);
+      });
+    }
+
     putCachedListings(rows);
     return { ok: true, rows };
   } catch (e: any) {

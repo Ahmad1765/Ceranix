@@ -39,6 +39,12 @@ import type {
 } from '@/lib/discover';
 import type { DiscoverTab } from '@/components/discover/SearchTabs';
 
+import {
+  type SearchFilterState,
+  EMPTY_SEARCH_FILTERS,
+  countActiveSearchFilters,
+} from './SearchFilterChips';
+
 export type CatTile = {
   id: Category | 'trending';
   label: string;
@@ -114,6 +120,13 @@ export function useDiscoverSearch({
   const [savingSearch, setSavingSearch] = useState(false);
   const [savedKey, setSavedKey] = useState<string | null>(null);
 
+  const [searchFilters, setSearchFilters] = useState<SearchFilterState>(() => ({
+    ...EMPTY_SEARCH_FILTERS,
+    category: (initialCat && initialCat !== 'trending' ? initialCat : null) as Category | null,
+    subcategory: initialSub,
+    sort: null,
+  }));
+
   const [serverResults, setServerResults] = useState<Listing[] | null>(null);
   const [userResults, setUserResults] = useState<Awaited<ReturnType<typeof searchUsers>>[number][]>([]);
   const [searching, setSearching] = useState(false);
@@ -127,12 +140,15 @@ export function useDiscoverSearch({
     setQuery(nextQ);
 
     const hasCat = typeof params.category === 'string';
+    let catId: CatTile['id'] | null = null;
+    let subId: string | null = null;
     if (hasCat) {
       const isValid = CATEGORY_TILES.some((t) => t.id === params.category);
-      const catId = isValid ? (params.category as CatTile['id']) : null;
+      catId = isValid ? (params.category as CatTile['id']) : null;
       setActiveCat(catId);
       const sub = typeof params.sub === 'string' ? params.sub : null;
-      setActiveSub(sub && getCategory(catId)?.subs.some((s) => s.id === sub) ? sub : null);
+      subId = sub && getCategory(catId)?.subs.some((s) => s.id === sub) ? sub : null;
+      setActiveSub(subId);
     } else {
       setActiveCat(null);
       setActiveSub(null);
@@ -145,6 +161,13 @@ export function useDiscoverSearch({
     const wantTab = HUB_TABS.find((t) => t === params.tab) ?? null;
     if (wantTab) setTab(wantTab);
     else if (nextQ || hasCat || wantSort) setTab('items');
+
+    setSearchFilters((prev) => ({
+      ...prev,
+      category: (catId && catId !== 'trending' ? catId : null) as Category | null,
+      subcategory: subId,
+      sort: wantSort,
+    }));
   }, [params.q, params.category, params.sub, params.tab, params.sort, params.n]);
 
   // ── Touch Saved Search Seen ──────────────────────────────────────────────
@@ -157,8 +180,8 @@ export function useDiscoverSearch({
       .catch(() => {});
   }, [savedId, qc]);
 
-  const browseCat = activeCat && activeCat !== 'trending' ? activeCat : null;
-  const browseSub = browseCat ? activeSub : null;
+  const browseCat = (searchFilters.category || (activeCat && activeCat !== 'trending' ? activeCat : null)) as Category | null;
+  const browseSub = searchFilters.subcategory || (browseCat ? activeSub : null);
   const browseSubs = browseCat ? getCategory(browseCat)?.subs ?? [] : [];
 
   // ── Debounced Server Search ──────────────────────────────────────────────
@@ -246,9 +269,112 @@ export function useDiscoverSearch({
     return rows;
   }, [listings, query]);
 
-  const results = hasQuery && serverResults !== null ? serverResults : clientFiltered;
+  const rawResults = hasQuery && serverResults !== null ? serverResults : clientFiltered;
+
+  // ── Multi-criteria Post-Search Filtering ────────────────────────────────
+  const results = useMemo(() => {
+    let list = rawResults;
+
+    // Filter by category
+    if (searchFilters.category) {
+      list = list.filter((l) => l && l.category === searchFilters.category);
+    }
+
+    // Filter by subcategory
+    if (searchFilters.subcategory) {
+      list = list.filter((l) => l && l.subcategory === searchFilters.subcategory);
+    }
+
+    // Filter by brand
+    if (searchFilters.brand) {
+      const bLower = searchFilters.brand.toLowerCase();
+      list = list.filter((l) => l && l.brand && l.brand.toLowerCase().includes(bLower));
+    }
+
+    // Filter by sizes
+    if (searchFilters.sizes.length > 0) {
+      list = list.filter((l) => l && l.size && searchFilters.sizes.includes(l.size));
+    }
+
+    // Filter by conditions
+    if (searchFilters.conditions.length > 0) {
+      list = list.filter((l) => l && l.condition && searchFilters.conditions.includes(l.condition));
+    }
+
+    // Filter by price min / max
+    if (searchFilters.priceMin != null) {
+      list = list.filter((l) => l && l.price >= searchFilters.priceMin!);
+    }
+    if (searchFilters.priceMax != null) {
+      list = list.filter((l) => l && l.price <= searchFilters.priceMax!);
+    }
+
+    // Filter by color
+    if (searchFilters.color) {
+      const colLower = searchFilters.color.toLowerCase();
+      list = list.filter((l) => l && l.color && l.color.toLowerCase() === colLower);
+    }
+
+    // Filter by material
+    if (searchFilters.material) {
+      const matLower = searchFilters.material.toLowerCase();
+      list = list.filter(
+        (l) =>
+          l &&
+          ((l.description && l.description.toLowerCase().includes(matLower)) ||
+            (Array.isArray(l.tags) &&
+              l.tags.some((t) => typeof t === 'string' && t.toLowerCase().includes(matLower)))),
+      );
+    }
+
+    // Sorting
+    const activeSort = searchFilters.sort || sort;
+    if (activeSort) {
+      list = [...list];
+      if (activeSort === 'price_asc') {
+        list.sort((a, b) => a.price - b.price);
+      } else if (activeSort === 'price_desc') {
+        list.sort((a, b) => b.price - a.price);
+      } else if (activeSort === 'newest') {
+        list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      } else if (activeSort === 'popular') {
+        list.sort((a, b) => (b.likes ?? 0) - (a.likes ?? 0));
+      }
+    }
+
+    return list;
+  }, [rawResults, searchFilters, sort]);
+
+  const activeFilterCount = useMemo(() => countActiveSearchFilters(searchFilters), [searchFilters]);
+
+  const updateFilter = useCallback(
+    (updater: (prev: SearchFilterState) => SearchFilterState) => {
+      setSearchFilters((prev) => {
+        const next = updater(prev);
+        if (next.category !== activeCat) {
+          setActiveCat(next.category);
+        }
+        if (next.subcategory !== activeSub) {
+          setActiveSub(next.subcategory);
+        }
+        if (next.sort !== sort) {
+          setSort(next.sort);
+        }
+        return next;
+      });
+    },
+    [activeCat, activeSub, sort],
+  );
+
+  const resetFilters = useCallback(() => {
+    setSearchFilters(EMPTY_SEARCH_FILTERS);
+    setActiveCat(null);
+    setActiveSub(null);
+    setSort(null);
+  }, []);
+
   const sortOnly = !hasQuery && !browseCat && !!sort;
-  const idle = !hasQuery && !browseCat && !sortOnly;
+  const idle = !hasQuery && !browseCat && !sortOnly && activeFilterCount === 0;
 
   // In-place theme sorting for the idle grid
   const gridResults = useMemo(() => {
@@ -286,11 +412,13 @@ export function useDiscoverSearch({
 
   const handleDigestPress = useCallback(
     (card: DigestCard) => {
-      if (card.target.kind === 'category') {
-        setActiveCat(card.target.category);
+      const target = card.target;
+      if (target.kind === 'category') {
+        setActiveCat(target.category);
+        setSearchFilters((prev) => ({ ...prev, category: target.category }));
         return;
       }
-      setDigestSort(card.target.theme);
+      setDigestSort(target.theme);
       requestAnimationFrame(() =>
         scrollRef.current?.scrollToOffset({
           offset: Math.max(0, (gridYRef.current ?? 0) - 8),
@@ -301,6 +429,7 @@ export function useDiscoverSearch({
     [scrollRef, gridYRef],
   );
 
+
   const handlePromoPress = useCallback(
     (target: PromoTarget) => {
       if (target.kind === 'listing') {
@@ -309,6 +438,7 @@ export function useDiscoverSearch({
       }
       if (target.kind === 'category') {
         setActiveCat(target.category);
+        setSearchFilters((prev) => ({ ...prev, category: target.category }));
         return;
       }
       setDigestSort(target.theme);
@@ -335,15 +465,22 @@ export function useDiscoverSearch({
     setActiveCat(null);
     setActiveSub(null);
     setSort(null);
+    setSearchFilters((prev) => ({
+      ...prev,
+      category: null,
+      subcategory: null,
+      sort: null,
+    }));
   }, []);
 
   const shopAll = useCallback(() => {
     setQuery('');
     clearCategory();
+    resetFilters();
     setDigestSort(null);
     setSearchActive(false);
     Keyboard.dismiss();
-  }, [clearCategory]);
+  }, [clearCategory, resetFilters]);
 
   const handleBrowse = useCallback(
     (action: BrowseAction) => {
@@ -361,6 +498,7 @@ export function useDiscoverSearch({
       clearCategory();
       setDigestSort(null);
       setSort(action.sort);
+      setSearchFilters((prev) => ({ ...prev, sort: action.sort }));
       requestAnimationFrame(() =>
         scrollRef.current?.scrollToOffset({
           offset: 0,
@@ -382,6 +520,12 @@ export function useDiscoverSearch({
       setActiveCat(action.category);
       setActiveSub(null);
       setSort(null);
+      setSearchFilters((prev) => ({
+        ...prev,
+        category: action.category,
+        subcategory: null,
+        sort: null,
+      }));
       setSearchActive(false);
       Keyboard.dismiss();
     },
@@ -439,5 +583,10 @@ export function useDiscoverSearch({
     handleBrowse,
     handleTopic,
     cancelSearch,
+    searchFilters,
+    updateFilter,
+    resetFilters,
+    activeFilterCount,
   };
 }
+

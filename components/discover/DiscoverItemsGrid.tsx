@@ -25,6 +25,10 @@ import {
 } from './EditorialFeed';
 import { GridSkeleton, RailSkeleton } from './DiscoverSkeletons';
 import {
+  SearchFilterChips,
+  type SearchFilterState,
+} from './SearchFilterChips';
+import {
   CATEGORY_TILES,
   SORT_OPTIONS,
   SORT_TITLE,
@@ -75,6 +79,10 @@ type DiscoverItemsGridProps = {
   onClearCategory: () => void;
   onClearSort: () => void;
   onClearDigestSort: () => void;
+  searchFilters: SearchFilterState;
+  onUpdateFilter: (updater: (prev: SearchFilterState) => SearchFilterState) => void;
+  onResetFilters: () => void;
+  activeFilterCount: number;
 };
 
 export const DiscoverItemsGrid = memo(function DiscoverItemsGrid({
@@ -117,7 +125,12 @@ export const DiscoverItemsGrid = memo(function DiscoverItemsGrid({
   onClearCategory,
   onClearSort,
   onClearDigestSort,
+  searchFilters,
+  onUpdateFilter,
+  onResetFilters,
+  activeFilterCount,
 }: DiscoverItemsGridProps) {
+
   const displayResults = idle ? gridResults : results;
 
   return (
@@ -243,7 +256,14 @@ export const DiscoverItemsGrid = memo(function DiscoverItemsGrid({
           if (gridYRef) (gridYRef as any).current = e.nativeEvent.layout.y;
         }}
       >
-        {browseCat && !hasQuery ? (
+        {hasQuery || activeFilterCount > 0 ? (
+          <SearchFilterChips
+            filters={searchFilters}
+            onUpdateFilter={onUpdateFilter}
+            onResetFilters={onResetFilters}
+            resultCount={displayResults.length}
+          />
+        ) : browseCat ? (
           <>
             <SectionHeader
               title={
@@ -337,7 +357,7 @@ export const DiscoverItemsGrid = memo(function DiscoverItemsGrid({
           />
         ) : (
           <SectionHeader
-            title={hasQuery ? 'Items' : idleGridTitle}
+            title={idleGridTitle}
             count={displayResults.length}
             rightText={displayResults.length === 1 ? 'item' : 'items'}
           />

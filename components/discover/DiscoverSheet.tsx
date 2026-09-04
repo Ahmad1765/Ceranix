@@ -52,6 +52,8 @@ import { buildTopicCovers } from '@/lib/discover';
 import { useFeedListingsQuery } from '@/lib/queries';
 import { colors, radii, type } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
+import { getSearchSuggestions } from '@/lib/searchSuggestions';
+import { PreSearchSuggestions } from '@/components/home/PreSearchSuggestions';
 import { SearchLanding, type BrowseAction, type TopicAction } from './SearchLanding';
 import { useSheetSearchFocus } from './useSheetSearchFocus';
 
@@ -475,6 +477,27 @@ function DiscoverSheetBody({ onClose }: { onClose: () => void }) {
     [go],
   );
 
+  const suggestions = useMemo(
+    () => getSearchSuggestions(query, { limit: 10 }),
+    [query],
+  );
+
+  const handleSelectSuggestion = useCallback(
+    (term: string) => {
+      setQuery('');
+      go(`/discover?q=${encodeURIComponent(term)}`);
+    },
+    [go],
+  );
+
+  const handlePopulateSuggestion = useCallback(
+    (term: string) => {
+      setQuery(term.trim() + ' ');
+      searchRef.current?.focus?.();
+    },
+    [],
+  );
+
   // Background, rounded top, top inset and the grabber all belong to SheetShell.
   return (
     <View style={{ flex: 1 }}>
@@ -556,14 +579,24 @@ function DiscoverSheetBody({ onClose }: { onClose: () => void }) {
         </Pressable>
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        contentContainerStyle={{ paddingBottom: 24 + insets.bottom }}
-      >
-        <SearchLanding covers={covers} onBrowse={onBrowse} onTopic={onTopic} />
-      </ScrollView>
+      {query.trim().length > 0 ? (
+        <View style={{ flex: 1, marginTop: 10 }}>
+          <PreSearchSuggestions
+            suggestions={suggestions}
+            onSelect={handleSelectSuggestion}
+            onPopulate={handlePopulateSuggestion}
+          />
+        </View>
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          contentContainerStyle={{ paddingBottom: 24 + insets.bottom }}
+        >
+          <SearchLanding covers={covers} onBrowse={onBrowse} onTopic={onTopic} />
+        </ScrollView>
+      )}
     </View>
   );
 }

@@ -417,8 +417,13 @@ export default function DiscoverScreen() {
           onClearCategory={search.clearCategory}
           onClearSort={() => search.setSort(null)}
           onClearDigestSort={() => search.setDigestSort(null)}
+          searchFilters={search.searchFilters}
+          onUpdateFilter={search.updateFilter}
+          onResetFilters={search.resetFilters}
+          activeFilterCount={search.activeFilterCount}
         />
       )}
+
     </>
   );
 
