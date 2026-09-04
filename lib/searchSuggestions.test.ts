@@ -46,7 +46,20 @@ describe('searchSuggestions engine', () => {
     expect(texts).toContain('tops women');
     expect(texts).toContain('tops with sleeves');
   });
+
+  it('matches words in order and prevents partial word matching earlier suggestion words', () => {
+    // "tops t" should match "tops tracksuit", "tops tie dye" etc., but NOT "tops women" (even though 'tops' contains 't')
+    const suggestionsTopsT = getSearchSuggestions('tops t');
+    const textsTopsT = suggestionsTopsT.map((s) => s.text);
+    expect(textsTopsT).not.toContain('tops women');
+
+    // Preserves valid full completions
+    const suggestionsTopsWomen = getSearchSuggestions('tops women');
+    const textsTopsWomen = suggestionsTopsWomen.map((s) => s.text);
+    expect(textsTopsWomen).toContain('tops women');
+  });
 });
+
 
 describe('splitSuggestionHighlight', () => {
   it('splits exact prefix match into match and remaining suffix', () => {

@@ -888,24 +888,51 @@ export function getSearchSuggestions(
   }
 
   // 4. Multi-word partial completion:
+  // Query words are matched against suggestion words in order.
+  // The final query word must prefix-match the corresponding suggestion word (startsWith),
+  // preventing a partial trailing word from matching an earlier suggestion word.
   // e.g. "tops w" -> matches "tops women", "tops with sleeves", "tops women y2k"
   // e.g. "tops h" -> matches "tops hollister"
   // e.g. "tops y" -> matches "tops y2k"
   const words = trimmed.split(/\s+/).filter(Boolean);
   if (words.length > 1) {
     for (const item of MASTER_RECOMMENDATIONS) {
-      const allWordsMatch = words.every((w, idx) => {
-        if (idx === words.length - 1) {
-          // Last word is prefix match
-          return item.includes(w) || item.startsWith(w);
+      const itemWords = item.split(/\s+/).filter(Boolean);
+      if (itemWords.length < words.length) continue;
+
+      let itemIdx = 0;
+      let matchesAll = true;
+
+      for (let qIdx = 0; qIdx < words.length; qIdx++) {
+        const qWord = words[qIdx];
+        const isLast = qIdx === words.length - 1;
+        let found = false;
+
+        while (itemIdx < itemWords.length) {
+          const itemWord = itemWords[itemIdx];
+          itemIdx++;
+          const matches = isLast
+            ? itemWord.startsWith(qWord)
+            : itemWord === qWord || itemWord.startsWith(qWord);
+
+          if (matches) {
+            found = true;
+            break;
+          }
         }
-        return item.includes(w);
-      });
-      if (allWordsMatch) {
+
+        if (!found) {
+          matchesAll = false;
+          break;
+        }
+      }
+
+      if (matchesAll) {
         addSuggestion(item);
       }
     }
   }
+
 
   // 5. Taxonomy subcategories matching from CATEGORIES
   for (const cat of CATEGORIES) {

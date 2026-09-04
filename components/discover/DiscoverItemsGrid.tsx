@@ -256,7 +256,7 @@ export const DiscoverItemsGrid = memo(function DiscoverItemsGrid({
           if (gridYRef) (gridYRef as any).current = e.nativeEvent.layout.y;
         }}
       >
-        {hasQuery || activeFilterCount > 0 ? (
+        {hasQuery ? (
           <SearchFilterChips
             filters={searchFilters}
             onUpdateFilter={onUpdateFilter}
@@ -274,6 +274,7 @@ export const DiscoverItemsGrid = memo(function DiscoverItemsGrid({
               count={results.length}
               action={{ label: 'Clear', onPress: onClearCategory }}
             />
+
 
             {/* Subcategory Chips */}
             {browseSubs.length > 0 && (

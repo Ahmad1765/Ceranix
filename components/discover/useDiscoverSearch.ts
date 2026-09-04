@@ -349,22 +349,21 @@ export function useDiscoverSearch({
 
   const updateFilter = useCallback(
     (updater: (prev: SearchFilterState) => SearchFilterState) => {
-      setSearchFilters((prev) => {
-        const next = updater(prev);
-        if (next.category !== activeCat) {
-          setActiveCat(next.category);
-        }
-        if (next.subcategory !== activeSub) {
-          setActiveSub(next.subcategory);
-        }
-        if (next.sort !== sort) {
-          setSort(next.sort);
-        }
-        return next;
-      });
+      const next = updater(searchFilters);
+      if (next.category !== activeCat) {
+        setActiveCat(next.category);
+      }
+      if (next.subcategory !== activeSub) {
+        setActiveSub(next.subcategory);
+      }
+      if (next.sort !== sort) {
+        setSort(next.sort);
+      }
+      setSearchFilters(next);
     },
-    [activeCat, activeSub, sort],
+    [searchFilters, activeCat, activeSub, sort],
   );
+
 
   const resetFilters = useCallback(() => {
     setSearchFilters(EMPTY_SEARCH_FILTERS);
@@ -374,7 +373,7 @@ export function useDiscoverSearch({
   }, []);
 
   const sortOnly = !hasQuery && !browseCat && !!sort;
-  const idle = !hasQuery && !browseCat && !sortOnly && activeFilterCount === 0;
+  const idle = !hasQuery && !browseCat && !sortOnly;
 
   // In-place theme sorting for the idle grid
   const gridResults = useMemo(() => {

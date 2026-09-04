@@ -248,11 +248,12 @@ export const SearchFilterChips = memo(function SearchFilterChips({
     const maxVal = customMax.trim() ? parseFloat(customMax) : null;
     onUpdateFilter((prev) => ({
       ...prev,
-      priceMin: minVal && !isNaN(minVal) ? Math.max(0, minVal) : null,
-      priceMax: maxVal && !isNaN(maxVal) ? Math.max(0, maxVal) : null,
+      priceMin: minVal !== null && !isNaN(minVal) ? Math.max(0, minVal) : null,
+      priceMax: maxVal !== null && !isNaN(maxVal) ? Math.max(0, maxVal) : null,
     }));
     closeModal();
   }, [customMin, customMax, onUpdateFilter, closeModal]);
+
 
   // Color Toggle
   const handleSelectColor = useCallback(

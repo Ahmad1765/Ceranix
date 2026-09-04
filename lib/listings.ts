@@ -325,6 +325,9 @@ export async function searchListings(opts: {
 
         if (!fallbackRes.error && fallbackRes.data) {
           data = fallbackRes.data;
+          error = null;
+        } else if (fallbackRes.error) {
+          error = fallbackRes.error;
         }
       }
     }
@@ -333,6 +336,7 @@ export async function searchListings(opts: {
       console.warn('[listings] searchListings', error.message);
       return { ok: false };
     }
+
 
     let rows = (data ?? []) as unknown as Listing[];
 
