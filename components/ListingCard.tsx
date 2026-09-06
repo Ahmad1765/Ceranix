@@ -16,7 +16,15 @@ import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
 import { router } from 'expo-router';
-import { cardImageUrl, getOptimizedImageUrl, thumbWidthFor, IMAGE_TRANSITION } from '@/lib/images';
+import {
+  cardImageUrl,
+  getOptimizedImageUrl,
+  thumbWidthFor,
+  IMAGE_TRANSITION,
+  setImagePlaceholder,
+  prefetchImages,
+} from '@/lib/images';
+import { putCachedListing } from '@/lib/listingCache';
 
 import { peekLikedIds } from '@/lib/engagementCache';
 import { formatPrice } from '@/lib/currency';
@@ -279,6 +287,11 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
     [activeIndex, cardWidth, images.length],
   );
 
+  const srcWidth = thumbWidthFor(cardWidth || 200);
+  const currentSrc = getOptimizedImageUrl(cardImageUrl(listing, activeIndex) || cardImageUrl(listing, 0), {
+    width: srcWidth,
+  });
+
   const handleCardPress = useCallback(
     (e: any) => {
       if (isSwipingOrDragging.current) {
@@ -294,15 +307,15 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
           return;
         }
       }
-      router.push(`/product/${listing.id}`);
+      putCachedListing(listing);
+      setImagePlaceholder(listing.id, currentSrc);
+      router.push({
+        pathname: `/product/${listing.id}`,
+        params: { initialImage: currentSrc },
+      } as any);
     },
-    [listing.id],
+    [listing, currentSrc],
   );
-
-  const srcWidth = thumbWidthFor(cardWidth || 200);
-  const currentSrc = getOptimizedImageUrl(cardImageUrl(listing, activeIndex) || cardImageUrl(listing, 0), {
-    width: srcWidth,
-  });
 
   const meta = [listing.size?.trim(), conditionLabel(listing.condition)].filter(Boolean).join(' · ');
   const { item: itemPrice, total: totalPrice } = priceBreakdown(listing.price);
@@ -317,6 +330,12 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
           y: e.nativeEvent.pageY,
           time: Date.now(),
         };
+        putCachedListing(listing);
+        setImagePlaceholder(listing.id, currentSrc);
+        const heroUrl = getOptimizedImageUrl(listing.images?.[activeIndex] || listing.images?.[0], {
+          width: 600,
+        });
+        if (heroUrl) prefetchImages([heroUrl]);
       }}
       accessibilityRole="link"
       accessibilityLabel={`${listing.brand || listing.title}${listing.size ? `, size ${listing.size}` : ''}, ${formatPrice(listing.price)}`}

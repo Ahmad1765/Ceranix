@@ -76,10 +76,8 @@ export function useConversationThread(
   const [input, setInput] = useState(initialInput);
 
   useEffect(() => {
-    if (initialInput) {
-      setInput(initialInput);
-    }
-  }, [initialInput]);
+    setInput(initialInput);
+  }, [conversationId, initialInput]);
 
   // ── Initial Parallel Fetch ────────────────────────────────────────────────
   useEffect(() => {

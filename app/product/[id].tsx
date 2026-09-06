@@ -51,7 +51,7 @@ import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { captureError } from '@/lib/sentry';
 import { getOrCreateConversation, sendOffer } from '@/lib/chat';
-import { cardImageUrl, prefetchImages } from '@/lib/images';
+import { cardImageUrl, prefetchImages, getImagePlaceholder } from '@/lib/images';
 import { SaveListSheet } from '@/components/SaveListSheet';
 import { colors } from '@/lib/theme';
 import { FullscreenImageViewer } from '@/components/product/FullscreenImageViewer';
@@ -92,13 +92,17 @@ const withFallbackSeller = (row: Listing | null): Listing | null =>
 
 export default function ProductScreen() {
   const { theme, isDark } = useTheme();
-  const { id } = useLocalSearchParams();
+  const { id, initialImage } = useLocalSearchParams<{ id: string; initialImage?: string }>();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const toast = useToast();
   const guestGate = useGuestGate();
   const { open: openSellSheet } = useSellSheet();
   const productIdParam = Array.isArray(id) ? id[0] : id;
+
+  const placeholderImage =
+    (typeof initialImage === 'string' && initialImage.length > 0 ? initialImage : undefined) ||
+    getImagePlaceholder(productIdParam);
 
   const [showStickyHeader, setShowStickyHeader] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
@@ -505,13 +509,14 @@ export default function ProductScreen() {
   }
 
   if (!listing) {
-    return <ProductSkeleton insetsTop={insets.top} />;
+    return <ProductSkeleton insetsTop={insets.top} placeholderImage={placeholderImage} />;
   }
 
   const itemPrice = Number(listing.price ?? 0);
   const bpFee = buyerProtectionFee(itemPrice);
   const buyTotal = orderTotal(itemPrice);
   const images = listing.images ?? [];
+  const heroPlaceholder = placeholderImage || cardImageUrl(listing, 0) || undefined;
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
@@ -536,6 +541,8 @@ export default function ProductScreen() {
         {/* 2. Hero Image Carousel & Action Discs */}
         <ProductHeroSection
           images={images}
+          placeholderImage={heroPlaceholder}
+          listingId={productIdParam}
           isSold={listing.is_sold}
           liked={engagement.liked}
           saved={engagement.saved}

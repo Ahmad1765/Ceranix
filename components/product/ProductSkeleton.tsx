@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { View } from 'react-native';
+import { Image } from 'expo-image';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -49,7 +50,13 @@ export function SkeletonBlock({
   );
 }
 
-export function ProductSkeleton({ insetsTop }: { insetsTop: number }) {
+export function ProductSkeleton({
+  insetsTop,
+  placeholderImage,
+}: {
+  insetsTop: number;
+  placeholderImage?: string;
+}) {
   const { theme } = useTheme();
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
@@ -72,12 +79,23 @@ export function ProductSkeleton({ insetsTop }: { insetsTop: number }) {
       </View>
 
       {/* Hero image */}
-      <SkeletonBlock
-        width="100%"
-        height={420}
-        radius={0}
-        style={{ marginTop: 4 }}
-      />
+      {placeholderImage ? (
+        <View style={{ width: '100%', height: 420, marginTop: 4, overflow: 'hidden', backgroundColor: theme.panel }}>
+          <Image
+            source={{ uri: placeholderImage }}
+            style={{ width: '100%', height: '100%' }}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+          />
+        </View>
+      ) : (
+        <SkeletonBlock
+          width="100%"
+          height={420}
+          radius={0}
+          style={{ marginTop: 4 }}
+        />
+      )}
 
       {/* Content block */}
       <View style={{ paddingHorizontal: 20, paddingTop: 22 }}>

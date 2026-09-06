@@ -32,6 +32,8 @@ type ProductHeroSectionProps = {
   onImagePress: (index: number) => void;
   onHeartPress: () => void;
   onOpenSaveList: () => void;
+  placeholderImage?: string;
+  listingId?: string;
 };
 
 export const ProductHeroSection = memo(function ProductHeroSection({
@@ -46,6 +48,8 @@ export const ProductHeroSection = memo(function ProductHeroSection({
   onImagePress,
   onHeartPress,
   onOpenSaveList,
+  placeholderImage,
+  listingId,
 }: ProductHeroSectionProps) {
   const { theme } = useTheme();
   return (
@@ -56,6 +60,8 @@ export const ProductHeroSection = memo(function ProductHeroSection({
           images={images}
           aspectRatio="4:5"
           onImagePress={onImagePress}
+          placeholderImage={placeholderImage}
+          listingId={listingId}
         />
       </Animated.View>
 

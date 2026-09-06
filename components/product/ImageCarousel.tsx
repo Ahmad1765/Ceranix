@@ -20,6 +20,8 @@ export interface ImageCarouselProps {
   onImagePress?: (index: number) => void;
   className?: string;
   style?: ViewStyle;
+  placeholderImage?: string;
+  listingId?: string;
 }
 
 /**
@@ -33,6 +35,8 @@ export function ImageCarousel({
   onImagePress,
   className = '',
   style,
+  placeholderImage,
+  listingId,
 }: ImageCarouselProps) {
   const { theme } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
@@ -45,9 +49,13 @@ export function ImageCarousel({
   // Proactively prefetch adjacent gallery images on mount so swipes are instantaneous
   useEffect(() => {
     if (validImages.length > 1) {
-      prefetchImages(validImages.slice(1));
+      const targetWidth = thumbWidthFor(carouselWidth);
+      const toPrefetch = validImages
+        .slice(1)
+        .map((u) => getOptimizedImageUrl(u, { width: targetWidth }));
+      prefetchImages(toPrefetch);
     }
-  }, [validImages]);
+  }, [validImages, carouselWidth]);
 
   useEffect(() => {
     setCarouselWidth(windowWidth);
@@ -116,11 +124,13 @@ export function ImageCarousel({
       >
         {validImages.map((uri, index) => (
           <CarouselSlide
-            key={index}
+            key={listingId ? `${listingId}-${index}` : `${uri}-${index}`}
             uri={uri}
             index={index}
             width={carouselWidth}
             height={carouselHeight}
+            placeholderUri={index === 0 ? placeholderImage : undefined}
+            listingId={listingId}
             onPress={onImagePress ? () => onImagePress(index) : undefined}
           />
         ))}
@@ -146,57 +156,73 @@ export function ImageCarousel({
   );
 }
 
-function CarouselSlide({
-  uri,
-  index,
-  width,
-  height,
-  onPress,
-}: {
-  uri: string;
-  index: number;
-  width: number;
-  height: number;
-  onPress?: () => void;
-}) {
-  const optimizedUri = getOptimizedImageUrl(uri, { width: thumbWidthFor(width) });
-  const imageElement = (
-    <Image
-      source={{ uri: optimizedUri }}
-      contentFit="cover"
-      transition={IMAGE_TRANSITION}
-      priority={index === 0 ? 'high' : 'normal'}
-      cachePolicy="memory-disk"
-      style={styles.image}
-    />
-  );
+const CarouselSlide = React.memo(
+  function CarouselSlide({
+    uri,
+    index,
+    width,
+    height,
+    placeholderUri,
+    listingId,
+    onPress,
+  }: {
+    uri: string;
+    index: number;
+    width: number;
+    height: number;
+    placeholderUri?: string;
+    listingId?: string;
+    onPress?: () => void;
+  }) {
+    const optimizedUri = getOptimizedImageUrl(uri, { width: thumbWidthFor(width) });
+    const imageElement = (
+      <Image
+        source={{ uri: optimizedUri }}
+        placeholder={placeholderUri ? { uri: placeholderUri } : undefined}
+        placeholderContentFit="cover"
+        contentFit="cover"
+        transition={IMAGE_TRANSITION}
+        priority={index === 0 ? 'high' : 'normal'}
+        cachePolicy="memory-disk"
+        recyclingKey={listingId ? `${listingId}-${index}` : undefined}
+        style={styles.image}
+      />
+    );
 
-  if (onPress) {
+    if (onPress) {
+      return (
+        <Pressable
+          onPress={onPress}
+          accessibilityRole="button"
+          accessibilityLabel="View full photo"
+          style={({ pressed }) => [
+            styles.slide,
+            { width, height, opacity: pressed ? 0.96 : 1 },
+          ]}
+        >
+          {imageElement}
+        </Pressable>
+      );
+    }
+
     return (
-      <Pressable
-        onPress={onPress}
-        accessibilityRole="button"
-        accessibilityLabel="View full photo"
-        style={({ pressed }) => [
-          styles.slide,
-          { width, height, opacity: pressed ? 0.96 : 1 },
-        ]}
+      <View
+        accessibilityRole="image"
+        accessibilityLabel="Product photo"
+        style={[styles.slide, { width, height }]}
       >
         {imageElement}
-      </Pressable>
+      </View>
     );
-  }
-
-  return (
-    <View
-      accessibilityRole="image"
-      accessibilityLabel="Product photo"
-      style={[styles.slide, { width, height }]}
-    >
-      {imageElement}
-    </View>
-  );
-}
+  },
+  (prev, next) =>
+    prev.uri === next.uri &&
+    prev.index === next.index &&
+    prev.width === next.width &&
+    prev.height === next.height &&
+    prev.placeholderUri === next.placeholderUri &&
+    prev.listingId === next.listingId,
+);
 
 const styles = StyleSheet.create({
   container: {

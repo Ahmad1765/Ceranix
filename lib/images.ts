@@ -148,3 +148,32 @@ export function prefetchImages(urls: (string | undefined | null)[]): void {
   }
 }
 
+// In-memory placeholder cache mapping listingId -> rendered image URL.
+// Allows the product screen to immediately paint the exact image URL already loaded
+// on the feed card as a placeholder, eliminating flash-of-blank/second loading states.
+const placeholderCache = new Map<string, string>();
+const MAX_PLACEHOLDERS = 200;
+
+export function setImagePlaceholder(
+  listingId: string | undefined | null,
+  url: string | undefined | null,
+): void {
+  if (!listingId || !url) return;
+  if (placeholderCache.has(listingId)) {
+    placeholderCache.delete(listingId);
+  } else if (placeholderCache.size >= MAX_PLACEHOLDERS) {
+    const oldestKey = placeholderCache.keys().next().value;
+    if (oldestKey) placeholderCache.delete(oldestKey);
+  }
+  placeholderCache.set(listingId, url);
+}
+
+export function getImagePlaceholder(listingId: string | undefined | null): string | undefined {
+  if (!listingId) return undefined;
+  return placeholderCache.get(listingId);
+}
+
+export function clearImagePlaceholders(): void {
+  placeholderCache.clear();
+}
+

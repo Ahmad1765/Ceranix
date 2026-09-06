@@ -3,7 +3,14 @@ import { View, Pressable } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { cardImageUrl, getOptimizedImageUrl, thumbWidthFor, IMAGE_TRANSITION } from '@/lib/images';
+import {
+  cardImageUrl,
+  getOptimizedImageUrl,
+  thumbWidthFor,
+  IMAGE_TRANSITION,
+  setImagePlaceholder,
+} from '@/lib/images';
+import { putCachedListing } from '@/lib/listingCache';
 import type { PriceDropListing } from '@/lib/myFeed';
 import { formatPrice as formatMoney } from '@/lib/currency';
 
@@ -31,7 +38,14 @@ export const PriceDropCard = memo(function PriceDropCard({ listing, width = 130 
       : 0;
   return (
     <Pressable
-      onPress={() => router.push(`/product/${listing.id}`)}
+      onPress={() => {
+        putCachedListing(listing);
+        setImagePlaceholder(listing.id, src);
+        router.push({
+          pathname: `/product/${listing.id}`,
+          params: { initialImage: src },
+        } as any);
+      }}
       style={{ width }}
       accessibilityRole="button"
       accessibilityLabel={`${listing.title}, price dropped to ${formatPrice(listing.new_price)}`}

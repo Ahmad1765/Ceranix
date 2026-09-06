@@ -1,5 +1,13 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
-import { cardImageUrl, getOptimizedImageUrl, thumbWidthFor, prefetchImages } from '@/lib/images';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
+import {
+  cardImageUrl,
+  getOptimizedImageUrl,
+  thumbWidthFor,
+  prefetchImages,
+  setImagePlaceholder,
+  getImagePlaceholder,
+  clearImagePlaceholders,
+} from '@/lib/images';
 
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios', select: (obj: any) => obj.ios || obj.default },
@@ -170,5 +178,37 @@ describe('cardImageUrl', () => {
 
   it('defaults to index 0', () => {
     expect(cardImageUrl({ images: [FULL, 'other'], thumbnails: [THUMB, 'other_thumb'] })).toBe(THUMB);
+  });
+});
+
+describe('placeholderCache', () => {
+  beforeEach(() => {
+    clearImagePlaceholders();
+  });
+
+  it('stores and retrieves a placeholder by listing id', () => {
+    setImagePlaceholder('listing-1', 'https://example.com/thumb.jpg');
+    expect(getImagePlaceholder('listing-1')).toBe('https://example.com/thumb.jpg');
+  });
+
+  it('returns undefined for missing or nullish ids', () => {
+    expect(getImagePlaceholder('unknown')).toBeUndefined();
+    expect(getImagePlaceholder(null)).toBeUndefined();
+    expect(getImagePlaceholder(undefined)).toBeUndefined();
+  });
+
+  it('ignores nullish inputs to setImagePlaceholder', () => {
+    setImagePlaceholder(null, 'https://example.com/thumb.jpg');
+    setImagePlaceholder('listing-2', null);
+    setImagePlaceholder('', '');
+    expect(getImagePlaceholder('listing-2')).toBeUndefined();
+  });
+
+  it('clears all cached entries', () => {
+    setImagePlaceholder('listing-1', 'https://example.com/1.jpg');
+    setImagePlaceholder('listing-2', 'https://example.com/2.jpg');
+    clearImagePlaceholders();
+    expect(getImagePlaceholder('listing-1')).toBeUndefined();
+    expect(getImagePlaceholder('listing-2')).toBeUndefined();
   });
 });
