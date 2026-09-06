@@ -21,6 +21,7 @@ import {
   type SaveList,
 } from '@/lib/saves';
 import { colors } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 
 const IS_IOS = Platform.OS === 'ios';
 const HAIRLINE = StyleSheet.hairlineWidth;
@@ -47,6 +48,7 @@ export function SaveListSheet({
   // refresh their "is saved" pill without round-tripping the network.
   onChanged?: (isSavedSomewhere: boolean) => void;
 }) {
+  const { theme, isDark } = useTheme();
   const [lists, setLists] = useState<SaveList[]>([]);
   const [containedIn, setContainedIn] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -161,9 +163,9 @@ export function SaveListSheet({
     >
       <Pressable onPress={onClose} style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         {IS_IOS ? (
-          <BlurView intensity={28} tint="dark" style={StyleSheet.absoluteFill} />
+          <BlurView intensity={28} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill} />
         ) : (
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)' }]} />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.55)' }]} />
         )}
         <Pressable
           onPress={() => {}}
@@ -171,11 +173,13 @@ export function SaveListSheet({
             width: width - 56,
             maxWidth: 360,
             maxHeight: '80%',
-            backgroundColor: IS_IOS ? 'rgba(255,255,255,0.96)' : 'white',
+            backgroundColor: isDark ? theme.panel : '#FFFFFF',
             borderRadius: 18,
             paddingVertical: 6,
+            borderWidth: isDark ? 1 : 0,
+            borderColor: theme.border,
             shadowColor: '#000',
-            shadowOpacity: 0.2,
+            shadowOpacity: isDark ? 0.4 : 0.15,
             shadowRadius: 24,
             shadowOffset: { width: 0, height: 16 },
             elevation: 12,
@@ -185,7 +189,7 @@ export function SaveListSheet({
             style={{
               fontSize: 13,
               fontWeight: '600',
-              color: 'rgba(15,15,15,0.62)',
+              color: theme.mute,
               textAlign: 'center',
               paddingTop: 14,
               paddingBottom: 10,
@@ -194,11 +198,11 @@ export function SaveListSheet({
           >
             {headerText}
           </Text>
-          <View style={{ height: HAIRLINE, backgroundColor: 'rgba(15,15,15,0.08)', marginHorizontal: 12 }} />
+          <View style={{ height: HAIRLINE, backgroundColor: theme.border, marginHorizontal: 12 }} />
 
           {loading ? (
             <View style={{ paddingVertical: 32, alignItems: 'center' }}>
-              <ActivityIndicator color={colors.purple} />
+              <ActivityIndicator color={theme.purple} />
             </View>
           ) : (
             <View>
@@ -217,23 +221,23 @@ export function SaveListSheet({
                       paddingVertical: 14,
                       paddingHorizontal: 18,
                       borderBottomWidth: isLast ? 0 : HAIRLINE,
-                      borderBottomColor: 'rgba(15,15,15,0.08)',
+                      borderBottomColor: theme.border,
                       opacity: pressed ? 0.55 : 1,
                     })}
                   >
                     <Text style={{ fontSize: 22, marginRight: 12 }}>{list.emoji}</Text>
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 16, fontWeight: '600', color: '#0F0F0F' }}>
+                      <Text style={{ fontSize: 16, fontWeight: '600', color: theme.text }}>
                         {list.name}
                       </Text>
-                      <Text style={{ fontSize: 12, color: 'rgba(15,15,15,0.62)', marginTop: 2 }}>
+                      <Text style={{ fontSize: 12, color: theme.mute, marginTop: 2 }}>
                         {list.item_count ?? 0} {list.item_count === 1 ? 'item' : 'items'}
                       </Text>
                     </View>
                     {isBusy ? (
-                      <ActivityIndicator color={colors.purple} size="small" />
+                      <ActivityIndicator color={theme.purple} size="small" />
                     ) : isIn ? (
-                      <Ionicons name="checkmark-circle" size={22} color={colors.purple} />
+                      <Ionicons name="checkmark-circle" size={22} color={theme.purple} />
                     ) : (
                       <View
                         style={{
@@ -241,7 +245,7 @@ export function SaveListSheet({
                           height: 22,
                           borderRadius: 11,
                           borderWidth: 1.5,
-                          borderColor: 'rgba(15,15,15,0.18)',
+                          borderColor: theme.border,
                         }}
                       />
                     )}
@@ -251,7 +255,7 @@ export function SaveListSheet({
             </View>
           )}
 
-          <View style={{ height: HAIRLINE, backgroundColor: 'rgba(15,15,15,0.08)', marginHorizontal: 12 }} />
+          <View style={{ height: HAIRLINE, backgroundColor: theme.border, marginHorizontal: 12 }} />
 
           {creating ? (
             <View
@@ -267,7 +271,7 @@ export function SaveListSheet({
                 value={newName}
                 onChangeText={setNewName}
                 placeholder="List name"
-                placeholderTextColor="rgba(15,15,15,0.55)"
+                placeholderTextColor={theme.mute}
                 autoFocus
                 returnKeyType="done"
                 onSubmitEditing={handleCreate}
@@ -275,11 +279,13 @@ export function SaveListSheet({
                   flex: 1,
                   fontSize: 15,
                   fontWeight: '600',
-                  color: '#0F0F0F',
+                  color: theme.text,
                   paddingVertical: 8,
                   paddingHorizontal: 12,
                   borderRadius: 10,
-                  backgroundColor: 'rgba(15,15,15,0.05)',
+                  backgroundColor: isDark ? theme.surface : 'rgba(15,15,15,0.05)',
+                  borderWidth: isDark ? 1 : 0,
+                  borderColor: theme.border,
                 }}
               />
               <Pressable
@@ -289,11 +295,11 @@ export function SaveListSheet({
                   paddingVertical: 8,
                   paddingHorizontal: 14,
                   borderRadius: 10,
-                  backgroundColor: colors.purple,
+                  backgroundColor: theme.purple,
                   opacity: newName.trim().length === 0 ? 0.4 : pressed ? 0.7 : 1,
                 })}
               >
-                <Text style={{ color: 'white', fontWeight: '700', fontSize: 14 }}>Add</Text>
+                <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>Add</Text>
               </Pressable>
             </View>
           ) : (
@@ -310,8 +316,8 @@ export function SaveListSheet({
                 opacity: pressed ? 0.55 : 1,
               })}
             >
-              <Feather name="plus" size={18} color={colors.purple} />
-              <Text style={{ fontSize: 15, fontWeight: '700', color: colors.purple, marginLeft: 6 }}>
+              <Feather name="plus" size={18} color={theme.purple} />
+              <Text style={{ fontSize: 15, fontWeight: '700', color: theme.purple, marginLeft: 6 }}>
                 Create new list
               </Text>
             </Pressable>

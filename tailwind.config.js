@@ -8,6 +8,7 @@ const WHITE = '#FFFFFF';
 const INK = '#0F0F0F';
 
 module.exports = {
+  darkMode: 'class',
   // Every directory that can contain a className string has to be listed, or
   // Tailwind never emits those rules and the class silently does nothing at
   // runtime. `lib/` counts: it holds the shared Text/TextInput shim and other

@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, Animated, Easing, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
 import { BlurView } from 'expo-blur';
+import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/lib/theme';
 
 const IS_IOS = Platform.OS === 'ios';
@@ -77,6 +78,7 @@ function PromptModal({
   options: PromptOptions;
   onResolve: (value: string | null) => void;
 }) {
+  const { theme, isDark } = useTheme();
   const [value, setValue] = useState(options.defaultValue ?? '');
   const submit = () => onResolve(value.trim() || null);
 
@@ -111,12 +113,12 @@ function PromptModal({
             where it's cheap (iOS/web) so the page visibly recedes. */}
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: enter }]}>
           {CAN_BLUR ? (
-            <BlurView intensity={24} tint="dark" style={StyleSheet.absoluteFill} />
+            <BlurView intensity={24} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill} />
           ) : null}
           <View
             style={[
               StyleSheet.absoluteFill,
-              { backgroundColor: CAN_BLUR ? 'rgba(12,8,26,0.35)' : 'rgba(12,8,26,0.45)' },
+              { backgroundColor: CAN_BLUR ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.65)' },
             ]}
           />
         </Animated.View>
@@ -128,21 +130,23 @@ function PromptModal({
           style={{
             width: 320,
             maxWidth: '90%',
-            backgroundColor: 'white',
+            backgroundColor: isDark ? theme.panel : '#FFFFFF',
             borderRadius: 18,
             padding: 18,
+            borderWidth: isDark ? 1 : 0,
+            borderColor: theme.border,
             elevation: 12,
             shadowColor: '#000',
-            shadowOpacity: 0.28,
+            shadowOpacity: isDark ? 0.45 : 0.2,
             shadowRadius: 30,
             shadowOffset: { width: 0, height: 18 },
           }}
         >
-          <Text style={{ fontSize: 16, fontWeight: '700', color: colors.ink, marginBottom: 4 }}>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: theme.text, marginBottom: 4 }}>
             {options.title}
           </Text>
           {options.message ? (
-            <Text style={{ fontSize: 13, color: colors.muteSoft, marginBottom: 12 }}>
+            <Text style={{ fontSize: 13, color: theme.mute, marginBottom: 12 }}>
               {options.message}
             </Text>
           ) : null}
@@ -150,17 +154,19 @@ function PromptModal({
             value={value}
             onChangeText={setValue}
             placeholder={options.placeholder}
-            placeholderTextColor={colors.muteSoft}
+            placeholderTextColor={theme.mute}
             autoFocus
             returnKeyType="done"
             onSubmitEditing={submit}
             style={{
               fontSize: 15,
-              color: colors.ink,
+              color: theme.text,
               paddingVertical: 10,
               paddingHorizontal: 12,
               borderRadius: 10,
-              backgroundColor: 'rgba(15,15,15,0.05)',
+              backgroundColor: isDark ? theme.surface : 'rgba(15,15,15,0.05)',
+              borderWidth: isDark ? 1 : 0,
+              borderColor: theme.border,
               marginTop: 8,
             }}
           />
@@ -173,7 +179,7 @@ function PromptModal({
                 opacity: pressed ? 0.6 : 1,
               })}
             >
-              <Text style={{ fontSize: 14, fontWeight: '600', color: colors.muteSoft }}>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: theme.mute }}>
                 {options.cancelLabel ?? 'Cancel'}
               </Text>
             </Pressable>
@@ -184,11 +190,11 @@ function PromptModal({
                 paddingVertical: 8,
                 paddingHorizontal: 14,
                 borderRadius: 10,
-                backgroundColor: colors.purple,
+                backgroundColor: theme.purple,
                 opacity: value.trim().length === 0 ? 0.4 : pressed ? 0.7 : 1,
               })}
             >
-              <Text style={{ fontSize: 14, fontWeight: '700', color: 'white' }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: '#FFFFFF' }}>
                 {options.submitLabel ?? 'OK'}
               </Text>
             </Pressable>

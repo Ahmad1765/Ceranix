@@ -45,6 +45,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const isDark = mode === 'system' ? systemColorScheme === 'dark' : mode === 'dark';
   const theme = isDark ? darkTheme : lightTheme;
 
+try {
+  // Ensure react-native-css-interop runtime flag is permanently 'class' mode
+  const { StyleSheet: InteropStyleSheet } = require('react-native-css-interop');
+  if (InteropStyleSheet && typeof InteropStyleSheet.setFlag === 'function') {
+    InteropStyleSheet.setFlag('darkMode', 'class');
+  }
+} catch {}
+
   // Keep static token references in sync with theme state
   setActiveTheme(theme);
   useEffect(() => {
@@ -58,6 +66,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         document.documentElement.classList.remove('dark');
       }
     }
+    try {
+      const { colorScheme } = require('nativewind');
+      if (colorScheme && typeof colorScheme.set === 'function') {
+        colorScheme.set(isDark ? 'dark' : 'light');
+      }
+    } catch {}
   }, [theme, isDark]);
 
   const setThemeMode = async (newMode: ThemeMode) => {

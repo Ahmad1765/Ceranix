@@ -44,8 +44,6 @@ const EMPTY: AddressForm = {
   phone: '',
 };
 
-const TEAL = '#007782';
-
 export function AddressSheet({
   visible,
   initial,
@@ -251,18 +249,19 @@ export function AddressSheet({
                 disabled={locating}
                 style={({ pressed }) => [
                   styles.autoFillBtn,
+                  { backgroundColor: isDark ? 'rgba(108, 71, 255, 0.18)' : '#EDE9FE' },
                   pressed && { opacity: 0.75 },
                 ]}
               >
                 {locating ? (
                   <>
-                    <ActivityIndicator size="small" color={TEAL} style={{ marginRight: 6 }} />
-                    <Text style={styles.autoFillText}>Locating your address…</Text>
+                    <ActivityIndicator size="small" color={theme.purple} style={{ marginRight: 6 }} />
+                    <Text style={[styles.autoFillText, { color: theme.purple }]}>Locating your address…</Text>
                   </>
                 ) : (
                   <>
-                    <Feather name="crosshair" size={14} color={TEAL} style={{ marginRight: 6 }} />
-                    <Text style={styles.autoFillText}>Use current location</Text>
+                    <Feather name="crosshair" size={14} color={theme.purple} style={{ marginRight: 6 }} />
+                    <Text style={[styles.autoFillText, { color: theme.purple }]}>Use current location</Text>
                   </>
                 )}
               </Pressable>
@@ -587,7 +586,7 @@ const styles = StyleSheet.create({
   autoFillText: {
     fontSize: 12.5,
     fontWeight: '700',
-    color: TEAL,
+    color: '#6C47FF',
     fontFamily: 'Inter_700Bold',
   } as TextStyle,
   fieldGroup: {

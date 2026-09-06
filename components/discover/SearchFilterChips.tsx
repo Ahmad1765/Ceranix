@@ -1,15 +1,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// SEARCH FILTER CHIPS & RESULTS HEADER (VINTED PARITY)
+// SEARCH FILTER CHIPS & RESULTS HEADER (CERANIX DESIGN SYSTEM)
 // ─────────────────────────────────────────────────────────────────────────────
 //
-// 💡 EDUCATIONAL PATTERN: Horizontal Refinement Chips & Micro-Filters
-//
-// Renders the horizontal scrollable filter chips directly below the search bar
-// once a search is active, matching Vinted's exact visual design and taxonomy:
+// Refinement Chips & Micro-Filters:
 // 1. "Filters" with slider icon and active badge
 // 2. "Category", "Brand", "Size", "Condition", "Price", "Color", "Material", "Sort by"
 // 3. Subheader with formatted result count ("500+ results") and "Search results ⓘ"
-// 4. Interactive quick-filter bottom sheets and educational search ranking modal
+// 4. Interactive quick-filter bottom sheets and search ranking modal
 // ─────────────────────────────────────────────────────────────────────────────
 
 import React, { memo, useState, useCallback, useMemo } from 'react';
@@ -24,7 +21,8 @@ import {
 import { Text, TextInput } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
-import { radii, type as typography } from '@/lib/theme';
+import { radii, type as typography, type ThemeTokens } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { CURRENCY_SYMBOL } from '@/lib/currency';
 import { CATEGORIES } from '@/lib/categories';
 import type { Category, Condition } from '@/types';
@@ -41,7 +39,6 @@ export {
   EMPTY_SEARCH_FILTERS,
   countActiveSearchFilters,
 };
-
 
 const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'One Size'];
 
@@ -144,6 +141,9 @@ export const SearchFilterChips = memo(function SearchFilterChips({
   resultCount,
   onOpenFullFilter,
 }: SearchFilterChipsProps) {
+  const { theme, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
+
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [brandInput, setBrandInput] = useState('');
   const [customMin, setCustomMin] = useState('');
@@ -151,7 +151,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
 
   const activeCount = useMemo(() => countActiveSearchFilters(filters), [filters]);
 
-  // Formatted count label matching Vinted: "500+ results" or "X results"
+  // Formatted count label: "500+ results" or "X results"
   const formattedCountText = useMemo(() => {
     if (resultCount >= 500) return '500+ results';
     if (resultCount === 1) return '1 result';
@@ -253,7 +253,6 @@ export const SearchFilterChips = memo(function SearchFilterChips({
     }));
     closeModal();
   }, [customMin, customMax, onUpdateFilter, closeModal]);
-
 
   // Color Toggle
   const handleSelectColor = useCallback(
@@ -374,7 +373,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           <Feather
             name="sliders"
             size={13.5}
-            color={activeCount > 0 ? '#007782' : '#15191A'}
+            color={activeCount > 0 ? theme.purple : theme.text}
             style={{ marginRight: 5 }}
           />
           <Text
@@ -417,7 +416,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           <Feather
             name="chevron-down"
             size={13}
-            color={filters.category ? '#007782' : '#6B7280'}
+            color={filters.category ? theme.purple : theme.mute}
             style={{ marginLeft: 4 }}
           />
         </Pressable>
@@ -447,7 +446,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           <Feather
             name="chevron-down"
             size={13}
-            color={filters.brand ? '#007782' : '#6B7280'}
+            color={filters.brand ? theme.purple : theme.mute}
             style={{ marginLeft: 4 }}
           />
         </Pressable>
@@ -477,7 +476,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           <Feather
             name="chevron-down"
             size={13}
-            color={filters.sizes.length > 0 ? '#007782' : '#6B7280'}
+            color={filters.sizes.length > 0 ? theme.purple : theme.mute}
             style={{ marginLeft: 4 }}
           />
         </Pressable>
@@ -507,7 +506,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           <Feather
             name="chevron-down"
             size={13}
-            color={filters.conditions.length > 0 ? '#007782' : '#6B7280'}
+            color={filters.conditions.length > 0 ? theme.purple : theme.mute}
             style={{ marginLeft: 4 }}
           />
         </Pressable>
@@ -543,8 +542,8 @@ export const SearchFilterChips = memo(function SearchFilterChips({
             size={13}
             color={
               filters.priceMin != null || filters.priceMax != null
-                ? '#007782'
-                : '#6B7280'
+                ? theme.purple
+                : theme.mute
             }
             style={{ marginLeft: 4 }}
           />
@@ -575,7 +574,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           <Feather
             name="chevron-down"
             size={13}
-            color={filters.color ? '#007782' : '#6B7280'}
+            color={filters.color ? theme.purple : theme.mute}
             style={{ marginLeft: 4 }}
           />
         </Pressable>
@@ -605,7 +604,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           <Feather
             name="chevron-down"
             size={13}
-            color={filters.material ? '#007782' : '#6B7280'}
+            color={filters.material ? theme.purple : theme.mute}
             style={{ marginLeft: 4 }}
           />
         </Pressable>
@@ -640,7 +639,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
             name="chevron-down"
             size={13}
             color={
-              filters.sort && filters.sort !== 'popular' ? '#007782' : '#6B7280'
+              filters.sort && filters.sort !== 'popular' ? theme.purple : theme.mute
             }
             style={{ marginLeft: 4 }}
           />
@@ -665,7 +664,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           ]}
         >
           <Text style={styles.infoButtonText}>Search results</Text>
-          <Feather name="help-circle" size={13.5} color="#5A6566" style={{ marginLeft: 4 }} />
+          <Feather name="help-circle" size={13.5} color={theme.mute} style={{ marginLeft: 4 }} />
         </Pressable>
       </View>
 
@@ -682,12 +681,12 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Category</Text>
-              <Pressable hitSlop={10} onPress={closeModal}>
-                <Feather name="x" size={20} color="#15191A" />
+              <Pressable hitSlop={10} onPress={closeModal} style={styles.modalCloseBtn} accessibilityLabel="Close category modal">
+                <Feather name="x" size={18} color={theme.text} />
               </Pressable>
             </View>
 
-            <ScrollView style={{ maxHeight: 380 }}>
+            <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
               <Pressable
                 onPress={() => handleSelectCategory(null)}
                 style={[
@@ -704,7 +703,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
                   All categories
                 </Text>
                 {filters.category === null && (
-                  <Feather name="check" size={16} color="#007782" />
+                  <Feather name="check" size={16} color={theme.purple} />
                 )}
               </Pressable>
 
@@ -720,7 +719,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
                     ]}
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                      <Feather name={c.icon} size={16} color={isSelected ? '#007782' : '#5A6566'} />
+                      <Feather name={c.icon} size={16} color={isSelected ? theme.purple : theme.mute} />
                       <Text
                         style={[
                           styles.optionText,
@@ -730,7 +729,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
                         {c.label}
                       </Text>
                     </View>
-                    {isSelected && <Feather name="check" size={16} color="#007782" />}
+                    {isSelected && <Feather name="check" size={16} color={theme.purple} />}
                   </Pressable>
                 );
               })}
@@ -750,39 +749,50 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Brand</Text>
-              <Pressable hitSlop={10} onPress={closeModal}>
-                <Feather name="x" size={20} color="#15191A" />
+              <Pressable hitSlop={10} onPress={closeModal} style={styles.modalCloseBtn} accessibilityLabel="Close brand modal">
+                <Feather name="x" size={18} color={theme.text} />
               </Pressable>
             </View>
 
             {/* Custom Brand Input */}
             <View style={styles.brandInputRow}>
-              <TextInput
-                value={brandInput}
-                onChangeText={setBrandInput}
-                placeholder="Type a brand name…"
-                placeholderTextColor="#9CA3AF"
-                onSubmitEditing={handleApplyCustomBrand}
-                style={styles.brandTextInput as any}
-              />
+              <View style={styles.brandInputBox}>
+                <Feather name="search" size={15} color={theme.mute} style={{ marginRight: 8 }} />
+                <TextInput
+                  value={brandInput}
+                  onChangeText={setBrandInput}
+                  placeholder="Type a brand name…"
+                  placeholderTextColor={theme.mute}
+                  onSubmitEditing={handleApplyCustomBrand}
+                  style={styles.brandTextInput as any}
+                />
+                {brandInput.length > 0 && (
+                  <Pressable onPress={() => setBrandInput('')} hitSlop={6}>
+                    <Feather name="x" size={14} color={theme.mute} />
+                  </Pressable>
+                )}
+              </View>
               <Pressable
                 onPress={handleApplyCustomBrand}
-                style={styles.brandApplyBtn}
+                style={({ pressed }) => [
+                  styles.brandApplyBtn,
+                  { opacity: pressed ? 0.8 : 1, transform: [{ scale: pressed ? 0.96 : 1 }] },
+                ]}
               >
                 <Text style={styles.brandApplyBtnText}>Apply</Text>
               </Pressable>
             </View>
 
-            <ScrollView style={{ maxHeight: 300 }}>
+            <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
               {filters.brand && (
                 <Pressable
                   onPress={() => handleSelectBrand(null)}
                   style={styles.optionRow}
                 >
-                  <Text style={[styles.optionText, { color: '#DC2626' }]}>
+                  <Text style={[styles.optionText, { color: '#EF4444' }]}>
                     Clear brand ({filters.brand})
                   </Text>
-                  <Feather name="x" size={15} color="#DC2626" />
+                  <Feather name="x" size={15} color="#EF4444" />
                 </Pressable>
               )}
 
@@ -805,7 +815,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
                     >
                       {b}
                     </Text>
-                    {isSelected && <Feather name="check" size={16} color="#007782" />}
+                    {isSelected && <Feather name="check" size={16} color={theme.purple} />}
                   </Pressable>
                 );
               })}
@@ -825,8 +835,8 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Size</Text>
-              <Pressable hitSlop={10} onPress={closeModal}>
-                <Feather name="x" size={20} color="#15191A" />
+              <Pressable hitSlop={10} onPress={closeModal} style={styles.modalCloseBtn} accessibilityLabel="Close size modal">
+                <Feather name="x" size={18} color={theme.text} />
               </Pressable>
             </View>
 
@@ -883,12 +893,12 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Condition</Text>
-              <Pressable hitSlop={10} onPress={closeModal}>
-                <Feather name="x" size={20} color="#15191A" />
+              <Pressable hitSlop={10} onPress={closeModal} style={styles.modalCloseBtn} accessibilityLabel="Close condition modal">
+                <Feather name="x" size={18} color={theme.text} />
               </Pressable>
             </View>
 
-            <ScrollView style={{ maxHeight: 320 }}>
+            <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false}>
               {CONDITIONS.map((cond) => {
                 const isSelected = filters.conditions.includes(cond.id);
                 return (
@@ -952,8 +962,8 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Price Range</Text>
-              <Pressable hitSlop={10} onPress={closeModal}>
-                <Feather name="x" size={20} color="#15191A" />
+              <Pressable hitSlop={10} onPress={closeModal} style={styles.modalCloseBtn} accessibilityLabel="Close price modal">
+                <Feather name="x" size={18} color={theme.text} />
               </Pressable>
             </View>
 
@@ -992,13 +1002,13 @@ export const SearchFilterChips = memo(function SearchFilterChips({
                   value={customMin}
                   onChangeText={setCustomMin}
                   placeholder="Min"
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={theme.mute}
                   keyboardType="numeric"
                   style={styles.numericInput as any}
                 />
               </View>
 
-              <Text style={{ color: '#9CA3AF', fontSize: 16 }}>–</Text>
+              <Text style={{ color: theme.mute, fontSize: 16 }}>–</Text>
 
               <View style={styles.priceInputBox}>
                 <Text style={styles.pricePrefix}>{CURRENCY_SYMBOL}</Text>
@@ -1006,7 +1016,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
                   value={customMax}
                   onChangeText={setCustomMax}
                   placeholder="Max"
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={theme.mute}
                   keyboardType="numeric"
                   style={styles.numericInput as any}
                 />
@@ -1043,12 +1053,12 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Color</Text>
-              <Pressable hitSlop={10} onPress={closeModal}>
-                <Feather name="x" size={20} color="#15191A" />
+              <Pressable hitSlop={10} onPress={closeModal} style={styles.modalCloseBtn} accessibilityLabel="Close color modal">
+                <Feather name="x" size={18} color={theme.text} />
               </Pressable>
             </View>
 
-            <ScrollView style={{ maxHeight: 340 }}>
+            <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
               <Pressable
                 onPress={() => handleSelectColor('')}
                 style={[
@@ -1059,7 +1069,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
                 <Text style={[styles.optionText, !filters.color && styles.optionTextSelected]}>
                   All colors
                 </Text>
-                {!filters.color && <Feather name="check" size={16} color="#007782" />}
+                {!filters.color && <Feather name="check" size={16} color={theme.purple} />}
               </Pressable>
 
               {COLORS.map((col) => {
@@ -1093,7 +1103,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
                         {col.name}
                       </Text>
                     </View>
-                    {isSelected && <Feather name="check" size={16} color="#007782" />}
+                    {isSelected && <Feather name="check" size={16} color={theme.purple} />}
                   </Pressable>
                 );
               })}
@@ -1113,12 +1123,12 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Material</Text>
-              <Pressable hitSlop={10} onPress={closeModal}>
-                <Feather name="x" size={20} color="#15191A" />
+              <Pressable hitSlop={10} onPress={closeModal} style={styles.modalCloseBtn} accessibilityLabel="Close material modal">
+                <Feather name="x" size={18} color={theme.text} />
               </Pressable>
             </View>
 
-            <ScrollView style={{ maxHeight: 340 }}>
+            <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
               <Pressable
                 onPress={() => handleSelectMaterial('')}
                 style={[
@@ -1129,7 +1139,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
                 <Text style={[styles.optionText, !filters.material && styles.optionTextSelected]}>
                   All materials
                 </Text>
-                {!filters.material && <Feather name="check" size={16} color="#007782" />}
+                {!filters.material && <Feather name="check" size={16} color={theme.purple} />}
               </Pressable>
 
               {MATERIALS.map((mat) => {
@@ -1151,7 +1161,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
                     >
                       {mat}
                     </Text>
-                    {isSelected && <Feather name="check" size={16} color="#007782" />}
+                    {isSelected && <Feather name="check" size={16} color={theme.purple} />}
                   </Pressable>
                 );
               })}
@@ -1171,12 +1181,12 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Sort by</Text>
-              <Pressable hitSlop={10} onPress={closeModal}>
-                <Feather name="x" size={20} color="#15191A" />
+              <Pressable hitSlop={10} onPress={closeModal} style={styles.modalCloseBtn} accessibilityLabel="Close sort modal">
+                <Feather name="x" size={18} color={theme.text} />
               </Pressable>
             </View>
 
-            <ScrollView style={{ maxHeight: 340 }}>
+            <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
               {SORT_OPTIONS.map((opt) => {
                 const isSelected =
                   opt.id === 'relevance'
@@ -1202,7 +1212,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
                       </Text>
                       <Text style={styles.optionDesc}>{opt.desc}</Text>
                     </View>
-                    {isSelected && <Feather name="check" size={16} color="#007782" />}
+                    {isSelected && <Feather name="check" size={16} color={theme.purple} />}
                   </Pressable>
                 );
               })}
@@ -1226,27 +1236,29 @@ export const SearchFilterChips = memo(function SearchFilterChips({
                   width: 44,
                   height: 44,
                   borderRadius: 22,
-                  backgroundColor: '#E6F7F8',
+                  backgroundColor: isDark ? 'rgba(108, 71, 255, 0.2)' : '#EDE9FE',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  marginBottom: 10,
+                  marginBottom: 12,
                 }}
               >
-                <Feather name="info" size={22} color="#007782" />
+                <Feather name="info" size={22} color={theme.purple} />
               </View>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: '#15191A' }}>
-                How search results work
+              <Text style={[styles.modalTitle, { fontSize: 18, marginBottom: 8 }]}>
+                Search ranking
+              </Text>
+              <Text
+                style={{
+                  fontSize: 13.5,
+                  color: theme.mute,
+                  textAlign: 'center',
+                  lineHeight: 20,
+                }}
+              >
+                Listings are ordered using an algorithmic score combining query relevance,
+                seller feedback, item condition, freshness, and engagement.
               </Text>
             </View>
-
-            <Text style={{ fontSize: 14, lineHeight: 20, color: '#5A6566', marginBottom: 16 }}>
-              Results are ranked to show the most relevant items first, based on match accuracy with
-              listing titles, brands, categories, descriptions, and tags.
-            </Text>
-
-            <Text style={{ fontSize: 14, lineHeight: 20, color: '#5A6566', marginBottom: 20 }}>
-              Use the chips above to refine your search by size, brand, price range, and condition.
-            </Text>
 
             <Pressable onPress={closeModal} style={styles.infoGotItBtn}>
               <Text style={styles.infoGotItBtnText}>Got it</Text>
@@ -1258,337 +1270,368 @@ export const SearchFilterChips = memo(function SearchFilterChips({
   );
 });
 
-// ── Styles (Vinted exact parity) ─────────────────────────────────────────────
+// ── Styles (Ceranix theme-aware system) ──────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: '#FFFFFF',
-    paddingTop: 8,
-    paddingBottom: 4,
-  },
-  chipsScrollView: {
-    maxHeight: 46,
-  },
-  chipsScrollContent: {
-    paddingHorizontal: 16,
-    gap: 8,
-    alignItems: 'center',
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 36,
-    paddingHorizontal: 14,
-    borderRadius: radii.pill,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  chipInactive: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E5E7EB',
-  },
-  chipActive: {
-    backgroundColor: '#E6F7F8',
-    borderColor: '#007782',
-    borderWidth: 1.5,
-  },
-  chipText: {
-    fontSize: 13.5,
-    fontFamily: typography.family.sansMedium,
-    letterSpacing: -0.1,
-  },
-  chipTextInactive: {
-    color: '#15191A',
-    fontWeight: '500',
-  },
-  chipTextActive: {
-    color: '#007782',
-    fontWeight: '700',
-  },
-  badge: {
-    marginLeft: 5,
-    backgroundColor: '#007782',
-    borderRadius: 10,
-    width: 17,
-    height: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badgeText: {
-    color: '#FFFFFF',
-    fontSize: 10.5,
-    fontWeight: '700',
-  },
-  resultsHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 6,
-  },
-  resultsCountText: {
-    fontSize: 13.5,
-    fontFamily: typography.family.sansMedium,
-    fontWeight: '500',
-    color: '#5A6566',
-    letterSpacing: -0.1,
-  },
-  infoButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  infoButtonText: {
-    fontSize: 13.5,
-    fontFamily: typography.family.sansMedium,
-    fontWeight: '500',
-    color: '#5A6566',
-    letterSpacing: -0.1,
-  },
+function createStyles(theme: ThemeTokens, isDark: boolean) {
+  return StyleSheet.create({
+    container: {
+      backgroundColor: theme.background,
+      paddingTop: 8,
+      paddingBottom: 4,
+    },
+    chipsScrollView: {
+      maxHeight: 46,
+    },
+    chipsScrollContent: {
+      paddingHorizontal: 16,
+      gap: 8,
+      alignItems: 'center',
+    },
+    chip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      height: 36,
+      paddingHorizontal: 14,
+      borderRadius: radii.pill,
+      borderWidth: 1,
+    },
+    chipInactive: {
+      backgroundColor: isDark ? theme.panel : theme.surface,
+      borderColor: theme.border,
+    },
+    chipActive: {
+      backgroundColor: isDark ? 'rgba(108, 71, 255, 0.18)' : '#EDE9FE',
+      borderColor: theme.purple,
+      borderWidth: 1.5,
+    },
+    chipText: {
+      fontSize: 13.5,
+      fontFamily: typography.family.sansMedium,
+      letterSpacing: -0.1,
+    },
+    chipTextInactive: {
+      color: theme.text,
+      fontWeight: '500',
+    },
+    chipTextActive: {
+      color: theme.purple,
+      fontWeight: '700',
+    },
+    badge: {
+      marginLeft: 5,
+      backgroundColor: theme.purple,
+      borderRadius: 10,
+      minWidth: 18,
+      height: 18,
+      paddingHorizontal: 4,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    badgeText: {
+      color: '#FFFFFF',
+      fontSize: 10.5,
+      fontWeight: '700',
+    },
+    resultsHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      paddingBottom: 6,
+    },
+    resultsCountText: {
+      fontSize: 13.5,
+      fontFamily: typography.family.sansMedium,
+      fontWeight: '500',
+      color: theme.mute,
+      letterSpacing: -0.1,
+    },
+    infoButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    infoButtonText: {
+      fontSize: 13.5,
+      fontFamily: typography.family.sansMedium,
+      fontWeight: '500',
+      color: theme.mute,
+      letterSpacing: -0.1,
+    },
 
-  // Modal Styles
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  modalCard: {
-    width: '100%',
-    maxWidth: 400,
-    backgroundColor: '#FFFFFF',
-    borderRadius: radii.xl,
-    padding: 18,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-    marginBottom: 8,
-  },
-  modalTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#15191A',
-  },
-  optionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: radii.md,
-  },
-  optionRowSelected: {
-    backgroundColor: '#F0FDF4',
-  },
-  optionText: {
-    fontSize: 15,
-    color: '#15191A',
-    fontWeight: '500',
-  },
-  optionTextSelected: {
-    color: '#007782',
-    fontWeight: '700',
-  },
-  optionRowWithDesc: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderRadius: radii.md,
-  },
-  optionDesc: {
-    fontSize: 12.5,
-    color: '#6B7280',
-    marginTop: 2,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    borderColor: '#D1D5DB',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 12,
-  },
-  checkboxActive: {
-    backgroundColor: '#007782',
-    borderColor: '#007782',
-  },
-  wrapGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    paddingVertical: 10,
-  },
-  sizeChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 54,
-  },
-  sizeChipInactive: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E5E7EB',
-  },
-  sizeChipActive: {
-    backgroundColor: '#E6F7F8',
-    borderColor: '#007782',
-    borderWidth: 1.5,
-  },
-  sizeChipText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  sizeChipTextInactive: {
-    color: '#15191A',
-  },
-  sizeChipTextActive: {
-    color: '#007782',
-  },
-  modalFooterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 16,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-    gap: 12,
-  },
-  modalClearBtn: {
-    flex: 1,
-    paddingVertical: 11,
-    borderRadius: radii.pill,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-  },
-  modalClearBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#4B5563',
-  },
-  modalDoneBtn: {
-    flex: 1,
-    paddingVertical: 11,
-    borderRadius: radii.pill,
-    backgroundColor: '#007782',
-    alignItems: 'center',
-  },
-  modalDoneBtnText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  brandInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 10,
-  },
-  brandTextInput: {
-    flex: 1,
-    height: 40,
-    backgroundColor: '#F9FAFB',
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: 12,
-    fontSize: 14,
-    color: '#15191A',
-  },
-  brandApplyBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: radii.md,
-    backgroundColor: '#007782',
-  },
-  brandApplyBtnText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  pricePresetsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 14,
-  },
-  pricePresetChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: radii.pill,
-    backgroundColor: '#F3F4F6',
-  },
-  pricePresetChipActive: {
-    backgroundColor: '#E6F7F8',
-    borderWidth: 1,
-    borderColor: '#007782',
-  },
-  pricePresetText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#15191A',
-  },
-  pricePresetTextActive: {
-    color: '#007782',
-    fontWeight: '700',
-  },
-  priceInputsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-    marginVertical: 10,
-  },
-  priceInputBox: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 42,
-    backgroundColor: '#F9FAFB',
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: 10,
-  },
-  pricePrefix: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6B7280',
-    marginRight: 4,
-  },
-  numericInput: {
-    flex: 1,
-    fontSize: 14,
-    color: '#15191A',
-    padding: 0,
-  },
-  infoGotItBtn: {
-    paddingVertical: 12,
-    borderRadius: radii.pill,
-    backgroundColor: '#007782',
-    alignItems: 'center',
-  },
-  infoGotItBtnText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-});
+    // Modal Styles
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.65)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+    },
+    modalCard: {
+      width: '100%',
+      maxWidth: 420,
+      backgroundColor: isDark ? theme.panel : '#FFFFFF',
+      borderRadius: radii.xl,
+      padding: 18,
+      borderWidth: isDark ? 1 : 0,
+      borderColor: theme.border,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: isDark ? 0.45 : 0.15,
+      shadowRadius: 24,
+      elevation: 10,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingBottom: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+      marginBottom: 10,
+    },
+    modalTitle: {
+      fontSize: 17,
+      fontWeight: '700',
+      fontFamily: typography.family.sansBold,
+      color: theme.text,
+    },
+    modalCloseBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: isDark ? theme.surface : 'rgba(0, 0, 0, 0.05)',
+    },
+    optionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      borderRadius: radii.md,
+      marginVertical: 1,
+    },
+    optionRowSelected: {
+      backgroundColor: isDark ? 'rgba(108, 71, 255, 0.16)' : '#F5F3FF',
+    },
+    optionText: {
+      fontSize: 15,
+      color: theme.text,
+      fontWeight: '500',
+      fontFamily: typography.family.sansMedium,
+    },
+    optionTextSelected: {
+      color: theme.purple,
+      fontWeight: '700',
+      fontFamily: typography.family.sansBold,
+    },
+    optionRowWithDesc: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 11,
+      paddingHorizontal: 12,
+      borderRadius: radii.md,
+      marginVertical: 1,
+    },
+    optionDesc: {
+      fontSize: 12.5,
+      color: theme.mute,
+      marginTop: 2,
+    },
+    checkbox: {
+      width: 20,
+      height: 20,
+      borderRadius: 5,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: 12,
+    },
+    checkboxActive: {
+      backgroundColor: theme.purple,
+      borderColor: theme.purple,
+    },
+    wrapGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      paddingVertical: 10,
+    },
+    sizeChip: {
+      paddingHorizontal: 14,
+      paddingVertical: 9,
+      borderRadius: radii.md,
+      borderWidth: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      minWidth: 54,
+    },
+    sizeChipInactive: {
+      backgroundColor: isDark ? theme.surface : '#FFFFFF',
+      borderColor: theme.border,
+    },
+    sizeChipActive: {
+      backgroundColor: isDark ? 'rgba(108, 71, 255, 0.2)' : '#EDE9FE',
+      borderColor: theme.purple,
+      borderWidth: 1.5,
+    },
+    sizeChipText: {
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    sizeChipTextInactive: {
+      color: theme.text,
+    },
+    sizeChipTextActive: {
+      color: theme.purple,
+    },
+    modalFooterRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: 16,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+      gap: 12,
+    },
+    modalClearBtn: {
+      flex: 1,
+      paddingVertical: 11,
+      borderRadius: radii.pill,
+      backgroundColor: isDark ? theme.surface : '#F3F4F6',
+      borderWidth: 1,
+      borderColor: theme.border,
+      alignItems: 'center',
+    },
+    modalClearBtnText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.text,
+    },
+    modalDoneBtn: {
+      flex: 1,
+      paddingVertical: 11,
+      borderRadius: radii.pill,
+      backgroundColor: theme.purple,
+      alignItems: 'center',
+    },
+    modalDoneBtnText: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: '#FFFFFF',
+    },
+    brandInputRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 12,
+    },
+    brandInputBox: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      height: 42,
+      backgroundColor: isDark ? theme.surface : '#F9FAFB',
+      borderRadius: radii.md,
+      borderWidth: 1,
+      borderColor: theme.border,
+      paddingHorizontal: 12,
+    },
+    brandTextInput: {
+      flex: 1,
+      fontSize: 14,
+      color: theme.text,
+      height: '100%',
+      padding: 0,
+    },
+    brandApplyBtn: {
+      paddingHorizontal: 16,
+      height: 42,
+      borderRadius: radii.md,
+      backgroundColor: theme.purple,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    brandApplyBtnText: {
+      color: '#FFFFFF',
+      fontSize: 13.5,
+      fontWeight: '700',
+      fontFamily: typography.family.sansBold,
+    },
+    pricePresetsRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginBottom: 14,
+    },
+    pricePresetChip: {
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: radii.pill,
+      backgroundColor: isDark ? theme.surface : '#F3F4F6',
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    pricePresetChipActive: {
+      backgroundColor: isDark ? 'rgba(108, 71, 255, 0.2)' : '#EDE9FE',
+      borderWidth: 1.5,
+      borderColor: theme.purple,
+    },
+    pricePresetText: {
+      fontSize: 13,
+      fontWeight: '500',
+      color: theme.text,
+    },
+    pricePresetTextActive: {
+      color: theme.purple,
+      fontWeight: '700',
+    },
+    priceInputsContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 10,
+      marginVertical: 10,
+    },
+    priceInputBox: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      height: 42,
+      backgroundColor: isDark ? theme.surface : '#F9FAFB',
+      borderRadius: radii.md,
+      borderWidth: 1,
+      borderColor: theme.border,
+      paddingHorizontal: 10,
+    },
+    pricePrefix: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.mute,
+      marginRight: 4,
+    },
+    numericInput: {
+      flex: 1,
+      fontSize: 14,
+      color: theme.text,
+      padding: 0,
+      height: '100%',
+    },
+    infoGotItBtn: {
+      paddingVertical: 12,
+      borderRadius: radii.pill,
+      backgroundColor: theme.purple,
+      alignItems: 'center',
+    },
+    infoGotItBtnText: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '700',
+    },
+  });
+}
