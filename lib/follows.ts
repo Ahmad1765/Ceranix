@@ -220,7 +220,7 @@ export async function searchUsers(query: string, limit = 20): Promise<FollowList
   if (!safe) return [];
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, username, full_name, avatar_url, is_verified, followers_count, listings(count)')
+    .select('id, username, full_name, avatar_url, is_verified, followers_count, listings:listings!listings_seller_id_fkey(count)')
     .eq('listings.is_sold', false)
     .or(`username.ilike.%${safe}%,full_name.ilike.%${safe}%`)
     .order('followers_count', { ascending: false, nullsFirst: false })

@@ -2,14 +2,43 @@ import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORAGE_KEY = '@ceranix/previous_searches';
-export const DEFAULT_PREVIOUS_SEARCHES = ['Vintage', 'Sneakers', 'Jackets'];
+export type SearchTabType = 'listings' | 'seller';
 
-let memoryHistory: string[] = [...DEFAULT_PREVIOUS_SEARCHES];
+export type SearchHistoryItem = {
+  term: string;
+  tab: SearchTabType;
+};
+
+export const DEFAULT_PREVIOUS_SEARCHES: SearchHistoryItem[] = [
+  { term: 'Vintage', tab: 'listings' },
+  { term: 'Sneakers', tab: 'listings' },
+  { term: 'Jackets', tab: 'listings' },
+];
+
+function normalizeHistory(raw: any): SearchHistoryItem[] {
+  if (!Array.isArray(raw)) return [...DEFAULT_PREVIOUS_SEARCHES];
+  return raw
+    .map((item) => {
+      if (typeof item === 'string') {
+        return { term: item.trim(), tab: 'listings' as SearchTabType };
+      }
+      if (item && typeof item.term === 'string') {
+        return {
+          term: item.term.trim(),
+          tab: (item.tab === 'seller' ? 'seller' : 'listings') as SearchTabType,
+        };
+      }
+      return null;
+    })
+    .filter((item): item is SearchHistoryItem => !!item && item.term.length > 0);
+}
+
+let memoryHistory: SearchHistoryItem[] = [...DEFAULT_PREVIOUS_SEARCHES];
 let isHydrated = false;
-let hydrationPromise: Promise<string[]> | null = null;
-const subscribers = new Set<(history: string[]) => void>();
+let hydrationPromise: Promise<SearchHistoryItem[]> | null = null;
+const subscribers = new Set<(history: SearchHistoryItem[]) => void>();
 
-function notifySubscribers(next: string[]) {
+function notifySubscribers(next: SearchHistoryItem[]) {
   memoryHistory = next;
   isHydrated = true;
   subscribers.forEach((fn) => fn(next));
@@ -18,7 +47,7 @@ function notifySubscribers(next: string[]) {
   );
 }
 
-async function hydrateHistory(): Promise<string[]> {
+async function hydrateHistory(): Promise<SearchHistoryItem[]> {
   if (isHydrated) return memoryHistory;
   if (!hydrationPromise) {
     hydrationPromise = (async () => {
@@ -29,11 +58,10 @@ async function hydrateHistory(): Promise<string[]> {
         }
         if (stored !== null) {
           const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed)) {
-            memoryHistory = parsed;
-            isHydrated = true;
-            return parsed;
-          }
+          const normalized = normalizeHistory(parsed);
+          memoryHistory = normalized;
+          isHydrated = true;
+          return normalized;
         }
       } catch (err) {
         console.warn('[useSearchHistory] Failed to load search history', err);
@@ -51,19 +79,19 @@ async function hydrateHistory(): Promise<string[]> {
 hydrateHistory();
 
 export function useSearchHistory() {
-  const [previousSearches, setPreviousSearches] = useState<string[]>(memoryHistory);
+  const [historyItems, setHistoryItems] = useState<SearchHistoryItem[]>(memoryHistory);
   const [isLoaded, setIsLoaded] = useState(isHydrated);
 
   useEffect(() => {
     let mounted = true;
-    const handleChange = (history: string[]) => {
-      if (mounted) setPreviousSearches(history);
+    const handleChange = (history: SearchHistoryItem[]) => {
+      if (mounted) setHistoryItems(history);
     };
     subscribers.add(handleChange);
 
     hydrateHistory().then((history) => {
       if (mounted) {
-        setPreviousSearches(history);
+        setHistoryItems(history);
         setIsLoaded(true);
       }
     });
@@ -74,18 +102,22 @@ export function useSearchHistory() {
     };
   }, []);
 
-  const addSearch = useCallback((term: string) => {
+  const addSearch = useCallback((term: string, tab: SearchTabType = 'listings') => {
     const trimmed = term.trim();
     if (!trimmed) return;
 
-    const filtered = memoryHistory.filter((t) => t.toLowerCase() !== trimmed.toLowerCase());
-    const next = [trimmed, ...filtered].slice(0, 15);
+    const filtered = memoryHistory.filter(
+      (item) => item.term.toLowerCase() !== trimmed.toLowerCase(),
+    );
+    const next: SearchHistoryItem[] = [{ term: trimmed, tab }, ...filtered].slice(0, 15);
     notifySubscribers(next);
   }, []);
 
   const removeSearch = useCallback((term: string) => {
     const trimmed = term.trim();
-    const next = memoryHistory.filter((t) => t.toLowerCase() !== trimmed.toLowerCase());
+    const next = memoryHistory.filter(
+      (item) => item.term.toLowerCase() !== trimmed.toLowerCase(),
+    );
     notifySubscribers(next);
   }, []);
 
@@ -94,7 +126,8 @@ export function useSearchHistory() {
   }, []);
 
   return {
-    previousSearches,
+    previousSearches: historyItems.map((item) => item.term),
+    historyItems,
     isLoaded,
     addSearch,
     removeSearch,

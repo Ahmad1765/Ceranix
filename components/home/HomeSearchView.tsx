@@ -111,7 +111,7 @@ export const HomeSearchView = memo(function HomeSearchView({
   const [query, setQuery] = useState(initialQuery);
   const [activeTab, setActiveTab] = useState<SearchTab>(initialTab);
   const [hasSubmitted, setHasSubmitted] = useState(initialQuery.trim().length > 0);
-  const { previousSearches, addSearch, removeSearch } = useSearchHistory();
+  const { previousSearches, historyItems, addSearch, removeSearch } = useSearchHistory();
 
   const suggestions = useMemo(
     () =>
@@ -151,7 +151,7 @@ export const HomeSearchView = memo(function HomeSearchView({
     Keyboard.dismiss();
     const trimmed = query.trim();
     if (trimmed.length >= 2) {
-      addSearch(trimmed);
+      addSearch(trimmed, activeTab);
     }
     animProgress.value = withTiming(
       0,
@@ -381,11 +381,10 @@ export const HomeSearchView = memo(function HomeSearchView({
       setActiveTab(tab);
       const targetX = tab === 'listings' ? 0 : screenWidth;
       pagerRef.current?.scrollTo({ x: targetX, animated: true });
-      RNAnimated.spring(scrollX, {
+      RNAnimated.timing(scrollX, {
         toValue: targetX,
+        duration: 240,
         useNativeDriver: false,
-        friction: 8,
-        tension: 50,
       }).start();
     },
     [screenWidth, scrollX],
@@ -426,7 +425,6 @@ export const HomeSearchView = memo(function HomeSearchView({
 
   const handleTouchEnd = useCallback(
     (e: any) => {
-      if (hasSubmitted) return;
       const currentX = e.nativeEvent?.pageX ?? e.nativeEvent?.clientX ?? 0;
       const currentY = e.nativeEvent?.pageY ?? e.nativeEvent?.clientY ?? 0;
       const deltaX = currentX - touchStartX.current;
@@ -442,7 +440,7 @@ export const HomeSearchView = memo(function HomeSearchView({
         }
       }
     },
-    [hasSubmitted, activeTab, handleTabPress],
+    [activeTab, handleTabPress],
   );
 
   // Suggestion selection from pre-search suggestions list
@@ -470,30 +468,34 @@ export const HomeSearchView = memo(function HomeSearchView({
     [],
   );
 
-  // Tag selection from Previous searches / Popular searches
+  // Tag selection from Previous searches / Popular searches with tab routing
   const handleSelectTag = useCallback(
-    (term: string) => {
+    (term: string, targetTab?: SearchTab) => {
       haptic();
       setQuery(term);
-      addSearch(term);
+      const tabToUse = targetTab ?? activeTab;
+      addSearch(term, tabToUse);
+      if (tabToUse !== activeTab) {
+        handleTabPress(tabToUse);
+      }
       setHasSubmitted(true);
       Keyboard.dismiss();
       const requestId = ++searchRequestIdRef.current;
       runSearch(term, requestId);
     },
-    [addSearch, runSearch],
+    [activeTab, handleTabPress, addSearch, runSearch],
   );
 
   const handleSubmitSearch = useCallback(() => {
     const trimmed = query.trim();
     if (trimmed.length > 0) {
-      addSearch(trimmed);
+      addSearch(trimmed, activeTab);
       setHasSubmitted(true);
       Keyboard.dismiss();
       const requestId = ++searchRequestIdRef.current;
       runSearch(trimmed, requestId);
     }
-  }, [query, addSearch, runSearch]);
+  }, [query, activeTab, addSearch, runSearch]);
 
   // ── Render Seller Row (Exact match to Image 2) ─────────────────────────────
   const renderSellerItem = useCallback(
@@ -617,15 +619,15 @@ export const HomeSearchView = memo(function HomeSearchView({
           gap: 14,
           opacity: pressed ? 0.88 : 1,
         })}
-
       >
-        <BinocularsIcon width={48} height={42} />
+        <BinocularsIcon width={52} height={46} />
 
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text
             style={{
-              fontSize: 15,
+              fontSize: 15.5,
               fontWeight: '700',
+              fontFamily: typography.family.sansBold,
               color: theme.text,
               letterSpacing: -0.2,
             }}
@@ -634,7 +636,8 @@ export const HomeSearchView = memo(function HomeSearchView({
           </Text>
           <Text
             style={{
-              fontSize: 12.5,
+              fontSize: 13,
+              fontFamily: typography.family.sansMedium,
               color: theme.mute,
               marginTop: 2,
             }}
@@ -647,12 +650,13 @@ export const HomeSearchView = memo(function HomeSearchView({
       </Pressable>
 
       {/* Previous searches Section */}
-      {previousSearches.length > 0 && (
+      {historyItems.length > 0 && (
         <View style={{ marginTop: 24 }}>
           <Text
             style={{
               fontSize: 15,
               fontWeight: '700',
+              fontFamily: typography.family.sansBold,
               color: theme.text,
               marginBottom: 12,
             }}
@@ -661,16 +665,16 @@ export const HomeSearchView = memo(function HomeSearchView({
           </Text>
 
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {previousSearches.map((term) => (
+            {historyItems.map((item) => (
               <Pressable
-                key={term}
-                onPress={() => handleSelectTag(term)}
+                key={item.term}
+                onPress={() => handleSelectTag(item.term, item.tab)}
                 style={({ pressed }) => ({
                   flexDirection: 'row',
                   alignItems: 'center',
                   backgroundColor: isDark ? theme.surface : '#FAF1D6',
-                  borderRadius: 4,
-                  paddingVertical: 8,
+                  borderRadius: 2,
+                  paddingVertical: 7,
                   paddingLeft: 12,
                   paddingRight: 8,
                   gap: 8,
@@ -679,28 +683,51 @@ export const HomeSearchView = memo(function HomeSearchView({
               >
                 <Text
                   style={{
-                    fontSize: 14,
-                    fontWeight: '600',
-                    color: theme.text,
+                    fontSize: 14.5,
+                    fontWeight: '500',
+                    fontFamily: typography.family.sansMedium,
+                    color: isDark ? '#EDEDED' : '#111827',
                   }}
                 >
-                  {term}
+                  {item.term}
                 </Text>
+
+                {item.tab === 'seller' && (
+                  <View
+                    style={{
+                      backgroundColor: isDark ? '#2D3748' : '#E2E8F0',
+                      borderRadius: 2,
+                      paddingHorizontal: 5,
+                      paddingVertical: 1,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 10,
+                        fontWeight: '600',
+                        fontFamily: typography.family.sansMedium,
+                        color: isDark ? '#A0AEC0' : '#4A5568',
+                      }}
+                    >
+                      Member
+                    </Text>
+                  </View>
+                )}
 
                 <Pressable
                   onPress={(e) => {
                     e.stopPropagation();
                     haptic();
-                    removeSearch(term);
+                    removeSearch(item.term);
                   }}
                   hitSlop={10}
-                  accessibilityLabel={`Remove ${term}`}
+                  accessibilityLabel={`Remove ${item.term}`}
                   style={({ pressed }) => ({
                     padding: 3,
                     opacity: pressed ? 0.5 : 1,
                   })}
                 >
-                  <Feather name="x" size={13} color={theme.text} />
+                  <Feather name="x" size={13} color={isDark ? '#9CA3AF' : '#111827'} />
                 </Pressable>
               </Pressable>
             ))}
@@ -714,6 +741,7 @@ export const HomeSearchView = memo(function HomeSearchView({
           style={{
             fontSize: 15,
             fontWeight: '700',
+            fontFamily: typography.family.sansBold,
             color: theme.text,
             marginBottom: 12,
           }}
@@ -725,23 +753,196 @@ export const HomeSearchView = memo(function HomeSearchView({
           {POPULAR_SEARCHES.map((term) => (
             <Pressable
               key={term}
-              onPress={() => handleSelectTag(term)}
+              onPress={() => handleSelectTag(term, 'listings')}
               style={({ pressed }) => ({
                 backgroundColor: isDark ? theme.surface : '#FAF1D6',
-                borderRadius: 4,
-                paddingVertical: 8,
+                borderRadius: 2,
+                paddingVertical: 7,
                 paddingHorizontal: 12,
                 opacity: pressed ? 0.75 : 1,
               })}
             >
               <Text
                 style={{
-                  fontSize: 14,
-                  fontWeight: '600',
-                  color: theme.text,
+                  fontSize: 14.5,
+                  fontWeight: '500',
+                  fontFamily: typography.family.sansMedium,
+                  color: isDark ? '#EDEDED' : '#111827',
                 }}
               >
                 {term}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+    </ScrollView>
+  );
+
+  // ── Render Idle Landing Content for Members Tab ────────────────────────────
+  const memberSearches = useMemo(
+    () => historyItems.filter((i) => i.tab === 'seller'),
+    [historyItems],
+  );
+
+  const renderMembersIdleLanding = (
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40 }}
+    >
+      {/* Search Members Banner Card */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          borderWidth: 1.2,
+          borderColor: isDark ? theme.border : '#123D2E',
+          borderRadius: 0,
+          paddingVertical: 14,
+          paddingHorizontal: 14,
+          backgroundColor: 'transparent',
+          gap: 14,
+        }}
+      >
+        <View
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 2,
+            backgroundColor: isDark ? theme.surface : '#E0ECE5',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Feather name="users" size={22} color={isDark ? '#2FD5C6' : '#0F3D2E'} />
+        </View>
+
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text
+            style={{
+              fontSize: 15.5,
+              fontWeight: '700',
+              fontFamily: typography.family.sansBold,
+              color: theme.text,
+              letterSpacing: -0.2,
+            }}
+          >
+            Find members & sellers
+          </Text>
+          <Text
+            style={{
+              fontSize: 13,
+              fontFamily: typography.family.sansMedium,
+              color: theme.mute,
+              marginTop: 2,
+            }}
+          >
+            Search by username or name to see their wardrobe
+          </Text>
+        </View>
+      </View>
+
+      {/* Previous member searches */}
+      {memberSearches.length > 0 && (
+        <View style={{ marginTop: 24 }}>
+          <Text
+            style={{
+              fontSize: 15,
+              fontWeight: '700',
+              fontFamily: typography.family.sansBold,
+              color: theme.text,
+              marginBottom: 12,
+            }}
+          >
+            Previous member searches
+          </Text>
+
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {memberSearches.map((item) => (
+              <Pressable
+                key={item.term}
+                onPress={() => handleSelectTag(item.term, 'seller')}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: isDark ? theme.surface : '#FAF1D6',
+                  borderRadius: 2,
+                  paddingVertical: 7,
+                  paddingLeft: 12,
+                  paddingRight: 8,
+                  gap: 8,
+                  opacity: pressed ? 0.75 : 1,
+                })}
+              >
+                <Text
+                  style={{
+                    fontSize: 14.5,
+                    fontWeight: '500',
+                    fontFamily: typography.family.sansMedium,
+                    color: isDark ? '#EDEDED' : '#111827',
+                  }}
+                >
+                  @{item.term}
+                </Text>
+
+                <Pressable
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    haptic();
+                    removeSearch(item.term);
+                  }}
+                  hitSlop={10}
+                  accessibilityLabel={`Remove ${item.term}`}
+                  style={({ pressed }) => ({
+                    padding: 3,
+                    opacity: pressed ? 0.5 : 1,
+                  })}
+                >
+                  <Feather name="x" size={13} color={isDark ? '#9CA3AF' : '#111827'} />
+                </Pressable>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* Suggested sellers Section */}
+      <View style={{ marginTop: 24 }}>
+        <Text
+          style={{
+            fontSize: 15,
+            fontWeight: '700',
+            fontFamily: typography.family.sansBold,
+            color: theme.text,
+            marginBottom: 12,
+          }}
+        >
+          Suggested sellers
+        </Text>
+
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {['carrinex', 'vintage_vault', 'daniel_store', 'sneakerhead', 'streetwear'].map((seller) => (
+            <Pressable
+              key={seller}
+              onPress={() => handleSelectTag(seller, 'seller')}
+              style={({ pressed }) => ({
+                backgroundColor: isDark ? theme.surface : '#FAF1D6',
+                borderRadius: 2,
+                paddingVertical: 7,
+                paddingHorizontal: 12,
+                opacity: pressed ? 0.75 : 1,
+              })}
+            >
+              <Text
+                style={{
+                  fontSize: 14.5,
+                  fontWeight: '500',
+                  fontFamily: typography.family.sansMedium,
+                  color: isDark ? '#EDEDED' : '#111827',
+                }}
+              >
+                @{seller}
               </Text>
             </Pressable>
           ))}
@@ -756,7 +957,7 @@ export const HomeSearchView = memo(function HomeSearchView({
       onTouchStart={Platform.OS === 'web' ? handleTouchStart : undefined}
       onTouchEnd={Platform.OS === 'web' ? handleTouchEnd : undefined}
     >
-      {/* ── Top Header Row ─────────────────────────────────────────────────── */}
+      {/* ── Top Header Row (No line under search) ─────────────────────────────── */}
       <View
         style={{
           flexDirection: 'row',
@@ -765,8 +966,7 @@ export const HomeSearchView = memo(function HomeSearchView({
           paddingTop: 8,
           paddingBottom: 8,
           gap: 10,
-          borderBottomWidth: hasSubmitted ? 1 : 0,
-          borderBottomColor: isDark ? '#242D31' : theme.border,
+          borderBottomWidth: 0,
         }}
       >
         {/* Search Input Box */}
@@ -873,6 +1073,7 @@ export const HomeSearchView = memo(function HomeSearchView({
             style={{
               fontSize: 15,
               fontWeight: '500',
+              fontFamily: typography.family.sansMedium,
               color: isDark ? '#EDEDED' : theme.text,
               letterSpacing: -0.2,
             }}
@@ -883,96 +1084,99 @@ export const HomeSearchView = memo(function HomeSearchView({
       </View>
 
       <Animated.View style={contentAnimatedStyle}>
-        {/* ── Tab Switcher ('Items' & 'Members') ────────────────────────────── */}
-        {!hasSubmitted && (
-          <View
+        {/* ── Tab Switcher ('Items' & 'Members' matching Tradera - Always Visible) ─ */}
+        <View
+          style={{
+            flexDirection: 'row',
+            borderBottomWidth: 1,
+            borderBottomColor: isDark ? '#242D31' : '#E5E7EB',
+            position: 'relative',
+          }}
+        >
+          {/* Items Tab */}
+          <Pressable
+            onPress={() => handleTabPress('listings')}
             style={{
-              flexDirection: 'row',
-              borderBottomWidth: 1,
-              borderBottomColor: isDark ? '#242D31' : theme.border,
-              marginTop: 4,
-              position: 'relative',
+              flex: 1,
+              alignItems: 'center',
+              paddingVertical: 12,
             }}
           >
-            {/* Items Tab */}
-            <Pressable
-              onPress={() => handleTabPress('listings')}
+            <Text
               style={{
-                flex: 1,
-                alignItems: 'center',
-                paddingVertical: 12,
+                fontSize: 16,
+                fontWeight: activeTab === 'listings' ? '700' : '500',
+                fontFamily:
+                  activeTab === 'listings'
+                    ? typography.family.sansBold
+                    : typography.family.sansMedium,
+                color:
+                  activeTab === 'listings'
+                    ? (isDark ? '#FFFFFF' : '#111827')
+                    : (isDark ? '#9CA3AF' : '#374151'),
+                letterSpacing: -0.2,
               }}
             >
-              <Text
-                style={{
-                  fontSize: 15.5,
-                  fontWeight: activeTab === 'listings' ? '600' : '400',
-                  color: activeTab === 'listings' ? (isDark ? '#FFFFFF' : theme.text) : (isDark ? '#9CA3AF' : theme.mute),
-                  fontFamily:
-                    activeTab === 'listings'
-                      ? 'Inklination-SemiBold, "Inklination SemiBold", "Inklination", Inter_600SemiBold, sans-serif'
-                      : 'Eina03-Regular, "Eina 03 Regular", "Eina 03", "Eina03", Inter_400Regular, sans-serif',
-                }}
-              >
-                Items
-              </Text>
-            </Pressable>
+              Items
+            </Text>
+          </Pressable>
 
-            {/* Members Tab */}
-            <Pressable
-              onPress={() => handleTabPress('seller')}
+          {/* Members Tab */}
+          <Pressable
+            onPress={() => handleTabPress('seller')}
+            style={{
+              flex: 1,
+              alignItems: 'center',
+              paddingVertical: 12,
+            }}
+          >
+            <Text
               style={{
-                flex: 1,
-                alignItems: 'center',
-                paddingVertical: 12,
+                fontSize: 16,
+                fontWeight: activeTab === 'seller' ? '700' : '500',
+                fontFamily:
+                  activeTab === 'seller'
+                    ? typography.family.sansBold
+                    : typography.family.sansMedium,
+                color:
+                  activeTab === 'seller'
+                    ? (isDark ? '#FFFFFF' : '#111827')
+                    : (isDark ? '#9CA3AF' : '#374151'),
+                letterSpacing: -0.2,
               }}
             >
-              <Text
-                style={{
-                  fontSize: 15.5,
-                  fontWeight: activeTab === 'seller' ? '600' : '400',
-                  color: activeTab === 'seller' ? (isDark ? '#FFFFFF' : theme.text) : (isDark ? '#9CA3AF' : theme.mute),
-                  fontFamily:
-                    activeTab === 'seller'
-                      ? 'Inklination-SemiBold, "Inklination SemiBold", "Inklination", Inter_600SemiBold, sans-serif'
-                      : 'Eina03-Regular, "Eina 03 Regular", "Eina 03", "Eina03", Inter_400Regular, sans-serif',
-                }}
-              >
-                Members
-              </Text>
-            </Pressable>
+              Members
+            </Text>
+          </Pressable>
 
-            {/* ── Continuous Sliding Underline Indicator ──────────────────────── */}
-            <RNAnimated.View
+          {/* ── Continuous Sliding Underline Indicator (Tradera Flat Corners) ─ */}
+          <RNAnimated.View
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              width: tabWidth,
+              height: 3,
+              transform: [{ translateX: indicatorTranslateX }],
+            }}
+          >
+            <View
               style={{
-                position: 'absolute',
-                bottom: -1,
-                left: 0,
-                width: tabWidth,
+                width: '100%',
                 height: 3,
-                alignItems: 'center',
-                justifyContent: 'center',
-                transform: [{ translateX: indicatorTranslateX }],
+                backgroundColor: isDark ? '#2FD5C6' : '#0F3D2E',
+                borderRadius: 0,
               }}
-            >
-              <View
-                style={{
-                  width: '85%',
-                  height: 3,
-                  backgroundColor: isDark ? '#2FD5C6' : '#0A3B2C',
-                  borderRadius: 2,
-                }}
-              />
-            </RNAnimated.View>
-          </View>
-        )}
+            />
+          </RNAnimated.View>
+        </View>
 
         {/* ── Horizontal Swipeable Pager for Items & Members ───────────────── */}
         <ScrollView
           ref={pagerRef}
           horizontal
           pagingEnabled
-          scrollEnabled={!hasSubmitted}
+          scrollEnabled={true}
           showsHorizontalScrollIndicator={false}
           contentOffset={{ x: initialTab === 'listings' ? 0 : screenWidth, y: 0 }}
           onScroll={handleScroll}
@@ -981,7 +1185,7 @@ export const HomeSearchView = memo(function HomeSearchView({
           style={[
             { flex: 1 },
             Platform.OS === 'web' && ({
-              scrollSnapType: hasSubmitted ? 'none' : 'x mandatory',
+              scrollSnapType: 'x mandatory',
               WebkitOverflowScrolling: 'touch',
             } as any),
           ]}
@@ -1065,8 +1269,7 @@ export const HomeSearchView = memo(function HomeSearchView({
             ]}
           >
             {!hasQuery ? (
-              /* Idle Seller state: Clean blank screen matching theme */
-              <View style={{ flex: 1, backgroundColor: theme.background }} />
+              renderMembersIdleLanding
             ) : loading ? (
               <View style={{ paddingVertical: 40, alignItems: 'center' }}>
                 <ActivityIndicator size="small" color={isDark ? theme.purple : '#0A3B2C'} />
