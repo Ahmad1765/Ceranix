@@ -710,7 +710,7 @@ function SellForm({
               borderRadius: radii['2xl'],
               borderWidth: 1,
               borderColor: errors.slots ? (theme.danger ?? '#EF4444') : theme.border,
-              backgroundColor: theme.surface,
+              backgroundColor: theme.background,
               padding: slots.length === 0 ? 24 : 14,
               overflow: 'hidden',
             }}
@@ -933,7 +933,7 @@ function SellForm({
               borderRadius: radii['2xl'],
               borderWidth: 1,
               borderColor: theme.border,
-              backgroundColor: theme.panel,
+              backgroundColor: theme.background,
               padding: 16,
               gap: 16,
             }}
@@ -963,7 +963,7 @@ function SellForm({
                       borderWidth: 1,
                       borderColor: error ? (theme.danger ?? '#EF4444') : theme.border,
                       borderRadius: radii.md,
-                      backgroundColor: theme.surface,
+                      backgroundColor: theme.background,
                       paddingHorizontal: 12,
                       paddingVertical: 10,
                     }}
@@ -1029,7 +1029,7 @@ function SellForm({
                       borderWidth: 1,
                       borderColor: error ? (theme.danger ?? '#EF4444') : theme.border,
                       borderRadius: radii.md,
-                      backgroundColor: theme.surface,
+                      backgroundColor: theme.background,
                       paddingHorizontal: 12,
                       paddingVertical: 10,
                     }}

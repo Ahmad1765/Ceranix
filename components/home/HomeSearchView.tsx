@@ -20,19 +20,26 @@ import Animated, {
   interpolate,
   Easing,
   runOnJS,
+  Extrapolation,
 } from 'react-native-reanimated';
 import { Text, TextInput } from '@/lib/rnText';
 import { router } from 'expo-router';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { useToast } from '@/lib/toast';
 import { useTheme } from '@/context/ThemeContext';
+import { useAuth } from '@/lib/auth';
 import { useSearchHistory } from '@/hooks/useSearchHistory';
 import { BinocularsIcon } from '@/components/ui/BinocularsIcon';
 import { searchUsers } from '@/lib/follows';
 import { searchListings } from '@/lib/listings';
 import { getSearchSuggestions } from '@/lib/searchSuggestions';
+import { createSavedSearch, deleteSavedSearch } from '@/lib/savedSearches';
+import { useSavedSearchesQuery } from '@/lib/queries/useFeedQueries';
+import { queryClient } from '@/lib/queryClient';
+import { qk } from '@/lib/queries/keys';
 import { PreSearchSuggestions } from './PreSearchSuggestions';
 import {
   SearchFilterChips,
@@ -130,6 +137,55 @@ export const HomeSearchView = memo(function HomeSearchView({
   const scrollX = useRef(new RNAnimated.Value(initialTab === 'listings' ? 0 : screenWidth)).current;
   const searchRequestIdRef = useRef(0);
 
+  const { user } = useAuth();
+  const savedSearchesQ = useSavedSearchesQuery(user?.id ?? null);
+
+  const isSaved = useMemo(() => {
+    const trimmed = query.trim().toLowerCase();
+    if (!trimmed || !savedSearchesQ.data) return false;
+    return savedSearchesQ.data.some(
+      (s) => s.query?.trim().toLowerCase() === trimmed,
+    );
+  }, [query, savedSearchesQ.data]);
+
+  const handleToggleSaveSearch = useCallback(async () => {
+    haptic();
+    if (!user?.id) {
+      toast.show('Sign in to save searches', { variant: 'info', icon: 'log-in' });
+      router.push('/auth/login');
+      return;
+    }
+    const trimmed = query.trim();
+    if (!trimmed) {
+      if (onOpenSavedAlerts) {
+        onOpenSavedAlerts();
+      } else {
+        toast.show('Type a search query to save alerts', { variant: 'info', icon: 'search' });
+      }
+      return;
+    }
+    const qNorm = trimmed.toLowerCase();
+    const existing = savedSearchesQ.data?.find(
+      (s) => s.query?.trim().toLowerCase() === qNorm,
+    );
+
+    if (existing) {
+      await deleteSavedSearch(existing.id);
+      queryClient.invalidateQueries({ queryKey: qk.savedSearches(user.id) });
+      toast.show('Search alert removed', { variant: 'info', icon: 'trash-2' });
+    } else {
+      await createSavedSearch({
+        userId: user.id,
+        query: trimmed,
+        category: searchFilters.category || null,
+        gender: null,
+        label: trimmed,
+      });
+      queryClient.invalidateQueries({ queryKey: qk.savedSearches(user.id) });
+      toast.show(`Saved search alert for "${trimmed}"`, { variant: 'success', icon: 'star' });
+    }
+  }, [user, query, searchFilters, savedSearchesQ.data, onOpenSavedAlerts, toast]);
+
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
 
@@ -139,9 +195,13 @@ export const HomeSearchView = memo(function HomeSearchView({
 
   useEffect(() => {
     animProgress.value = withTiming(1, {
-      duration: 260,
+      duration: 400,
       easing: Easing.bezier(0.16, 1, 0.3, 1),
     });
+    const focusTimer = setTimeout(() => {
+      inputRef.current?.focus?.();
+    }, 260);
+    return () => clearTimeout(focusTimer);
   }, [animProgress]);
 
   const handleClose = useCallback(() => {
@@ -156,8 +216,8 @@ export const HomeSearchView = memo(function HomeSearchView({
     animProgress.value = withTiming(
       0,
       {
-        duration: 200,
-        easing: Easing.in(Easing.cubic),
+        duration: 320,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
       },
       (finished) => {
         if (finished) {
@@ -165,7 +225,7 @@ export const HomeSearchView = memo(function HomeSearchView({
         }
       },
     );
-  }, [isClosing, onClose, animProgress, query, addSearch]);
+  }, [isClosing, onClose, animProgress, query, activeTab, addSearch]);
 
   useEffect(() => {
     const onBackPress = () => {
@@ -176,26 +236,30 @@ export const HomeSearchView = memo(function HomeSearchView({
     return () => subscription.remove();
   }, [handleClose]);
 
-  const rootAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(animProgress.value, [0, 0.15, 1], [0, 0.9, 1]),
-  }));
+  const rootAnimatedStyle = useAnimatedStyle(() => {
+    const translateX = interpolate(
+      animProgress.value,
+      [0, 1],
+      [screenWidth, 0],
+      Extrapolation.CLAMP,
+    );
+    return {
+      transform: [{ translateX }],
+    };
+  });
 
   const searchBarAnimatedStyle = useAnimatedStyle(() => {
-    const opacity = interpolate(animProgress.value, [0, 0.3, 1], [0, 0.8, 1]);
-    const translateY = interpolate(animProgress.value, [0, 1], [-8, 0]);
+    const scale = interpolate(animProgress.value, [0, 1], [0.96, 1], Extrapolation.CLAMP);
     return {
-      opacity,
-      transform: [{ translateY }],
+      transform: [{ scale }],
     };
   });
 
   const contentAnimatedStyle = useAnimatedStyle(() => {
-    const translateY = interpolate(animProgress.value, [0, 1], [20, 0]);
-    const opacity = interpolate(animProgress.value, [0, 0.25, 1], [0, 0, 1]);
+    const opacity = interpolate(animProgress.value, [0, 0.2, 1], [0, 0.8, 1], Extrapolation.CLAMP);
     return {
       flex: 1,
       opacity,
-      transform: [{ translateY }],
     };
   });
 
@@ -431,6 +495,10 @@ export const HomeSearchView = memo(function HomeSearchView({
       const deltaY = currentY - touchStartY.current;
 
       if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 35) {
+        if (touchStartX.current < 45 && deltaX > 45 && activeTab === 'listings') {
+          handleClose();
+          return;
+        }
         if (deltaX < 0 && activeTab === 'listings') {
           // Swipe left -> go to Seller
           handleTabPress('seller');
@@ -440,7 +508,7 @@ export const HomeSearchView = memo(function HomeSearchView({
         }
       }
     },
-    [activeTab, handleTabPress],
+    [activeTab, handleTabPress, handleClose],
   );
 
   // Suggestion selection from pre-search suggestions list
@@ -953,11 +1021,22 @@ export const HomeSearchView = memo(function HomeSearchView({
 
   return (
     <Animated.View
-      style={[{ flex: 1, backgroundColor: theme.background }, rootAnimatedStyle]}
+      style={[
+        {
+          flex: 1,
+          backgroundColor: theme.background,
+          shadowColor: '#000',
+          shadowOffset: { width: -3, height: 0 },
+          shadowOpacity: isDark ? 0.35 : 0.1,
+          shadowRadius: 10,
+          elevation: 12,
+        },
+        rootAnimatedStyle,
+      ]}
       onTouchStart={Platform.OS === 'web' ? handleTouchStart : undefined}
       onTouchEnd={Platform.OS === 'web' ? handleTouchEnd : undefined}
     >
-      {/* ── Top Header Row (No line under search) ─────────────────────────────── */}
+      {/* ── Top Header Row (Plick layout: [<] [ 🔍 Search ... (x) ] [ ⭐ ] ) ─── */}
       <View
         style={{
           flexDirection: 'row',
@@ -969,6 +1048,28 @@ export const HomeSearchView = memo(function HomeSearchView({
           borderBottomWidth: 0,
         }}
       >
+        {/* Back Button '<' (Exact same as Plick) */}
+        <Pressable
+          onPress={handleClose}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+          style={({ pressed }) => ({
+            width: 36,
+            height: 44,
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: pressed ? 0.6 : 1,
+            transform: [{ scale: pressed ? 0.94 : 1 }],
+          })}
+        >
+          <Feather
+            name="chevron-left"
+            size={28}
+            color={isDark ? '#EDEDED' : '#111827'}
+          />
+        </Pressable>
+
         {/* Search Input Box */}
         <Animated.View
           style={[
@@ -976,13 +1077,13 @@ export const HomeSearchView = memo(function HomeSearchView({
               flex: 1,
               flexDirection: 'row',
               alignItems: 'center',
-              backgroundColor: isDark ? '#1C2327' : theme.surface,
+              backgroundColor: isDark ? '#1C2327' : '#F3F4F6',
               borderRadius: radii.pill,
               paddingLeft: 14,
               paddingRight: 10,
               height: 44,
               borderWidth: 1,
-              borderColor: isDark ? '#2B353B' : theme.border,
+              borderColor: isDark ? '#2B353B' : '#E5E7EB',
             },
             searchBarAnimatedStyle,
           ]}
@@ -990,7 +1091,7 @@ export const HomeSearchView = memo(function HomeSearchView({
           <Feather
             name="search"
             size={16}
-            color={isDark ? '#9CA3AF' : theme.mute}
+            color={isDark ? '#9CA3AF' : '#6B7280'}
             style={{ flexShrink: 0 }}
           />
           <TextInput
@@ -1007,8 +1108,8 @@ export const HomeSearchView = memo(function HomeSearchView({
             }}
             onSubmitEditing={handleSubmitSearch}
             placeholder="Search"
-            placeholderTextColor={isDark ? '#6B7280' : theme.muteSoft}
-            autoFocus
+            placeholderTextColor={isDark ? '#6B7280' : '#9CA3AF'}
+            autoFocus={Platform.OS === 'web'}
             returnKeyType="search"
             autoCapitalize="none"
             autoCorrect={false}
@@ -1022,7 +1123,7 @@ export const HomeSearchView = memo(function HomeSearchView({
                 fontFamily: typography.family.sansMedium,
                 fontSize: 16,
                 letterSpacing: -0.15,
-                color: isDark ? '#FFFFFF' : theme.ink,
+                color: isDark ? '#FFFFFF' : '#111827',
                 padding: 0,
                 outlineStyle: 'none',
                 outlineWidth: 0,
@@ -1047,69 +1148,76 @@ export const HomeSearchView = memo(function HomeSearchView({
                 width: 20,
                 height: 20,
                 borderRadius: 10,
-                backgroundColor: isDark ? '#2F3C43' : theme.border,
+                backgroundColor: isDark ? '#2F3C43' : '#E5E7EB',
                 alignItems: 'center',
                 justifyContent: 'center',
                 marginRight: 2,
               }}
             >
-              <Feather name="x" size={12} color={isDark ? '#D1D5DB' : theme.mute} />
+              <Feather name="x" size={12} color={isDark ? '#D1D5DB' : '#6B7280'} />
             </Pressable>
           )}
         </Animated.View>
 
-        {/* Close Text Button (Matching Screenshot) */}
+        {/* Save Your Search Star Button on Right (Exact same as Plick) */}
         <Pressable
-          onPress={handleClose}
+          onPress={handleToggleSaveSearch}
           hitSlop={8}
-          accessibilityLabel="Close search"
+          accessibilityRole="button"
+          accessibilityLabel={isSaved ? "Saved search active" : "Save this search"}
           style={({ pressed }) => ({
-            paddingVertical: 6,
-            paddingHorizontal: 4,
-            opacity: pressed ? 0.7 : 1,
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+            backgroundColor: isSaved
+              ? (isDark ? '#2E2816' : '#FEF3C7')
+              : (isDark ? '#1C2327' : '#F3F4F6'),
+            borderWidth: 1,
+            borderColor: isSaved
+              ? (isDark ? '#78350F' : '#FDE68A')
+              : (isDark ? '#2B353B' : '#E5E7EB'),
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: pressed ? 0.75 : 1,
+            transform: [{ scale: pressed ? 0.94 : 1 }],
           })}
         >
-          <Text
-            style={{
-              fontSize: 15,
-              fontWeight: '500',
-              fontFamily: typography.family.sansMedium,
-              color: isDark ? '#EDEDED' : theme.text,
-              letterSpacing: -0.2,
-            }}
-          >
-            Close
-          </Text>
+          <Ionicons
+            name={isSaved ? "star" : "star-outline"}
+            size={20}
+            color={isSaved ? "#F59E0B" : (isDark ? "#9CA3AF" : "#6B7280")}
+          />
         </Pressable>
       </View>
 
       <Animated.View style={contentAnimatedStyle}>
-        {/* ── Tab Switcher ('Items' & 'Members' matching Tradera - Always Visible) ─ */}
-        <View
-          style={{
-            flexDirection: 'row',
-            borderBottomWidth: 1,
-            borderBottomColor: isDark ? '#242D31' : '#E5E7EB',
-            position: 'relative',
-          }}
-        >
-          {/* Items Tab */}
-          <Pressable
-            onPress={() => handleTabPress('listings')}
+        {/* ── Tab Switcher ('Items' & 'Members') - Hidden in results ─ */}
+        {!hasSubmitted && !hasQuery && (
+          <View
             style={{
-              flex: 1,
-              alignItems: 'center',
-              paddingVertical: 12,
+              flexDirection: 'row',
+              borderBottomWidth: 1,
+              borderBottomColor: isDark ? '#242D31' : '#E5E7EB',
+              position: 'relative',
             }}
           >
-            <Text
+            {/* Items Tab */}
+            <Pressable
+              onPress={() => handleTabPress('listings')}
               style={{
-                fontSize: 16,
-                fontWeight: activeTab === 'listings' ? '700' : '500',
-                fontFamily:
-                  activeTab === 'listings'
-                    ? typography.family.sansBold
-                    : typography.family.sansMedium,
+                flex: 1,
+                alignItems: 'center',
+                paddingVertical: 12,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 16,
+                  fontWeight: activeTab === 'listings' ? '700' : '500',
+                  fontFamily:
+                    activeTab === 'listings'
+                      ? typography.family.sansBold
+                      : typography.family.sansMedium,
                 color:
                   activeTab === 'listings'
                     ? (isDark ? '#FFFFFF' : '#111827')
@@ -1170,22 +1278,23 @@ export const HomeSearchView = memo(function HomeSearchView({
             />
           </RNAnimated.View>
         </View>
+        )}
 
         {/* ── Horizontal Swipeable Pager for Items & Members ───────────────── */}
         <ScrollView
           ref={pagerRef}
           horizontal
           pagingEnabled
-          scrollEnabled={true}
+          scrollEnabled={!hasSubmitted && !hasQuery}
           showsHorizontalScrollIndicator={false}
-          contentOffset={{ x: initialTab === 'listings' ? 0 : screenWidth, y: 0 }}
+          contentOffset={{ x: activeTab === 'listings' ? 0 : screenWidth, y: 0 }}
           onScroll={handleScroll}
           onMomentumScrollEnd={handleMomentumScrollEnd}
           scrollEventThrottle={16}
           style={[
             { flex: 1 },
             Platform.OS === 'web' && ({
-              scrollSnapType: 'x mandatory',
+              scrollSnapType: !hasSubmitted && !hasQuery ? 'x mandatory' : 'none',
               WebkitOverflowScrolling: 'touch',
             } as any),
           ]}
@@ -1282,7 +1391,7 @@ export const HomeSearchView = memo(function HomeSearchView({
                 keyboardShouldPersistTaps="handled"
                 contentContainerStyle={{ paddingBottom: 40 }}
                 ListHeaderComponent={
-                  hasSubmitted ? (
+                  hasQuery ? (
                     <View
                       style={{
                         paddingHorizontal: 16,

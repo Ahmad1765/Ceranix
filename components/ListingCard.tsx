@@ -1,5 +1,5 @@
 import { memo, useEffect, useState, useCallback, useRef } from 'react';
-import { View, Pressable } from 'react-native';
+import { View, Pressable, Platform } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedScrollHandler,
@@ -84,6 +84,9 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
   // Imperative handle for the like pop — fired on tap so the Instagram-style
   // spring bounce never rides an async server-hydration update.
   const heartAnimRef = useRef<PopIconHandle>(null);
+  const carouselRef = useRef<Animated.ScrollView>(null);
+  const pointerDownPos = useRef({ x: 0, y: 0, time: 0 });
+  const isSwipingOrDragging = useRef(false);
 
   // Hydrate the liked state for the current user. Cards are recycled in the
   // feed grid so we re-run this whenever the listing id or user changes.
@@ -243,6 +246,59 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
     setLikeBusy(false);
   }, [liked, likeBusy, listing.id, toast, userId, guestGate]);
 
+  const handlePrevSlide = useCallback(
+    (e?: any) => {
+      e?.stopPropagation?.();
+      isSwipingOrDragging.current = true;
+      if (activeIndex <= 0) return;
+      const target = activeIndex - 1;
+      setActiveIndex(target);
+      const w = cardWidth || 200;
+      carouselRef.current?.scrollTo({ x: target * w, animated: true });
+      setTimeout(() => {
+        isSwipingOrDragging.current = false;
+      }, 200);
+    },
+    [activeIndex, cardWidth],
+  );
+
+  const handleNextSlide = useCallback(
+    (e?: any) => {
+      e?.stopPropagation?.();
+      isSwipingOrDragging.current = true;
+      if (activeIndex >= images.length - 1) return;
+      setCarouselHydrated(true);
+      const target = activeIndex + 1;
+      setActiveIndex(target);
+      const w = cardWidth || 200;
+      carouselRef.current?.scrollTo({ x: target * w, animated: true });
+      setTimeout(() => {
+        isSwipingOrDragging.current = false;
+      }, 200);
+    },
+    [activeIndex, cardWidth, images.length],
+  );
+
+  const handleCardPress = useCallback(
+    (e: any) => {
+      if (isSwipingOrDragging.current) {
+        isSwipingOrDragging.current = false;
+        return;
+      }
+      const pageX = e?.nativeEvent?.pageX;
+      const pageY = e?.nativeEvent?.pageY;
+      if (pageX !== undefined && pageY !== undefined && pointerDownPos.current.time > 0) {
+        const dx = Math.abs(pageX - pointerDownPos.current.x);
+        const dy = Math.abs(pageY - pointerDownPos.current.y);
+        if (dx > 10 || dy > 10) {
+          return;
+        }
+      }
+      router.push(`/product/${listing.id}`);
+    },
+    [listing.id],
+  );
+
   const srcWidth = thumbWidthFor(cardWidth || 200);
   const currentSrc = getOptimizedImageUrl(cardImageUrl(listing, activeIndex) || cardImageUrl(listing, 0), {
     width: srcWidth,
@@ -254,7 +310,14 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
   return (
     <View style={{ flex: 1, marginBottom: 16 }}>
     <Pressable
-      onPress={() => router.push(`/product/${listing.id}`)}
+      onPress={handleCardPress}
+      onPressIn={(e) => {
+        pointerDownPos.current = {
+          x: e.nativeEvent.pageX,
+          y: e.nativeEvent.pageY,
+          time: Date.now(),
+        };
+      }}
       accessibilityRole="link"
       accessibilityLabel={`${listing.brand || listing.title}${listing.size ? `, size ${listing.size}` : ''}, ${formatPrice(listing.price)}`}
       accessibilityHint="Opens listing details"
@@ -278,46 +341,61 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
         {hasMultiple ? (
           // Horizontal paging carousel — one full-width slide per photo. Nested
           // inside the fixed-ratio, clipped container so pages snap edge to edge.
-          //
-          // Slides are mounted lazily. A grid card is a thumbnail first and a
-          // gallery second: mounting every photo meant a 4-photo listing built
-          // four native image views and fired four downloads for a card the
-          // shopper may never swipe — times every card FlashList mounts and
-          // re-mounts while scrolling, all competing with the *visible* photos
-          // for both the JS thread and the connection pool. Un-mounted slides
-          // still render as empty slots of the exact same width, so the paging
-          // geometry, the dot count, and the scroll offsets are identical from
-          // the first frame; only the pixels arrive later. `onTouchStart` fires
-          // on finger-down, before the drag produces any movement, so the real
-          // images are requested well before the swipe lands.
           <Animated.ScrollView
+            ref={carouselRef}
             horizontal
             pagingEnabled
+            nestedScrollEnabled
+            disableIntervalMomentum
             showsHorizontalScrollIndicator={false}
             onScroll={carouselScrollHandler}
             onTouchStart={hydrateCarousel}
+            onScrollBeginDrag={() => {
+              hydrateCarousel();
+              isSwipingOrDragging.current = true;
+            }}
+            onScrollEndDrag={() => {
+              setTimeout(() => {
+                isSwipingOrDragging.current = false;
+              }, 150);
+            }}
             scrollEventThrottle={16}
-            style={{ width: '100%', height: '100%' }}
+            style={[
+              { width: '100%', height: '100%' },
+              Platform.OS === 'web' && ({
+                scrollSnapType: 'x mandatory',
+                WebkitOverflowScrolling: 'touch',
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none',
+              } as any),
+            ]}
           >
-            {images.map((_uri, i) =>
-              // Slide 0 and whatever slide is currently showing are always real
-              // — the second clause matters for a recycled card parked
-              // mid-carousel, which must never show an empty slot.
-              i === 0 || i === activeIndex || carouselHydrated ? (
-                <Image
-                  key={`${listing.id}-${i}`}
-                  source={{ uri: getOptimizedImageUrl(cardImageUrl(listing, i), { width: srcWidth }) }}
-                  style={{ width: cardWidth || 200, height: '100%' }}
-                  contentFit="cover"
-                  cachePolicy="memory-disk"
-                  recyclingKey={`${listing.id}-${i}`}
-                  transition={IMAGE_TRANSITION}
-                  priority={i === 0 ? 'high' : 'normal'}
-                />
-              ) : (
-                <View key={`${listing.id}-${i}`} style={{ width: cardWidth || 200, height: '100%' }} />
-              ),
-            )}
+            {images.map((_uri, i) => (
+              <View
+                key={`${listing.id}-${i}`}
+                style={[
+                  { width: cardWidth || 200, height: '100%' },
+                  Platform.OS === 'web' && ({
+                    scrollSnapAlign: 'start',
+                    scrollSnapStop: 'always',
+                    flexShrink: 0,
+                  } as any),
+                ]}
+              >
+                {i === 0 || i === activeIndex || carouselHydrated ? (
+                  <Image
+                    source={{ uri: getOptimizedImageUrl(cardImageUrl(listing, i), { width: srcWidth }) }}
+                    style={[{ width: '100%', height: '100%' }, Platform.OS === 'web' && ({ userSelect: 'none' } as any)]}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                    recyclingKey={`${listing.id}-${i}`}
+                    transition={IMAGE_TRANSITION}
+                    priority={i === 0 ? 'high' : 'normal'}
+                    pointerEvents="none"
+                  />
+                ) : null}
+              </View>
+            ))}
           </Animated.ScrollView>
         ) : (
           <Image
@@ -329,6 +407,58 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
             transition={IMAGE_TRANSITION}
             priority="high"
           />
+        )}
+
+        {hasMultiple && activeIndex > 0 && (
+          <Pressable
+            onPress={handlePrevSlide}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Previous photo"
+            style={({ pressed }) => ({
+              position: 'absolute',
+              left: 6,
+              top: '50%',
+              transform: [{ translateY: -13 }],
+              width: 26,
+              height: 26,
+              borderRadius: 13,
+              backgroundColor: 'rgba(255, 255, 255, 0.92)',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 10,
+              opacity: pressed ? 0.75 : 1,
+              ...shadow.sm,
+            })}
+          >
+            <Feather name="chevron-left" size={15} color={colors.ink} />
+          </Pressable>
+        )}
+
+        {hasMultiple && activeIndex < images.length - 1 && (
+          <Pressable
+            onPress={handleNextSlide}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Next photo"
+            style={({ pressed }) => ({
+              position: 'absolute',
+              right: 6,
+              top: '50%',
+              transform: [{ translateY: -13 }],
+              width: 26,
+              height: 26,
+              borderRadius: 13,
+              backgroundColor: 'rgba(255, 255, 255, 0.92)',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 10,
+              opacity: pressed ? 0.75 : 1,
+              ...shadow.sm,
+            })}
+          >
+            <Feather name="chevron-right" size={15} color={colors.ink} />
+          </Pressable>
         )}
 
         {hasMultiple && (
@@ -449,11 +579,11 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
         <Text className="text-[11px] text-ink-soft mt-1">
           {formatPrice(itemPrice, { whole: true })}
         </Text>
-        <View className="flex-row items-center mt-0.5" style={{ gap: 3 }}>
+        <View className="flex-row items-center mt-0.5" style={{ gap: 4 }}>
           <Text className="text-[12px] font-bold text-ink">
             {formatPrice(totalPrice, { whole: true })} incl.
           </Text>
-          <ShieldCheckIcon size={12} />
+          <ShieldCheckIcon size={14} />
         </View>
 
       </View>

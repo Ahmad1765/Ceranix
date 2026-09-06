@@ -15,7 +15,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { RefreshControl, BackHandler, StyleSheet, View } from 'react-native';
+import { RefreshControl, StyleSheet, View } from 'react-native';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, router } from 'expo-router';
@@ -158,17 +158,6 @@ export default function HomeScreen() {
     ]);
   }, [feedRefetch, trendingRefetch, dropsRefetch, searchesRefetch, savedRefetch, userId]);
 
-  // ── BackHandler listener for search mode ────────────────────────────────
-  useEffect(() => {
-    if (!searchModeOpen) return;
-    const onBackPress = () => {
-      setSearchModeOpen(false);
-      return true;
-    };
-    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
-    return () => subscription.remove();
-  }, [searchModeOpen]);
-
   // ── Multi-Tier Client Filter Hook ────────────────────────────────────────
   const feedFilter = useHomeFeedFilters({
     listings,
@@ -283,7 +272,7 @@ export default function HomeScreen() {
       />
 
       {searchModeOpen && (
-        <View style={StyleSheet.absoluteFillObject}>
+        <View style={[StyleSheet.absoluteFillObject, { zIndex: 100, elevation: 10 }]}>
           <HomeSearchView
             onClose={() => setSearchModeOpen(false)}
             onOpenSavedAlerts={() => {
