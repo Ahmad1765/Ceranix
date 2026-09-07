@@ -235,7 +235,7 @@ const TopicTile = memo(function TopicTile({
         <Feather name={topic.icon} size={15} color={colors.purple} />
         {uri ? (
           <Image
-            source={{ uri: getOptimizedImageUrl(uri, { width: 100 }) }}
+            source={{ uri }}
             // borderRadius is repeated on the image, not just the parent:
             // Android does not reliably clip an absolutely-positioned child to
             // a rounded parent's `overflow: hidden`, which left the cover as a

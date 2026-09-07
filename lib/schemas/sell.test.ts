@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { SellFormSchema } from './sell';
+import { CURRENCY_SYMBOL } from '@/lib/currency';
 
 describe('SellFormSchema', () => {
   const validPayload = {
@@ -101,9 +102,21 @@ describe('SellFormSchema', () => {
   it('fails on invalid price formats (negative, zero, NaN, too many decimals)', () => {
     const negative = SellFormSchema.safeParse({ ...validPayload, price: '-10' });
     expect(negative.success).toBe(false);
+    if (!negative.success) {
+      expect(negative.error.issues[0].message).toBe(`Enter a valid price greater than ${CURRENCY_SYMBOL}0`);
+    }
 
     const zero = SellFormSchema.safeParse({ ...validPayload, price: '0' });
     expect(zero.success).toBe(false);
+    if (!zero.success) {
+      expect(zero.error.issues[0].message).toBe(`Enter a valid price greater than ${CURRENCY_SYMBOL}0`);
+    }
+
+    const tooHigh = SellFormSchema.safeParse({ ...validPayload, price: '100001' });
+    expect(tooHigh.success).toBe(false);
+    if (!tooHigh.success) {
+      expect(tooHigh.error.issues[0].message).toBe(`Price cannot exceed ${CURRENCY_SYMBOL}100,000`);
+    }
 
     const notNumber = SellFormSchema.safeParse({ ...validPayload, price: 'abc' });
     expect(notNumber.success).toBe(false);

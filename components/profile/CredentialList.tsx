@@ -30,7 +30,18 @@ export function CredentialList({ rows }: { rows: Credential[] }) {
           ) : null}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             {row.key === 'verified' || row.icon === 'shield' ? (
-              <ShieldCheckIcon size={26} />
+              <View
+                style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: 13,
+                  backgroundColor: colors.purpleSoft,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <ShieldCheckIcon size={14} />
+              </View>
             ) : (
               <View
                 style={{

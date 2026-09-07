@@ -32,8 +32,8 @@ type FeedSearchProps = {
   resultCount: number | null;
   filterCount: number;
   onOpenFilter: () => void;
-  savedActive: boolean;
-  onToggleSaved: () => void;
+  unreadNotificationsCount?: number;
+  onPressNotifications?: () => void;
 };
 
 export const FeedSearch = memo(function FeedSearch({
@@ -46,8 +46,8 @@ export const FeedSearch = memo(function FeedSearch({
   resultCount,
   filterCount,
   onOpenFilter,
-  savedActive,
-  onToggleSaved,
+  unreadNotificationsCount,
+  onPressNotifications,
 }: FeedSearchProps) {
   const { theme } = useTheme();
   const inputRef = useRef<any>(null);
@@ -248,32 +248,56 @@ export const FeedSearch = memo(function FeedSearch({
               )}
             </Pressable>
 
-            {/* Saved quick toggle */}
+            {/* Notifications button (Plick style) */}
             <Pressable
               onPress={() => {
                 haptic();
-                onToggleSaved();
+                if (onPressNotifications) {
+                  onPressNotifications();
+                } else {
+                  router.push('/news' as any);
+                }
               }}
               accessibilityRole="button"
-              accessibilityLabel={savedActive ? 'Viewing saved items' : 'View saved items'}
+              accessibilityLabel={
+                unreadNotificationsCount && unreadNotificationsCount > 0
+                  ? `${unreadNotificationsCount} unread notifications`
+                  : 'Notifications'
+              }
               style={({ pressed }) => ({
                 width: 44,
                 height: 44,
                 borderRadius: 22,
-                backgroundColor: savedActive ? theme.ink : theme.surface,
+                backgroundColor: theme.surface,
                 borderWidth: 1,
-                borderColor: savedActive ? theme.ink : theme.border,
+                borderColor: theme.border,
                 alignItems: 'center',
                 justifyContent: 'center',
                 transform: [{ scale: pressed ? 0.94 : 1 }],
+                position: 'relative',
                 ...shadow.sm,
               })}
             >
               <Feather
-                name="bookmark"
-                size={16}
-                color={savedActive ? theme.background : theme.ink}
+                name="bell"
+                size={17}
+                color={theme.ink}
               />
+              {!!unreadNotificationsCount && unreadNotificationsCount > 0 && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: 10,
+                    right: 10,
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: '#EF4444',
+                    borderWidth: 1.5,
+                    borderColor: theme.surface,
+                  }}
+                />
+              )}
             </Pressable>
           </>
         )}
@@ -436,14 +460,12 @@ type HomeHeaderProps = {
   searchProps: FeedSearchProps;
   chipProps: ChipRowProps;
   showColdStartBanner: boolean;
-  showFollowCta: boolean;
 };
 
 export const HomeHeader = memo(function HomeHeader({
   searchProps,
   chipProps,
   showColdStartBanner,
-  showFollowCta,
 }: HomeHeaderProps) {
   const { theme } = useTheme();
 
@@ -472,30 +494,6 @@ export const HomeHeader = memo(function HomeHeader({
           <Feather name="user-plus" size={16} color={theme.purple} style={{ marginRight: 10 }} />
           <Text style={{ flex: 1, color: theme.purple, fontSize: 13, fontWeight: '600' }}>
             Sign in and like a few items to see this feed personalize itself.
-          </Text>
-        </Pressable>
-      )}
-
-      {showFollowCta && (
-        <Pressable
-          onPress={() => {
-            haptic();
-            router.push('/(tabs)/discover');
-          }}
-          style={{
-            marginTop: -8,
-            marginHorizontal: 14,
-            marginBottom: 10,
-            padding: 14,
-            borderRadius: radii.md,
-            backgroundColor: theme.purpleSoft,
-            flexDirection: 'row',
-            alignItems: 'center',
-          }}
-        >
-          <Feather name="compass" size={16} color={theme.purple} style={{ marginRight: 10 }} />
-          <Text style={{ flex: 1, color: theme.purple, fontSize: 13, fontWeight: '600' }}>
-            Follow some sellers or like a few items to start personalizing your feed.
           </Text>
         </Pressable>
       )}

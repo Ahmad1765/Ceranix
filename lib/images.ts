@@ -13,12 +13,33 @@ import { Image as ExpoImage } from 'expo-image';
 const SUPABASE_TRANSFORM_ENABLED =
   (process.env.EXPO_PUBLIC_SUPABASE_IMAGE_TRANSFORM ?? '').toLowerCase() === 'true';
 
+// Image proxy (Cloudflare edge CDN) enabled by default in app, disabled in test runner unless tested
+const IMAGE_PROXY_ENABLED =
+  process.env.EXPO_PUBLIC_IMAGE_PROXY === 'false'
+    ? false
+    : process.env.TEST_IMAGE_PROXY === 'true' ||
+      (process.env.EXPO_PUBLIC_IMAGE_PROXY === 'true' && !process.env.VITEST) ||
+      (!process.env.VITEST && process.env.NODE_ENV !== 'test');
+
 export const IMAGE_TRANSITION = Platform.OS === 'web' ? 0 : 120;
 
 type Opts = {
   width?: number;
   quality?: number;
 };
+
+/**
+ * Safely converts a Supabase listing image URL to its card-sized thumbnail sibling.
+ * E.g.: .../photo.jpg -> .../photo_thumb.jpg
+ */
+export function toSupabaseThumbnailUrl(url: string): string {
+  if (!url || typeof url !== 'string') return '';
+  if (!url.includes('/storage/v1/object/public/listing-images/')) return url;
+  if (url.includes('_thumb.')) return url;
+  const dot = url.lastIndexOf('.');
+  if (dot < 0) return `${url}_thumb`;
+  return `${url.slice(0, dot)}_thumb${url.slice(dot)}`;
+}
 
 export function getOptimizedImageUrl(
   url: string | undefined | null,
@@ -27,6 +48,10 @@ export function getOptimizedImageUrl(
   if (!url) return '';
   const { width = 400, quality = 70 } = opts;
 
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    return url;
+  }
+
   // Fast check: only rewrite known CDN hosts that support parameter-based resizing
   const isUnsplash =
     url.startsWith('https://images.unsplash.com/') ||
@@ -34,7 +59,7 @@ export function getOptimizedImageUrl(
   const isCloudinary = url.startsWith('https://res.cloudinary.com/');
   const isPexels = url.startsWith('https://images.pexels.com/');
   const isImgix = url.includes('.imgix.net');
-  const isSupabase = SUPABASE_TRANSFORM_ENABLED && url.includes('.supabase.co');
+  const isSupabase = url.includes('.supabase.co');
 
   if (!isUnsplash && !isCloudinary && !isPexels && !isImgix && !isSupabase) {
     return url;
@@ -56,6 +81,22 @@ export function getOptimizedImageUrl(
       u.searchParams.set('quality', String(quality));
       u.searchParams.set('resize', 'cover');
       return u.toString();
+    }
+
+    if (isSupabase) {
+      // If image proxy is enabled, route through Cloudflare-backed edge CDN (wsrv.nl).
+      // This converts to modern WebP, resizes accurately, and edge-caches globally.
+      // Egress hits on Supabase are eliminated after the initial edge-cache fill!
+      if (IMAGE_PROXY_ENABLED) {
+        // If requesting card/thumbnail dimension (<= 640px) from listing-images, point to _thumb file
+        const base =
+          width <= 640 && u.pathname.includes('/storage/v1/object/public/listing-images/')
+            ? toSupabaseThumbnailUrl(url)
+            : url;
+        return `https://wsrv.nl/?url=${encodeURIComponent(base)}&w=${width}&q=${quality}&output=webp`;
+      }
+
+      return url;
     }
 
     if (u.hostname === 'images.unsplash.com' || u.hostname === 'plus.unsplash.com') {

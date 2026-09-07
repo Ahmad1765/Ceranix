@@ -43,7 +43,7 @@ import {
   type SearchFilterState,
   EMPTY_SEARCH_FILTERS,
   countActiveSearchFilters,
-} from './SearchFilterChips';
+} from '@/lib/searchFilters';
 
 export type CatTile = {
   id: Category | 'trending';
@@ -349,19 +349,21 @@ export function useDiscoverSearch({
 
   const updateFilter = useCallback(
     (updater: (prev: SearchFilterState) => SearchFilterState) => {
-      const next = updater(searchFilters);
-      if (next.category !== activeCat) {
-        setActiveCat(next.category);
-      }
-      if (next.subcategory !== activeSub) {
-        setActiveSub(next.subcategory);
-      }
-      if (next.sort !== sort) {
-        setSort(next.sort);
-      }
-      setSearchFilters(next);
+      setSearchFilters((prev) => {
+        const next = updater(prev);
+        if (next.category !== prev.category) {
+          setActiveCat(next.category);
+        }
+        if (next.subcategory !== prev.subcategory) {
+          setActiveSub(next.subcategory);
+        }
+        if (next.sort !== prev.sort) {
+          setSort(next.sort);
+        }
+        return next;
+      });
     },
-    [searchFilters, activeCat, activeSub, sort],
+    [],
   );
 
 

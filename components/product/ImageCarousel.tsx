@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   ScrollView,
@@ -44,7 +44,7 @@ export function ImageCarousel({
   const [carouselWidth, setCarouselWidth] = useState(windowWidth);
   const scrollRef = useRef<ScrollView>(null);
 
-  const validImages = (images || []).filter(Boolean);
+  const validImages = useMemo(() => (images || []).filter(Boolean), [images]);
 
   // Proactively prefetch adjacent gallery images on mount so swipes are instantaneous
   useEffect(() => {
@@ -221,7 +221,8 @@ const CarouselSlide = React.memo(
     prev.width === next.width &&
     prev.height === next.height &&
     prev.placeholderUri === next.placeholderUri &&
-    prev.listingId === next.listingId,
+    prev.listingId === next.listingId &&
+    (prev.onPress !== undefined) === (next.onPress !== undefined),
 );
 
 const styles = StyleSheet.create({

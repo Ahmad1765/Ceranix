@@ -82,7 +82,7 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
         link: true,
         onPress: () => {
           tap('selection');
-          router.push(`/discover?q=${encodeURIComponent(brandVal)}` as any);
+          router.push(`/?q=${encodeURIComponent(brandVal)}` as any);
         },
         trailing: <Feather name="chevron-right" size={18} color={theme.mute} />,
       });
@@ -229,7 +229,7 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
               <Pressable
                 onPress={() => {
                   tap('selection');
-                  router.push(`/discover?category=${encodeURIComponent(listing.category)}` as any);
+                  router.push(`/?category=${encodeURIComponent(listing.category)}` as any);
                 }}
                 style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
               >
@@ -249,7 +249,7 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
                     onPress={() => {
                       tap('selection');
                       router.push(
-                        `/discover?category=${encodeURIComponent(listing.category)}&sub=${encodeURIComponent(listing.subcategory!)}` as any,
+                        `/?category=${encodeURIComponent(listing.category)}&sub=${encodeURIComponent(listing.subcategory!)}` as any,
                       );
                     }}
                     style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
@@ -318,7 +318,7 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
             {listing.tags.map((tag) => (
               <Pressable
                 key={tag}
-                onPress={() => router.push(`/discover?q=${encodeURIComponent(tag)}` as any)}
+                onPress={() => router.push(`/?q=${encodeURIComponent(tag)}` as any)}
                 style={({ pressed }) => ({
                   backgroundColor: theme.white,
                   borderWidth: 1,

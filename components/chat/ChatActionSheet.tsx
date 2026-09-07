@@ -97,6 +97,11 @@ export function ChatActionSheet({
     }
   }, [visible, internalVisible, dismiss, translateY, backdropOpacity]);
 
+  const dismissRef = useRef(dismiss);
+  useEffect(() => {
+    dismissRef.current = dismiss;
+  }, [dismiss]);
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
@@ -110,7 +115,7 @@ export function ChatActionSheet({
       },
       onPanResponderRelease: (_, gestureState) => {
         if (gestureState.dy > 50 || gestureState.vy > 0.3) {
-          dismiss();
+          dismissRef.current();
         } else {
           Animated.spring(translateY, {
             toValue: 0,

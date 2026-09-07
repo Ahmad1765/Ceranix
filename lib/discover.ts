@@ -7,6 +7,7 @@
 // sections), and the underlying grid guarantees the screen is never blank.
 
 import type { Category, Listing } from '@/types';
+import { cardImageUrl } from '@/lib/images';
 
 // ── Category labels ────────────────────────────────────────────────────────
 // Mirrors the tiles in discover.tsx so an "edit" reads as a real section name.
@@ -73,7 +74,7 @@ export interface Collection {
   images: string[];
 }
 
-const firstImage = (l: Listing | undefined): string | null => l?.images?.[0] ?? null;
+const firstImage = (l: Listing | undefined): string | null => (l ? cardImageUrl(l, 0) || null : null);
 
 // "Nike, Stüssy + more" from a group of listings — the most common brands first.
 function brandLine(listings: Listing[], max = 2): string {
@@ -234,7 +235,7 @@ export function buildTopicCovers(listings: Listing[]): Partial<Record<string, st
   const covers: Partial<Record<string, string>> = {};
   for (const l of listings) {
     if (l.is_sold || covers[l.category]) continue;
-    const img = l.images?.[0];
+    const img = cardImageUrl(l, 0);
     if (img) covers[l.category] = img;
   }
   return covers;
@@ -278,7 +279,7 @@ export function buildCollections(listings: Listing[]): Collection[] {
       const eyebrow =
         cats.length > 2 ? `${cats.slice(0, 2).join(', ')} + more` : cats.join(', ');
       const images = arr
-        .map((l) => l.images?.[0])
+        .map((l) => cardImageUrl(l, 0))
         .filter((u): u is string => !!u)
         .slice(0, 3);
       return { id: `collection-${brand}`, brand, eyebrow, images };

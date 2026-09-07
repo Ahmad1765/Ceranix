@@ -137,19 +137,33 @@ export function ThreadHeader({
           )}
         </View>
 
-        {/* Name */}
-        <Text
-          numberOfLines={1}
-          style={{
-            flexShrink: 1,
-            fontFamily: typography.family.sansBold,
-            fontSize: 16,
-            letterSpacing: -0.2,
-            color: theme.ink,
-          }}
-        >
-          {name}
-        </Text>
+        {/* Name & Subtitle */}
+        <View style={{ flexShrink: 1, justifyContent: 'center' }}>
+          <Text
+            numberOfLines={1}
+            style={{
+              fontFamily: typography.family.sansBold,
+              fontSize: subtitle ? 14.5 : 16,
+              letterSpacing: -0.2,
+              color: theme.ink,
+            }}
+          >
+            {name}
+          </Text>
+          {subtitle ? (
+            <Text
+              numberOfLines={1}
+              style={{
+                fontFamily: typography.family.sans,
+                fontSize: 11.5,
+                color: theme.mute,
+                marginTop: 1,
+              }}
+            >
+              {subtitle}
+            </Text>
+          ) : null}
+        </View>
       </Pressable>
 
       {/* Spacer pushes overflow to the right edge */}

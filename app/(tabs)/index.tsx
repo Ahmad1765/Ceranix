@@ -28,10 +28,10 @@ import { FeedFilterSheet } from '@/components/navigation/FeedFilterSheet';
 import {
   useMyFeedListingsQuery,
   useFeedListingsQuery,
-  usePriceDropsQuery,
   useSavedSearchesQuery,
   useSavedListingsQuery,
   useDeleteSavedSearch,
+  useActivityUnreadCount,
 } from '@/lib/queries';
 import {
   useGridDimensions,
@@ -39,17 +39,12 @@ import {
   GRID_DRAW_DISTANCE,
 } from '@/lib/responsive';
 import type { Listing } from '@/types';
-import type { RecommendedListing } from '@/lib/recommendations';
-import type { PriceDropListing } from '@/lib/myFeed';
 import type { SavedSearch } from '@/lib/savedSearches';
 import {
-  FOR_YOU,
   GridPlaceholder,
   GridRow,
   HomeHeader,
   HomeSearchView,
-  PriceDropRail,
-  SAVED,
   useHomeFeedFilters,
 } from '@/components/home';
 
@@ -57,7 +52,6 @@ const HORIZONTAL_PAD = 12;
 const GRID_GAP = 8;
 const EMPTY_LISTINGS: Listing[] = [];
 const EMPTY_SAVED_SEARCHES: SavedSearch[] = [];
-const EMPTY_PRICE_DROPS: PriceDropListing[] = [];
 
 export default function HomeScreen() {
   const { theme } = useTheme();
@@ -85,21 +79,15 @@ export default function HomeScreen() {
   const userId = user?.id ?? null;
   const feedQ = useMyFeedListingsQuery(userId);
   const trendingQ = useFeedListingsQuery({ tab: 'popular', limit: 60 });
-  const priceDropsQ = usePriceDropsQuery(userId);
   const savedSearchesQ = useSavedSearchesQuery(userId);
   const savedListingsQ = useSavedListingsQuery(userId);
   const deleteSavedSearchM = useDeleteSavedSearch(userId);
+  const unreadNotifications = useActivityUnreadCount(userId);
 
   const listings = feedQ.data ?? EMPTY_LISTINGS;
   const loading = feedQ.isLoading;
-  const isFallback =
-    !user ||
-    (listings as RecommendedListing[]).every(
-      (r) => !r.rec_reason || r.rec_reason === 'trending',
-    );
   const trendingListings = trendingQ.data ?? EMPTY_LISTINGS;
   const trendingLoading = trendingQ.isLoading;
-  const priceDrops = priceDropsQ.data ?? EMPTY_PRICE_DROPS;
   const savedSearches = savedSearchesQ.data ?? EMPTY_SAVED_SEARCHES;
   const savedListings = savedListingsQ.data ?? EMPTY_LISTINGS;
   const loadingSaved = savedListingsQ.isLoading;
@@ -117,13 +105,11 @@ export default function HomeScreen() {
   const refreshing =
     feedQ.isRefetching ||
     trendingQ.isRefetching ||
-    priceDropsQ.isRefetching ||
     savedSearchesQ.isRefetching ||
     savedListingsQ.isRefetching;
 
   const { isStale: feedStale, refetch: feedRefetch } = feedQ;
   const { isStale: trendingStale, refetch: trendingRefetch } = trendingQ;
-  const { isStale: dropsStale, refetch: dropsRefetch } = priceDropsQ;
   const { isStale: searchesStale, refetch: searchesRefetch } = savedSearchesQ;
   const { isStale: savedStale, refetch: savedRefetch } = savedListingsQ;
 
@@ -132,7 +118,6 @@ export default function HomeScreen() {
     useCallback(() => {
       if (feedStale) feedRefetch();
       if (trendingStale) trendingRefetch();
-      if (userId && dropsStale) dropsRefetch();
       if (userId && searchesStale) searchesRefetch();
       if (userId && savedStale) savedRefetch();
     }, [
@@ -140,8 +125,6 @@ export default function HomeScreen() {
       feedRefetch,
       trendingStale,
       trendingRefetch,
-      dropsStale,
-      dropsRefetch,
       searchesStale,
       searchesRefetch,
       savedStale,
@@ -154,9 +137,9 @@ export default function HomeScreen() {
     await Promise.all([
       feedRefetch(),
       trendingRefetch(),
-      ...(userId ? [dropsRefetch(), searchesRefetch(), savedRefetch()] : []),
+      ...(userId ? [searchesRefetch(), savedRefetch()] : []),
     ]);
-  }, [feedRefetch, trendingRefetch, dropsRefetch, searchesRefetch, savedRefetch, userId]);
+  }, [feedRefetch, trendingRefetch, searchesRefetch, savedRefetch, userId]);
 
   // ── Multi-Tier Client Filter Hook ────────────────────────────────────────
   const feedFilter = useHomeFeedFilters({
@@ -172,16 +155,7 @@ export default function HomeScreen() {
   });
 
   const authSettled = !authLoading;
-  const ctaInputsSettled = authSettled && !feedQ.isPending && !savedSearchesQ.isPending;
   const showColdStartBanner = authSettled && !user;
-  const showFollowCta =
-    ctaInputsSettled && !!user && savedSearches.length === 0 && isFallback;
-  const showRails =
-    feedFilter.activeChip === FOR_YOU &&
-    !feedFilter.showingSaved &&
-    !feedFilter.isSearching &&
-    feedFilter.activeFilterCount === 0;
-
   const gridLoading = feedFilter.showingSaved
     ? loadingSaved
     : feedFilter.showingTrending
@@ -199,45 +173,39 @@ export default function HomeScreen() {
 
   // ── Composed Header Element ──────────────────────────────────────────────
   const listHeader = (
-    <>
-      <HomeHeader
-        searchProps={{
-          value: feedFilter.query,
-          onChangeText: feedFilter.setQuery,
-          focused: feedFilter.searchFocused,
-          onFocus: () => feedFilter.setSearchFocused(true),
-          onBlur: () => feedFilter.setSearchFocused(false),
-          onPressSearch: () => setSearchModeOpen(true),
-          resultCount:
-            feedFilter.isSearching || feedFilter.activeFilterCount > 0
-              ? feedFilter.filteredListings.length
-              : null,
-          filterCount: feedFilter.activeFilterCount,
-          onOpenFilter: () => feedFilter.setFilterOpen(true),
-          savedActive: feedFilter.showingSaved,
-          onToggleSaved: () =>
-            feedFilter.selectChip(feedFilter.showingSaved ? FOR_YOU : SAVED),
-        }}
-        chipProps={{
-          savedSearches,
-          activeChip: feedFilter.activeChip,
-          onSelectChip: feedFilter.selectChip,
-          onDeleteChip: feedFilter.onDeleteChip,
-          onAdd: () => {
-            if (!user?.id) {
-              toast.show('Sign in to create drop alerts', { variant: 'info', icon: 'log-in' });
-              router.push('/auth/login');
-              return;
-            }
-            setAlertSheetOpen(true);
-          },
-        }}
-        showColdStartBanner={showColdStartBanner}
-        showFollowCta={showFollowCta}
-      />
-
-      <PriceDropRail show={showRails} priceDrops={priceDrops} />
-    </>
+    <HomeHeader
+      searchProps={{
+        value: feedFilter.query,
+        onChangeText: feedFilter.setQuery,
+        focused: feedFilter.searchFocused,
+        onFocus: () => feedFilter.setSearchFocused(true),
+        onBlur: () => feedFilter.setSearchFocused(false),
+        onPressSearch: () => setSearchModeOpen(true),
+        resultCount:
+          feedFilter.isSearching || feedFilter.activeFilterCount > 0
+            ? feedFilter.filteredListings.length
+            : null,
+        filterCount: feedFilter.activeFilterCount,
+        onOpenFilter: () => feedFilter.setFilterOpen(true),
+        unreadNotificationsCount: unreadNotifications,
+        onPressNotifications: () => router.push('/news' as any),
+      }}
+      chipProps={{
+        savedSearches,
+        activeChip: feedFilter.activeChip,
+        onSelectChip: feedFilter.selectChip,
+        onDeleteChip: feedFilter.onDeleteChip,
+        onAdd: () => {
+          if (!user?.id) {
+            toast.show('Sign in to create drop alerts', { variant: 'info', icon: 'log-in' });
+            router.push('/auth/login');
+            return;
+          }
+          setAlertSheetOpen(true);
+        },
+      }}
+      showColdStartBanner={showColdStartBanner}
+    />
   );
 
   return (

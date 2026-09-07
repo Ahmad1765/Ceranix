@@ -1396,6 +1396,7 @@ export const HomeSearchView = memo(function HomeSearchView({
               renderListingsIdleLanding
             ) : !hasSubmitted ? (
               <PreSearchSuggestions
+                query={query}
                 suggestions={suggestions}
                 onSelect={handleSelectSuggestion}
                 onPopulate={handlePopulateSuggestion}

@@ -433,6 +433,13 @@ function SellForm({
             newImagesToUpload.map((n) => n.image),
             user.id,
           );
+          if (uploaded.length < newImagesToUpload.length) {
+            const partialUrls = uploaded.map((u) => u.url).filter(Boolean);
+            if (partialUrls.length > 0) {
+              deleteListingImages(partialUrls).catch(() => {});
+            }
+            throw new Error('Failed to upload all images. Please try again.');
+          }
           uploadedNewImages = uploaded.map((u, i) => ({
             index: newImagesToUpload[i].index,
             url: u.url,

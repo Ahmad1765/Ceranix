@@ -17,6 +17,7 @@ const FEED_LISTING_COLS =
   'id, seller_id, title, brand, size, price, category, subcategory, color, gender, condition, images, thumbnails, is_sold, views, likes, tags, created_at';
 const FEED_SELLER_COLS = 'id, username, full_name, avatar_url, is_verified, vacation_mode';
 const SELECT_FEED = `${FEED_LISTING_COLS}, seller:profiles!listings_seller_id_fkey!inner(${FEED_SELLER_COLS})`;
+const SELECT_SEARCH_FEED = `${FEED_LISTING_COLS}, description, seller:profiles!listings_seller_id_fkey!inner(${FEED_SELLER_COLS})`;
 
 export type FeedTab = 'for_you' | 'popular';
 
@@ -254,7 +255,7 @@ export async function searchListings(opts: {
   try {
     let q = supabase
       .from('listings')
-      .select(SELECT_FEED)
+      .select(SELECT_SEARCH_FEED)
       .eq('is_sold', false)
       .eq('seller.vacation_mode', false);
 
@@ -286,8 +287,7 @@ export async function searchListings(opts: {
 
     let { data, error } = await q
       .order('likes', { ascending: false, nullsFirst: false })
-      .order('created_at', { ascending: false })
-      .limit(limit);
+      .order('created_at', { ascending: false });
 
     // Fallback: If strict multi-token AND returned 0 results, fall back to matching primary token
     if ((!data || data.length === 0) && tokens.length > 1) {
@@ -310,7 +310,7 @@ export async function searchListings(opts: {
       if (primaryConds.length > 0) {
         let fallbackQ = supabase
           .from('listings')
-          .select(SELECT_FEED)
+          .select(SELECT_SEARCH_FEED)
           .eq('is_sold', false)
           .eq('seller.vacation_mode', false)
           .or(primaryConds.join(','));
@@ -320,8 +320,7 @@ export async function searchListings(opts: {
 
         const fallbackRes = await fallbackQ
           .order('likes', { ascending: false, nullsFirst: false })
-          .order('created_at', { ascending: false })
-          .limit(limit);
+          .order('created_at', { ascending: false });
 
         if (!fallbackRes.error && fallbackRes.data) {
           data = fallbackRes.data;
@@ -350,6 +349,10 @@ export async function searchListings(opts: {
         }
         return (b.likes ?? 0) - (a.likes ?? 0);
       });
+    }
+
+    if (limit > 0 && rows.length > limit) {
+      rows = rows.slice(0, limit);
     }
 
     putCachedListings(rows);

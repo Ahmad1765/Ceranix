@@ -1,5 +1,11 @@
 import { memo, useEffect, useState, useCallback, useRef } from 'react';
-import { View, Pressable, Platform } from 'react-native';
+import {
+  View,
+  Pressable,
+  Platform,
+  type NativeSyntheticEvent,
+  type NativeScrollEvent,
+} from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedScrollHandler,
@@ -14,7 +20,6 @@ import { Text } from '@/lib/rnText';
 // Reanimated-managed component plus its props node per photo, per card, on every
 // FlashList recycle. (The product screen's hero carousel is a different case.)
 import { Image } from 'expo-image';
-import Feather from '@expo/vector-icons/Feather';
 import { router } from 'expo-router';
 import {
   cardImageUrl,
@@ -34,7 +39,7 @@ import { useToast } from '@/lib/toast';
 import { isLiked as fetchIsLiked, toggleLike } from '@/lib/listings';
 import { useGuestGate } from '@/components/GuestGate';
 import { PopIcon, type PopIconHandle } from '@/components/product/PopIcon';
-import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
+import { VintedShieldIcon } from '@/components/ui/VintedShieldIcon';
 import { BRAND_PURPLE, conditionLabel } from '@/components/product/shared';
 import { colors, radii, shadow } from '@/lib/theme';
 import type { Listing } from '@/types';
@@ -254,37 +259,198 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
     setLikeBusy(false);
   }, [liked, likeBusy, listing.id, toast, userId, guestGate]);
 
-  const handlePrevSlide = useCallback(
-    (e?: any) => {
-      e?.stopPropagation?.();
-      isSwipingOrDragging.current = true;
-      if (activeIndex <= 0) return;
-      const target = activeIndex - 1;
-      setActiveIndex(target);
-      const w = cardWidth || 200;
-      carouselRef.current?.scrollTo({ x: target * w, animated: true });
-      setTimeout(() => {
-        isSwipingOrDragging.current = false;
-      }, 200);
+  useEffect(() => {
+    if (cardWidth > 0) {
+      pageW.value = cardWidth;
+    }
+  }, [cardWidth, pageW]);
+
+  const lastDragEndTime = useRef(0);
+  const isPointerDownRef = useRef(false);
+  const pointerStartPosRef = useRef({ x: 0, y: 0 });
+  const pointerStartScrollRef = useRef(0);
+  const hasDraggedRef = useRef(false);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const getScrollEl = useCallback((): HTMLElement | null => {
+    if (Platform.OS !== 'web' || !carouselRef.current) return null;
+    const target = carouselRef.current as any;
+    if (typeof target.getScrollableNode === 'function') {
+      return target.getScrollableNode();
+    }
+    if (target instanceof HTMLElement) {
+      return target;
+    }
+    if (target._innerViewRef) {
+      return target._innerViewRef;
+    }
+    return null;
+  }, []);
+
+  const handlePointerDown = useCallback(
+    (e: any) => {
+      if (Platform.OS !== 'web' || !hasMultiple) return;
+      hydrateCarousel();
+
+      if (e.pointerType === 'touch' || (e.button !== undefined && e.button !== 0)) return;
+
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.('button, [role="button"]')) {
+        return;
+      }
+
+      const clientX = e.clientX ?? e.nativeEvent?.clientX;
+      const clientY = e.clientY ?? e.nativeEvent?.clientY;
+      if (clientX === undefined) return;
+
+      isPointerDownRef.current = true;
+      hasDraggedRef.current = false;
+      pointerStartPosRef.current = { x: clientX, y: clientY };
+
+      const scrollEl = getScrollEl();
+      if (scrollEl) {
+        pointerStartScrollRef.current = scrollEl.scrollLeft;
+        scrollEl.style.scrollSnapType = 'none';
+        scrollEl.style.scrollBehavior = 'auto';
+      } else {
+        pointerStartScrollRef.current = activeIndex * (cardWidth || 200);
+      }
+
+      if (e.target?.setPointerCapture && e.pointerId !== undefined) {
+        try {
+          e.target.setPointerCapture(e.pointerId);
+        } catch {}
+      }
     },
-    [activeIndex, cardWidth],
+    [hasMultiple, hydrateCarousel, getScrollEl, activeIndex, cardWidth],
   );
 
-  const handleNextSlide = useCallback(
-    (e?: any) => {
-      e?.stopPropagation?.();
-      isSwipingOrDragging.current = true;
-      if (activeIndex >= images.length - 1) return;
-      setCarouselHydrated(true);
-      const target = activeIndex + 1;
-      setActiveIndex(target);
-      const w = cardWidth || 200;
-      carouselRef.current?.scrollTo({ x: target * w, animated: true });
-      setTimeout(() => {
-        isSwipingOrDragging.current = false;
-      }, 200);
+  const handlePointerMove = useCallback(
+    (e: any) => {
+      if (Platform.OS !== 'web' || !isPointerDownRef.current || !hasMultiple) return;
+      if (e.pointerType === 'touch') return;
+
+      const clientX = e.clientX ?? e.nativeEvent?.clientX;
+      const clientY = e.clientY ?? e.nativeEvent?.clientY;
+      if (clientX === undefined) return;
+
+      const dx = clientX - pointerStartPosRef.current.x;
+      const dy = clientY - pointerStartPosRef.current.y;
+
+      if (!hasDraggedRef.current) {
+        if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+          if (Math.abs(dy) > Math.abs(dx)) {
+            isPointerDownRef.current = false;
+            const scrollEl = getScrollEl();
+            if (scrollEl) {
+              scrollEl.style.scrollSnapType = 'x mandatory';
+            }
+            return;
+          }
+          hasDraggedRef.current = true;
+          isSwipingOrDragging.current = true;
+          setIsDragging(true);
+        }
+      }
+
+      if (hasDraggedRef.current) {
+        e.preventDefault?.();
+        const scrollEl = getScrollEl();
+        if (scrollEl) {
+          scrollEl.scrollLeft = pointerStartScrollRef.current - dx;
+        }
+      }
     },
-    [activeIndex, cardWidth, images.length],
+    [hasMultiple, getScrollEl],
+  );
+
+  const handlePointerUp = useCallback(
+    (e: any) => {
+      if (Platform.OS !== 'web' || !isPointerDownRef.current || !hasMultiple) return;
+      isPointerDownRef.current = false;
+      setIsDragging(false);
+
+      if (e.target?.releasePointerCapture && e.pointerId !== undefined) {
+        try {
+          e.target.releasePointerCapture(e.pointerId);
+        } catch {}
+      }
+
+      if (e.pointerType === 'touch') return;
+
+      const scrollEl = getScrollEl();
+      if (hasDraggedRef.current) {
+        const clientX = e.clientX ?? e.nativeEvent?.clientX ?? pointerStartPosRef.current.x;
+        const dx = clientX - pointerStartPosRef.current.x;
+        const w = cardWidth || 200;
+        const threshold = Math.min(36, w * 0.16);
+
+        let target = activeIndex;
+        if (dx < -threshold && activeIndex < images.length - 1) {
+          target = activeIndex + 1;
+        } else if (dx > threshold && activeIndex > 0) {
+          target = activeIndex - 1;
+        }
+
+        setActiveIndex(target);
+        offsetX.value = target * w;
+        lastDragEndTime.current = Date.now();
+        isSwipingOrDragging.current = true;
+
+        if (scrollEl) {
+          scrollEl.style.scrollSnapType = 'x mandatory';
+          scrollEl.style.scrollBehavior = 'smooth';
+          if (typeof scrollEl.scrollTo === 'function') {
+            scrollEl.scrollTo({ left: target * w, behavior: 'smooth' });
+          } else {
+            scrollEl.scrollLeft = target * w;
+          }
+        } else {
+          carouselRef.current?.scrollTo({ x: target * w, animated: true });
+        }
+
+        setTimeout(() => {
+          isSwipingOrDragging.current = false;
+        }, 250);
+      } else {
+        if (scrollEl) {
+          scrollEl.style.scrollSnapType = 'x mandatory';
+        }
+      }
+      hasDraggedRef.current = false;
+    },
+    [hasMultiple, getScrollEl, cardWidth, activeIndex, images.length, offsetX],
+  );
+
+  const handlePointerCancel = useCallback(
+    (e: any) => {
+      if (Platform.OS !== 'web' || !isPointerDownRef.current) return;
+      isPointerDownRef.current = false;
+      setIsDragging(false);
+      hasDraggedRef.current = false;
+      isSwipingOrDragging.current = false;
+      const scrollEl = getScrollEl();
+      if (scrollEl) {
+        scrollEl.style.scrollSnapType = 'x mandatory';
+      }
+    },
+    [getScrollEl],
+  );
+
+  const handleWebScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const x = e.nativeEvent.contentOffset.x;
+      const w = e.nativeEvent.layoutMeasurement?.width || cardWidth || 200;
+      if (w > 0) {
+        offsetX.value = x;
+        pageW.value = w;
+        const page = Math.round(x / w);
+        if (page !== activeIndex && page >= 0 && page < images.length) {
+          setActiveIndex(page);
+        }
+      }
+    },
+    [cardWidth, activeIndex, images.length, offsetX, pageW],
   );
 
   const srcWidth = thumbWidthFor(cardWidth || 200);
@@ -294,7 +460,7 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
 
   const handleCardPress = useCallback(
     (e: any) => {
-      if (isSwipingOrDragging.current) {
+      if (isSwipingOrDragging.current || Date.now() - lastDragEndTime.current < 300) {
         isSwipingOrDragging.current = false;
         return;
       }
@@ -303,7 +469,7 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
       if (pageX !== undefined && pageY !== undefined && pointerDownPos.current.time > 0) {
         const dx = Math.abs(pageX - pointerDownPos.current.x);
         const dy = Math.abs(pageY - pointerDownPos.current.y);
-        if (dx > 10 || dy > 10) {
+        if (dx > 8 || dy > 8) {
           return;
         }
       }
@@ -332,7 +498,7 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
         };
         putCachedListing(listing);
         setImagePlaceholder(listing.id, currentSrc);
-        const heroUrl = getOptimizedImageUrl(listing.images?.[activeIndex] || listing.images?.[0], {
+        const heroUrl = getOptimizedImageUrl(cardImageUrl(listing, activeIndex) || cardImageUrl(listing, 0), {
           width: 600,
         });
         if (heroUrl) prefetchImages([heroUrl]);
@@ -350,12 +516,29 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
       <View className="w-full" style={{ borderRadius: radii.lg, ...shadow.sm }}>
       <View
         className="relative w-full"
-        style={{ aspectRatio: 1 / 1.33, overflow: 'hidden', borderRadius: radii.lg, backgroundColor: colors.panel }}
+        style={{
+          aspectRatio: 1 / 1.33,
+          overflow: 'hidden',
+          borderRadius: radii.lg,
+          backgroundColor: colors.panel,
+          ...(Platform.OS === 'web' && hasMultiple
+            ? ({
+                cursor: isDragging ? 'grabbing' : 'grab',
+                userSelect: 'none',
+                WebkitUserSelect: 'none',
+              } as any)
+            : {}),
+        }}
         onLayout={
           width == null
             ? (e) => setMeasuredWidth(e.nativeEvent.layout.width)
             : undefined
         }
+        onPointerDown={Platform.OS === 'web' && hasMultiple ? handlePointerDown : undefined}
+        onPointerMove={Platform.OS === 'web' && hasMultiple ? handlePointerMove : undefined}
+        onPointerUp={Platform.OS === 'web' && hasMultiple ? handlePointerUp : undefined}
+        onPointerCancel={Platform.OS === 'web' && hasMultiple ? handlePointerCancel : undefined}
+        onPointerEnter={Platform.OS === 'web' && hasMultiple ? hydrateCarousel : undefined}
       >
         {hasMultiple ? (
           // Horizontal paging carousel — one full-width slide per photo. Nested
@@ -367,16 +550,26 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
             nestedScrollEnabled
             disableIntervalMomentum
             showsHorizontalScrollIndicator={false}
-            onScroll={carouselScrollHandler}
+            onScroll={Platform.OS === 'web' ? handleWebScroll : carouselScrollHandler}
             onTouchStart={hydrateCarousel}
             onScrollBeginDrag={() => {
               hydrateCarousel();
               isSwipingOrDragging.current = true;
             }}
             onScrollEndDrag={() => {
+              lastDragEndTime.current = Date.now();
               setTimeout(() => {
                 isSwipingOrDragging.current = false;
-              }, 150);
+              }, 200);
+            }}
+            onMomentumScrollBegin={() => {
+              isSwipingOrDragging.current = true;
+            }}
+            onMomentumScrollEnd={() => {
+              lastDragEndTime.current = Date.now();
+              setTimeout(() => {
+                isSwipingOrDragging.current = false;
+              }, 200);
             }}
             scrollEventThrottle={16}
             style={[
@@ -401,10 +594,17 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
                   } as any),
                 ]}
               >
-                {i === 0 || i === activeIndex || carouselHydrated ? (
+                {Math.abs(i - activeIndex) <= 1 || carouselHydrated ? (
                   <Image
                     source={{ uri: getOptimizedImageUrl(cardImageUrl(listing, i), { width: srcWidth }) }}
-                    style={[{ width: '100%', height: '100%' }, Platform.OS === 'web' && ({ userSelect: 'none' } as any)]}
+                    style={[
+                      { width: '100%', height: '100%' },
+                      Platform.OS === 'web' && ({
+                        userSelect: 'none',
+                        WebkitUserSelect: 'none',
+                        WebkitUserDrag: 'none',
+                      } as any),
+                    ]}
                     contentFit="cover"
                     cachePolicy="memory-disk"
                     recyclingKey={`${listing.id}-${i}`}
@@ -428,58 +628,6 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
           />
         )}
 
-        {hasMultiple && activeIndex > 0 && (
-          <Pressable
-            onPress={handlePrevSlide}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Previous photo"
-            style={({ pressed }) => ({
-              position: 'absolute',
-              left: 6,
-              top: '50%',
-              transform: [{ translateY: -13 }],
-              width: 26,
-              height: 26,
-              borderRadius: 13,
-              backgroundColor: 'rgba(255, 255, 255, 0.92)',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 10,
-              opacity: pressed ? 0.75 : 1,
-              ...shadow.sm,
-            })}
-          >
-            <Feather name="chevron-left" size={15} color={colors.ink} />
-          </Pressable>
-        )}
-
-        {hasMultiple && activeIndex < images.length - 1 && (
-          <Pressable
-            onPress={handleNextSlide}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Next photo"
-            style={({ pressed }) => ({
-              position: 'absolute',
-              right: 6,
-              top: '50%',
-              transform: [{ translateY: -13 }],
-              width: 26,
-              height: 26,
-              borderRadius: 13,
-              backgroundColor: 'rgba(255, 255, 255, 0.92)',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 10,
-              opacity: pressed ? 0.75 : 1,
-              ...shadow.sm,
-            })}
-          >
-            <Feather name="chevron-right" size={15} color={colors.ink} />
-          </Pressable>
-        )}
-
         {hasMultiple && (
           <View
             style={{
@@ -495,7 +643,13 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
             }}
           >
             {images.map((_, i) => (
-              <CardPageDot key={i} index={i} offsetX={offsetX} pageW={pageW} />
+              <CardPageDot
+                key={i}
+                index={i}
+                offsetX={offsetX}
+                pageW={pageW}
+                activeIndex={activeIndex}
+              />
             ))}
           </View>
         )}
@@ -602,7 +756,7 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
           <Text className="text-[12px] font-bold text-ink">
             {formatPrice(totalPrice, { whole: true })} incl.
           </Text>
-          <ShieldCheckIcon size={14} />
+          <VintedShieldIcon size={13} />
         </View>
 
       </View>
@@ -621,14 +775,16 @@ const CardPageDot = memo(function CardPageDot({
   index,
   offsetX,
   pageW,
+  activeIndex = 0,
 }: {
   index: number;
   offsetX: SharedValue<number>;
   pageW: SharedValue<number>;
+  activeIndex?: number;
 }) {
   const animStyle = useAnimatedStyle(() => {
     // Before the first scroll event the width is still 0; page 0 is active.
-    const page = pageW.value > 0 ? Math.round(offsetX.value / pageW.value) : 0;
+    const page = pageW.value > 0 ? Math.round(offsetX.value / pageW.value) : activeIndex;
     return {
       backgroundColor: page === index ? 'white' : 'rgba(255,255,255,0.55)',
     };

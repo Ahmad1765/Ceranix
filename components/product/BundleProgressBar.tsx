@@ -13,7 +13,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { type as typography } from '@/lib/theme';
 
-function TagIcon({ size = 20, color = '#5356EE' }: { size?: number; color?: string }) {
+function TagIcon({ size = 20, color = '#6C47FF' }: { size?: number; color?: string }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
@@ -36,6 +36,7 @@ export function BundleProgressBar({
   onPress?: () => void;
 }) {
   const { theme, isDark } = useTheme();
+  const purple = theme.purple;
   const [infoModalVisible, setInfoModalVisible] = useState(false);
   const selectedItems = sellerItems.filter((s) => selectedIds.has(s.id));
   const { itemCount, pct, qualifies, progress, nextTier } = computeBundlePricing(
@@ -100,7 +101,7 @@ export function BundleProgressBar({
               justifyContent: 'center',
             }}
           >
-            <TagIcon size={22} color="#5356EE" />
+            <TagIcon size={22} color={purple} />
           </View>
 
           {/* Headline & Guidance Subtitle */}
@@ -163,7 +164,7 @@ export function BundleProgressBar({
               top: 0,
               bottom: 0,
               width: `${Math.max(0, Math.min(100, progress * 100))}%`,
-              backgroundColor: '#5356EE',
+              backgroundColor: purple,
               borderRadius: 3,
             }}
           />
@@ -184,9 +185,9 @@ export function BundleProgressBar({
                   height: 8,
                   marginLeft: -4,
                   borderRadius: 4,
-                  backgroundColor: reached ? '#5356EE' : unreachedDotColor,
+                  backgroundColor: reached ? purple : unreachedDotColor,
                   borderWidth: 1.5,
-                  borderColor: reached ? '#5356EE' : (isDark ? theme.panel : '#FFFFFF'),
+                  borderColor: reached ? purple : (isDark ? theme.panel : '#FFFFFF'),
                   zIndex: 2,
                 }}
               />
@@ -216,8 +217,9 @@ export function BundleProgressBar({
             }}
           >
             {BUNDLE_TIERS.filter((t) => t.pct > 0).map((t, idx, arr) => {
+              const isTopTier = idx === arr.length - 1;
               const active = itemCount >= t.count;
-              const isCurrent = (t.count === 5 && itemCount >= 5) || itemCount === t.count;
+              const isCurrent = (isTopTier && itemCount >= t.count) || itemCount === t.count;
               return (
                 <React.Fragment key={t.count}>
                   <View
@@ -236,7 +238,7 @@ export function BundleProgressBar({
                           width: 28,
                           height: 28,
                           borderRadius: 14,
-                          backgroundColor: active ? '#5356EE' : (isDark ? '#374151' : '#E5E7EB'),
+                          backgroundColor: active ? purple : (isDark ? '#374151' : '#E5E7EB'),
                           alignItems: 'center',
                           justifyContent: 'center',
                         }}
@@ -256,7 +258,7 @@ export function BundleProgressBar({
                           color: active ? theme.ink : theme.mute,
                         }}
                       >
-                        {t.count === 5 ? '5 or more items' : `${t.count} items`}
+                        {isTopTier ? `${t.count} or more items` : `${t.count} items`}
                       </Text>
                     </View>
 
@@ -272,7 +274,7 @@ export function BundleProgressBar({
                         style={{
                           fontSize: 13.5,
                           fontFamily: typography.family.sansBold,
-                          color: active ? '#5356EE' : theme.mute,
+                          color: active ? purple : theme.mute,
                         }}
                       >
                         {t.pct}% OFF

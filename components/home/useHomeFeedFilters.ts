@@ -75,23 +75,29 @@ export function useHomeFeedFilters({
   const [filterOpen, setFilterOpen] = useState(false);
   const activeFilterCount = countActiveFilters(filters);
 
-  // ── Discover Deep Link Synchronization ───────────────────────────────────
-  const params = useLocalSearchParams<{ sort?: string; category?: string; n?: string }>();
+  // ── Deep Link & Search Query Synchronization ────────────────────────────
+  const params = useLocalSearchParams<{ sort?: string; category?: string; q?: string; sub?: string; n?: string }>();
   useEffect(() => {
     const sort = FEED_SORTS.find((s) => s === params.sort);
     const category = isValidCategory(params.category) ? params.category : null;
-    if (!sort && !category && !params.n) return;
+    const q = params.q?.trim();
+    if (!sort && !category && !q && !params.n) return;
 
-    setQuery('');
-    const trending = sort === 'popular';
-    setActiveChip(trending ? TRENDING : FOR_YOU);
+    if (q) {
+      setQuery(q);
+      setActiveChip(FOR_YOU);
+    } else {
+      setQuery('');
+      const trending = sort === 'popular';
+      setActiveChip(trending ? TRENDING : FOR_YOU);
+    }
     setFilters({
       ...EMPTY_FEED_FILTERS,
       category,
-      sort: !sort || trending ? 'relevance' : sort,
+      sort: !sort || sort === 'popular' ? 'relevance' : sort,
     });
     scrollToTop();
-  }, [params.sort, params.category, params.n, scrollToTop]);
+  }, [params.sort, params.category, params.q, params.n, scrollToTop]);
 
   // ── Chip Selection & Target Refetch ──────────────────────────────────────
   const selectChip = useCallback(

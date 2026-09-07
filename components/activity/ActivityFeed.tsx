@@ -27,9 +27,10 @@ const EMPTY_CONVERSATIONS: ConversationRow[] = [];
 
 type Props = {
   bottomInset?: number;
+  showTabs?: boolean;
 };
 
-export function ActivityFeed({ bottomInset = 24 }: Props) {
+export function ActivityFeed({ bottomInset = 24, showTabs = true }: Props) {
   const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState<ActivityTab>('following');
   const { user } = useAuth();
@@ -44,11 +45,17 @@ export function ActivityFeed({ bottomInset = 24 }: Props) {
   const inboxQ = useInboxQuery(userId);
   const conversations = inboxQ.data ?? EMPTY_CONVERSATIONS;
 
-  // Filter direct profile messages (conversations without a listing, not support bot)
-  const directMessages = useMemo(
-    () => conversations.filter((c) => !c.listing_id && !isSupportConversation(c)),
-    [conversations],
-  );
+  // Filter direct profile messages:
+  // Activity is strictly for people who message you directly — NOT for buying or giving offers
+  const directMessages = useMemo(() => {
+    const isOffer = (c: ConversationRow) => {
+      const msg = c.last_message?.trim().toLowerCase() || '';
+      return msg.startsWith('offer:') || msg.startsWith('offer ') || msg.includes('offer:');
+    };
+    return conversations.filter(
+      (c) => !c.listing_id && !isSupportConversation(c) && !isOffer(c),
+    );
+  }, [conversations]);
 
   const { refetch: searchesRefetch, isStale: searchesStale } = searchesQ;
   const { refetch: matchesRefetch, isStale: matchesStale } = matchesQ;
@@ -72,7 +79,7 @@ export function ActivityFeed({ bottomInset = 24 }: Props) {
     if (s.query) params.set('q', s.query);
     if (s.category) params.set('category', s.category);
     params.set('savedId', s.id);
-    router.push(`/discover?${params.toString()}` as any);
+    router.push(`/?${params.toString()}` as any);
   }, []);
 
   const confirmDelete = useCallback(
@@ -91,24 +98,26 @@ export function ActivityFeed({ bottomInset = 24 }: Props) {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
-      {/* Tabs */}
-      <View style={{ marginTop: 12 }}>
-        <Tabs
-          variant="pill"
-          value={activeTab}
-          onChange={setActiveTab}
-          tabs={[
-            {
-              value: 'following',
-              label: 'Following',
-              icon: 'users',
-              count: directMessages.length > 0 ? directMessages.length : undefined,
-            },
-            { value: 'foryou', label: 'For you', icon: 'compass' },
-            { value: 'searches', label: 'Saved', icon: 'bookmark', count: searches.length },
-          ]}
-        />
-      </View>
+      {/* Tabs (optional, hidden in inbox activity section) */}
+      {showTabs && (
+        <View style={{ marginTop: 12 }}>
+          <Tabs
+            variant="pill"
+            value={activeTab}
+            onChange={setActiveTab}
+            tabs={[
+              {
+                value: 'following',
+                label: 'Following',
+                icon: 'users',
+                count: directMessages.length > 0 ? directMessages.length : undefined,
+              },
+              { value: 'foryou', label: 'For you', icon: 'compass' },
+              { value: 'searches', label: 'Saved', icon: 'bookmark', count: searches.length },
+            ]}
+          />
+        </View>
+      )}
 
       {/* Content */}
       <ScrollView
@@ -170,12 +179,12 @@ export function ActivityFeed({ bottomInset = 24 }: Props) {
             ) : (
               <EmptyState
                 icon="users"
-                title="No direct messages yet"
-                description="When you message creators directly through their profile or people you follow message you, they'll appear here."
+                title="Quiet on this side"
+                description="When you message creators directly through their profile or people you follow post, they'll appear here."
                 cta={{
                   label: 'Find Sellers to Follow',
                   icon: 'search',
-                  onPress: () => router.push('/discover' as any),
+                  onPress: () => router.push('/' as any),
                 }}
               />
             )}
@@ -186,12 +195,12 @@ export function ActivityFeed({ bottomInset = 24 }: Props) {
           <View style={{ paddingTop: 14 }}>
             <EmptyState
               icon="bell"
-              title="Nothing new for you yet"
+              title="Nothing for you yet"
               description="We'll surface special price drops and curated updates from your favorite categories here."
               cta={{
-                label: 'Explore Discover',
-                icon: 'compass',
-                onPress: () => router.push('/discover' as any),
+                label: 'Explore Feed',
+                icon: 'home',
+                onPress: () => router.push('/' as any),
               }}
             />
           </View>
@@ -222,7 +231,7 @@ export function ActivityFeed({ bottomInset = 24 }: Props) {
                 cta={{
                   label: 'Search now',
                   icon: 'search',
-                  onPress: () => router.push('/discover' as any),
+                  onPress: () => router.push('/' as any),
                 }}
               />
             ) : (

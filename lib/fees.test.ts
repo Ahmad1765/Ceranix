@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, it, expect } from 'vitest';
 import {
-  BUYER_PROTECTION_FEE,
+  BUYER_PROTECTION_MODE,
+  BUYER_PROTECTION_PERCENTAGE,
   buyerProtectionFee,
   orderTotal,
   priceBreakdown,
@@ -73,10 +74,18 @@ describe('the edge function copy of the fee', () => {
     'utf8',
   );
 
-  it('declares the same flat fee as lib/fees.ts', () => {
-    const match = source.match(/const BUYER_PROTECTION_FEE\s*=\s*(\d+(?:\.\d+)?)\s*;/);
-    expect(match, 'BUYER_PROTECTION_FEE not found in the edge function').not.toBeNull();
-    expect(Number(match![1])).toBe(BUYER_PROTECTION_FEE);
+  it('declares the same percentage mode and percentage fee as lib/fees.ts', () => {
+    const modeMatch = source.match(
+      /const BUYER_PROTECTION_MODE(?::\s*[^=]+)?\s*=\s*['"]([^'"]+)['"]\s*;/,
+    );
+    expect(modeMatch, 'BUYER_PROTECTION_MODE not found in the edge function').not.toBeNull();
+    expect(modeMatch![1]).toBe(BUYER_PROTECTION_MODE);
+
+    const percentMatch = source.match(
+      /const BUYER_PROTECTION_PERCENTAGE\s*=\s*(\d+(?:\.\d+)?)\s*;/,
+    );
+    expect(percentMatch, 'BUYER_PROTECTION_PERCENTAGE not found in the edge function').not.toBeNull();
+    expect(Number(percentMatch![1])).toBe(BUYER_PROTECTION_PERCENTAGE);
   });
 
   it('still passes the split to the webhook as metadata', () => {

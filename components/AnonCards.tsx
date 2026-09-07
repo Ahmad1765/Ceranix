@@ -138,7 +138,7 @@ function go(displayKey: string) {
   if (route.q) params.set('q', route.q);
   if (route.category) params.set('category', route.category);
   const qs = params.toString();
-  router.push(`/(tabs)/discover${qs ? `?${qs}` : ''}` as any);
+  router.push(`/(tabs)${qs ? `?${qs}` : ''}` as any);
 }
 
 function CategoryTile({
@@ -368,7 +368,7 @@ function TopBrandsRow() {
         {TOP_BRANDS.map((b) => (
           <Pressable
             key={b.key}
-            onPress={() => router.push(`/(tabs)/discover?q=${b.q}` as any)}
+            onPress={() => router.push(`/(tabs)?q=${b.q}` as any)}
             style={({ pressed }) => ({
               alignItems: 'center',
               opacity: pressed ? 0.85 : 1,
@@ -517,10 +517,10 @@ export const AnonCards = memo(function AnonCards() {
             Picked for you
           </Text>
           <Pressable
-            onPress={() => router.push('/(tabs)/discover' as any)}
+            onPress={() => router.push('/(tabs)' as any)}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel="See all listings on discover"
+            accessibilityLabel="See all listings on feed"
           >
             <Text style={{ fontSize: 13, fontFamily: 'Inter_700Bold', color: '#6C47FF' }}>
               See all

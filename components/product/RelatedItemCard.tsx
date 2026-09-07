@@ -3,11 +3,11 @@ import { View, ScrollView, Pressable } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
-import { getOptimizedImageUrl, thumbWidthFor, IMAGE_TRANSITION } from '@/lib/images';
+import { getOptimizedImageUrl, cardImageUrl, thumbWidthFor, IMAGE_TRANSITION } from '@/lib/images';
 import { CARD_WIDTH, CARD_IMAGE_HEIGHT, type RelatedItem } from './shared';
 import { formatPrice } from '@/lib/currency';
 import { priceBreakdown } from '@/lib/fees';
-import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
+import { VintedShieldIcon } from '@/components/ui/VintedShieldIcon';
 import { useTheme } from '@/context/ThemeContext';
 
 export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress: () => void }) {
@@ -147,7 +147,7 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
           <Text style={{ fontSize: 12, fontWeight: '700', color: theme.ink }}>
             {formatPrice(totalPrice, { whole: true })} incl.
           </Text>
-          <ShieldCheckIcon size={12} />
+          <VintedShieldIcon size={13} />
         </View>
       </View>
     </Pressable>

@@ -262,6 +262,8 @@ function ConversationPage({
   );
 }
 
+const SUPPORT_THREAD_THRESHOLD = 10;
+
 // ── Working Support Hub Page ────────────────────────────────────────────────
 function SupportPage({
   data,
@@ -283,6 +285,11 @@ function SupportPage({
   const { theme } = useTheme();
   const [startingChat, setStartingChat] = useState(false);
 
+  const renderSupportItem = useCallback(
+    ({ item }: { item: ConversationRow }) => <InboxListRow conv={item} userId={userId} />,
+    [userId],
+  );
+
   const handleStartSupportChat = async (prompt?: string) => {
     if (startingChat) return;
     haptic();
@@ -299,13 +306,13 @@ function SupportPage({
           router.push(`/conversation/${conv.id}` as any);
         }
       } else {
+        setStartingChat(false);
         Alert.alert('Unable to start support chat', 'Please check your connection and try again.');
       }
     } catch (e) {
+      setStartingChat(false);
       console.warn('[support] failed to start', e);
       Alert.alert('Support unavailable', 'Failed to connect to Ceranix Support. Please try again later.');
-    } finally {
-      setStartingChat(false);
     }
   };
 
@@ -501,12 +508,22 @@ function SupportPage({
                 overflow: 'hidden',
               }}
             >
-              {data.map((conv, idx) => (
-                <View key={conv.id}>
-                  <InboxListRow conv={conv} userId={userId} />
-                  {idx < data.length - 1 && <InboxSeparator />}
-                </View>
-              ))}
+              {data.length <= SUPPORT_THREAD_THRESHOLD ? (
+                data.map((conv, idx) => (
+                  <View key={conv.id}>
+                    <InboxListRow conv={conv} userId={userId} />
+                    {idx < data.length - 1 && <InboxSeparator />}
+                  </View>
+                ))
+              ) : (
+                <FlatList
+                  data={data}
+                  keyExtractor={keyById}
+                  renderItem={renderSupportItem}
+                  ItemSeparatorComponent={InboxSeparator}
+                  scrollEnabled={false}
+                />
+              )}
             </View>
           </View>
         )}
@@ -689,17 +706,26 @@ export default function InboxScreen() {
   }, [userId, inboxRefetch]);
 
   // Tab data partition:
-  // - Selling: listing chats where user is seller
-  // - Buying: listing chats where user is buyer
+  // - Selling: listing or offer chats where user is seller
+  // - Buying: listing or offer chats where user is buyer
   // - Support: chats involving Support Bot
+  // - Activity: strictly direct user-to-user messages (not for buying or giving offers)
   const pageData = useMemo<Record<ConversationTab | 'support', ConversationRow[]>>(() => {
     const uid = user?.id;
     if (!uid) {
       return { selling: [], buying: [], support: [] };
     }
+    const isOffer = (c: ConversationRow) => {
+      const msg = c.last_message?.trim().toLowerCase() || '';
+      return msg.startsWith('offer:') || msg.startsWith('offer ') || msg.includes('offer:');
+    };
     return {
-      selling: conversations.filter((c) => c.seller_id === uid && !!c.listing_id && !isSupportConversation(c)),
-      buying: conversations.filter((c) => c.buyer_id === uid && !!c.listing_id && !isSupportConversation(c)),
+      selling: conversations.filter(
+        (c) => c.seller_id === uid && (!!c.listing_id || isOffer(c)) && !isSupportConversation(c),
+      ),
+      buying: conversations.filter(
+        (c) => c.buyer_id === uid && (!!c.listing_id || isOffer(c)) && !isSupportConversation(c),
+      ),
       support: conversations.filter((c) => isSupportConversation(c)),
     };
   }, [conversations, user?.id]);
@@ -750,29 +776,13 @@ export default function InboxScreen() {
       {/* Header */}
       <View
         style={{
-          flexDirection: 'row',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingHorizontal: 16,
+          justifyContent: 'center',
+          paddingHorizontal: 32,
           paddingTop: 8,
-          paddingBottom: 12,
+          paddingBottom: 21,
         }}
       >
-        <Pressable
-          hitSlop={HIT_SLOP_8}
-          onPress={() => router.push('/settings')}
-          accessibilityRole="button"
-          accessibilityLabel="Settings"
-          style={({ pressed }) => ({
-            width: 36,
-            height: 36,
-            alignItems: 'center',
-            justifyContent: 'center',
-            opacity: pressed ? 0.6 : 1,
-          })}
-        >
-          <Feather name="more-horizontal" size={22} color={theme.ink} />
-        </Pressable>
         <Text
           style={{
             fontFamily: typography.family.sansBold,
@@ -783,21 +793,6 @@ export default function InboxScreen() {
         >
           Inbox
         </Text>
-        <Pressable
-          hitSlop={HIT_SLOP_8}
-          onPress={() => router.push('/discover' as any)}
-          accessibilityRole="button"
-          accessibilityLabel="Find something to talk about"
-          style={({ pressed }) => ({
-            width: 36,
-            height: 36,
-            alignItems: 'center',
-            justifyContent: 'center',
-            opacity: pressed ? 0.6 : 1,
-          })}
-        >
-          <Feather name="search" size={21} color={theme.ink} />
-        </Pressable>
       </View>
 
       {/* Underline tabs */}
@@ -841,7 +836,7 @@ export default function InboxScreen() {
               if (item.value === 'activity') {
                 return (
                   <View style={{ width: pageWidth, height: pagerHeight }}>
-                    <ActivityFeed bottomInset={tabBarClearance} />
+                    <ActivityFeed bottomInset={tabBarClearance} showTabs={false} />
                   </View>
                 );
               }

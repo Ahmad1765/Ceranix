@@ -1,48 +1,72 @@
 import React from 'react';
-import { View, ViewStyle } from 'react-native';
-import Svg, { Circle, Path } from 'react-native-svg';
+import { View, type ViewStyle } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
+import { useTheme } from '@/context/ThemeContext';
 
-interface ShieldCheckIconProps {
+export interface ShieldCheckIconProps {
   size?: number;
   width?: number;
   height?: number;
-  bgColor?: string;
+  color?: string;
   strokeColor?: string;
+  bgColor?: string;
   style?: ViewStyle;
 }
 
 export function ShieldCheckIcon({
-  size = 24,
+  size = 14,
   width,
   height,
-  bgColor,
+  color,
   strokeColor,
+  bgColor,
   style,
 }: ShieldCheckIconProps) {
+  const { theme } = useTheme();
   const w = width ?? size;
   const h = height ?? size;
+  const iconColor = color ?? strokeColor ?? theme.purple ?? '#6C47FF';
 
-  // High-visibility emerald green shield with crisp white checkmark
-  const fill = bgColor ?? '#10B981';
-  const stroke = strokeColor ?? '#FFFFFF';
+  const iconSvg = (
+    <Svg width={w} height={h} viewBox="0 0 12 12" fill="none">
+      {/* Checkmark */}
+      <Path
+        fill={iconColor}
+        d="m7.924 4.114.708.707-2.829 2.828-2.121-2.121.707-.707 1.414 1.414z"
+      />
+      {/* Shield outline */}
+      <Path
+        fill={iconColor}
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M11 6c0 4.2-5 6-5 6s-5-1.8-5-6V1.8L6 0l5 1.8zM2 6V2.503l4-1.44 4 1.44V6c0 1.66-.98 2.902-2.115 3.787A9.4 9.4 0 0 1 6 10.917a9.368 9.368 0 0 1-1.885-1.13C2.981 8.902 2 7.66 2 6m3.66 5.06"
+      />
+    </Svg>
+  );
+
+  if (bgColor) {
+    return (
+      <View
+        style={[
+          {
+            width: w,
+            height: h,
+            borderRadius: w / 2,
+            backgroundColor: bgColor,
+            alignItems: 'center',
+            justifyContent: 'center',
+          },
+          style,
+        ]}
+      >
+        {iconSvg}
+      </View>
+    );
+  }
 
   return (
     <View style={[{ width: w, height: h, alignItems: 'center', justifyContent: 'center' }, style]}>
-      <Svg width={w} height={h} viewBox="0 0 20 20" fill="none">
-        {/* Solid high-visibility security shield */}
-        <Path
-          d="M10 1.5L3.5 3.8C3.5 3.8 3.5 9 3.5 10.5C3.5 14.8 6.5 17.8 10 18.8C13.5 17.8 16.5 14.8 16.5 10.5C16.5 9 16.5 3.8 16.5 3.8L10 1.5Z"
-          fill={fill}
-        />
-        {/* Bold crisp white verified checkmark */}
-        <Path
-          d="M6.8 10.2L8.8 12.2L13.2 7.8"
-          stroke={stroke}
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </Svg>
+      {iconSvg}
     </View>
   );
 }

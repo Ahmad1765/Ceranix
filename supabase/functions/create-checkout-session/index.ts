@@ -182,10 +182,18 @@ Deno.serve(async (req: Request) => {
     }
 
     // Buyer Protection fee, added as its own line item so the buyer is charged
-    // the same total shown in the app. Flat, never a percentage — keep this in
-    // sync with BUYER_PROTECTION_FEE in lib/fees.ts.
+    // the same total shown in the app. Keep this in sync with BUYER_PROTECTION_MODE
+    // and BUYER_PROTECTION_PERCENTAGE in lib/fees.ts.
+    const BUYER_PROTECTION_MODE: 'flat' | 'percentage' = 'percentage';
+    const BUYER_PROTECTION_PERCENTAGE = 6;
     const BUYER_PROTECTION_FEE = 6;
-    const feeCents = Math.round(BUYER_PROTECTION_FEE * 100);
+
+    const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+    const feeDollars =
+      BUYER_PROTECTION_MODE === 'percentage'
+        ? round2(round2(chargeDollars) * (BUYER_PROTECTION_PERCENTAGE / 100))
+        : BUYER_PROTECTION_FEE;
+    const feeCents = Math.round(feeDollars * 100);
 
     let successUrlObj: URL;
     let cancelUrlObj: URL;

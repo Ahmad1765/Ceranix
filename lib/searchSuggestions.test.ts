@@ -23,6 +23,13 @@ describe('searchSuggestions engine', () => {
     expect(texts).toContain('tops with sleeves');
   });
 
+  it('returns identical category suggestions for singular and plural roots', () => {
+    expect(getSearchSuggestions('top').map((s) => s.text)).toEqual(getSearchSuggestions('tops').map((s) => s.text));
+    expect(getSearchSuggestions('jean').map((s) => s.text)).toEqual(getSearchSuggestions('jeans').map((s) => s.text));
+    expect(getSearchSuggestions('hoodie').map((s) => s.text)).toEqual(getSearchSuggestions('hoodies').map((s) => s.text));
+    expect(getSearchSuggestions('dress').map((s) => s.text)).toEqual(getSearchSuggestions('dresses').map((s) => s.text));
+  });
+
   it('includes and prioritizes matching recent searches', () => {
     const suggestions = getSearchSuggestions('hoodie', {
       recentSearches: ['hoodie zip up', 'vintage jacket'],
@@ -83,5 +90,54 @@ describe('splitSuggestionHighlight', () => {
       { text: 'tops', isMatch: true },
       { text: ' with sleeves', isMatch: false },
     ]);
+  });
+
+  it('handles terms with trailing spaces in suggestion highlights', () => {
+    const parts = splitSuggestionHighlight('vintage jacket', 'vintage jacket   ');
+    expect(parts).toEqual([
+      { text: 'vintage jacket', isMatch: true },
+    ]);
+  });
+});
+
+describe('PreSearchSuggestions fallback resolution', () => {
+  const resolveSuggestions = (query?: string, suggestions: any[] = []) => {
+    const cleanQuery = query?.trim() ?? '';
+    if (suggestions.length > 0) return suggestions;
+    if (!cleanQuery) return [];
+    return [
+      {
+        id: `fallback-${cleanQuery}`,
+        text: cleanQuery,
+        parts: splitSuggestionHighlight(cleanQuery, cleanQuery),
+      },
+    ];
+  };
+
+  it('renders fallback row when suggestions is empty for non-empty query', () => {
+    const result = resolveSuggestions('vintage jacket', []);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({
+      id: 'fallback-vintage jacket',
+      text: 'vintage jacket',
+      parts: [{ text: 'vintage jacket', isMatch: true }],
+    });
+  });
+
+  it('renders fallback row correctly for queries with trailing spaces', () => {
+    const result = resolveSuggestions('vintage jacket   ', []);
+    expect(result).toHaveLength(1);
+    expect(result[0].text).toBe('vintage jacket');
+  });
+
+  it('returns empty list (null rendering) when query is whitespace and suggestions is empty', () => {
+    const result = resolveSuggestions('   ', []);
+    expect(result).toEqual([]);
+  });
+
+  it('preserves suggestions when suggestions array is non-empty', () => {
+    const existing = [{ id: 'sugg-1', text: 'hoodie', parts: [] }];
+    const result = resolveSuggestions('hood', existing as any);
+    expect(result).toBe(existing);
   });
 });

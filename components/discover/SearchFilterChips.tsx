@@ -246,10 +246,17 @@ export const SearchFilterChips = memo(function SearchFilterChips({
     haptic();
     const minVal = customMin.trim() ? parseFloat(customMin) : null;
     const maxVal = customMax.trim() ? parseFloat(customMax) : null;
+    let priceMin = minVal !== null && !isNaN(minVal) ? Math.max(0, minVal) : null;
+    let priceMax = maxVal !== null && !isNaN(maxVal) ? Math.max(0, maxVal) : null;
+    if (priceMin !== null && priceMax !== null && priceMin > priceMax) {
+      const temp = priceMin;
+      priceMin = priceMax;
+      priceMax = temp;
+    }
     onUpdateFilter((prev) => ({
       ...prev,
-      priceMin: minVal !== null && !isNaN(minVal) ? Math.max(0, minVal) : null,
-      priceMax: maxVal !== null && !isNaN(maxVal) ? Math.max(0, maxVal) : null,
+      priceMin,
+      priceMax,
     }));
     closeModal();
   }, [customMin, customMax, onUpdateFilter, closeModal]);

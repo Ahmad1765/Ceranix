@@ -2,7 +2,20 @@ import type { Condition, Gender, Listing } from '@/types';
 import type { PhotoSlot } from '@/lib/photoClean/slots';
 import type { SellFormValues, ParcelSize } from '@/lib/schemas/sell';
 import { queryClient } from '@/lib/queryClient';
-import { qk } from '@/lib/queries/keys';
+import {
+  qk,
+  MY_FEED_LISTINGS_PREFIX,
+  HOME_FEED_PREFIX,
+  FEED_LISTINGS_PREFIX,
+  USER_LISTINGS_PREFIX,
+  SAVED_LISTINGS_PREFIX,
+  LIKED_LISTINGS_PREFIX,
+  SELLER_OTHER_LISTINGS_PREFIX,
+  SIMILAR_LISTINGS_PREFIX,
+  TAG_LISTINGS_PREFIX,
+  PRICE_DROPS_PREFIX,
+  NEW_FROM_FOLLOWED_PREFIX,
+} from '@/lib/queries/keys';
 import type { QueryClient } from '@tanstack/react-query';
 
 export const DEFAULT_SELL_VALUES: SellFormValues = {
@@ -75,19 +88,19 @@ export function patchListingInCache(
     return old;
   };
 
-  // Synchronously update all feed and listing queries in memory by deriving prefixes from qk factory:
+  // Synchronously update all feed and listing queries in memory using listing query prefixes:
   const listingPrefixes = [
-    qk.myFeedListings(null)[0],
-    qk.homeFeed('for_you', null)[0],
-    qk.feedListings('for_you', null, null, null)[0],
-    qk.userListings('')[0],
-    qk.savedListings(null)[0],
-    qk.likedListings(null)[0],
-    qk.sellerOtherListings(null, null)[0],
-    qk.similarListings(null)[0],
-    qk.tagListings(null)[0],
-    qk.priceDrops(null)[0],
-    qk.newFromFollowed(null)[0],
+    MY_FEED_LISTINGS_PREFIX,
+    HOME_FEED_PREFIX,
+    FEED_LISTINGS_PREFIX,
+    USER_LISTINGS_PREFIX,
+    SAVED_LISTINGS_PREFIX,
+    LIKED_LISTINGS_PREFIX,
+    SELLER_OTHER_LISTINGS_PREFIX,
+    SIMILAR_LISTINGS_PREFIX,
+    TAG_LISTINGS_PREFIX,
+    PRICE_DROPS_PREFIX,
+    NEW_FROM_FOLLOWED_PREFIX,
   ];
 
   for (const prefix of listingPrefixes) {

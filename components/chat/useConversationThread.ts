@@ -33,7 +33,7 @@ import { capture } from '@/lib/analytics';
 import { captureError } from '@/lib/sentry';
 import { withTimeout } from '@/lib/async';
 import { maybeSoftAskForPush } from '@/lib/notifications';
-import { getOptimizedImageUrl } from '@/lib/images';
+import { getOptimizedImageUrl, cardImageUrl } from '@/lib/images';
 import { reportListing } from '@/lib/reports';
 import {
   isSupportConversation,
@@ -189,8 +189,8 @@ export function useConversationThread(
     : other?.avatar_url
     ? getOptimizedImageUrl(other.avatar_url, { width: 120 })
     : null;
-  const listingThumb = conv?.listing?.images?.[0]
-    ? getOptimizedImageUrl(conv.listing.images[0], { width: 120 })
+  const listingThumb = conv?.listing
+    ? getOptimizedImageUrl(cardImageUrl(conv.listing, 0), { width: 120 })
     : null;
 
   // ── Reaction Mapping ─────────────────────────────────────────────────────
@@ -256,7 +256,7 @@ export function useConversationThread(
 
         // Trigger intelligent support concierge automated response if talking to Support
         if (isSupport) {
-          void sendSupportBotReply(conversationId, text);
+          sendSupportBotReply(conversationId, text).catch(() => {});
         }
         return;
       }

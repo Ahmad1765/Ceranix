@@ -444,7 +444,7 @@ function DiscoverSheetBody({ onClose }: { onClose: () => void }) {
     const q = query.trim();
     if (!q) return;
     setQuery('');
-    go(`/discover?q=${encodeURIComponent(q)}`);
+    go(`/?q=${encodeURIComponent(q)}`);
   }, [query, go]);
 
   const onBrowse = useCallback(
@@ -455,7 +455,7 @@ function DiscoverSheetBody({ onClose }: { onClose: () => void }) {
         return;
       }
       if (action.kind === 'tab') {
-        go(`/discover?tab=${action.tab}`);
+        go(`/?tab=${action.tab}`);
         return;
       }
       // Sorts land on the home feed, not the Discover screen: the feed is the
@@ -485,7 +485,7 @@ function DiscoverSheetBody({ onClose }: { onClose: () => void }) {
   const handleSelectSuggestion = useCallback(
     (term: string) => {
       setQuery('');
-      go(`/discover?q=${encodeURIComponent(term)}`);
+      go(`/?q=${encodeURIComponent(term)}`);
     },
     [go],
   );
@@ -582,6 +582,7 @@ function DiscoverSheetBody({ onClose }: { onClose: () => void }) {
       {query.trim().length > 0 ? (
         <View style={{ flex: 1, marginTop: 10 }}>
           <PreSearchSuggestions
+            query={query}
             suggestions={suggestions}
             onSelect={handleSelectSuggestion}
             onPopulate={handlePopulateSuggestion}

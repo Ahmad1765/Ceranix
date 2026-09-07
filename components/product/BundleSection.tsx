@@ -3,7 +3,7 @@ import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
 import { router } from 'expo-router';
-import { getOptimizedImageUrl } from '@/lib/images';
+import { getOptimizedImageUrl, cardImageUrl } from '@/lib/images';
 import { formatPrice } from '@/lib/currency';
 import { priceBreakdown } from '@/lib/fees';
 import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
@@ -297,9 +297,9 @@ function BaseItemCard({ item }: { item: Listing }) {
           borderColor: BRAND_PURPLE,
         }}
       >
-        {item.images?.[0] ? (
+        {cardImageUrl(item, 0) ? (
           <Image
-            source={{ uri: getOptimizedImageUrl(item.images[0], { width: 500 }) }}
+            source={{ uri: getOptimizedImageUrl(cardImageUrl(item, 0), { width: 500 }) }}
             style={{ width: '100%', height: '100%' }}
             contentFit="cover"
             cachePolicy="memory-disk"
@@ -342,7 +342,7 @@ function BaseItemCard({ item }: { item: Listing }) {
           <Text style={{ fontSize: 12, fontWeight: '700', color: theme.ink }}>
             {formatPrice(totalPrice, { whole: true })} incl.
           </Text>
-          <ShieldCheckIcon size={12} />
+          <ShieldCheckIcon size={13} />
         </View>
       </View>
     </View>
@@ -390,9 +390,9 @@ function BundleSelectCard({
             transform: [{ scale: pressed ? 0.98 : 1 }],
           })}
         >
-          {item.images?.[0] ? (
+          {cardImageUrl(item, 0) ? (
             <Image
-              source={{ uri: getOptimizedImageUrl(item.images[0], { width: 500 }) }}
+              source={{ uri: getOptimizedImageUrl(cardImageUrl(item, 0), { width: 500 }) }}
               style={{ width: '100%', height: '100%' }}
               contentFit="cover"
               cachePolicy="memory-disk"
@@ -476,7 +476,7 @@ function BundleSelectCard({
           <Text style={{ fontSize: 12, fontWeight: '700', color: theme.ink }}>
             {formatPrice(totalPrice, { whole: true })} incl.
           </Text>
-          <ShieldCheckIcon size={12} />
+          <ShieldCheckIcon size={13} />
         </View>
       </View>
     </View>

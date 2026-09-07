@@ -98,7 +98,7 @@ export const ProductOverviewHeader = memo(function ProductOverviewHeader({
                   accessibilityLabel={`Shop more from ${s.text}`}
                   onPress={() => {
                     tap('selection');
-                    router.push(`/discover?q=${encodeURIComponent(s.text)}` as any);
+                    router.push(`/?q=${encodeURIComponent(s.text)}` as any);
                   }}
                 >
                   {s.text}
@@ -140,12 +140,8 @@ export const ProductOverviewHeader = memo(function ProductOverviewHeader({
           >
             <Text style={{ fontSize: 14, fontFamily: 'Inter_500Medium', color: theme.mute }}>
               +{formatPrice(bpFee)} Buyer Protection fee
-              {/* {BUYER_PROTECTION_MODE === 'percentage'
-                ? ` (${BUYER_PROTECTION_PERCENTAGE}%)`
-                : ''} */}
             </Text>
-            {/* Shield icon matching the reference — purple circle + shield outline + checkmark */}
-            <ShieldCheckIcon size={20} />
+            <ShieldCheckIcon size={14} />
           </Pressable>
 
         ) : null}

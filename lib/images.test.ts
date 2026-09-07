@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import {
   cardImageUrl,
   getOptimizedImageUrl,
+  toSupabaseThumbnailUrl,
   thumbWidthFor,
   prefetchImages,
   setImagePlaceholder,
@@ -119,6 +120,59 @@ describe('getOptimizedImageUrl with the Supabase transform flag enabled', () => 
     expect(out.searchParams.get('width')).toBe('600');
     expect(out.searchParams.get('quality')).toBe('80');
     expect(out.searchParams.get('resize')).toBe('cover');
+  });
+});
+
+describe('toSupabaseThumbnailUrl', () => {
+  it('converts a full-resolution listing image URL to a thumbnail URL', () => {
+    const full = 'https://abc.supabase.co/storage/v1/object/public/listing-images/a/photo.jpg';
+    expect(toSupabaseThumbnailUrl(full)).toBe(
+      'https://abc.supabase.co/storage/v1/object/public/listing-images/a/photo_thumb.jpg',
+    );
+  });
+
+  it('keeps existing thumbnail URLs intact without duplicate suffix', () => {
+    const thumb = 'https://abc.supabase.co/storage/v1/object/public/listing-images/a/photo_thumb.jpg';
+    expect(toSupabaseThumbnailUrl(thumb)).toBe(thumb);
+  });
+
+  it('leaves non-listing-images and non-supabase URLs untouched', () => {
+    expect(toSupabaseThumbnailUrl('https://example.com/photo.jpg')).toBe('https://example.com/photo.jpg');
+    expect(toSupabaseThumbnailUrl('')).toBe('');
+  });
+});
+
+describe('getOptimizedImageUrl with edge image proxy enabled', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it('routes Supabase images through Cloudflare edge CDN (wsrv.nl) in WebP format', async () => {
+    vi.stubEnv('TEST_IMAGE_PROXY', 'true');
+    vi.resetModules();
+    const { getOptimizedImageUrl: fresh } = await import('@/lib/images');
+
+    const out = fresh(SUPABASE_PUBLIC, { width: 300, quality: 75 });
+    expect(out).toContain('https://wsrv.nl/?url=');
+    expect(out).toContain('output=webp');
+    expect(out).toContain('w=300');
+    expect(out).toContain('q=75');
+    // For width <= 640, it points the source to _thumb.jpg
+    expect(out).toContain('photo_thumb.jpg');
+  });
+
+  it('routes large Supabase images through wsrv.nl keeping master source for detail', async () => {
+    vi.stubEnv('TEST_IMAGE_PROXY', 'true');
+    vi.resetModules();
+    const { getOptimizedImageUrl: fresh } = await import('@/lib/images');
+
+    const out = fresh(SUPABASE_PUBLIC, { width: 1080, quality: 85 });
+    expect(out).toContain('https://wsrv.nl/?url=');
+    expect(out).toContain('output=webp');
+    expect(out).toContain('w=1080');
+    expect(out).toContain('photo.jpg');
+    expect(out).not.toContain('photo_thumb.jpg');
   });
 });
 

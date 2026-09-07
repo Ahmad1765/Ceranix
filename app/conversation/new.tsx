@@ -21,7 +21,7 @@ import { useAuth } from '@/lib/auth';
 import { useListingQuery, useProfileQuery } from '@/lib/queries';
 import { getOrCreateConversation, sendMessage, sendOffer } from '@/lib/chat';
 import { getOrCreateSupportConversation, SUPPORT_BOT_USER_ID, SUPPORT_BOT_NAME, SUPPORT_BOT_AVATAR } from '@/lib/support';
-import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
+import { getOptimizedImageUrl, cardImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 import { formatPrice } from '@/lib/currency';
 import { orderTotal } from '@/lib/fees';
 import { useToast } from '@/lib/toast';
@@ -168,7 +168,7 @@ export default function NewConversationScreen() {
     mode === 'offer' &&
     Number.isFinite(amountNum) &&
     amountNum > 0 &&
-    (!listing || amountNum < listing.price || isBundle);
+    (isBundle ? amountNum <= baseReferencePrice : !listing || amountNum < listing.price);
   const msgValid = mode === 'message' && message.trim().length > 0;
 
   const totalWithProtection = useMemo(() => {
@@ -352,7 +352,7 @@ export default function NewConversationScreen() {
     );
   }
 
-  const thumb = listing?.images?.[0] ? getOptimizedImageUrl(listing.images[0], { width: 240 }) : null;
+  const thumb = listing ? getOptimizedImageUrl(cardImageUrl(listing, 0), { width: 240 }) : null;
   const targetName = isSupport
     ? SUPPORT_BOT_NAME
     : targetProfile?.full_name || targetProfile?.username || (listing?.seller ? (listing.seller as any).username : 'User');

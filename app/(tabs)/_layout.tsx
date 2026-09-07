@@ -13,11 +13,6 @@ export default function TabsLayout() {
       screenOptions={{ headerShown: false, freezeOnBlur: true }}
     >
       <Tabs.Screen name="index" options={{ title: 'Home' }} />
-      {/* Like the Sell tab below, Discover never switches to its flat tab
-          content on press — it slides the search sheet up over whatever
-          screen is active (components/discover/DiscoverSheet.tsx). Picking
-          anything in the sheet is what navigates here, carrying the intent as
-          params. app/(tabs)/discover.tsx stays the real screen behind it. */}
       <Tabs.Screen
         name="discover"
         options={{ title: 'Discover' }}

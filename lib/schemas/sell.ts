@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { Category, Condition, Gender } from '@/types';
 import { hasSubcategories } from '@/lib/categories';
+import { CURRENCY_SYMBOL } from '@/lib/currency';
 
 export const CATEGORY_VALUES: [Category, ...Category[]] = [
   'clothing',
@@ -69,14 +70,14 @@ export const SellFormSchema = z
           const num = parseFloat(val);
           return !Number.isNaN(num) && num > 0;
         },
-        'Enter a valid price greater than $0',
+        `Enter a valid price greater than ${CURRENCY_SYMBOL}0`,
       )
       .refine(
         (val) => {
           const num = parseFloat(val);
           return Number.isFinite(num) && num <= 100000;
         },
-        'Price cannot exceed $100,000',
+        `Price cannot exceed ${CURRENCY_SYMBOL}100,000`,
       )
       .refine(
         (val) => {

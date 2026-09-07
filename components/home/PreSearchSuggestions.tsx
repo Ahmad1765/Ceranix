@@ -1,11 +1,11 @@
-import React, { memo, useCallback } from 'react';
+import React, { memo, useCallback, useMemo } from 'react';
 import { View, Pressable, ScrollView, Platform } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/context/ThemeContext';
 import { HIT_SLOP_8 } from '@/lib/responsive';
-import type { SearchSuggestion } from '@/lib/searchSuggestions';
+import { type SearchSuggestion, splitSuggestionHighlight } from '@/lib/searchSuggestions';
 
 function haptic() {
   if (Platform.OS !== 'web') {
@@ -14,12 +14,14 @@ function haptic() {
 }
 
 interface PreSearchSuggestionsProps {
+  query?: string;
   suggestions: SearchSuggestion[];
   onSelect: (term: string) => void;
   onPopulate: (term: string) => void;
 }
 
 export const PreSearchSuggestions = memo(function PreSearchSuggestions({
+  query,
   suggestions,
   onSelect,
   onPopulate,
@@ -42,7 +44,21 @@ export const PreSearchSuggestions = memo(function PreSearchSuggestions({
     [onPopulate],
   );
 
-  if (suggestions.length === 0) {
+  const cleanQuery = query?.trim() ?? '';
+
+  const displaySuggestions = useMemo<SearchSuggestion[]>(() => {
+    if (suggestions.length > 0) return suggestions;
+    if (!cleanQuery) return [];
+    return [
+      {
+        id: `fallback-${cleanQuery}`,
+        text: cleanQuery,
+        parts: splitSuggestionHighlight(cleanQuery, cleanQuery),
+      },
+    ];
+  }, [suggestions, cleanQuery]);
+
+  if (displaySuggestions.length === 0) {
     return null;
   }
 
@@ -54,7 +70,7 @@ export const PreSearchSuggestions = memo(function PreSearchSuggestions({
       contentContainerStyle={{ paddingBottom: 40 }}
       style={{ flex: 1, backgroundColor: theme.background }}
     >
-      {suggestions.map((item) => (
+      {displaySuggestions.map((item) => (
         <SuggestionRow
           key={item.id}
           item={item}

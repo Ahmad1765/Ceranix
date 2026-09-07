@@ -1,26 +1,35 @@
-import { useCallback, useState } from 'react';
-import { View, Pressable, ScrollView, ActivityIndicator } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import {
+  View,
+  Pressable,
+  ScrollView,
+  ActivityIndicator,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+} from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
-import { colors, radii } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
+import { shadow } from '@/lib/theme';
 import { createSavedSearch } from '@/lib/savedSearches';
 import { useToast } from '@/lib/toast';
 import { captureError } from '@/lib/sentry';
-import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
-import type { Category, Gender } from '@/types';
 
-const CATEGORIES: { id: Category; label: string; emoji: string }[] = [
-  { id: 'clothing', label: 'Clothing', emoji: '👕' },
-  { id: 'shoes', label: 'Shoes', emoji: '👟' },
-  { id: 'bags', label: 'Bags', emoji: '👜' },
-  { id: 'accessories', label: 'Accessories', emoji: '🕶️' },
-  { id: 'electronics', label: 'Tech', emoji: '📱' },
-  { id: 'beauty', label: 'Beauty', emoji: '💄' },
-  { id: 'other', label: 'Other', emoji: '✨' },
+const POPULAR_BRANDS = [
+  'Nike',
+  'Zara',
+  'Adidas',
+  'H&M',
+  "Levi's",
+  'Ralph Lauren',
+  'Brandy Melville',
+  'Stüssy',
+  'Carhartt',
+  'Supreme',
+  'Vintage',
 ];
-
-const CARD_W = 116;
-const CARD_H = 132;
 
 interface Props {
   visible: boolean;
@@ -29,19 +38,18 @@ interface Props {
   onCreated: () => void;
 }
 
+/**
+ * Simple, elegant Drop Alert modal matching the clean Plick/resale design.
+ * Features a direct search input with "Apply" button and popular brand suggestions.
+ */
 export function DropAlertSheet({ visible, userId, onClose, onCreated }: Props) {
+  const { theme } = useTheme();
   const toast = useToast();
   const [query, setQuery] = useState('');
-  const [category, setCategory] = useState<Category | null>(null);
-  const [gender, setGender] = useState<Gender>('all');
-  const [notify, setNotify] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const reset = useCallback(() => {
     setQuery('');
-    setCategory(null);
-    setGender('all');
-    setNotify(true);
   }, []);
 
   const handleClose = useCallback(() => {
@@ -50,259 +58,268 @@ export function DropAlertSheet({ visible, userId, onClose, onCreated }: Props) {
     onClose();
   }, [reset, onClose, saving]);
 
-  const handleCreate = useCallback(async () => {
-    const q = query.trim();
-    if (!q && !category) {
-      toast.show('Add a brand or pick a category', { variant: 'info', icon: 'alert-circle' });
-      return;
-    }
-    setSaving(true);
-    try {
-      const row = await createSavedSearch({
-        userId,
-        query: q || null,
-        category,
-        gender: gender === 'all' ? null : gender,
-        notify,
-      });
-      if (!row) {
-        toast.show("Couldn't create the alert", { variant: 'default', icon: 'alert-triangle' });
+  const saveAlertFor = useCallback(
+    async (brandOrQuery: string) => {
+      const q = brandOrQuery.trim();
+      if (!q) {
+        toast.show('Type a brand or keyword', { variant: 'info', icon: 'alert-circle' });
         return;
       }
-      toast.show(notify ? "Alert created — we'll ping you" : 'Filter added', {
-        variant: 'success',
-        icon: 'bell',
-      });
-      reset();
-      onCreated();
-      onClose();
-    } catch (e: any) {
-      captureError(e, { fn: 'dropAlert.create' });
-      toast.show("Couldn't create the alert", { variant: 'default', icon: 'alert-triangle' });
-    } finally {
-      setSaving(false);
-    }
-  }, [query, category, gender, notify, userId, toast, reset, onCreated, onClose]);
+      if (saving) return;
+      setSaving(true);
+      try {
+        const row = await createSavedSearch({
+          userId,
+          query: q,
+          category: null,
+          gender: null,
+          notify: true,
+        });
+        if (!row) {
+          toast.show("Couldn't create the alert", { variant: 'default', icon: 'alert-triangle' });
+          return;
+        }
+        toast.show(`Alert created for "${q}"`, {
+          variant: 'success',
+          icon: 'bell',
+        });
+        reset();
+        onCreated();
+        onClose();
+      } catch (e: any) {
+        captureError(e, { fn: 'dropAlert.create' });
+        toast.show("Couldn't create the alert", { variant: 'default', icon: 'alert-triangle' });
+      } finally {
+        setSaving(false);
+      }
+    },
+    [userId, toast, reset, onCreated, onClose, saving],
+  );
+
+  const handleApply = useCallback(() => {
+    saveAlertFor(query);
+  }, [query, saveAlertFor]);
+
+  const filteredBrands = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return POPULAR_BRANDS;
+    const matches = POPULAR_BRANDS.filter((b) => b.toLowerCase().includes(q));
+    // If user's typed string isn't in popular brands, suggest adding it as custom query
+    return matches;
+  }, [query]);
 
   return (
-    <BottomSheetModal
+    <Modal
       visible={visible}
-      onClose={handleClose}
-      title="Create drop alert"
-      subtitle="Get notified when matching items appear."
-      snapHeightRatio={0.88}
-      scrollable
-      footer={
-        <Pressable
-          onPress={handleCreate}
-          disabled={saving}
-          style={({ pressed }) => ({
-            paddingVertical: 14,
-            borderRadius: radii.pill,
-            backgroundColor: colors.ink,
-            alignItems: 'center',
-            opacity: pressed ? 0.85 : 1,
-          })}
-        >
-          {saving ? (
-            <ActivityIndicator color={colors.white} />
-          ) : (
-            <Text style={{ fontSize: 14.5, fontWeight: '700', color: colors.white, letterSpacing: -0.1 }}>
-              Create alert
-            </Text>
-          )}
-        </Pressable>
-      }
+      transparent
+      animationType="fade"
+      onRequestClose={handleClose}
     >
-      {/* Brand/keyword input */}
-      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.ink, marginTop: 4, marginBottom: 8, letterSpacing: 0.3 }}>
-        BRAND OR KEYWORD
-      </Text>
-      <View
-        style={{
-          backgroundColor: colors.panel,
-          borderRadius: radii.md,
-          paddingHorizontal: 14,
-          paddingVertical: 12,
-          flexDirection: 'row',
-          alignItems: 'center',
-        }}
-      >
-        <Feather name="search" size={16} color={colors.muteSoft} />
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="e.g. Nike, vintage tee"
-          placeholderTextColor={colors.muteSoft}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="done"
+      <TouchableWithoutFeedback onPress={handleClose}>
+        <View
           style={{
             flex: 1,
-            marginLeft: 10,
-            fontSize: 14,
-            color: colors.ink,
-            padding: 0,
-            outlineStyle: 'none',
-            outlineWidth: 0,
-          } as any}
-        />
-      </View>
-
-      {/* Category */}
-      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.ink, marginTop: 18, marginBottom: 8, letterSpacing: 0.3 }}>
-        CATEGORY
-      </Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        decelerationRate="fast"
-        snapToInterval={CARD_W + 10}
-        snapToAlignment="start"
-        contentContainerStyle={{ gap: 10, paddingRight: 20 }}
-        style={{ marginHorizontal: -20, paddingHorizontal: 20 }}
-      >
-        {CATEGORIES.map((c) => {
-          const active = category === c.id;
-          return (
-            <Pressable
-              key={c.id}
-              onPress={() => setCategory(active ? null : c.id)}
-              style={({ pressed }) => ({
-                width: CARD_W,
-                height: CARD_H,
-                borderRadius: radii.xl,
-                borderWidth: 1,
-                borderColor: active ? colors.purple : colors.hairline,
-                backgroundColor: active ? colors.purple : colors.white,
-                padding: 10,
-                justifyContent: 'space-between',
-                opacity: pressed ? 0.85 : 1,
-              })}
-            >
+            backgroundColor: 'rgba(0, 0, 0, 0.55)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            paddingHorizontal: 18,
+          }}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={{ width: '100%', maxWidth: 390 }}
+          >
+            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
               <View
                 style={{
-                  flex: 1,
-                  borderRadius: radii.lg,
-                  backgroundColor: active ? 'rgba(255,255,255,0.16)' : colors.primarySoft,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: 8,
+                  width: '100%',
+                  backgroundColor: theme.surface,
+                  borderRadius: 24,
+                  paddingHorizontal: 20,
+                  paddingTop: 20,
+                  paddingBottom: 22,
+                  maxHeight: 520,
+                  ...shadow.lg,
                 }}
               >
-                <Text style={{ fontSize: 40, lineHeight: 48 }}>{c.emoji}</Text>
+                {/* Header Row: Title & Close 'x' Button */}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: 16,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 18,
+                      fontWeight: '800',
+                      color: theme.ink,
+                      letterSpacing: -0.3,
+                    }}
+                  >
+                    Drop alert
+                  </Text>
+                  <Pressable
+                    onPress={handleClose}
+                    accessibilityRole="button"
+                    accessibilityLabel="Close"
+                    hitSlop={8}
+                    style={({ pressed }) => ({
+                      width: 32,
+                      height: 32,
+                      borderRadius: 16,
+                      backgroundColor: theme.panel,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      opacity: pressed ? 0.7 : 1,
+                    })}
+                  >
+                    <Feather name="x" size={16} color={theme.ink} />
+                  </Pressable>
+                </View>
+
+                {/* Search Input Row with Apply Button */}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 10,
+                    marginBottom: 14,
+                  }}
+                >
+                  <View
+                    style={{
+                      flex: 1,
+                      height: 46,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: theme.surface,
+                      borderWidth: 1,
+                      borderColor: theme.hairline,
+                      borderRadius: 12,
+                      paddingHorizontal: 12,
+                    }}
+                  >
+                    <Feather name="search" size={17} color={theme.mute} style={{ marginRight: 8 }} />
+                    <TextInput
+                      value={query}
+                      onChangeText={setQuery}
+                      placeholder="Type a brand name..."
+                      placeholderTextColor={theme.muteSoft}
+                      autoCapitalize="words"
+                      autoCorrect={false}
+                      returnKeyType="done"
+                      onSubmitEditing={handleApply}
+                      style={{
+                        flex: 1,
+                        fontSize: 14.5,
+                        color: theme.ink,
+                        padding: 0,
+                        outlineStyle: 'none',
+                      } as any}
+                    />
+                  </View>
+
+                  <Pressable
+                    onPress={handleApply}
+                    disabled={saving || !query.trim()}
+                    style={({ pressed }) => ({
+                      height: 46,
+                      paddingHorizontal: 20,
+                      borderRadius: 12,
+                      backgroundColor: '#6C47FF',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      opacity: saving || !query.trim() ? 0.45 : pressed ? 0.85 : 1,
+                    })}
+                  >
+                    {saving ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text
+                        style={{
+                          fontSize: 15,
+                          fontWeight: '700',
+                          color: '#FFFFFF',
+                          letterSpacing: -0.2,
+                        }}
+                      >
+                        Apply
+                      </Text>
+                    )}
+                  </Pressable>
+                </View>
+
+                {/* Vertical Brand Suggestions List */}
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{ paddingVertical: 4 }}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {filteredBrands.map((brand) => (
+                    <Pressable
+                      key={brand}
+                      onPress={() => {
+                        setQuery(brand);
+                        saveAlertFor(brand);
+                      }}
+                      style={({ pressed }) => ({
+                        paddingVertical: 12,
+                        paddingHorizontal: 4,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        opacity: pressed ? 0.6 : 1,
+                      })}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 15,
+                          fontWeight: '500',
+                          color: theme.ink,
+                          letterSpacing: -0.1,
+                        }}
+                      >
+                        {brand}
+                      </Text>
+                    </Pressable>
+                  ))}
+
+                  {query.trim().length > 0 &&
+                    !POPULAR_BRANDS.some(
+                      (b) => b.toLowerCase() === query.trim().toLowerCase(),
+                    ) && (
+                      <Pressable
+                        onPress={handleApply}
+                        style={({ pressed }) => ({
+                          paddingVertical: 12,
+                          paddingHorizontal: 4,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 8,
+                          opacity: pressed ? 0.6 : 1,
+                        })}
+                      >
+                        <Feather name="plus" size={15} color="#6C47FF" />
+                        <Text
+                          style={{
+                            fontSize: 15,
+                            fontWeight: '600',
+                            color: '#6C47FF',
+                          }}
+                        >
+                          {`Alert for "${query.trim()}"`}
+                        </Text>
+                      </Pressable>
+                    )}
+                </ScrollView>
               </View>
-              <Text
-                style={{
-                  fontSize: 13.5,
-                  fontWeight: '700',
-                  color: active ? colors.white : colors.ink,
-                  letterSpacing: -0.1,
-                  paddingLeft: 4,
-                }}
-                numberOfLines={1}
-              >
-                {c.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-
-      {/* Gender */}
-      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.ink, marginTop: 18, marginBottom: 8, letterSpacing: 0.3 }}>
-        FOR
-      </Text>
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        {(['all', 'men', 'women', 'unisex'] as const).map((g) => {
-          const active = gender === g;
-          return (
-            <Pressable
-              key={g}
-              onPress={() => setGender(g)}
-              style={({ pressed }) => ({
-                flex: 1,
-                paddingVertical: 10,
-                borderRadius: radii.pill,
-                borderWidth: 1,
-                borderColor: active ? colors.ink : colors.hairline,
-                backgroundColor: active ? colors.panel : colors.white,
-                alignItems: 'center',
-                opacity: pressed ? 0.7 : 1,
-              })}
-            >
-              <Text
-                style={{
-                  fontSize: 12.5,
-                  fontWeight: active ? '700' : '600',
-                  color: colors.ink,
-                  textTransform: 'capitalize',
-                }}
-              >
-                {g === 'all' ? 'Anyone' : g}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      {/* Notify toggle */}
-      <Pressable
-        onPress={() => setNotify(!notify)}
-        style={({ pressed }) => ({
-          marginTop: 22,
-          padding: 14,
-          borderRadius: radii.md,
-          backgroundColor: notify ? colors.purpleSoft : colors.panel,
-          flexDirection: 'row',
-          alignItems: 'center',
-          opacity: pressed ? 0.85 : 1,
-        })}
-      >
-        <View
-          style={{
-            width: 28,
-            height: 28,
-            borderRadius: 14,
-            backgroundColor: notify ? colors.purple : colors.white,
-            borderWidth: notify ? 0 : 1,
-            borderColor: colors.hairline,
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginRight: 12,
-          }}
-        >
-          <Feather name="bell" size={14} color={notify ? colors.white : colors.muteSoft} />
+            </TouchableWithoutFeedback>
+          </KeyboardAvoidingView>
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 13.5, fontWeight: '700', color: colors.ink }}>
-            Notify me on new matches
-          </Text>
-          <Text style={{ fontSize: 12, color: colors.muteSoft, marginTop: 2 }}>
-            {notify ? 'Push when fresh listings hit your filters' : 'Just save the filter without pings'}
-          </Text>
-        </View>
-        <View
-          style={{
-            width: 36,
-            height: 22,
-            borderRadius: 11,
-            backgroundColor: notify ? colors.purple : colors.hairline,
-            padding: 2,
-            alignItems: notify ? 'flex-end' : 'flex-start',
-            justifyContent: 'center',
-          }}
-        >
-          <View
-            style={{
-              width: 18,
-              height: 18,
-              borderRadius: 9,
-              backgroundColor: colors.white,
-            }}
-          />
-        </View>
-      </Pressable>
-    </BottomSheetModal>
+      </TouchableWithoutFeedback>
+    </Modal>
   );
 }

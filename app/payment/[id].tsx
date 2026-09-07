@@ -72,10 +72,14 @@ export default function PaymentScreen() {
   const listing = listingQ.data ?? null;
 
   const bundleIdsParam = typeof bundle_ids === 'string' ? bundle_ids : '';
-  const bundleItemIds = useMemo(
-    () => bundleIdsParam.split(',').filter(Boolean),
-    [bundleIdsParam],
-  );
+  const bundleItemIds = useMemo(() => {
+    const primaryId = id ? String(id) : '';
+    const listingId = listing?.id ? String(listing.id) : '';
+    const raw = bundleIdsParam.split(',').filter(Boolean);
+    return Array.from(
+      new Set(raw.filter((itemId) => itemId !== primaryId && (!listingId || itemId !== listingId))),
+    );
+  }, [bundleIdsParam, id, listing?.id]);
   const isBundle = bundleItemIds.length > 0;
 
   const [bundledListings, setBundledListings] = useState<Listing[]>([]);
@@ -91,16 +95,21 @@ export default function PaymentScreen() {
       setBundleFetchError(null);
       return;
     }
+    if (!listing?.seller_id) return;
+
     let active = true;
     setBundleFetchStatus('loading');
     setBundleFetchError(null);
 
     (async () => {
       try {
+        const queryIds = bundleItemIds.filter((itemId) => itemId !== String(listing.id || id));
         const { data, error } = await supabase
           .from('listings')
           .select(SELECT_LISTING_WITH_SELLER)
-          .in('id', bundleItemIds);
+          .in('id', queryIds)
+          .eq('seller_id', listing.seller_id)
+          .eq('is_sold', false);
 
         if (!active) return;
 
@@ -142,7 +151,7 @@ export default function PaymentScreen() {
     return () => {
       active = false;
     };
-  }, [bundleIdsParam, bundleItemIds, toast]);
+  }, [bundleIdsParam, bundleItemIds, listing?.seller_id, listing?.id, id, toast]);
 
   const allOrderItems = useMemo(
     () => (listing ? [listing, ...bundledListings] : []),
@@ -289,9 +298,7 @@ export default function PaymentScreen() {
   const itemPrice =
     offerAmount ??
     (isBundle
-      ? explicitBundleTotal && explicitBundleTotal > 0
-        ? explicitBundleTotal
-        : bundleCalculation?.total ?? Number(listing.price ?? 0)
+      ? bundleCalculation?.total ?? Number(listing.price ?? 0)
       : Number(listing.price ?? 0));
 
   const bpFee = buyerProtectionFee(itemPrice);
@@ -420,7 +427,7 @@ export default function PaymentScreen() {
       });
 
       // Mark all items sold
-      const allItemIds = [String(listing.id), ...bundleItemIds];
+      const allItemIds = Array.from(new Set([String(listing.id), ...bundleItemIds]));
       try {
         await Promise.all(
           allItemIds.map(async (itemId) => {
