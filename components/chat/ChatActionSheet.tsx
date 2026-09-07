@@ -74,7 +74,7 @@ export function ChatActionSheet({
   useEffect(() => {
     if (visible) {
       isClosingRef.current = false;
-      const animId = ++animGenerationRef.current;
+      ++animGenerationRef.current;
       setInternalVisible(true);
       translateY.setValue(450);
       backdropOpacity.setValue(0);

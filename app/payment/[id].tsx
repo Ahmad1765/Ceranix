@@ -54,7 +54,6 @@ export default function PaymentScreen() {
     id,
     offer,
     bundle_ids,
-    bundle_total,
     fulfillment: fulfillmentParam,
     paymentMethod: paymentMethodParam,
   } = useLocalSearchParams<{
@@ -294,7 +293,6 @@ export default function PaymentScreen() {
   }
 
   // Price breakdown calculations
-  const explicitBundleTotal = bundle_total ? Number(bundle_total) : null;
   const itemPrice =
     offerAmount ??
     (isBundle
