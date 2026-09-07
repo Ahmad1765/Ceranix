@@ -836,7 +836,7 @@ export default function InboxScreen() {
               if (item.value === 'activity') {
                 return (
                   <View style={{ width: pageWidth, height: pagerHeight }}>
-                    <ActivityFeed bottomInset={tabBarClearance} showTabs={false} />
+                    <ActivityFeed bottomInset={tabBarClearance} />
                   </View>
                 );
               }
