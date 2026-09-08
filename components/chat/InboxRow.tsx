@@ -50,6 +50,7 @@ function InboxRowImpl({
         gap: 12,
         paddingHorizontal: 16,
         paddingVertical: 13,
+        minHeight: 92,
         backgroundColor: pressed ? theme.panel : 'transparent',
       })}
     >

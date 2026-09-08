@@ -25,7 +25,11 @@ import { safeBack } from '@/lib/nav';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { supabase } from '@/lib/supabase';
 import { buyerProtectionFee, formatPrice, shippingFee } from '@/lib/fees';
-import { computeBundlePricing } from '@/lib/bundle';
+import {
+  computeBundlePricing,
+  sanitizeBundleItemIds,
+  computeCheckoutItemPrice,
+} from '@/lib/bundle';
 import { AddressSheet, type AddressForm } from '@/components/settings/AddressSheet';
 import { BuyerProtectionSheet } from '@/components/product/BuyerProtectionSheet';
 import {
@@ -60,7 +64,6 @@ export default function PaymentScreen() {
     id: string;
     offer?: string;
     bundle_ids?: string;
-    bundle_total?: string;
     fulfillment?: string;
     paymentMethod?: string;
   }>();
@@ -71,14 +74,10 @@ export default function PaymentScreen() {
   const listing = listingQ.data ?? null;
 
   const bundleIdsParam = typeof bundle_ids === 'string' ? bundle_ids : '';
-  const bundleItemIds = useMemo(() => {
-    const primaryId = id ? String(id) : '';
-    const listingId = listing?.id ? String(listing.id) : '';
-    const raw = bundleIdsParam.split(',').filter(Boolean);
-    return Array.from(
-      new Set(raw.filter((itemId) => itemId !== primaryId && (!listingId || itemId !== listingId))),
-    );
-  }, [bundleIdsParam, id, listing?.id]);
+  const bundleItemIds = useMemo(
+    () => sanitizeBundleItemIds(bundleIdsParam, id, listing?.id),
+    [bundleIdsParam, id, listing?.id],
+  );
   const isBundle = bundleItemIds.length > 0;
 
   const [bundledListings, setBundledListings] = useState<Listing[]>([]);
@@ -293,11 +292,12 @@ export default function PaymentScreen() {
   }
 
   // Price breakdown calculations
-  const itemPrice =
-    offerAmount ??
-    (isBundle
-      ? bundleCalculation?.total ?? Number(listing.price ?? 0)
-      : Number(listing.price ?? 0));
+  const itemPrice = computeCheckoutItemPrice({
+    offerAmount,
+    isBundle,
+    bundleCalculationTotal: bundleCalculation?.total,
+    listingPrice: Number(listing.price ?? 0),
+  });
 
   const bpFee = buyerProtectionFee(itemPrice);
   const deliveryFee = fulfillment === 'handshake' ? 0 : shippingFee(itemPrice);
@@ -467,7 +467,7 @@ export default function PaymentScreen() {
               order_status: result.status,
               amount: totalAmount,
               is_bundle: isBundle,
-              bundle_item_ids: isBundle ? bundleItemIds : null,
+              bundle_item_ids: isBundle ? bundleItemIds : undefined,
             },
           });
         }

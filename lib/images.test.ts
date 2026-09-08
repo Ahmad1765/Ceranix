@@ -136,6 +136,28 @@ describe('toSupabaseThumbnailUrl', () => {
     expect(toSupabaseThumbnailUrl(thumb)).toBe(thumb);
   });
 
+  it('preserves query parameters, fragments, and host when query contains dots', () => {
+    const urlWithQuery =
+      'https://abc.supabase.co:8443/storage/v1/object/public/listing-images/a/photo.jpg?token=abc.def&v=1.2#frag.ment';
+    expect(toSupabaseThumbnailUrl(urlWithQuery)).toBe(
+      'https://abc.supabase.co:8443/storage/v1/object/public/listing-images/a/photo_thumb.jpg?token=abc.def&v=1.2#frag.ment',
+    );
+  });
+
+  it('handles extensionless paths properly and preserves query parameters', () => {
+    const extensionless =
+      'https://abc.supabase.co/storage/v1/object/public/listing-images/a/raw_image?token=foo.bar';
+    expect(toSupabaseThumbnailUrl(extensionless)).toBe(
+      'https://abc.supabase.co/storage/v1/object/public/listing-images/a/raw_image_thumb?token=foo.bar',
+    );
+  });
+
+  it('leaves already-suffixed extensionless thumbnail URLs intact', () => {
+    const thumbExtensionless =
+      'https://abc.supabase.co/storage/v1/object/public/listing-images/a/raw_image_thumb?token=foo.bar';
+    expect(toSupabaseThumbnailUrl(thumbExtensionless)).toBe(thumbExtensionless);
+  });
+
   it('leaves non-listing-images and non-supabase URLs untouched', () => {
     expect(toSupabaseThumbnailUrl('https://example.com/photo.jpg')).toBe('https://example.com/photo.jpg');
     expect(toSupabaseThumbnailUrl('')).toBe('');
@@ -173,6 +195,21 @@ describe('getOptimizedImageUrl with edge image proxy enabled', () => {
     expect(out).toContain('w=1080');
     expect(out).toContain('photo.jpg');
     expect(out).not.toContain('photo_thumb.jpg');
+  });
+
+  it('leaves non-Supabase URLs whose path or query contains .supabase.co untouched', async () => {
+    vi.stubEnv('TEST_IMAGE_PROXY', 'true');
+    vi.resetModules();
+    const { getOptimizedImageUrl: fresh } = await import('@/lib/images');
+
+    const nonSupabaseUrl1 = 'https://example.com/photo.jpg?source=abc.supabase.co';
+    expect(fresh(nonSupabaseUrl1, { width: 300 })).toBe(nonSupabaseUrl1);
+
+    const nonSupabaseUrl2 = 'https://evil.com/fake.supabase.co/image.png';
+    expect(fresh(nonSupabaseUrl2, { width: 300 })).toBe(nonSupabaseUrl2);
+
+    const nonSupabaseUrl3 = 'https://not-supabase.co/storage/v1/object/public/listing-images/photo.jpg';
+    expect(fresh(nonSupabaseUrl3, { width: 300 })).toBe(nonSupabaseUrl3);
   });
 });
 

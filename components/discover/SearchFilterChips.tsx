@@ -18,6 +18,7 @@ import {
   StyleSheet,
   Platform,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Text, TextInput } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
@@ -32,13 +33,9 @@ import {
   type SearchFilterState,
   EMPTY_SEARCH_FILTERS,
   countActiveSearchFilters,
+  normalizeCustomPrice,
 } from '@/lib/searchFilters';
 
-export {
-  type SearchFilterState,
-  EMPTY_SEARCH_FILTERS,
-  countActiveSearchFilters,
-};
 
 const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'One Size'];
 
@@ -64,7 +61,12 @@ const POPULAR_BRANDS = [
   'North Face',
 ];
 
-const COLORS: { name: string; hex: string; border?: string }[] = [
+const COLORS: {
+  name: string;
+  hex: string;
+  border?: string;
+  gradient?: readonly [string, string, ...string[]];
+}[] = [
   { name: 'Black', hex: '#111111' },
   { name: 'White', hex: '#FFFFFF', border: '#D1D5DB' },
   { name: 'Grey', hex: '#9CA3AF' },
@@ -76,7 +78,11 @@ const COLORS: { name: string; hex: string; border?: string }[] = [
   { name: 'Purple', hex: '#9333EA' },
   { name: 'Yellow', hex: '#EAB308' },
   { name: 'Brown', hex: '#78350F' },
-  { name: 'Multi', hex: 'linear-gradient(45deg, #f00, #ff0, #00f)' },
+  {
+    name: 'Multi',
+    hex: '#A855F7',
+    gradient: ['#EF4444', '#EAB308', '#3B82F6'] as const,
+  },
 ];
 
 const MATERIALS = [
@@ -244,15 +250,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
 
   const handleApplyCustomPrice = useCallback(() => {
     haptic();
-    const minVal = customMin.trim() ? parseFloat(customMin) : null;
-    const maxVal = customMax.trim() ? parseFloat(customMax) : null;
-    let priceMin = minVal !== null && !isNaN(minVal) ? Math.max(0, minVal) : null;
-    let priceMax = maxVal !== null && !isNaN(maxVal) ? Math.max(0, maxVal) : null;
-    if (priceMin !== null && priceMax !== null && priceMin > priceMax) {
-      const temp = priceMin;
-      priceMin = priceMax;
-      priceMax = temp;
-    }
+    const { priceMin, priceMax } = normalizeCustomPrice(customMin, customMax);
     onUpdateFilter((prev) => ({
       ...prev,
       priceMin,
@@ -375,7 +373,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
             { transform: [{ scale: pressed ? 0.96 : 1 }] },
           ]}
           accessibilityRole="button"
-          accessibilityLabel="Open all filters"
+          accessibilityLabel={onOpenFullFilter ? 'Open all filters' : 'Open category modal'}
         >
           <Feather
             name="sliders"
@@ -1091,16 +1089,31 @@ export const SearchFilterChips = memo(function SearchFilterChips({
                     ]}
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                      <View
-                        style={{
-                          width: 20,
-                          height: 20,
-                          borderRadius: 10,
-                          backgroundColor: col.hex,
-                          borderWidth: col.border ? 1 : 0,
-                          borderColor: col.border || 'transparent',
-                        }}
-                      />
+                      {col.gradient ? (
+                        <LinearGradient
+                          colors={col.gradient}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={{
+                            width: 20,
+                            height: 20,
+                            borderRadius: 10,
+                            borderWidth: col.border ? 1 : 0,
+                            borderColor: col.border || 'transparent',
+                          }}
+                        />
+                      ) : (
+                        <View
+                          style={{
+                            width: 20,
+                            height: 20,
+                            borderRadius: 10,
+                            backgroundColor: col.hex,
+                            borderWidth: col.border ? 1 : 0,
+                            borderColor: col.border || 'transparent',
+                          }}
+                        />
+                      )}
                       <Text
                         style={[
                           styles.optionText,

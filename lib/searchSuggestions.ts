@@ -862,3 +862,22 @@ export function getSearchSuggestions(
 
   return results.slice(0, limit);
 }
+
+export function resolveSuggestions(
+  query?: string,
+  suggestions: SearchSuggestion[] = [],
+): SearchSuggestion[] {
+  const cleanQuery = query?.trim() ?? '';
+  if (suggestions.length > 0) return suggestions;
+  if (!cleanQuery) return [];
+  return [
+    {
+      id: `fallback-${cleanQuery}`,
+      text: cleanQuery,
+      parts: splitSuggestionHighlight(cleanQuery, cleanQuery),
+    },
+  ];
+}
+
+export const resolvePreSearchSuggestions = resolveSuggestions;
+

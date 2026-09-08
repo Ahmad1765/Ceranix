@@ -1,17 +1,21 @@
 import { useCallback, useMemo } from 'react';
-import { View, ScrollView, RefreshControl } from 'react-native';
-import { Text } from '@/lib/rnText';
+import { View, FlatList, RefreshControl, Platform } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
-import { type as typography } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { EmptyState } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useInboxQuery } from '@/lib/queries';
 import { isSupportConversation } from '@/lib/support';
-import { type ConversationRow } from '@/lib/chat';
+import { type ConversationRow, isTransactionalConversation } from '@/lib/chat';
 import { InboxRow } from '@/components/chat/InboxRow';
 
 const EMPTY_CONVERSATIONS: ConversationRow[] = [];
+const keyById = (item: ConversationRow) => item.id;
+
+function ActivitySeparator() {
+  const { theme } = useTheme();
+  return <View style={{ height: 1, backgroundColor: theme.hairline }} />;
+}
 
 type Props = {
   bottomInset?: number;
@@ -28,12 +32,8 @@ export function ActivityFeed({ bottomInset = 24 }: Props) {
   // Filter direct profile messages:
   // Activity is strictly for people who message you directly — NOT for buying or giving offers
   const directMessages = useMemo(() => {
-    const isOffer = (c: ConversationRow) => {
-      const msg = c.last_message?.trim().toLowerCase() || '';
-      return msg.startsWith('offer:') || msg.startsWith('offer ') || msg.includes('offer:');
-    };
     return conversations.filter(
-      (c) => !c.listing_id && !isSupportConversation(c) && !isOffer(c),
+      (c) => !isTransactionalConversation(c) && !isSupportConversation(c),
     );
   }, [conversations]);
 
@@ -50,12 +50,40 @@ export function ActivityFeed({ bottomInset = 24 }: Props) {
     await inboxRefetch();
   }, [inboxRefetch]);
 
+  const renderItem = useCallback(
+    ({ item }: { item: ConversationRow }) => (
+      <InboxRow
+        conv={item}
+        userId={userId || ''}
+        onPress={() => router.push(`/conversation/${item.id}` as any)}
+      />
+    ),
+    [userId],
+  );
+
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
-      {/* Content */}
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: bottomInset + 30 }}
+      <FlatList
+        style={{ flex: 1 }}
+        data={directMessages}
+        keyExtractor={keyById}
+        renderItem={renderItem}
+        ItemSeparatorComponent={ActivitySeparator}
+        windowSize={7}
+        initialNumToRender={10}
+        maxToRenderPerBatch={8}
+        updateCellsBatchingPeriod={50}
+        removeClippedSubviews={Platform.OS === 'android'}
+        ListEmptyComponent={
+          <EmptyState
+            icon="users"
+            title="No direct messages yet"
+            description="When you message creators directly through their profile, they’ll appear here."
+          />
+        }
+        contentContainerStyle={
+          directMessages.length === 0 ? { flex: 1 } : { paddingBottom: bottomInset }
+        }
         refreshControl={
           <RefreshControl
             refreshing={inboxQ.isRefetching}
@@ -63,65 +91,7 @@ export function ActivityFeed({ bottomInset = 24 }: Props) {
             tintColor={theme.primary}
           />
         }
-      >
-        <View style={{ paddingTop: 10 }}>
-          {directMessages.length > 0 ? (
-            <View>
-              <View
-                style={{
-                  paddingHorizontal: 16,
-                  paddingVertical: 10,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                }}
-              >
-                <Text
-                  style={{
-                    fontFamily: typography.family.sansBold,
-                    fontSize: 11.5,
-                    letterSpacing: 0.8,
-                    textTransform: 'uppercase',
-                    color: theme.muteSoft,
-                  }}
-                >
-                  Direct Profile Messages
-                </Text>
-                <Text
-                  style={{
-                    fontFamily: typography.family.sansMedium,
-                    fontSize: 12,
-                    color: theme.primary,
-                  }}
-                >
-                  {directMessages.length} {directMessages.length === 1 ? 'chat' : 'chats'}
-                </Text>
-              </View>
-
-              {directMessages.map((conv) => (
-                <View key={conv.id} style={{ borderBottomWidth: 1, borderBottomColor: theme.hairline }}>
-                  <InboxRow
-                    conv={conv}
-                    userId={userId || ''}
-                    onPress={() => router.push(`/conversation/${conv.id}` as any)}
-                  />
-                </View>
-              ))}
-            </View>
-          ) : (
-            <EmptyState
-              icon="users"
-              title="Quiet on this side"
-              description="When you message creators directly through their profile or people you follow post, they'll appear here."
-              cta={{
-                label: 'Find Sellers to Follow',
-                icon: 'search',
-                onPress: () => router.push('/' as any),
-              }}
-            />
-          )}
-        </View>
-      </ScrollView>
+      />
     </View>
   );
 }

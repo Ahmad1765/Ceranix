@@ -13,6 +13,9 @@ create index if not exists conversations_seller_idx
   on public.conversations(seller_id, updated_at desc);
 create index if not exists conversations_last_sender_idx
   on public.conversations(last_sender_id);
+create unique index if not exists direct_conversations_participants_idx
+  on public.conversations (least(buyer_id, seller_id), greatest(buyer_id, seller_id))
+  where listing_id is null;
 
 -- The "Participants can view" policy already exists in setup.sql; INSERT/UPDATE
 -- are added here so the client can create and bump conversations from the app.

@@ -23,13 +23,15 @@ test.describe('Inbox (signed in)', () => {
     }
   });
 
-  test('the Activity tab reaches the saved-search feed', async ({ page }) => {
+  test('the Activity tab reaches the direct messages feed', async ({ page }) => {
     await page.getByText('Activity', { exact: true }).click();
-    // The feed's own pill tabs are the stable landmark — the panes underneath
-    // are either empty states or live saved searches depending on the account.
-    await expect(page.getByText('Following', { exact: true }).first()).toBeVisible();
-    await expect(page.getByText('For you', { exact: true }).first()).toBeVisible();
-    await expect(page.getByText('Saved', { exact: true }).first()).toBeVisible();
+    await expect(
+      page
+        .locator(
+          "text=/^now$|^\\d+[mhd]$|^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \\d{1,2}$|No direct messages yet|Quiet on this side/",
+        )
+        .first(),
+    ).toBeVisible();
   });
 
   test('the default tab hydrates its content area', async ({ page }) => {

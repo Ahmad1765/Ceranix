@@ -442,7 +442,7 @@ function OutgoingOfferBubble({
             if (Platform.OS !== 'web') {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
             }
-            onPay(amount, msg.metadata?.bundle_item_ids);
+            onPay(amount, msg.metadata?.bundle_item_ids ?? undefined);
           }}
           accessibilityLabel={`Pay ${formatPrice(amount)}`}
           style={{
@@ -802,7 +802,7 @@ function IncomingOfferCard({
             if (Platform.OS !== 'web') {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
             }
-            onPay(amount, msg.metadata?.bundle_item_ids);
+            onPay(amount, msg.metadata?.bundle_item_ids ?? undefined);
           }}
           accessibilityLabel={`Buy now for ${formatPrice(amount)}`}
           style={{

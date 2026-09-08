@@ -19,11 +19,14 @@ import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/lib/auth';
 import { useListingQuery, useProfileQuery } from '@/lib/queries';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
 import { getOrCreateConversation, sendMessage, sendOffer } from '@/lib/chat';
 import { getOrCreateSupportConversation, SUPPORT_BOT_USER_ID, SUPPORT_BOT_NAME, SUPPORT_BOT_AVATAR } from '@/lib/support';
 import { getOptimizedImageUrl, cardImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 import { formatPrice } from '@/lib/currency';
 import { orderTotal } from '@/lib/fees';
+import { calculateOfferPresets, isOfferAmountValid } from '@/lib/bundle';
 import { useToast } from '@/lib/toast';
 import { captureError } from '@/lib/sentry';
 import { radii, shadow, type } from '@/lib/theme';
@@ -111,24 +114,40 @@ export default function NewConversationScreen() {
   const messageRef = useRef<any>(null);
   const amountRef = useRef<any>(null);
 
-  // Base price reference for offer presets: bundle total when isBundle is true, or listing.price
+  // Fetch authoritative prices for bundle items from the server so the offer
+  // ceiling is never derived from the (untrusted) URL `amount` param.
+  const bundleItemPricesQ = useQuery({
+    queryKey: ['bundleItemPrices', ...bundleItemIds],
+    enabled: isBundle && bundleItemIds.length > 0,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('listings')
+        .select('id, price')
+        .in('id', bundleItemIds);
+      if (error) throw new Error(error.message);
+      return (data ?? []) as { id: string; price: number }[];
+    },
+  });
+  const bundleItemPrices = bundleItemPricesQ.data ?? null;
+
+  // Base price reference for offer presets and ceiling.
+  // Non-bundle: listing.price (authoritative from the DB).
+  // Bundle: listing.price + sum of fetched bundle item prices.
   const baseReferencePrice = useMemo(() => {
-    if (isBundle && initialAmountRaw && parseFloat(initialAmountRaw) > 0) {
-      return parseFloat(initialAmountRaw);
+    const listingPrice = Number(listing?.price ?? 0);
+    if (isBundle && bundleItemPrices && bundleItemPrices.length > 0) {
+      const addOnTotal = bundleItemPrices.reduce((sum, item) => sum + Number(item.price ?? 0), 0);
+      return listingPrice + addOnTotal;
     }
-    return Number(listing?.price ?? 0);
-  }, [isBundle, initialAmountRaw, listing?.price]);
+    return listingPrice;
+  }, [isBundle, bundleItemPrices, listing?.price]);
 
   // Preset tiers: 10% and 20%
-  const preset10 = useMemo(() => {
-    if (baseReferencePrice <= 0) return 0;
-    return Math.max(1, Math.round(baseReferencePrice * 0.9));
-  }, [baseReferencePrice]);
-
-  const preset20 = useMemo(() => {
-    if (baseReferencePrice <= 0) return 0;
-    return Math.max(1, Math.round(baseReferencePrice * 0.8));
-  }, [baseReferencePrice]);
+  const { preset10, preset20 } = useMemo(
+    () => calculateOfferPresets(baseReferencePrice),
+    [baseReferencePrice],
+  );
 
   const hasInitializedAmount = useRef(Boolean(initialAmount));
 
@@ -166,9 +185,12 @@ export default function NewConversationScreen() {
   const amountNum = parseFloat(amount) || 0;
   const offerValid =
     mode === 'offer' &&
-    Number.isFinite(amountNum) &&
-    amountNum > 0 &&
-    (isBundle ? amountNum <= baseReferencePrice : !listing || amountNum < listing.price);
+    isOfferAmountValid({
+      amountNum,
+      isBundle,
+      baseReferencePrice,
+      listingPrice: listing?.price,
+    });
   const msgValid = mode === 'message' && message.trim().length > 0;
 
   const totalWithProtection = useMemo(() => {
@@ -190,11 +212,15 @@ export default function NewConversationScreen() {
           Alert.alert('Could not connect to support', 'Please try again.');
           return;
         }
-        await sendMessage({
+        const saved = await sendMessage({
           conversationId: conv.id,
           senderId: user.id,
           content: message.trim(),
         });
+        if (!saved) {
+          Alert.alert('Could not send message', 'Please try again.');
+          return;
+        }
         toast.show('Message sent to Support', { variant: 'success', icon: 'check' });
         router.replace(`/conversation/${conv.id}` as any);
       } catch (err) {
@@ -223,11 +249,15 @@ export default function NewConversationScreen() {
           Alert.alert('Could not start chat', 'Please try again.');
           return;
         }
-        await sendMessage({
+        const saved = await sendMessage({
           conversationId: conv.id,
           senderId: user.id,
           content: message.trim(),
         });
+        if (!saved) {
+          Alert.alert('Could not send message', 'Please try again.');
+          return;
+        }
         toast.show('Message sent', { variant: 'success', icon: 'check' });
         router.replace(`/conversation/${conv.id}` as any);
       } catch (err) {

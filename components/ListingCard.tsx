@@ -100,6 +100,19 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
   const carouselRef = useRef<Animated.ScrollView>(null);
   const pointerDownPos = useRef({ x: 0, y: 0, time: 0 });
   const isSwipingOrDragging = useRef(false);
+  const lastDragEndTime = useRef(0);
+  const webScrollTimeoutRef = useRef<any>(null);
+  const containerRef = useRef<any>(null);
+  const touchStartPos = useRef({ x: 0, y: 0, time: 0 });
+  const hasTouchMoved = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      if (webScrollTimeoutRef.current) {
+        clearTimeout(webScrollTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Hydrate the liked state for the current user. Cards are recycled in the
   // feed grid so we re-run this whenever the listing id or user changes.
@@ -166,6 +179,28 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
   // read it inside useAnimatedStyle, so a swipe animates without re-rendering
   // any React component at all. (Same mechanism as AnimatedTabBar and the
   // product screen's HeroPageDot.)
+  // First contact with the carousel promotes it from "thumbnail" to "gallery"
+  // and mounts the remaining slides. Repeat touches are free — React bails out
+  // of a setState that doesn't change the value.
+  const hydrateCarousel = useCallback(() => {
+    setCarouselHydrated(true);
+  }, []);
+
+  const handleDragBegin = useCallback(() => {
+    hydrateCarousel();
+    isSwipingOrDragging.current = true;
+  }, [hydrateCarousel]);
+
+  const handleDragEnd = useCallback(() => {
+    lastDragEndTime.current = Date.now();
+    if (webScrollTimeoutRef.current) {
+      clearTimeout(webScrollTimeoutRef.current);
+    }
+    webScrollTimeoutRef.current = setTimeout(() => {
+      isSwipingOrDragging.current = false;
+    }, 450);
+  }, []);
+
   const offsetX = useSharedValue(0);
   const pageW = useSharedValue(0);
   const carouselScrollHandler = useAnimatedScrollHandler({
@@ -174,6 +209,18 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
       // Read from the event rather than assuming cardWidth, exactly as the old
       // JS handler did — it is the measured viewport width of the slide.
       pageW.value = e.layoutMeasurement.width;
+    },
+    onBeginDrag: () => {
+      runOnJS(handleDragBegin)();
+    },
+    onEndDrag: () => {
+      runOnJS(handleDragEnd)();
+    },
+    onMomentumBegin: () => {
+      runOnJS(handleDragBegin)();
+    },
+    onMomentumEnd: () => {
+      runOnJS(handleDragEnd)();
     },
   });
 
@@ -194,13 +241,6 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
       if (previous !== null && page !== previous) runOnJS(setActiveIndex)(page);
     },
   );
-
-  // First contact with the carousel promotes it from "thumbnail" to "gallery"
-  // and mounts the remaining slides. Repeat touches are free — React bails out
-  // of a setState that doesn't change the value.
-  const hydrateCarousel = useCallback(() => {
-    setCarouselHydrated(true);
-  }, []);
 
   const handleToggleLike = useCallback(async () => {
     if (!userId) {
@@ -265,7 +305,6 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
     }
   }, [cardWidth, pageW]);
 
-  const lastDragEndTime = useRef(0);
   const isPointerDownRef = useRef(false);
   const pointerStartPosRef = useRef({ x: 0, y: 0 });
   const pointerStartScrollRef = useRef(0);
@@ -385,11 +424,15 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
         const w = cardWidth || 200;
         const threshold = Math.min(36, w * 0.16);
 
-        let target = activeIndex;
-        if (dx < -threshold && activeIndex < images.length - 1) {
-          target = activeIndex + 1;
-        } else if (dx > threshold && activeIndex > 0) {
-          target = activeIndex - 1;
+        const startPage = Math.max(
+          0,
+          Math.min(images.length - 1, Math.round(pointerStartScrollRef.current / w)),
+        );
+        let target = startPage;
+        if (dx < -threshold && startPage < images.length - 1) {
+          target = startPage + 1;
+        } else if (dx > threshold && startPage > 0) {
+          target = startPage - 1;
         }
 
         setActiveIndex(target);
@@ -409,9 +452,12 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
           carouselRef.current?.scrollTo({ x: target * w, animated: true });
         }
 
-        setTimeout(() => {
+        if (webScrollTimeoutRef.current) {
+          clearTimeout(webScrollTimeoutRef.current);
+        }
+        webScrollTimeoutRef.current = setTimeout(() => {
           isSwipingOrDragging.current = false;
-        }, 250);
+        }, 450);
       } else {
         if (scrollEl) {
           scrollEl.style.scrollSnapType = 'x mandatory';
@@ -419,7 +465,7 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
       }
       hasDraggedRef.current = false;
     },
-    [hasMultiple, getScrollEl, cardWidth, activeIndex, images.length, offsetX],
+    [hasMultiple, getScrollEl, cardWidth, images.length, offsetX],
   );
 
   const handlePointerCancel = useCallback(
@@ -437,6 +483,75 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
     [getScrollEl],
   );
 
+  const handleTouchStart = useCallback(
+    (e: any) => {
+      hydrateCarousel();
+      const touch = e.nativeEvent?.touches?.[0] || e.nativeEvent;
+      if (touch) {
+        touchStartPos.current = {
+          x: touch.pageX ?? touch.clientX ?? 0,
+          y: touch.pageY ?? touch.clientY ?? 0,
+          time: Date.now(),
+        };
+      }
+      hasTouchMoved.current = false;
+    },
+    [hydrateCarousel],
+  );
+
+  const handleTouchMove = useCallback((e: any) => {
+    const touch = e.nativeEvent?.touches?.[0] || e.nativeEvent;
+    if (touch && touchStartPos.current.time > 0) {
+      const dx = Math.abs((touch.pageX ?? touch.clientX ?? 0) - touchStartPos.current.x);
+      const dy = Math.abs((touch.pageY ?? touch.clientY ?? 0) - touchStartPos.current.y);
+      if (dx > 6) {
+        hasTouchMoved.current = true;
+        isSwipingOrDragging.current = true;
+        lastDragEndTime.current = Date.now();
+      }
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback((e: any) => {
+    if (hasTouchMoved.current || isSwipingOrDragging.current) {
+      lastDragEndTime.current = Date.now();
+      if (webScrollTimeoutRef.current) {
+        clearTimeout(webScrollTimeoutRef.current);
+      }
+      webScrollTimeoutRef.current = setTimeout(() => {
+        isSwipingOrDragging.current = false;
+      }, 450);
+    }
+    hasTouchMoved.current = false;
+  }, []);
+
+  // Web capture phase interception: halts synthetic clicks following swipes before
+  // bubbling to the card's outer Pressable
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !containerRef.current) return;
+    const node = containerRef.current as any;
+    const target: HTMLElement | null =
+      typeof node.getScrollableNode === 'function'
+        ? node.getScrollableNode()
+        : node instanceof HTMLElement
+        ? node
+        : (node._innerViewRef ?? null);
+
+    if (!target) return;
+
+    const handleClickCapture = (e: MouseEvent) => {
+      if (isSwipingOrDragging.current || Date.now() - lastDragEndTime.current < 450) {
+        e.stopPropagation();
+        e.preventDefault();
+      }
+    };
+
+    target.addEventListener('click', handleClickCapture, true);
+    return () => {
+      target.removeEventListener('click', handleClickCapture, true);
+    };
+  }, []);
+
   const handleWebScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       const x = e.nativeEvent.contentOffset.x;
@@ -449,6 +564,14 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
           setActiveIndex(page);
         }
       }
+      isSwipingOrDragging.current = true;
+      lastDragEndTime.current = Date.now();
+      if (webScrollTimeoutRef.current) {
+        clearTimeout(webScrollTimeoutRef.current);
+      }
+      webScrollTimeoutRef.current = setTimeout(() => {
+        isSwipingOrDragging.current = false;
+      }, 450);
     },
     [cardWidth, activeIndex, images.length, offsetX, pageW],
   );
@@ -460,7 +583,7 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
 
   const handleCardPress = useCallback(
     (e: any) => {
-      if (isSwipingOrDragging.current || Date.now() - lastDragEndTime.current < 300) {
+      if (isSwipingOrDragging.current || Date.now() - lastDragEndTime.current < 450) {
         isSwipingOrDragging.current = false;
         return;
       }
@@ -489,6 +612,7 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
   return (
     <View style={{ flex: 1, marginBottom: 16 }}>
     <Pressable
+      testID="listing-card"
       onPress={handleCardPress}
       onPressIn={(e) => {
         pointerDownPos.current = {
@@ -515,6 +639,8 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
           the same layer. Splitting the two views is the standard fix. */}
       <View className="w-full" style={{ borderRadius: radii.lg, ...shadow.sm }}>
       <View
+        ref={containerRef}
+        testID="listing-card-carousel"
         className="relative w-full"
         style={{
           aspectRatio: 1 / 1.33,
@@ -526,6 +652,7 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
                 cursor: isDragging ? 'grabbing' : 'grab',
                 userSelect: 'none',
                 WebkitUserSelect: 'none',
+                touchAction: 'pan-x pan-y',
               } as any)
             : {}),
         }}
@@ -534,6 +661,10 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
             ? (e) => setMeasuredWidth(e.nativeEvent.layout.width)
             : undefined
         }
+        onTouchStart={hasMultiple ? handleTouchStart : undefined}
+        onTouchMove={hasMultiple ? handleTouchMove : undefined}
+        onTouchEnd={hasMultiple ? handleTouchEnd : undefined}
+        onTouchCancel={hasMultiple ? handleTouchEnd : undefined}
         onPointerDown={Platform.OS === 'web' && hasMultiple ? handlePointerDown : undefined}
         onPointerMove={Platform.OS === 'web' && hasMultiple ? handlePointerMove : undefined}
         onPointerUp={Platform.OS === 'web' && hasMultiple ? handlePointerUp : undefined}
@@ -551,32 +682,22 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
             disableIntervalMomentum
             showsHorizontalScrollIndicator={false}
             onScroll={Platform.OS === 'web' ? handleWebScroll : carouselScrollHandler}
-            onTouchStart={hydrateCarousel}
-            onScrollBeginDrag={() => {
-              hydrateCarousel();
-              isSwipingOrDragging.current = true;
-            }}
-            onScrollEndDrag={() => {
-              lastDragEndTime.current = Date.now();
-              setTimeout(() => {
-                isSwipingOrDragging.current = false;
-              }, 200);
-            }}
-            onMomentumScrollBegin={() => {
-              isSwipingOrDragging.current = true;
-            }}
-            onMomentumScrollEnd={() => {
-              lastDragEndTime.current = Date.now();
-              setTimeout(() => {
-                isSwipingOrDragging.current = false;
-              }, 200);
-            }}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onTouchCancel={handleTouchEnd}
+            onScrollBeginDrag={handleDragBegin}
+            onScrollEndDrag={handleDragEnd}
+            onMomentumScrollBegin={handleDragBegin}
+            onMomentumScrollEnd={handleDragEnd}
             scrollEventThrottle={16}
             style={[
               { width: '100%', height: '100%' },
               Platform.OS === 'web' && ({
                 scrollSnapType: 'x mandatory',
-                WebkitOverflowScrolling: 'touch',
+                WebkitScrollSnapType: 'x mandatory',
+                overscrollBehaviorX: 'contain',
+                touchAction: 'pan-x pan-y',
                 scrollbarWidth: 'none',
                 msOverflowStyle: 'none',
               } as any),
@@ -589,7 +710,7 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
                   { width: cardWidth || 200, height: '100%' },
                   Platform.OS === 'web' && ({
                     scrollSnapAlign: 'start',
-                    scrollSnapStop: 'always',
+                    WebkitScrollSnapAlign: 'start',
                     flexShrink: 0,
                   } as any),
                 ]}

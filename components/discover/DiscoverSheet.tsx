@@ -45,7 +45,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Feather from '@expo/vector-icons/Feather';
-import { router } from 'expo-router';
+import { router, useGlobalSearchParams } from 'expo-router';
 import { SafeAreaProvider, initialWindowMetrics, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BRAND } from '@/lib/brand';
 import { buildTopicCovers } from '@/lib/discover';
@@ -417,6 +417,17 @@ function DiscoverSheetBody({ onClose }: { onClose: () => void }) {
   // photos cross-fade in after. Usually a cache hit anyway — Discover's idle
   // grid uses this exact key — so the wait is invisible.
   const [settled, setSettled] = useState(false);
+  const params = useGlobalSearchParams();
+  const activeBrowseChipId = useMemo(() => {
+    if (params.sort === 'newest') return 'new';
+    if (params.sort === 'popular') return 'trending';
+    if (params.sort === 'price_asc') return 'cheapest';
+    if (params.tab === 'aesthetics') return 'aesthetics';
+    if (params.tab === 'brands') return 'brands';
+    if (params.tab === 'users') return 'sellers';
+    return null;
+  }, [params.sort, params.tab]);
+
   useEffect(() => {
     // Backstop timer alongside the interaction handle: if any animation handle
     // leaks, runAfterInteractions never fires and the Topics tiles would sit
@@ -595,7 +606,12 @@ function DiscoverSheetBody({ onClose }: { onClose: () => void }) {
           keyboardDismissMode="on-drag"
           contentContainerStyle={{ paddingBottom: 24 + insets.bottom }}
         >
-          <SearchLanding covers={covers} onBrowse={onBrowse} onTopic={onTopic} />
+          <SearchLanding
+            covers={covers}
+            onBrowse={onBrowse}
+            onTopic={onTopic}
+            activeChipId={activeBrowseChipId}
+          />
         </ScrollView>
       )}
     </View>

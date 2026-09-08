@@ -42,3 +42,19 @@ export function countActiveSearchFilters(f: SearchFilterState): number {
   if (f.sort && f.sort !== 'popular') count += 1;
   return count;
 }
+
+export function normalizeCustomPrice(
+  customMin: string | null | undefined,
+  customMax: string | null | undefined,
+): { priceMin: number | null; priceMax: number | null } {
+  const minVal = customMin?.trim() ? parseFloat(customMin) : null;
+  const maxVal = customMax?.trim() ? parseFloat(customMax) : null;
+  let priceMin = minVal !== null && !isNaN(minVal) ? Math.max(0, minVal) : null;
+  let priceMax = maxVal !== null && !isNaN(maxVal) ? Math.max(0, maxVal) : null;
+  if (priceMin !== null && priceMax !== null && priceMin > priceMax) {
+    const temp = priceMin;
+    priceMin = priceMax;
+    priceMax = temp;
+  }
+  return { priceMin, priceMax };
+}

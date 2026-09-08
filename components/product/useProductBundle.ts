@@ -65,13 +65,13 @@ export function useProductBundle({
   }, []);
 
   const handleBuyBundle = useCallback(
-    (total: number, selectedItemIds?: string[]) => {
+    (_total: number, selectedItemIds?: string[]) => {
       tap('medium');
       if (!user) {
         guestGate.prompt({
-          title: 'Buy bundle',
-          message: 'Create a free account to bundle items and check out.',
-          icon: 'shopping-bag',
+          title: 'Sign in to bundle',
+          message: 'Create a free account to buy bundled items with a discount.',
+          icon: 'package',
         });
         return;
       }
@@ -85,9 +85,7 @@ export function useProductBundle({
         return;
       }
       const ids = selectedItemIds ?? Array.from(selectedBundleIds);
-      const params: Record<string, string> = {
-        bundle_total: total.toFixed(2),
-      };
+      const params: Record<string, string> = {};
       if (ids.length > 0) {
         params.bundle_ids = ids.join(',');
       }

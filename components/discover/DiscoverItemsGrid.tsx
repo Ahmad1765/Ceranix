@@ -24,10 +24,8 @@ import {
   ShopByBrandRail,
 } from './EditorialFeed';
 import { GridSkeleton, RailSkeleton } from './DiscoverSkeletons';
-import {
-  SearchFilterChips,
-  type SearchFilterState,
-} from './SearchFilterChips';
+import { SearchFilterChips } from './SearchFilterChips';
+import type { SearchFilterState } from '@/lib/searchFilters';
 import {
   CATEGORY_TILES,
   SORT_OPTIONS,
@@ -82,7 +80,6 @@ type DiscoverItemsGridProps = {
   searchFilters: SearchFilterState;
   onUpdateFilter: (updater: (prev: SearchFilterState) => SearchFilterState) => void;
   onResetFilters: () => void;
-  activeFilterCount: number;
 };
 
 export const DiscoverItemsGrid = memo(function DiscoverItemsGrid({
@@ -128,7 +125,6 @@ export const DiscoverItemsGrid = memo(function DiscoverItemsGrid({
   searchFilters,
   onUpdateFilter,
   onResetFilters,
-  activeFilterCount,
 }: DiscoverItemsGridProps) {
 
   const displayResults = idle ? gridResults : results;
@@ -293,8 +289,10 @@ export const DiscoverItemsGrid = memo(function DiscoverItemsGrid({
                       style={({ pressed }) => ({
                         paddingHorizontal: 14,
                         paddingVertical: 8,
-                        borderRadius: 999,
-                        backgroundColor: on ? colors.purple : colors.panel,
+                        borderRadius: radii.pill,
+                        borderWidth: 1,
+                        borderColor: on ? colors.purple : colors.hair,
+                        backgroundColor: on ? colors.purple : (pressed ? colors.selected : 'transparent'),
                         transform: [{ scale: pressed ? 0.96 : 1 }],
                       })}
                     >
@@ -329,10 +327,10 @@ export const DiscoverItemsGrid = memo(function DiscoverItemsGrid({
                     style={({ pressed }) => ({
                       paddingHorizontal: 12,
                       paddingVertical: 7,
-                      borderRadius: 999,
+                      borderRadius: radii.pill,
                       borderWidth: 1,
                       borderColor: on ? colors.purple : colors.hair,
-                      backgroundColor: on ? colors.purpleSoft : colors.white,
+                      backgroundColor: on ? colors.purpleSoft : (pressed ? colors.selected : 'transparent'),
                       transform: [{ scale: pressed ? 0.96 : 1 }],
                     })}
                   >

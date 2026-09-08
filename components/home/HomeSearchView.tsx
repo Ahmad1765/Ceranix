@@ -42,12 +42,12 @@ import { useSavedSearchesQuery } from '@/lib/queries/useFeedQueries';
 import { queryClient } from '@/lib/queryClient';
 import { qk } from '@/lib/queries/keys';
 import { PreSearchSuggestions } from './PreSearchSuggestions';
+import { SearchFilterChips } from '@/components/discover';
 import {
-  SearchFilterChips,
   type SearchFilterState,
   EMPTY_SEARCH_FILTERS,
   countActiveSearchFilters,
-} from '@/components/discover';
+} from '@/lib/searchFilters';
 import { ListingCard } from '@/components/ListingCard';
 import { useGridDimensions } from '@/lib/responsive';
 import { radii, type as typography } from '@/lib/theme';
@@ -179,26 +179,33 @@ export const HomeSearchView = memo(function HomeSearchView({
   }, [query, searchFilters]);
 
   const isSaved = useMemo(() => {
-    const { key, query: qText } = effectiveSearchInfo;
+    const { key, label } = effectiveSearchInfo;
     if (localSavedKeys.has(key)) return true;
-    if (qText && savedSearchesQ.data) {
-      const qNorm = qText.toLowerCase();
-      if (
-        savedSearchesQ.data.some(
+    if (savedSearchesQ.data) {
+      const actualQuery = query.trim() || null;
+      if (actualQuery) {
+        const qNorm = actualQuery.toLowerCase();
+        return savedSearchesQ.data.some(
           (s) =>
             s.query?.trim().toLowerCase() === qNorm ||
             s.label?.trim().toLowerCase() === qNorm,
-        )
-      ) {
-        return true;
+        );
       }
+      const catNorm = searchFilters.category?.toLowerCase() || null;
+      const labelNorm = label.toLowerCase();
+      return savedSearchesQ.data.some(
+        (s) =>
+          (!s.query || s.query.trim() === '') &&
+          (catNorm ? s.category?.toLowerCase() === catNorm : !s.category) &&
+          s.label?.trim().toLowerCase() === labelNorm,
+      );
     }
     return false;
-  }, [effectiveSearchInfo, localSavedKeys, savedSearchesQ.data]);
+  }, [effectiveSearchInfo, localSavedKeys, query, savedSearchesQ.data, searchFilters.category]);
 
   const handleToggleSaveSearch = useCallback(async () => {
     haptic();
-    const { key, label, query: qText } = effectiveSearchInfo;
+    const { key, label } = effectiveSearchInfo;
     const currentlySaved = isSaved;
     const nextSaved = !currentlySaved;
 
@@ -232,12 +239,23 @@ export const HomeSearchView = memo(function HomeSearchView({
     // If authenticated, sync with Supabase
     if (user?.id) {
       try {
-        const qNorm = qText.toLowerCase();
-        const existing = savedSearchesQ.data?.find(
-          (s) =>
-            s.query?.trim().toLowerCase() === qNorm ||
-            s.label?.trim().toLowerCase() === qNorm,
-        );
+        const actualQuery = query.trim() || null;
+        const existing = savedSearchesQ.data?.find((s) => {
+          if (actualQuery) {
+            const qNorm = actualQuery.toLowerCase();
+            return (
+              s.query?.trim().toLowerCase() === qNorm ||
+              s.label?.trim().toLowerCase() === qNorm
+            );
+          }
+          const catNorm = searchFilters.category?.toLowerCase() || null;
+          const labelNorm = label.toLowerCase();
+          return (
+            (!s.query || s.query.trim() === '') &&
+            (catNorm ? s.category?.toLowerCase() === catNorm : !s.category) &&
+            s.label?.trim().toLowerCase() === labelNorm
+          );
+        });
 
         if (currentlySaved && existing) {
           await deleteSavedSearch(existing.id);
@@ -245,7 +263,7 @@ export const HomeSearchView = memo(function HomeSearchView({
         } else if (!currentlySaved) {
           await createSavedSearch({
             userId: user.id,
-            query: qText,
+            query: actualQuery,
             category: searchFilters.category || null,
             gender: null,
             label,
@@ -256,7 +274,7 @@ export const HomeSearchView = memo(function HomeSearchView({
         console.warn('[saved-searches] sync error', err);
       }
     }
-  }, [effectiveSearchInfo, isSaved, user, savedSearchesQ.data, searchFilters, toast]);
+  }, [effectiveSearchInfo, isSaved, user, savedSearchesQ.data, query, searchFilters, toast]);
 
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
@@ -430,6 +448,7 @@ export const HomeSearchView = memo(function HomeSearchView({
         return;
       }
 
+      if (searchRequestIdRef.current !== requestId) return;
       setLoading(true);
 
       try {
@@ -591,10 +610,8 @@ export const HomeSearchView = memo(function HomeSearchView({
       addSearch(term);
       setHasSubmitted(true);
       Keyboard.dismiss();
-      const requestId = ++searchRequestIdRef.current;
-      runSearch(term, requestId);
     },
-    [addSearch, runSearch],
+    [addSearch],
   );
 
   // Arrow click to populate search bar for query refinement
@@ -620,10 +637,8 @@ export const HomeSearchView = memo(function HomeSearchView({
       }
       setHasSubmitted(true);
       Keyboard.dismiss();
-      const requestId = ++searchRequestIdRef.current;
-      runSearch(term, requestId);
     },
-    [activeTab, handleTabPress, addSearch, runSearch],
+    [activeTab, handleTabPress, addSearch],
   );
 
   const handleSubmitSearch = useCallback(() => {
@@ -632,10 +647,8 @@ export const HomeSearchView = memo(function HomeSearchView({
       addSearch(trimmed, activeTab);
       setHasSubmitted(true);
       Keyboard.dismiss();
-      const requestId = ++searchRequestIdRef.current;
-      runSearch(trimmed, requestId);
     }
-  }, [query, activeTab, addSearch, runSearch]);
+  }, [query, activeTab, addSearch]);
 
   // ── Render Seller Row (Exact match to Image 2) ─────────────────────────────
   const renderSellerItem = useCallback(

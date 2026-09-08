@@ -136,12 +136,18 @@ export async function getOrCreateConversation(args: {
   }
 
   // Direct user-to-user conversation (no listing)
-  const { data: existing } = await supabase
+  const { data: existingRows, error: lookupError } = await supabase
     .from('conversations')
     .select(CONVERSATION_SELECT)
     .is('listing_id', null)
     .or(`and(buyer_id.eq.${buyerId},seller_id.eq.${sellerId}),and(buyer_id.eq.${sellerId},seller_id.eq.${buyerId})`)
-    .maybeSingle();
+    .order('updated_at', { ascending: false })
+    .limit(1);
+  if (lookupError) {
+    console.warn('[chat] getOrCreateConversation direct lookup', lookupError.message);
+    return null;
+  }
+  const existing = existingRows?.[0];
   if (existing) return existing as unknown as ConversationRow;
 
   const { data: created, error } = await supabase
@@ -235,7 +241,7 @@ export async function sendOffer(args: {
         currency: 'PKR',
         note: args.note?.trim() || null,
         is_bundle: isBundle,
-        bundle_item_ids: args.bundleItemIds ?? null,
+        bundle_item_ids: args.bundleItemIds ?? undefined,
         bundle_count: count,
       },
       offer_status: 'pending',
@@ -478,4 +484,12 @@ export function otherParticipant(
   if (conv.buyer_id === userId) return conv.seller;
   if (conv.seller_id === userId) return conv.buyer;
   return null;
+}
+
+/** A conversation is "transactional" (buying/selling) when it is tied to a
+ *  listing. Offers can only be sent inside listing-based conversations (the
+ *  `canOffer` guard and all creation flows enforce this), so `listing_id` is
+ *  the stable, authoritative signal — no text heuristics needed. */
+export function isTransactionalConversation(conv: ConversationRow): boolean {
+  return !!conv.listing_id;
 }

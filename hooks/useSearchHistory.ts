@@ -102,10 +102,11 @@ export function useSearchHistory() {
     };
   }, []);
 
-  const addSearch = useCallback((term: string, tab: SearchTabType = 'listings') => {
+  const addSearch = useCallback(async (term: string, tab: SearchTabType = 'listings') => {
     const trimmed = term.trim();
     if (!trimmed) return;
 
+    await hydrateHistory();
     const filtered = memoryHistory.filter(
       (item) => item.term.toLowerCase() !== trimmed.toLowerCase(),
     );
@@ -113,8 +114,9 @@ export function useSearchHistory() {
     notifySubscribers(next);
   }, []);
 
-  const removeSearch = useCallback((term: string) => {
+  const removeSearch = useCallback(async (term: string) => {
     const trimmed = term.trim();
+    await hydrateHistory();
     const next = memoryHistory.filter(
       (item) => item.term.toLowerCase() !== trimmed.toLowerCase(),
     );

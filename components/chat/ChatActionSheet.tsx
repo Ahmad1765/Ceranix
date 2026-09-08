@@ -46,10 +46,12 @@ export function ChatActionSheet({
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const isClosingRef = useRef(false);
   const animGenerationRef = useRef(0);
+  const isOpenRef = useRef(false);
 
   const dismiss = useCallback(() => {
     if (isClosingRef.current) return;
     isClosingRef.current = true;
+    isOpenRef.current = false;
     const animId = ++animGenerationRef.current;
 
     Animated.parallel([
@@ -71,8 +73,11 @@ export function ChatActionSheet({
     });
   }, [translateY, backdropOpacity, onClose]);
 
+  // Entrance animation effect: runs only when transitioning to visible
   useEffect(() => {
     if (visible) {
+      if (isOpenRef.current) return;
+      isOpenRef.current = true;
       isClosingRef.current = false;
       ++animGenerationRef.current;
       setInternalVisible(true);
@@ -92,10 +97,17 @@ export function ChatActionSheet({
           useNativeDriver: Platform.OS !== 'web',
         }),
       ]).start();
-    } else if (internalVisible && !isClosingRef.current) {
+    } else {
+      isOpenRef.current = false;
+    }
+  }, [visible, translateY, backdropOpacity]);
+
+  // Dismissal effect: triggers exit animation when parent sets visible to false
+  useEffect(() => {
+    if (!visible && internalVisible && !isClosingRef.current) {
       dismiss();
     }
-  }, [visible, internalVisible, dismiss, translateY, backdropOpacity]);
+  }, [visible, internalVisible, dismiss]);
 
   const dismissRef = useRef(dismiss);
   useEffect(() => {

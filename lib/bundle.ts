@@ -79,3 +79,89 @@ export function computeBundlePricing(
 
   return { itemCount, subtotal, tier, pct, qualifies, savings, total, progress, nextTier };
 }
+
+/**
+ * Calculates 10% and 20% bundle or single-item offer presets against baseReferencePrice.
+ */
+export function calculateOfferPresets(baseReferencePrice: number): {
+  preset10: number;
+  preset20: number;
+} {
+  if (!Number.isFinite(baseReferencePrice) || baseReferencePrice <= 0) {
+    return { preset10: 0, preset20: 0 };
+  }
+  return {
+    preset10: Math.max(1, Math.round(baseReferencePrice * 0.9)),
+    preset20: Math.max(1, Math.round(baseReferencePrice * 0.8)),
+  };
+}
+
+/**
+ * Validates an offer amount:
+ * - Must be a finite positive number.
+ * - For bundles: ceiling is baseReferencePrice (amountNum <= baseReferencePrice).
+ * - For non-bundles: ceiling is listing.price (amountNum < listingPrice).
+ */
+export function isOfferAmountValid({
+  amountNum,
+  isBundle,
+  baseReferencePrice,
+  listingPrice,
+}: {
+  amountNum: number;
+  isBundle: boolean;
+  baseReferencePrice: number;
+  listingPrice?: number;
+}): boolean {
+  return (
+    Number.isFinite(amountNum) &&
+    amountNum > 0 &&
+    (isBundle ? amountNum <= baseReferencePrice : !listingPrice || amountNum < listingPrice)
+  );
+}
+
+/**
+ * Sanitizes bundle item IDs from a comma-separated query param string:
+ * - Drops empty tokens
+ * - Strips out the primary listing ID (if present) to prevent self-bundling
+ * - Strips out any secondary listingId match
+ * - Deduplicates remaining item IDs
+ */
+export function sanitizeBundleItemIds(
+  bundleIdsParam: string | null | undefined,
+  primaryId?: string | null,
+  listingId?: string | null,
+): string[] {
+  if (!bundleIdsParam || typeof bundleIdsParam !== 'string') return [];
+  const pId = primaryId ? String(primaryId) : '';
+  const lId = listingId ? String(listingId) : '';
+  const raw = bundleIdsParam.split(',').filter(Boolean);
+  return Array.from(
+    new Set(raw.filter((itemId) => itemId !== pId && (!lId || itemId !== lId))),
+  );
+}
+
+/**
+ * Computes the item price for checkout:
+ * - If an offer amount is accepted/present, that takes precedence.
+ * - If a bundle: uses recomputed bundleCalculationTotal (falls back to listing price if missing).
+ * - If non-bundle: uses listing price.
+ */
+export function computeCheckoutItemPrice({
+  offerAmount,
+  isBundle,
+  bundleCalculationTotal,
+  listingPrice,
+}: {
+  offerAmount: number | null;
+  isBundle: boolean;
+  bundleCalculationTotal?: number | null;
+  listingPrice: number;
+}): number {
+  return (
+    offerAmount ??
+    (isBundle
+      ? bundleCalculationTotal ?? Number(listingPrice ?? 0)
+      : Number(listingPrice ?? 0))
+  );
+}

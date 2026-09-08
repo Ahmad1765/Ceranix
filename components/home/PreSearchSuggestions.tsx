@@ -5,7 +5,14 @@ import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/context/ThemeContext';
 import { HIT_SLOP_8 } from '@/lib/responsive';
-import { type SearchSuggestion, splitSuggestionHighlight } from '@/lib/searchSuggestions';
+import {
+  type SearchSuggestion,
+  splitSuggestionHighlight,
+  resolveSuggestions,
+  resolvePreSearchSuggestions,
+} from '@/lib/searchSuggestions';
+
+export { resolveSuggestions, resolvePreSearchSuggestions };
 
 function haptic() {
   if (Platform.OS !== 'web') {
@@ -44,19 +51,9 @@ export const PreSearchSuggestions = memo(function PreSearchSuggestions({
     [onPopulate],
   );
 
-  const cleanQuery = query?.trim() ?? '';
-
   const displaySuggestions = useMemo<SearchSuggestion[]>(() => {
-    if (suggestions.length > 0) return suggestions;
-    if (!cleanQuery) return [];
-    return [
-      {
-        id: `fallback-${cleanQuery}`,
-        text: cleanQuery,
-        parts: splitSuggestionHighlight(cleanQuery, cleanQuery),
-      },
-    ];
-  }, [suggestions, cleanQuery]);
+    return resolveSuggestions(query, suggestions);
+  }, [suggestions, query]);
 
   if (displaySuggestions.length === 0) {
     return null;

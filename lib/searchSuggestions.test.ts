@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   getSearchSuggestions,
   splitSuggestionHighlight,
+  resolveSuggestions,
 } from './searchSuggestions';
 
 describe('searchSuggestions engine', () => {
@@ -101,19 +102,6 @@ describe('splitSuggestionHighlight', () => {
 });
 
 describe('PreSearchSuggestions fallback resolution', () => {
-  const resolveSuggestions = (query?: string, suggestions: any[] = []) => {
-    const cleanQuery = query?.trim() ?? '';
-    if (suggestions.length > 0) return suggestions;
-    if (!cleanQuery) return [];
-    return [
-      {
-        id: `fallback-${cleanQuery}`,
-        text: cleanQuery,
-        parts: splitSuggestionHighlight(cleanQuery, cleanQuery),
-      },
-    ];
-  };
-
   it('renders fallback row when suggestions is empty for non-empty query', () => {
     const result = resolveSuggestions('vintage jacket', []);
     expect(result).toHaveLength(1);

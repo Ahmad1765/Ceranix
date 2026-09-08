@@ -102,7 +102,7 @@ export default defineConfig({
     {
       name: 'chromium-iphone-se',
       use: { ...devices['iPhone SE'], browserName: 'chromium', channel: 'chromium' },
-      testMatch: /(tab-navigation|responsive)\.spec\.ts$/,
+      testMatch: /(tab-navigation|responsive|product-slider-iphone)\.spec\.ts$/,
     },
     // Tablet — landscape iPad-ish viewport. Layout shifts to 3+ columns here.
     {

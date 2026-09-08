@@ -182,16 +182,20 @@ const SEARCH_STOP_WORDS = new Set([
   'from',
 ]);
 
-function getSearchTokenVariants(token: string): string[] {
+export function getSearchTokenVariants(token: string): string[] {
   const t = token.toLowerCase().trim();
   if (!t) return [];
   const variants = new Set<string>([t]);
 
   if (t.endsWith('ies') && t.length > 4) {
     variants.add(t.slice(0, -3) + 'y');
+  } else if (t.endsWith('ss')) {
+    variants.add(t + 'es');
   } else if (t.endsWith('es') && t.length > 3) {
     variants.add(t.slice(0, -2));
-    variants.add(t.slice(0, -1));
+    if (!t.endsWith('sses')) {
+      variants.add(t.slice(0, -1));
+    }
   } else if (t.endsWith('s') && t.length > 3 && !t.endsWith('ss')) {
     variants.add(t.slice(0, -1));
   } else {
@@ -235,6 +239,10 @@ function scoreListingRelevance(listing: Listing, rawQuery: string, tokens: strin
   score += Math.min(15, (listing.likes ?? 0) * 0.1);
   return score;
 }
+
+// Bounded candidate pool cap to prevent unbounded full-table fetches
+// while providing enough candidates for client-side relevance ranking.
+export const CANDIDATE_CAP = 200;
 
 // Server-side search across the WHOLE catalog (title, brand, description, tags, category, subcategory).
 // Supports multi-token conjunctions, word stemming, and client-side relevance scoring.
@@ -287,7 +295,8 @@ export async function searchListings(opts: {
 
     let { data, error } = await q
       .order('likes', { ascending: false, nullsFirst: false })
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(CANDIDATE_CAP);
 
     // Fallback: If strict multi-token AND returned 0 results, fall back to matching primary token
     if ((!data || data.length === 0) && tokens.length > 1) {
@@ -320,7 +329,8 @@ export async function searchListings(opts: {
 
         const fallbackRes = await fallbackQ
           .order('likes', { ascending: false, nullsFirst: false })
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false })
+          .limit(CANDIDATE_CAP);
 
         if (!fallbackRes.error && fallbackRes.data) {
           data = fallbackRes.data;

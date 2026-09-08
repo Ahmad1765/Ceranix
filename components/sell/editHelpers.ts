@@ -4,38 +4,30 @@ import type { SellFormValues, ParcelSize } from '@/lib/schemas/sell';
 import { queryClient } from '@/lib/queryClient';
 import {
   qk,
-  MY_FEED_LISTINGS_PREFIX,
-  HOME_FEED_PREFIX,
-  FEED_LISTINGS_PREFIX,
-  USER_LISTINGS_PREFIX,
-  SAVED_LISTINGS_PREFIX,
-  LIKED_LISTINGS_PREFIX,
-  SELLER_OTHER_LISTINGS_PREFIX,
-  SIMILAR_LISTINGS_PREFIX,
-  TAG_LISTINGS_PREFIX,
-  PRICE_DROPS_PREFIX,
-  NEW_FROM_FOLLOWED_PREFIX,
+  LISTING_QUERY_PREFIXES,
 } from '@/lib/queries/keys';
 import type { QueryClient } from '@tanstack/react-query';
 
-export const DEFAULT_SELL_VALUES: SellFormValues = {
-  slots: [],
-  title: '',
-  description: '',
-  price: '',
-  brand: '',
-  size: '',
-  condition: 'good',
-  category: 'clothing',
-  subcategory: null,
-  color: null,
-  gender: 'women',
-  tags: [],
-  parcelSize: null,
-};
+export function createDefaultSellValues(): SellFormValues {
+  return {
+    slots: [],
+    title: '',
+    description: '',
+    price: '',
+    brand: '',
+    size: '',
+    condition: 'good',
+    category: 'clothing',
+    subcategory: null,
+    color: null,
+    gender: 'women',
+    tags: [],
+    parcelSize: null,
+  };
+}
 
 export function listingToSellFormValues(listing: Listing | null | undefined): SellFormValues {
-  if (!listing) return DEFAULT_SELL_VALUES;
+  if (!listing) return createDefaultSellValues();
   const initialSlots: PhotoSlot[] = (listing.images ?? []).filter(Boolean).map((url, i) => ({
     id: `existing-${i}-${url}`,
     original: { uri: url, base64: null },
@@ -89,21 +81,7 @@ export function patchListingInCache(
   };
 
   // Synchronously update all feed and listing queries in memory using listing query prefixes:
-  const listingPrefixes = [
-    MY_FEED_LISTINGS_PREFIX,
-    HOME_FEED_PREFIX,
-    FEED_LISTINGS_PREFIX,
-    USER_LISTINGS_PREFIX,
-    SAVED_LISTINGS_PREFIX,
-    LIKED_LISTINGS_PREFIX,
-    SELLER_OTHER_LISTINGS_PREFIX,
-    SIMILAR_LISTINGS_PREFIX,
-    TAG_LISTINGS_PREFIX,
-    PRICE_DROPS_PREFIX,
-    NEW_FROM_FOLLOWED_PREFIX,
-  ];
-
-  for (const prefix of listingPrefixes) {
+  for (const prefix of LISTING_QUERY_PREFIXES) {
     qc.setQueriesData({ queryKey: [prefix] }, patchData);
   }
 }

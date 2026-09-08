@@ -42,9 +42,6 @@ export {
 } from './useDiscoverSearch';
 export {
   SearchFilterChips,
-  EMPTY_SEARCH_FILTERS,
-  countActiveSearchFilters,
-  type SearchFilterState,
   type SearchFilterChipsProps,
 } from './SearchFilterChips';
 export { useSheetSearchFocus } from './useSheetSearchFocus';

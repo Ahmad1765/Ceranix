@@ -12,16 +12,24 @@
 // Presentational: every tap emits a typed action the host applies. Deliberately
 // un-animated — see the note on the entrance animation below.
 
-import { memo, useCallback } from 'react';
-import { View, Pressable, useWindowDimensions } from 'react-native';
+import { memo, useCallback, useState, useEffect } from 'react';
+import { View, Pressable, useWindowDimensions, Platform } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
+import * as Haptics from 'expo-haptics';
 import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 import { CATEGORIES, type CategoryId } from '@/lib/categories';
 import { colors, radii, type } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import type { SortKey } from '@/lib/listings';
 import type { DiscoverTab } from './SearchTabs';
+
+function haptic() {
+  if (Platform.OS !== 'web') {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  }
+}
 
 const PAD = 16;
 const GAP = 10;
@@ -82,24 +90,46 @@ export function SearchLanding({
   covers,
   onBrowse,
   onTopic,
+  activeChipId,
 }: {
   /** category id → a live cover shot, so tiles show real stock, not clip art. */
   covers: Partial<Record<string, string>>;
   onBrowse: (action: BrowseAction) => void;
   onTopic: (action: TopicAction) => void;
+  activeChipId?: string | null;
 }) {
   // Tile width in px rather than '48%' — a percentage width sharing a
   // flex-wrap row with `gap` resolves too narrow on native (RN 0.81's Yoga)
   // and packs three tiles per row. Same fix as AestheticsPanel.
   const { width: winWidth } = useWindowDimensions();
   const tileWidth = (winWidth - PAD * 2 - GAP) / 2;
+  const [selectedId, setSelectedId] = useState<string | null>(activeChipId ?? null);
+
+  useEffect(() => {
+    if (activeChipId !== undefined) {
+      setSelectedId(activeChipId);
+    }
+  }, [activeChipId]);
+
+  const handleSelectChip = useCallback(
+    (action: BrowseAction, id: string) => {
+      setSelectedId(id);
+      onBrowse(action);
+    },
+    [onBrowse],
+  );
 
   return (
     <View style={{ paddingHorizontal: PAD, marginTop: 20 }}>
       <SectionLabel>Browse</SectionLabel>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
         {BROWSE_CHIPS.map((c) => (
-          <BrowseChipView key={c.id} chip={c} onSelect={onBrowse} />
+          <BrowseChipView
+            key={c.id}
+            chip={c}
+            selected={selectedId === c.id}
+            onSelect={handleSelectChip}
+          />
         ))}
       </View>
 
@@ -148,33 +178,46 @@ function SectionLabel({ children }: { children: string }) {
 // layout property — so it composites instead of triggering layout.
 const BrowseChipView = memo(function BrowseChipView({
   chip,
+  selected,
   onSelect,
 }: {
   chip: ChipDef;
-  onSelect: (action: BrowseAction) => void;
+  selected: boolean;
+  onSelect: (action: BrowseAction, chipId: string) => void;
 }) {
-  const onPress = useCallback(() => onSelect(chip.action), [onSelect, chip.action]);
+  const { theme } = useTheme();
+  const [hovered, setHovered] = useState(false);
+  const onPress = useCallback(() => {
+    haptic();
+    onSelect(chip.action, chip.id);
+  }, [onSelect, chip.action, chip.id]);
+
   return (
     <Pressable
       onPress={onPress}
+      onHoverIn={() => setHovered(true)}
+      onHoverOut={() => setHovered(false)}
       accessibilityRole="button"
       accessibilityLabel={`Browse ${chip.label.toLowerCase()}`}
-      style={({ pressed }) => ({
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        paddingVertical: 8,
-        paddingLeft: 10,
-        paddingRight: 13,
-        borderRadius: radii.lg,
-        borderWidth: 1,
-        borderColor: colors.hair,
-        backgroundColor: pressed ? colors.panel : colors.white,
-        transform: [{ scale: pressed ? 0.97 : 1 }],
-      })}
+      accessibilityState={{ selected }}
+      style={({ pressed }) => {
+        const isFilled = selected || pressed || hovered;
+        return {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          paddingVertical: 8,
+          paddingHorizontal: 14,
+          borderRadius: radii.pill,
+          borderWidth: 1,
+          borderColor: theme.border,
+          backgroundColor: isFilled ? theme.selected : 'transparent',
+          transform: [{ scale: pressed ? 0.96 : 1 }],
+        };
+      }}
     >
-      <Feather name={chip.icon} size={16} color={colors.purple} />
-      <Text style={{ fontSize: 13.5, fontFamily: type.family.sansBold, color: colors.ink }}>
+      <Feather name={chip.icon} size={13.5} color={colors.purple} />
+      <Text style={{ fontSize: 13, fontFamily: type.family.sansBold, color: theme.ink }}>
         {chip.label}
       </Text>
     </Pressable>

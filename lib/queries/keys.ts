@@ -14,8 +14,9 @@
 // clear: `qc.invalidateQueries({ queryKey: qk.profile(userId) })`.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type FeedTab = 'for_you' | 'popular';
-export type SortKey = 'newest' | 'price_asc' | 'price_desc' | 'popular';
+import type { FeedTab, SortKey } from '@/lib/listings';
+
+export type { FeedTab, SortKey };
 export type HomeFeedTab = FeedTab | 'following';
 
 export const listingKey = (id: string) => ['listing', id] as const;

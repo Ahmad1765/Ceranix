@@ -45,7 +45,7 @@ import {
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { SellFormSchema, type SellFormValues } from '@/lib/schemas/sell';
-import { DEFAULT_SELL_VALUES, listingToSellFormValues, patchListingInCache } from './editHelpers';
+import { createDefaultSellValues, listingToSellFormValues, patchListingInCache } from './editHelpers';
 
 const DISPLAY_BOLD = typography.family.sansBold;
 
@@ -390,7 +390,7 @@ function SellForm({
   };
 
   const resetForm = () => {
-    reset(DEFAULT_SELL_VALUES);
+    reset(createDefaultSellValues());
   };
 
   const canPublish =
@@ -480,9 +480,18 @@ function SellForm({
           tags: formData.tags || [],
         };
 
-        const result = await updateListing(editingListing.id, updatePayload);
-        if (!result.ok) {
-          throw new Error(result.error || 'Failed to update listing');
+        let result: { ok: boolean; error?: string; count?: number };
+        try {
+          result = await updateListing(editingListing.id, updatePayload);
+          if (!result.ok) {
+            throw new Error(result.error || 'Failed to update listing');
+          }
+        } catch (updateErr) {
+          const newlyUploadedUrls = uploadedNewImages.map((u) => u.url);
+          if (newlyUploadedUrls.length > 0) {
+            await deleteListingImages(newlyUploadedUrls).catch(() => {});
+          }
+          throw updateErr;
         }
 
         const currentUrlSet = new Set(finalUrls);

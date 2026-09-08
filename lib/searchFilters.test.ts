@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   EMPTY_SEARCH_FILTERS,
   countActiveSearchFilters,
+  normalizeCustomPrice,
   type SearchFilterState,
 } from './searchFilters';
 
@@ -53,18 +54,6 @@ describe('SearchFilterChips & State logic', () => {
   });
 
   it('normalizes and swaps custom price bounds correctly', () => {
-    const normalizeCustomPrice = (customMin: string, customMax: string) => {
-      const minVal = customMin.trim() ? parseFloat(customMin) : null;
-      const maxVal = customMax.trim() ? parseFloat(customMax) : null;
-      let priceMin = minVal !== null && !isNaN(minVal) ? Math.max(0, minVal) : null;
-      let priceMax = maxVal !== null && !isNaN(maxVal) ? Math.max(0, maxVal) : null;
-      if (priceMin !== null && priceMax !== null && priceMin > priceMax) {
-        const temp = priceMin;
-        priceMin = priceMax;
-        priceMax = temp;
-      }
-      return { priceMin, priceMax };
-    };
 
     // Swapping when min > max
     expect(normalizeCustomPrice('100', '20')).toEqual({ priceMin: 20, priceMax: 100 });

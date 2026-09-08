@@ -1,5 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
-import { computeBundlePricing } from '@/lib/bundle';
+import {
+  computeBundlePricing,
+  calculateOfferPresets,
+  isOfferAmountValid,
+  sanitizeBundleItemIds,
+  computeCheckoutItemPrice,
+} from '@/lib/bundle';
 import { sendOffer } from '@/lib/chat';
 
 vi.mock('@/lib/supabase', () => ({
@@ -99,46 +105,29 @@ describe('bundleFlow tests', () => {
 
   it('calculates 10% and 20% presets against full bundle total rather than single item price', () => {
     const bundleTotal = 4500;
-    const preset10 = Math.max(1, Math.round(bundleTotal * 0.9));
-    const preset20 = Math.max(1, Math.round(bundleTotal * 0.8));
+    const { preset10, preset20 } = calculateOfferPresets(bundleTotal);
 
     expect(preset10).toBe(4050);
     expect(preset20).toBe(3600);
   });
 
   it('validates bundle offers against baseReferencePrice ceiling and non-bundle against listing price', () => {
-    const isOfferValid = ({
-      amountNum,
-      isBundle,
-      baseReferencePrice,
-      listingPrice,
-    }: {
-      amountNum: number;
-      isBundle: boolean;
-      baseReferencePrice: number;
-      listingPrice?: number;
-    }) =>
-      Number.isFinite(amountNum) &&
-      amountNum > 0 &&
-      (isBundle ? amountNum <= baseReferencePrice : !listingPrice || amountNum < listingPrice);
-
     // Bundle offer: ceiling is baseReferencePrice (no greater than)
-    expect(isOfferValid({ amountNum: 4000, isBundle: true, baseReferencePrice: 4500 })).toBe(true);
-    expect(isOfferValid({ amountNum: 4500, isBundle: true, baseReferencePrice: 4500 })).toBe(true);
-    expect(isOfferValid({ amountNum: 4501, isBundle: true, baseReferencePrice: 4500 })).toBe(false);
-    expect(isOfferValid({ amountNum: 0, isBundle: true, baseReferencePrice: 4500 })).toBe(false);
+    expect(isOfferAmountValid({ amountNum: 4000, isBundle: true, baseReferencePrice: 4500 })).toBe(true);
+    expect(isOfferAmountValid({ amountNum: 4500, isBundle: true, baseReferencePrice: 4500 })).toBe(true);
+    expect(isOfferAmountValid({ amountNum: 4501, isBundle: true, baseReferencePrice: 4500 })).toBe(false);
+    expect(isOfferAmountValid({ amountNum: 0, isBundle: true, baseReferencePrice: 4500 })).toBe(false);
 
     // Non-bundle offer: ceiling is listing price (exclusive)
-    expect(isOfferValid({ amountNum: 2000, isBundle: false, baseReferencePrice: 2500, listingPrice: 2500 })).toBe(true);
-    expect(isOfferValid({ amountNum: 2500, isBundle: false, baseReferencePrice: 2500, listingPrice: 2500 })).toBe(false);
-    expect(isOfferValid({ amountNum: 3000, isBundle: false, baseReferencePrice: 2500, listingPrice: 2500 })).toBe(false);
+    expect(isOfferAmountValid({ amountNum: 2000, isBundle: false, baseReferencePrice: 2500, listingPrice: 2500 })).toBe(true);
+    expect(isOfferAmountValid({ amountNum: 2500, isBundle: false, baseReferencePrice: 2500, listingPrice: 2500 })).toBe(false);
+    expect(isOfferAmountValid({ amountNum: 3000, isBundle: false, baseReferencePrice: 2500, listingPrice: 2500 })).toBe(false);
   });
 
   it('sanitizes payment bundleItemIds by removing primary listing id and deduplicating', () => {
     const primaryId = 'base-123';
     const bundleIdsParam = 'base-123,item-456,item-789,item-456';
-    const raw = bundleIdsParam.split(',').filter(Boolean);
-    const sanitized = Array.from(new Set(raw.filter((itemId) => itemId !== primaryId)));
+    const sanitized = sanitizeBundleItemIds(bundleIdsParam, primaryId);
 
     expect(sanitized).toEqual(['item-456', 'item-789']);
 
@@ -162,26 +151,10 @@ describe('bundleFlow tests', () => {
   });
 
   it('computes itemPrice using recomputed bundle total rather than explicitBundleTotal param', () => {
-    const computeItemPrice = ({
-      offerAmount,
-      isBundle,
-      bundleCalculationTotal,
-      listingPrice,
-    }: {
-      offerAmount: number | null;
-      isBundle: boolean;
-      bundleCalculationTotal?: number | null;
-      listingPrice: number;
-    }) =>
-      offerAmount ??
-      (isBundle
-        ? bundleCalculationTotal ?? Number(listingPrice ?? 0)
-        : Number(listingPrice ?? 0));
-
     // Bundle with recomputed calculation: uses recomputed total regardless of route param
     const recomputedTotal = 4000;
     expect(
-      computeItemPrice({
+      computeCheckoutItemPrice({
         offerAmount: null,
         isBundle: true,
         bundleCalculationTotal: recomputedTotal,
@@ -191,7 +164,7 @@ describe('bundleFlow tests', () => {
 
     // Bundle with offer amount: offer amount takes precedence
     expect(
-      computeItemPrice({
+      computeCheckoutItemPrice({
         offerAmount: 3500,
         isBundle: true,
         bundleCalculationTotal: recomputedTotal,
@@ -201,7 +174,7 @@ describe('bundleFlow tests', () => {
 
     // Bundle fallback when recomputed total is null/undefined: falls back to listing price
     expect(
-      computeItemPrice({
+      computeCheckoutItemPrice({
         offerAmount: null,
         isBundle: true,
         bundleCalculationTotal: null,
@@ -211,7 +184,7 @@ describe('bundleFlow tests', () => {
 
     // Non-bundle: uses listing price
     expect(
-      computeItemPrice({
+      computeCheckoutItemPrice({
         offerAmount: null,
         isBundle: false,
         bundleCalculationTotal: recomputedTotal,

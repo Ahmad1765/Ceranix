@@ -18,7 +18,7 @@ test.describe('Discover search focus', () => {
     await page.goto('/');
     await waitForAppReady(page);
 
-    await page.getByRole('button', { name: /discover|search/i }).first().click();
+    await page.getByRole('button', { name: 'Discover' }).click();
 
     const activeTag = await page.evaluate(() => document.activeElement?.tagName ?? 'none');
     expect(activeTag).toBe('INPUT');
@@ -32,7 +32,7 @@ test.describe('Discover search focus', () => {
     await page.goto('/');
     await waitForAppReady(page);
 
-    await page.getByRole('button', { name: /discover|search/i }).first().click();
+    await page.getByRole('button', { name: 'Discover' }).click();
     await page.getByRole('button', { name: 'Browse lowest price' }).click();
 
     await expect(page).toHaveURL(/[?&]sort=price_asc/);
@@ -46,7 +46,7 @@ test.describe('Discover search focus', () => {
     await page.goto('/');
     await waitForAppReady(page);
 
-    await page.getByRole('button', { name: /discover|search/i }).first().click();
+    await page.getByRole('button', { name: 'Discover' }).click();
     await page.getByRole('button', { name: 'Browse Shoes' }).click();
 
     await expect(page).toHaveURL(/[?&]category=shoes/);

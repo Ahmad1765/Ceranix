@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   View,
   Pressable,
@@ -47,13 +47,14 @@ export function DropAlertSheet({ visible, userId, onClose, onCreated }: Props) {
   const toast = useToast();
   const [query, setQuery] = useState('');
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
 
   const reset = useCallback(() => {
     setQuery('');
   }, []);
 
   const handleClose = useCallback(() => {
-    if (saving) return;
+    if (savingRef.current || saving) return;
     reset();
     onClose();
   }, [reset, onClose, saving]);
@@ -65,7 +66,8 @@ export function DropAlertSheet({ visible, userId, onClose, onCreated }: Props) {
         toast.show('Type a brand or keyword', { variant: 'info', icon: 'alert-circle' });
         return;
       }
-      if (saving) return;
+      if (savingRef.current) return;
+      savingRef.current = true;
       setSaving(true);
       try {
         const row = await createSavedSearch({
@@ -90,10 +92,11 @@ export function DropAlertSheet({ visible, userId, onClose, onCreated }: Props) {
         captureError(e, { fn: 'dropAlert.create' });
         toast.show("Couldn't create the alert", { variant: 'default', icon: 'alert-triangle' });
       } finally {
+        savingRef.current = false;
         setSaving(false);
       }
     },
-    [userId, toast, reset, onCreated, onClose, saving],
+    [userId, toast, reset, onCreated, onClose],
   );
 
   const handleApply = useCallback(() => {
@@ -103,9 +106,7 @@ export function DropAlertSheet({ visible, userId, onClose, onCreated }: Props) {
   const filteredBrands = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return POPULAR_BRANDS;
-    const matches = POPULAR_BRANDS.filter((b) => b.toLowerCase().includes(q));
-    // If user's typed string isn't in popular brands, suggest adding it as custom query
-    return matches;
+    return POPULAR_BRANDS.filter((b) => b.toLowerCase().includes(q));
   }, [query]);
 
   return (

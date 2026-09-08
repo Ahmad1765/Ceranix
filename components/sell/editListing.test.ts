@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { QueryClient } from '@tanstack/react-query';
-import { listingToSellFormValues, patchListingInCache } from './editHelpers';
+import { createDefaultSellValues, listingToSellFormValues, patchListingInCache } from './editHelpers';
 import { qk } from '@/lib/queries/keys';
 import type { Listing } from '@/types';
 
@@ -13,6 +13,28 @@ vi.mock('@/lib/queryClient', () => ({
   },
 }));
 
+describe('createDefaultSellValues', () => {
+  it('returns default empty values', () => {
+    const values = createDefaultSellValues();
+    expect(values.title).toBe('');
+    expect(values.price).toBe('');
+    expect(values.slots).toEqual([]);
+    expect(values.tags).toEqual([]);
+    expect(values.condition).toBe('good');
+    expect(values.category).toBe('clothing');
+    expect(values.gender).toBe('women');
+    expect(values.parcelSize).toBeNull();
+  });
+
+  it('returns fresh array and object instances on every call', () => {
+    const first = createDefaultSellValues();
+    const second = createDefaultSellValues();
+    expect(first).not.toBe(second);
+    expect(first.slots).not.toBe(second.slots);
+    expect(first.tags).not.toBe(second.tags);
+  });
+});
+
 describe('listingToSellFormValues', () => {
   it('returns default empty values when no listing is provided', () => {
     const values = listingToSellFormValues(null);
@@ -22,6 +44,14 @@ describe('listingToSellFormValues', () => {
     expect(values.condition).toBe('good');
     expect(values.category).toBe('clothing');
     expect(values.gender).toBe('women');
+  });
+
+  it('returns fresh array instances on subsequent null/undefined calls', () => {
+    const first = listingToSellFormValues(null);
+    const second = listingToSellFormValues(undefined);
+    expect(first).not.toBe(second);
+    expect(first.slots).not.toBe(second.slots);
+    expect(first.tags).not.toBe(second.tags);
   });
 
   it('correctly maps a full existing listing into form values and photo slots', () => {

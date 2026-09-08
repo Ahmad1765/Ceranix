@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { View, ScrollView, Pressable } from 'react-native';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { View, ScrollView, Pressable, Platform } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
@@ -18,13 +18,120 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
   const srcWidth = thumbWidthFor(CARD_WIDTH);
   const { total: totalPrice } = priceBreakdown(item.price);
 
-  const armCarousel = () => {
+  const isSwipingOrDragging = useRef(false);
+  const lastDragEndTime = useRef(0);
+  const webScrollTimeoutRef = useRef<any>(null);
+  const containerRef = useRef<any>(null);
+  const touchStartPos = useRef({ x: 0, y: 0, time: 0 });
+  const hasTouchMoved = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      if (webScrollTimeoutRef.current) {
+        clearTimeout(webScrollTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const armCarousel = useCallback(() => {
     if (!carouselArmed) setCarouselArmed(true);
-  };
+  }, [carouselArmed]);
+
+  const handleTouchStart = useCallback(
+    (e: any) => {
+      armCarousel();
+      const touch = e.nativeEvent?.touches?.[0] || e.nativeEvent;
+      if (touch) {
+        touchStartPos.current = {
+          x: touch.pageX ?? touch.clientX ?? 0,
+          y: touch.pageY ?? touch.clientY ?? 0,
+          time: Date.now(),
+        };
+      }
+      hasTouchMoved.current = false;
+    },
+    [armCarousel],
+  );
+
+  const handleTouchMove = useCallback((e: any) => {
+    const touch = e.nativeEvent?.touches?.[0] || e.nativeEvent;
+    if (touch && touchStartPos.current.time > 0) {
+      const dx = Math.abs((touch.pageX ?? touch.clientX ?? 0) - touchStartPos.current.x);
+      const dy = Math.abs((touch.pageY ?? touch.clientY ?? 0) - touchStartPos.current.y);
+      if (dx > 6) {
+        hasTouchMoved.current = true;
+        isSwipingOrDragging.current = true;
+        lastDragEndTime.current = Date.now();
+      }
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback((e: any) => {
+    if (hasTouchMoved.current || isSwipingOrDragging.current) {
+      lastDragEndTime.current = Date.now();
+      if (webScrollTimeoutRef.current) {
+        clearTimeout(webScrollTimeoutRef.current);
+      }
+      webScrollTimeoutRef.current = setTimeout(() => {
+        isSwipingOrDragging.current = false;
+      }, 450);
+    }
+    hasTouchMoved.current = false;
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !containerRef.current) return;
+    const node = containerRef.current as any;
+    const target: HTMLElement | null =
+      typeof node.getScrollableNode === 'function'
+        ? node.getScrollableNode()
+        : node instanceof HTMLElement
+        ? node
+        : (node._innerViewRef ?? null);
+
+    if (!target) return;
+
+    const handleClickCapture = (e: MouseEvent) => {
+      if (isSwipingOrDragging.current || Date.now() - lastDragEndTime.current < 450) {
+        e.stopPropagation();
+        e.preventDefault();
+      }
+    };
+
+    target.addEventListener('click', handleClickCapture, true);
+    return () => {
+      target.removeEventListener('click', handleClickCapture, true);
+    };
+  }, []);
+
+  const handleScroll = useCallback((e: any) => {
+    setActiveIndex(Math.round(e.nativeEvent.contentOffset.x / CARD_WIDTH));
+    isSwipingOrDragging.current = true;
+    lastDragEndTime.current = Date.now();
+    if (webScrollTimeoutRef.current) {
+      clearTimeout(webScrollTimeoutRef.current);
+    }
+    webScrollTimeoutRef.current = setTimeout(() => {
+      isSwipingOrDragging.current = false;
+    }, 450);
+  }, []);
+
+  const handlePress = useCallback(() => {
+    if (isSwipingOrDragging.current || Date.now() - lastDragEndTime.current < 450) {
+      return;
+    }
+    onPress();
+  }, [onPress]);
 
   return (
-    <Pressable onPress={onPress} style={{ width: CARD_WIDTH, marginBottom: 18 }}>
+    <Pressable
+      testID="related-item-card"
+      onPress={handlePress}
+      style={{ width: CARD_WIDTH, marginBottom: 18 }}
+    >
       <View
+        ref={containerRef}
+        testID="related-item-carousel"
         style={{
           position: 'relative',
           width: CARD_WIDTH,
@@ -32,7 +139,16 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
           borderRadius: 14,
           overflow: 'hidden',
           backgroundColor: theme.panel,
+          ...(Platform.OS === 'web' && hasMultiple
+            ? ({
+                touchAction: 'pan-x pan-y',
+              } as any)
+            : {}),
         }}
+        onTouchStart={hasMultiple ? handleTouchStart : undefined}
+        onTouchMove={hasMultiple ? handleTouchMove : undefined}
+        onTouchEnd={hasMultiple ? handleTouchEnd : undefined}
+        onTouchCancel={hasMultiple ? handleTouchEnd : undefined}
       >
         {hasMultiple ? (
           <ScrollView
@@ -40,29 +156,75 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
             pagingEnabled
             showsHorizontalScrollIndicator={false}
             nestedScrollEnabled
-            onScroll={(e) =>
-              setActiveIndex(Math.round(e.nativeEvent.contentOffset.x / CARD_WIDTH))
-            }
-            onTouchStart={armCarousel}
-            onScrollBeginDrag={armCarousel}
+            onScroll={handleScroll}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onTouchCancel={handleTouchEnd}
+            onScrollBeginDrag={() => {
+              armCarousel();
+              isSwipingOrDragging.current = true;
+            }}
+            onScrollEndDrag={() => {
+              lastDragEndTime.current = Date.now();
+              if (webScrollTimeoutRef.current) {
+                clearTimeout(webScrollTimeoutRef.current);
+              }
+              webScrollTimeoutRef.current = setTimeout(() => {
+                isSwipingOrDragging.current = false;
+              }, 450);
+            }}
             scrollEventThrottle={16}
             disableIntervalMomentum
+            style={[
+              Platform.OS === 'web' && ({
+                scrollSnapType: 'x mandatory',
+                WebkitScrollSnapType: 'x mandatory',
+                overscrollBehaviorX: 'contain',
+                touchAction: 'pan-x pan-y',
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none',
+              } as any),
+            ]}
           >
             {item.images.map((uri, i) => {
               if (i !== 0 && !carouselArmed) {
-                return <View key={i} style={{ width: CARD_WIDTH, height: CARD_IMAGE_HEIGHT }} />;
+                return (
+                  <View
+                    key={i}
+                    style={[
+                      { width: CARD_WIDTH, height: CARD_IMAGE_HEIGHT },
+                      Platform.OS === 'web' && ({
+                        scrollSnapAlign: 'start',
+                        WebkitScrollSnapAlign: 'start',
+                        flexShrink: 0,
+                      } as any),
+                    ]}
+                  />
+                );
               }
               return (
-                <Image
+                <View
                   key={i}
-                  source={{ uri: getOptimizedImageUrl(uri, { width: srcWidth }) }}
-                  style={{ width: CARD_WIDTH, height: CARD_IMAGE_HEIGHT }}
-                  contentFit="cover"
-                  cachePolicy="memory-disk"
-                  recyclingKey={uri}
-                  transition={IMAGE_TRANSITION}
-                  priority={i === 0 ? 'normal' : 'low'}
-                />
+                  style={[
+                    { width: CARD_WIDTH, height: CARD_IMAGE_HEIGHT },
+                    Platform.OS === 'web' && ({
+                      scrollSnapAlign: 'start',
+                      WebkitScrollSnapAlign: 'start',
+                      flexShrink: 0,
+                    } as any),
+                  ]}
+                >
+                  <Image
+                    source={{ uri: getOptimizedImageUrl(uri, { width: srcWidth }) }}
+                    style={{ width: CARD_WIDTH, height: CARD_IMAGE_HEIGHT }}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                    recyclingKey={uri}
+                    transition={IMAGE_TRANSITION}
+                    priority={i === 0 ? 'normal' : 'low'}
+                  />
+                </View>
               );
             })}
           </ScrollView>

@@ -35,10 +35,29 @@ type Opts = {
 export function toSupabaseThumbnailUrl(url: string): string {
   if (!url || typeof url !== 'string') return '';
   if (!url.includes('/storage/v1/object/public/listing-images/')) return url;
-  if (url.includes('_thumb.')) return url;
-  const dot = url.lastIndexOf('.');
-  if (dot < 0) return `${url}_thumb`;
-  return `${url.slice(0, dot)}_thumb${url.slice(dot)}`;
+
+  try {
+    const parsed = new URL(url);
+    const { pathname } = parsed;
+    if (pathname.includes('_thumb.') || pathname.endsWith('_thumb')) return url;
+
+    const lastSlash = pathname.lastIndexOf('/');
+    const dot = pathname.lastIndexOf('.');
+    if (dot > lastSlash) {
+      parsed.pathname = `${pathname.slice(0, dot)}_thumb${pathname.slice(dot)}`;
+    } else {
+      parsed.pathname = `${pathname}_thumb`;
+    }
+    return parsed.toString();
+  } catch {
+    if (url.includes('_thumb.')) return url;
+    const lastSlash = url.lastIndexOf('/');
+    const dot = url.lastIndexOf('.');
+    if (dot > lastSlash) {
+      return `${url.slice(0, dot)}_thumb${url.slice(dot)}`;
+    }
+    return `${url}_thumb`;
+  }
 }
 
 export function getOptimizedImageUrl(
@@ -52,25 +71,22 @@ export function getOptimizedImageUrl(
     return url;
   }
 
-  // Fast check: only rewrite known CDN hosts that support parameter-based resizing
-  const isUnsplash =
-    url.startsWith('https://images.unsplash.com/') ||
-    url.startsWith('https://plus.unsplash.com/');
-  const isCloudinary = url.startsWith('https://res.cloudinary.com/');
-  const isPexels = url.startsWith('https://images.pexels.com/');
-  const isImgix = url.includes('.imgix.net');
-  const isSupabase = url.includes('.supabase.co');
-
-  if (!isUnsplash && !isCloudinary && !isPexels && !isImgix && !isSupabase) {
-    return url;
-  }
-
   try {
     const u = new URL(url);
+    const isSupabase = u.hostname === 'supabase.co' || u.hostname.endsWith('.supabase.co');
+    const isUnsplash =
+      u.hostname === 'images.unsplash.com' || u.hostname === 'plus.unsplash.com';
+    const isCloudinary = u.hostname === 'res.cloudinary.com';
+    const isPexels = u.hostname === 'images.pexels.com';
+    const isImgix = u.hostname.endsWith('.imgix.net');
+
+    if (!isUnsplash && !isCloudinary && !isPexels && !isImgix && !isSupabase) {
+      return url;
+    }
 
     if (
       SUPABASE_TRANSFORM_ENABLED &&
-      u.hostname.endsWith('.supabase.co') &&
+      isSupabase &&
       u.pathname.includes('/storage/v1/object/public/')
     ) {
       u.pathname = u.pathname.replace(
@@ -99,7 +115,7 @@ export function getOptimizedImageUrl(
       return url;
     }
 
-    if (u.hostname === 'images.unsplash.com' || u.hostname === 'plus.unsplash.com') {
+    if (isUnsplash) {
       u.searchParams.set('w', String(width));
       u.searchParams.set('q', String(quality));
       u.searchParams.set('auto', 'format');
@@ -107,14 +123,14 @@ export function getOptimizedImageUrl(
       return u.toString();
     }
 
-    if (u.hostname === 'images.pexels.com') {
+    if (isPexels) {
       u.searchParams.set('auto', 'compress');
       u.searchParams.set('cs', 'tinysrgb');
       u.searchParams.set('w', String(width));
       return u.toString();
     }
 
-    if (u.hostname.endsWith('.imgix.net')) {
+    if (isImgix) {
       u.searchParams.set('w', String(width));
       u.searchParams.set('q', String(quality));
       u.searchParams.set('auto', 'format');

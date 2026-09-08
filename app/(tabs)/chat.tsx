@@ -9,6 +9,7 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/lib/auth';
 import {
   subscribeToInbox,
+  isTransactionalConversation,
   type ConversationRow,
 } from '@/lib/chat';
 import {
@@ -23,12 +24,11 @@ import { colors, radii, shadow, type as typography } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { EmptyState } from '@/components/ui';
 import { InboxRow, InboxSkeleton } from '@/components/chat';
-import { ActivityFeed } from '@/components/activity';
 import { HIT_SLOP_8, useTabBarClearance } from '@/lib/responsive';
 import { PressableScale } from '@/components/PressableScale';
 
 type InboxTab = 'selling' | 'buying' | 'activity' | 'support';
-type ConversationTab = Exclude<InboxTab, 'activity' | 'support'>;
+type ConversationTab = Exclude<InboxTab, 'support'>;
 
 const EMPTY_CONVERSATIONS: ConversationRow[] = [];
 const keyById = (item: ConversationRow) => item.id;
@@ -191,6 +191,12 @@ function emptyStateFor(tab: ConversationTab) {
         title: 'No conversations yet',
         description: 'Found something you love? Tap message on the listing to chat.',
       };
+    case 'activity':
+      return {
+        icon: 'users' as const,
+        title: 'No direct messages yet',
+        description: 'When you message creators directly through their profile, they’ll appear here.',
+      };
   }
 }
 
@@ -262,8 +268,6 @@ function ConversationPage({
   );
 }
 
-const SUPPORT_THREAD_THRESHOLD = 10;
-
 // ── Working Support Hub Page ────────────────────────────────────────────────
 function SupportPage({
   data,
@@ -285,11 +289,6 @@ function SupportPage({
   const { theme } = useTheme();
   const [startingChat, setStartingChat] = useState(false);
 
-  const renderSupportItem = useCallback(
-    ({ item }: { item: ConversationRow }) => <InboxListRow conv={item} userId={userId} />,
-    [userId],
-  );
-
   const handleStartSupportChat = async (prompt?: string) => {
     if (startingChat) return;
     haptic();
@@ -305,6 +304,7 @@ function SupportPage({
         } else {
           router.push(`/conversation/${conv.id}` as any);
         }
+        setStartingChat(false);
       } else {
         setStartingChat(false);
         Alert.alert('Unable to start support chat', 'Please check your connection and try again.');
@@ -508,22 +508,12 @@ function SupportPage({
                 overflow: 'hidden',
               }}
             >
-              {data.length <= SUPPORT_THREAD_THRESHOLD ? (
-                data.map((conv, idx) => (
-                  <View key={conv.id}>
-                    <InboxListRow conv={conv} userId={userId} />
-                    {idx < data.length - 1 && <InboxSeparator />}
-                  </View>
-                ))
-              ) : (
-                <FlatList
-                  data={data}
-                  keyExtractor={keyById}
-                  renderItem={renderSupportItem}
-                  ItemSeparatorComponent={InboxSeparator}
-                  scrollEnabled={false}
-                />
-              )}
+              {data.map((conv, idx) => (
+                <View key={conv.id}>
+                  <InboxListRow conv={conv} userId={userId} />
+                  {idx < data.length - 1 && <InboxSeparator />}
+                </View>
+              ))}
             </View>
           </View>
         )}
@@ -708,23 +698,22 @@ export default function InboxScreen() {
   // Tab data partition:
   // - Selling: listing or offer chats where user is seller
   // - Buying: listing or offer chats where user is buyer
-  // - Support: chats involving Support Bot
   // - Activity: strictly direct user-to-user messages (not for buying or giving offers)
+  // - Support: chats involving Support Bot
   const pageData = useMemo<Record<ConversationTab | 'support', ConversationRow[]>>(() => {
     const uid = user?.id;
     if (!uid) {
-      return { selling: [], buying: [], support: [] };
+      return { selling: [], buying: [], activity: [], support: [] };
     }
-    const isOffer = (c: ConversationRow) => {
-      const msg = c.last_message?.trim().toLowerCase() || '';
-      return msg.startsWith('offer:') || msg.startsWith('offer ') || msg.includes('offer:');
-    };
     return {
       selling: conversations.filter(
-        (c) => c.seller_id === uid && (!!c.listing_id || isOffer(c)) && !isSupportConversation(c),
+        (c) => c.seller_id === uid && isTransactionalConversation(c) && !isSupportConversation(c),
       ),
       buying: conversations.filter(
-        (c) => c.buyer_id === uid && (!!c.listing_id || isOffer(c)) && !isSupportConversation(c),
+        (c) => c.buyer_id === uid && isTransactionalConversation(c) && !isSupportConversation(c),
+      ),
+      activity: conversations.filter(
+        (c) => !isTransactionalConversation(c) && !isSupportConversation(c),
       ),
       support: conversations.filter((c) => isSupportConversation(c)),
     };
@@ -833,13 +822,6 @@ export default function InboxScreen() {
             scrollEventThrottle={16}
             onMomentumScrollEnd={onMomentumScrollEnd}
             renderItem={({ item }) => {
-              if (item.value === 'activity') {
-                return (
-                  <View style={{ width: pageWidth, height: pagerHeight }}>
-                    <ActivityFeed bottomInset={tabBarClearance} />
-                  </View>
-                );
-              }
               if (item.value === 'support') {
                 return (
                   <SupportPage
