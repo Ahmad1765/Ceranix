@@ -39,7 +39,7 @@ import { useToast } from '@/lib/toast';
 import { isLiked as fetchIsLiked, toggleLike } from '@/lib/listings';
 import { useGuestGate } from '@/components/GuestGate';
 import { PopIcon, type PopIconHandle } from '@/components/product/PopIcon';
-import { VintedShieldIcon } from '@/components/ui/VintedShieldIcon';
+import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { BRAND_PURPLE, conditionLabel } from '@/components/product/shared';
 import { colors, radii, shadow } from '@/lib/theme';
 import type { Listing } from '@/types';
@@ -876,7 +876,7 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
           <Text className="text-[12px] font-bold text-ink">
             {formatPrice(totalPrice, { whole: true })} incl.
           </Text>
-          <VintedShieldIcon size={13} />
+          <ShieldCheckIcon size={13} />
         </View>
 
       </View>

@@ -153,6 +153,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
   const [customMax, setCustomMax] = useState('');
 
   const activeCount = useMemo(() => countActiveSearchFilters(filters), [filters]);
+  const activeIconColor = isDark ? '#FFFFFF' : '#0F0F0F';
 
   // Formatted count label: "500+ results" or "X results"
   const formattedCountText = useMemo(() => {
@@ -375,7 +376,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           <Feather
             name="sliders"
             size={13.5}
-            color={activeCount > 0 ? theme.purple : theme.text}
+            color={activeCount > 0 ? activeIconColor : theme.text}
             style={{ marginRight: 5 }}
           />
           <Text
@@ -415,12 +416,27 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           >
             {categoryLabel}
           </Text>
-          <Feather
-            name="chevron-down"
-            size={13}
-            color={filters.category ? theme.purple : theme.mute}
-            style={{ marginLeft: 4 }}
-          />
+          {filters.category ? (
+            <Pressable
+              hitSlop={8}
+              onPress={(e) => {
+                e.stopPropagation();
+                haptic();
+                onUpdateFilter((prev) => ({ ...prev, category: null, subcategory: null }));
+              }}
+              style={{ marginLeft: 5, padding: 1, outlineStyle: 'none' } as any}
+              accessibilityLabel="Clear category filter"
+            >
+              <Feather name="x" size={12} color={activeIconColor} />
+            </Pressable>
+          ) : (
+            <Feather
+              name="chevron-down"
+              size={12.5}
+              color={theme.mute}
+              style={{ marginLeft: 4 }}
+            />
+          )}
         </Pressable>
 
         {/* Chip 3: Brand */}
@@ -445,12 +461,27 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           >
             {brandLabel}
           </Text>
-          <Feather
-            name="chevron-down"
-            size={13}
-            color={filters.brand ? theme.purple : theme.mute}
-            style={{ marginLeft: 4 }}
-          />
+          {filters.brand ? (
+            <Pressable
+              hitSlop={8}
+              onPress={(e) => {
+                e.stopPropagation();
+                haptic();
+                onUpdateFilter((prev) => ({ ...prev, brand: null }));
+              }}
+              style={{ marginLeft: 5, padding: 1, outlineStyle: 'none' } as any}
+              accessibilityLabel="Clear brand filter"
+            >
+              <Feather name="x" size={12} color={activeIconColor} />
+            </Pressable>
+          ) : (
+            <Feather
+              name="chevron-down"
+              size={12.5}
+              color={theme.mute}
+              style={{ marginLeft: 4 }}
+            />
+          )}
         </Pressable>
 
         {/* Chip 4: Size */}
@@ -475,12 +506,27 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           >
             {sizeLabel}
           </Text>
-          <Feather
-            name="chevron-down"
-            size={13}
-            color={filters.sizes.length > 0 ? theme.purple : theme.mute}
-            style={{ marginLeft: 4 }}
-          />
+          {filters.sizes.length > 0 ? (
+            <Pressable
+              hitSlop={8}
+              onPress={(e) => {
+                e.stopPropagation();
+                haptic();
+                onUpdateFilter((prev) => ({ ...prev, sizes: [] }));
+              }}
+              style={{ marginLeft: 5, padding: 1, outlineStyle: 'none' } as any}
+              accessibilityLabel="Clear size filter"
+            >
+              <Feather name="x" size={12} color={activeIconColor} />
+            </Pressable>
+          ) : (
+            <Feather
+              name="chevron-down"
+              size={12.5}
+              color={theme.mute}
+              style={{ marginLeft: 4 }}
+            />
+          )}
         </Pressable>
 
         {/* Chip 5: Condition */}
@@ -505,12 +551,27 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           >
             {conditionLabel}
           </Text>
-          <Feather
-            name="chevron-down"
-            size={13}
-            color={filters.conditions.length > 0 ? theme.purple : theme.mute}
-            style={{ marginLeft: 4 }}
-          />
+          {filters.conditions.length > 0 ? (
+            <Pressable
+              hitSlop={8}
+              onPress={(e) => {
+                e.stopPropagation();
+                haptic();
+                onUpdateFilter((prev) => ({ ...prev, conditions: [] }));
+              }}
+              style={{ marginLeft: 5, padding: 1, outlineStyle: 'none' } as any}
+              accessibilityLabel="Clear condition filter"
+            >
+              <Feather name="x" size={12} color={activeIconColor} />
+            </Pressable>
+          ) : (
+            <Feather
+              name="chevron-down"
+              size={12.5}
+              color={theme.mute}
+              style={{ marginLeft: 4 }}
+            />
+          )}
         </Pressable>
 
         {/* Chip 6: Price */}
@@ -539,16 +600,27 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           >
             {priceLabel}
           </Text>
-          <Feather
-            name="chevron-down"
-            size={13}
-            color={
-              filters.priceMin != null || filters.priceMax != null
-                ? theme.purple
-                : theme.mute
-            }
-            style={{ marginLeft: 4 }}
-          />
+          {filters.priceMin != null || filters.priceMax != null ? (
+            <Pressable
+              hitSlop={8}
+              onPress={(e) => {
+                e.stopPropagation();
+                haptic();
+                onUpdateFilter((prev) => ({ ...prev, priceMin: null, priceMax: null }));
+              }}
+              style={{ marginLeft: 5, padding: 1, outlineStyle: 'none' } as any}
+              accessibilityLabel="Clear price filter"
+            >
+              <Feather name="x" size={12} color={activeIconColor} />
+            </Pressable>
+          ) : (
+            <Feather
+              name="chevron-down"
+              size={12.5}
+              color={theme.mute}
+              style={{ marginLeft: 4 }}
+            />
+          )}
         </Pressable>
 
         {/* Chip 7: Color */}
@@ -573,12 +645,27 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           >
             {colorLabel}
           </Text>
-          <Feather
-            name="chevron-down"
-            size={13}
-            color={filters.color ? theme.purple : theme.mute}
-            style={{ marginLeft: 4 }}
-          />
+          {filters.color ? (
+            <Pressable
+              hitSlop={8}
+              onPress={(e) => {
+                e.stopPropagation();
+                haptic();
+                onUpdateFilter((prev) => ({ ...prev, color: null }));
+              }}
+              style={{ marginLeft: 5, padding: 1, outlineStyle: 'none' } as any}
+              accessibilityLabel="Clear color filter"
+            >
+              <Feather name="x" size={12} color={activeIconColor} />
+            </Pressable>
+          ) : (
+            <Feather
+              name="chevron-down"
+              size={12.5}
+              color={theme.mute}
+              style={{ marginLeft: 4 }}
+            />
+          )}
         </Pressable>
 
         {/* Chip 8: Material */}
@@ -603,12 +690,27 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           >
             {materialLabel}
           </Text>
-          <Feather
-            name="chevron-down"
-            size={13}
-            color={filters.material ? theme.purple : theme.mute}
-            style={{ marginLeft: 4 }}
-          />
+          {filters.material ? (
+            <Pressable
+              hitSlop={8}
+              onPress={(e) => {
+                e.stopPropagation();
+                haptic();
+                onUpdateFilter((prev) => ({ ...prev, material: null }));
+              }}
+              style={{ marginLeft: 5, padding: 1, outlineStyle: 'none' } as any}
+              accessibilityLabel="Clear material filter"
+            >
+              <Feather name="x" size={12} color={activeIconColor} />
+            </Pressable>
+          ) : (
+            <Feather
+              name="chevron-down"
+              size={12.5}
+              color={theme.mute}
+              style={{ marginLeft: 4 }}
+            />
+          )}
         </Pressable>
 
         {/* Chip 9: Sort by */}
@@ -637,14 +739,27 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           >
             {sortLabel}
           </Text>
-          <Feather
-            name="chevron-down"
-            size={13}
-            color={
-              filters.sort ? theme.purple : theme.mute
-            }
-            style={{ marginLeft: 4 }}
-          />
+          {filters.sort ? (
+            <Pressable
+              hitSlop={8}
+              onPress={(e) => {
+                e.stopPropagation();
+                haptic();
+                onUpdateFilter((prev) => ({ ...prev, sort: null }));
+              }}
+              style={{ marginLeft: 5, padding: 1, outlineStyle: 'none' } as any}
+              accessibilityLabel="Reset sort order"
+            >
+              <Feather name="x" size={12} color={activeIconColor} />
+            </Pressable>
+          ) : (
+            <Feather
+              name="chevron-down"
+              size={12.5}
+              color={theme.mute}
+              style={{ marginLeft: 4 }}
+            />
+          )}
         </Pressable>
       </ScrollView>
 
@@ -652,22 +767,62 @@ export const SearchFilterChips = memo(function SearchFilterChips({
       <View style={styles.resultsHeaderRow}>
         <Text style={styles.resultsCountText}>{formattedCountText}</Text>
 
-        <Pressable
-          onPress={() => {
-            haptic();
-            setActiveModal('info');
-          }}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel="How search results work"
-          style={({ pressed }) => [
-            styles.infoButton,
-            { opacity: pressed ? 0.65 : 1 },
-          ]}
-        >
-          <Text style={styles.infoButtonText}>Search results</Text>
-          <Feather name="help-circle" size={13.5} color={theme.mute} style={{ marginLeft: 4 }} />
-        </Pressable>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          {activeCount > 0 && (
+            <Pressable
+              onPress={() => {
+                haptic();
+                onUpdateFilter(() => ({
+                  category: null,
+                  subcategory: null,
+                  brand: null,
+                  sizes: [],
+                  conditions: [],
+                  priceMin: null,
+                  priceMax: null,
+                  color: null,
+                  material: null,
+                  sort: null,
+                }));
+              }}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Reset all filters"
+              style={({ pressed }) => ({
+                opacity: pressed ? 0.6 : 1,
+                outlineStyle: 'none',
+              } as any)}
+            >
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontFamily: typography.family.sansBold,
+                  color: theme.ink,
+                  textDecorationLine: 'underline',
+                }}
+              >
+                Clear all
+              </Text>
+            </Pressable>
+          )}
+
+          <Pressable
+            onPress={() => {
+              haptic();
+              setActiveModal('info');
+            }}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="How search results work"
+            style={({ pressed }) => [
+              styles.infoButton,
+              { opacity: pressed ? 0.65 : 1, outlineStyle: 'none' } as any,
+            ]}
+          >
+            <Text style={styles.infoButtonText}>Search results</Text>
+            <Feather name="help-circle" size={13.5} color={theme.mute} style={{ marginLeft: 4 }} />
+          </Pressable>
+        </View>
       </View>
 
       {/* ── 3. Quick Sub-Modals / Bottom Sheets ────────────────────────────── */}
@@ -1307,47 +1462,74 @@ function createStyles(theme: ThemeTokens, isDark: boolean) {
     chip: {
       flexDirection: 'row',
       alignItems: 'center',
-      height: 36,
-      paddingHorizontal: 14,
+      height: 35,
+      paddingHorizontal: 13,
       borderRadius: radii.pill,
       borderWidth: 1,
+      outlineStyle: 'none',
+      ...Platform.select({
+        web: {
+          outline: 'none',
+          userSelect: 'none',
+        } as any,
+      }),
     },
     chipInactive: {
-      backgroundColor: isDark ? theme.panel : theme.surface,
-      borderColor: theme.border,
+      backgroundColor: isDark ? theme.panel : '#FFFFFF',
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(15, 15, 15, 0.12)',
+      ...Platform.select({
+        web: {
+          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+        } as any,
+        default: {
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.03,
+          shadowRadius: 2,
+          elevation: 1,
+        },
+      }),
     },
     chipActive: {
-      backgroundColor: isDark ? 'rgba(108, 71, 255, 0.18)' : '#EDE9FE',
-      borderColor: theme.purple,
-      borderWidth: 1.5,
+      backgroundColor: isDark ? '#2C2C30' : '#EBEBEF',
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.22)' : 'rgba(15, 15, 15, 0.20)',
+      borderWidth: 1,
+      ...Platform.select({
+        web: {
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+        } as any,
+      }),
     },
     chipText: {
-      fontSize: 13.5,
+      fontSize: 13,
       fontFamily: typography.family.sansMedium,
-      letterSpacing: -0.1,
+      letterSpacing: -0.15,
     },
     chipTextInactive: {
       color: theme.text,
       fontWeight: '500',
     },
     chipTextActive: {
-      color: theme.purple,
-      fontWeight: '700',
+      color: isDark ? '#FFFFFF' : '#0F0F0F',
+      fontWeight: '600',
+      fontFamily: typography.family.sansBold,
     },
     badge: {
-      marginLeft: 5,
-      backgroundColor: theme.purple,
-      borderRadius: 10,
+      marginLeft: 6,
+      backgroundColor: isDark ? '#FFFFFF' : '#0F0F0F',
+      borderRadius: radii.pill,
       minWidth: 18,
       height: 18,
-      paddingHorizontal: 4,
+      paddingHorizontal: 5,
       alignItems: 'center',
       justifyContent: 'center',
     },
     badgeText: {
-      color: '#FFFFFF',
+      color: isDark ? '#0F0F0F' : '#FFFFFF',
       fontSize: 10.5,
+      fontFamily: typography.family.sansBold,
       fontWeight: '700',
+      lineHeight: 11,
     },
     resultsHeaderRow: {
       flexDirection: 'row',

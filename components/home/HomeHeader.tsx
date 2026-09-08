@@ -15,7 +15,12 @@ import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
 import { radii, shadow, type as typography } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
-import { FOR_YOU, TRENDING } from './useHomeFeedFilters';
+import {
+  FOR_YOU,
+  TRENDING,
+  type DynamicFilterChip,
+  DEFAULT_TRENDING_CHIP,
+} from './useHomeFeedFilters';
 import type { SavedSearch } from '@/lib/savedSearches';
 
 function haptic() {
@@ -72,7 +77,7 @@ export const FeedSearch = memo(function FeedSearch({
             flex: 1,
             flexDirection: 'row',
             alignItems: 'center',
-            backgroundColor: theme.surface,
+            backgroundColor: pressed ? theme.surface : theme.panel,
             borderRadius: radii.pill,
             paddingLeft: 14,
             paddingRight: 10,
@@ -80,7 +85,9 @@ export const FeedSearch = memo(function FeedSearch({
             borderWidth: 1,
             borderColor: theme.border,
             opacity: pressed && onPressSearch ? 0.85 : 1,
-          })}
+            outlineStyle: 'none',
+            ...shadow.sm,
+          } as any)}
         >
           <Feather
             name="search"
@@ -203,14 +210,15 @@ export const FeedSearch = memo(function FeedSearch({
                 width: 44,
                 height: 44,
                 borderRadius: 22,
-                backgroundColor: hasFilters ? theme.ink : theme.surface,
+                backgroundColor: hasFilters ? theme.ink : (pressed ? theme.surface : theme.panel),
                 borderWidth: 1,
                 borderColor: hasFilters ? theme.ink : theme.border,
                 alignItems: 'center',
                 justifyContent: 'center',
                 transform: [{ scale: pressed ? 0.94 : 1 }],
+                outlineStyle: 'none',
                 ...shadow.sm,
-              })}
+              } as any)}
             >
               <Feather
                 name="sliders"
@@ -268,15 +276,16 @@ export const FeedSearch = memo(function FeedSearch({
                 width: 44,
                 height: 44,
                 borderRadius: 22,
-                backgroundColor: theme.surface,
+                backgroundColor: pressed ? theme.surface : theme.panel,
                 borderWidth: 1,
                 borderColor: theme.border,
                 alignItems: 'center',
                 justifyContent: 'center',
                 transform: [{ scale: pressed ? 0.94 : 1 }],
                 position: 'relative',
+                outlineStyle: 'none',
                 ...shadow.sm,
-              })}
+              } as any)}
             >
               <Feather
                 name="bell"
@@ -294,7 +303,7 @@ export const FeedSearch = memo(function FeedSearch({
                     borderRadius: 4,
                     backgroundColor: '#EF4444',
                     borderWidth: 1.5,
-                    borderColor: theme.surface,
+                    borderColor: theme.panel,
                   }}
                 />
               )}
@@ -309,7 +318,9 @@ export const FeedSearch = memo(function FeedSearch({
 type ChipRowProps = {
   savedSearches: SavedSearch[];
   activeChip: string;
+  dynamicChip?: DynamicFilterChip;
   onSelectChip: (id: string) => void;
+  onResetDynamicChip?: () => void;
   onDeleteChip: (s: SavedSearch) => void;
   onAdd: () => void;
 };
@@ -317,11 +328,18 @@ type ChipRowProps = {
 export const ChipRow = memo(function ChipRow({
   savedSearches,
   activeChip,
+  dynamicChip = DEFAULT_TRENDING_CHIP,
   onSelectChip,
+  onResetDynamicChip,
   onDeleteChip,
   onAdd,
 }: ChipRowProps) {
   const { theme } = useTheme();
+
+  const isDynamicActive =
+    activeChip === dynamicChip.id ||
+    (dynamicChip.isDefaultTrending && activeChip === TRENDING);
+  const isCustom = !dynamicChip.isDefaultTrending;
 
   return (
     <ScrollView
@@ -335,13 +353,15 @@ export const ChipRow = memo(function ChipRow({
           haptic();
           onSelectChip(FOR_YOU);
         }}
+        accessibilityRole="button"
+        accessibilityLabel="Browse For you"
         style={({ pressed }) => ({
           paddingHorizontal: 14,
           paddingVertical: 8,
           borderRadius: radii.pill,
           backgroundColor: activeChip === FOR_YOU ? theme.selected : theme.white,
           borderWidth: 1,
-          borderColor: activeChip === FOR_YOU ? theme.border : theme.border,
+          borderColor: theme.border,
           flexDirection: 'row',
           alignItems: 'center',
           gap: 6,
@@ -360,26 +380,33 @@ export const ChipRow = memo(function ChipRow({
         </Text>
       </Pressable>
 
-      {/* Trending Chip */}
+      {/* Dynamic Chip (Trending by default, or replaced by Discover filter chip/topic) */}
       <Pressable
         onPress={() => {
           haptic();
-          onSelectChip(TRENDING);
+          onSelectChip(dynamicChip.id);
         }}
+        accessibilityRole="button"
+        accessibilityLabel={`Browse ${dynamicChip.label}`}
         style={({ pressed }) => ({
-          paddingHorizontal: 14,
+          paddingLeft: 14,
+          paddingRight: isCustom ? 8 : 14,
           paddingVertical: 8,
           borderRadius: radii.pill,
-          backgroundColor: activeChip === TRENDING ? theme.selected : theme.white,
+          backgroundColor: isDynamicActive ? theme.selected : theme.white,
           borderWidth: 1,
-          borderColor: activeChip === TRENDING ? theme.border : theme.border,
+          borderColor: theme.border,
           flexDirection: 'row',
           alignItems: 'center',
           gap: 6,
           transform: [{ scale: pressed ? 0.96 : 1 }],
         })}
       >
-        <Feather name="trending-up" size={13} color={theme.ink} />
+        <Feather
+          name={dynamicChip.icon}
+          size={13}
+          color={theme.ink}
+        />
         <Text
           style={{
             fontFamily: typography.family.sansBold,
@@ -387,8 +414,35 @@ export const ChipRow = memo(function ChipRow({
             color: theme.ink,
           }}
         >
-          Trending
+          {dynamicChip.label}
         </Text>
+
+        {/* If user customized this chip from Discover, provide a 1-tap reset 'x' button */}
+        {isCustom && onResetDynamicChip ? (
+          <Pressable
+            onPress={(e) => {
+              if (e && typeof e.stopPropagation === 'function') {
+                e.stopPropagation();
+              }
+              haptic();
+              onResetDynamicChip();
+            }}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel="Reset to Trending"
+            style={({ pressed }) => ({
+              width: 18,
+              height: 18,
+              borderRadius: 9,
+              backgroundColor: pressed ? theme.surface : theme.border,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginLeft: 2,
+            })}
+          >
+            <Feather name="x" size={11} color={theme.ink} />
+          </Pressable>
+        ) : null}
       </Pressable>
 
       {/* Create Alert / Saved Search Circular Button */}

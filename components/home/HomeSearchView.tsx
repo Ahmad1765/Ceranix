@@ -1172,7 +1172,7 @@ export const HomeSearchView = memo(function HomeSearchView({
               flex: 1,
               flexDirection: 'row',
               alignItems: 'center',
-              backgroundColor: isDark ? theme.panel : theme.surface,
+              backgroundColor: theme.panel,
               borderRadius: radii.pill,
               paddingLeft: 14,
               paddingRight: 10,

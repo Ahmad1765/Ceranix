@@ -29,7 +29,7 @@ export function SearchBar({
       style={{
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: colors.surface,
+        backgroundColor: colors.panel,
         borderRadius: radii.pill,
         paddingLeft: 14,
         paddingRight: 10,

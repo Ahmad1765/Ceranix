@@ -19,6 +19,7 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { Alert } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
+import Feather from '@expo/vector-icons/Feather';
 import { useToast } from '@/lib/toast';
 import {
   type FeedFilters,
@@ -33,6 +34,24 @@ import type { SavedSearch } from '@/lib/savedSearches';
 export const FOR_YOU: 'for-you' = 'for-you';
 export const TRENDING: 'trending' = 'trending';
 export const SAVED: 'saved' = 'saved';
+
+export type DynamicFilterChip = {
+  id: string;
+  label: string;
+  icon: keyof typeof Feather.glyphMap;
+  category?: Category | null;
+  sort?: FeedSort | null;
+  tab?: string | null;
+  isDefaultTrending: boolean;
+};
+
+export const DEFAULT_TRENDING_CHIP: DynamicFilterChip = {
+  id: 'trending',
+  label: 'Trending',
+  icon: 'trending-up',
+  sort: 'popular',
+  isDefaultTrending: true,
+};
 
 const VALID_CATEGORIES: ReadonlySet<Category> = new Set<Category>([
   'clothing', 'shoes', 'bags', 'accessories', 'electronics', 'beauty', 'other',
@@ -69,6 +88,7 @@ export function useHomeFeedFilters({
 }: UseHomeFeedFiltersProps) {
   const toast = useToast();
   const [activeChip, setActiveChip] = useState<string>(FOR_YOU);
+  const [dynamicChip, setDynamicChip] = useState<DynamicFilterChip>(DEFAULT_TRENDING_CHIP);
   const [query, setQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
   const [filters, setFilters] = useState<FeedFilters>(EMPTY_FEED_FILTERS);
@@ -76,36 +96,122 @@ export function useHomeFeedFilters({
   const activeFilterCount = countActiveFilters(filters);
 
   // ── Deep Link & Search Query Synchronization ────────────────────────────
-  const params = useLocalSearchParams<{ sort?: string; category?: string; q?: string; sub?: string; n?: string }>();
+  const params = useLocalSearchParams<{
+    sort?: string;
+    category?: string;
+    q?: string;
+    sub?: string;
+    n?: string;
+    tab?: string;
+    chipLabel?: string;
+    chipIcon?: string;
+    resetTrending?: string;
+  }>();
+
   useEffect(() => {
+    if (params.resetTrending) {
+      setDynamicChip(DEFAULT_TRENDING_CHIP);
+      setFilters(EMPTY_FEED_FILTERS);
+      setActiveChip(FOR_YOU);
+      scrollToTop();
+      return;
+    }
+
     const sort = FEED_SORTS.find((s) => s === params.sort);
     const category = isValidCategory(params.category) ? params.category : null;
     const q = params.q?.trim();
-    if (!sort && !category && !q && !params.n) return;
+    if (!sort && !category && !q && !params.n && !params.tab) return;
 
     if (q) {
       setQuery(q);
       setActiveChip(FOR_YOU);
     } else {
       setQuery('');
-      const trending = sort === 'popular';
-      setActiveChip(trending ? TRENDING : FOR_YOU);
+      if (category) {
+        const label = params.chipLabel
+          ? decodeURIComponent(params.chipLabel)
+          : category.charAt(0).toUpperCase() + category.slice(1);
+        const icon = (params.chipIcon as any) || 'box';
+        const newChip: DynamicFilterChip = {
+          id: `category:${category}`,
+          label,
+          icon,
+          category,
+          isDefaultTrending: false,
+        };
+        setDynamicChip(newChip);
+        setActiveChip(newChip.id);
+        setFilters({
+          ...EMPTY_FEED_FILTERS,
+          category,
+          sort: 'relevance',
+        });
+      } else if (sort) {
+        if (sort === 'popular') {
+          setDynamicChip(DEFAULT_TRENDING_CHIP);
+          setActiveChip(TRENDING);
+          setFilters({
+            ...EMPTY_FEED_FILTERS,
+            sort: 'popular',
+          });
+        } else {
+          const label = params.chipLabel
+            ? decodeURIComponent(params.chipLabel)
+            : sort === 'newest'
+            ? 'New'
+            : 'Lowest price';
+          const icon =
+            (params.chipIcon as any) || (sort === 'newest' ? 'zap' : 'arrow-down');
+          const newChip: DynamicFilterChip = {
+            id: `sort:${sort}`,
+            label,
+            icon,
+            sort,
+            isDefaultTrending: false,
+          };
+          setDynamicChip(newChip);
+          setActiveChip(newChip.id);
+          setFilters({
+            ...EMPTY_FEED_FILTERS,
+            sort,
+          });
+        }
+      } else if (params.tab) {
+        const label = params.chipLabel
+          ? decodeURIComponent(params.chipLabel)
+          : params.tab.charAt(0).toUpperCase() + params.tab.slice(1);
+        const icon = (params.chipIcon as any) || 'hash';
+        const newChip: DynamicFilterChip = {
+          id: `tab:${params.tab}`,
+          label,
+          icon,
+          tab: params.tab,
+          isDefaultTrending: false,
+        };
+        setDynamicChip(newChip);
+        setActiveChip(newChip.id);
+      }
     }
-    setFilters({
-      ...EMPTY_FEED_FILTERS,
-      category,
-      sort: !sort || sort === 'popular' ? 'relevance' : sort,
-    });
     scrollToTop();
-  }, [params.sort, params.category, params.q, params.n, scrollToTop]);
+  }, [
+    params.sort,
+    params.category,
+    params.q,
+    params.n,
+    params.tab,
+    params.chipLabel,
+    params.chipIcon,
+    params.resetTrending,
+    scrollToTop,
+  ]);
 
   // ── Chip Selection & Target Refetch ──────────────────────────────────────
   const selectChip = useCallback(
     (chip: string) => {
       setActiveChip(chip);
-      if (chip === TRENDING) {
+      if (chip === TRENDING || (dynamicChip.isDefaultTrending && chip === dynamicChip.id)) {
         trendingRefetch();
-      } else if (chip === FOR_YOU) {
+      } else if (chip === FOR_YOU || chip === dynamicChip.id) {
         feedRefetch();
       }
       scrollToTop();
@@ -113,8 +219,14 @@ export function useHomeFeedFilters({
         scrollToTop();
       });
     },
-    [scrollToTop, trendingRefetch, feedRefetch],
+    [scrollToTop, trendingRefetch, feedRefetch, dynamicChip.id, dynamicChip.isDefaultTrending],
   );
+
+  const resetDynamicChip = useCallback(() => {
+    setDynamicChip(DEFAULT_TRENDING_CHIP);
+    setActiveChip((current) => (current === dynamicChip.id ? TRENDING : current));
+    scrollToTop();
+  }, [dynamicChip.id, scrollToTop]);
 
   // Guarantee list resets to top whenever activeChip changes, including after
   // FlashList layout settles for the new dataset.
@@ -166,12 +278,25 @@ export function useHomeFeedFilters({
   );
 
   const showingSaved = activeChip === SAVED;
-  const showingTrending = activeChip === TRENDING;
+  const showingTrending =
+    activeChip === TRENDING || (dynamicChip.isDefaultTrending && activeChip === dynamicChip.id);
+  const showingDynamic = !dynamicChip.isDefaultTrending && activeChip === dynamicChip.id;
 
-  // ── Tier 1: View Selection (For You, Saved, Trending, Saved Search) ───────
+  // ── Tier 1: View Selection (For You, Saved, Trending, Dynamic, Saved Search) ───────
   const visibleListings = useMemo(() => {
     if (showingSaved) return savedListings;
     if (showingTrending) return trendingListings;
+    if (showingDynamic) {
+      let rows = listings;
+      if (dynamicChip.category) {
+        rows = rows.filter((l) => l.category === dynamicChip.category);
+      } else if (dynamicChip.tab === 'brands') {
+        rows = rows.filter((l) => Boolean(l.brand && l.brand.trim().length > 0));
+      } else if (dynamicChip.tab === 'aesthetics') {
+        rows = rows.filter((l) => Boolean(l.tags && l.tags.length > 0));
+      }
+      return rows;
+    }
     if (!activeSavedSearch) return listings;
     let rows = listings;
     if (isValidCategory(activeSavedSearch.category)) {
@@ -187,7 +312,16 @@ export function useHomeFeedFilters({
       );
     }
     return rows;
-  }, [listings, savedListings, trendingListings, showingTrending, activeSavedSearch, showingSaved]);
+  }, [
+    listings,
+    savedListings,
+    trendingListings,
+    showingTrending,
+    showingDynamic,
+    dynamicChip,
+    activeSavedSearch,
+    showingSaved,
+  ]);
 
   // ── Tier 2: Deferred Search Query Refinement ─────────────────────────────
   const deferredQuery = useDeferredValue(query);
@@ -213,7 +347,15 @@ export function useHomeFeedFilters({
       rows = rows.filter((l) => !!l.size && filters.sizes.includes(l.size));
     if (filters.priceMin != null) rows = rows.filter((l) => l.price >= filters.priceMin!);
     if (filters.priceMax != null) rows = rows.filter((l) => l.price <= filters.priceMax!);
-    switch (filters.sort) {
+
+    const effectiveSort =
+      filters.sort !== 'relevance'
+        ? filters.sort
+        : showingDynamic && dynamicChip.sort
+          ? dynamicChip.sort
+          : filters.sort;
+
+    switch (effectiveSort) {
       case 'newest':
         rows = [...rows].sort(
           (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
@@ -232,7 +374,7 @@ export function useHomeFeedFilters({
         break;
     }
     return rows;
-  }, [searchedListings, filters]);
+  }, [searchedListings, filters, showingDynamic, dynamicChip.sort]);
 
   // ── Tier 4: 2D Grid Row Chunking for FlashList ───────────────────────────
   const gridRows = useMemo(() => {
@@ -251,11 +393,15 @@ export function useHomeFeedFilters({
         ? 'No saved items yet. Tap the bookmark on any listing to save it.'
         : showingTrending
           ? 'Nothing trending right now.'
-          : 'Nothing matches this feed yet.';
+          : showingDynamic
+            ? `No items found in ${dynamicChip.label}.`
+            : 'Nothing matches this feed yet.';
 
   return {
     activeChip,
     setActiveChip,
+    dynamicChip,
+    resetDynamicChip,
     selectChip,
     onDeleteChip,
     query,
@@ -276,6 +422,7 @@ export function useHomeFeedFilters({
     gridEmptyText,
     showingSaved,
     showingTrending,
+    showingDynamic,
     activeSavedSearch,
   };
 }

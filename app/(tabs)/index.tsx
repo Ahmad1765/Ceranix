@@ -193,7 +193,9 @@ export default function HomeScreen() {
       chipProps={{
         savedSearches,
         activeChip: feedFilter.activeChip,
+        dynamicChip: feedFilter.dynamicChip,
         onSelectChip: feedFilter.selectChip,
+        onResetDynamicChip: feedFilter.resetDynamicChip,
         onDeleteChip: feedFilter.onDeleteChip,
         onAdd: () => {
           if (!user?.id) {

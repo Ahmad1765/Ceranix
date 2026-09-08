@@ -7,7 +7,7 @@ import { getOptimizedImageUrl, thumbWidthFor, IMAGE_TRANSITION } from '@/lib/ima
 import { CARD_WIDTH, CARD_IMAGE_HEIGHT, type RelatedItem } from './shared';
 import { formatPrice } from '@/lib/currency';
 import { priceBreakdown } from '@/lib/fees';
-import { VintedShieldIcon } from '@/components/ui/VintedShieldIcon';
+import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { useTheme } from '@/context/ThemeContext';
 
 const SUPPRESSION_WINDOW_MS = 450;
@@ -314,7 +314,7 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
           <Text style={{ fontSize: 12, fontWeight: '700', color: theme.ink }}>
             {formatPrice(totalPrice, { whole: true })} incl.
           </Text>
-          <VintedShieldIcon size={13} />
+          <ShieldCheckIcon size={13} />
         </View>
       </View>
     </Pressable>

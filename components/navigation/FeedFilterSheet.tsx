@@ -9,7 +9,6 @@ import {
 import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
-import { ThumbButton } from '@/components/ui/ThumbButton';
 import { Text, TextInput } from '@/lib/rnText';
 import { radii, type, ThemeTokens } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
@@ -90,9 +89,12 @@ export interface FeedFilterSheetProps {
 }
 
 /**
- * Mobile-First Discovery Filter Bottom Sheet.
- * High-performance, theme-reactive multi-criteria refinement bottom sheet
- * with wrap grids, dual-bound price inputs, and tactile micro-interactions.
+ * Editorial Discovery Filter Bottom Sheet.
+ * Inspired by Mercari's calm, structured list hierarchy:
+ * - Centered "Filters" header with left ✕ dismiss and right "Clear all"
+ * - Clean structured rows with live summaries and chevrons
+ * - Expandable accordion drawers for zero-clutter scanning
+ * - Single prominent Signal Purple bottom CTA button
  */
 export function FeedFilterSheet({
   visible,
@@ -107,10 +109,27 @@ export function FeedFilterSheet({
   const [minFocused, setMinFocused] = useState(false);
   const [maxFocused, setMaxFocused] = useState(false);
 
-  // Sync with initial only when visible transitions from false to true
+  // Track accordion state for each row
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    sort: false,
+    category: false,
+    size: false,
+    price: false,
+    condition: false,
+  });
+
+  // Sync with initial whenever sheet opens
   React.useEffect(() => {
     if (!prevVisibleRef.current && visible) {
       setFilters(initial);
+      // Auto-expand category if active, otherwise keep clean collapsed
+      setExpandedSections({
+        sort: false,
+        category: Boolean(initial.category),
+        size: initial.sizes.length > 0,
+        price: initial.priceMin != null || initial.priceMax != null,
+        condition: initial.conditions.length > 0,
+      });
     }
     prevVisibleRef.current = visible;
   }, [visible, initial]);
@@ -139,6 +158,14 @@ export function FeedFilterSheet({
       }
     }
   }, []);
+
+  const toggleSection = useCallback((key: string) => {
+    triggerHaptic('selection');
+    setExpandedSections((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  }, [triggerHaptic]);
 
   const toggleCategory = useCallback((cat: Category) => {
     triggerHaptic('selection');
@@ -212,419 +239,579 @@ export function FeedFilterSheet({
     filters.priceMax != null &&
     filters.priceMin > filters.priceMax;
 
+  // Summaries for list row right side
+  const sortSummary = useMemo(() => {
+    const s = SORTS.find((item) => item.id === filters.sort);
+    return s ? s.label : 'Recommended';
+  }, [filters.sort]);
+
+  const categorySummary = useMemo(() => {
+    if (!filters.category) return 'Any';
+    const c = CATEGORIES.find((item) => item.id === filters.category);
+    return c ? c.label : 'Any';
+  }, [filters.category]);
+
+  const sizeSummary = useMemo(() => {
+    if (filters.sizes.length === 0) return 'Any';
+    if (filters.sizes.length <= 2) return filters.sizes.join(', ');
+    return `${filters.sizes.length} selected`;
+  }, [filters.sizes]);
+
+  const priceSummary = useMemo(() => {
+    if (filters.priceMin != null && filters.priceMax != null) {
+      return `${CURRENCY_SYMBOL}${filters.priceMin} - ${CURRENCY_SYMBOL}${filters.priceMax}`;
+    }
+    if (filters.priceMin != null) return `From ${CURRENCY_SYMBOL}${filters.priceMin}`;
+    if (filters.priceMax != null) return `Up to ${CURRENCY_SYMBOL}${filters.priceMax}`;
+    return 'Any';
+  }, [filters.priceMin, filters.priceMax]);
+
+  const conditionSummary = useMemo(() => {
+    if (filters.conditions.length === 0) return 'Any';
+    if (filters.conditions.length === 1) {
+      const c = CONDITIONS.find((item) => item.id === filters.conditions[0]);
+      return c ? c.label : '1 selected';
+    }
+    return `${filters.conditions.length} selected`;
+  }, [filters.conditions]);
+
+  const buttonLabel = useMemo(() => {
+    if (resultCount !== undefined && !isDirty) {
+      return `Show results (${resultCount})`;
+    }
+    if (activeCount > 0) {
+      return `Show results (${activeCount})`;
+    }
+    return 'Show results';
+  }, [resultCount, isDirty, activeCount]);
+
   // Dynamic Theme-Aware Styles
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
+  const activeChipTextColor = isDark ? '#111111' : '#FFFFFF';
 
   return (
     <BottomSheetModal
       visible={visible}
       onClose={onClose}
-      title="Filter & Refine"
-      subtitle={
-        activeCount > 0
-          ? `${activeCount} filter${activeCount > 1 ? 's' : ''} active${
-              resultCount !== undefined ? ` · ${resultCount} items` : ''
-            }`
-          : 'Browse all items'
-      }
       snapHeightRatio={0.9}
       scrollable
-      headerRight={
-        activeCount > 0 ? (
+      sheetBackgroundColor={theme.panel}
+      contentPaddingHorizontal={0}
+      customHeader={
+        <View style={styles.header}>
+          <Pressable
+            onPress={onClose}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            style={styles.headerCloseButton}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+          >
+            <Feather name="x" size={20} color={theme.ink} />
+          </Pressable>
+
+          <Text style={styles.headerTitle}>Filters</Text>
+
           <Pressable
             onPress={handleReset}
-            hitSlop={10}
-            style={({ pressed }) => [
-              styles.headerReset,
-              { opacity: pressed ? 0.7 : 1 },
-            ]}
+            disabled={activeCount === 0}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            style={styles.headerClearButton}
             accessibilityRole="button"
-            accessibilityLabel="Reset all filters"
+            accessibilityLabel="Clear all filters"
           >
-            <Feather name="rotate-ccw" size={13} color={theme.purple} style={{ marginRight: 4 }} />
-            <Text style={styles.headerResetText}>Reset</Text>
+            <Text
+              style={[
+                styles.headerClearText,
+                { color: activeCount > 0 ? theme.purple : theme.muteSoft },
+              ]}
+            >
+              Clear all
+            </Text>
           </Pressable>
-        ) : null
+        </View>
       }
       footer={
-        <View style={styles.footerRow}>
-          <View style={styles.resetButtonFlex}>
-            <ThumbButton
-              label="Reset"
-              variant="secondary"
-              heightToken="48px"
-              disabled={activeCount === 0}
-              onPress={handleReset}
-              accessibilityLabel="Reset all filters"
-            />
-          </View>
-          <View style={styles.applyButtonFlex}>
-            <ThumbButton
-              label={
-                !isDirty && resultCount !== undefined
-                  ? `Show ${resultCount} Results`
-                  : activeCount > 0
-                  ? `Apply (${activeCount})`
-                  : 'Apply Filters'
-              }
-              variant="primary"
-              heightToken="48px"
-              onPress={handleApply}
-              accessibilityLabel="Apply filters and close"
-            />
-          </View>
+        <View style={styles.footerContainer}>
+          <Pressable
+            onPress={handleApply}
+            style={({ pressed }) => [
+              styles.primaryApplyButton,
+              { transform: [{ scale: pressed ? 0.98 : 1 }] },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Apply filters and close"
+          >
+            <Text style={styles.primaryApplyText}>{buttonLabel}</Text>
+          </Pressable>
         </View>
       }
     >
-      <View style={styles.container}>
-        {/* 1. Category Selector */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Category</Text>
-            {filters.category ? (
-              <View style={styles.activeBadge}>
-                <Text style={styles.activeBadgeText}>1 selected</Text>
-              </View>
-            ) : null}
-          </View>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.scrollRow}
+      <View style={styles.listContainer}>
+        {/* 1. Sort By Row */}
+        <View style={styles.rowWrapper}>
+          <Pressable
+            onPress={() => toggleSection('sort')}
+            style={({ pressed }) => [
+              styles.rowItem,
+              { backgroundColor: pressed ? theme.surface : theme.panel },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Toggle Sort by filter"
           >
-            {CATEGORIES.map((cat) => {
-              const active = filters.category === cat.id;
-              return (
-                <Pressable
-                  key={cat.id}
-                  onPress={() => toggleCategory(cat.id)}
-                  style={({ pressed }) => [
-                    styles.chip,
-                    active ? styles.chipActive : styles.chipInactive,
-                    { transform: [{ scale: pressed ? 0.96 : 1 }] },
-                  ]}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: active }}
-                >
-                  <Feather
-                    name={cat.icon}
-                    size={14}
-                    color={active ? '#FFFFFF' : theme.ink}
-                  />
-                  <Text
-                    style={[
-                      styles.chipText,
-                      {
-                        color: active ? '#FFFFFF' : theme.ink,
-                        fontFamily: active
-                          ? type.family.sansBold
-                          : type.family.sansMedium,
-                        fontWeight: active ? '700' : '500',
-                      },
-                    ]}
-                  >
-                    {cat.label}
-                  </Text>
-                  {active && (
-                    <Feather name="check" size={12} color="#FFFFFF" style={{ marginLeft: 2 }} />
-                  )}
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
-
-        {/* 2. Size Selector (Wrap Grid for instant scanning) */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Size</Text>
-            {filters.sizes.length > 0 ? (
-              <View style={styles.activeBadge}>
-                <Text style={styles.activeBadgeText}>{filters.sizes.length} selected</Text>
-              </View>
-            ) : null}
-          </View>
-
-          <View style={styles.wrapGrid}>
-            {SIZES.map((size) => {
-              const active = filters.sizes.includes(size);
-              return (
-                <Pressable
-                  key={size}
-                  onPress={() => toggleSize(size)}
-                  style={({ pressed }) => [
-                    styles.sizeChip,
-                    active ? styles.chipActive : styles.chipInactive,
-                    { transform: [{ scale: pressed ? 0.95 : 1 }] },
-                  ]}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: active }}
-                >
-                  <Text
-                    style={[
-                      styles.sizeChipText,
-                      {
-                        color: active ? '#FFFFFF' : theme.ink,
-                        fontFamily: active
-                          ? type.family.sansBold
-                          : type.family.sansMedium,
-                        fontWeight: active ? '700' : '500',
-                      },
-                    ]}
-                  >
-                    {size}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* 3. Condition Selector */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Condition</Text>
-            {filters.conditions.length > 0 ? (
-              <View style={styles.activeBadge}>
-                <Text style={styles.activeBadgeText}>{filters.conditions.length} selected</Text>
-              </View>
-            ) : null}
-          </View>
-
-          <View style={styles.wrapGrid}>
-            {CONDITIONS.map((cond) => {
-              const active = filters.conditions.includes(cond.id);
-              return (
-                <Pressable
-                  key={cond.id}
-                  onPress={() => toggleCondition(cond.id)}
-                  style={({ pressed }) => [
-                    styles.chip,
-                    active ? styles.chipActive : styles.chipInactive,
-                    { transform: [{ scale: pressed ? 0.96 : 1 }] },
-                  ]}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: active }}
-                >
-                  {active && (
-                    <Feather name="check" size={13} color="#FFFFFF" style={{ marginRight: 2 }} />
-                  )}
-                  <Text
-                    style={[
-                      styles.chipText,
-                      {
-                        color: active ? '#FFFFFF' : theme.ink,
-                        fontFamily: active
-                          ? type.family.sansBold
-                          : type.family.sansMedium,
-                        fontWeight: active ? '700' : '500',
-                      },
-                    ]}
-                  >
-                    {cond.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* 4. Price Range (Presets + Custom Inputs) */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Price Range</Text>
-            {filters.priceMin != null || filters.priceMax != null ? (
-              <View style={styles.activeBadge}>
-                <Text style={styles.activeBadgeText}>
-                  {filters.priceMin != null && filters.priceMax != null
-                    ? `${CURRENCY_SYMBOL}${filters.priceMin} - ${CURRENCY_SYMBOL}${filters.priceMax}`
-                    : filters.priceMin != null
-                    ? `From ${CURRENCY_SYMBOL}${filters.priceMin}`
-                    : filters.priceMax != null
-                    ? `Up to ${CURRENCY_SYMBOL}${filters.priceMax}`
-                    : ''}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-
-          {/* Quick Price Preset Chips */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.scrollRow}
-          >
-            {PRICE_PRESETS.map((preset, index) => {
-              const isMatch =
-                filters.priceMin === preset.min && filters.priceMax === preset.max;
-              return (
-                <Pressable
-                  key={index}
-                  onPress={() => handleApplyPreset(preset.min, preset.max)}
-                  style={({ pressed }) => [
-                    styles.chip,
-                    isMatch ? styles.chipActive : styles.chipInactive,
-                    { transform: [{ scale: pressed ? 0.96 : 1 }] },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      {
-                        color: isMatch ? '#FFFFFF' : theme.ink,
-                        fontFamily: isMatch
-                          ? type.family.sansBold
-                          : type.family.sansMedium,
-                        fontWeight: isMatch ? '700' : '500',
-                      },
-                    ]}
-                  >
-                    {preset.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-
-          {/* Custom Min/Max Inputs */}
-          <View style={styles.priceRow}>
-            <View
-              style={[
-                styles.priceInputWrapper,
-                minFocused && styles.priceInputWrapperFocused,
-              ]}
-            >
-              <Text style={styles.priceInputPrefix}>{CURRENCY_SYMBOL}</Text>
-              <TextInput
-                value={filters.priceMin != null ? String(filters.priceMin) : ''}
-                onChangeText={(text) => {
-                  const n = parseInt(text.replace(/[^0-9]/g, ''), 10);
-                  setFilters((prev) => ({
-                    ...prev,
-                    priceMin: isNaN(n) ? null : n,
-                  }));
-                }}
-                onFocus={() => setMinFocused(true)}
-                onBlur={() => setMinFocused(false)}
-                placeholder="Min"
-                placeholderTextColor={theme.muteSoft}
-                keyboardType="number-pad"
-                returnKeyType="done"
-                style={styles.priceInput}
+            <Text style={styles.rowTitle}>Sort by</Text>
+            <View style={styles.rowRight}>
+              <Text style={styles.rowValue}>{sortSummary}</Text>
+              <Feather
+                name={expandedSections.sort ? 'chevron-down' : 'chevron-right'}
+                size={18}
+                color={theme.muteSoft}
               />
-              {filters.priceMin != null && (
-                <Pressable
-                  onPress={() => setFilters((prev) => ({ ...prev, priceMin: null }))}
-                  hitSlop={8}
-                  style={styles.inputClearButton}
-                  accessibilityLabel="Clear minimum price"
-                >
-                  <Feather name="x" size={13} color={theme.mute} />
-                </Pressable>
-              )}
             </View>
+          </Pressable>
 
-            <Text style={styles.priceDivider}>to</Text>
-
-            <View
-              style={[
-                styles.priceInputWrapper,
-                maxFocused && styles.priceInputWrapperFocused,
-              ]}
-            >
-              <Text style={styles.priceInputPrefix}>{CURRENCY_SYMBOL}</Text>
-              <TextInput
-                value={filters.priceMax != null ? String(filters.priceMax) : ''}
-                onChangeText={(text) => {
-                  const n = parseInt(text.replace(/[^0-9]/g, ''), 10);
-                  setFilters((prev) => ({
-                    ...prev,
-                    priceMax: isNaN(n) ? null : n,
-                  }));
-                }}
-                onFocus={() => setMaxFocused(true)}
-                onBlur={() => setMaxFocused(false)}
-                placeholder="Max"
-                placeholderTextColor={theme.muteSoft}
-                keyboardType="number-pad"
-                returnKeyType="done"
-                style={styles.priceInput}
-              />
-              {filters.priceMax != null && (
-                <Pressable
-                  onPress={() => setFilters((prev) => ({ ...prev, priceMax: null }))}
-                  hitSlop={8}
-                  style={styles.inputClearButton}
-                  accessibilityLabel="Clear maximum price"
-                >
-                  <Feather name="x" size={13} color={theme.mute} />
-                </Pressable>
-              )}
-            </View>
-          </View>
-
-          {hasPriceConflict && (
-            <View style={styles.priceWarningRow}>
-              <Feather name="info" size={12} color={theme.purple} />
-              <Text style={styles.priceWarningText}>
-                Min is greater than Max (will auto-adjust on apply)
-              </Text>
+          {expandedSections.sort && (
+            <View style={styles.drawerContent}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.scrollRow}
+              >
+                {SORTS.map((sortOption) => {
+                  const active = filters.sort === sortOption.id;
+                  return (
+                    <Pressable
+                      key={sortOption.id}
+                      onPress={() => {
+                        triggerHaptic('selection');
+                        setFilters((prev) => ({ ...prev, sort: sortOption.id }));
+                      }}
+                      style={({ pressed }) => [
+                        styles.chip,
+                        active ? styles.chipActive : styles.chipInactive,
+                        { transform: [{ scale: pressed ? 0.96 : 1 }] },
+                      ]}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: active }}
+                    >
+                      <Feather
+                        name={sortOption.icon}
+                        size={13}
+                        color={active ? activeChipTextColor : theme.ink}
+                      />
+                      <Text
+                        style={[
+                          styles.chipText,
+                          {
+                            color: active ? activeChipTextColor : theme.ink,
+                            fontFamily: active
+                              ? type.family.sansBold
+                              : type.family.sansMedium,
+                            fontWeight: active ? '700' : '500',
+                          },
+                        ]}
+                      >
+                        {sortOption.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
             </View>
           )}
+          <View style={styles.hairlineDivider} />
         </View>
 
-        {/* 5. Sort Order Selector */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Sort By</Text>
-          </View>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.scrollRow}
+        {/* 2. Size Row */}
+        <View style={styles.rowWrapper}>
+          <Pressable
+            onPress={() => toggleSection('size')}
+            style={({ pressed }) => [
+              styles.rowItem,
+              { backgroundColor: pressed ? theme.surface : theme.panel },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Toggle Size filter"
           >
-            {SORTS.map((sortOption) => {
-              const active = filters.sort === sortOption.id;
-              return (
-                <Pressable
-                  key={sortOption.id}
-                  onPress={() => {
-                    triggerHaptic('selection');
-                    setFilters((prev) => ({ ...prev, sort: sortOption.id }));
-                  }}
-                  style={({ pressed }) => [
-                    styles.chip,
-                    active ? styles.chipActive : styles.chipInactive,
-                    { transform: [{ scale: pressed ? 0.96 : 1 }] },
+            <Text style={styles.rowTitle}>Size</Text>
+            <View style={styles.rowRight}>
+              <Text
+                style={[
+                  styles.rowValue,
+                  filters.sizes.length > 0 && styles.rowValueActive,
+                ]}
+              >
+                {sizeSummary}
+              </Text>
+              <Feather
+                name={expandedSections.size ? 'chevron-down' : 'chevron-right'}
+                size={18}
+                color={theme.muteSoft}
+              />
+            </View>
+          </Pressable>
+
+          {expandedSections.size && (
+            <View style={styles.drawerContent}>
+              <View style={styles.wrapGrid}>
+                {SIZES.map((size) => {
+                  const active = filters.sizes.includes(size);
+                  return (
+                    <Pressable
+                      key={size}
+                      onPress={() => toggleSize(size)}
+                      style={({ pressed }) => [
+                        styles.sizeChip,
+                        active ? styles.chipActive : styles.chipInactive,
+                        { transform: [{ scale: pressed ? 0.95 : 1 }] },
+                      ]}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: active }}
+                    >
+                      <Text
+                        style={[
+                          styles.sizeChipText,
+                          {
+                            color: active ? activeChipTextColor : theme.ink,
+                            fontFamily: active
+                              ? type.family.sansBold
+                              : type.family.sansMedium,
+                            fontWeight: active ? '700' : '500',
+                          },
+                        ]}
+                      >
+                        {size}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+          <View style={styles.hairlineDivider} />
+        </View>
+
+        {/* 3. Price Row */}
+        <View style={styles.rowWrapper}>
+          <Pressable
+            onPress={() => toggleSection('price')}
+            style={({ pressed }) => [
+              styles.rowItem,
+              { backgroundColor: pressed ? theme.surface : theme.panel },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Toggle Price filter"
+          >
+            <Text style={styles.rowTitle}>Price</Text>
+            <View style={styles.rowRight}>
+              <Text
+                style={[
+                  styles.rowValue,
+                  (filters.priceMin != null || filters.priceMax != null) &&
+                    styles.rowValueActive,
+                ]}
+              >
+                {priceSummary}
+              </Text>
+              <Feather
+                name={expandedSections.price ? 'chevron-down' : 'chevron-right'}
+                size={18}
+                color={theme.muteSoft}
+              />
+            </View>
+          </Pressable>
+
+          {expandedSections.price && (
+            <View style={styles.drawerContent}>
+              {/* Preset Chips */}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.scrollRow}
+              >
+                {PRICE_PRESETS.map((preset, index) => {
+                  const isMatch =
+                    filters.priceMin === preset.min &&
+                    filters.priceMax === preset.max;
+                  return (
+                    <Pressable
+                      key={index}
+                      onPress={() => handleApplyPreset(preset.min, preset.max)}
+                      style={({ pressed }) => [
+                        styles.chip,
+                        isMatch ? styles.chipActive : styles.chipInactive,
+                        { transform: [{ scale: pressed ? 0.96 : 1 }] },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.chipText,
+                          {
+                            color: isMatch ? activeChipTextColor : theme.ink,
+                            fontFamily: isMatch
+                              ? type.family.sansBold
+                              : type.family.sansMedium,
+                            fontWeight: isMatch ? '700' : '500',
+                          },
+                        ]}
+                      >
+                        {preset.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+
+              {/* Custom Min/Max Inputs */}
+              <View style={styles.priceRow}>
+                <View
+                  style={[
+                    styles.priceInputWrapper,
+                    minFocused && styles.priceInputWrapperFocused,
                   ]}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: active }}
                 >
-                  <Feather
-                    name={sortOption.icon}
-                    size={14}
-                    color={active ? '#FFFFFF' : theme.ink}
+                  <Text style={styles.priceInputPrefix}>{CURRENCY_SYMBOL}</Text>
+                  <TextInput
+                    value={filters.priceMin != null ? String(filters.priceMin) : ''}
+                    onChangeText={(text) => {
+                      const n = parseInt(text.replace(/[^0-9]/g, ''), 10);
+                      setFilters((prev) => ({
+                        ...prev,
+                        priceMin: isNaN(n) ? null : n,
+                      }));
+                    }}
+                    onFocus={() => setMinFocused(true)}
+                    onBlur={() => setMinFocused(false)}
+                    placeholder="Min"
+                    placeholderTextColor={theme.muteSoft}
+                    keyboardType="number-pad"
+                    returnKeyType="done"
+                    style={styles.priceInput}
                   />
-                  <Text
-                    style={[
-                      styles.chipText,
-                      {
-                        color: active ? '#FFFFFF' : theme.ink,
-                        fontFamily: active
-                          ? type.family.sansBold
-                          : type.family.sansMedium,
-                        fontWeight: active ? '700' : '500',
-                      },
-                    ]}
-                  >
-                    {sortOption.label}
+                  {filters.priceMin != null && (
+                    <Pressable
+                      onPress={() => setFilters((prev) => ({ ...prev, priceMin: null }))}
+                      hitSlop={8}
+                      style={styles.inputClearButton}
+                      accessibilityLabel="Clear minimum price"
+                    >
+                      <Feather name="x" size={12} color={theme.mute} />
+                    </Pressable>
+                  )}
+                </View>
+
+                <Text style={styles.priceDivider}>to</Text>
+
+                <View
+                  style={[
+                    styles.priceInputWrapper,
+                    maxFocused && styles.priceInputWrapperFocused,
+                  ]}
+                >
+                  <Text style={styles.priceInputPrefix}>{CURRENCY_SYMBOL}</Text>
+                  <TextInput
+                    value={filters.priceMax != null ? String(filters.priceMax) : ''}
+                    onChangeText={(text) => {
+                      const n = parseInt(text.replace(/[^0-9]/g, ''), 10);
+                      setFilters((prev) => ({
+                        ...prev,
+                        priceMax: isNaN(n) ? null : n,
+                      }));
+                    }}
+                    onFocus={() => setMaxFocused(true)}
+                    onBlur={() => setMaxFocused(false)}
+                    placeholder="Max"
+                    placeholderTextColor={theme.muteSoft}
+                    keyboardType="number-pad"
+                    returnKeyType="done"
+                    style={styles.priceInput}
+                  />
+                  {filters.priceMax != null && (
+                    <Pressable
+                      onPress={() => setFilters((prev) => ({ ...prev, priceMax: null }))}
+                      hitSlop={8}
+                      style={styles.inputClearButton}
+                      accessibilityLabel="Clear maximum price"
+                    >
+                      <Feather name="x" size={12} color={theme.mute} />
+                    </Pressable>
+                  )}
+                </View>
+              </View>
+
+              {hasPriceConflict && (
+                <View style={styles.priceWarningRow}>
+                  <Feather name="info" size={12} color={theme.purple} />
+                  <Text style={styles.priceWarningText}>
+                    Min is greater than Max (will auto-adjust on apply)
                   </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+                </View>
+              )}
+            </View>
+          )}
+          <View style={styles.hairlineDivider} />
+        </View>
+
+        {/* 4. Condition Row */}
+        <View style={styles.rowWrapper}>
+          <Pressable
+            onPress={() => toggleSection('condition')}
+            style={({ pressed }) => [
+              styles.rowItem,
+              { backgroundColor: pressed ? theme.surface : theme.panel },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Toggle Condition filter"
+          >
+            <Text style={styles.rowTitle}>Condition</Text>
+            <View style={styles.rowRight}>
+              <Text
+                style={[
+                  styles.rowValue,
+                  filters.conditions.length > 0 && styles.rowValueActive,
+                ]}
+              >
+                {conditionSummary}
+              </Text>
+              <Feather
+                name={expandedSections.condition ? 'chevron-down' : 'chevron-right'}
+                size={18}
+                color={theme.muteSoft}
+              />
+            </View>
+          </Pressable>
+
+          {expandedSections.condition && (
+            <View style={styles.drawerContent}>
+              <View style={styles.wrapGrid}>
+                {CONDITIONS.map((cond) => {
+                  const active = filters.conditions.includes(cond.id);
+                  return (
+                    <Pressable
+                      key={cond.id}
+                      onPress={() => toggleCondition(cond.id)}
+                      style={({ pressed }) => [
+                        styles.chip,
+                        active ? styles.chipActive : styles.chipInactive,
+                        { transform: [{ scale: pressed ? 0.96 : 1 }] },
+                      ]}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: active }}
+                    >
+                      {active && (
+                        <Feather
+                          name="check"
+                          size={12}
+                          color={activeChipTextColor}
+                          style={{ marginRight: 2 }}
+                        />
+                      )}
+                      <Text
+                        style={[
+                          styles.chipText,
+                          {
+                            color: active ? activeChipTextColor : theme.ink,
+                            fontFamily: active
+                              ? type.family.sansBold
+                              : type.family.sansMedium,
+                            fontWeight: active ? '700' : '500',
+                          },
+                        ]}
+                      >
+                        {cond.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+          <View style={styles.hairlineDivider} />
+        </View>
+
+        {/* 5. Category Row */}
+        <View style={styles.rowWrapper}>
+          <Pressable
+            onPress={() => toggleSection('category')}
+            style={({ pressed }) => [
+              styles.rowItem,
+              { backgroundColor: pressed ? theme.surface : theme.panel },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Toggle Category filter"
+          >
+            <Text style={styles.rowTitle}>Category</Text>
+            <View style={styles.rowRight}>
+              <Text
+                style={[
+                  styles.rowValue,
+                  Boolean(filters.category) && styles.rowValueActive,
+                ]}
+              >
+                {categorySummary}
+              </Text>
+              <Feather
+                name={expandedSections.category ? 'chevron-down' : 'chevron-right'}
+                size={18}
+                color={theme.muteSoft}
+              />
+            </View>
+          </Pressable>
+
+          {expandedSections.category && (
+            <View style={styles.drawerContent}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.scrollRow}
+              >
+                {CATEGORIES.map((cat) => {
+                  const active = filters.category === cat.id;
+                  return (
+                    <Pressable
+                      key={cat.id}
+                      onPress={() => toggleCategory(cat.id)}
+                      style={({ pressed }) => [
+                        styles.chip,
+                        active ? styles.chipActive : styles.chipInactive,
+                        { transform: [{ scale: pressed ? 0.96 : 1 }] },
+                      ]}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: active }}
+                    >
+                      <Feather
+                        name={cat.icon}
+                        size={13}
+                        color={active ? activeChipTextColor : theme.ink}
+                      />
+                      <Text
+                        style={[
+                          styles.chipText,
+                          {
+                            color: active ? activeChipTextColor : theme.ink,
+                            fontFamily: active
+                              ? type.family.sansBold
+                              : type.family.sansMedium,
+                            fontWeight: active ? '700' : '500',
+                          },
+                        ]}
+                      >
+                        {cat.label}
+                      </Text>
+                      {active && (
+                        <Feather
+                          name="check"
+                          size={12}
+                          color={activeChipTextColor}
+                          style={{ marginLeft: 2 }}
+                        />
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+          <View style={styles.hairlineDivider} />
         </View>
       </View>
     </BottomSheetModal>
@@ -632,80 +819,160 @@ export function FeedFilterSheet({
 }
 
 function createStyles(theme: ThemeTokens, isDark: boolean) {
-  const inactiveChipBg = isDark ? '#222222' : '#F4F4F6';
-  const inactiveChipBorder = isDark ? 'rgba(255, 255, 255, 0.10)' : 'rgba(0, 0, 0, 0.07)';
-  const activeChipBg = isDark ? theme.purple : '#111111';
-  const activeChipBorder = isDark ? theme.purple : '#111111';
+  const inactiveChipBg = isDark ? 'rgba(255, 255, 255, 0.08)' : '#FFFFFF';
+  const inactiveChipBorder = isDark
+    ? 'rgba(255, 255, 255, 0.12)'
+    : 'rgba(0, 0, 0, 0.08)';
+  const activeChipBg = isDark ? '#FFFFFF' : '#0F0F0F';
+  const activeChipBorder = isDark ? '#FFFFFF' : '#0F0F0F';
   const inputBg = isDark ? '#1E1E20' : '#FFFFFF';
-  const inputBorder = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)';
+  const inputBorder = isDark
+    ? 'rgba(255, 255, 255, 0.12)'
+    : 'rgba(0, 0, 0, 0.12)';
 
   return StyleSheet.create({
-    container: {
-      gap: 24,
-    },
-    headerReset: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: radii.sm,
-    },
-    headerResetText: {
-      fontSize: 13,
-      color: theme.purple,
-      fontFamily: type.family.sansBold,
-      fontWeight: '700',
-    },
-    section: {
-      gap: 12,
-    },
-    sectionHeaderRow: {
+    header: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingTop: 4,
+      paddingBottom: 14,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.hairline,
     },
-    sectionTitle: {
+    headerCloseButton: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.05)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: -2,
+    },
+    headerTitle: {
+      fontSize: 17,
+      fontFamily: type.family.sansSemibold,
+      fontWeight: '600',
+      color: theme.ink,
+      letterSpacing: -0.3,
+    },
+    headerClearButton: {
+      minWidth: 60,
+      alignItems: 'flex-end',
+      justifyContent: 'center',
+      paddingVertical: 6,
+      marginRight: -4,
+    },
+    headerClearText: {
       fontSize: 14,
+      fontFamily: type.family.sansSemibold,
+      fontWeight: '600',
+    },
+    footerContainer: {
+      paddingHorizontal: 20,
+      paddingTop: 10,
+      paddingBottom: 6,
+    },
+    primaryApplyButton: {
+      height: 50,
+      borderRadius: 14,
+      backgroundColor: isDark ? '#FFFFFF' : '#0F0F0F',
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...Platform.select({
+        ios: {
+          shadowColor: '#000000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: isDark ? 0 : 0.08,
+          shadowRadius: 8,
+        },
+        android: {
+          elevation: isDark ? 0 : 2,
+        },
+        default: {
+          boxShadow: isDark ? 'none' : '0 2px 10px rgba(0, 0, 0, 0.08)',
+        },
+      }),
+    },
+    primaryApplyText: {
+      fontSize: 15.5,
+      fontFamily: type.family.sansSemibold,
+      fontWeight: '600',
+      color: isDark ? '#0F0F0F' : '#FFFFFF',
+      letterSpacing: -0.3,
+    },
+    listContainer: {
+      paddingBottom: 24,
+    },
+    rowWrapper: {
+      width: '100%',
+    },
+    rowItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingVertical: 18,
+    },
+    rowTitle: {
+      fontSize: 15.5,
       fontFamily: type.family.sansBold,
       fontWeight: '700',
       color: theme.ink,
-      letterSpacing: -0.15,
+      letterSpacing: -0.2,
     },
-    activeBadge: {
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-      borderRadius: radii.pill,
-      backgroundColor: isDark ? 'rgba(108, 71, 255, 0.25)' : theme.purpleSoft,
+    rowRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
     },
-    activeBadgeText: {
-      fontSize: 11.5,
-      fontFamily: type.family.sansBold,
-      fontWeight: '700',
-      color: isDark ? '#C4B5FD' : theme.purple,
+    rowValue: {
+      fontSize: 14.5,
+      fontFamily: type.family.sans,
+      color: theme.mute,
+      letterSpacing: -0.1,
+    },
+    rowValueActive: {
+      fontFamily: type.family.sansMedium,
+      color: theme.ink,
+      fontWeight: '600',
+    },
+    hairlineDivider: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: theme.hairline,
+      marginLeft: 20,
+    },
+    drawerContent: {
+      paddingHorizontal: 20,
+      paddingTop: 4,
+      paddingBottom: 18,
+      gap: 12,
     },
     scrollRow: {
       flexDirection: 'row',
       gap: 8,
-      paddingVertical: 2,
+      paddingVertical: 4,
     },
     wrapGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: 8,
+      paddingVertical: 4,
     },
     chip: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 7,
-      height: 40,
+      gap: 6,
+      height: 38,
       paddingHorizontal: 14,
       borderRadius: radii.pill,
       borderWidth: 1,
     },
     sizeChip: {
-      minWidth: 48,
-      height: 40,
-      paddingHorizontal: 14,
+      minWidth: 46,
+      height: 38,
+      paddingHorizontal: 12,
       borderRadius: radii.pill,
       borderWidth: 1,
       alignItems: 'center',
@@ -735,7 +1002,7 @@ function createStyles(theme: ThemeTokens, isDark: boolean) {
     },
     priceInputWrapper: {
       flex: 1,
-      height: 46,
+      height: 44,
       flexDirection: 'row',
       alignItems: 'center',
       backgroundColor: inputBg,
@@ -755,7 +1022,7 @@ function createStyles(theme: ThemeTokens, isDark: boolean) {
     },
     priceInput: {
       flex: 1,
-      fontSize: 14.5,
+      fontSize: 14,
       color: theme.ink,
       fontFamily: type.family.sansMedium,
       padding: 0,
@@ -763,10 +1030,12 @@ function createStyles(theme: ThemeTokens, isDark: boolean) {
       outlineWidth: 0,
     } as any,
     inputClearButton: {
-      width: 22,
-      height: 22,
-      borderRadius: 11,
-      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: isDark
+        ? 'rgba(255, 255, 255, 0.08)'
+        : 'rgba(0, 0, 0, 0.06)',
       alignItems: 'center',
       justifyContent: 'center',
       marginLeft: 4,
@@ -780,24 +1049,12 @@ function createStyles(theme: ThemeTokens, isDark: boolean) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
-      paddingTop: 4,
+      paddingTop: 2,
     },
     priceWarningText: {
       fontSize: 11.5,
       fontFamily: type.family.sansMedium,
       color: isDark ? '#C4B5FD' : theme.purple,
-    },
-    footerRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      paddingBottom: 4,
-    },
-    resetButtonFlex: {
-      flex: 1,
-    },
-    applyButtonFlex: {
-      flex: 2,
     },
   });
 }

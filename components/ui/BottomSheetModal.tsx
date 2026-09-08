@@ -46,6 +46,12 @@ export interface BottomSheetModalProps {
   scrollable?: boolean;
   /** Custom header right element (e.g. "Clear" button) */
   headerRight?: React.ReactNode;
+  /** Custom header replacement (overrides title, subtitle, headerRight) */
+  customHeader?: React.ReactNode;
+  /** Custom sheet background color (defaults to theme.panel for paper white) */
+  sheetBackgroundColor?: string;
+  /** Custom horizontal padding for scroll content (default: 20) */
+  contentPaddingHorizontal?: number;
   /** Disable drag-to-dismiss gesture */
   disableDrag?: boolean;
   /** Fixed explicit height in pixels (overrides snapHeightRatio) */
@@ -78,6 +84,9 @@ export function BottomSheetModal({
   autoHeight = false,
   scrollable = true,
   headerRight,
+  customHeader,
+  sheetBackgroundColor,
+  contentPaddingHorizontal,
   disableDrag = false,
   style,
 }: BottomSheetModalProps) {
@@ -182,7 +191,7 @@ export function BottomSheetModal({
           style={[
             styles.sheet,
             {
-              backgroundColor: theme.surface,
+              backgroundColor: sheetBackgroundColor ?? theme.panel,
               borderTopWidth: StyleSheet.hairlineWidth,
               borderColor: theme.border,
               paddingBottom: Math.max(insets.bottom, 16),
@@ -199,8 +208,10 @@ export function BottomSheetModal({
                 <View style={[styles.dragHandle, { backgroundColor: theme.hairline }]} />
               </View>
 
-              {/* Header with Title & 44x44 Dismiss Button */}
-              {(title || subtitle || headerRight) && (
+              {/* Custom Header or Default Header with Title & Dismiss Button */}
+              {customHeader ? (
+                customHeader
+              ) : (title || subtitle || headerRight) ? (
                 <View style={[styles.header, { borderBottomColor: theme.hairline }]}>
                   <View style={styles.headerTextContainer}>
                     {title && (
@@ -234,7 +245,7 @@ export function BottomSheetModal({
                     </Pressable>
                   </View>
                 </View>
-              )}
+              ) : null}
             </View>
           </GestureDetector>
 
@@ -245,16 +256,24 @@ export function BottomSheetModal({
                   style: { flex: 1 },
                   showsVerticalScrollIndicator: false,
                   keyboardShouldPersistTaps: 'handled' as const,
-                  contentContainerStyle: styles.scrollContent,
+                  contentContainerStyle: [
+                    styles.scrollContent,
+                    contentPaddingHorizontal !== undefined && { paddingHorizontal: contentPaddingHorizontal },
+                  ],
                 }
-              : { style: styles.staticContent })}
+              : {
+                  style: [
+                    styles.staticContent,
+                    contentPaddingHorizontal !== undefined && { paddingHorizontal: contentPaddingHorizontal },
+                  ],
+                })}
           >
             {children}
           </ContentWrapper>
 
           {/* Thumb-Zone Pinned Footer (Z: 120 inside sheet) */}
           {footer && (
-            <View style={[styles.footerContainer, { backgroundColor: theme.surface, borderTopColor: theme.hairline }]}>
+            <View style={[styles.footerContainer, { backgroundColor: sheetBackgroundColor ?? theme.panel, borderTopColor: theme.hairline }]}>
               {footer}
             </View>
           )}
@@ -283,6 +302,9 @@ const styles = StyleSheet.create({
     borderTopRightRadius: radii['3xl'],
     zIndex: 110,
     overflow: 'hidden',
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
     ...Platform.select({
       ios: {
         shadowColor: '#000',

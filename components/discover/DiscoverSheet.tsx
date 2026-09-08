@@ -459,31 +459,32 @@ function DiscoverSheetBody({ onClose }: { onClose: () => void }) {
   }, [query, go]);
 
   const onBrowse = useCallback(
-    (action: BrowseAction) => {
+    (action: BrowseAction, chip?: { label: string; icon: keyof typeof Feather.glyphMap }) => {
       if (action.kind === 'saved') {
         onClose();
         router.push('/news' as any);
         return;
       }
+      const label = chip?.label ?? (action.kind === 'sort' ? action.sort : action.tab);
+      const icon = chip?.icon ?? 'filter';
       if (action.kind === 'tab') {
-        go(`/?tab=${action.tab}`);
+        go(`/?tab=${action.tab}&chipLabel=${encodeURIComponent(label)}&chipIcon=${icon}`);
         return;
       }
-      // Sorts land on the home feed, not the Discover screen: the feed is the
-      // grid the user already browses and it owns all three orderings
-      // (FeedFilterSheet). Discover stays the destination only for the hub
-      // panels below, which exist nowhere else.
-      go(`/?sort=${action.sort}`);
+      go(`/?sort=${action.sort}&chipLabel=${encodeURIComponent(label)}&chipIcon=${icon}`);
     },
     [go, onClose],
   );
 
   const onTopic = useCallback(
-    (action: TopicAction) => {
-      // Same destination as the sorts above, for the same reason: a topic is a
-      // grid intent, and the feed is the grid. "All items" carries no param at
-      // all — the nonce alone is what tells the feed to reset.
-      go(action.kind === 'all' ? '/' : `/?category=${action.category}`);
+    (action: TopicAction, topic?: { label: string; icon: keyof typeof Feather.glyphMap }) => {
+      if (action.kind === 'all') {
+        go('/?resetTrending=1');
+        return;
+      }
+      const label = topic?.label ?? action.category;
+      const icon = topic?.icon ?? 'box';
+      go(`/?category=${action.category}&chipLabel=${encodeURIComponent(label)}&chipIcon=${icon}`);
     },
     [go],
   );

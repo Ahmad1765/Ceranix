@@ -94,8 +94,8 @@ export function SearchLanding({
 }: {
   /** category id → a live cover shot, so tiles show real stock, not clip art. */
   covers: Partial<Record<string, string>>;
-  onBrowse: (action: BrowseAction) => void;
-  onTopic: (action: TopicAction) => void;
+  onBrowse: (action: BrowseAction, chip?: ChipDef) => void;
+  onTopic: (action: TopicAction, topic?: TopicDef) => void;
   activeChipId?: string | null;
 }) {
   // Tile width in px rather than '48%' — a percentage width sharing a
@@ -114,9 +114,20 @@ export function SearchLanding({
   const handleSelectChip = useCallback(
     (action: BrowseAction, id: string) => {
       setSelectedId(id);
-      onBrowse(action);
+      const chip = BROWSE_CHIPS.find((c) => c.id === id);
+      onBrowse(action, chip);
     },
     [onBrowse],
+  );
+
+  const handleSelectTopic = useCallback(
+    (action: TopicAction) => {
+      const topic = TOPIC_TILES.find((t) =>
+        action.kind === 'all' ? t.id === '__all' : t.id === action.category,
+      );
+      onTopic(action, topic);
+    },
+    [onTopic],
   );
 
   return (
@@ -142,7 +153,7 @@ export function SearchLanding({
               topic={t}
               width={tileWidth}
               cover={covers[t.id]}
-              onSelect={onTopic}
+              onSelect={handleSelectTopic}
             />
           ))}
         </View>
