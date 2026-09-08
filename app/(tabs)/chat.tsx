@@ -10,17 +10,17 @@ import { useAuth } from '@/lib/auth';
 import {
   subscribeToInbox,
   isTransactionalConversation,
+  isConversationUnread,
   type ConversationRow,
 } from '@/lib/chat';
 import {
   isSupportConversation,
-  isDirectConversation,
   getOrCreateSupportConversation,
   SUPPORT_TOPICS,
   SUPPORT_BOT_NAME,
   SUPPORT_BOT_AVATAR,
 } from '@/lib/support';
-import { useActivityUnreadCount, useInboxQuery } from '@/lib/queries';
+import { useInboxQuery } from '@/lib/queries';
 import { colors, radii, shadow, type as typography } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { EmptyState } from '@/components/ui';
@@ -28,7 +28,7 @@ import { InboxRow, InboxSkeleton } from '@/components/chat';
 import { HIT_SLOP_8, useTabBarClearance } from '@/lib/responsive';
 import { PressableScale } from '@/components/PressableScale';
 
-type InboxTab = 'selling' | 'buying' | 'activity' | 'support';
+type InboxTab = 'selling' | 'buying' | 'support';
 type ConversationTab = Exclude<InboxTab, 'support'>;
 
 const EMPTY_CONVERSATIONS: ConversationRow[] = [];
@@ -37,7 +37,6 @@ const keyById = (item: ConversationRow) => item.id;
 const INBOX_TABS: { value: InboxTab; label: string }[] = [
   { value: 'selling', label: 'Selling' },
   { value: 'buying', label: 'Buying' },
-  { value: 'activity', label: 'Activity' },
   { value: 'support', label: 'Support' },
 ];
 
@@ -191,12 +190,6 @@ function emptyStateFor(tab: ConversationTab) {
         icon: 'shopping-bag' as const,
         title: 'No conversations yet',
         description: 'Found something you love? Tap message on the listing to chat.',
-      };
-    case 'activity':
-      return {
-        icon: 'users' as const,
-        title: 'No direct messages yet',
-        description: 'When you message creators directly through their profile, they’ll appear here.',
       };
   }
 }
@@ -657,8 +650,19 @@ export default function InboxScreen() {
   const refreshing = inboxQ.isRefetching;
   const { refetch: inboxRefetch, isStale: inboxStale } = inboxQ;
 
-  const activityUnread = useActivityUnreadCount(userId);
-  const tabBadges = useMemo(() => ({ activity: activityUnread }), [activityUnread]);
+  const tabBadges = useMemo(() => {
+    let sellingCount = 0;
+    let buyingCount = 0;
+    if (userId) {
+      conversations.forEach((c) => {
+        if (isConversationUnread(c, userId)) {
+          if (c.seller_id === userId) sellingCount++;
+          if (c.buyer_id === userId) buyingCount++;
+        }
+      });
+    }
+    return { selling: sellingCount, buying: buyingCount };
+  }, [conversations, userId]);
 
   const pagerRef = useRef<FlatList<{ value: InboxTab; label: string }>>(null);
   const [scrollX] = useState(() => new Animated.Value(0));
@@ -699,12 +703,11 @@ export default function InboxScreen() {
   // Tab data partition:
   // - Selling: listing or offer chats where user is seller
   // - Buying: listing or offer chats where user is buyer
-  // - Activity: strictly direct user-to-user messages (not for buying or giving offers)
   // - Support: chats involving Support Bot
   const pageData = useMemo<Record<ConversationTab | 'support', ConversationRow[]>>(() => {
     const uid = user?.id;
     if (!uid) {
-      return { selling: [], buying: [], activity: [], support: [] };
+      return { selling: [], buying: [], support: [] };
     }
     return {
       selling: conversations.filter(
@@ -713,7 +716,6 @@ export default function InboxScreen() {
       buying: conversations.filter(
         (c) => c.buyer_id === uid && isTransactionalConversation(c) && !isSupportConversation(c),
       ),
-      activity: conversations.filter(isDirectConversation),
       support: conversations.filter((c) => isSupportConversation(c)),
     };
   }, [conversations, user?.id]);

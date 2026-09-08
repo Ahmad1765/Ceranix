@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { View, FlatList, Pressable, RefreshControl, Platform, Alert } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { router } from 'expo-router';
@@ -14,7 +14,7 @@ import {
   useDeleteSavedSearch,
 } from '@/lib/queries';
 import { DropAlertSheet } from '@/components/DropAlertSheet';
-import { radii, shadow, type as typography } from '@/lib/theme';
+import { radii, type as typography } from '@/lib/theme';
 import type { SavedSearch } from '@/lib/savedSearches';
 
 function haptic() {
@@ -39,7 +39,7 @@ export function SearchesTab({ bottomInset = 24 }: { bottomInset?: number }) {
   const searchesQ = useSavedSearchesQuery(userId);
   const searches = searchesQ.data ?? [];
   const matchesQ = useSavedSearchMatchesQuery(userId, searches);
-  const matchCounts = matchesQ.data?.counts ?? {};
+  const matchCounts = useMemo(() => matchesQ.data?.counts ?? {}, [matchesQ.data?.counts]);
   const deleteM = useDeleteSavedSearch(userId);
 
   const refreshing = searchesQ.isRefetching || matchesQ.isRefetching;

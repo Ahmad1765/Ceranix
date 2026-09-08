@@ -64,6 +64,15 @@ export default function NewsScreen() {
     setPagerHeight(e.nativeEvent.layout.height);
   }, []);
 
+  const getItemLayout = useCallback(
+    (_: any, index: number) => ({
+      length: pageWidth,
+      offset: pageWidth * index,
+      index,
+    }),
+    [pageWidth],
+  );
+
   const goToTab = useCallback(
     (tab: NewsTab) => {
       const to = NEWS_TABS.findIndex((t) => t.value === tab);
@@ -96,80 +105,88 @@ export default function NewsScreen() {
       const bottomInset = Math.max(insets.bottom, 16) + 16;
       return (
         <View style={{ width: pageWidth, height: pagerHeight > 0 ? pagerHeight : '100%' }}>
-          {item.value === 'following' && <FollowingTab bottomInset={bottomInset} />}
-          {item.value === 'for_you' && <ForYouTab bottomInset={bottomInset} />}
-          {item.value === 'searches' && <SearchesTab bottomInset={bottomInset} />}
+          <View style={{ flex: 1, maxWidth: 680, width: '100%', alignSelf: 'center' }}>
+            {item.value === 'following' && <FollowingTab bottomInset={bottomInset} />}
+            {item.value === 'for_you' && <ForYouTab bottomInset={bottomInset} />}
+            {item.value === 'searches' && <SearchesTab bottomInset={bottomInset} />}
+          </View>
         </View>
       );
     },
     [pageWidth, pagerHeight, insets.bottom],
   );
 
+  const tabWidth = Math.min(pageWidth, 680);
+
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.background }}>
-      {/* Top Header Bar matching reference */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingHorizontal: 12,
-          paddingTop: 6,
-          paddingBottom: 8,
-          backgroundColor: theme.background,
-        }}
-      >
-        <Pressable
-          onPress={() => safeBack()}
-          hitSlop={HIT_SLOP_8}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          style={({ pressed }) => ({
-            width: 38,
-            height: 38,
-            alignItems: 'center',
-            justifyContent: 'center',
-            opacity: pressed ? 0.6 : 1,
-          })}
-        >
-          <Feather name="arrow-left" size={22} color={theme.ink} />
-        </Pressable>
-
-        <Text
+      {/* Centered Top Header Bar & Tabs */}
+      <View style={{ width: '100%', maxWidth: 680, alignSelf: 'center' }}>
+        <View
           style={{
-            fontSize: 17,
-            fontWeight: '800',
-            color: theme.ink,
-            letterSpacing: -0.2,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 12,
+            paddingTop: 6,
+            paddingBottom: 8,
+            backgroundColor: theme.background,
           }}
         >
-          News
-        </Text>
+          <Pressable
+            onPress={() => safeBack()}
+            hitSlop={HIT_SLOP_8}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            style={({ pressed }) => ({
+              width: 38,
+              height: 38,
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: pressed ? 0.6 : 1,
+            })}
+          >
+            <Feather name="arrow-left" size={22} color={theme.ink} />
+          </Pressable>
 
-        {/* Spacer to keep title centered */}
-        <View style={{ width: 38, height: 38 }} />
+          <Text
+            style={{
+              fontSize: 17,
+              fontWeight: '800',
+              color: theme.ink,
+              letterSpacing: -0.2,
+            }}
+          >
+            News
+          </Text>
+
+          {/* Spacer to keep title centered */}
+          <View style={{ width: 38, height: 38 }} />
+        </View>
+
+        {/* Underline Tabs: Following | For you | Searches */}
+        <NewsUnderlineTabs
+          value={activeTab}
+          onChange={goToTab}
+          scrollX={scrollX}
+          pageWidth={tabWidth}
+          badges={tabBadges}
+        />
       </View>
 
-      {/* Underline Tabs: Following | For you | Searches */}
-      <NewsUnderlineTabs
-        value={activeTab}
-        onChange={goToTab}
-        scrollX={scrollX}
-        pageWidth={pageWidth}
-        badges={tabBadges}
-      />
-
       {/* Horizontal Page View */}
-      <View style={{ flex: 1 }} onLayout={onPagerLayout}>
+      <View style={{ flex: 1, overflow: 'hidden' }} onLayout={onPagerLayout}>
         {pageWidth > 0 && pagerHeight > 0 && (
-          <FlatList
-            ref={pagerRef}
+          <Animated.FlatList
+            ref={pagerRef as any}
             horizontal
             pagingEnabled
+            bounces={false}
             showsHorizontalScrollIndicator={false}
             data={NEWS_TABS}
             keyExtractor={(item) => item.value}
             renderItem={renderPage}
+            getItemLayout={getItemLayout}
             onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], {
               useNativeDriver: false,
             })}
