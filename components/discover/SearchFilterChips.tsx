@@ -31,7 +31,6 @@ import type { SortKey } from '@/lib/listings';
 
 import {
   type SearchFilterState,
-  EMPTY_SEARCH_FILTERS,
   countActiveSearchFilters,
   normalizeCustomPrice,
 } from '@/lib/searchFilters';
@@ -135,7 +134,6 @@ type ModalType =
 export interface SearchFilterChipsProps {
   filters: SearchFilterState;
   onUpdateFilter: (updater: (prev: SearchFilterState) => SearchFilterState) => void;
-  onResetFilters: () => void;
   resultCount: number;
   onOpenFullFilter?: () => void;
 }
@@ -143,7 +141,6 @@ export interface SearchFilterChipsProps {
 export const SearchFilterChips = memo(function SearchFilterChips({
   filters,
   onUpdateFilter,
-  onResetFilters,
   resultCount,
   onOpenFullFilter,
 }: SearchFilterChipsProps) {
@@ -342,7 +339,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
   }, [filters.material]);
 
   const sortLabel = useMemo(() => {
-    if (!filters.sort || filters.sort === 'popular') return 'Sort by';
+    if (!filters.sort) return 'Sort by';
     const s = SORT_OPTIONS.find((item) => item.id === filters.sort);
     return s ? s.label : 'Sort by';
   }, [filters.sort]);
@@ -622,7 +619,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           }}
           style={({ pressed }) => [
             styles.chip,
-            filters.sort && filters.sort !== 'popular'
+            filters.sort
               ? styles.chipActive
               : styles.chipInactive,
             { transform: [{ scale: pressed ? 0.96 : 1 }] },
@@ -633,7 +630,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           <Text
             style={[
               styles.chipText,
-              filters.sort && filters.sort !== 'popular'
+              filters.sort
                 ? styles.chipTextActive
                 : styles.chipTextInactive,
             ]}
@@ -644,7 +641,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
             name="chevron-down"
             size={13}
             color={
-              filters.sort && filters.sort !== 'popular' ? theme.purple : theme.mute
+              filters.sort ? theme.purple : theme.mute
             }
             style={{ marginLeft: 4 }}
           />
@@ -1210,7 +1207,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
               {SORT_OPTIONS.map((opt) => {
                 const isSelected =
                   opt.id === 'relevance'
-                    ? filters.sort === null || filters.sort === 'popular'
+                    ? filters.sort === null
                     : filters.sort === opt.id;
                 return (
                   <Pressable

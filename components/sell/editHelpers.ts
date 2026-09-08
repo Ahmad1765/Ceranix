@@ -85,3 +85,24 @@ export function patchListingInCache(
     qc.setQueriesData({ queryKey: [prefix] }, patchData);
   }
 }
+
+/**
+ * Splits comma-delimited input into separate tag candidates, trims and normalizes
+ * (strips `#`, converts to lowercase), deduplicates against existing tags, and caps at maxTags (default 10).
+ */
+export function parseTagInput(
+  candidate: string,
+  existingTags: string[] = [],
+  maxTags = 10,
+): string[] {
+  const parts = candidate.split(',');
+  const next = [...existingTags];
+  for (const part of parts) {
+    const raw = part.trim().replace(/#/g, '').toLowerCase();
+    if (raw && !next.includes(raw) && next.length < maxTags) {
+      next.push(raw);
+    }
+  }
+  return next;
+}
+

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORAGE_KEY = '@ceranix/previous_searches';
@@ -127,8 +127,13 @@ export function useSearchHistory() {
     notifySubscribers([]);
   }, []);
 
+  const previousSearches = useMemo(
+    () => historyItems.map((item) => item.term),
+    [historyItems],
+  );
+
   return {
-    previousSearches: historyItems.map((item) => item.term),
+    previousSearches,
     historyItems,
     isLoaded,
     addSearch,

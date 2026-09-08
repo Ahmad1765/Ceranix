@@ -6,6 +6,9 @@ declare
   has_offer_trigger boolean;
   has_reactions_table boolean;
 begin
+  -- Serialize direct-conversation deduplication and unique index creation against concurrent inserts
+  lock table public.conversations in share row exclusive mode;
+
   drop table if exists _conv_duplicates;
   create temp table _conv_duplicates on commit drop as
   with ranked as (
@@ -84,6 +87,11 @@ begin
     where c.id = sub.conversation_id
       and (c.updated_at is null or sub.latest_created_at > c.updated_at);
   end if;
+
+  -- Create unique index while retaining the table lock within the same transaction
+  execute 'create unique index if not exists direct_conversations_participants_idx
+    on public.conversations (least(buyer_id, seller_id), greatest(buyer_id, seller_id))
+    where listing_id is null';
 end $$;
 
 -- Partial unique index on normalized participant pair for direct conversations (where listing_id is null).

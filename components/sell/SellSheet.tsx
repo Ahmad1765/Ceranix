@@ -504,20 +504,8 @@ function SellForm({
 
         const updatedListing: Listing = {
           ...editingListing,
-          title: formData.title.trim(),
-          description: formData.description?.trim() || '',
-          price: priceNum,
-          category: formData.category,
-          subcategory: formData.subcategory || null,
-          color: formData.color || null,
-          gender: formData.gender,
-          brand: formData.brand?.trim() || null,
-          size: formData.size?.trim() || null,
-          condition: formData.condition,
-          parcel_size: formData.parcelSize || null,
-          images: finalUrls,
-          thumbnails: finalThumbs,
-          tags: formData.tags || [],
+          ...updatePayload,
+          description: updatePayload.description || '',
         };
 
         patchListingInCache(editingListing.id, updatedListing);

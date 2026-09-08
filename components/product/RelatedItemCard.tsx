@@ -3,12 +3,14 @@ import { View, ScrollView, Pressable, Platform } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
-import { getOptimizedImageUrl, cardImageUrl, thumbWidthFor, IMAGE_TRANSITION } from '@/lib/images';
+import { getOptimizedImageUrl, thumbWidthFor, IMAGE_TRANSITION } from '@/lib/images';
 import { CARD_WIDTH, CARD_IMAGE_HEIGHT, type RelatedItem } from './shared';
 import { formatPrice } from '@/lib/currency';
 import { priceBreakdown } from '@/lib/fees';
 import { VintedShieldIcon } from '@/components/ui/VintedShieldIcon';
 import { useTheme } from '@/context/ThemeContext';
+
+const SUPPRESSION_WINDOW_MS = 450;
 
 export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress: () => void }) {
   const { theme } = useTheme();
@@ -57,7 +59,6 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
     const touch = e.nativeEvent?.touches?.[0] || e.nativeEvent;
     if (touch && touchStartPos.current.time > 0) {
       const dx = Math.abs((touch.pageX ?? touch.clientX ?? 0) - touchStartPos.current.x);
-      const dy = Math.abs((touch.pageY ?? touch.clientY ?? 0) - touchStartPos.current.y);
       if (dx > 6) {
         hasTouchMoved.current = true;
         isSwipingOrDragging.current = true;
@@ -74,7 +75,7 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
       }
       webScrollTimeoutRef.current = setTimeout(() => {
         isSwipingOrDragging.current = false;
-      }, 450);
+      }, SUPPRESSION_WINDOW_MS);
     }
     hasTouchMoved.current = false;
   }, []);
@@ -92,7 +93,7 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
     if (!target) return;
 
     const handleClickCapture = (e: MouseEvent) => {
-      if (isSwipingOrDragging.current || Date.now() - lastDragEndTime.current < 450) {
+      if (isSwipingOrDragging.current || Date.now() - lastDragEndTime.current < SUPPRESSION_WINDOW_MS) {
         e.stopPropagation();
         e.preventDefault();
       }
@@ -113,20 +114,24 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
     }
     webScrollTimeoutRef.current = setTimeout(() => {
       isSwipingOrDragging.current = false;
-    }, 450);
+    }, SUPPRESSION_WINDOW_MS);
   }, []);
 
   const handlePress = useCallback(() => {
-    if (isSwipingOrDragging.current || Date.now() - lastDragEndTime.current < 450) {
+    if (isSwipingOrDragging.current || Date.now() - lastDragEndTime.current < SUPPRESSION_WINDOW_MS) {
       return;
     }
     onPress();
   }, [onPress]);
 
+  const accessibilityLabel = `${item.brand || 'Item'}${item.meta ? `, ${item.meta}` : ''}, ${formatPrice(item.price, { whole: true })}`;
+
   return (
     <Pressable
       testID="related-item-card"
       onPress={handlePress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       style={{ width: CARD_WIDTH, marginBottom: 18 }}
     >
       <View
@@ -172,7 +177,7 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
               }
               webScrollTimeoutRef.current = setTimeout(() => {
                 isSwipingOrDragging.current = false;
-              }, 450);
+              }, SUPPRESSION_WINDOW_MS);
             }}
             scrollEventThrottle={16}
             disableIntervalMomentum

@@ -103,10 +103,11 @@ export function getOptimizedImageUrl(
       // If image proxy is enabled, route through Cloudflare-backed edge CDN (wsrv.nl).
       // This converts to modern WebP, resizes accurately, and edge-caches globally.
       // Egress hits on Supabase are eliminated after the initial edge-cache fill!
-      if (IMAGE_PROXY_ENABLED) {
+      // Only public objects are routed through the proxy; signed/private paths bypass it.
+      if (IMAGE_PROXY_ENABLED && u.pathname.startsWith('/storage/v1/object/public/')) {
         // If requesting card/thumbnail dimension (<= 640px) from listing-images, point to _thumb file
         const base =
-          width <= 640 && u.pathname.includes('/storage/v1/object/public/listing-images/')
+          width <= 640 && u.pathname.startsWith('/storage/v1/object/public/listing-images/')
             ? toSupabaseThumbnailUrl(url)
             : url;
         return `https://wsrv.nl/?url=${encodeURIComponent(base)}&w=${width}&q=${quality}&output=webp`;

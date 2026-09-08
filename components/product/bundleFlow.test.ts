@@ -7,6 +7,19 @@ import {
   computeCheckoutItemPrice,
 } from '@/lib/bundle';
 import { sendOffer } from '@/lib/chat';
+import { serializeBundleIds } from '@/components/product/useProductBundle';
+
+vi.mock('expo-router', () => ({
+  router: { push: vi.fn() },
+}));
+
+vi.mock('@/components/product/shared', () => ({
+  tap: vi.fn(),
+}));
+
+vi.mock('@/lib/toast', () => ({
+  useToast: () => ({ show: vi.fn() }),
+}));
 
 vi.mock('@/lib/supabase', () => ({
   supabase: {
@@ -65,12 +78,12 @@ describe('bundleFlow tests', () => {
     const baseListingId = 'base-123';
     const selectedBundleIds = ['item-456', 'item-789'];
 
-    // 1. Serialization (useProductBundle: ids.join(','))
-    const bundleIdsParam = selectedBundleIds.join(',');
+    // 1. Serialization (useProductBundle: serializeBundleIds)
+    const bundleIdsParam = serializeBundleIds(selectedBundleIds);
     expect(bundleIdsParam).toBe('item-456,item-789');
 
-    // 2. Route param parsing (app/conversation/new.tsx & app/payment/[id].tsx)
-    const parsedBundleIds = bundleIdsParam.split(',').filter(Boolean);
+    // 2. Route param parsing (app/conversation/new.tsx & app/payment/[id].tsx via sanitizeBundleItemIds)
+    const parsedBundleIds = sanitizeBundleItemIds(bundleIdsParam, baseListingId);
     const isBundle = parsedBundleIds.length > 0;
     const bundleCount = 1 + parsedBundleIds.length;
     const allItemIds = [baseListingId, ...parsedBundleIds];

@@ -5,8 +5,8 @@ import { useTheme } from '@/context/ThemeContext';
 import { EmptyState } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useInboxQuery } from '@/lib/queries';
-import { isSupportConversation } from '@/lib/support';
-import { type ConversationRow, isTransactionalConversation } from '@/lib/chat';
+import { isDirectConversation } from '@/lib/support';
+import { type ConversationRow } from '@/lib/chat';
 import { InboxRow } from '@/components/chat/InboxRow';
 
 const EMPTY_CONVERSATIONS: ConversationRow[] = [];
@@ -32,9 +32,7 @@ export function ActivityFeed({ bottomInset = 24 }: Props) {
   // Filter direct profile messages:
   // Activity is strictly for people who message you directly — NOT for buying or giving offers
   const directMessages = useMemo(() => {
-    return conversations.filter(
-      (c) => !isTransactionalConversation(c) && !isSupportConversation(c),
-    );
+    return conversations.filter(isDirectConversation);
   }, [conversations]);
 
   const { refetch: inboxRefetch, isStale: inboxStale } = inboxQ;

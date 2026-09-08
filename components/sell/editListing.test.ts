@@ -1,6 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import { QueryClient } from '@tanstack/react-query';
-import { createDefaultSellValues, listingToSellFormValues, patchListingInCache } from './editHelpers';
+import {
+  createDefaultSellValues,
+  listingToSellFormValues,
+  patchListingInCache,
+  parseTagInput,
+} from './editHelpers';
 import { qk } from '@/lib/queries/keys';
 import type { Listing } from '@/types';
 
@@ -260,3 +265,49 @@ describe('patchListingInCache', () => {
     expect(updatedCache?.pages[1]?.[0]?.title).toBe('Second Page Item');
   });
 });
+
+describe('parseTagInput (TagsSheet tag-processing)', () => {
+  it('splits comma-separated input such as "vintage, y2k"', () => {
+    const result = parseTagInput('vintage, y2k', []);
+    expect(result).toEqual(['vintage', 'y2k']);
+  });
+
+  it('normalizes candidates by trimming whitespace and converting to lowercase', () => {
+    const result = parseTagInput('  Oversized ,  STREETWEAR  ', []);
+    expect(result).toEqual(['oversized', 'streetwear']);
+  });
+
+  it('strips leading # hash characters', () => {
+    const result = parseTagInput('#grunge, #aesthetic', []);
+    expect(result).toEqual(['grunge', 'aesthetic']);
+  });
+
+  it('deduplicates against existing tags', () => {
+    const result = parseTagInput('vintage, y2k, denim', ['vintage']);
+    expect(result).toEqual(['vintage', 'y2k', 'denim']);
+  });
+
+  it('deduplicates repeated tags within the same input draft', () => {
+    const result = parseTagInput('vintage, Y2K, vintage, y2k', []);
+    expect(result).toEqual(['vintage', 'y2k']);
+  });
+
+  it('ignores empty tokens from multiple or trailing commas', () => {
+    const result = parseTagInput('vintage, , , y2k, ', []);
+    expect(result).toEqual(['vintage', 'y2k']);
+  });
+
+  it('caps total tags at 10 items when new candidates exceed limit', () => {
+    const existing = ['t1', 't2', 't3', 't4', 't5', 't6', 't7', 't8'];
+    const result = parseTagInput('t9, t10, t11, t12', existing);
+    expect(result).toHaveLength(10);
+    expect(result).toEqual(['t1', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9', 't10']);
+  });
+
+  it('preserves existing tags when already at 10 items limit', () => {
+    const existing = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
+    const result = parseTagInput('vintage, y2k', existing);
+    expect(result).toEqual(existing);
+  });
+});
+

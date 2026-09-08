@@ -29,6 +29,13 @@ type UseProductBundleProps = {
   guestGate: ReturnType<typeof useGuestGate>;
 };
 
+export function serializeBundleIds(ids: string[] | Iterable<string>): string {
+  const arr = Array.isArray(ids) ? ids : Array.from(ids);
+  return arr.join(',');
+}
+
+export const serializeBundleItemIds = serializeBundleIds;
+
 export function useProductBundle({
   listing,
   sellerItems,
@@ -87,7 +94,7 @@ export function useProductBundle({
       const ids = selectedItemIds ?? Array.from(selectedBundleIds);
       const params: Record<string, string> = {};
       if (ids.length > 0) {
-        params.bundle_ids = ids.join(',');
+        params.bundle_ids = serializeBundleIds(ids);
       }
       router.push({
         pathname: `/payment/${listing.id}`,
@@ -124,7 +131,7 @@ export function useProductBundle({
         amount: amount.toFixed(2),
       };
       if (ids.length > 0) {
-        params.bundle_ids = ids.join(',');
+        params.bundle_ids = serializeBundleIds(ids);
       }
       router.push({
         pathname: '/conversation/new',

@@ -150,14 +150,15 @@ export default function NewConversationScreen() {
   );
 
   const hasInitializedAmount = useRef(Boolean(initialAmount));
+  const isBundlePricesLoading = isBundle && bundleItemIds.length > 0 && bundleItemPrices === null;
 
   useEffect(() => {
-    if (baseReferencePrice > 0 && !hasInitializedAmount.current) {
+    if (baseReferencePrice > 0 && !hasInitializedAmount.current && !isBundlePricesLoading) {
       hasInitializedAmount.current = true;
       setAmount(String(preset20 || Math.round(baseReferencePrice * 0.8)));
       setSelectedCard('custom');
     }
-  }, [baseReferencePrice, preset20]);
+  }, [baseReferencePrice, preset20, isBundlePricesLoading]);
 
   const handleSelectCard = (card: 'tier10' | 'tier20' | 'custom') => {
     if (Platform.OS !== 'web') {

@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { computeBundlePricing, BUNDLE_TIERS, BUNDLE_MIN_ITEMS } from '@/lib/bundle';
+import {
+  computeBundlePricing,
+  BUNDLE_TIERS,
+  BUNDLE_MIN_ITEMS,
+  isOfferAmountValid,
+} from '@/lib/bundle';
 
 // These tests encode the *bundle discount policy* and money-safety rules — the
 // behaviour a buyer is actually charged by — not the implementation. If the
@@ -138,3 +143,132 @@ function mulberry32(seed: number) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+
+describe('isOfferAmountValid', () => {
+  it('rejects missing, zero, and NaN listingPrice for non-bundles', () => {
+    expect(
+      isOfferAmountValid({
+        amountNum: 50,
+        isBundle: false,
+        baseReferencePrice: 100,
+        listingPrice: undefined,
+      }),
+    ).toBe(false);
+
+    expect(
+      isOfferAmountValid({
+        amountNum: 50,
+        isBundle: false,
+        baseReferencePrice: 100,
+        listingPrice: 0,
+      }),
+    ).toBe(false);
+
+    expect(
+      isOfferAmountValid({
+        amountNum: 50,
+        isBundle: false,
+        baseReferencePrice: 100,
+        listingPrice: NaN,
+      }),
+    ).toBe(false);
+
+    expect(
+      isOfferAmountValid({
+        amountNum: 50,
+        isBundle: false,
+        baseReferencePrice: 100,
+        listingPrice: -10,
+      }),
+    ).toBe(false);
+  });
+
+  it('allows valid offers below positive listingPrice for non-bundles', () => {
+    expect(
+      isOfferAmountValid({
+        amountNum: 80,
+        isBundle: false,
+        baseReferencePrice: 100,
+        listingPrice: 100,
+      }),
+    ).toBe(true);
+
+    // Equal to or greater than listingPrice is invalid for non-bundles
+    expect(
+      isOfferAmountValid({
+        amountNum: 100,
+        isBundle: false,
+        baseReferencePrice: 100,
+        listingPrice: 100,
+      }),
+    ).toBe(false);
+
+    expect(
+      isOfferAmountValid({
+        amountNum: 120,
+        isBundle: false,
+        baseReferencePrice: 100,
+        listingPrice: 100,
+      }),
+    ).toBe(false);
+  });
+
+  it('validates bundle offers against baseReferencePrice ceiling', () => {
+    expect(
+      isOfferAmountValid({
+        amountNum: 150,
+        isBundle: true,
+        baseReferencePrice: 150,
+        listingPrice: 100,
+      }),
+    ).toBe(true);
+
+    expect(
+      isOfferAmountValid({
+        amountNum: 140,
+        isBundle: true,
+        baseReferencePrice: 150,
+        listingPrice: 100,
+      }),
+    ).toBe(true);
+
+    expect(
+      isOfferAmountValid({
+        amountNum: 151,
+        isBundle: true,
+        baseReferencePrice: 150,
+        listingPrice: 100,
+      }),
+    ).toBe(false);
+  });
+
+  it('rejects zero, negative, or non-finite offer amounts', () => {
+    expect(
+      isOfferAmountValid({
+        amountNum: 0,
+        isBundle: false,
+        baseReferencePrice: 100,
+        listingPrice: 100,
+      }),
+    ).toBe(false);
+
+    expect(
+      isOfferAmountValid({
+        amountNum: -10,
+        isBundle: false,
+        baseReferencePrice: 100,
+        listingPrice: 100,
+      }),
+    ).toBe(false);
+
+    expect(
+      isOfferAmountValid({
+        amountNum: NaN,
+        isBundle: false,
+        baseReferencePrice: 100,
+        listingPrice: 100,
+      }),
+    ).toBe(false);
+  });
+});
+

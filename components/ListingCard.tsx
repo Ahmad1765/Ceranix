@@ -503,7 +503,6 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
     const touch = e.nativeEvent?.touches?.[0] || e.nativeEvent;
     if (touch && touchStartPos.current.time > 0) {
       const dx = Math.abs((touch.pageX ?? touch.clientX ?? 0) - touchStartPos.current.x);
-      const dy = Math.abs((touch.pageY ?? touch.clientY ?? 0) - touchStartPos.current.y);
       if (dx > 6) {
         hasTouchMoved.current = true;
         isSwipingOrDragging.current = true;
@@ -598,12 +597,16 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
       }
       putCachedListing(listing);
       setImagePlaceholder(listing.id, currentSrc);
+      const heroUrl = getOptimizedImageUrl(cardImageUrl(listing, activeIndex) || cardImageUrl(listing, 0), {
+        width: 600,
+      });
+      if (heroUrl) prefetchImages([heroUrl]);
       router.push({
         pathname: `/product/${listing.id}`,
         params: { initialImage: currentSrc },
       } as any);
     },
-    [listing, currentSrc],
+    [listing, currentSrc, activeIndex],
   );
 
   const meta = [listing.size?.trim(), conditionLabel(listing.condition)].filter(Boolean).join(' · ');
@@ -622,10 +625,6 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
         };
         putCachedListing(listing);
         setImagePlaceholder(listing.id, currentSrc);
-        const heroUrl = getOptimizedImageUrl(cardImageUrl(listing, activeIndex) || cardImageUrl(listing, 0), {
-          width: 600,
-        });
-        if (heroUrl) prefetchImages([heroUrl]);
       }}
       accessibilityRole="link"
       accessibilityLabel={`${listing.brand || listing.title}${listing.size ? `, size ${listing.size}` : ''}, ${formatPrice(listing.price)}`}

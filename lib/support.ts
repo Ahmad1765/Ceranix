@@ -3,6 +3,7 @@ import {
   getOrCreateConversation,
   sendMessage,
   CONVERSATION_SELECT,
+  isTransactionalConversation,
   type ConversationRow,
   type ChatMessage,
 } from '@/lib/chat';
@@ -127,6 +128,15 @@ export function isSupportConversation(conv: ConversationRow | null | undefined):
   );
 }
 
+/**
+ * A direct conversation is a user-to-user thread not tied to any listing (non-transactional)
+ * and not involving the Support Bot.
+ */
+export function isDirectConversation(conv: ConversationRow | null | undefined): boolean {
+  if (!conv) return false;
+  return !isTransactionalConversation(conv) && !isSupportConversation(conv);
+}
+
 export function generateSupportResponse(query: string): string {
   const clean = query.toLowerCase().trim();
 
@@ -174,13 +184,19 @@ export async function getOrCreateSupportConversation(userId: string): Promise<Co
   await ensureSupportProfile();
 
   // Find existing conversation with support bot
-  const { data: existing } = await supabase
+  const { data: existingRows, error: lookupError } = await supabase
     .from('conversations')
     .select(CONVERSATION_SELECT)
     .is('listing_id', null)
     .or(`and(buyer_id.eq.${userId},seller_id.eq.${SUPPORT_BOT_USER_ID}),and(buyer_id.eq.${SUPPORT_BOT_USER_ID},seller_id.eq.${userId})`)
-    .maybeSingle();
+    .order('updated_at', { ascending: false })
+    .limit(1);
 
+  if (lookupError) {
+    console.warn('[support] getOrCreateSupportConversation lookup', lookupError.message);
+  }
+
+  const existing = existingRows?.[0];
   if (existing) return existing as unknown as ConversationRow;
 
   // Otherwise create a new direct conversation

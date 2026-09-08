@@ -9,7 +9,7 @@ describe('SellFormSchema', () => {
     description: 'Great condition vintage leather jacket',
     price: '150.00',
     category: 'clothing',
-    subcategory: 'jackets',
+    subcategory: 'outerwear',
     brand: 'AllSaints',
     size: 'M',
     condition: 'good',
@@ -144,6 +144,28 @@ describe('SellFormSchema', () => {
       subcategory: null,
     });
     expect(otherCat.success).toBe(true);
+  });
+
+  it('rejects an unrelated subcategory ID not present in the category subs', () => {
+    const invalidSub = SellFormSchema.safeParse({
+      ...validPayload,
+      category: 'clothing',
+      subcategory: 'sneakers', // belongs to shoes, not clothing
+    });
+    expect(invalidSub.success).toBe(false);
+    if (!invalidSub.success) {
+      expect(invalidSub.error.issues[0].path).toContain('subcategory');
+    }
+
+    const nonExistentSub = SellFormSchema.safeParse({
+      ...validPayload,
+      category: 'clothing',
+      subcategory: 'non_existent_sub',
+    });
+    expect(nonExistentSub.success).toBe(false);
+    if (!nonExistentSub.success) {
+      expect(nonExistentSub.error.issues[0].path).toContain('subcategory');
+    }
   });
 
   it('limits tags to a maximum of 10', () => {

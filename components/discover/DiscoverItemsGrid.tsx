@@ -79,7 +79,6 @@ type DiscoverItemsGridProps = {
   onClearDigestSort: () => void;
   searchFilters: SearchFilterState;
   onUpdateFilter: (updater: (prev: SearchFilterState) => SearchFilterState) => void;
-  onResetFilters: () => void;
 };
 
 export const DiscoverItemsGrid = memo(function DiscoverItemsGrid({
@@ -124,7 +123,6 @@ export const DiscoverItemsGrid = memo(function DiscoverItemsGrid({
   onClearDigestSort,
   searchFilters,
   onUpdateFilter,
-  onResetFilters,
 }: DiscoverItemsGridProps) {
 
   const displayResults = idle ? gridResults : results;
@@ -256,7 +254,6 @@ export const DiscoverItemsGrid = memo(function DiscoverItemsGrid({
           <SearchFilterChips
             filters={searchFilters}
             onUpdateFilter={onUpdateFilter}
-            onResetFilters={onResetFilters}
             resultCount={displayResults.length}
           />
         ) : browseCat ? (

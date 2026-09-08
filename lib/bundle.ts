@@ -113,11 +113,18 @@ export function isOfferAmountValid({
   baseReferencePrice: number;
   listingPrice?: number;
 }): boolean {
-  return (
-    Number.isFinite(amountNum) &&
-    amountNum > 0 &&
-    (isBundle ? amountNum <= baseReferencePrice : !listingPrice || amountNum < listingPrice)
-  );
+  if (!Number.isFinite(amountNum) || amountNum <= 0) {
+    return false;
+  }
+  if (isBundle) {
+    return amountNum <= baseReferencePrice;
+  }
+  const validListingPrice =
+    typeof listingPrice === 'number' && Number.isFinite(listingPrice) && listingPrice > 0;
+  if (!validListingPrice) {
+    return false;
+  }
+  return amountNum < listingPrice;
 }
 
 /**

@@ -567,6 +567,22 @@ export function CategorySheet({
   );
 }
 
+export function parseTagInput(
+  candidate: string,
+  existingTags: string[] = [],
+  maxTags = 10,
+): string[] {
+  const parts = candidate.split(',');
+  const next = [...existingTags];
+  for (const part of parts) {
+    const raw = part.trim().replace(/#/g, '').toLowerCase();
+    if (raw && !next.includes(raw) && next.length < maxTags) {
+      next.push(raw);
+    }
+  }
+  return next;
+}
+
 // ── Tags (chip input) ────────────────────────────────────────────────────────
 export function TagsSheet({
   visible,
@@ -591,10 +607,7 @@ export function TagsSheet({
 
   const addFromDraft = (candidate?: string) => {
     const textToUse = typeof candidate === 'string' ? candidate : draft;
-    const raw = textToUse.trim().replace(/[,#]/g, '').toLowerCase();
-    if (raw && !tags.includes(raw) && tags.length < 10) {
-      setTags((prev) => [...prev, raw]);
-    }
+    setTags((prev) => parseTagInput(textToUse, prev, 10));
     setDraft('');
   };
 
@@ -646,7 +659,7 @@ export function TagsSheet({
         <TextInput
           value={draft}
           onChangeText={(text) => {
-            if (/[ ,]$/.test(text)) {
+            if (text.includes(',') || /[ ]$/.test(text)) {
               addFromDraft(text);
             } else {
               setDraft(text);

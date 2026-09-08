@@ -211,6 +211,18 @@ describe('getOptimizedImageUrl with edge image proxy enabled', () => {
     const nonSupabaseUrl3 = 'https://not-supabase.co/storage/v1/object/public/listing-images/photo.jpg';
     expect(fresh(nonSupabaseUrl3, { width: 300 })).toBe(nonSupabaseUrl3);
   });
+
+  it('allows signed and private Supabase paths to bypass wsrv.nl proxy', async () => {
+    vi.stubEnv('TEST_IMAGE_PROXY', 'true');
+    vi.resetModules();
+    const { getOptimizedImageUrl: fresh } = await import('@/lib/images');
+
+    const signedUrl = 'https://abc.supabase.co/storage/v1/object/sign/private-bucket/doc.jpg?token=secret123';
+    expect(fresh(signedUrl, { width: 300 })).toBe(signedUrl);
+
+    const authenticatedUrl = 'https://abc.supabase.co/storage/v1/object/authenticated/vault/id.png';
+    expect(fresh(authenticatedUrl, { width: 300 })).toBe(authenticatedUrl);
+  });
 });
 
 describe('thumbWidthFor', () => {

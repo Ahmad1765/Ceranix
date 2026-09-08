@@ -416,6 +416,7 @@ export default function PaymentScreen() {
     try {
       const result = await paymentService.checkout({
         listingId: String(listing.id),
+        bundleItemIds: isBundle ? bundleItemIds : undefined,
         paymentMethod: selectedMethod === 'cod' ? 'cod' : 'card',
         buyerId: user.id,
         sellerId: listing.seller_id,
@@ -426,18 +427,28 @@ export default function PaymentScreen() {
 
       // Mark all items sold
       const allItemIds = Array.from(new Set([String(listing.id), ...bundleItemIds]));
-      try {
-        await Promise.all(
-          allItemIds.map(async (itemId) => {
-            try {
-              await setListingSold(itemId, true);
-            } catch {
-              // ignore
-            }
-          }),
+      const soldResults = await Promise.allSettled(
+        allItemIds.map(async (itemId) => {
+          const success = await setListingSold(itemId, true);
+          if (!success) {
+            throw new Error(`Failed to update sold status for item ${itemId}`);
+          }
+          return itemId;
+        }),
+      );
+
+      const failedItemIds = soldResults
+        .map((res, index) => (res.status === 'rejected' ? allItemIds[index] : null))
+        .filter((itemId): itemId is string => itemId !== null);
+
+      if (failedItemIds.length > 0) {
+        console.warn('[payment] Some items failed to be marked as sold:', failedItemIds);
+        toast.show(
+          failedItemIds.length === allItemIds.length
+            ? 'Order placed, but items could not be marked as sold.'
+            : 'Order placed, but some bundled items could not be marked as sold.',
+          { variant: 'default', icon: 'alert-triangle' },
         );
-      } catch {
-        // ignore fallback
       }
 
       const isPaid = result.status === 'paid';

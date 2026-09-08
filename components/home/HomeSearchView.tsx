@@ -42,7 +42,7 @@ import { useSavedSearchesQuery } from '@/lib/queries/useFeedQueries';
 import { queryClient } from '@/lib/queryClient';
 import { qk } from '@/lib/queries/keys';
 import { PreSearchSuggestions } from './PreSearchSuggestions';
-import { SearchFilterChips } from '@/components/discover';
+import { SearchFilterChips } from '@/components/discover/SearchFilterChips';
 import {
   type SearchFilterState,
   EMPTY_SEARCH_FILTERS,
@@ -1429,7 +1429,6 @@ export const HomeSearchView = memo(function HomeSearchView({
                 <SearchFilterChips
                   filters={searchFilters}
                   onUpdateFilter={setSearchFilters}
-                  onResetFilters={() => setSearchFilters(EMPTY_SEARCH_FILTERS)}
                   resultCount={displayListings.length}
                 />
 

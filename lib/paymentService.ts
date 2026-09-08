@@ -17,6 +17,7 @@ export interface CheckoutRequest {
   offerAmount?: number | null;
   shippingAddress?: unknown;
   deliveryNotes?: string | null;
+  bundleItemIds?: string[];
 }
 
 export interface CheckoutResult {
@@ -113,6 +114,23 @@ export class CodPaymentProvider implements PaymentProvider {
           order_id: data.id,
           amount_cents: data.amount_cents,
         });
+
+        if (request.bundleItemIds?.length) {
+          for (const bundleId of request.bundleItemIds) {
+            try {
+              await supabase.rpc('process_checkout', {
+                p_listing_id: bundleId,
+                p_buyer_id: request.buyerId ?? null,
+                p_payment_method: 'cod',
+                p_shipping_address: validatedAddress,
+                p_offer_amount: null,
+                p_delivery_notes: request.deliveryNotes?.trim() || validatedAddress.deliveryInstructions || null,
+              });
+            } catch (err) {
+              console.warn('[paymentService] cod bundled item checkout failed', bundleId, err);
+            }
+          }
+        }
 
         return {
           success: true,
@@ -243,6 +261,22 @@ export class StripePaymentProvider implements PaymentProvider {
 
       if (!error && data) {
         backendOrder = data as Order;
+        if (request.bundleItemIds?.length) {
+          for (const bundleId of request.bundleItemIds) {
+            try {
+              await supabase.rpc('process_checkout', {
+                p_listing_id: bundleId,
+                p_buyer_id: request.buyerId ?? null,
+                p_payment_method: 'card',
+                p_shipping_address: validatedAddress,
+                p_offer_amount: null,
+                p_delivery_notes: request.deliveryNotes?.trim() || null,
+              });
+            } catch (err) {
+              console.warn('[paymentService] card bundled item checkout failed', bundleId, err);
+            }
+          }
+        }
       } else if (error) {
         cardRpcError = new Error(error.message);
       }

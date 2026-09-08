@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { Category, Condition, Gender } from '@/types';
-import { hasSubcategories } from '@/lib/categories';
+import { hasSubcategories, CATEGORIES } from '@/lib/categories';
 import { CURRENCY_SYMBOL } from '@/lib/currency';
 
 export const CATEGORY_VALUES: [Category, ...Category[]] = [
@@ -109,12 +109,18 @@ export const SellFormSchema = z
     parcelSize: z.enum(PARCEL_SIZE_VALUES).nullable(),
   })
   .superRefine((data, ctx) => {
-    if (hasSubcategories(data.category) && !data.subcategory) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Please choose a subcategory for this item',
-        path: ['subcategory'],
-      });
+    if (hasSubcategories(data.category)) {
+      const cat = CATEGORIES.find((c) => c.id === data.category);
+      const isSubcategoryValid = Boolean(
+        data.subcategory && cat?.subs.some((s) => s.id === data.subcategory),
+      );
+      if (!isSubcategoryValid) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Please choose a subcategory for this item',
+          path: ['subcategory'],
+        });
+      }
     }
   });
 

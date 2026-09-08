@@ -14,6 +14,7 @@ import {
 } from '@/lib/chat';
 import {
   isSupportConversation,
+  isDirectConversation,
   getOrCreateSupportConversation,
   SUPPORT_TOPICS,
   SUPPORT_BOT_NAME,
@@ -712,9 +713,7 @@ export default function InboxScreen() {
       buying: conversations.filter(
         (c) => c.buyer_id === uid && isTransactionalConversation(c) && !isSupportConversation(c),
       ),
-      activity: conversations.filter(
-        (c) => !isTransactionalConversation(c) && !isSupportConversation(c),
-      ),
+      activity: conversations.filter(isDirectConversation),
       support: conversations.filter((c) => isSupportConversation(c)),
     };
   }, [conversations, user?.id]);
