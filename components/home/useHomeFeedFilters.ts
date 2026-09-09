@@ -289,7 +289,8 @@ export function useHomeFeedFilters({
     [savedSearches, activeChip],
   );
 
-  const showingSaved = activeChip === SAVED;
+  const showingSaved =
+    activeChip === SAVED || (dynamicChip.tab === 'saved' && activeChip === dynamicChip.id);
   const showingTrending =
     activeChip === TRENDING || (dynamicChip.isDefaultTrending && activeChip === dynamicChip.id);
   const showingDynamic = !dynamicChip.isDefaultTrending && activeChip === dynamicChip.id;

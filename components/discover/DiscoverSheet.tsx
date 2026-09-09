@@ -461,8 +461,7 @@ function DiscoverSheetBody({ onClose }: { onClose: () => void }) {
   const onBrowse = useCallback(
     (action: BrowseAction, chip?: { label: string; icon: keyof typeof Feather.glyphMap }) => {
       if (action.kind === 'saved') {
-        onClose();
-        router.push({ pathname: '/(tabs)/profile', params: { tab: 'collections' } } as any);
+        go(`/?tab=saved&chipLabel=${encodeURIComponent('Saved')}&chipIcon=bookmark`);
         return;
       }
       const label = chip?.label ?? (action.kind === 'sort' ? action.sort : action.tab);

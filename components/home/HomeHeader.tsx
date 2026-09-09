@@ -339,14 +339,20 @@ export const ChipRow = memo(function ChipRow({
   const isDynamicActive =
     activeChip === dynamicChip.id ||
     (dynamicChip.isDefaultTrending && activeChip === TRENDING);
+  const isForYouActive = activeChip === FOR_YOU;
 
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingVertical: 12, alignItems: 'center' }}
+      contentContainerStyle={{
+        paddingHorizontal: 16,
+        gap: 8,
+        paddingVertical: 10,
+        alignItems: 'center',
+      }}
     >
-      {/* For You Primary Chip */}
+      {/* 1. For You Primary Chip */}
       <Pressable
         onPress={() => {
           haptic();
@@ -355,23 +361,25 @@ export const ChipRow = memo(function ChipRow({
         accessibilityRole="button"
         accessibilityLabel="Browse For you"
         style={({ pressed }) => ({
-          paddingHorizontal: 14,
-          paddingVertical: 8,
-          borderRadius: radii.pill,
-          backgroundColor: activeChip === FOR_YOU ? theme.selected : theme.white,
+          height: 38,
+          paddingHorizontal: 16,
+          borderRadius: 19,
+          backgroundColor: isForYouActive ? theme.selected : theme.white,
           borderWidth: 1,
-          borderColor: theme.border,
+          borderColor: isForYouActive ? 'transparent' : theme.border,
           flexDirection: 'row',
           alignItems: 'center',
+          justifyContent: 'center',
           gap: 6,
           transform: [{ scale: pressed ? 0.96 : 1 }],
         })}
       >
-        <Feather name="zap" size={13} color={theme.ink} />
+        <Feather name="zap" size={13.5} color={theme.ink} />
         <Text
           style={{
             fontFamily: typography.family.sansBold,
-            fontSize: 13,
+            fontSize: 14,
+            letterSpacing: -0.2,
             color: theme.ink,
           }}
         >
@@ -379,7 +387,7 @@ export const ChipRow = memo(function ChipRow({
         </Text>
       </Pressable>
 
-      {/* Dynamic Chip (Trending by default, or replaced by Discover filter chip/topic) */}
+      {/* 2. Dynamic Chip (Trending, Saved, or Category topic) */}
       <Pressable
         onPress={() => {
           haptic();
@@ -388,27 +396,29 @@ export const ChipRow = memo(function ChipRow({
         accessibilityRole="button"
         accessibilityLabel={`Browse ${dynamicChip.label}`}
         style={({ pressed }) => ({
-          paddingHorizontal: 14,
-          paddingVertical: 8,
-          borderRadius: radii.pill,
+          height: 38,
+          paddingHorizontal: 16,
+          borderRadius: 19,
           backgroundColor: isDynamicActive ? theme.selected : theme.white,
           borderWidth: 1,
-          borderColor: theme.border,
+          borderColor: isDynamicActive ? 'transparent' : theme.border,
           flexDirection: 'row',
           alignItems: 'center',
+          justifyContent: 'center',
           gap: 6,
           transform: [{ scale: pressed ? 0.96 : 1 }],
         })}
       >
         <Feather
           name={dynamicChip.icon}
-          size={13}
+          size={13.5}
           color={theme.ink}
         />
         <Text
           style={{
             fontFamily: typography.family.sansBold,
-            fontSize: 13,
+            fontSize: 14,
+            letterSpacing: -0.2,
             color: theme.ink,
           }}
         >
@@ -416,7 +426,7 @@ export const ChipRow = memo(function ChipRow({
         </Text>
       </Pressable>
 
-      {/* Create Alert / Saved Search Circular Button */}
+      {/* 3. Create Alert / Saved Search Circular Button */}
       <Pressable
         onPress={() => {
           haptic();
@@ -424,9 +434,9 @@ export const ChipRow = memo(function ChipRow({
         }}
         accessibilityLabel="Create alert"
         style={({ pressed }) => ({
-          width: 34,
-          height: 34,
-          borderRadius: radii.pill,
+          width: 38,
+          height: 38,
+          borderRadius: 19,
           backgroundColor: theme.white,
           borderWidth: 1,
           borderColor: theme.border,
@@ -435,10 +445,10 @@ export const ChipRow = memo(function ChipRow({
           transform: [{ scale: pressed ? 0.96 : 1 }],
         })}
       >
-        <Feather name="plus" size={16} color={theme.ink} />
+        <Feather name="plus" size={17} color={theme.ink} />
       </Pressable>
 
-      {/* Saved Searches Chips */}
+      {/* 4. Saved Searches / Custom Topics Chips */}
       {savedSearches.map((s) => {
         const active = activeChip === s.id;
         return (
@@ -453,14 +463,15 @@ export const ChipRow = memo(function ChipRow({
               onDeleteChip(s);
             }}
             style={({ pressed }) => ({
-              paddingHorizontal: 14,
-              paddingVertical: 8,
-              borderRadius: radii.pill,
+              height: 38,
+              paddingHorizontal: 16,
+              borderRadius: 19,
               backgroundColor: active ? theme.selected : theme.white,
               borderWidth: 1,
-              borderColor: active ? theme.border : theme.border,
+              borderColor: active ? 'transparent' : theme.border,
               flexDirection: 'row',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: 6,
               transform: [{ scale: pressed ? 0.96 : 1 }],
             })}
@@ -468,7 +479,8 @@ export const ChipRow = memo(function ChipRow({
             <Text
               style={{
                 fontFamily: typography.family.sansMedium,
-                fontSize: 13,
+                fontSize: 14,
+                letterSpacing: -0.2,
                 color: theme.ink,
               }}
             >

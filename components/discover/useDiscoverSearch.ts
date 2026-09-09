@@ -494,7 +494,7 @@ export function useDiscoverSearch({
       setSearchActive(false);
       Keyboard.dismiss();
       if (action.kind === 'saved') {
-        router.push({ pathname: '/(tabs)/profile', params: { tab: 'collections' } } as any);
+        router.push('/?tab=saved&chipLabel=Saved&chipIcon=bookmark' as any);
         return;
       }
       if (action.kind === 'tab') {
