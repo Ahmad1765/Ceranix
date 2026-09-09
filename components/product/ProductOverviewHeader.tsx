@@ -27,14 +27,18 @@ type ProductOverviewHeaderProps = {
   listing: Listing;
   bpFee: number;
   onOpenBpSheet: () => void;
+  hasBundleItems?: boolean;
+  onScrollToBundle?: () => void;
 };
 
 export const ProductOverviewHeader = memo(function ProductOverviewHeader({
   listing,
   bpFee,
   onOpenBpSheet,
+  hasBundleItems = true,
+  onScrollToBundle,
 }: ProductOverviewHeaderProps) {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const heartCount = Math.max(0, Number(listing.likes ?? 0));
   const itemPrice = Number(listing.price ?? 0);
 
@@ -114,17 +118,21 @@ export const ProductOverviewHeader = memo(function ProductOverviewHeader({
       <View style={{ marginTop: 18 }}>
         <Text
           style={{
-            fontSize: 22,
+            fontSize: 28,
             fontFamily: 'Inter_700Bold',
             color: theme.ink,
-            letterSpacing: -0.4,
+            lineHeight: 34,
+            letterSpacing: -0.6,
           }}
         >
           {formatPrice(itemPrice, { whole: true })}
         </Text>
         {bpFee > 0 ? (
           <Pressable
-            onPress={() => { tap('selection'); onOpenBpSheet(); }}
+            onPress={() => {
+              tap('selection');
+              onOpenBpSheet();
+            }}
             accessibilityRole="button"
             accessibilityLabel={`Plus ${formatPrice(bpFee)} Buyer Protection fee. See the breakdown.`}
             hitSlop={8}
@@ -138,13 +146,46 @@ export const ProductOverviewHeader = memo(function ProductOverviewHeader({
               opacity: pressed ? 0.6 : 1,
             })}
           >
-            <Text style={{ fontSize: 14, fontFamily: 'Inter_500Medium', color: theme.mute }}>
+            <Text style={{ fontSize: 15, fontFamily: 'Inter_400Regular', color: theme.ink }}>
               +{formatPrice(bpFee)} Buyer Protection fee
             </Text>
-            <ShieldCheckIcon size={14} />
+            <ShieldCheckIcon size={22} />
           </Pressable>
-
         ) : null}
+
+        {hasBundleItems && (
+          <Pressable
+            onPress={() => {
+              tap('selection');
+              onScrollToBundle?.();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Up to 35% off when you bundle items from this seller"
+            style={({ pressed }) => ({
+              backgroundColor: isDark ? 'rgba(83, 86, 238, 0.16)' : '#F2F3FE',
+              borderRadius: 12,
+              paddingHorizontal: 16,
+              paddingVertical: 14,
+              marginTop: 14,
+              opacity: pressed ? 0.75 : 1,
+            })}
+          >
+            <Text
+              style={{
+                fontSize: 15,
+                lineHeight: 22,
+                fontFamily: 'Inter_400Regular',
+                color: theme.ink,
+              }}
+            >
+              Up to{' '}
+              <Text style={{ fontFamily: 'Inter_600SemiBold', color: '#5356EE' }}>
+                35% off
+              </Text>{' '}
+              when you bundle items from this seller
+            </Text>
+          </Pressable>
+        )}
       </View>
     </View>
   );

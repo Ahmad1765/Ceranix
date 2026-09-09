@@ -562,7 +562,11 @@ export default function ProductScreen() {
         <ProductOverviewHeader
           listing={listing}
           bpFee={bpFee}
+          hasBundleItems={sellerItems.length > 0}
           onOpenBpSheet={() => engagement.setBpVisible(true)}
+          onScrollToBundle={() => {
+            mainScrollRef.current?.scrollTo({ y: 650, animated: true });
+          }}
         />
 
         {/* 4. Seller Profile Card */}
