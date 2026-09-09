@@ -376,7 +376,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           accessibilityLabel={onOpenFullFilter ? 'Open all filters' : 'Open category modal'}
         >
           <FilterSlidersIcon
-            size={17}
+            size={14.5}
             color={activeCount > 0 ? activeIconColor : theme.text}
           />
           {activeCount > 0 && (
@@ -1324,7 +1324,7 @@ function createStyles(theme: ThemeTokens, isDark: boolean) {
       paddingBottom: 4,
     },
     chipsScrollView: {
-      maxHeight: 46,
+      maxHeight: 38,
     },
     chipsScrollContent: {
       paddingHorizontal: 16,
@@ -1334,8 +1334,8 @@ function createStyles(theme: ThemeTokens, isDark: boolean) {
     chip: {
       flexDirection: 'row',
       alignItems: 'center',
-      height: 35,
-      paddingHorizontal: 13,
+      height: 28,
+      paddingHorizontal: 11,
       borderRadius: radii.pill,
       borderWidth: 1,
       outlineStyle: 'none',
@@ -1347,8 +1347,8 @@ function createStyles(theme: ThemeTokens, isDark: boolean) {
       }),
     },
     filterIconChip: {
-      paddingHorizontal: 12,
-      minWidth: 42,
+      paddingHorizontal: 8,
+      minWidth: 32,
       justifyContent: 'center',
       alignItems: 'center',
     },
@@ -1379,9 +1379,10 @@ function createStyles(theme: ThemeTokens, isDark: boolean) {
       }),
     },
     chipText: {
-      fontSize: 13,
+      fontSize: 12,
       fontFamily: typography.family.sansMedium,
       letterSpacing: -0.15,
+      lineHeight: 14,
     },
     chipTextInactive: {
       color: theme.text,
@@ -1393,18 +1394,18 @@ function createStyles(theme: ThemeTokens, isDark: boolean) {
       fontFamily: typography.family.sansBold,
     },
     badge: {
-      marginLeft: 6,
+      marginLeft: 5,
       backgroundColor: isDark ? '#FFFFFF' : '#0F0F0F',
       borderRadius: radii.pill,
-      minWidth: 18,
-      height: 18,
-      paddingHorizontal: 5,
+      minWidth: 16,
+      height: 16,
+      paddingHorizontal: 4,
       alignItems: 'center',
       justifyContent: 'center',
     },
     badgeText: {
       color: isDark ? '#0F0F0F' : '#FFFFFF',
-      fontSize: 10.5,
+      fontSize: 9.5,
       fontFamily: typography.family.sansBold,
       fontWeight: '700',
       lineHeight: 11,
@@ -1539,13 +1540,13 @@ function createStyles(theme: ThemeTokens, isDark: boolean) {
       paddingVertical: 10,
     },
     sizeChip: {
-      paddingHorizontal: 14,
-      paddingVertical: 9,
-      borderRadius: radii.md,
+      height: 28,
+      paddingHorizontal: 12,
+      borderRadius: radii.pill,
       borderWidth: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      minWidth: 54,
+      minWidth: 46,
     },
     sizeChipInactive: {
       backgroundColor: isDark ? theme.surface : '#FFFFFF',
@@ -1557,7 +1558,7 @@ function createStyles(theme: ThemeTokens, isDark: boolean) {
       borderWidth: 1.5,
     },
     sizeChipText: {
-      fontSize: 14,
+      fontSize: 12,
       fontWeight: '600',
     },
     sizeChipTextInactive: {
@@ -1647,12 +1648,14 @@ function createStyles(theme: ThemeTokens, isDark: boolean) {
       marginBottom: 14,
     },
     pricePresetChip: {
+      height: 28,
       paddingHorizontal: 12,
-      paddingVertical: 8,
       borderRadius: radii.pill,
       backgroundColor: isDark ? theme.surface : '#F3F4F6',
       borderWidth: 1,
       borderColor: theme.border,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     pricePresetChipActive: {
       backgroundColor: isDark ? 'rgba(108, 71, 255, 0.2)' : '#EDE9FE',
@@ -1660,7 +1663,7 @@ function createStyles(theme: ThemeTokens, isDark: boolean) {
       borderColor: theme.purple,
     },
     pricePresetText: {
-      fontSize: 13,
+      fontSize: 12,
       fontWeight: '500',
       color: theme.text,
     },

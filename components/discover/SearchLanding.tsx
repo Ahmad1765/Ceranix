@@ -216,9 +216,10 @@ const BrowseChipView = memo(function BrowseChipView({
         return {
           flexDirection: 'row',
           alignItems: 'center',
-          gap: 6,
-          paddingVertical: 8,
-          paddingHorizontal: 14,
+          justifyContent: 'center',
+          gap: 5,
+          height: 28,
+          paddingHorizontal: 12,
           borderRadius: radii.pill,
           borderWidth: 1,
           borderColor: theme.border,
@@ -227,8 +228,8 @@ const BrowseChipView = memo(function BrowseChipView({
         };
       }}
     >
-      <Feather name={chip.icon} size={13.5} color={colors.purple} />
-      <Text style={{ fontSize: 13, fontFamily: type.family.sansBold, color: theme.ink }}>
+      <Feather name={chip.icon} size={12} color={colors.purple} />
+      <Text style={{ fontSize: 12, fontFamily: type.family.sansBold, color: theme.ink }}>
         {chip.label}
       </Text>
     </Pressable>

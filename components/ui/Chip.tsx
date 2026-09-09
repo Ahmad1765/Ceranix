@@ -25,14 +25,13 @@ export function Chip({
   size = 'md',
 }: Props) {
   const sty = stylesFor(active ? 'selected' : tone);
-  const padY = size === 'sm' ? 6 : 8;
-  const padX = size === 'sm' ? 12 : 14;
-  const fs = size === 'sm' ? 12 : 13;
+  const padX = 12;
+  const fs = 12;
 
   const Inner = (
     <View
       style={{
-        paddingVertical: padY,
+        height: 28,
         paddingHorizontal: padX,
         borderRadius: radii.pill,
         backgroundColor: sty.bg,
@@ -40,10 +39,11 @@ export function Chip({
         borderColor: sty.bc,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        justifyContent: 'center',
+        gap: 5,
       }}
     >
-      {icon && <Feather name={icon} size={fs + 1} color={sty.fg} />}
+      {icon && <Feather name={icon} size={fs} color={sty.fg} />}
       <Text style={{ fontSize: fs, fontWeight: '700', color: sty.fg, letterSpacing: 0.1 }}>
         {label}
       </Text>
@@ -51,19 +51,21 @@ export function Chip({
         <View
           style={{
             marginLeft: 2,
-            paddingHorizontal: 6,
-            paddingVertical: 1,
-            borderRadius: 999,
+            paddingHorizontal: 4,
+            height: 16,
+            minWidth: 16,
+            borderRadius: 8,
             backgroundColor: active ? colors.pink : colors.pinkSoft,
-            minWidth: 18,
             alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
           <Text
             style={{
-              fontSize: 10,
+              fontSize: 9.5,
               fontWeight: '800',
               color: active ? colors.white : colors.pinkDeep,
+              lineHeight: 11,
             }}
           >
             {count}

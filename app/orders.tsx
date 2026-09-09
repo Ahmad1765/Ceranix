@@ -429,9 +429,11 @@ function OrdersScreen() {
               }}
               style={({ pressed }) => [
                 {
-                  paddingHorizontal: 14,
-                  paddingVertical: 6.5,
-                  borderRadius: 20,
+                  height: 28,
+                  paddingHorizontal: 12,
+                  borderRadius: 14,
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   borderWidth: 1,
                   backgroundColor: active ? theme.purpleSoft : theme.panel,
                   borderColor: active ? theme.purple : theme.border,
@@ -441,7 +443,7 @@ function OrdersScreen() {
             >
               <Text
                 style={{
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: active ? '700' : '500',
                   color: active ? theme.purple : theme.mute,
                   fontFamily: active ? typography.family.sansBold : typography.family.sansMedium,

@@ -678,9 +678,11 @@ export default function UserProfileScreen() {
                       accessibilityRole="button"
                       accessibilityState={{ selected: active }}
                       style={({ pressed }) => ({
+                        height: 28,
                         paddingHorizontal: 12,
-                        paddingVertical: 6,
-                        borderRadius: 8,
+                        borderRadius: 14,
+                        alignItems: 'center',
+                        justifyContent: 'center',
                         backgroundColor: active ? colors.purple : colors.surface,
                         borderWidth: 1,
                         borderColor: active ? colors.purple : colors.border,
@@ -689,7 +691,7 @@ export default function UserProfileScreen() {
                     >
                       <Text
                         style={{
-                          fontSize: 12.5,
+                          fontSize: 12,
                           fontWeight: active ? '700' : '600',
                           color: active ? '#FFFFFF' : colors.ink,
                         }}

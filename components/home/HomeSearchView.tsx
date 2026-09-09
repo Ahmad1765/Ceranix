@@ -825,22 +825,22 @@ export const HomeSearchView = memo(function HomeSearchView({
                 key={item.term}
                 onPress={() => handleSelectTag(item.term, item.tab)}
                 style={({ pressed }) => ({
+                  height: 28,
                   flexDirection: 'row',
                   alignItems: 'center',
                   backgroundColor: isDark ? theme.surface : theme.panel,
                   borderWidth: 1,
                   borderColor: theme.border,
-                  borderRadius: radii.pill,
-                  paddingVertical: 7,
+                  borderRadius: 14,
                   paddingLeft: 12,
                   paddingRight: 8,
-                  gap: 8,
+                  gap: 6,
                   opacity: pressed ? 0.75 : 1,
                 })}
               >
                 <Text
                   style={{
-                    fontSize: 14,
+                    fontSize: 12.5,
                     fontWeight: '500',
                     fontFamily: typography.family.sansMedium,
                     color: theme.text,
@@ -912,18 +912,20 @@ export const HomeSearchView = memo(function HomeSearchView({
               key={term}
               onPress={() => handleSelectTag(term, 'listings')}
               style={({ pressed }) => ({
+                height: 28,
                 backgroundColor: isDark ? theme.surface : theme.panel,
                 borderWidth: 1,
                 borderColor: theme.border,
-                borderRadius: radii.pill,
-                paddingVertical: 7,
-                paddingHorizontal: 14,
+                borderRadius: 14,
+                paddingHorizontal: 12,
+                alignItems: 'center',
+                justifyContent: 'center',
                 opacity: pressed ? 0.75 : 1,
               })}
             >
               <Text
                 style={{
-                  fontSize: 14,
+                  fontSize: 12.5,
                   fontWeight: '500',
                   fontFamily: typography.family.sansMedium,
                   color: theme.text,
@@ -1023,22 +1025,22 @@ export const HomeSearchView = memo(function HomeSearchView({
                 key={item.term}
                 onPress={() => handleSelectTag(item.term, 'seller')}
                 style={({ pressed }) => ({
+                  height: 28,
                   flexDirection: 'row',
                   alignItems: 'center',
                   backgroundColor: isDark ? theme.surface : theme.panel,
                   borderWidth: 1,
                   borderColor: theme.border,
-                  borderRadius: radii.pill,
-                  paddingVertical: 7,
+                  borderRadius: 14,
                   paddingLeft: 12,
                   paddingRight: 8,
-                  gap: 8,
+                  gap: 6,
                   opacity: pressed ? 0.75 : 1,
                 })}
               >
                 <Text
                   style={{
-                    fontSize: 14,
+                    fontSize: 12.5,
                     fontWeight: '500',
                     fontFamily: typography.family.sansMedium,
                     color: theme.text,
@@ -1088,18 +1090,20 @@ export const HomeSearchView = memo(function HomeSearchView({
               key={seller}
               onPress={() => handleSelectTag(seller, 'seller')}
               style={({ pressed }) => ({
+                height: 28,
                 backgroundColor: isDark ? theme.surface : theme.panel,
                 borderWidth: 1,
                 borderColor: theme.border,
-                borderRadius: radii.pill,
-                paddingVertical: 7,
-                paddingHorizontal: 14,
+                borderRadius: 14,
+                paddingHorizontal: 12,
+                alignItems: 'center',
+                justifyContent: 'center',
                 opacity: pressed ? 0.75 : 1,
               })}
             >
               <Text
                 style={{
-                  fontSize: 14,
+                  fontSize: 12.5,
                   fontWeight: '500',
                   fontFamily: typography.family.sansMedium,
                   color: theme.text,

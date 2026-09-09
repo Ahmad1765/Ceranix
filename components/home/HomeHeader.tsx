@@ -348,7 +348,7 @@ export const ChipRow = memo(function ChipRow({
       contentContainerStyle={{
         paddingHorizontal: 16,
         gap: 8,
-        paddingVertical: 10,
+        paddingVertical: 6,
         alignItems: 'center',
       }}
     >
@@ -361,24 +361,24 @@ export const ChipRow = memo(function ChipRow({
         accessibilityRole="button"
         accessibilityLabel="Browse For you"
         style={({ pressed }) => ({
-          height: 38,
-          paddingHorizontal: 16,
-          borderRadius: 19,
+          height: 28,
+          paddingHorizontal: 12,
+          borderRadius: 14,
           backgroundColor: isForYouActive ? theme.selected : theme.white,
           borderWidth: 1,
           borderColor: isForYouActive ? 'transparent' : theme.border,
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: 6,
+          gap: 5,
           transform: [{ scale: pressed ? 0.96 : 1 }],
         })}
       >
-        <Feather name="zap" size={13.5} color={theme.ink} />
+        <Feather name="zap" size={12} color={theme.ink} />
         <Text
           style={{
             fontFamily: typography.family.sansBold,
-            fontSize: 14,
+            fontSize: 12.5,
             letterSpacing: -0.2,
             color: theme.ink,
           }}
@@ -396,28 +396,28 @@ export const ChipRow = memo(function ChipRow({
         accessibilityRole="button"
         accessibilityLabel={`Browse ${dynamicChip.label}`}
         style={({ pressed }) => ({
-          height: 38,
-          paddingHorizontal: 16,
-          borderRadius: 19,
+          height: 28,
+          paddingHorizontal: 12,
+          borderRadius: 14,
           backgroundColor: isDynamicActive ? theme.selected : theme.white,
           borderWidth: 1,
           borderColor: isDynamicActive ? 'transparent' : theme.border,
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: 6,
+          gap: 5,
           transform: [{ scale: pressed ? 0.96 : 1 }],
         })}
       >
         <Feather
           name={dynamicChip.icon}
-          size={13.5}
+          size={12}
           color={theme.ink}
         />
         <Text
           style={{
             fontFamily: typography.family.sansBold,
-            fontSize: 14,
+            fontSize: 12.5,
             letterSpacing: -0.2,
             color: theme.ink,
           }}
@@ -434,9 +434,9 @@ export const ChipRow = memo(function ChipRow({
         }}
         accessibilityLabel="Create alert"
         style={({ pressed }) => ({
-          width: 38,
-          height: 38,
-          borderRadius: 19,
+          width: 28,
+          height: 28,
+          borderRadius: 14,
           backgroundColor: theme.white,
           borderWidth: 1,
           borderColor: theme.border,
@@ -445,7 +445,7 @@ export const ChipRow = memo(function ChipRow({
           transform: [{ scale: pressed ? 0.96 : 1 }],
         })}
       >
-        <Feather name="plus" size={17} color={theme.ink} />
+        <Feather name="plus" size={14} color={theme.ink} />
       </Pressable>
 
       {/* 4. Saved Searches / Custom Topics Chips */}
@@ -463,23 +463,23 @@ export const ChipRow = memo(function ChipRow({
               onDeleteChip(s);
             }}
             style={({ pressed }) => ({
-              height: 38,
-              paddingHorizontal: 16,
-              borderRadius: 19,
+              height: 28,
+              paddingHorizontal: 12,
+              borderRadius: 14,
               backgroundColor: active ? theme.selected : theme.white,
               borderWidth: 1,
               borderColor: active ? 'transparent' : theme.border,
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 6,
+              gap: 5,
               transform: [{ scale: pressed ? 0.96 : 1 }],
             })}
           >
             <Text
               style={{
                 fontFamily: typography.family.sansMedium,
-                fontSize: 14,
+                fontSize: 12.5,
                 letterSpacing: -0.2,
                 color: theme.ink,
               }}

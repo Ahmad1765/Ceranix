@@ -210,10 +210,11 @@ export const ProfileListingTabs = memo(function ProfileListingTabs({
             style={({ pressed }) => ({
               flexDirection: 'row',
               alignItems: 'center',
-              gap: 6,
-              paddingHorizontal: 14,
-              paddingVertical: 8,
-              borderRadius: 8,
+              justifyContent: 'center',
+              gap: 5,
+              height: 28,
+              paddingHorizontal: 12,
+              borderRadius: 14,
               backgroundColor: activeListId === null ? colors.purple : colors.surface,
               borderWidth: 1,
               borderColor: activeListId === null ? colors.purple : colors.border,
@@ -222,12 +223,12 @@ export const ProfileListingTabs = memo(function ProfileListingTabs({
           >
             <Ionicons
               name="play-circle-outline"
-              size={16}
+              size={14}
               color={activeListId === null ? '#FFFFFF' : colors.ink}
             />
             <Text
               style={{
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: '700',
                 color: activeListId === null ? '#FFFFFF' : colors.ink,
               }}
@@ -236,7 +237,7 @@ export const ProfileListingTabs = memo(function ProfileListingTabs({
             </Text>
             <Text
               style={{
-                fontSize: 12,
+                fontSize: 11,
                 color: activeListId === null ? 'rgba(255,255,255,0.85)' : colors.mute,
                 fontWeight: '600',
               }}
@@ -256,10 +257,11 @@ export const ProfileListingTabs = memo(function ProfileListingTabs({
                   style={({ pressed }) => ({
                     flexDirection: 'row',
                     alignItems: 'center',
-                    gap: 6,
-                    paddingHorizontal: 14,
-                    paddingVertical: 8,
-                    borderRadius: 8,
+                    justifyContent: 'center',
+                    gap: 5,
+                    height: 28,
+                    paddingHorizontal: 12,
+                    borderRadius: 14,
                     backgroundColor: isListActive ? colors.purple : colors.surface,
                     borderWidth: 1,
                     borderColor: isListActive ? colors.purple : colors.border,
@@ -268,12 +270,12 @@ export const ProfileListingTabs = memo(function ProfileListingTabs({
                 >
                   <Ionicons
                     name="play-circle-outline"
-                    size={16}
+                    size={14}
                     color={isListActive ? '#FFFFFF' : colors.ink}
                   />
                   <Text
                     style={{
-                      fontSize: 13,
+                      fontSize: 12,
                       fontWeight: '700',
                       color: isListActive ? '#FFFFFF' : colors.ink,
                     }}
@@ -282,7 +284,7 @@ export const ProfileListingTabs = memo(function ProfileListingTabs({
                   </Text>
                   <Text
                     style={{
-                      fontSize: 12,
+                      fontSize: 11,
                       color: isListActive ? 'rgba(255,255,255,0.85)' : colors.mute,
                       fontWeight: '600',
                     }}
@@ -297,9 +299,9 @@ export const ProfileListingTabs = memo(function ProfileListingTabs({
             <Pressable
               onPress={onCreateList}
               style={({ pressed }) => ({
-                width: 36,
-                height: 36,
-                borderRadius: 8,
+                width: 28,
+                height: 28,
+                borderRadius: 14,
                 borderWidth: 1,
                 borderColor: colors.border,
                 backgroundColor: colors.surface,
@@ -308,7 +310,7 @@ export const ProfileListingTabs = memo(function ProfileListingTabs({
                 opacity: pressed ? 0.7 : 1,
               })}
             >
-              <Feather name="plus" size={16} color={colors.ink} />
+              <Feather name="plus" size={14} color={colors.ink} />
             </Pressable>
           )}
         </ScrollView>

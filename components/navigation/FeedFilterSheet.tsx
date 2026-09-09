@@ -963,23 +963,24 @@ function createStyles(theme: ThemeTokens, isDark: boolean) {
     chip: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 6,
-      height: 38,
-      paddingHorizontal: 14,
+      justifyContent: 'center',
+      gap: 5,
+      height: 28,
+      paddingHorizontal: 12,
       borderRadius: radii.pill,
       borderWidth: 1,
     },
     sizeChip: {
-      minWidth: 46,
-      height: 38,
-      paddingHorizontal: 12,
+      minWidth: 44,
+      height: 28,
+      paddingHorizontal: 10,
       borderRadius: radii.pill,
       borderWidth: 1,
       alignItems: 'center',
       justifyContent: 'center',
     },
     sizeChipText: {
-      fontSize: 13,
+      fontSize: 12,
       letterSpacing: -0.1,
     },
     chipInactive: {
@@ -991,7 +992,7 @@ function createStyles(theme: ThemeTokens, isDark: boolean) {
       borderColor: activeChipBorder,
     },
     chipText: {
-      fontSize: 13,
+      fontSize: 12,
       letterSpacing: -0.1,
     },
     priceRow: {

@@ -340,10 +340,11 @@ function Chip({ label, onPress }: { label: string; onPress: () => void }) {
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
-        paddingHorizontal: 14,
-        paddingVertical: 9,
-        borderRadius: radii.md,
+        justifyContent: 'center',
+        gap: 5,
+        height: 28,
+        paddingHorizontal: 12,
+        borderRadius: radii.pill,
         borderWidth: 1,
         borderColor: colors.hair,
         backgroundColor: pressed ? colors.panel : colors.white,
@@ -351,17 +352,17 @@ function Chip({ label, onPress }: { label: string; onPress: () => void }) {
     >
       <Text
         style={{
-          fontSize: 12.5,
+          fontSize: 11.5,
           fontFamily: type.family.sansBold,
           color: colors.ink,
-          letterSpacing: 0.8,
+          letterSpacing: 0.6,
           textTransform: 'uppercase',
         }}
         numberOfLines={1}
       >
         {label}
       </Text>
-      <Feather name="arrow-up-right" size={13} color={colors.purple} />
+      <Feather name="arrow-up-right" size={12} color={colors.purple} />
     </Pressable>
   );
 }

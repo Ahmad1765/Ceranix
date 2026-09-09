@@ -167,10 +167,22 @@ function ToggleChip({ label, active, onPress, icon, disabled }: { label: string;
       disabled={disabled}
       accessibilityRole="switch"
       accessibilityState={{ checked: active }}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, borderWidth: 1, borderColor: active ? '#6C47FF' : 'rgba(15,15,15,0.12)', backgroundColor: active ? 'rgba(108,71,255,0.08)' : '#fff', opacity: disabled ? 0.5 : 1 }}
+      style={{
+        height: 28,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 5,
+        paddingHorizontal: 12,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: active ? '#6C47FF' : 'rgba(15,15,15,0.12)',
+        backgroundColor: active ? 'rgba(108,71,255,0.08)' : '#fff',
+        opacity: disabled ? 0.5 : 1,
+      }}
     >
-      <Feather name={icon} size={14} color={active ? '#6C47FF' : 'rgba(15,15,15,0.55)'} />
-      <Text style={{ fontSize: 13, fontWeight: '700', color: active ? '#6C47FF' : 'rgba(15,15,15,0.62)' }}>{label}</Text>
+      <Feather name={icon} size={12} color={active ? '#6C47FF' : 'rgba(15,15,15,0.55)'} />
+      <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#6C47FF' : 'rgba(15,15,15,0.62)' }}>{label}</Text>
     </Pressable>
   );
 }
