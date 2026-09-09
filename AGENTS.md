@@ -17,4 +17,5 @@ Before suggesting, writing, or modifying ANY user interface, component, screen, 
 - **One Primary CTA Rule:** Only one filled purple button per view.
 - **Floating Tab Bar Clearance:** Scrollable containers must include `paddingBottom` for `AnimatedTabBar.tsx` (insets.bottom + 80).
 - **Unified Shield Icon Everywhere:** All buyer protection and verification marks across the app (Home cards, related items, product detail, checkout) must use `<ShieldCheckIcon>` matching the canonical product page shield (Signal Purple `#6C47FF`). Never use teal (`#007782`) or ad-hoc shields.
+- **Canonical Filter Sliders Icon (Strictly Icon-Only):** All filter controls (Home header, Discover chips, search overlays) must use `<FilterSlidersIcon>` matching the canonical 3-track horizontal sliders (top-left, middle-right, bottom-left) with hollow knob centers, and must be strictly **icon-only** (omit the word "Filter" / "Filters" from the visible button/chip). Never use vertical sliders or generic funnels.
 - **Never bypass `GuestGate`:** Maintain auth guards on offer, purchase, sell, and chat actions.

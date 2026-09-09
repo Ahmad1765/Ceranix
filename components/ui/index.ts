@@ -14,4 +14,5 @@ export { UserCommentHeader } from './UserCommentHeader';
 export { Input, type InputProps } from './Input';
 export { ShieldCheckIcon } from './ShieldCheckIcon';
 export { VintedShieldIcon } from './VintedShieldIcon';
+export { FilterSlidersIcon, type FilterSlidersIconProps } from './FilterSlidersIcon';
 

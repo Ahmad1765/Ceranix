@@ -312,35 +312,50 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
   const [isDragging, setIsDragging] = useState(false);
 
   const getScrollEl = useCallback((): HTMLElement | null => {
-    if (Platform.OS !== 'web' || !carouselRef.current) return null;
-    const target = carouselRef.current as any;
-    if (typeof target.getScrollableNode === 'function') {
-      return target.getScrollableNode();
+    if (Platform.OS !== 'web') return null;
+    if (carouselRef.current) {
+      const target = carouselRef.current as any;
+      if (typeof target.getScrollableNode === 'function') {
+        const node = target.getScrollableNode();
+        if (node instanceof HTMLElement) return node;
+      }
+      if (target instanceof HTMLElement) {
+        return target;
+      }
+      if (target._innerViewRef instanceof HTMLElement) {
+        return target._innerViewRef;
+      }
+      if (target._component) {
+        if (typeof target._component.getScrollableNode === 'function') {
+          const node = target._component.getScrollableNode();
+          if (node instanceof HTMLElement) return node;
+        }
+        if (target._component instanceof HTMLElement) return target._component;
+      }
     }
-    if (target instanceof HTMLElement) {
-      return target;
-    }
-    if (target._innerViewRef) {
-      return target._innerViewRef;
+    if (containerRef.current) {
+      const container =
+        typeof containerRef.current.getScrollableNode === 'function'
+          ? containerRef.current.getScrollableNode()
+          : containerRef.current instanceof HTMLElement
+          ? containerRef.current
+          : containerRef.current?._innerViewRef;
+      if (container instanceof HTMLElement) {
+        const scrollChild = container.querySelector(
+          '[style*="overflow-x"], .r-overflowX-lltvgl, [data-testid="listing-card-scroll"]',
+        ) as HTMLElement | null;
+        if (scrollChild) return scrollChild;
+        const firstDiv = container.firstElementChild as HTMLElement | null;
+        if (firstDiv && firstDiv.scrollWidth > firstDiv.clientWidth) return firstDiv;
+      }
     }
     return null;
   }, []);
 
-  const handlePointerDown = useCallback(
-    (e: any) => {
-      if (Platform.OS !== 'web' || !hasMultiple) return;
+  const startDrag = useCallback(
+    (clientX: number, clientY: number) => {
+      if (!hasMultiple) return;
       hydrateCarousel();
-
-      if (e.pointerType === 'touch' || (e.button !== undefined && e.button !== 0)) return;
-
-      const target = e.target as HTMLElement | null;
-      if (target?.closest?.('button, [role="button"]')) {
-        return;
-      }
-
-      const clientX = e.clientX ?? e.nativeEvent?.clientX;
-      const clientY = e.clientY ?? e.nativeEvent?.clientY;
-      if (clientX === undefined) return;
 
       isPointerDownRef.current = true;
       hasDraggedRef.current = false;
@@ -354,24 +369,13 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
       } else {
         pointerStartScrollRef.current = activeIndex * (cardWidth || 200);
       }
-
-      if (e.target?.setPointerCapture && e.pointerId !== undefined) {
-        try {
-          e.target.setPointerCapture(e.pointerId);
-        } catch {}
-      }
     },
     [hasMultiple, hydrateCarousel, getScrollEl, activeIndex, cardWidth],
   );
 
-  const handlePointerMove = useCallback(
-    (e: any) => {
-      if (Platform.OS !== 'web' || !isPointerDownRef.current || !hasMultiple) return;
-      if (e.pointerType === 'touch') return;
-
-      const clientX = e.clientX ?? e.nativeEvent?.clientX;
-      const clientY = e.clientY ?? e.nativeEvent?.clientY;
-      if (clientX === undefined) return;
+  const moveDrag = useCallback(
+    (clientX: number, clientY: number, preventDefault?: () => void) => {
+      if (!isPointerDownRef.current || !hasMultiple) return;
 
       const dx = clientX - pointerStartPosRef.current.x;
       const dy = clientY - pointerStartPosRef.current.y;
@@ -379,6 +383,8 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
       if (!hasDraggedRef.current) {
         if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
           if (Math.abs(dy) > Math.abs(dx)) {
+            // Dominant vertical motion: shopper is scrolling the feed.
+            // Cancel carousel dragging and restore scroll snap.
             isPointerDownRef.current = false;
             const scrollEl = getScrollEl();
             if (scrollEl) {
@@ -388,39 +394,34 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
           }
           hasDraggedRef.current = true;
           isSwipingOrDragging.current = true;
+          lastDragEndTime.current = Date.now();
           setIsDragging(true);
         }
       }
 
       if (hasDraggedRef.current) {
-        e.preventDefault?.();
+        preventDefault?.();
         const scrollEl = getScrollEl();
         if (scrollEl) {
           scrollEl.scrollLeft = pointerStartScrollRef.current - dx;
+        } else {
+          carouselRef.current?.scrollTo({ x: pointerStartScrollRef.current - dx, animated: false });
         }
       }
     },
     [hasMultiple, getScrollEl],
   );
 
-  const handlePointerUp = useCallback(
-    (e: any) => {
-      if (Platform.OS !== 'web' || !isPointerDownRef.current || !hasMultiple) return;
+  const endDrag = useCallback(
+    (clientX?: number) => {
+      if (!isPointerDownRef.current || !hasMultiple) return;
       isPointerDownRef.current = false;
       setIsDragging(false);
 
-      if (e.target?.releasePointerCapture && e.pointerId !== undefined) {
-        try {
-          e.target.releasePointerCapture(e.pointerId);
-        } catch {}
-      }
-
-      if (e.pointerType === 'touch') return;
-
       const scrollEl = getScrollEl();
       if (hasDraggedRef.current) {
-        const clientX = e.clientX ?? e.nativeEvent?.clientX ?? pointerStartPosRef.current.x;
-        const dx = clientX - pointerStartPosRef.current.x;
+        const endX = clientX ?? pointerStartPosRef.current.x;
+        const dx = endX - pointerStartPosRef.current.x;
         const w = cardWidth || 200;
         const threshold = Math.min(36, w * 0.16);
 
@@ -468,61 +469,125 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
     [hasMultiple, getScrollEl, cardWidth, images.length, offsetX],
   );
 
-  const handlePointerCancel = useCallback(
+  const cancelDrag = useCallback(() => {
+    if (!isPointerDownRef.current) return;
+    isPointerDownRef.current = false;
+    setIsDragging(false);
+    hasDraggedRef.current = false;
+    isSwipingOrDragging.current = false;
+    const scrollEl = getScrollEl();
+    if (scrollEl) {
+      scrollEl.style.scrollSnapType = 'x mandatory';
+    }
+  }, [getScrollEl]);
+
+  const handlePointerDown = useCallback(
     (e: any) => {
-      if (Platform.OS !== 'web' || !isPointerDownRef.current) return;
-      isPointerDownRef.current = false;
-      setIsDragging(false);
-      hasDraggedRef.current = false;
-      isSwipingOrDragging.current = false;
-      const scrollEl = getScrollEl();
-      if (scrollEl) {
-        scrollEl.style.scrollSnapType = 'x mandatory';
+      if (Platform.OS !== 'web' || !hasMultiple) return;
+      // On web touch screens, touch events handle swiping natively; skip mouse pointer capture
+      if (e.pointerType === 'touch') return;
+      if (e.button !== undefined && e.button !== 0) return;
+
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.('button, [role="button"]')) {
+        return;
+      }
+
+      const clientX = e.clientX ?? e.nativeEvent?.clientX;
+      const clientY = e.clientY ?? e.nativeEvent?.clientY;
+      if (clientX === undefined) return;
+
+      startDrag(clientX, clientY);
+
+      if (e.target?.setPointerCapture && e.pointerId !== undefined) {
+        try {
+          e.target.setPointerCapture(e.pointerId);
+        } catch {}
       }
     },
-    [getScrollEl],
+    [hasMultiple, startDrag],
+  );
+
+  const handlePointerMove = useCallback(
+    (e: any) => {
+      if (Platform.OS !== 'web' || !isPointerDownRef.current || !hasMultiple) return;
+
+      const clientX = e.clientX ?? e.nativeEvent?.clientX;
+      const clientY = e.clientY ?? e.nativeEvent?.clientY;
+      if (clientX === undefined) return;
+
+      moveDrag(clientX, clientY, () => e.preventDefault?.());
+    },
+    [hasMultiple, moveDrag],
+  );
+
+  const handlePointerUp = useCallback(
+    (e: any) => {
+      if (Platform.OS !== 'web' || !isPointerDownRef.current || !hasMultiple) return;
+
+      if (e.target?.releasePointerCapture && e.pointerId !== undefined) {
+        try {
+          e.target.releasePointerCapture(e.pointerId);
+        } catch {}
+      }
+
+      const clientX = e.clientX ?? e.nativeEvent?.clientX;
+      endDrag(clientX);
+    },
+    [hasMultiple, endDrag],
+  );
+
+  const handlePointerCancel = useCallback(
+    (e: any) => {
+      if (Platform.OS !== 'web') return;
+      cancelDrag();
+    },
+    [cancelDrag],
   );
 
   const handleTouchStart = useCallback(
     (e: any) => {
-      hydrateCarousel();
-      const touch = e.nativeEvent?.touches?.[0] || e.nativeEvent;
-      if (touch) {
-        touchStartPos.current = {
-          x: touch.pageX ?? touch.clientX ?? 0,
-          y: touch.pageY ?? touch.clientY ?? 0,
-          time: Date.now(),
-        };
-      }
-      hasTouchMoved.current = false;
+      if (!hasMultiple) return;
+      const touch = e.nativeEvent?.touches?.[0] || e.touches?.[0] || e.nativeEvent;
+      if (!touch) return;
+      const clientX = touch.clientX ?? touch.pageX;
+      const clientY = touch.clientY ?? touch.pageY;
+      if (clientX === undefined) return;
+      startDrag(clientX, clientY);
     },
-    [hydrateCarousel],
+    [hasMultiple, startDrag],
   );
 
-  const handleTouchMove = useCallback((e: any) => {
-    const touch = e.nativeEvent?.touches?.[0] || e.nativeEvent;
-    if (touch && touchStartPos.current.time > 0) {
-      const dx = Math.abs((touch.pageX ?? touch.clientX ?? 0) - touchStartPos.current.x);
-      if (dx > 6) {
-        hasTouchMoved.current = true;
-        isSwipingOrDragging.current = true;
-        lastDragEndTime.current = Date.now();
-      }
-    }
-  }, []);
+  const handleTouchMove = useCallback(
+    (e: any) => {
+      if (!isPointerDownRef.current || !hasMultiple) return;
+      const touch = e.nativeEvent?.touches?.[0] || e.touches?.[0] || e.nativeEvent;
+      if (!touch) return;
+      const clientX = touch.clientX ?? touch.pageX;
+      const clientY = touch.clientY ?? touch.pageY;
+      if (clientX === undefined) return;
+      moveDrag(clientX, clientY, () => {
+        if (e.cancelable) {
+          e.preventDefault?.();
+        }
+      });
+    },
+    [hasMultiple, moveDrag],
+  );
 
-  const handleTouchEnd = useCallback((e: any) => {
-    if (hasTouchMoved.current || isSwipingOrDragging.current) {
-      lastDragEndTime.current = Date.now();
-      if (webScrollTimeoutRef.current) {
-        clearTimeout(webScrollTimeoutRef.current);
-      }
-      webScrollTimeoutRef.current = setTimeout(() => {
-        isSwipingOrDragging.current = false;
-      }, 450);
-    }
-    hasTouchMoved.current = false;
-  }, []);
+  const handleTouchEnd = useCallback(
+    (e: any) => {
+      if (!isPointerDownRef.current || !hasMultiple) return;
+      const touch = e.nativeEvent?.changedTouches?.[0] || e.changedTouches?.[0] || e.nativeEvent;
+      const clientX = touch ? (touch.clientX ?? touch.pageX) : undefined;
+      endDrag(clientX);
+    },
+    [hasMultiple, endDrag],
+  );
+
+  const handleTouchCancel = useCallback(() => {
+    cancelDrag();
+  }, [cancelDrag]);
 
   // Web capture phase interception: halts synthetic clicks following swipes before
   // bubbling to the card's outer Pressable
@@ -663,7 +728,7 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
         onTouchStart={hasMultiple ? handleTouchStart : undefined}
         onTouchMove={hasMultiple ? handleTouchMove : undefined}
         onTouchEnd={hasMultiple ? handleTouchEnd : undefined}
-        onTouchCancel={hasMultiple ? handleTouchEnd : undefined}
+        onTouchCancel={hasMultiple ? handleTouchCancel : undefined}
         onPointerDown={Platform.OS === 'web' && hasMultiple ? handlePointerDown : undefined}
         onPointerMove={Platform.OS === 'web' && hasMultiple ? handlePointerMove : undefined}
         onPointerUp={Platform.OS === 'web' && hasMultiple ? handlePointerUp : undefined}
@@ -684,7 +749,7 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
-            onTouchCancel={handleTouchEnd}
+            onTouchCancel={handleTouchCancel}
             onScrollBeginDrag={handleDragBegin}
             onScrollEndDrag={handleDragEnd}
             onMomentumScrollBegin={handleDragBegin}

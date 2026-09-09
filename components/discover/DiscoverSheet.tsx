@@ -462,7 +462,7 @@ function DiscoverSheetBody({ onClose }: { onClose: () => void }) {
     (action: BrowseAction, chip?: { label: string; icon: keyof typeof Feather.glyphMap }) => {
       if (action.kind === 'saved') {
         onClose();
-        router.push('/news' as any);
+        router.push({ pathname: '/(tabs)/profile', params: { tab: 'collections' } } as any);
         return;
       }
       const label = chip?.label ?? (action.kind === 'sort' ? action.sort : action.tab);

@@ -18,7 +18,7 @@
 //    memoized `ProfileGridRow` elements to maintain 60fps scrolling.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -26,7 +26,7 @@ import {
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import { RequireAuth } from '@/components/RequireAuth';
 import { useAuth } from '@/lib/auth';
@@ -60,12 +60,30 @@ const EMPTY_LISTINGS: Listing[] = [];
 
 function ProfileScreenInner() {
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ tab?: string }>();
   const { profile, refreshProfile } = useAuth();
   const profileId = profile?.id ?? null;
   const profileUsername = profile?.username ?? null;
   const toast = useToast();
   const { open: openSellSheet } = useSellSheet();
-  const [activeTab, setActiveTab] = useState<ProfileTab>('selling');
+  const [activeTab, setActiveTab] = useState<ProfileTab>(() => {
+    if (params.tab === 'collections' || params.tab === 'saved') return 'collections';
+    if (params.tab === 'liked') return 'liked';
+    if (params.tab === 'details') return 'details';
+    return 'selling';
+  });
+
+  useEffect(() => {
+    if (params.tab === 'collections' || params.tab === 'saved') {
+      setActiveTab('collections');
+    } else if (params.tab === 'liked') {
+      setActiveTab('liked');
+    } else if (params.tab === 'selling') {
+      setActiveTab('selling');
+    } else if (params.tab === 'details') {
+      setActiveTab('details');
+    }
+  }, [params.tab]);
 
   const heroFade = useFadeIn(0, 320);
   const tabClear = useTabBarClearance();

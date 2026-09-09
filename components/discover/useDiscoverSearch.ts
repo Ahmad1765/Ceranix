@@ -494,7 +494,7 @@ export function useDiscoverSearch({
       setSearchActive(false);
       Keyboard.dismiss();
       if (action.kind === 'saved') {
-        router.push('/news' as any);
+        router.push({ pathname: '/(tabs)/profile', params: { tab: 'collections' } } as any);
         return;
       }
       if (action.kind === 'tab') {

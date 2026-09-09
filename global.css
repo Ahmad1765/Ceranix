@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+html,
+body,
+#root {
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+}
+
 /* Web only: kill focus outline on mouse click (:focus), but preserve
    keyboard accessibility by rendering a clear ring on :focus-visible. */
 @layer base {
@@ -14,9 +21,9 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* Prevent iOS Safari / Android Chrome auto-zoom on input focus by ensuring 16px minimum font size on touch devices */
-  @media (pointer: coarse) {
-    input,
+  /* Prevent iOS Safari / Android Chrome auto-zoom on input focus by ensuring 16px minimum font size on touch/mobile devices */
+  @media (pointer: coarse), screen and (max-width: 768px) {
+    input:not([type="checkbox"]):not([type="radio"]),
     textarea,
     select {
       font-size: 16px !important;

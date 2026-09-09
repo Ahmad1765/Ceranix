@@ -177,19 +177,31 @@ export function useHomeFeedFilters({
           });
         }
       } else if (params.tab) {
-        const label = params.chipLabel
-          ? decodeURIComponent(params.chipLabel)
-          : params.tab.charAt(0).toUpperCase() + params.tab.slice(1);
-        const icon = (params.chipIcon as any) || 'hash';
-        const newChip: DynamicFilterChip = {
-          id: `tab:${params.tab}`,
-          label,
-          icon,
-          tab: params.tab,
-          isDefaultTrending: false,
-        };
-        setDynamicChip(newChip);
-        setActiveChip(newChip.id);
+        if (params.tab === 'saved') {
+          const newChip: DynamicFilterChip = {
+            id: 'tab:saved',
+            label: 'Saved',
+            icon: 'bookmark',
+            tab: 'saved',
+            isDefaultTrending: false,
+          };
+          setDynamicChip(newChip);
+          setActiveChip(newChip.id);
+        } else {
+          const label = params.chipLabel
+            ? decodeURIComponent(params.chipLabel)
+            : params.tab.charAt(0).toUpperCase() + params.tab.slice(1);
+          const icon = (params.chipIcon as any) || 'hash';
+          const newChip: DynamicFilterChip = {
+            id: `tab:${params.tab}`,
+            label,
+            icon,
+            tab: params.tab,
+            isDefaultTrending: false,
+          };
+          setDynamicChip(newChip);
+          setActiveChip(newChip.id);
+        }
       }
     }
     scrollToTop();
@@ -290,6 +302,8 @@ export function useHomeFeedFilters({
       let rows = listings;
       if (dynamicChip.category) {
         rows = rows.filter((l) => l.category === dynamicChip.category);
+      } else if (dynamicChip.tab === 'saved') {
+        return savedListings;
       } else if (dynamicChip.tab === 'brands') {
         rows = rows.filter((l) => Boolean(l.brand && l.brand.trim().length > 0));
       } else if (dynamicChip.tab === 'aesthetics') {

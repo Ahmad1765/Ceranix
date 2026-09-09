@@ -13,6 +13,7 @@ import { Text, TextInput } from '@/lib/rnText';
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
+import { FilterSlidersIcon } from '@/components/ui';
 import { radii, shadow, type as typography } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 import {
@@ -220,9 +221,8 @@ export const FeedSearch = memo(function FeedSearch({
                 ...shadow.sm,
               } as any)}
             >
-              <Feather
-                name="sliders"
-                size={16}
+              <FilterSlidersIcon
+                size={19}
                 color={hasFilters ? theme.background : theme.ink}
               />
               {hasFilters && (
@@ -339,7 +339,6 @@ export const ChipRow = memo(function ChipRow({
   const isDynamicActive =
     activeChip === dynamicChip.id ||
     (dynamicChip.isDefaultTrending && activeChip === TRENDING);
-  const isCustom = !dynamicChip.isDefaultTrending;
 
   return (
     <ScrollView
@@ -389,8 +388,7 @@ export const ChipRow = memo(function ChipRow({
         accessibilityRole="button"
         accessibilityLabel={`Browse ${dynamicChip.label}`}
         style={({ pressed }) => ({
-          paddingLeft: 14,
-          paddingRight: isCustom ? 8 : 14,
+          paddingHorizontal: 14,
           paddingVertical: 8,
           borderRadius: radii.pill,
           backgroundColor: isDynamicActive ? theme.selected : theme.white,
@@ -416,33 +414,6 @@ export const ChipRow = memo(function ChipRow({
         >
           {dynamicChip.label}
         </Text>
-
-        {/* If user customized this chip from Discover, provide a 1-tap reset 'x' button */}
-        {isCustom && onResetDynamicChip ? (
-          <Pressable
-            onPress={(e) => {
-              if (e && typeof e.stopPropagation === 'function') {
-                e.stopPropagation();
-              }
-              haptic();
-              onResetDynamicChip();
-            }}
-            hitSlop={6}
-            accessibilityRole="button"
-            accessibilityLabel="Reset to Trending"
-            style={({ pressed }) => ({
-              width: 18,
-              height: 18,
-              borderRadius: 9,
-              backgroundColor: pressed ? theme.surface : theme.border,
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginLeft: 2,
-            })}
-          >
-            <Feather name="x" size={11} color={theme.ink} />
-          </Pressable>
-        ) : null}
       </Pressable>
 
       {/* Create Alert / Saved Search Circular Button */}

@@ -22,6 +22,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Text, TextInput } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
+import { FilterSlidersIcon } from '@/components/ui';
 import { radii, type as typography, type ThemeTokens } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { CURRENCY_SYMBOL } from '@/lib/currency';
@@ -367,26 +368,17 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           }}
           style={({ pressed }) => [
             styles.chip,
+            styles.filterIconChip,
             activeCount > 0 ? styles.chipActive : styles.chipInactive,
             { transform: [{ scale: pressed ? 0.96 : 1 }] },
           ]}
           accessibilityRole="button"
           accessibilityLabel={onOpenFullFilter ? 'Open all filters' : 'Open category modal'}
         >
-          <Feather
-            name="sliders"
-            size={13.5}
+          <FilterSlidersIcon
+            size={17}
             color={activeCount > 0 ? activeIconColor : theme.text}
-            style={{ marginRight: 5 }}
           />
-          <Text
-            style={[
-              styles.chipText,
-              activeCount > 0 ? styles.chipTextActive : styles.chipTextInactive,
-            ]}
-          >
-            Filters
-          </Text>
           {activeCount > 0 && (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{activeCount}</Text>
@@ -416,27 +408,12 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           >
             {categoryLabel}
           </Text>
-          {filters.category ? (
-            <Pressable
-              hitSlop={8}
-              onPress={(e) => {
-                e.stopPropagation();
-                haptic();
-                onUpdateFilter((prev) => ({ ...prev, category: null, subcategory: null }));
-              }}
-              style={{ marginLeft: 5, padding: 1, outlineStyle: 'none' } as any}
-              accessibilityLabel="Clear category filter"
-            >
-              <Feather name="x" size={12} color={activeIconColor} />
-            </Pressable>
-          ) : (
-            <Feather
-              name="chevron-down"
-              size={12.5}
-              color={theme.mute}
-              style={{ marginLeft: 4 }}
-            />
-          )}
+          <Feather
+            name="chevron-down"
+            size={12.5}
+            color={filters.category ? activeIconColor : theme.mute}
+            style={{ marginLeft: 4 }}
+          />
         </Pressable>
 
         {/* Chip 3: Brand */}
@@ -461,27 +438,12 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           >
             {brandLabel}
           </Text>
-          {filters.brand ? (
-            <Pressable
-              hitSlop={8}
-              onPress={(e) => {
-                e.stopPropagation();
-                haptic();
-                onUpdateFilter((prev) => ({ ...prev, brand: null }));
-              }}
-              style={{ marginLeft: 5, padding: 1, outlineStyle: 'none' } as any}
-              accessibilityLabel="Clear brand filter"
-            >
-              <Feather name="x" size={12} color={activeIconColor} />
-            </Pressable>
-          ) : (
-            <Feather
-              name="chevron-down"
-              size={12.5}
-              color={theme.mute}
-              style={{ marginLeft: 4 }}
-            />
-          )}
+          <Feather
+            name="chevron-down"
+            size={12.5}
+            color={filters.brand ? activeIconColor : theme.mute}
+            style={{ marginLeft: 4 }}
+          />
         </Pressable>
 
         {/* Chip 4: Size */}
@@ -506,27 +468,12 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           >
             {sizeLabel}
           </Text>
-          {filters.sizes.length > 0 ? (
-            <Pressable
-              hitSlop={8}
-              onPress={(e) => {
-                e.stopPropagation();
-                haptic();
-                onUpdateFilter((prev) => ({ ...prev, sizes: [] }));
-              }}
-              style={{ marginLeft: 5, padding: 1, outlineStyle: 'none' } as any}
-              accessibilityLabel="Clear size filter"
-            >
-              <Feather name="x" size={12} color={activeIconColor} />
-            </Pressable>
-          ) : (
-            <Feather
-              name="chevron-down"
-              size={12.5}
-              color={theme.mute}
-              style={{ marginLeft: 4 }}
-            />
-          )}
+          <Feather
+            name="chevron-down"
+            size={12.5}
+            color={filters.sizes.length > 0 ? activeIconColor : theme.mute}
+            style={{ marginLeft: 4 }}
+          />
         </Pressable>
 
         {/* Chip 5: Condition */}
@@ -551,27 +498,12 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           >
             {conditionLabel}
           </Text>
-          {filters.conditions.length > 0 ? (
-            <Pressable
-              hitSlop={8}
-              onPress={(e) => {
-                e.stopPropagation();
-                haptic();
-                onUpdateFilter((prev) => ({ ...prev, conditions: [] }));
-              }}
-              style={{ marginLeft: 5, padding: 1, outlineStyle: 'none' } as any}
-              accessibilityLabel="Clear condition filter"
-            >
-              <Feather name="x" size={12} color={activeIconColor} />
-            </Pressable>
-          ) : (
-            <Feather
-              name="chevron-down"
-              size={12.5}
-              color={theme.mute}
-              style={{ marginLeft: 4 }}
-            />
-          )}
+          <Feather
+            name="chevron-down"
+            size={12.5}
+            color={filters.conditions.length > 0 ? activeIconColor : theme.mute}
+            style={{ marginLeft: 4 }}
+          />
         </Pressable>
 
         {/* Chip 6: Price */}
@@ -600,27 +532,12 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           >
             {priceLabel}
           </Text>
-          {filters.priceMin != null || filters.priceMax != null ? (
-            <Pressable
-              hitSlop={8}
-              onPress={(e) => {
-                e.stopPropagation();
-                haptic();
-                onUpdateFilter((prev) => ({ ...prev, priceMin: null, priceMax: null }));
-              }}
-              style={{ marginLeft: 5, padding: 1, outlineStyle: 'none' } as any}
-              accessibilityLabel="Clear price filter"
-            >
-              <Feather name="x" size={12} color={activeIconColor} />
-            </Pressable>
-          ) : (
-            <Feather
-              name="chevron-down"
-              size={12.5}
-              color={theme.mute}
-              style={{ marginLeft: 4 }}
-            />
-          )}
+          <Feather
+            name="chevron-down"
+            size={12.5}
+            color={filters.priceMin != null || filters.priceMax != null ? activeIconColor : theme.mute}
+            style={{ marginLeft: 4 }}
+          />
         </Pressable>
 
         {/* Chip 7: Color */}
@@ -645,27 +562,12 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           >
             {colorLabel}
           </Text>
-          {filters.color ? (
-            <Pressable
-              hitSlop={8}
-              onPress={(e) => {
-                e.stopPropagation();
-                haptic();
-                onUpdateFilter((prev) => ({ ...prev, color: null }));
-              }}
-              style={{ marginLeft: 5, padding: 1, outlineStyle: 'none' } as any}
-              accessibilityLabel="Clear color filter"
-            >
-              <Feather name="x" size={12} color={activeIconColor} />
-            </Pressable>
-          ) : (
-            <Feather
-              name="chevron-down"
-              size={12.5}
-              color={theme.mute}
-              style={{ marginLeft: 4 }}
-            />
-          )}
+          <Feather
+            name="chevron-down"
+            size={12.5}
+            color={filters.color ? activeIconColor : theme.mute}
+            style={{ marginLeft: 4 }}
+          />
         </Pressable>
 
         {/* Chip 8: Material */}
@@ -690,27 +592,12 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           >
             {materialLabel}
           </Text>
-          {filters.material ? (
-            <Pressable
-              hitSlop={8}
-              onPress={(e) => {
-                e.stopPropagation();
-                haptic();
-                onUpdateFilter((prev) => ({ ...prev, material: null }));
-              }}
-              style={{ marginLeft: 5, padding: 1, outlineStyle: 'none' } as any}
-              accessibilityLabel="Clear material filter"
-            >
-              <Feather name="x" size={12} color={activeIconColor} />
-            </Pressable>
-          ) : (
-            <Feather
-              name="chevron-down"
-              size={12.5}
-              color={theme.mute}
-              style={{ marginLeft: 4 }}
-            />
-          )}
+          <Feather
+            name="chevron-down"
+            size={12.5}
+            color={filters.material ? activeIconColor : theme.mute}
+            style={{ marginLeft: 4 }}
+          />
         </Pressable>
 
         {/* Chip 9: Sort by */}
@@ -739,27 +626,12 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           >
             {sortLabel}
           </Text>
-          {filters.sort ? (
-            <Pressable
-              hitSlop={8}
-              onPress={(e) => {
-                e.stopPropagation();
-                haptic();
-                onUpdateFilter((prev) => ({ ...prev, sort: null }));
-              }}
-              style={{ marginLeft: 5, padding: 1, outlineStyle: 'none' } as any}
-              accessibilityLabel="Reset sort order"
-            >
-              <Feather name="x" size={12} color={activeIconColor} />
-            </Pressable>
-          ) : (
-            <Feather
-              name="chevron-down"
-              size={12.5}
-              color={theme.mute}
-              style={{ marginLeft: 4 }}
-            />
-          )}
+          <Feather
+            name="chevron-down"
+            size={12.5}
+            color={filters.sort ? activeIconColor : theme.mute}
+            style={{ marginLeft: 4 }}
+          />
         </Pressable>
       </ScrollView>
 
@@ -1473,6 +1345,12 @@ function createStyles(theme: ThemeTokens, isDark: boolean) {
           userSelect: 'none',
         } as any,
       }),
+    },
+    filterIconChip: {
+      paddingHorizontal: 12,
+      minWidth: 42,
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     chipInactive: {
       backgroundColor: isDark ? theme.panel : '#FFFFFF',
