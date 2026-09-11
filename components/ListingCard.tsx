@@ -111,8 +111,6 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
   imagesLengthRef.current = images.length;
   const cardWidthRef = useRef(cardWidth);
   cardWidthRef.current = cardWidth;
-  const touchStartPos = useRef({ x: 0, y: 0, time: 0 });
-  const hasTouchMoved = useRef(false);
 
   useEffect(() => {
     return () => {

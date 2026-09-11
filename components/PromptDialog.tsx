@@ -10,7 +10,6 @@ import { Alert, Animated, Easing, Modal, Platform, Pressable, StyleSheet, View }
 import { Text, TextInput } from '@/lib/rnText';
 import { BlurView } from 'expo-blur';
 import { useTheme } from '@/context/ThemeContext';
-import { colors } from '@/lib/theme';
 
 const IS_IOS = Platform.OS === 'ios';
 // BlurView renders cheaply on iOS (native) and on web (CSS backdrop-filter).

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Pressable } from 'react-native';
+import { View } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import { radii, shadow, type as typography } from '@/lib/theme';

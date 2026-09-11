@@ -69,7 +69,7 @@ export function ThreadHeader({
         onPress={onPressIdentity}
         disabled={!onPressIdentity}
         accessibilityRole="button"
-        accessibilityLabel={`View ${name}'s profile`}
+        accessibilityLabel={`View ${name}'s profile, ${online ? 'online' : 'offline'}`}
         style={({ pressed }) => ({
           flexShrink: 1,
           flexDirection: 'row',

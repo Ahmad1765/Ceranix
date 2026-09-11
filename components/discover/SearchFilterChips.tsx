@@ -9,7 +9,7 @@
 // 4. Interactive quick-filter bottom sheets and search ranking modal
 // ─────────────────────────────────────────────────────────────────────────────
 
-import React, { memo, useState, useCallback, useMemo } from 'react';
+import React, { memo, useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   ScrollView,
@@ -150,8 +150,19 @@ export const SearchFilterChips = memo(function SearchFilterChips({
 
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [brandInput, setBrandInput] = useState('');
-  const [customMin, setCustomMin] = useState('');
-  const [customMax, setCustomMax] = useState('');
+  const [customMin, setCustomMin] = useState(() =>
+    filters.priceMin != null ? String(filters.priceMin) : '',
+  );
+  const [customMax, setCustomMax] = useState(() =>
+    filters.priceMax != null ? String(filters.priceMax) : '',
+  );
+
+  useEffect(() => {
+    if (activeModal === 'price') {
+      setCustomMin(filters.priceMin != null ? String(filters.priceMin) : '');
+      setCustomMax(filters.priceMax != null ? String(filters.priceMax) : '');
+    }
+  }, [activeModal, filters.priceMin, filters.priceMax]);
 
   const activeCount = useMemo(() => countActiveSearchFilters(filters), [filters]);
   const activeIconColor = isDark ? '#FFFFFF' : '#0F0F0F';

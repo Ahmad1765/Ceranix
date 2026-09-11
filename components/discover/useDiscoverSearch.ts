@@ -141,22 +141,23 @@ export function useDiscoverSearch({
 
     const hasCat = typeof params.category === 'string';
     let catId: CatTile['id'] | null = null;
-    let subId: string | null = null;
     if (hasCat) {
       const isValid = CATEGORY_TILES.some((t) => t.id === params.category);
       catId = isValid ? (params.category as CatTile['id']) : null;
       setActiveCat(catId);
-      const sub = typeof params.sub === 'string' ? params.sub : null;
-      subId = sub && getCategory(catId)?.subs.some((s) => s.id === sub) ? sub : null;
-      setActiveSub(subId);
-    } else {
-      setActiveCat(null);
-      setActiveSub(null);
     }
 
-    const wantSort = SORT_KEYS.find((s) => s === params.sort) ?? null;
-    if (wantSort) setSort(wantSort);
-    else if (hasCat) setSort(null);
+    const hasSub = typeof params.sub === 'string';
+    let subId: string | null = null;
+    if (hasSub) {
+      const sub = typeof params.sub === 'string' ? params.sub : null;
+      subId = sub && (!catId || getCategory(catId)?.subs.some((s) => s.id === sub)) ? sub : null;
+      setActiveSub(subId);
+    }
+
+    const hasSort = typeof params.sort === 'string';
+    const wantSort = hasSort ? (SORT_KEYS.find((s) => s === params.sort) ?? null) : null;
+    if (hasSort) setSort(wantSort);
 
     const wantTab = HUB_TABS.find((t) => t === params.tab) ?? null;
     if (wantTab) setTab(wantTab);
@@ -164,9 +165,11 @@ export function useDiscoverSearch({
 
     setSearchFilters((prev) => ({
       ...prev,
-      category: (catId && catId !== 'trending' ? catId : null) as Category | null,
-      subcategory: subId,
-      sort: wantSort,
+      category: hasCat
+        ? ((catId && catId !== 'trending' ? catId : null) as Category | null)
+        : prev.category,
+      subcategory: hasSub ? subId : prev.subcategory,
+      sort: hasSort ? wantSort : prev.sort,
     }));
   }, [params.q, params.category, params.sub, params.tab, params.sort, params.n]);
 
@@ -349,29 +352,17 @@ export function useDiscoverSearch({
 
   const updateFilter = useCallback(
     (updater: (prev: SearchFilterState) => SearchFilterState) => {
-      let nextState: SearchFilterState | undefined;
-      let prevState: SearchFilterState | undefined;
-      setSearchFilters((prev) => {
-        prevState = prev;
-        nextState = updater(prev);
-        return nextState;
-      });
-      const prev = prevState ?? searchFilters;
-      if (nextState) {
-        if (nextState.category !== prev.category) {
-          setActiveCat(nextState.category);
-        }
-        if (nextState.subcategory !== prev.subcategory) {
-          setActiveSub(nextState.subcategory);
-        }
-        if (nextState.sort !== prev.sort) {
-          setSort(nextState.sort);
-        }
-      }
+      setSearchFilters(updater);
     },
-    [searchFilters],
+    [],
   );
 
+  // Derive legacy activeCat, activeSub, and sort from searchFilters
+  useEffect(() => {
+    setActiveCat((prev) => (searchFilters.category ? searchFilters.category : (prev === 'trending' ? 'trending' : null)));
+    setActiveSub(searchFilters.subcategory ?? null);
+    setSort(searchFilters.sort ?? null);
+  }, [searchFilters.category, searchFilters.subcategory, searchFilters.sort]);
 
   const resetFilters = useCallback(() => {
     setSearchFilters(EMPTY_SEARCH_FILTERS);
@@ -380,7 +371,8 @@ export function useDiscoverSearch({
     setSort(null);
   }, []);
 
-  const sortOnly = !hasQuery && !browseCat && !!sort;
+  const activeSort = searchFilters.sort || sort;
+  const sortOnly = !hasQuery && !browseCat && !!activeSort;
   const idle = !hasQuery && !browseCat && !sortOnly && activeFilterCount === 0;
 
   // In-place theme sorting for the idle grid
@@ -556,7 +548,7 @@ export function useDiscoverSearch({
     setActiveCat,
     activeSub,
     setActiveSub,
-    sort,
+    sort: activeSort,
     setSort,
     digestSort,
     setDigestSort,

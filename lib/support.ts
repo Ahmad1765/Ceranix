@@ -221,8 +221,26 @@ export async function getOrCreateSupportConversation(userId: string): Promise<Co
 }
 
 export async function sendSupportBotReply(conversationId: string, userMessage: string): Promise<ChatMessage | null> {
+  const replyText = generateSupportResponse(userMessage);
+
+  // 1. Trusted server-side RPC path enforcing sender identity & authorization
   try {
-    const replyText = generateSupportResponse(userMessage);
+    const { data, error } = await supabase.rpc('dispatch_support_bot_reply', {
+      p_conversation_id: conversationId,
+      p_content: replyText,
+    });
+    if (!error && data) {
+      return data as unknown as ChatMessage;
+    }
+    if (error) {
+      console.warn('[support] server rpc dispatch_support_bot_reply error, falling back', error.message);
+    }
+  } catch (rpcErr) {
+    console.warn('[support] server rpc dispatch_support_bot_reply failed, falling back', rpcErr);
+  }
+
+  // 2. Direct fallback (for tests and offline/demo environments)
+  try {
     return await sendMessage({
       conversationId,
       senderId: SUPPORT_BOT_USER_ID,
@@ -230,6 +248,6 @@ export async function sendSupportBotReply(conversationId: string, userMessage: s
     });
   } catch (err) {
     console.warn('[support] bot reply failed', err);
-    return null;
+    throw err;
   }
 }

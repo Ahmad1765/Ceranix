@@ -32,7 +32,9 @@ export async function fetchOrderForListing(
 ): Promise<Order | null> {
   const { data, error } = await supabase
     .from("orders")
-    .select("id, status, amount_cents, fee_cents, currency, payment_method, shipping_address, delivery_notes, courier_name, tracking_number, cancel_reason, cancelled_by, shipped_at, completed_at, created_at, listing_id, buyer_id, seller_id")
+    .select(
+      "id, status, fulfillment_status, fulfillment_type, amount_cents, fee_cents, currency, payment_method, shipping_address, delivery_notes, courier_name, tracking_number, cancel_reason, cancelled_by, dispute_reason, dispute_evidence_urls, disputed_at, dispute_resolved_at, payment_authorized_at, packed_at, shifted_at, shipped_at, delivered_at, completed_at, cod_paid_at, supplier_name, supplier_order_id, created_at, listing_id, buyer_id, seller_id",
+    )
     .eq("listing_id", listingId)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -79,7 +81,7 @@ export async function fetchMyOrders(userId: string): Promise<MyOrder[]> {
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "id, status, amount_cents, fee_cents, currency, payment_method, shipping_address, delivery_notes, created_at, listing_id, buyer_id, seller_id, listing:listings(id, title, images, thumbnails, price)",
+      "id, status, fulfillment_status, fulfillment_type, amount_cents, fee_cents, currency, payment_method, shipping_address, delivery_notes, courier_name, tracking_number, cancel_reason, cancelled_by, dispute_reason, dispute_evidence_urls, disputed_at, dispute_resolved_at, payment_authorized_at, packed_at, shifted_at, shipped_at, delivered_at, completed_at, cod_paid_at, supplier_name, supplier_order_id, created_at, listing_id, buyer_id, seller_id, listing:listings(id, title, images, thumbnails, price)",
     )
     .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
     .order("created_at", { ascending: false });

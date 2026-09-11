@@ -20,7 +20,6 @@ import {
   removeFromList,
   type SaveList,
 } from '@/lib/saves';
-import { colors } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 
 const IS_IOS = Platform.OS === 'ios';

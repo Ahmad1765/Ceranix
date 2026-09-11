@@ -21,7 +21,6 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { colors } from '../lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 
 // Clean Instagram-style dock: white pill, icon-only, a single soft-purple disc
@@ -53,8 +52,6 @@ import { useTheme } from '@/context/ThemeContext';
 // React state here would mean a full tab-bar render every frame of every drag,
 // on top of the list already scrolling behind it.
 // ---------------------------------------------------------------------------
-const ACCENT = colors.ink; // active icon stays dark (ink), like the reference
-const INACTIVE = colors.ink; // near-black line icons, Instagram-clean
 const DISC_FILL = 'rgba(15,15,15,0.08)'; // neutral grey disc (ink @8%)
 
 // The dock's translucent fill. Two values because only iOS still layers a real
@@ -159,7 +156,7 @@ function selectionHaptic() {
 export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const reduced = useReducedMotion();
-  const { theme, isDark } = useTheme();
+  const { isDark } = useTheme();
 
   const dockBg = isDark ? 'rgba(24, 24, 24, 0.94)' : BAR_FILL;
   const dockBorder = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.7)';

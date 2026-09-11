@@ -91,7 +91,7 @@ export function SearchBar({
             width: 26,
             height: 26,
             borderRadius: radii.pill,
-            backgroundColor: colors.panel,
+            backgroundColor: colors.surface,
             alignItems: 'center',
             justifyContent: 'center',
             opacity: pressed ? 0.7 : 1,

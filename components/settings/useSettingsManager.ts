@@ -15,7 +15,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Platform, Share, Linking } from 'react-native';
+import { Platform, Linking } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
@@ -45,7 +45,7 @@ export const SECTIONS: readonly Section[] = ['shop', 'verify', 'enhance', 'accou
 export type Busy = 'logout' | 'delete' | 'password' | null;
 
 export function useSettingsManager() {
-  const { profile, user, session, signOut, refreshProfile } = useAuth();
+  const { user, session, signOut, refreshProfile } = useAuth();
   const toast = useToast();
   const params = useLocalSearchParams<{ open?: string }>();
 

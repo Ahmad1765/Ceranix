@@ -60,6 +60,13 @@ export default function NewsScreen() {
     return () => scrollX.removeListener(id);
   }, [scrollX, pageWidth]);
 
+  useEffect(() => {
+    if (pageWidth <= 0) return;
+    const index = NEWS_TABS.findIndex((t) => t.value === activeTabRef.current);
+    if (index < 0) return;
+    pagerRef.current?.scrollToOffset({ offset: index * pageWidth, animated: false });
+  }, [pageWidth]);
+
   const onPagerLayout = useCallback((e: LayoutChangeEvent) => {
     setPagerHeight(e.nativeEvent.layout.height);
   }, []);

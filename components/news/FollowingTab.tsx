@@ -38,44 +38,8 @@ export function FollowingTab({ bottomInset = 24 }: { bottomInset?: number }) {
 
     const source = followedListings.length > 0 ? followedListings : communityListings;
 
-    return source.map((listing: Listing, index: number) => {
+    return source.map((listing: Listing) => {
       const seller = listing.seller;
-      // Synthesize realistic activity stream from genuine listing & seller data
-      if (index % 4 === 1 && seller) {
-        return {
-          id: `follow-${listing.id}`,
-          kind: 'user_followed',
-          actor: {
-            id: seller.id,
-            username: seller.username,
-            full_name: seller.full_name || seller.username,
-            avatar_url: seller.avatar_url,
-          },
-          targetUser: {
-            id: 'community-curator',
-            username: 'Carrinex Studio',
-            full_name: 'Carrinex Verified',
-            avatar_url: null,
-          },
-          created_at: listing.created_at,
-        };
-      }
-
-      if (index % 4 === 2 && seller) {
-        return {
-          id: `like-${listing.id}`,
-          kind: 'listing_liked',
-          actor: {
-            id: seller.id,
-            username: seller.username,
-            full_name: seller.full_name || seller.username,
-            avatar_url: seller.avatar_url,
-          },
-          listing,
-          created_at: listing.created_at,
-        };
-      }
-
       return {
         id: `listing-${listing.id}`,
         kind: 'listing_created',

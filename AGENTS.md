@@ -4,7 +4,7 @@
 
 Before suggesting, writing, or modifying ANY user interface, component, screen, or styling code in this repository:
 1. **Read `UI_GUARDRAILS.md` first.**
-2. **Perform Collision Detection:** Check whether the user's requested change conflicts with the protected rules in [UI_GUARDRAILS.md](file:///d:/Softwares/Ceranix/UI_GUARDRAILS.md).
+2. **Perform Collision Detection:** Check whether the user's requested change conflicts with the protected rules in [UI_GUARDRAILS.md](./UI_GUARDRAILS.md).
 3. **Hard-Stop on Collision:** If the request collides with protected invariants (e.g., using `className` on `<Pressable>`, breaking Inter font imports, introducing forbidden colors/gradients, removing safe-area bottom padding for the floating tab bar, or adding Depop-style badge clutter):
    - **Do NOT execute the breaking change.**
    - Warn the user about the collision and the exact risk of breakage.
@@ -13,7 +13,7 @@ Before suggesting, writing, or modifying ANY user interface, component, screen, 
 ## Core Technical Invariants at a Glance:
 - **Never use `className` on `<Pressable>`:** Use inline `style` or `PressableScale` (NativeWind interop is unregistered via `lib/pressableInterop.ts`).
 - **Never import raw `Text` from `'react-native'`:** Always use `import { Text } from '@/lib/rnText'` or `<AppText>` for Inter font mapping.
-- **Strict Three-Hue Palette:** Only Signal Purple (`#6C47FF`), Paper White (`#FFFFFF`), and Ink (`#0F0F0F` / `#111111`). No gradients.
+- **Strict Three-Hue Palette:** Only Signal Purple (`#6C47FF`), Paper White (`#FFFFFF`), and Ink (`#0F0F0F` / `#111111`). Approved semantic exceptions: destructive red (`#EF4444`) and canonical `<ShieldCheckIcon>` tokens (`#F2F3FE` background fill and `#5356EE` stroke). No unapproved ad-hoc colors or gradients.
 - **One Primary CTA Rule:** Only one filled purple button per view.
 - **Floating Tab Bar Clearance:** Scrollable containers must include `paddingBottom` for `AnimatedTabBar.tsx` (insets.bottom + 80).
 - **Unified Shield Icon Everywhere:** All buyer protection and verification marks across the app (Home cards, related items, product detail, checkout) must use canonical circular badge `<ShieldCheckIcon>` (viewBox `0 0 24 24`, circular background `#F2F3FE`, stroke `#5356EE` with round checkmark). Never use teal (`#007782`) or ad-hoc shields.

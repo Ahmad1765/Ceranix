@@ -126,22 +126,38 @@ export default function NewConversationScreen() {
         .select('id, price')
         .in('id', bundleItemIds);
       if (error) throw new Error(error.message);
-      return (data ?? []) as { id: string; price: number }[];
+      const rows = (data ?? []) as { id: string; price: number }[];
+      if (rows.length !== bundleItemIds.length) {
+        throw new Error('One or more bundled items are no longer available.');
+      }
+      return rows;
     },
   });
   const bundleItemPrices = bundleItemPricesQ.data ?? null;
+
+  useEffect(() => {
+    if (bundleItemPricesQ.isError) {
+      toast.show(
+        bundleItemPricesQ.error?.message || 'Some items in this bundle could not be loaded.',
+        { variant: 'default', icon: 'alert-triangle' },
+      );
+    }
+  }, [bundleItemPricesQ.isError, bundleItemPricesQ.error, toast]);
 
   // Base price reference for offer presets and ceiling.
   // Non-bundle: listing.price (authoritative from the DB).
   // Bundle: listing.price + sum of fetched bundle item prices.
   const baseReferencePrice = useMemo(() => {
     const listingPrice = Number(listing?.price ?? 0);
-    if (isBundle && bundleItemPrices && bundleItemPrices.length > 0) {
-      const addOnTotal = bundleItemPrices.reduce((sum, item) => sum + Number(item.price ?? 0), 0);
-      return listingPrice + addOnTotal;
+    if (isBundle) {
+      if (bundleItemPrices && bundleItemPrices.length === bundleItemIds.length && bundleItemPrices.length > 0) {
+        const addOnTotal = bundleItemPrices.reduce((sum, item) => sum + Number(item.price ?? 0), 0);
+        return listingPrice + addOnTotal;
+      }
+      return 0;
     }
     return listingPrice;
-  }, [isBundle, bundleItemPrices, listing?.price]);
+  }, [isBundle, bundleItemPrices, bundleItemIds.length, listing?.price]);
 
   // Preset tiers: 10% and 20%
   const { preset10, preset20 } = useMemo(
@@ -150,15 +166,25 @@ export default function NewConversationScreen() {
   );
 
   const hasInitializedAmount = useRef(Boolean(initialAmount));
-  const isBundlePricesLoading = isBundle && bundleItemIds.length > 0 && bundleItemPrices === null;
+  const isBundlePricesLoading = isBundle && bundleItemIds.length > 0 && bundleItemPricesQ.isLoading;
+  const isBundleReady =
+    !isBundle ||
+    (bundleItemPricesQ.isSuccess &&
+      Array.isArray(bundleItemPrices) &&
+      bundleItemPrices.length === bundleItemIds.length);
 
   useEffect(() => {
-    if (baseReferencePrice > 0 && !hasInitializedAmount.current && !isBundlePricesLoading) {
+    if (
+      baseReferencePrice > 0 &&
+      !hasInitializedAmount.current &&
+      isBundleReady &&
+      !isBundlePricesLoading
+    ) {
       hasInitializedAmount.current = true;
       setAmount(String(preset20 || Math.round(baseReferencePrice * 0.8)));
       setSelectedCard('custom');
     }
-  }, [baseReferencePrice, preset20, isBundlePricesLoading]);
+  }, [baseReferencePrice, preset20, isBundleReady, isBundlePricesLoading]);
 
   const handleSelectCard = (card: 'tier10' | 'tier20' | 'custom') => {
     if (Platform.OS !== 'web') {
@@ -186,6 +212,7 @@ export default function NewConversationScreen() {
   const amountNum = parseFloat(amount) || 0;
   const offerValid =
     mode === 'offer' &&
+    isBundleReady &&
     isOfferAmountValid({
       amountNum,
       isBundle,
@@ -291,6 +318,10 @@ export default function NewConversationScreen() {
 
       let ok = false;
       if (mode === 'offer') {
+        if (isBundle && (!bundleItemPrices || bundleItemPrices.length !== bundleItemIds.length)) {
+          Alert.alert('Bundle Unavailable', 'One or more bundled items could not be verified.');
+          return;
+        }
         const saved = await sendOffer({
           conversationId: conv.id,
           senderId: user.id,
@@ -737,7 +768,7 @@ export default function NewConversationScreen() {
               {/* Limit Subtext */}
               <View style={styles.limitRow}>
                 <Text style={[styles.limitText, { color: theme.muteSoft }]}>
-                  25 offers left for today.{' '}
+                  Offers left for today.{' '}
                 </Text>
                 <Pressable onPress={handleLearnWhy} hitSlop={6}>
                   <Text style={[styles.learnWhyText, { color: theme.primary }]}>Learn why.</Text>

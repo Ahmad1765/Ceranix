@@ -21,6 +21,7 @@ import {
   tap,
   timeAgo,
 } from '@/components/product/shared';
+import { BUNDLE_TIERS } from '@/lib/bundle';
 import type { Listing } from '@/types';
 
 type ProductOverviewHeaderProps = {
@@ -35,7 +36,7 @@ export const ProductOverviewHeader = memo(function ProductOverviewHeader({
   listing,
   bpFee,
   onOpenBpSheet,
-  hasBundleItems = true,
+  hasBundleItems = false,
   onScrollToBundle,
 }: ProductOverviewHeaderProps) {
   const { theme, isDark } = useTheme();
@@ -160,7 +161,7 @@ export const ProductOverviewHeader = memo(function ProductOverviewHeader({
               onScrollToBundle?.();
             }}
             accessibilityRole="button"
-            accessibilityLabel="Up to 35% off when you bundle items from this seller"
+            accessibilityLabel={`Up to ${BUNDLE_TIERS[BUNDLE_TIERS.length - 1].pct}% off when you bundle items from this seller`}
             style={({ pressed }) => ({
               backgroundColor: isDark ? 'rgba(83, 86, 238, 0.16)' : '#F2F3FE',
               borderRadius: 12,
@@ -180,7 +181,7 @@ export const ProductOverviewHeader = memo(function ProductOverviewHeader({
             >
               Up to{' '}
               <Text style={{ fontFamily: 'Inter_600SemiBold', color: '#5356EE' }}>
-                35% off
+                {BUNDLE_TIERS[BUNDLE_TIERS.length - 1].pct}% off
               </Text>{' '}
               when you bundle items from this seller
             </Text>

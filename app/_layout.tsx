@@ -24,6 +24,7 @@ import { queryClient, persistOptions } from '@/lib/queryClient';
 import { initOnlineManager } from '@/lib/offline';
 import { initOfflineSync } from '@/lib/offlineSync';
 import { attachResponseListener, configureNotifications } from '@/lib/notifications';
+import { onOrderUpdated } from '@/lib/paymentService';
 import { AuthProvider } from '@/lib/auth';
 import { ToastProvider } from '@/lib/toast';
 import { GuestGateProvider } from '@/components/GuestGate';
@@ -52,6 +53,21 @@ initOnlineManager();
 // permission — that happens contextually (first conversation) or from Settings.
 // No-ops on web.
 configureNotifications();
+
+// Automatically invalidate orders and listings across the app on payment/fulfillment updates
+onOrderUpdated((listingId) => {
+  try {
+    queryClient.invalidateQueries({ queryKey: ['myOrders'] });
+    queryClient.invalidateQueries({ queryKey: ['feedListings'] });
+    queryClient.invalidateQueries({ queryKey: ['homeFeed'] });
+    if (listingId) {
+      queryClient.invalidateQueries({ queryKey: ['listing', listingId] });
+      queryClient.invalidateQueries({ queryKey: ['orderForListing', listingId] });
+    }
+  } catch {
+    // Non-fatal
+  }
+});
 
 // React-native-web ships Alert.alert as a no-op, so every validation /
 // confirm path that calls Alert.alert silently dies on web. The shim swaps
@@ -136,8 +152,23 @@ function usePreventViewportZoomOnWeb() {
     }
     meta.setAttribute(
       'content',
-      'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover'
+      'width=device-width, initial-scale=1, viewport-fit=cover'
     );
+
+    // Prevent iOS Safari auto-zoom on input focus while preserving user pinch-to-zoom
+    let style = document.getElementById('prevent-ios-zoom-style') as HTMLStyleElement | null;
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'prevent-ios-zoom-style';
+      style.textContent = `
+        @media screen and (max-width: 768px) {
+          input, textarea, select {
+            font-size: 16px !important;
+          }
+        }
+      `;
+      document.head.appendChild(style);
+    }
 
     // On iOS Safari, when keyboard dismisses or input blurs, ensure horizontal viewport offset is reset to 0
     const handleFocusOut = () => {

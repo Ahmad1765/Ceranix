@@ -55,6 +55,9 @@ alter table public.orders
       'canceled'
     ));
 
+-- Make stripe_session_id nullable so orders can be created in awaiting_payment state before Stripe session generation
+alter table public.orders alter column stripe_session_id drop not null;
+
 -- Backfill fulfillment_status on pre-existing rows
 update public.orders
    set fulfillment_status = case
@@ -467,9 +470,18 @@ begin
      where id = v_unlocked_orders.id;
 
     if v_unlocked_orders.listing_id is not null then
-      update public.listings
-         set is_sold = false
-       where id = v_unlocked_orders.listing_id;
+      if not exists (
+        select 1
+          from public.orders
+         where listing_id = v_unlocked_orders.listing_id
+           and id <> v_unlocked_orders.id
+           and status not in ('canceled', 'refunded', 'failed')
+           and coalesce(fulfillment_status, '') not in ('canceled', 'failed')
+      ) then
+        update public.listings
+           set is_sold = false
+         where id = v_unlocked_orders.listing_id;
+      end if;
     end if;
   end loop;
 end;
@@ -497,12 +509,12 @@ end $$;
 -- 8. EXECUTION PERMISSIONS: Revoke public, grant exclusively to authenticated
 -- ─────────────────────────────────────────────────────────────────────────────
 
-revoke execute on function public.confirm_order_payment_authorization(uuid, text, text) from public, anon;
+revoke execute on function public.confirm_order_payment_authorization(uuid, text, text) from public, anon, authenticated;
 revoke execute on function public.advance_order_fulfillment(uuid, text, text, text, text, text) from public, anon;
 revoke execute on function public.open_order_dispute(uuid, text, text[]) from public, anon;
 revoke execute on function public.sweep_expired_offers_and_reservations() from public, anon;
 
-grant execute on function public.confirm_order_payment_authorization(uuid, text, text) to authenticated, service_role;
+grant execute on function public.confirm_order_payment_authorization(uuid, text, text) to service_role;
 grant execute on function public.advance_order_fulfillment(uuid, text, text, text, text, text) to authenticated, service_role;
 grant execute on function public.open_order_dispute(uuid, text, text[]) to authenticated, service_role;
 grant execute on function public.sweep_expired_offers_and_reservations() to service_role;

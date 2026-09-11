@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { View, Pressable, ScrollView, ActivityIndicator, Share, Platform, Linking } from 'react-native';
+import { View, Pressable, ScrollView, ActivityIndicator, Share, Platform, Linking, AppState } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -138,8 +138,17 @@ export default function InvoiceScreen() {
       if (active) setConfirming(false);
     })();
 
+    const appStateSub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active' && active) {
+        load().then((refreshed) => {
+          if (refreshed && active) setOrder(refreshed);
+        });
+      }
+    });
+
     return () => {
       active = false;
+      appStateSub.remove();
     };
   }, [paid, placed, method, id, user?.id, listing?.seller_id, listing?.seller?.id]);
 
@@ -151,7 +160,7 @@ export default function InvoiceScreen() {
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*',
           schema: 'public',
           table: 'orders',
           filter: `id=eq.${order.id}`,
@@ -475,8 +484,19 @@ export default function InvoiceScreen() {
     }
   };
 
-  const isOrderActive = order?.status === 'paid' || order?.status === 'pending';
-  const isShipped = Boolean(order?.shipped_at || (order as any)?.tracking_number);
+  const isOrderActive =
+    order?.status === 'paid' ||
+    order?.status === 'pending' ||
+    order?.status === 'packing' ||
+    order?.status === 'shifting' ||
+    order?.status === 'delivered';
+  const isShipped = Boolean(
+    order?.shipped_at ||
+    (order as any)?.shifted_at ||
+    (order as any)?.tracking_number ||
+    order?.status === 'shifting' ||
+    order?.fulfillment_status === 'shifting'
+  );
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top']}>
@@ -834,7 +854,87 @@ export default function InvoiceScreen() {
               Dispute In Review by Support
             </Text>
           </View>
-        ) : isSeller && order?.payment_method === 'cod' && order?.status === 'pending' ? (
+        ) : isSeller && (order?.fulfillment_status === 'pending' || (!order?.fulfillment_status && !isShipped && order?.status !== 'completed')) ? (
+          <View style={{ width: '100%', gap: 8 }}>
+            <Pressable
+              onPress={handleStartPacking}
+              disabled={advancingPacking}
+              style={({ pressed }) => [
+                {
+                  height: 48,
+                  borderRadius: 12,
+                  backgroundColor: theme.ink,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                },
+                pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
+              ]}
+            >
+              {advancingPacking ? (
+                <ActivityIndicator color={theme.background} size="small" />
+              ) : (
+                <>
+                  <Feather
+                    name={order?.fulfillment_type === 'dropship' ? 'send' : 'package'}
+                    size={16}
+                    color={theme.background}
+                    style={{ marginRight: 8 }}
+                  />
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: theme.background, fontFamily: typography.family.sansBold }}>
+                    {order?.fulfillment_type === 'dropship' ? 'Send to Supplier' : 'Start Packing Order'}
+                  </Text>
+                </>
+              )}
+            </Pressable>
+
+            {order?.payment_method === 'cod' && (
+              <Pressable
+                onPress={handleCompleteCodOrder}
+                disabled={completingCod}
+                style={{ alignItems: 'center', paddingVertical: 4 }}
+              >
+                <Text style={{ fontSize: 13, color: theme.mute, textDecorationLine: 'underline', fontFamily: typography.family.sansMedium }}>
+                  Delivering in person right now? Mark CoD Delivered & Paid
+                </Text>
+              </Pressable>
+            )}
+          </View>
+        ) : isSeller && (order?.fulfillment_status === 'packing' || (!order?.fulfillment_status && isOrderActive && !isShipped)) ? (
+          <View style={{ width: '100%', gap: 8 }}>
+            <Pressable
+              onPress={() => setShowShipModal(true)}
+              style={({ pressed }) => [
+                {
+                  height: 48,
+                  borderRadius: 12,
+                  backgroundColor: theme.primary,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                },
+                pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
+              ]}
+            >
+              <Feather name="truck" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
+              <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF', fontFamily: typography.family.sansBold }}>
+                Mark as Shipped / In-Transit
+              </Text>
+            </Pressable>
+
+            {order?.payment_method === 'cod' && (
+              <Pressable
+                onPress={handleCompleteCodOrder}
+                disabled={completingCod}
+                style={{ alignItems: 'center', paddingVertical: 4 }}
+              >
+                <Text style={{ fontSize: 13, color: theme.mute, textDecorationLine: 'underline', fontFamily: typography.family.sansMedium }}>
+                  Delivering in person right now? Mark CoD Delivered & Paid
+                </Text>
+              </Pressable>
+            )}
+          </View>
+        ) : isSeller && order?.payment_method === 'cod' && (order?.fulfillment_status === 'shifting' || isShipped) && order?.status !== 'completed' ? (
           <Pressable
             onPress={handleCompleteCodOrder}
             disabled={completingCod}
@@ -842,7 +942,7 @@ export default function InvoiceScreen() {
               {
                 height: 48,
                 borderRadius: 12,
-                backgroundColor: theme.ink,
+                backgroundColor: theme.primary,
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -857,38 +957,6 @@ export default function InvoiceScreen() {
                 <Feather name="check-circle" size={16} color={theme.background} style={{ marginRight: 8 }} />
                 <Text style={{ fontSize: 15, fontWeight: '700', color: theme.background, fontFamily: typography.family.sansBold }}>
                   Mark CoD Delivered & Paid
-                </Text>
-              </>
-            )}
-          </Pressable>
-        ) : isSeller && (order?.fulfillment_status === 'pending' || (!order?.fulfillment_status && order?.status === 'paid' && !isShipped)) ? (
-          <Pressable
-            onPress={handleStartPacking}
-            disabled={advancingPacking}
-            style={({ pressed }) => [
-              {
-                height: 48,
-                borderRadius: 12,
-                backgroundColor: theme.ink,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-              },
-              pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
-            ]}
-          >
-            {advancingPacking ? (
-              <ActivityIndicator color={theme.background} size="small" />
-            ) : (
-              <>
-                <Feather
-                  name={order?.fulfillment_type === 'dropship' ? 'send' : 'package'}
-                  size={16}
-                  color={theme.background}
-                  style={{ marginRight: 8 }}
-                />
-                <Text style={{ fontSize: 15, fontWeight: '700', color: theme.background, fontFamily: typography.family.sansBold }}>
-                  {order?.fulfillment_type === 'dropship' ? 'Send to Supplier' : 'Start Packing Order'}
                 </Text>
               </>
             )}
@@ -913,7 +981,7 @@ export default function InvoiceScreen() {
               Mark as Shipped / In-Transit
             </Text>
           </Pressable>
-        ) : isBuyer && (isShipped || order?.fulfillment_status === 'shifting' || order?.fulfillment_status === 'delivered') && order?.status !== 'completed' ? (
+        ) : isBuyer && (isShipped || order?.fulfillment_status === 'shifting' || order?.fulfillment_status === 'delivered' || order?.status === 'shifting' || order?.status === 'delivered') && order?.status !== 'completed' && order?.fulfillment_status !== 'completed' ? (
           <View style={{ gap: 8, width: '100%' }}>
             <Pressable
               onPress={handleConfirmReceived}

@@ -50,6 +50,17 @@ describe('deriveInvoiceStatus', () => {
   it('lets a paid order win over an in-flight confirm poll', () => {
     expect(deriveInvoiceStatus(order('paid'), true)).toBe('paid');
   });
+
+  it('reflects active fulfillment transitions accurately', () => {
+    expect(deriveInvoiceStatus(order('packing'), false)).toBe('packing');
+    expect(deriveInvoiceStatus(order('shifting'), false)).toBe('shifting');
+    expect(deriveInvoiceStatus(order('delivered'), false)).toBe('delivered');
+    expect(deriveInvoiceStatus(order('disputed'), false)).toBe('disputed');
+    expect(deriveInvoiceStatus(order('completed'), false)).toBe('completed');
+    // Also supports fulfillment_status property when status is still paid
+    expect(deriveInvoiceStatus({ status: 'paid', fulfillment_status: 'shifting' } as any, false)).toBe('shifting');
+    expect(deriveInvoiceStatus({ status: 'paid', fulfillment_status: 'delivered' } as any, false)).toBe('delivered');
+  });
 });
 
 describe('deriveInvoiceAmounts', () => {

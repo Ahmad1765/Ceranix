@@ -37,8 +37,11 @@ export function OrderStepper({
   // Effective state combining fulfillmentStatus & legacy status
   const effectiveFulfillment = fulfillmentStatus || (
     status === 'completed' ? 'completed' :
+    status === 'delivered' ? 'delivered' :
+    status === 'disputed' ? 'disputed' :
     status === 'canceled' || status === 'refunded' || status === 'failed' ? 'canceled' :
-    shippedAt || status === 'shipped' ? 'shifting' :
+    status === 'shifting' || shippedAt || status === 'shipped' ? 'shifting' :
+    status === 'packing' ? 'packing' :
     status === 'paid' ? 'packing' :
     status === 'awaiting_payment' ? 'awaiting_payment' :
     'pending'
@@ -165,7 +168,10 @@ export function OrderStepper({
       subtitle: isDropship ? 'Processing' : 'Seller preparing',
     },
     { title: 'Shifting', subtitle: courierName || 'In transit' },
-    { title: 'Completed', subtitle: 'Delivered' },
+    {
+      title: effectiveFulfillment === 'delivered' ? 'Delivered' : 'Completed',
+      subtitle: effectiveFulfillment === 'delivered' ? 'Please inspect' : 'Delivered',
+    },
   ];
 
   return (

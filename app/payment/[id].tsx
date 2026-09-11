@@ -19,6 +19,8 @@ import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/context/ThemeContext';
 import { type as typography } from '@/lib/theme';
 import { useListingQuery } from '@/lib/queries';
+import { queryClient } from '@/lib/queryClient';
+import { qk } from '@/lib/queries/keys';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { safeBack } from '@/lib/nav';
@@ -40,7 +42,7 @@ import {
 import { paymentService, normalizeAddressInput } from '@/lib/paymentService';
 import { ShippingAddressSchema } from '@/lib/schemas/order';
 import { getOrCreateConversation } from '@/lib/chat';
-import { setListingSold, SELECT_LISTING_WITH_SELLER } from '@/lib/listings';
+import { SELECT_LISTING_WITH_SELLER } from '@/lib/listings';
 import type { ShippingAddress, Listing } from '@/types';
 
 function tap(style: 'light' | 'medium' = 'light') {
@@ -342,17 +344,57 @@ export default function PaymentScreen() {
     setAddressSheetOpen(false);
 
     try {
-      const { data, error } = await (supabase
-        .from('shipping_addresses')
-        .upsert(payload, { onConflict: 'user_id' })
-        .select()
-        .single() as any);
+      const isRealUuid =
+        Boolean(previousAddress?.id) &&
+        !previousAddress!.id.startsWith('mock_') &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(previousAddress!.id);
 
-      if (error) {
-        throw error;
+      const rpcPayload = isRealUuid ? { ...payload, id: previousAddress!.id } : payload;
+
+      let savedAddress: ShippingAddress | null = null;
+
+      // Primary: Canonical atomic RPC that unsets prior default and updates/inserts
+      const { data: rpcData, error: rpcError } = await (supabase.rpc as any)(
+        'upsert_shipping_address_with_default',
+        { p_payload: rpcPayload }
+      );
+
+      if (!rpcError && rpcData) {
+        savedAddress = rpcData as ShippingAddress;
+      } else {
+        // Fallback: Direct table operations if RPC is unavailable in current database
+        // Clear prior default to satisfy partial unique index shipping_addresses_one_default_idx
+        await supabase
+          .from('shipping_addresses')
+          .update({ is_default: false })
+          .eq('user_id', user.id)
+          .eq('is_default', true);
+
+        if (isRealUuid) {
+          const { data: updateData, error: updateError } = await (supabase
+            .from('shipping_addresses')
+            .update(payload)
+            .eq('id', previousAddress!.id)
+            .eq('user_id', user.id)
+            .select()
+            .single() as any);
+
+          if (updateError) throw updateError;
+          savedAddress = updateData as ShippingAddress;
+        } else {
+          const { data: insertData, error: insertError } = await (supabase
+            .from('shipping_addresses')
+            .insert(payload)
+            .select()
+            .single() as any);
+
+          if (insertError) throw insertError;
+          savedAddress = insertData as ShippingAddress;
+        }
       }
-      if (data) {
-        setShippingAddress(data as ShippingAddress);
+
+      if (savedAddress) {
+        setShippingAddress(savedAddress);
       }
       toast.show('Shipping address saved', { variant: 'default', icon: 'check' });
     } catch (err: any) {
@@ -425,31 +467,17 @@ export default function PaymentScreen() {
         shippingAddress,
       });
 
-      // Mark all items sold
+      // Update local query cache and feed queries to immediately reflect atomic server transaction sold state
       const allItemIds = Array.from(new Set([String(listing.id), ...bundleItemIds]));
-      const soldResults = await Promise.allSettled(
-        allItemIds.map(async (itemId) => {
-          const success = await setListingSold(itemId, true);
-          if (!success) {
-            throw new Error(`Failed to update sold status for item ${itemId}`);
-          }
-          return itemId;
-        }),
-      );
-
-      const failedItemIds = soldResults
-        .map((res, index) => (res.status === 'rejected' ? allItemIds[index] : null))
-        .filter((itemId): itemId is string => itemId !== null);
-
-      if (failedItemIds.length > 0) {
-        console.warn('[payment] Some items failed to be marked as sold:', failedItemIds);
-        toast.show(
-          failedItemIds.length === allItemIds.length
-            ? 'Order placed, but items could not be marked as sold.'
-            : 'Order placed, but some bundled items could not be marked as sold.',
-          { variant: 'default', icon: 'alert-triangle' },
+      allItemIds.forEach((itemId) => {
+        queryClient.setQueryData<Listing>(qk.listing(itemId), (old) =>
+          old ? { ...old, is_sold: true } : old,
         );
-      }
+        queryClient.invalidateQueries({ queryKey: qk.listing(itemId) });
+      });
+      queryClient.invalidateQueries({ queryKey: ['myOrders'] });
+      queryClient.invalidateQueries({ queryKey: ['feedListings'] });
+      queryClient.invalidateQueries({ queryKey: ['homeFeed'] });
 
       const isPaid = result.status === 'paid';
       const allTitles = allOrderItems.map((item) => item.title).filter(Boolean);

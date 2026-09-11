@@ -53,3 +53,4 @@ export const persistOptions: PersistQueryClientProviderProps['persistOptions'] =
     shouldDehydrateQuery: (query) => query.state.status === 'success',
   },
 };
+

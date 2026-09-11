@@ -258,7 +258,15 @@ export function useConversationThread(
 
         // Trigger intelligent support concierge automated response if talking to Support
         if (isSupport) {
-          sendSupportBotReply(conversationId, text).catch(() => {});
+          try {
+            await sendSupportBotReply(conversationId, text);
+          } catch (err: any) {
+            console.error('[conversation] support bot reply failed', err);
+            toast.show(err?.message || 'Support assistant could not send a reply.', {
+              variant: 'default',
+              icon: 'alert-triangle',
+            });
+          }
         }
         return;
       }
@@ -268,7 +276,7 @@ export function useConversationThread(
         prev.map((m) => (m.id === tempId ? { ...m, pending: false, failed: true } : m)),
       );
     },
-    [conversationId, isSupport, user],
+    [conversationId, isSupport, toast, user],
   );
 
   const handleSend = useCallback(() => {

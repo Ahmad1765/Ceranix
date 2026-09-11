@@ -123,7 +123,7 @@ Carrinex is a disciplined, quiet-luxury resale marketplace. Restraint communicat
 
 | Invariant | Forbidden (AI Must Reject) | Enforced Standard |
 | :--- | :--- | :--- |
-| **Color Palette** | Any 4th color (no blue, green, orange, yellow). No ad-hoc hex values like `#3B82F6` or `#10B981`. | **The Three-Hue Rule:** Only Signal Purple (`#6C47FF`), Paper White (`#FFFFFF`), and Ink (`#0F0F0F` / `#111111` at calibrated opacities). Semantic red (`#EF4444`) is permitted *only* for destructive/danger states. |
+| **Color Palette** | Any unapproved color (no blue, green, orange, yellow). No ad-hoc hex values like `#3B82F6` or `#10B981`. | **The Three-Hue Rule:** Only Signal Purple (`#6C47FF`), Paper White (`#FFFFFF`), and Ink (`#0F0F0F` / `#111111` at calibrated opacities). Semantic red (`#EF4444`) is permitted *only* for destructive/danger states, and trust badge tokens (`#F2F3FE` background fill and `#5356EE` stroke) are approved semantic tokens *strictly* for `<ShieldCheckIcon>`. |
 | **Gradients** | Any gradient backgrounds, gradient buttons, or gradient text. | **Zero Gradients Rule:** Flat surfaces only. All gradient tokens resolve to flat colors. |
 | **Resale Clutter** | Poshmark/Depop-style badges, ribbons, star ratings, stickers, promotional overlays, or emoji as decoration. | Clean, quiet presentation. Product photography and seller words are the centerpiece. Use Feather or Ionicons, never decorative emoji. |
 | **Action Hierarchy** | Multiple filled purple buttons on the same screen. | **One Primary Action Rule:** Exactly ONE primary purple CTA per screen. Secondary actions must be Ghost (white + hairline border), Dark (ink), or Soft (purple tint). |
@@ -183,10 +183,11 @@ Before proceeding with a user request, match it against this matrix:
 
 ---
 
-## 6. Emergency Override Procedure
+## 6. Invariant Enforcement & Refusal Policy
 
-If the user **explicitly insists** on overriding one of these rules after receiving the AI's warning:
-1. The AI must explicitly state:
-   > *"Proceeding with this override violates `[Rule Name]`. This may cause `[Specific Breakage, e.g. native style degradation or brand inconsistency]`. Applying the requested change per your explicit confirmation."*
-2. Isolate the change as locally as possible so it does not infect global files or break shared components.
-3. Never bypass core runtime crash protections (such as `disablePressableInterop()` or font blocking).
+Protected invariants have **no override mechanism**. If the user explicitly insists on overriding one of these rules after receiving the AI's warning:
+1. **Refuse Colliding Changes:** The AI must refuse to execute or apply any colliding change, including after explicit user confirmation.
+2. **Warn and State the Risk:** Explicitly warn the user about the collision and the exact risk of breakage:
+   > *"⚠️ **UI Guardrail Collision Warning:** Your request to `[Action]` conflicts with `[Rule Name / Invariant]` in `UI_GUARDRAILS.md`. This change cannot be applied because it causes `[Specific Breakage, e.g. native style degradation, runtime crash, or brand inconsistency]`."*
+3. **Provide Safe Alternative:** Propose and implement only the safe, compliant alternative as specified in `UI_GUARDRAILS.md`.
+

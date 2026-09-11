@@ -9,6 +9,10 @@ import type { Order } from '@/lib/payments';
 export type InvoiceStatus =
   | 'paid'
   | 'completed'
+  | 'packing'
+  | 'shifting'
+  | 'delivered'
+  | 'disputed'
   | 'pending'
   | 'confirming'
   | 'refunded'
@@ -30,18 +34,24 @@ export type InvoiceStatus =
  *  - `cod_pending` is an active Cash on Delivery order awaiting delivery & collection.
  *  - `confirming` is transient, shown only while re-checking after a checkout
  *    return. It is never derived from the URL.
+ *  - Fulfillment state transitions (packing, shifting, delivered, disputed, completed)
+ *    must reflect their active operational stage rather than falling back to Pending.
  */
 export function deriveInvoiceStatus(
-  order: Pick<Order, 'status' | 'payment_method'> | null | undefined,
+  order: Pick<Order, 'status' | 'payment_method' | 'fulfillment_status'> | null | undefined,
   confirming: boolean,
 ): InvoiceStatus {
-  if (order?.status === 'completed') return 'completed';
-  if (order?.status === 'paid') return 'paid';
+  if (order?.status === 'completed' || order?.fulfillment_status === 'completed') return 'completed';
+  if (order?.status === 'disputed' || order?.fulfillment_status === 'disputed') return 'disputed';
   if (order?.status === 'refund_due') return 'refund_due';
   if (order?.status === 'refunded') return 'refunded';
-  if (order?.status === 'canceled') return 'canceled';
+  if (order?.status === 'canceled' || order?.fulfillment_status === 'canceled') return 'canceled';
   if (order?.status === 'failed') return 'failed';
-  if (order?.payment_method === 'cod' && order?.status === 'pending') return 'cod_pending';
+  if (order?.status === 'delivered' || order?.fulfillment_status === 'delivered') return 'delivered';
+  if (order?.status === 'shifting' || order?.fulfillment_status === 'shifting') return 'shifting';
+  if (order?.status === 'packing' || order?.fulfillment_status === 'packing') return 'packing';
+  if (order?.status === 'paid') return 'paid';
+  if (order?.payment_method === 'cod' && (order?.status === 'pending' || order?.fulfillment_status === 'pending')) return 'cod_pending';
   if (confirming) return 'confirming';
   return 'pending';
 }

@@ -5,6 +5,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { EmptyState } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { usePriceDropsQuery, useMyFeedListingsQuery } from '@/lib/queries';
+import { BRAND } from '@/lib/brand';
 import { NewsActivityRow, type ActivityItem } from './NewsActivityRow';
 import type { Listing } from '@/types';
 
@@ -53,7 +54,7 @@ export function ForYouTab({ bottomInset = 24 }: { bottomInset?: number }) {
         kind: 'listing_created',
         actor: {
           id: seller?.id || 'curator',
-          username: seller?.username || 'Carrinex',
+          username: seller?.username || BRAND,
           full_name: seller?.full_name || 'Recommended for you',
           avatar_url: seller?.avatar_url,
         },

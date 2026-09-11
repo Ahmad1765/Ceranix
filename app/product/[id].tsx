@@ -20,7 +20,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Pressable, Alert, Share } from 'react-native';
+import { View, Pressable, Alert, Share, type LayoutChangeEvent } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { safeBack } from '@/lib/nav';
@@ -48,6 +48,7 @@ import { confirm } from '@/lib/confirm';
 import { logListingView } from '@/lib/recommendations';
 import { capture, buildListingViewedProps } from '@/lib/analytics';
 import { useAuth } from '@/lib/auth';
+import { fetchOrderForListing, type Order } from '@/lib/payments';
 import { useToast } from '@/lib/toast';
 import { captureError } from '@/lib/sentry';
 import { getOrCreateConversation, sendOffer } from '@/lib/chat';
@@ -112,6 +113,11 @@ export default function ProductScreen() {
   const heartAnimRef = useRef<PopIconHandle>(null);
   const saveAnimRef = useRef<PopIconHandle>(null);
   const mainScrollRef = useRef<any>(null);
+  const bundleSectionYRef = useRef<number | null>(null);
+
+  const handleRelatedSectionLayout = useCallback((e: LayoutChangeEvent) => {
+    bundleSectionYRef.current = e.nativeEvent.layout.y;
+  }, []);
 
   // ── Primary Listing Query ────────────────────────────────────────────────
   const listingQ = useListingQuery(productIdParam, withFallbackSeller);
@@ -158,6 +164,27 @@ export default function ProductScreen() {
   // ── Social & Follow State ────────────────────────────────────────────────
   const sellerId = listing?.seller?.id ?? '';
   const isOwnListing = !!user?.id && listing?.seller_id === user.id;
+
+  // Check if current user is the buyer of this listing
+  const [buyerOrder, setBuyerOrder] = useState<Order | null>(null);
+  useEffect(() => {
+    if (!productIdParam || !user?.id) {
+      setBuyerOrder(null);
+      return;
+    }
+    let active = true;
+    fetchOrderForListing(productIdParam)
+      .then((ord) => {
+        if (active && ord && ord.buyer_id === user.id && ord.status !== 'canceled') {
+          setBuyerOrder(ord);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [productIdParam, user?.id]);
+
   const followStateQ = useFollowStateQuery(user?.id ?? null, isOwnListing ? '' : sellerId);
   const followState = followStateQ.data;
   const followed = followState ? followState.isFollowing : false;
@@ -565,7 +592,9 @@ export default function ProductScreen() {
           hasBundleItems={sellerItems.length > 0}
           onOpenBpSheet={() => engagement.setBpVisible(true)}
           onScrollToBundle={() => {
-            mainScrollRef.current?.scrollTo({ y: 650, animated: true });
+            if (bundleSectionYRef.current != null) {
+              mainScrollRef.current?.scrollTo({ y: bundleSectionYRef.current, animated: true });
+            }
           }}
         />
 
@@ -615,6 +644,7 @@ export default function ProductScreen() {
           onClearAllBundle={bundle.handleClearAllBundle}
           onBuyBundle={bundle.handleBuyBundle}
           onSendBundleOffer={bundle.handleSendBundleOffer}
+          onLayout={handleRelatedSectionLayout}
         />
       </Animated.ScrollView>
 
@@ -624,7 +654,12 @@ export default function ProductScreen() {
         buyTotal={buyTotal}
         bottomInset={insets.bottom}
         isOwner={isOwnListing}
-        isSold={listing.is_sold}
+        isSold={listing.is_sold || Boolean(buyerOrder)}
+        hasPurchased={Boolean(buyerOrder)}
+        onViewOrderPress={() => {
+          tap('selection');
+          router.push(`/invoice/${listing.id}` as any);
+        }}
         onChatPress={() => openChat('message')}
         onOfferPress={() => {
           if (canOffer()) engagement.setOfferVisible(true);

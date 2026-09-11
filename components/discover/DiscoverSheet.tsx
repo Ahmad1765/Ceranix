@@ -472,7 +472,7 @@ function DiscoverSheetBody({ onClose }: { onClose: () => void }) {
       }
       go(`/?sort=${action.sort}&chipLabel=${encodeURIComponent(label)}&chipIcon=${icon}`);
     },
-    [go, onClose],
+    [go],
   );
 
   const onTopic = useCallback(

@@ -8,7 +8,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { memo } from 'react';
-import { View, Pressable } from 'react-native';
+import { View, Pressable, type LayoutChangeEvent } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '@/context/ThemeContext';
@@ -35,6 +35,7 @@ type ProductRelatedSectionProps = {
   onClearAllBundle: () => void;
   onBuyBundle: (total: number, selectedIds: string[]) => void;
   onSendBundleOffer: (amount: number, selectedIds: string[]) => void;
+  onLayout?: (event: LayoutChangeEvent) => void;
 };
 
 export const ProductRelatedSection = memo(function ProductRelatedSection({
@@ -49,10 +50,11 @@ export const ProductRelatedSection = memo(function ProductRelatedSection({
   onClearAllBundle,
   onBuyBundle,
   onSendBundleOffer,
+  onLayout,
 }: ProductRelatedSectionProps) {
   const { theme } = useTheme();
   return (
-    <View style={{ marginTop: 22 }}>
+    <View style={{ marginTop: 22 }} onLayout={onLayout}>
       {/* Tab Pills: Seller's Items vs Similar Items */}
       <View style={{ flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 4 }}>
         {(['members', 'similar'] as const).map((tab) => {

@@ -7,7 +7,6 @@ import {
   ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
 import { Text } from '@/lib/rnText';
 import { formatPrice } from '@/lib/currency';
@@ -23,8 +22,10 @@ export interface ProductActionBarProps {
   onSubmitOffer?: (amount: number) => void;
   onBuyPress?: () => void;
   onChatPress?: () => void;
+  onViewOrderPress?: () => void;
   isOwner?: boolean;
   isSold?: boolean;
+  hasPurchased?: boolean;
   disabled?: boolean;
   className?: string;
   style?: ViewStyle;
@@ -40,8 +41,10 @@ export function ProductActionBar({
   onSubmitOffer,
   onBuyPress,
   onChatPress,
+  onViewOrderPress,
   isOwner = false,
   isSold = false,
+  hasPurchased = false,
   disabled = false,
   className = '',
   style,
@@ -68,6 +71,48 @@ export function ProductActionBar({
     }
     onBuyPress?.();
   };
+
+  if (hasPurchased) {
+    return (
+      <View
+        className={className}
+        style={[
+          styles.container,
+          {
+            backgroundColor: theme.surface,
+            borderTopColor: theme.border,
+            paddingBottom: Math.max(safeBottom, 16),
+          },
+          style,
+        ]}
+      >
+        <View style={styles.actionRow}>
+          <View style={{ flex: 1, marginRight: 10, justifyContent: 'center' }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: '#10B981', fontFamily: 'Inter_700Bold' }}>
+              You purchased this item
+            </Text>
+            <Text style={{ fontSize: 11.5, color: theme.mute, fontFamily: 'Inter_500Medium' }}>
+              Tap to track fulfillment status
+            </Text>
+          </View>
+          <Pressable
+            onPress={onViewOrderPress}
+            style={({ pressed }) => [
+              styles.buyButton,
+              {
+                backgroundColor: theme.primary,
+                paddingHorizontal: 18,
+                height: 44,
+                opacity: pressed ? 0.85 : 1,
+              },
+            ]}
+          >
+            <Text style={[styles.buyButtonText, { color: '#FFFFFF' }]}>Track Order</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
 
   if (isSold) {
     return (

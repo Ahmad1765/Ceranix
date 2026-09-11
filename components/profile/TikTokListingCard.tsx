@@ -6,7 +6,6 @@ import Feather from '@expo/vector-icons/Feather';
 import { router } from 'expo-router';
 import { cardImageUrl, getOptimizedImageUrl } from '@/lib/images';
 import { formatPrice } from '@/lib/currency';
-import { colors } from '@/lib/theme';
 import type { Listing } from '@/types';
 
 interface Props {

@@ -346,6 +346,26 @@ export class StripePaymentProvider implements PaymentProvider {
   }
 }
 
+type OrderUpdateListener = (listingId?: string | null) => void;
+const orderUpdateListeners = new Set<OrderUpdateListener>();
+
+export function onOrderUpdated(listener: OrderUpdateListener): () => void {
+  orderUpdateListeners.add(listener);
+  return () => {
+    orderUpdateListeners.delete(listener);
+  };
+}
+
+export function notifyOrderUpdated(listingId?: string | null): void {
+  orderUpdateListeners.forEach((listener) => {
+    try {
+      listener(listingId);
+    } catch {
+      // Non-fatal subscriber error
+    }
+  });
+}
+
 // ── Payment Service Registry & Dispatcher ──────────────────────────────────────
 export class PaymentService {
   private providers = new Map<PaymentMethod, PaymentProvider>();
@@ -369,7 +389,11 @@ export class PaymentService {
 
   async checkout(request: CheckoutRequest): Promise<CheckoutResult> {
     const provider = this.getProvider(request.paymentMethod);
-    return await provider.processCheckout(request);
+    const result = await provider.processCheckout(request);
+    if (result.success) {
+      notifyOrderUpdated(request.listingId);
+    }
+    return result;
   }
 
   /**
@@ -393,6 +417,7 @@ export class PaymentService {
 
       if (!error && data) {
         capture('order_cancelled', { order_id: orderId, reason });
+        notifyOrderUpdated(listingId ?? (data as Order)?.listing_id);
         return data as Order;
       }
       if (error) {
@@ -429,6 +454,7 @@ export class PaymentService {
         }
         if (!fallbackError) {
           capture('order_cancelled', { order_id: orderId, reason, fallback: true });
+          notifyOrderUpdated(listingId ?? (updatedOrder as Order)?.listing_id);
           return updatedOrder as Order;
         }
       }
@@ -533,6 +559,7 @@ export class PaymentService {
 
       if (!error && data) {
         capture('order_completed_by_buyer', { order_id: orderId });
+        notifyOrderUpdated((data as Order)?.listing_id);
         return data as Order;
       }
       if (error) {
@@ -559,6 +586,7 @@ export class PaymentService {
         fallbackError = new Error(updateError.message);
       } else if (updatedOrder) {
         capture('order_completed_by_buyer', { order_id: orderId, fallback: true });
+        notifyOrderUpdated((updatedOrder as Order)?.listing_id);
         return updatedOrder as Order;
       }
     } catch (e: any) {
@@ -608,6 +636,7 @@ export class PaymentService {
 
     if (data) {
       capture('cod_order_completed', { order_id: orderId });
+      notifyOrderUpdated((data as Order)?.listing_id);
       return data as Order;
     }
 
@@ -662,6 +691,7 @@ export class PaymentService {
     }
 
     capture('fulfillment_advanced', { order_id: orderId, target_status: targetStatus });
+    notifyOrderUpdated((data as Order)?.listing_id);
     return data as Order;
   }
 
@@ -700,6 +730,7 @@ export class PaymentService {
     }
 
     capture('order_disputed', { order_id: orderId, reason });
+    notifyOrderUpdated((data as Order)?.listing_id);
     return data as Order;
   }
 

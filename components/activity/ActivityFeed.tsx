@@ -73,11 +73,13 @@ export function ActivityFeed({ bottomInset = 24 }: Props) {
         updateCellsBatchingPeriod={50}
         removeClippedSubviews={Platform.OS === 'android'}
         ListEmptyComponent={
-          <EmptyState
-            icon="users"
-            title="No direct messages yet"
-            description="When you message creators directly through their profile, they’ll appear here."
-          />
+          !inboxQ.isLoading ? (
+            <EmptyState
+              icon="users"
+              title="No direct messages yet"
+              description="When you message creators directly through their profile, they’ll appear here."
+            />
+          ) : null
         }
         contentContainerStyle={
           directMessages.length === 0 ? { flex: 1 } : { paddingBottom: bottomInset }

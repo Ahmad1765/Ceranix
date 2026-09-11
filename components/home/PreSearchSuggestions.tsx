@@ -7,7 +7,6 @@ import { useTheme } from '@/context/ThemeContext';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import {
   type SearchSuggestion,
-  splitSuggestionHighlight,
   resolveSuggestions,
   resolvePreSearchSuggestions,
 } from '@/lib/searchSuggestions';

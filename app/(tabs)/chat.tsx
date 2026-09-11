@@ -650,20 +650,6 @@ export default function InboxScreen() {
   const refreshing = inboxQ.isRefetching;
   const { refetch: inboxRefetch, isStale: inboxStale } = inboxQ;
 
-  const tabBadges = useMemo(() => {
-    let sellingCount = 0;
-    let buyingCount = 0;
-    if (userId) {
-      conversations.forEach((c) => {
-        if (isConversationUnread(c, userId)) {
-          if (c.seller_id === userId) sellingCount++;
-          if (c.buyer_id === userId) buyingCount++;
-        }
-      });
-    }
-    return { selling: sellingCount, buying: buyingCount };
-  }, [conversations, userId]);
-
   const pagerRef = useRef<FlatList<{ value: InboxTab; label: string }>>(null);
   const [scrollX] = useState(() => new Animated.Value(0));
   const activeTabRef = useRef<InboxTab>(activeTab);
@@ -719,6 +705,20 @@ export default function InboxScreen() {
       support: conversations.filter((c) => isSupportConversation(c)),
     };
   }, [conversations, user?.id]);
+
+  const tabBadges = useMemo(() => {
+    let sellingCount = 0;
+    let buyingCount = 0;
+    if (userId) {
+      pageData.selling.forEach((c) => {
+        if (isConversationUnread(c, userId)) sellingCount++;
+      });
+      pageData.buying.forEach((c) => {
+        if (isConversationUnread(c, userId)) buyingCount++;
+      });
+    }
+    return { selling: sellingCount, buying: buyingCount };
+  }, [pageData, userId]);
 
   const onRefresh = useCallback(async () => {
     await inboxRefetch();

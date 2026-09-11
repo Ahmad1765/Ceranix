@@ -1,7 +1,5 @@
 import React from 'react';
 import { ShieldCheckIcon, type ShieldCheckIconProps } from './ShieldCheckIcon';
-import { useTheme } from '@/context/ThemeContext';
-
 export type VintedShieldIconProps = ShieldCheckIconProps;
 
 /** Canonical Buyer Protection shield color matching product page and brand purple */
@@ -17,7 +15,6 @@ export function VintedShieldIcon({
   strokeColor,
   ...props
 }: VintedShieldIconProps) {
-  const { theme } = useTheme();
   const iconColor = color ?? strokeColor ?? VINTED_SHIELD_COLOR;
   return <ShieldCheckIcon color={iconColor} {...props} />;
 }

@@ -84,6 +84,11 @@ end;
 $$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- Ensure stripe_session_id is nullable for pre-payment orders
+-- ─────────────────────────────────────────────────────────────────────────────
+alter table public.orders alter column stripe_session_id drop not null;
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- RPC: accept_chat_offer (Atomic Chat-to-Order Bridge)
 -- ─────────────────────────────────────────────────────────────────────────────
 
@@ -105,6 +110,7 @@ declare
   v_amount_cents int;
   v_fee_cents int := 0;
   v_item_price numeric;
+  v_session_id text;
 begin
   -- 1. MANDATORY AUTHENTICATION CHECK
   v_caller_id := auth.uid();
@@ -216,6 +222,8 @@ begin
    where id = v_listing.id;
 
   -- 9. CREATE ACTIVE ORDER RECORD (Awaiting Payment Gate)
+  v_session_id := 'offer_' || gen_random_uuid()::text;
+
   insert into public.orders (
     listing_id,
     buyer_id,
@@ -223,6 +231,7 @@ begin
     amount_cents,
     fee_cents,
     currency,
+    stripe_session_id,
     offer_message_id,
     status,
     fulfillment_status,
@@ -234,6 +243,7 @@ begin
     v_amount_cents,
     v_fee_cents,
     'pkr',
+    v_session_id,
     p_offer_message_id,
     'awaiting_payment',
     'awaiting_payment',

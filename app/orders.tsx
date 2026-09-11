@@ -34,8 +34,14 @@ function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
   const { theme } = useTheme();
   const { total } = deriveInvoiceAmounts(order, order.listing?.price, buyerProtectionFee);
   const image = order.listing ? cardImageUrl(order.listing, 0) : '';
-  const isCanceled = order.status === 'canceled' || order.status === 'refunded';
-  const isShipped = Boolean((order as any).shipped_at || (order as any).tracking_number);
+  const isCanceled = order.status === 'canceled' || order.status === 'refunded' || order.status === 'failed';
+  const isShipped = Boolean(
+    (order as any).shipped_at ||
+    (order as any).shifted_at ||
+    (order as any).tracking_number ||
+    order.status === 'shifting' ||
+    (order as any).fulfillment_status === 'shifting'
+  );
 
   const handlePress = () => {
     tap();
@@ -46,7 +52,9 @@ function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
 
   const fulfillment = (order as any).fulfillment_status;
   const isDisputed = fulfillment === 'disputed' || order.status === 'disputed';
-  const isPacking = fulfillment === 'packing';
+  const isDelivered = fulfillment === 'delivered' || order.status === 'delivered';
+  const isPacking = fulfillment === 'packing' || order.status === 'packing';
+  const isCompleted = fulfillment === 'completed' || order.status === 'completed';
   const isAwaitingPayment = fulfillment === 'awaiting_payment' || order.status === 'awaiting_payment';
 
   return (
@@ -123,7 +131,9 @@ function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
             <Feather
               name={
                 isCanceled ? 'x-circle' :
-                isShipped || fulfillment === 'shifting' ? 'truck' :
+                isCompleted ? 'check-circle' :
+                isDelivered ? 'package' :
+                isShipped ? 'truck' :
                 isPacking ? 'package' :
                 isAwaitingPayment ? 'clock' :
                 'check-circle'
@@ -131,7 +141,9 @@ function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
               size={12}
               color={
                 isCanceled ? '#EF4444' :
-                isShipped || fulfillment === 'shifting' ? theme.primary :
+                isCompleted ? '#10B981' :
+                isDelivered ? theme.primary :
+                isShipped ? theme.primary :
                 isPacking ? theme.primary :
                 isAwaitingPayment ? '#D97706' :
                 '#10B981'
@@ -148,7 +160,7 @@ function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
                 fontFamily: typography.family.sansSemibold,
               },
               isCanceled && { color: '#EF4444' },
-              (isShipped || fulfillment === 'shifting' || isPacking) && { color: theme.primary },
+              (isShipped || isPacking || isDelivered) && { color: theme.primary },
               isAwaitingPayment && { color: '#D97706' },
               isDisputed && { color: theme.ink },
             ]}
@@ -157,14 +169,18 @@ function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
               ? 'Order Canceled'
               : isDisputed
               ? 'Dispute under review'
-              : isShipped || fulfillment === 'shifting'
-              ? 'Shifting · In transit'
+              : isCompleted
+              ? 'Completed'
+              : isDelivered
+              ? (side === 'bought' ? 'Delivered · Please inspect' : 'Delivered · Awaiting completion')
+              : isShipped
+              ? 'Dispatched · In transit'
               : isPacking
-              ? (order as any).fulfillment_type === 'dropship' ? 'Supplier Processing' : 'Packing'
+              ? (order as any).fulfillment_type === 'dropship' ? 'Supplier Processing' : 'Packing order'
               : isAwaitingPayment
               ? 'Awaiting Payment'
-              : order.status === 'completed' || fulfillment === 'completed'
-              ? 'Completed'
+              : order.payment_method === 'cod' && (order.status === 'pending' || fulfillment === 'pending')
+              ? (side === 'bought' ? 'CoD · Pay on delivery' : 'CoD · Awaiting delivery')
               : 'Order Confirmed'}
           </Text>
         </View>
@@ -304,8 +320,15 @@ function OrdersScreen() {
           o.status === 'pending' ||
           o.status === 'paid' ||
           o.status === 'awaiting_payment' ||
+          o.status === 'packing' ||
+          o.status === 'shifting' ||
+          o.status === 'delivered' ||
+          o.status === 'disputed' ||
+          (o as any).fulfillment_status === 'pending' ||
+          (o as any).fulfillment_status === 'awaiting_payment' ||
           (o as any).fulfillment_status === 'packing' ||
           (o as any).fulfillment_status === 'shifting' ||
+          (o as any).fulfillment_status === 'delivered' ||
           (o as any).fulfillment_status === 'disputed',
       );
     }
