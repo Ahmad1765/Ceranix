@@ -67,9 +67,58 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
     }
   }, []);
 
+  const scrollRef = useRef<ScrollView>(null);
+
   const handleTouchEnd = useCallback((e: any) => {
-    if (hasTouchMoved.current || isSwipingOrDragging.current) {
+    const touch = e?.nativeEvent?.changedTouches?.[0] || e?.changedTouches?.[0] || e?.nativeEvent;
+    const endX = touch ? (touch.pageX ?? touch.clientX ?? 0) : 0;
+    const dx = endX - touchStartPos.current.x;
+    const dt = Date.now() - touchStartPos.current.time;
+    const velocity = Math.abs(dx) / Math.max(1, dt);
+    const threshold = CARD_WIDTH * 0.15;
+
+    if (hasTouchMoved.current || Math.abs(dx) > threshold) {
       lastDragEndTime.current = Date.now();
+      isSwipingOrDragging.current = true;
+
+      let target = activeIndex;
+      if (dx < -threshold || (dx < -10 && velocity > 0.16)) {
+        if (activeIndex < item.images.length - 1) {
+          target = activeIndex + 1;
+        }
+      } else if (dx > threshold || (dx > 10 && velocity > 0.16)) {
+        if (activeIndex > 0) {
+          target = activeIndex - 1;
+        }
+      }
+
+      setActiveIndex(target);
+      const targetX = target * CARD_WIDTH;
+      const node: any = scrollRef.current;
+      const scrollNode: HTMLElement | null =
+        typeof node?.getScrollableNode === 'function'
+          ? node.getScrollableNode()
+          : node instanceof HTMLElement
+          ? node
+          : null;
+      if (scrollNode) {
+        scrollNode.style.scrollSnapType = 'none';
+        scrollNode.style.scrollBehavior = 'smooth';
+        try {
+          (scrollNode as any).scrollTo?.({ x: targetX, y: 0, animated: true });
+          (Element.prototype.scrollTo as any).call(scrollNode, { left: targetX, behavior: 'smooth' });
+        } catch {
+          scrollNode.scrollLeft = targetX;
+        }
+        setTimeout(() => {
+          if (scrollNode) {
+            scrollNode.style.scrollSnapType = 'x mandatory';
+          }
+        }, 350);
+      } else {
+        scrollRef.current?.scrollTo({ x: targetX, animated: true });
+      }
+
       if (webScrollTimeoutRef.current) {
         clearTimeout(webScrollTimeoutRef.current);
       }
@@ -78,7 +127,7 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
       }, SUPPRESSION_WINDOW_MS);
     }
     hasTouchMoved.current = false;
-  }, []);
+  }, [activeIndex, item.images.length]);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || !containerRef.current) return;
@@ -157,15 +206,12 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
       >
         {hasMultiple ? (
           <ScrollView
+            ref={scrollRef}
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
             nestedScrollEnabled
             onScroll={handleScroll}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-            onTouchCancel={handleTouchEnd}
             onScrollBeginDrag={() => {
               armCarousel();
               isSwipingOrDragging.current = true;
@@ -185,6 +231,7 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
               Platform.OS === 'web' && ({
                 scrollSnapType: 'x mandatory',
                 WebkitScrollSnapType: 'x mandatory',
+                WebkitOverflowScrolling: 'touch',
                 overscrollBehaviorX: 'contain',
                 touchAction: 'pan-x pan-y',
                 scrollbarWidth: 'none',

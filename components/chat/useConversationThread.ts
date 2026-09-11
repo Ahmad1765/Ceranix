@@ -48,6 +48,8 @@ import {
   markConversationRead,
   sendMessage,
   sendOffer,
+  acceptChatOffer,
+  counterOffer,
   setReaction,
   subscribeToMessages,
   subscribeToReactions,
@@ -329,17 +331,64 @@ export function useConversationThread(
     async (msg: ChatMessage, offerStatus: 'accepted' | 'declined') => {
       const prev = msg.offer_status ?? 'pending';
       setMessages((m) => m.map((x) => (x.id === msg.id ? { ...x, offer_status: offerStatus } : x)));
-      const ok = await updateOfferStatus(msg.id, offerStatus);
-      if (!ok) {
+
+      try {
+        if (offerStatus === 'accepted') {
+          await acceptChatOffer(msg.id);
+          if (convListingId) {
+            queryClient.invalidateQueries({ queryKey: qk.listing(convListingId) });
+          }
+          if (user?.id) {
+            queryClient.invalidateQueries({ queryKey: qk.inbox(user.id) });
+          }
+          toast.show('Offer accepted! Order created.', {
+            variant: 'success',
+            icon: 'check',
+          });
+        } else {
+          const ok = await updateOfferStatus(msg.id, 'declined');
+          if (!ok) throw new Error('Could not decline offer');
+          toast.show('Offer declined', {
+            variant: 'info',
+            icon: 'x',
+          });
+        }
+      } catch (err: any) {
         setMessages((m) => m.map((x) => (x.id === msg.id ? { ...x, offer_status: prev } : x)));
-        Alert.alert('Could not update offer', 'Please try again.');
-      } else {
-        toast.show(offerStatus === 'accepted' ? 'Offer accepted' : 'Offer declined', {
-          variant: offerStatus === 'accepted' ? 'success' : 'info',
-        });
+        Alert.alert('Could not update offer', err.message || 'Please try again.');
       }
     },
-    [toast],
+    [convListingId, queryClient, toast, user?.id],
+  );
+
+  const handleCounterOffer = useCallback(
+    async (parentMsg: ChatMessage, amount: number, note?: string) => {
+      if (!user || !conversationId) return false;
+      try {
+        const saved = await counterOffer({
+          conversationId,
+          senderId: user.id,
+          parentOfferId: parentMsg.id,
+          amount,
+          note,
+        });
+        if (saved) {
+          pinnedRef.current = true;
+          setMessages((prev) => [
+            ...prev.map((m) => (m.id === parentMsg.id ? { ...m, offer_status: 'countered' as const } : m)),
+            saved,
+          ]);
+          toast.show('Counter-offer sent', { variant: 'success', icon: 'check' });
+          return true;
+        }
+        return false;
+      } catch (e: any) {
+        captureError(e, { fn: 'conversation.counterOffer' });
+        toast.show("Couldn't send counter-offer", { variant: 'default', icon: 'alert-triangle' });
+        return false;
+      }
+    },
+    [conversationId, toast, user],
   );
 
   // ── Reporting ────────────────────────────────────────────────────────────
@@ -388,6 +437,7 @@ export function useConversationThread(
     handleSend,
     handleRetry,
     handleSendOffer,
+    handleCounterOffer,
     handleOfferResponse,
     handleReport,
   };

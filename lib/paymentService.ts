@@ -6,7 +6,7 @@ import {
   ShippingAddressSchema,
   type ValidatedShippingAddress,
 } from '@/types/validation/order';
-import type { Order, PaymentMethod, OrderStatus } from '@/types';
+import type { Order, PaymentMethod, OrderStatus, FulfillmentStatus } from '@/types';
 
 export interface CheckoutRequest {
   listingId: string;
@@ -601,6 +601,7 @@ export class PaymentService {
         currency: 'pkr',
         payment_method: 'cod',
         status: 'paid',
+        fulfillment_status: 'completed',
         created_at: new Date().toISOString(),
       };
     }
@@ -611,6 +612,129 @@ export class PaymentService {
     }
 
     throw new Error('Failed to complete order');
+  }
+
+  /**
+   * Advance order through the fulfillment pipeline (Pending -> Packing -> Shifting -> Delivered/Completed).
+   * Strictly enforces caller authorization (seller vs buyer) and state machine invariants.
+   */
+  async advanceOrderFulfillment({
+    orderId,
+    targetStatus,
+    courier,
+    trackingNumber,
+    supplierOrderId,
+    supplierName,
+  }: {
+    orderId: string;
+    targetStatus: FulfillmentStatus;
+    courier?: string;
+    trackingNumber?: string;
+    supplierOrderId?: string;
+    supplierName?: string;
+  }): Promise<Order> {
+    const { data, error } = await supabase.rpc('advance_order_fulfillment', {
+      p_order_id: orderId,
+      p_target_status: targetStatus,
+      p_courier: courier?.trim() || null,
+      p_tracking_number: trackingNumber?.trim() || null,
+      p_supplier_order_id: supplierOrderId?.trim() || null,
+      p_supplier_name: supplierName?.trim() || null,
+    });
+
+    if (error) {
+      if (!isDemoMode()) throw new Error(error.message);
+      // Demo fallback
+      capture('fulfillment_advanced_demo', { order_id: orderId, target_status: targetStatus });
+      return {
+        id: orderId,
+        status: targetStatus === 'completed' ? 'completed' : 'paid',
+        fulfillment_status: targetStatus,
+        courier_name: courier,
+        tracking_number: trackingNumber,
+        supplier_order_id: supplierOrderId,
+        supplier_name: supplierName,
+        amount_cents: 0,
+        fee_cents: 0,
+        currency: 'pkr',
+        created_at: new Date().toISOString(),
+      } as Order;
+    }
+
+    capture('fulfillment_advanced', { order_id: orderId, target_status: targetStatus });
+    return data as Order;
+  }
+
+  /**
+   * Buyer Protection: Open a dispute for damaged, defective, or lost goods.
+   */
+  async openOrderDispute({
+    orderId,
+    reason,
+    evidenceUrls = [],
+  }: {
+    orderId: string;
+    reason: string;
+    evidenceUrls?: string[];
+  }): Promise<Order> {
+    const { data, error } = await supabase.rpc('open_order_dispute', {
+      p_order_id: orderId,
+      p_reason: reason.trim(),
+      p_evidence_urls: evidenceUrls,
+    });
+
+    if (error) {
+      if (!isDemoMode()) throw new Error(error.message);
+      capture('order_disputed_demo', { order_id: orderId, reason });
+      return {
+        id: orderId,
+        status: 'disputed',
+        fulfillment_status: 'disputed',
+        dispute_reason: reason,
+        dispute_evidence_urls: evidenceUrls,
+        amount_cents: 0,
+        fee_cents: 0,
+        currency: 'pkr',
+        created_at: new Date().toISOString(),
+      } as Order;
+    }
+
+    capture('order_disputed', { order_id: orderId, reason });
+    return data as Order;
+  }
+
+  /**
+   * Confirm Stripe payment authorization and advance order to pending fulfillment.
+   */
+  async confirmPaymentAuthorization({
+    orderId,
+    stripeEventId,
+    paymentIntent,
+  }: {
+    orderId: string;
+    stripeEventId: string;
+    paymentIntent?: string;
+  }): Promise<Order> {
+    const { data, error } = await supabase.rpc('confirm_order_payment_authorization', {
+      p_order_id: orderId,
+      p_stripe_event_id: stripeEventId,
+      p_payment_intent: paymentIntent || null,
+    });
+
+    if (error) {
+      if (!isDemoMode()) throw new Error(error.message);
+      return {
+        id: orderId,
+        status: 'paid',
+        fulfillment_status: 'pending',
+        amount_cents: 0,
+        fee_cents: 0,
+        currency: 'pkr',
+        created_at: new Date().toISOString(),
+      } as Order;
+    }
+
+    return data as Order;
   }
 }
 

@@ -4,29 +4,48 @@ import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import { useTheme } from '@/context/ThemeContext';
 import { type as typography } from '@/lib/theme';
+import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
+import type { FulfillmentStatus, FulfillmentType } from '@/types';
 
 export interface OrderStepperProps {
-  status: 'pending' | 'paid' | 'shipped' | 'delivered' | 'completed' | 'canceled' | 'refunded' | 'refund_due' | 'failed' | string;
+  status?: string;
+  fulfillmentStatus?: FulfillmentStatus | string;
+  fulfillmentType?: FulfillmentType | string;
   paymentMethod?: string;
   shippedAt?: string | null;
   courierName?: string | null;
   trackingNumber?: string | null;
   cancelReason?: string | null;
+  disputeReason?: string | null;
   isSeller?: boolean;
 }
 
 export function OrderStepper({
   status,
+  fulfillmentStatus,
+  fulfillmentType = 'direct',
   paymentMethod,
   shippedAt,
   courierName,
   trackingNumber,
   cancelReason,
+  disputeReason,
   isSeller = false,
 }: OrderStepperProps) {
   const { theme, isDark } = useTheme();
 
-  if (status === 'canceled' || status === 'refunded' || status === 'failed') {
+  // Effective state combining fulfillmentStatus & legacy status
+  const effectiveFulfillment = fulfillmentStatus || (
+    status === 'completed' ? 'completed' :
+    status === 'canceled' || status === 'refunded' || status === 'failed' ? 'canceled' :
+    shippedAt || status === 'shipped' ? 'shifting' :
+    status === 'paid' ? 'packing' :
+    status === 'awaiting_payment' ? 'awaiting_payment' :
+    'pending'
+  );
+
+  // ── 1. Canceled / Refunded / Failed Banner ──────────────────────────────────
+  if (effectiveFulfillment === 'canceled' || status === 'canceled' || status === 'refunded' || status === 'failed') {
     return (
       <View
         style={{
@@ -69,35 +88,83 @@ export function OrderStepper({
     );
   }
 
-  // Derive active stage (1 to 4)
-  // Stage 1: Placed
-  // Stage 2: Preparing / Packing
-  // Stage 3: Shipped
-  // Stage 4: Completed
-  let currentStage = 1;
-  if (status === 'completed' || status === 'delivered') {
-    currentStage = 4; // Completed / Delivered
-  } else if (shippedAt || status === 'shipped' || status === 'in_transit') {
-    currentStage = 3; // Shipped / In transit
-  } else if (status === 'paid') {
-    currentStage = 2; // Paid & Seller Preparing
+  // ── 2. Buyer Protection Dispute Active Banner ──────────────────────────────
+  if (effectiveFulfillment === 'disputed' || status === 'disputed') {
+    return (
+      <View
+        style={{
+          backgroundColor: isDark ? 'rgba(83, 86, 238, 0.12)' : '#F2F3FE',
+          borderRadius: 14,
+          borderWidth: 1,
+          borderColor: isDark ? 'rgba(83, 86, 238, 0.3)' : '#DCDFFE',
+          padding: 14,
+          marginBottom: 16,
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+          <ShieldCheckIcon size={20} style={{ marginRight: 8 }} />
+          <Text
+            style={{
+              fontSize: 15,
+              fontWeight: '700',
+              color: theme.ink,
+              fontFamily: typography.family.sansBold,
+            }}
+          >
+            Buyer Protection Dispute Open
+          </Text>
+        </View>
+        <Text
+          style={{
+            fontSize: 12.5,
+            color: theme.mute,
+            fontFamily: typography.family.sans,
+            lineHeight: 17,
+          }}
+        >
+          {disputeReason
+            ? `Claim: ${disputeReason}. Funds are held securely in Escrow pending resolution.`
+            : 'A claim has been opened for this order. Funds are held in Escrow pending inspection review.'}
+        </Text>
+      </View>
+    );
   }
+
+  // ── 3. Derive Active Stage (1 to 4) ────────────────────────────────────────
+  // Stage 1: Placed / Authorized
+  // Stage 2: Packing / Supplier Processing
+  // Stage 3: Shifting / Dispatched
+  // Stage 4: Delivered / Completed
+  let currentStage = 1;
+  if (effectiveFulfillment === 'completed' || effectiveFulfillment === 'delivered') {
+    currentStage = 4;
+  } else if (effectiveFulfillment === 'shifting' || shippedAt) {
+    currentStage = 3;
+  } else if (effectiveFulfillment === 'packing') {
+    currentStage = 2;
+  } else if (effectiveFulfillment === 'pending' || effectiveFulfillment === 'awaiting_payment') {
+    currentStage = 1;
+  }
+
+  const isAwaitingPayment = effectiveFulfillment === 'awaiting_payment';
+  const isDropship = fulfillmentType === 'dropship';
 
   let placedSubtitle = 'Paid';
   if (paymentMethod === 'cod') {
     placedSubtitle = 'CoD Order';
+  } else if (isAwaitingPayment) {
+    placedSubtitle = 'Awaiting Auth';
   } else if (status === 'pending') {
     placedSubtitle = 'Pending';
-  } else if (status === 'refund_due') {
-    placedSubtitle = 'Refund due';
-  } else if (status === 'failed') {
-    placedSubtitle = 'Failed';
   }
 
   const steps = [
     { title: 'Placed', subtitle: placedSubtitle },
-    { title: 'Packing', subtitle: 'Seller preparing' },
-    { title: 'Shipped', subtitle: courierName || 'In transit' },
+    {
+      title: isDropship ? 'Supplier' : 'Packing',
+      subtitle: isDropship ? 'Processing' : 'Seller preparing',
+    },
+    { title: 'Shifting', subtitle: courierName || 'In transit' },
     { title: 'Completed', subtitle: 'Delivered' },
   ];
 
@@ -137,7 +204,7 @@ export function OrderStepper({
                     isCurrent && {
                       backgroundColor: theme.purpleSoft,
                       borderWidth: 2,
-                      borderColor: theme.purple,
+                      borderColor: theme.primary,
                     },
                     isUpcoming && { backgroundColor: theme.panel },
                   ]}
@@ -150,7 +217,7 @@ export function OrderStepper({
                         width: 8,
                         height: 8,
                         borderRadius: 4,
-                        backgroundColor: theme.purple,
+                        backgroundColor: theme.primary,
                       }}
                     />
                   ) : (
@@ -209,7 +276,7 @@ export function OrderStepper({
         })}
       </View>
 
-      {/* Tracking info badge if shipped */}
+      {/* Tracking info badge if shifting / in-transit */}
       {trackingNumber ? (
         <View
           style={{
@@ -223,11 +290,11 @@ export function OrderStepper({
             marginTop: 14,
           }}
         >
-          <Feather name="truck" size={14} color={theme.purple} style={{ marginRight: 6 }} />
+          <Feather name="truck" size={14} color={theme.primary} style={{ marginRight: 6 }} />
           <Text
             style={{
               fontSize: 12,
-              color: theme.purple,
+              color: theme.primary,
               fontFamily: typography.family.sansMedium,
             }}
           >

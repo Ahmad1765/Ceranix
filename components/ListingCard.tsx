@@ -103,6 +103,14 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
   const lastDragEndTime = useRef(0);
   const webScrollTimeoutRef = useRef<any>(null);
   const containerRef = useRef<any>(null);
+  const activeIndexRef = useRef(activeIndex);
+  activeIndexRef.current = activeIndex;
+  const hasMultipleRef = useRef(hasMultiple);
+  hasMultipleRef.current = hasMultiple;
+  const imagesLengthRef = useRef(images.length);
+  imagesLengthRef.current = images.length;
+  const cardWidthRef = useRef(cardWidth);
+  cardWidthRef.current = cardWidth;
   const touchStartPos = useRef({ x: 0, y: 0, time: 0 });
   const hasTouchMoved = useRef(false);
 
@@ -313,26 +321,6 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
 
   const getScrollEl = useCallback((): HTMLElement | null => {
     if (Platform.OS !== 'web') return null;
-    if (carouselRef.current) {
-      const target = carouselRef.current as any;
-      if (typeof target.getScrollableNode === 'function') {
-        const node = target.getScrollableNode();
-        if (node instanceof HTMLElement) return node;
-      }
-      if (target instanceof HTMLElement) {
-        return target;
-      }
-      if (target._innerViewRef instanceof HTMLElement) {
-        return target._innerViewRef;
-      }
-      if (target._component) {
-        if (typeof target._component.getScrollableNode === 'function') {
-          const node = target._component.getScrollableNode();
-          if (node instanceof HTMLElement) return node;
-        }
-        if (target._component instanceof HTMLElement) return target._component;
-      }
-    }
     if (containerRef.current) {
       const container =
         typeof containerRef.current.getScrollableNode === 'function'
@@ -341,12 +329,25 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
           ? containerRef.current
           : containerRef.current?._innerViewRef;
       if (container instanceof HTMLElement) {
-        const scrollChild = container.querySelector(
-          '[style*="overflow-x"], .r-overflowX-lltvgl, [data-testid="listing-card-scroll"]',
-        ) as HTMLElement | null;
+        const scrollChild = Array.from(container.querySelectorAll<HTMLElement>('*')).find(
+          (el) => el.scrollWidth > el.clientWidth,
+        );
         if (scrollChild) return scrollChild;
-        const firstDiv = container.firstElementChild as HTMLElement | null;
-        if (firstDiv && firstDiv.scrollWidth > firstDiv.clientWidth) return firstDiv;
+      }
+    }
+    if (carouselRef.current) {
+      const target = carouselRef.current as any;
+      const node =
+        (typeof target.getScrollableNode === 'function' && target.getScrollableNode()) ||
+        (typeof target._component?.getScrollableNode === 'function' && target._component.getScrollableNode()) ||
+        target._component ||
+        target;
+      if (node instanceof HTMLElement) {
+        if (node.scrollWidth > node.clientWidth) return node;
+        const inner = Array.from(node.querySelectorAll?.<HTMLElement>('*') || []).find(
+          (el: any) => el.scrollWidth > el.clientWidth,
+        );
+        if (inner) return inner as HTMLElement;
       }
     }
     return null;
@@ -441,16 +442,24 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
         lastDragEndTime.current = Date.now();
         isSwipingOrDragging.current = true;
 
+        const targetX = target * w;
         if (scrollEl) {
-          scrollEl.style.scrollSnapType = 'x mandatory';
+          scrollEl.style.scrollSnapType = 'none';
           scrollEl.style.scrollBehavior = 'smooth';
-          if (typeof scrollEl.scrollTo === 'function') {
-            scrollEl.scrollTo({ left: target * w, behavior: 'smooth' });
-          } else {
-            scrollEl.scrollLeft = target * w;
+          try {
+            (scrollEl as any).scrollTo?.({ x: targetX, y: 0, animated: true });
+            (Element.prototype.scrollTo as any).call(scrollEl, { left: targetX, behavior: 'smooth' });
+          } catch {
+            scrollEl.scrollLeft = targetX;
           }
+          // Delay restoring snap-type so WebKit does not cancel smooth scroll mid-flight
+          setTimeout(() => {
+            if (scrollEl) {
+              scrollEl.style.scrollSnapType = 'x mandatory';
+            }
+          }, 350);
         } else {
-          carouselRef.current?.scrollTo({ x: target * w, animated: true });
+          carouselRef.current?.scrollTo({ x: targetX, animated: true });
         }
 
         if (webScrollTimeoutRef.current) {
@@ -484,7 +493,7 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
   const handlePointerDown = useCallback(
     (e: any) => {
       if (Platform.OS !== 'web' || !hasMultiple) return;
-      // On web touch screens, touch events handle swiping natively; skip mouse pointer capture
+      // On web touch screens, touch events handle swiping; skip mouse pointer capture
       if (e.pointerType === 'touch') return;
       if (e.button !== undefined && e.button !== 0) return;
 
@@ -545,52 +554,126 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
     [cancelDrag],
   );
 
+  const touchStartPosRef = useRef<{ x: number; y: number; time: number; startIndex: number }>({
+    x: 0,
+    y: 0,
+    time: 0,
+    startIndex: 0,
+  });
+  const touchLastPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const hasTouchSwipedRef = useRef(false);
+
   const handleTouchStart = useCallback(
+    (e: any) => {
+      if (!hasMultiple) return;
+      hydrateCarousel();
+      const touch = e.nativeEvent?.touches?.[0] || e.touches?.[0] || e.nativeEvent;
+      if (!touch) return;
+      const clientX = touch.clientX ?? touch.pageX;
+      const clientY = touch.clientY ?? touch.pageY;
+      if (clientX !== undefined && clientY !== undefined) {
+        touchStartPosRef.current = {
+          x: clientX,
+          y: clientY,
+          time: Date.now(),
+          startIndex: activeIndex,
+        };
+        touchLastPosRef.current = { x: clientX, y: clientY };
+        hasTouchSwipedRef.current = false;
+      }
+    },
+    [hasMultiple, hydrateCarousel, activeIndex],
+  );
+
+  const handleTouchMove = useCallback(
     (e: any) => {
       if (!hasMultiple) return;
       const touch = e.nativeEvent?.touches?.[0] || e.touches?.[0] || e.nativeEvent;
       if (!touch) return;
       const clientX = touch.clientX ?? touch.pageX;
       const clientY = touch.clientY ?? touch.pageY;
-      if (clientX === undefined) return;
-      startDrag(clientX, clientY);
-    },
-    [hasMultiple, startDrag],
-  );
-
-  const handleTouchMove = useCallback(
-    (e: any) => {
-      if (!isPointerDownRef.current || !hasMultiple) return;
-      const touch = e.nativeEvent?.touches?.[0] || e.touches?.[0] || e.nativeEvent;
-      if (!touch) return;
-      const clientX = touch.clientX ?? touch.pageX;
-      const clientY = touch.clientY ?? touch.pageY;
-      if (clientX === undefined) return;
-      moveDrag(clientX, clientY, () => {
-        if (e.cancelable) {
-          e.preventDefault?.();
+      if (clientX !== undefined && clientY !== undefined) {
+        touchLastPosRef.current = { x: clientX, y: clientY };
+        const dx = Math.abs(clientX - touchStartPosRef.current.x);
+        const dy = Math.abs(clientY - touchStartPosRef.current.y);
+        if (dx > 6 && dx > dy) {
+          hasTouchSwipedRef.current = true;
+          isSwipingOrDragging.current = true;
+          lastDragEndTime.current = Date.now();
         }
-      });
+      }
     },
-    [hasMultiple, moveDrag],
+    [hasMultiple],
   );
 
   const handleTouchEnd = useCallback(
     (e: any) => {
-      if (!isPointerDownRef.current || !hasMultiple) return;
-      const touch = e.nativeEvent?.changedTouches?.[0] || e.changedTouches?.[0] || e.nativeEvent;
-      const clientX = touch ? (touch.clientX ?? touch.pageX) : undefined;
-      endDrag(clientX);
+      const touch = e?.nativeEvent?.changedTouches?.[0] || e?.changedTouches?.[0] || e?.nativeEvent;
+      const endX = touch ? (touch.clientX ?? touch.pageX) : touchLastPosRef.current.x;
+      const dx = endX - touchStartPosRef.current.x;
+      const dt = Date.now() - touchStartPosRef.current.time;
+      const velocity = Math.abs(dx) / Math.max(1, dt);
+      const w = cardWidth || 200;
+      const threshold = Math.min(28, w * 0.14);
+
+      if (hasTouchSwipedRef.current || Math.abs(dx) > threshold) {
+        lastDragEndTime.current = Date.now();
+        isSwipingOrDragging.current = true;
+
+        const startIdx = touchStartPosRef.current.startIndex;
+        let target = startIdx;
+        if (dx < -threshold || (dx < -10 && velocity > 0.16)) {
+          if (startIdx < images.length - 1) {
+            target = startIdx + 1;
+          }
+        } else if (dx > threshold || (dx > 10 && velocity > 0.16)) {
+          if (startIdx > 0) {
+            target = startIdx - 1;
+          }
+        }
+
+        const scrollEl = getScrollEl();
+        const slideW = scrollEl?.clientWidth || cardWidth || 200;
+        setActiveIndex(target);
+        offsetX.value = target * slideW;
+        const targetX = target * slideW;
+        if (scrollEl) {
+          scrollEl.style.scrollSnapType = 'none';
+          scrollEl.style.scrollBehavior = 'smooth';
+          try {
+            (scrollEl as any).scrollTo?.({ x: targetX, y: 0, animated: true });
+            (Element.prototype.scrollTo as any).call(scrollEl, { left: targetX, behavior: 'smooth' });
+          } catch {
+            scrollEl.scrollLeft = targetX;
+          }
+          setTimeout(() => {
+            if (scrollEl) {
+              scrollEl.style.scrollSnapType = 'x mandatory';
+            }
+          }, 350);
+        } else {
+          carouselRef.current?.scrollTo({ x: targetX, animated: true });
+        }
+
+        if (webScrollTimeoutRef.current) {
+          clearTimeout(webScrollTimeoutRef.current);
+        }
+        webScrollTimeoutRef.current = setTimeout(() => {
+          isSwipingOrDragging.current = false;
+        }, 450);
+      }
+      hasTouchSwipedRef.current = false;
     },
-    [hasMultiple, endDrag],
+    [cardWidth, images.length, getScrollEl, offsetX],
   );
 
   const handleTouchCancel = useCallback(() => {
-    cancelDrag();
-  }, [cancelDrag]);
+    hasTouchSwipedRef.current = false;
+    isSwipingOrDragging.current = false;
+  }, []);
 
   // Web capture phase interception: halts synthetic clicks following swipes before
-  // bubbling to the card's outer Pressable
+  // bubbling to the card's outer Pressable, and handles native mobile web swipes reliably.
   useEffect(() => {
     if (Platform.OS !== 'web' || !containerRef.current) return;
     const node = containerRef.current as any;
@@ -610,11 +693,104 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
       }
     };
 
+    let startX = 0;
+    let startY = 0;
+    let startTime = 0;
+    let startIdx = 0;
+    let hasSwiped = false;
+
+    const onNativeTouchStart = (e: TouchEvent) => {
+      if (!hasMultipleRef.current) return;
+      hydrateCarousel();
+      const t = e.touches[0];
+      if (!t) return;
+      startX = t.clientX;
+      startY = t.clientY;
+      startTime = Date.now();
+      startIdx = activeIndexRef.current;
+      hasSwiped = false;
+    };
+
+    const onNativeTouchMove = (e: TouchEvent) => {
+      if (!hasMultipleRef.current) return;
+      const t = e.touches[0];
+      if (!t) return;
+      const dx = Math.abs(t.clientX - startX);
+      const dy = Math.abs(t.clientY - startY);
+      if (dx > 6 && dx > dy) {
+        hasSwiped = true;
+        isSwipingOrDragging.current = true;
+        lastDragEndTime.current = Date.now();
+      }
+    };
+
+    const onNativeTouchEnd = (e: TouchEvent) => {
+      if (!hasMultipleRef.current) return;
+      const t = e.changedTouches[0];
+      const endX = t ? t.clientX : startX;
+      const dx = endX - startX;
+      const dt = Date.now() - startTime;
+      const velocity = Math.abs(dx) / Math.max(1, dt);
+      const scrollEl = getScrollEl();
+      const slideW = scrollEl?.clientWidth || cardWidthRef.current || 200;
+      const threshold = Math.min(28, slideW * 0.14);
+
+      if (hasSwiped || Math.abs(dx) > threshold) {
+        lastDragEndTime.current = Date.now();
+        isSwipingOrDragging.current = true;
+
+        let targetIdx = startIdx;
+        if (dx < -threshold || (dx < -10 && velocity > 0.16)) {
+          if (startIdx < imagesLengthRef.current - 1) {
+            targetIdx = startIdx + 1;
+          }
+        } else if (dx > threshold || (dx > 10 && velocity > 0.16)) {
+          if (startIdx > 0) {
+            targetIdx = startIdx - 1;
+          }
+        }
+
+        const targetX = targetIdx * slideW;
+        if (scrollEl) {
+          scrollEl.style.scrollSnapType = 'none';
+          scrollEl.style.scrollBehavior = 'smooth';
+          try {
+            (scrollEl as any).scrollTo?.({ x: targetX, y: 0, animated: true });
+            (Element.prototype.scrollTo as any).call(scrollEl, { left: targetX, behavior: 'smooth' });
+          } catch {
+            scrollEl.scrollLeft = targetX;
+          }
+          setTimeout(() => {
+            if (scrollEl) {
+              scrollEl.style.scrollSnapType = 'x mandatory';
+            }
+          }, 350);
+        } else {
+          carouselRef.current?.scrollTo({ x: targetX, animated: true });
+        }
+
+        if (webScrollTimeoutRef.current) {
+          clearTimeout(webScrollTimeoutRef.current);
+        }
+        webScrollTimeoutRef.current = setTimeout(() => {
+          isSwipingOrDragging.current = false;
+        }, 450);
+      }
+      hasSwiped = false;
+    };
+
     target.addEventListener('click', handleClickCapture, true);
+    target.addEventListener('touchstart', onNativeTouchStart, { passive: true });
+    target.addEventListener('touchmove', onNativeTouchMove, { passive: true });
+    target.addEventListener('touchend', onNativeTouchEnd, { passive: true });
+
     return () => {
       target.removeEventListener('click', handleClickCapture, true);
+      target.removeEventListener('touchstart', onNativeTouchStart);
+      target.removeEventListener('touchmove', onNativeTouchMove);
+      target.removeEventListener('touchend', onNativeTouchEnd);
     };
-  }, []);
+  }, [hydrateCarousel, getScrollEl, offsetX]);
 
   const handleWebScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -704,7 +880,7 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
       <View className="w-full" style={{ borderRadius: radii.lg, ...shadow.sm }}>
       <View
         ref={containerRef}
-        testID="listing-card-carousel"
+        testID={hasMultiple ? 'listing-card-carousel' : 'listing-card-single-image'}
         className="relative w-full"
         style={{
           aspectRatio: 1 / 1.33,
@@ -746,10 +922,6 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
             disableIntervalMomentum
             showsHorizontalScrollIndicator={false}
             onScroll={Platform.OS === 'web' ? handleWebScroll : carouselScrollHandler}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-            onTouchCancel={handleTouchCancel}
             onScrollBeginDrag={handleDragBegin}
             onScrollEndDrag={handleDragEnd}
             onMomentumScrollBegin={handleDragBegin}
@@ -760,6 +932,7 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
               Platform.OS === 'web' && ({
                 scrollSnapType: 'x mandatory',
                 WebkitScrollSnapType: 'x mandatory',
+                WebkitOverflowScrolling: 'touch',
                 overscrollBehaviorX: 'contain',
                 touchAction: 'pan-x pan-y',
                 scrollbarWidth: 'none',

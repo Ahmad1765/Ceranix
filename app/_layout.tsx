@@ -139,17 +139,16 @@ function usePreventViewportZoomOnWeb() {
       'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover'
     );
 
-    const preventGesture = (e: Event) => {
-      e.preventDefault();
+    // On iOS Safari, when keyboard dismisses or input blurs, ensure horizontal viewport offset is reset to 0
+    const handleFocusOut = () => {
+      if (typeof window !== 'undefined') {
+        window.scrollTo({ left: 0, top: window.scrollY, behavior: 'instant' as any });
+      }
     };
-    document.addEventListener('gesturestart', preventGesture, { passive: false });
-    document.addEventListener('gesturechange', preventGesture, { passive: false });
-    document.addEventListener('gestureend', preventGesture, { passive: false });
+    window.addEventListener('focusout', handleFocusOut);
 
     return () => {
-      document.removeEventListener('gesturestart', preventGesture);
-      document.removeEventListener('gesturechange', preventGesture);
-      document.removeEventListener('gestureend', preventGesture);
+      window.removeEventListener('focusout', handleFocusOut);
     };
   }, []);
 }

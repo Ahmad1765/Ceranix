@@ -20,6 +20,7 @@ import { formatPrice } from '@/lib/currency';
 import type { ChatMessage } from '@/lib/chat';
 import type { Anchor } from './ReactionPicker';
 import { bubbleStamp } from './format';
+import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 
 const TAIL_RADIUS = 6;
 const BUBBLE_RADIUS = 18;
@@ -243,6 +244,36 @@ function OfferStatusPill({ status, isPaid }: { status: string; isPaid: boolean }
           }}
         >
           Declined
+        </Text>
+      </View>
+    );
+  }
+
+  if (status === 'countered') {
+    return (
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 4,
+          paddingHorizontal: 8,
+          paddingVertical: 3,
+          borderRadius: radii.pill,
+          backgroundColor: theme.panel,
+          borderWidth: 1,
+          borderColor: theme.border,
+        }}
+      >
+        <Feather name="corner-up-right" size={10} color={theme.mute} />
+        <Text
+          style={{
+            fontFamily: typography.family.sansBold,
+            fontSize: 11,
+            color: theme.mute,
+            letterSpacing: 0.2,
+          }}
+        >
+          Countered
         </Text>
       </View>
     );
@@ -530,7 +561,8 @@ function IncomingOfferCard({
   const discountPercent = showStruck && listingPrice ? Math.round(((listingPrice - amount) / listingPrice) * 100) : 0;
   const isDeclined = status === 'declined';
   const isExpired = status === 'expired';
-  const canMakeCounter = (isDeclined || isExpired) && !listingSold && !!onCounterOffer;
+  const isCountered = status === 'countered';
+  const canMakeCounter = (isDeclined || isExpired || isCountered) && !listingSold && !!onCounterOffer;
 
   return (
     <View
@@ -851,15 +883,15 @@ function IncomingOfferCard({
       {/* Paid confirmation */}
       {isPaid && (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
-          <Feather name="shield" size={12} color="#10B981" />
+          <ShieldCheckIcon size={14} />
           <Text
             style={{
               fontFamily: typography.family.sansBold,
               fontSize: 12,
-              color: '#10B981',
+              color: theme.ink,
             }}
           >
-            Paid · Protected by Buyer Protection 🛡️
+            Paid · Protected by Buyer Protection
           </Text>
         </View>
       )}
@@ -892,7 +924,8 @@ function OfferBubble(
     msg.metadata?.order_status === 'paid' ||
     msg.metadata?.payment_status === 'paid'
   );
-  const canRespond = !mine && isSeller && status === 'pending';
+  const isPending = status === 'pending' || status === 'proposed';
+  const canRespond = !mine && isPending && !listingSold;
   const canPay = !isSeller && status === 'accepted' && !!listingId && !listingSold && !isPaid;
   const awaitingPayment = isSeller && status === 'accepted' && !listingSold && !isPaid;
 

@@ -61,15 +61,32 @@ export interface ShippingAddress {
 export type PaymentMethod = 'card' | 'cod';
 
 export type OrderStatus =
+  | 'awaiting_payment'
   | 'pending'
   | 'paid'
+  | 'packing'
+  | 'shifting'
+  | 'delivered'
+  | 'completed'
+  | 'disputed'
+  | 'refund_due'
   | 'refunded'
   | 'canceled'
-  | 'refund_due'
-  | 'failed'
-  | 'completed';
+  | 'failed';
 
-// A row of public.orders — record of payments and Cash on Delivery orders.
+export type FulfillmentStatus =
+  | 'awaiting_payment'
+  | 'pending'
+  | 'packing'
+  | 'shifting'
+  | 'delivered'
+  | 'completed'
+  | 'disputed'
+  | 'canceled';
+
+export type FulfillmentType = 'direct' | 'dropship';
+
+// A row of public.orders — record of payments, fulfillment lifecycle, and Cash on Delivery orders.
 export interface Order {
   id: string;
   listing_id: string;
@@ -83,13 +100,25 @@ export interface Order {
   offer_message_id?: string | null;
   payment_method?: PaymentMethod;
   status: OrderStatus;
+  fulfillment_status?: FulfillmentStatus;
+  fulfillment_type?: FulfillmentType;
+  supplier_name?: string | null;
+  supplier_order_id?: string | null;
   shipping_address?: ValidatedShippingAddress | null;
   delivery_notes?: string | null;
   courier_name?: string | null;
   tracking_number?: string | null;
   cancel_reason?: string | null;
   cancelled_by?: string | null;
+  dispute_reason?: string | null;
+  dispute_evidence_urls?: string[] | null;
+  disputed_at?: string | null;
+  dispute_resolved_at?: string | null;
+  payment_authorized_at?: string | null;
+  packed_at?: string | null;
+  shifted_at?: string | null;
   shipped_at?: string | null;
+  delivered_at?: string | null;
   completed_at?: string | null;
   created_at: string;
 }

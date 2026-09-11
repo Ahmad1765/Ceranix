@@ -18,9 +18,11 @@ import { fetchOrderForListing, type Order } from '@/lib/payments';
 import { deriveInvoiceStatus, deriveInvoiceAmounts } from '@/lib/invoiceStatus';
 import { confirm } from '@/lib/confirm';
 import { paymentService } from '@/lib/paymentService';
+import { supabase } from '@/lib/supabase';
 import { generateMapsLink } from '@/lib/maps';
 import { BRAND } from '@/lib/brand';
 import { OrderStepper } from '@/components/orders/OrderStepper';
+import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { CancelOrderModal } from '@/components/orders/CancelOrderModal';
 import { MarkShippedModal } from '@/components/orders/MarkShippedModal';
 import { cardImageUrl, getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
@@ -80,6 +82,8 @@ export default function InvoiceScreen() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showShipModal, setShowShipModal] = useState(false);
   const [completingReceipt, setCompletingReceipt] = useState(false);
+  const [advancingPacking, setAdvancingPacking] = useState(false);
+  const [openingDispute, setOpeningDispute] = useState(false);
 
   const priceRef = useRef(listing?.price);
   priceRef.current = listing?.price;
@@ -138,6 +142,32 @@ export default function InvoiceScreen() {
       active = false;
     };
   }, [paid, placed, method, id, user?.id, listing?.seller_id, listing?.seller?.id]);
+
+  // Real-time synchronization for order changes across devices
+  useEffect(() => {
+    if (!order?.id) return;
+    const channel = supabase
+      .channel(`order_rt_invoice_${order.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'orders',
+          filter: `id=eq.${order.id}`,
+        },
+        (payload) => {
+          if (payload.new) {
+            setOrder((prev) => ({ ...(prev ?? {}), ...(payload.new as Order) }));
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [order?.id]);
 
   if (!listing && id && listingQ.isPending) {
     return (
@@ -231,10 +261,10 @@ export default function InvoiceScreen() {
 
   const onShareDispatchSlip = async () => {
     tap('light');
-    const addr = order?.shipping_address;
-    const recipient = addr?.recipient_name || buyerName;
+    const addr = order?.shipping_address as any;
+    const recipient = addr?.recipientName || addr?.recipient_name || buyerName;
     const street = [addr?.line1, addr?.line2].filter(Boolean).join(', ');
-    const cityArea = [addr?.city, addr?.state, addr?.postal_code].filter(Boolean).join(', ');
+    const cityArea = [addr?.city, addr?.state, addr?.postalCode || addr?.postal_code].filter(Boolean).join(', ');
     const phone = addr?.phone ? `📞 Phone: ${addr.phone}` : '';
     const note = order?.delivery_notes ? `📝 Note: ${order.delivery_notes}` : '';
     const paymentLine =
@@ -295,18 +325,46 @@ export default function InvoiceScreen() {
     }
   };
 
+  // Seller Start Packing Handler
+  const handleStartPacking = async () => {
+    if (!order?.id || advancingPacking) return;
+    tap('medium');
+    setAdvancingPacking(true);
+    try {
+      const updated = await paymentService.advanceOrderFulfillment({
+        orderId: order.id,
+        targetStatus: 'packing',
+      });
+      setOrder(updated);
+      toast.show(
+        order.fulfillment_type === 'dropship'
+          ? 'Sent to supplier for processing'
+          : 'Order marked as Packing',
+        { variant: 'default', icon: 'check' },
+      );
+    } catch (e: any) {
+      toast.show(e?.message || 'Failed to update order status', {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
+    } finally {
+      setAdvancingPacking(false);
+    }
+  };
+
   // Seller Mark Shipped Handler
   const handleMarkShipped = async (courier: string, trackingNumber: string) => {
     if (!order?.id) return;
     tap('medium');
     try {
-      const updated = await paymentService.markOrderShipped({
+      const updated = await paymentService.advanceOrderFulfillment({
         orderId: order.id,
+        targetStatus: 'shifting',
         courier,
         trackingNumber,
       });
       setOrder(updated);
-      toast.show('Order marked as shipped!', {
+      toast.show('Order marked as Shifting / Dispatched!', {
         variant: 'default',
         icon: 'check',
       });
@@ -316,6 +374,41 @@ export default function InvoiceScreen() {
         icon: 'alert-triangle',
       });
       throw e;
+    }
+  };
+
+  // Buyer Open Dispute Handler
+  const handleOpenDispute = async () => {
+    if (!order?.id || openingDispute) return;
+    tap('medium');
+
+    const confirmed = await confirm({
+      title: 'Report Damaged Item / Issue?',
+      message: 'Opening a dispute will place payout funds on hold under Buyer Protection while support mediates.',
+      confirmLabel: 'Open Dispute',
+      destructive: true,
+    });
+
+    if (!confirmed) return;
+
+    setOpeningDispute(true);
+    try {
+      const updated = await paymentService.openOrderDispute({
+        orderId: order.id,
+        reason: 'Item damaged / defective on arrival',
+      });
+      setOrder(updated);
+      toast.show('Dispute opened. Funds placed on hold.', {
+        variant: 'default',
+        icon: 'shield',
+      });
+    } catch (e: any) {
+      toast.show(e?.message || 'Failed to open dispute', {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
+    } finally {
+      setOpeningDispute(false);
     }
   };
 
@@ -444,11 +537,14 @@ export default function InvoiceScreen() {
         <View style={{ paddingHorizontal: 16 }}>
           <OrderStepper
             status={order?.status ?? (paid === '1' ? 'paid' : 'pending')}
+            fulfillmentStatus={order?.fulfillment_status}
+            fulfillmentType={order?.fulfillment_type}
             paymentMethod={order?.payment_method}
             shippedAt={order?.shipped_at}
-            courierName={(order as any)?.courier_name}
-            trackingNumber={(order as any)?.tracking_number}
-            cancelReason={(order as any)?.cancel_reason}
+            courierName={order?.courier_name}
+            trackingNumber={order?.tracking_number}
+            cancelReason={order?.cancel_reason}
+            disputeReason={order?.dispute_reason}
             isSeller={isSeller}
           />
         </View>
@@ -527,20 +623,27 @@ export default function InvoiceScreen() {
               </Text>
             </View>
 
-            <Text style={{ fontSize: 14, fontWeight: '600', color: theme.ink, fontFamily: typography.family.sansSemibold, marginBottom: 2 }}>
-              {order.shipping_address.recipient_name || buyerName}
-            </Text>
-            <Text style={{ fontSize: 13, color: theme.mute, fontFamily: typography.family.sans, lineHeight: 18 }}>
-              {[order.shipping_address.line1, order.shipping_address.line2].filter(Boolean).join(', ')}
-            </Text>
-            <Text style={{ fontSize: 13, color: theme.mute, fontFamily: typography.family.sans }}>
-              {[order.shipping_address.city, order.shipping_address.state, order.shipping_address.postal_code, order.shipping_address.country].filter(Boolean).join(', ')}
-            </Text>
-            {order.shipping_address.phone ? (
-              <Text style={{ fontSize: 12.5, color: theme.muteSoft, fontFamily: typography.family.sans, marginTop: 4 }}>
-                📞 {order.shipping_address.phone}
-              </Text>
-            ) : null}
+            {(() => {
+              const addr = order.shipping_address as any;
+              return (
+                <>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: theme.ink, fontFamily: typography.family.sansSemibold, marginBottom: 2 }}>
+                    {addr.recipientName || addr.recipient_name || buyerName}
+                  </Text>
+                  <Text style={{ fontSize: 13, color: theme.mute, fontFamily: typography.family.sans, lineHeight: 18 }}>
+                    {[addr.line1, addr.line2].filter(Boolean).join(', ')}
+                  </Text>
+                  <Text style={{ fontSize: 13, color: theme.mute, fontFamily: typography.family.sans }}>
+                    {[addr.city, addr.state, addr.postalCode || addr.postal_code, addr.country].filter(Boolean).join(', ')}
+                  </Text>
+                  {addr.phone ? (
+                    <Text style={{ fontSize: 12.5, color: theme.muteSoft, fontFamily: typography.family.sans, marginTop: 4 }}>
+                      📞 {addr.phone}
+                    </Text>
+                  ) : null}
+                </>
+              );
+            })()}
 
             {mapsUrl && (
               <Pressable
@@ -712,6 +815,25 @@ export default function InvoiceScreen() {
               This order is canceled
             </Text>
           </View>
+        ) : order?.fulfillment_status === 'disputed' || order?.status === 'disputed' ? (
+          <View
+            style={{
+              height: 48,
+              borderRadius: 12,
+              backgroundColor: theme.panel,
+              borderWidth: 1,
+              borderColor: theme.border,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+            }}
+          >
+            <ShieldCheckIcon size={16} />
+            <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+              Dispute In Review by Support
+            </Text>
+          </View>
         ) : isSeller && order?.payment_method === 'cod' && order?.status === 'pending' ? (
           <Pressable
             onPress={handleCompleteCodOrder}
@@ -739,9 +861,10 @@ export default function InvoiceScreen() {
               </>
             )}
           </Pressable>
-        ) : isSeller && !isShipped && isOrderActive ? (
+        ) : isSeller && (order?.fulfillment_status === 'pending' || (!order?.fulfillment_status && order?.status === 'paid' && !isShipped)) ? (
           <Pressable
-            onPress={() => setShowShipModal(true)}
+            onPress={handleStartPacking}
+            disabled={advancingPacking}
             style={({ pressed }) => [
               {
                 height: 48,
@@ -754,20 +877,30 @@ export default function InvoiceScreen() {
               pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
             ]}
           >
-            <Feather name="truck" size={16} color={theme.background} style={{ marginRight: 8 }} />
-            <Text style={{ fontSize: 15, fontWeight: '700', color: theme.background, fontFamily: typography.family.sansBold }}>
-              Mark as Shipped
-            </Text>
+            {advancingPacking ? (
+              <ActivityIndicator color={theme.background} size="small" />
+            ) : (
+              <>
+                <Feather
+                  name={order?.fulfillment_type === 'dropship' ? 'send' : 'package'}
+                  size={16}
+                  color={theme.background}
+                  style={{ marginRight: 8 }}
+                />
+                <Text style={{ fontSize: 15, fontWeight: '700', color: theme.background, fontFamily: typography.family.sansBold }}>
+                  {order?.fulfillment_type === 'dropship' ? 'Send to Supplier' : 'Start Packing Order'}
+                </Text>
+              </>
+            )}
           </Pressable>
-        ) : isBuyer && isShipped && order?.status !== 'completed' ? (
+        ) : isSeller && (order?.fulfillment_status === 'packing' || (!order?.fulfillment_status && isOrderActive && !isShipped)) ? (
           <Pressable
-            onPress={handleConfirmReceived}
-            disabled={completingReceipt}
+            onPress={() => setShowShipModal(true)}
             style={({ pressed }) => [
               {
                 height: 48,
                 borderRadius: 12,
-                backgroundColor: theme.purple,
+                backgroundColor: theme.primary,
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -775,17 +908,69 @@ export default function InvoiceScreen() {
               pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
             ]}
           >
-            {completingReceipt ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
-            ) : (
-              <>
-                <Feather name="check" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
-                <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF', fontFamily: typography.family.sansBold }}>
-                  Confirm Delivery (Everything is OK)
-                </Text>
-              </>
-            )}
+            <Feather name="truck" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
+            <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF', fontFamily: typography.family.sansBold }}>
+              Mark as Shipped / In-Transit
+            </Text>
           </Pressable>
+        ) : isBuyer && (isShipped || order?.fulfillment_status === 'shifting' || order?.fulfillment_status === 'delivered') && order?.status !== 'completed' ? (
+          <View style={{ gap: 8, width: '100%' }}>
+            <Pressable
+              onPress={handleConfirmReceived}
+              disabled={completingReceipt}
+              style={({ pressed }) => [
+                {
+                  height: 48,
+                  borderRadius: 12,
+                  backgroundColor: theme.primary,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                },
+                pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
+              ]}
+            >
+              {completingReceipt ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <>
+                  <Feather name="check" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF', fontFamily: typography.family.sansBold }}>
+                    Confirm Delivery (Everything is OK)
+                  </Text>
+                </>
+              )}
+            </Pressable>
+
+            <Pressable
+              onPress={handleOpenDispute}
+              disabled={openingDispute}
+              style={({ pressed }) => [
+                {
+                  height: 40,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                  backgroundColor: theme.panel,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                },
+                pressed && { opacity: 0.8 },
+              ]}
+            >
+              {openingDispute ? (
+                <ActivityIndicator color={theme.ink} size="small" />
+              ) : (
+                <>
+                  <ShieldCheckIcon size={14} style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: theme.ink, fontFamily: typography.family.sansSemibold }}>
+                    Report Damaged Item / Dispute
+                  </Text>
+                </>
+              )}
+            </Pressable>
+          </View>
         ) : (
           <Pressable
             onPress={handleContactOtherUser}

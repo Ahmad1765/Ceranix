@@ -1,12 +1,14 @@
 import { supabase } from '@/lib/supabase';
 import { formatPrice } from '@/lib/currency';
-import type { User, Listing } from '@/types';
+import type { User, Listing, Order } from '@/types';
 
 export type MessageKind = 'text' | 'offer' | 'system';
 export type OfferStatus =
+  | 'proposed'
   | 'pending'
   | 'accepted'
   | 'declined'
+  | 'countered'
   | 'expired'
   | 'withdrawn';
 
@@ -28,6 +30,7 @@ export interface ChatMessage {
     bundle_count?: number;
   } | null;
   offer_status: OfferStatus | null;
+  parent_offer_id?: string | null;
   created_at: string;
   updated_at?: string;
   /** Client-only: an optimistic message still in flight. Never selected. */
@@ -178,7 +181,7 @@ export async function getOrCreateConversation(args: {
 export async function fetchMessages(conversationId: string): Promise<ChatMessage[]> {
   const { data, error } = await supabase
     .from('messages')
-    .select('id, conversation_id, sender_id, content, kind, metadata, offer_status, created_at, updated_at')
+    .select('id, conversation_id, sender_id, content, kind, metadata, offer_status, parent_offer_id, created_at, updated_at')
     .eq('conversation_id', conversationId)
     .order('created_at', { ascending: true });
   if (error) {
@@ -246,7 +249,7 @@ export async function sendOffer(args: {
       },
       offer_status: 'pending',
     })
-    .select('id, conversation_id, sender_id, content, kind, metadata, offer_status, created_at, updated_at')
+    .select('id, conversation_id, sender_id, content, kind, metadata, offer_status, parent_offer_id, created_at, updated_at')
     .single();
   if (error) {
     console.warn('[chat] sendOffer', error.message);
@@ -257,7 +260,7 @@ export async function sendOffer(args: {
 
 export async function updateOfferStatus(
   messageId: string,
-  status: Exclude<OfferStatus, 'pending'>,
+  status: Exclude<OfferStatus, 'pending' | 'proposed'>,
 ): Promise<boolean> {
   const { error } = await supabase
     .from('messages')
@@ -269,6 +272,63 @@ export async function updateOfferStatus(
     return false;
   }
   return true;
+}
+
+/**
+ * Atomically accepts an offer in chat, locking inventory and creating an order in awaiting_payment state.
+ */
+export async function acceptChatOffer(offerMessageId: string): Promise<Order | null> {
+  const { data, error } = await supabase.rpc('accept_chat_offer', {
+    p_offer_message_id: offerMessageId,
+  });
+  if (error) {
+    console.warn('[chat] acceptChatOffer', error.message);
+    throw new Error(error.message);
+  }
+  return data as Order;
+}
+
+/**
+ * Creates a counter-offer linked to a parent offer, marking the parent offer as 'countered'.
+ */
+export async function counterOffer(args: {
+  conversationId: string;
+  senderId: string;
+  parentOfferId: string;
+  amount: number;
+  note?: string;
+}): Promise<ChatMessage | null> {
+  if (!Number.isFinite(args.amount) || args.amount <= 0) return null;
+  const amountValue = Number(args.amount.toFixed(2));
+
+  // Mark parent offer as countered
+  await updateOfferStatus(args.parentOfferId, 'countered');
+
+  const defaultNote = `Counter-Offer: ${formatPrice(amountValue)}`;
+  const { data, error } = await supabase
+    .from('messages')
+    .insert({
+      conversation_id: args.conversationId,
+      sender_id: args.senderId,
+      content: args.note?.trim() || defaultNote,
+      kind: 'offer',
+      parent_offer_id: args.parentOfferId,
+      metadata: {
+        amount: amountValue,
+        currency: 'PKR',
+        note: args.note?.trim() || null,
+        counter_to: args.parentOfferId,
+      },
+      offer_status: 'pending',
+    })
+    .select('id, conversation_id, sender_id, content, kind, metadata, offer_status, parent_offer_id, created_at, updated_at')
+    .single();
+
+  if (error) {
+    console.warn('[chat] counterOffer', error.message);
+    return null;
+  }
+  return data as unknown as ChatMessage;
 }
 
 // ── Reactions ─────────────────────────────────────────────────────────────

@@ -19,7 +19,7 @@
 // `fontFamily` in its style (see components/AnimatedTabBar.tsx for the
 // pattern: pick the Inter file matching the fontWeight already there).
 import React from 'react';
-import { Text as RNText, TextInput as RNTextInput, StyleSheet } from 'react-native';
+import { Text as RNText, TextInput as RNTextInput, StyleSheet, Platform } from 'react-native';
 import type { TextProps, TextInputProps } from 'react-native';
 import { cssInterop } from 'nativewind';
 import { colors } from '@/lib/theme';
@@ -47,9 +47,21 @@ function withDefaultInterFont<P extends { style?: any }>(
     const family = flat.fontFamily || (WEIGHT_FONT[String(flat.fontWeight ?? '400')] ?? 'Inter_400Regular');
     const color = flat.color ?? colors.text;
 
+    // On mobile web (iOS Safari & touch devices), enforce minimum 16px fontSize on inputs
+    // to prevent iOS Safari from auto-zooming the viewport upon focusing an input.
+    let mobileInputStyle: any = undefined;
+    if (Platform.OS === 'web' && displayName === 'DefaultFontTextInput') {
+      if (typeof window !== 'undefined' && ('ontouchstart' in window || window.innerWidth <= 768)) {
+        if (!flat.fontSize || flat.fontSize < 16) {
+          mobileInputStyle = { fontSize: 16 };
+        }
+      }
+    }
+
     const style = [
       { fontFamily: family, color },
       props.style,
+      mobileInputStyle,
     ];
     return <Base ref={ref as any} {...(extraDefaults as any)} {...(props as any)} style={style} />;
   });

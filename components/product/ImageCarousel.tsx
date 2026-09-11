@@ -8,6 +8,7 @@ import {
   StyleSheet,
   ViewStyle,
   Pressable,
+  Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
@@ -57,12 +58,15 @@ export function ImageCarousel({
     }
   }, [validImages, carouselWidth]);
 
+  const prevWidthRef = useRef(carouselWidth);
   useEffect(() => {
     setCarouselWidth(windowWidth);
   }, [windowWidth]);
 
+  // Only realign when carouselWidth actually changes (e.g. device rotation), never during swipes
   useEffect(() => {
-    if (carouselWidth > 0) {
+    if (prevWidthRef.current !== carouselWidth && carouselWidth > 0) {
+      prevWidthRef.current = carouselWidth;
       scrollRef.current?.scrollTo({
         x: activeIndex * carouselWidth,
         y: 0,
@@ -74,6 +78,90 @@ export function ImageCarousel({
   // Height based on aspect ratio
   const carouselHeight = aspectRatio === '1:1' ? carouselWidth : carouselWidth * 1.25;
 
+  const touchStartPos = useRef({ x: 0, y: 0, time: 0 });
+  const isSwiping = useRef(false);
+  const lastSwipeTime = useRef(0);
+
+  const handleTouchStart = useCallback((e: any) => {
+    const touch = e.nativeEvent?.touches?.[0] || e.touches?.[0] || e.nativeEvent;
+    if (!touch) return;
+    touchStartPos.current = {
+      x: touch.clientX ?? touch.pageX,
+      y: touch.clientY ?? touch.pageY,
+      time: Date.now(),
+    };
+    isSwiping.current = false;
+  }, []);
+
+  const handleTouchMove = useCallback((e: any) => {
+    const touch = e.nativeEvent?.touches?.[0] || e.touches?.[0] || e.nativeEvent;
+    if (!touch) return;
+    const dx = Math.abs((touch.clientX ?? touch.pageX) - touchStartPos.current.x);
+    const dy = Math.abs((touch.clientY ?? touch.pageY) - touchStartPos.current.y);
+    if (dx > 6 && dx > dy) {
+      isSwiping.current = true;
+      lastSwipeTime.current = Date.now();
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(
+    (e: any) => {
+      const touch = e.nativeEvent?.changedTouches?.[0] || e.changedTouches?.[0] || e.nativeEvent;
+      const endX = touch ? (touch.clientX ?? touch.pageX) : touchStartPos.current.x;
+      const dx = endX - touchStartPos.current.x;
+      const dt = Date.now() - touchStartPos.current.time;
+      const velocity = Math.abs(dx) / Math.max(1, dt);
+      const threshold = Math.min(45, carouselWidth * 0.15);
+
+      if (isSwiping.current || Math.abs(dx) > threshold) {
+        lastSwipeTime.current = Date.now();
+        let target = activeIndex;
+        if (dx < -threshold || (dx < -12 && velocity > 0.16)) {
+          if (activeIndex < validImages.length - 1) {
+            target = activeIndex + 1;
+          }
+        } else if (dx > threshold || (dx > 12 && velocity > 0.16)) {
+          if (activeIndex > 0) {
+            target = activeIndex - 1;
+          }
+        }
+
+        setActiveIndex(target);
+        const node: any = scrollRef.current;
+        const scrollNode: HTMLElement | null =
+          typeof node?.getScrollableNode === 'function'
+            ? node.getScrollableNode()
+            : node instanceof HTMLElement
+            ? node
+            : null;
+        const targetX = target * carouselWidth;
+        if (scrollNode) {
+          scrollNode.style.scrollSnapType = 'none';
+          scrollNode.style.scrollBehavior = 'smooth';
+          try {
+            (scrollNode as any).scrollTo?.({ x: targetX, y: 0, animated: true });
+            (Element.prototype.scrollTo as any).call(scrollNode, { left: targetX, behavior: 'smooth' });
+          } catch {
+            scrollNode.scrollLeft = targetX;
+          }
+          setTimeout(() => {
+            if (scrollNode) {
+              scrollNode.style.scrollSnapType = 'x mandatory';
+            }
+          }, 350);
+        } else {
+          scrollRef.current?.scrollTo({ x: targetX, y: 0, animated: true });
+        }
+        setTimeout(() => {
+          isSwiping.current = false;
+        }, 350);
+      } else {
+        isSwiping.current = false;
+      }
+    },
+    [activeIndex, carouselWidth, validImages.length],
+  );
+
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       const offsetX = event.nativeEvent.contentOffset.x;
@@ -83,6 +171,16 @@ export function ImageCarousel({
       }
     },
     [activeIndex, carouselWidth, validImages.length]
+  );
+
+  const handleImagePress = useCallback(
+    (index: number) => {
+      if (isSwiping.current || Date.now() - lastSwipeTime.current < 400) {
+        return;
+      }
+      onImagePress?.(index);
+    },
+    [onImagePress],
   );
 
   if (validImages.length === 0) {
@@ -102,14 +200,19 @@ export function ImageCarousel({
 
   return (
     <View
+      testID="product-hero-carousel"
       className={className}
       style={[styles.container, { height: carouselHeight, backgroundColor: theme.panel }, style]}
       onLayout={(e) => {
         const w = e.nativeEvent.layout.width;
-        if (w > 0 && w !== carouselWidth) {
+        if (w > 0 && Math.abs(w - carouselWidth) > 2) {
           setCarouselWidth(w);
         }
       }}
+      onTouchStart={validImages.length > 1 ? handleTouchStart : undefined}
+      onTouchMove={validImages.length > 1 ? handleTouchMove : undefined}
+      onTouchEnd={validImages.length > 1 ? handleTouchEnd : undefined}
+      onTouchCancel={validImages.length > 1 ? handleTouchEnd : undefined}
     >
       <ScrollView
         ref={scrollRef}
@@ -131,7 +234,7 @@ export function ImageCarousel({
             height={carouselHeight}
             placeholderUri={index === 0 ? placeholderImage : undefined}
             listingId={listingId}
-            onPress={onImagePress ? () => onImagePress(index) : undefined}
+            onPress={onImagePress ? () => handleImagePress(index) : undefined}
           />
         ))}
       </ScrollView>
@@ -233,11 +336,29 @@ const styles = StyleSheet.create({
   },
   scroll: {
     flex: 1,
+    ...Platform.select({
+      web: {
+        scrollSnapType: 'x mandatory',
+        WebkitScrollSnapType: 'x mandatory',
+        WebkitOverflowScrolling: 'touch',
+        touchAction: 'pan-x pan-y',
+        overscrollBehaviorX: 'contain',
+        scrollbarWidth: 'none',
+        msOverflowStyle: 'none',
+      } as any,
+    }),
   },
   slide: {
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
+    ...Platform.select({
+      web: {
+        scrollSnapAlign: 'start',
+        WebkitScrollSnapAlign: 'start',
+        flexShrink: 0,
+      } as any,
+    }),
   },
   image: {
     width: '100%',

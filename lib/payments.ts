@@ -15,26 +15,10 @@ type SessionResponse = { url: string; sessionId: string };
 // controlled listing-lifecycle toggle (app/product/[id].tsx "Mark as sold"),
 // so trusting it lets a seller forge a Paid invoice, or flip a genuinely paid
 // one back to Pending and send the buyer to pay a second time.
-export type Order = {
-  id: string;
-  status: "pending" | "paid" | "refunded" | "canceled" | "refund_due" | "failed" | "completed";
-  amount_cents: number;
-  fee_cents: number;
-  currency: string;
-  payment_method?: "card" | "cod";
-  shipping_address?: Record<string, any> | null;
-  delivery_notes?: string | null;
-  courier_name?: string | null;
-  tracking_number?: string | null;
-  cancel_reason?: string | null;
-  cancelled_by?: string | null;
-  shipped_at?: string | null;
-  completed_at?: string | null;
-  created_at: string;
-  listing_id?: string;
-  buyer_id?: string;
-  seller_id?: string;
-};
+import type { Order as CanonicalOrder, OrderStatus, FulfillmentStatus, FulfillmentType } from "@/types";
+
+export type { OrderStatus, FulfillmentStatus, FulfillmentType };
+export type Order = CanonicalOrder;
 
 /**
  * The caller's order for a listing, newest first, or null if they never paid.

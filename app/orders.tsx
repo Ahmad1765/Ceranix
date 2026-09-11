@@ -24,6 +24,8 @@ import { getOptimizedImageUrl, cardImageUrl, IMAGE_TRANSITION } from '@/lib/imag
 import { buyerProtectionFee, formatPrice } from '@/lib/fees';
 import { deriveInvoiceAmounts } from '@/lib/invoiceStatus';
 import { partitionOrders, type OrderSide } from '@/lib/orders';
+import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
+import { supabase } from '@/lib/supabase';
 import type { MyOrder } from '@/lib/payments';
 
 type FilterStatus = 'all' | 'in_progress' | 'canceled' | 'completed';
@@ -41,6 +43,11 @@ function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
       router.push(`/invoice/${order.listing_id}` as any);
     }
   };
+
+  const fulfillment = (order as any).fulfillment_status;
+  const isDisputed = fulfillment === 'disputed' || order.status === 'disputed';
+  const isPacking = fulfillment === 'packing';
+  const isAwaitingPayment = fulfillment === 'awaiting_payment' || order.status === 'awaiting_payment';
 
   return (
     <Pressable
@@ -101,7 +108,7 @@ function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
         </Text>
         <Text
           style={{
-            fontSize: 13.5,
+            fontSize: 13,
             color: theme.mute,
             fontFamily: typography.family.sansMedium,
             marginBottom: 3,
@@ -110,12 +117,28 @@ function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
           {formatPrice(total)}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Feather
-            name={isCanceled ? 'x-circle' : isShipped ? 'truck' : 'check-circle'}
-            size={12}
-            color={isCanceled ? '#EF4444' : isShipped ? theme.purple : '#10B981'}
-            style={{ marginRight: 4 }}
-          />
+          {isDisputed ? (
+            <ShieldCheckIcon size={13} style={{ marginRight: 4 }} />
+          ) : (
+            <Feather
+              name={
+                isCanceled ? 'x-circle' :
+                isShipped || fulfillment === 'shifting' ? 'truck' :
+                isPacking ? 'package' :
+                isAwaitingPayment ? 'clock' :
+                'check-circle'
+              }
+              size={12}
+              color={
+                isCanceled ? '#EF4444' :
+                isShipped || fulfillment === 'shifting' ? theme.primary :
+                isPacking ? theme.primary :
+                isAwaitingPayment ? '#D97706' :
+                '#10B981'
+              }
+              style={{ marginRight: 4 }}
+            />
+          )}
           <Text
             style={[
               {
@@ -125,16 +148,24 @@ function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
                 fontFamily: typography.family.sansSemibold,
               },
               isCanceled && { color: '#EF4444' },
-              isShipped && { color: theme.purple },
+              (isShipped || fulfillment === 'shifting' || isPacking) && { color: theme.primary },
+              isAwaitingPayment && { color: '#D97706' },
+              isDisputed && { color: theme.ink },
             ]}
           >
             {isCanceled
               ? 'Order Canceled'
-              : isShipped
-              ? 'Shipped · In transit'
-              : order.status === 'paid'
-              ? 'Order Confirmed'
-              : 'CoD · Awaiting delivery'}
+              : isDisputed
+              ? 'Dispute under review'
+              : isShipped || fulfillment === 'shifting'
+              ? 'Shifting · In transit'
+              : isPacking
+              ? (order as any).fulfillment_type === 'dropship' ? 'Supplier Processing' : 'Packing'
+              : isAwaitingPayment
+              ? 'Awaiting Payment'
+              : order.status === 'completed' || fulfillment === 'completed'
+              ? 'Completed'
+              : 'Order Confirmed'}
           </Text>
         </View>
       </View>
@@ -239,19 +270,50 @@ function OrdersScreen() {
     }
   }, [justPaid, refetch]);
 
+  // Real-time synchronization for orders dashboard
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel(`user_orders_dash_${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+        },
+        () => {
+          refetch();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, refetch]);
+
   const rawRows = side === 'bought' ? allBoughtOrders : sold;
 
   // Filter items based on active status chip
   const rows = useMemo(() => {
     if (filter === 'all') return rawRows;
     if (filter === 'in_progress') {
-      return rawRows.filter((o) => o.status === 'pending' || o.status === 'paid');
+      return rawRows.filter(
+        (o) =>
+          o.status === 'pending' ||
+          o.status === 'paid' ||
+          o.status === 'awaiting_payment' ||
+          (o as any).fulfillment_status === 'packing' ||
+          (o as any).fulfillment_status === 'shifting' ||
+          (o as any).fulfillment_status === 'disputed',
+      );
     }
     if (filter === 'canceled') {
-      return rawRows.filter((o) => o.status === 'canceled' || o.status === 'refunded');
+      return rawRows.filter((o) => o.status === 'canceled' || o.status === 'refunded' || o.status === 'failed');
     }
     if (filter === 'completed') {
-      return rawRows.filter((o) => o.status === 'completed');
+      return rawRows.filter((o) => o.status === 'completed' || (o as any).fulfillment_status === 'completed');
     }
     return rawRows;
   }, [rawRows, filter]);

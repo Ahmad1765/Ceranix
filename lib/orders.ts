@@ -88,6 +88,16 @@ export function orderBadge(
         };
       }
       return { label: 'Awaiting payment', tone: 'warn' };
+    case 'awaiting_payment':
+      return { label: 'Awaiting payment', tone: 'warn' };
+    case 'packing':
+      return { label: side === 'bought' ? 'Seller packaging' : 'Packing order', tone: 'neutral' };
+    case 'shifting':
+      return { label: 'Dispatched · In transit', tone: 'positive' };
+    case 'delivered':
+      return { label: 'Delivered · Please inspect', tone: 'positive' };
+    case 'disputed':
+      return { label: 'Dispute in review', tone: 'warn' };
     default: {
       const unexpected: never = status;
       console.warn('[orders] unhandled order status', unexpected);
