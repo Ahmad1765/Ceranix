@@ -193,9 +193,8 @@ export function AestheticsPanel({
   tags: TagIndexEntry[];
   onOpen: (tag: string) => void;
 }) {
-  // An odd count leaves one tile alone on the last row instead of a paired
-  // grid — floor to an even count so every row always reads as a pair.
-  const evenTags = tags.length % 2 === 1 ? tags.slice(0, -1) : tags;
+  // Retain all tags including odd counts — the trailing spacer balances the final row.
+  const evenTags = tags;
   // Group into pairs of two for a rock-solid, responsive 2-column grid.
   // Using explicit rows with flex: 1 eliminates subpixel rounding and Yoga flexWrap
   // bugs where calculated pixel widths overflow the row on devices with odd screen
