@@ -64,10 +64,11 @@ import type { PopIconHandle } from '@/components/product/PopIcon';
 import { ProductSkeleton } from '@/components/product/ProductSkeleton';
 import {
   tap,
-  IMAGE_HEIGHT,
+  useProductDimensions,
   FALLBACK_SELLER,
   EMPTY_LISTINGS,
 } from '@/components/product/shared';
+import { CONTENT_MAX_WIDTH } from '@/lib/responsive';
 import { useTheme } from '@/context/ThemeContext';
 import { BRAND, APP_URL } from '@/lib/brand';
 import { reportListing, REPORT_REASONS } from '@/lib/reports';
@@ -227,6 +228,12 @@ export default function ProductScreen() {
     }, [sellerId, isOwnListing, refetchFollow]),
   );
 
+  const { imageHeight: heroHeight } = useProductDimensions();
+  const heroHeightSv = useSharedValue(heroHeight);
+  useEffect(() => {
+    heroHeightSv.value = heroHeight;
+  }, [heroHeight, heroHeightSv]);
+
   // ── Reanimated Scroll & Parallax Handlers ────────────────────────────────
   const scrollY = useSharedValue(0);
   const scrollHandler = useAnimatedScrollHandler({
@@ -236,7 +243,7 @@ export default function ProductScreen() {
   });
 
   useAnimatedReaction(
-    () => scrollY.value > IMAGE_HEIGHT - 80,
+    () => scrollY.value > heroHeightSv.value - 80,
     (curr, prev) => {
       if (curr !== prev) runOnJS(setShowStickyHeader)(curr);
     },
@@ -247,7 +254,8 @@ export default function ProductScreen() {
     if (y >= 0) {
       return { transform: [{ translateY: 0 }, { scale: 1 }] };
     }
-    const stretch = -y / IMAGE_HEIGHT;
+    const h = heroHeightSv.value > 0 ? heroHeightSv.value : 1;
+    const stretch = -y / h;
     return {
       transform: [
         { translateY: y / 2 },
@@ -559,7 +567,12 @@ export default function ProductScreen() {
       <Animated.ScrollView
         ref={mainScrollRef}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 16) + 120 }}
+        contentContainerStyle={{
+          paddingBottom: Math.max(insets.bottom, 16) + 120,
+          width: '100%',
+          maxWidth: CONTENT_MAX_WIDTH,
+          alignSelf: 'center',
+        }}
         onScroll={scrollHandler}
         scrollEventThrottle={16}
         contentInsetAdjustmentBehavior="never"

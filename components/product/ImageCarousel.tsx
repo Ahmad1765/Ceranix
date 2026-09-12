@@ -14,6 +14,7 @@ import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
 import { useTheme } from '@/context/ThemeContext';
 import { getOptimizedImageUrl, thumbWidthFor, IMAGE_TRANSITION, prefetchImages } from '@/lib/images';
+import { CONTENT_MAX_WIDTH } from '@/lib/responsive';
 
 export interface ImageCarouselProps {
   images: string[];
@@ -42,7 +43,7 @@ export function ImageCarousel({
   const { theme } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
   const [activeIndex, setActiveIndex] = useState(0);
-  const [carouselWidth, setCarouselWidth] = useState(windowWidth);
+  const [carouselWidth, setCarouselWidth] = useState(Math.min(windowWidth, CONTENT_MAX_WIDTH));
   const scrollRef = useRef<ScrollView>(null);
 
   const validImages = useMemo(() => (images || []).filter(Boolean), [images]);
@@ -60,7 +61,7 @@ export function ImageCarousel({
 
   const prevWidthRef = useRef(carouselWidth);
   useEffect(() => {
-    setCarouselWidth(windowWidth);
+    setCarouselWidth(Math.min(windowWidth, CONTENT_MAX_WIDTH));
   }, [windowWidth]);
 
   // Only realign when carouselWidth actually changes (e.g. device rotation), never during swipes

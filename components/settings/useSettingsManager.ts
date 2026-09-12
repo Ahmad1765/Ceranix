@@ -49,7 +49,7 @@ export function useSettingsManager() {
   const toast = useToast();
   const params = useLocalSearchParams<{ open?: string }>();
 
-  const [open, setOpen] = useState<Section | null>(null);
+  const [openSection, setOpenSection] = useState<Section | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
   const [pushOn, setPushOn] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
@@ -125,30 +125,65 @@ export function useSettingsManager() {
   }, [loadExtras]);
 
   // ── 2. Deep-Link Handler ──────────────────────────────────────────────────
-  const handledDeepLink = useRef(false);
+  const lastHandledParam = useRef<string | null>(null);
   useEffect(() => {
-    const target = params.open;
-    if (!target) {
-      handledDeepLink.current = false;
+    const rawTarget = params.open;
+    if (!rawTarget) {
+      lastHandledParam.current = null;
       return;
     }
-    if (handledDeepLink.current) return;
-    if (target === 'bundle') {
-      setShowBundle(true);
-      setOpen('shop');
-    } else if (SECTIONS.includes(target as Section)) {
-      setOpen(target as Section);
-    } else {
-      handledDeepLink.current = false;
-      return;
+    const target = (Array.isArray(rawTarget) ? rawTarget[0] : rawTarget).toLowerCase();
+    if (lastHandledParam.current === target) return;
+    lastHandledParam.current = target;
+
+    switch (target) {
+      case 'bundle':
+        setOpenSection('shop');
+        setShowBundle(true);
+        break;
+      case 'address':
+        setOpenSection('verify');
+        setShowAddress(true);
+        break;
+      case 'payout':
+        setOpenSection('verify');
+        setShowPayout(true);
+        break;
+      case 'verify':
+        setOpenSection('verify');
+        setShowVerify(true);
+        break;
+      case 'theme':
+        setOpenSection('enhance');
+        setShowTheme(true);
+        break;
+      case 'subscription':
+      case 'pro':
+        setOpenSection('enhance');
+        setShowSubscription(true);
+        break;
+      case 'notifications':
+      case 'enhance':
+        setOpenSection('enhance');
+        break;
+      case 'shop':
+      case 'account':
+      case 'help':
+      case 'admin':
+        setOpenSection(target as Section);
+        break;
+      default:
+        if (SECTIONS.includes(target as Section)) {
+          setOpenSection(target as Section);
+        }
+        break;
     }
-    handledDeepLink.current = true;
   }, [params.open]);
 
   // ── 3. Section Toggling ───────────────────────────────────────────────────
   const toggleSection = useCallback((s: Section) => {
     tap('light');
-    setOpen((prev) => (prev === s ? null : s));
+    setOpenSection((prev) => (prev === s ? null : s));
   }, []);
 
   // ── 4. DB Sync Actions (Vacation, Bundle, Push, Analytics) ────────────────
@@ -471,8 +506,8 @@ export function useSettingsManager() {
   );
 
   return {
-    open,
-    setOpen,
+    open: openSection,
+    setOpen: setOpenSection,
     toggleSection,
     busy,
     pushOn,

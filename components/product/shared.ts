@@ -2,21 +2,59 @@
 // sub-components. Kept in one module so the screen and the components in
 // components/product/* share a single source of truth for dimensions, the
 // brand palette, and the listing→related-card mapping.
-import { Dimensions, Platform, StyleSheet } from 'react-native';
+import { Dimensions, Platform, StyleSheet, useWindowDimensions } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { cardImageUrl } from '@/lib/images';
+import { CONTENT_MAX_WIDTH } from '@/lib/responsive';
 import type { Listing } from '@/types';
 
 export const IS_IOS = Platform.OS === 'ios';
 export const HAIRLINE = StyleSheet.hairlineWidth;
 
+export const CARD_GAP = 8;
+export const CARD_OUTER_PAD = 12;
+
+/**
+ * Computes dynamic viewport and product layout dimensions based on a given window width.
+ * Capped to CONTENT_MAX_WIDTH so layouts on wide screens/tablets stay disciplined.
+ */
+export function getProductDimensions(windowWidth: number) {
+  const contentWidth = Math.min(windowWidth, CONTENT_MAX_WIDTH);
+  const imageHeight = Math.round(contentWidth * 1.25);
+  const cardWidth = Math.floor((contentWidth - CARD_OUTER_PAD * 2 - CARD_GAP) / 2);
+  const cardImageHeight = Math.round(cardWidth * 1.25);
+
+  return {
+    contentWidth,
+    imageHeight,
+    cardWidth,
+    cardImageHeight,
+  };
+}
+
+/**
+ * Hook returning dynamic dimensions for product screens and cards.
+ * Automatically recalculates on screen rotation or window resize (tablet/web).
+ */
+export function useProductDimensions() {
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const dims = getProductDimensions(windowWidth);
+
+  return {
+    windowWidth,
+    windowHeight,
+    ...dims,
+  };
+}
+
+// Fallback initial evaluations for legacy static references
 const win = Dimensions.get('window');
 export const width = win.width;
 export const SCREEN_HEIGHT = win.height;
 // Hero images render at a 4:5 portrait ratio — the e-commerce standard
 // (Instagram/Shopify), tall enough to show a garment without dominating the
 // fold. Rounded so the parallax math lands on whole pixels.
-export const IMAGE_HEIGHT = Math.round(width * 1.25);
+export const IMAGE_HEIGHT = Math.round(Math.min(win.width, CONTENT_MAX_WIDTH) * 1.25);
 
 /** iOS-only haptic tap. No-op on Android/web. */
 export function tap(style: 'light' | 'medium' | 'selection' = 'selection') {
@@ -141,10 +179,8 @@ export function listingToRelated(row: Listing): RelatedItem {
 // Re-exported here so the product components keep a single import surface.
 export { BUNDLE_TIERS, BUNDLE_MIN_ITEMS, computeBundlePricing } from '@/lib/bundle';
 
-export const CARD_GAP = 8;
-export const CARD_OUTER_PAD = 12;
 // Floor so 2*CARD_WIDTH + CARD_GAP can never exceed the row width due to
 // sub-pixel rounding — otherwise the second card wraps and the grid collapses
 // into a single column on certain devices/layout passes.
-export const CARD_WIDTH = Math.floor((width - CARD_OUTER_PAD * 2 - CARD_GAP) / 2);
+export const CARD_WIDTH = Math.floor((Math.min(width, CONTENT_MAX_WIDTH) - CARD_OUTER_PAD * 2 - CARD_GAP) / 2);
 export const CARD_IMAGE_HEIGHT = Math.round(CARD_WIDTH * 1.25);

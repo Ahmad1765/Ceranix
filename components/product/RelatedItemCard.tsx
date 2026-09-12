@@ -4,7 +4,7 @@ import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
 import { getOptimizedImageUrl, thumbWidthFor, IMAGE_TRANSITION } from '@/lib/images';
-import { CARD_WIDTH, CARD_IMAGE_HEIGHT, type RelatedItem } from './shared';
+import { useProductDimensions, type RelatedItem } from './shared';
 import { formatPrice } from '@/lib/currency';
 import { priceBreakdown } from '@/lib/fees';
 import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
@@ -14,10 +14,11 @@ const SUPPRESSION_WINDOW_MS = 450;
 
 export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress: () => void }) {
   const { theme } = useTheme();
+  const { cardWidth, cardImageHeight } = useProductDimensions();
   const [activeIndex, setActiveIndex] = useState(0);
   const [carouselArmed, setCarouselArmed] = useState(false);
   const hasMultiple = item.images.length > 1;
-  const srcWidth = thumbWidthFor(CARD_WIDTH);
+  const srcWidth = thumbWidthFor(cardWidth);
   const { total: totalPrice } = priceBreakdown(item.price);
 
   const isSwipingOrDragging = useRef(false);
@@ -75,7 +76,7 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
     const dx = endX - touchStartPos.current.x;
     const dt = Date.now() - touchStartPos.current.time;
     const velocity = Math.abs(dx) / Math.max(1, dt);
-    const threshold = CARD_WIDTH * 0.15;
+    const threshold = cardWidth * 0.15;
 
     if (hasTouchMoved.current || Math.abs(dx) > threshold) {
       lastDragEndTime.current = Date.now();
@@ -93,7 +94,7 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
       }
 
       setActiveIndex(target);
-      const targetX = target * CARD_WIDTH;
+      const targetX = target * cardWidth;
       const node: any = scrollRef.current;
       const scrollNode: HTMLElement | null =
         typeof node?.getScrollableNode === 'function'
@@ -127,7 +128,7 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
       }, SUPPRESSION_WINDOW_MS);
     }
     hasTouchMoved.current = false;
-  }, [activeIndex, item.images.length]);
+  }, [activeIndex, item.images.length, cardWidth]);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || !containerRef.current) return;
@@ -155,7 +156,7 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
   }, []);
 
   const handleScroll = useCallback((e: any) => {
-    setActiveIndex(Math.round(e.nativeEvent.contentOffset.x / CARD_WIDTH));
+    setActiveIndex(Math.round(e.nativeEvent.contentOffset.x / cardWidth));
     isSwipingOrDragging.current = true;
     lastDragEndTime.current = Date.now();
     if (webScrollTimeoutRef.current) {
@@ -164,7 +165,7 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
     webScrollTimeoutRef.current = setTimeout(() => {
       isSwipingOrDragging.current = false;
     }, SUPPRESSION_WINDOW_MS);
-  }, []);
+  }, [cardWidth]);
 
   const handlePress = useCallback(() => {
     if (isSwipingOrDragging.current || Date.now() - lastDragEndTime.current < SUPPRESSION_WINDOW_MS) {
@@ -181,15 +182,15 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
       onPress={handlePress}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      style={{ width: CARD_WIDTH, marginBottom: 18 }}
+      style={{ width: cardWidth, marginBottom: 18 }}
     >
       <View
         ref={containerRef}
         testID="related-item-carousel"
         style={{
           position: 'relative',
-          width: CARD_WIDTH,
-          height: CARD_IMAGE_HEIGHT,
+          width: cardWidth,
+          height: cardImageHeight,
           borderRadius: 14,
           overflow: 'hidden',
           backgroundColor: theme.panel,
@@ -245,7 +246,7 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
                   <View
                     key={i}
                     style={[
-                      { width: CARD_WIDTH, height: CARD_IMAGE_HEIGHT },
+                      { width: cardWidth, height: cardImageHeight },
                       Platform.OS === 'web' && ({
                         scrollSnapAlign: 'start',
                         WebkitScrollSnapAlign: 'start',
@@ -259,7 +260,7 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
                 <View
                   key={i}
                   style={[
-                    { width: CARD_WIDTH, height: CARD_IMAGE_HEIGHT },
+                    { width: cardWidth, height: cardImageHeight },
                     Platform.OS === 'web' && ({
                       scrollSnapAlign: 'start',
                       WebkitScrollSnapAlign: 'start',
@@ -269,7 +270,7 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
                 >
                   <Image
                     source={{ uri: getOptimizedImageUrl(uri, { width: srcWidth }) }}
-                    style={{ width: CARD_WIDTH, height: CARD_IMAGE_HEIGHT }}
+                    style={{ width: cardWidth, height: cardImageHeight }}
                     contentFit="cover"
                     cachePolicy="memory-disk"
                     recyclingKey={uri}
@@ -287,7 +288,7 @@ export function RelatedItemCard({ item, onPress }: { item: RelatedItem; onPress:
                 ? getOptimizedImageUrl(item.images[0], { width: srcWidth })
                 : 'https://placehold.co/400x400/eeeeee/cccccc.png?text=No+Image',
             }}
-            style={{ width: CARD_WIDTH, height: CARD_IMAGE_HEIGHT }}
+            style={{ width: cardWidth, height: cardImageHeight }}
             contentFit="cover"
             cachePolicy="memory-disk"
             recyclingKey={item.images && item.images.length > 0 ? item.images[0] : 'empty-placeholder'}

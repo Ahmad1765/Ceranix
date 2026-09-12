@@ -7,12 +7,12 @@ import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/context/ThemeContext';
-import { type as typography } from '@/lib/theme';
+import { type as typography, radii } from '@/lib/theme';
 import { useListingQuery } from '@/lib/queries';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { safeBack } from '@/lib/nav';
-import { HIT_SLOP_8 } from '@/lib/responsive';
+import { HIT_SLOP_8, CONTENT_MAX_WIDTH } from '@/lib/responsive';
 import { buyerProtectionFee, formatPrice, MANAGED_SHIPPING_FEE } from '@/lib/fees';
 import { fetchOrderForListing, type Order } from '@/lib/payments';
 import { deriveInvoiceStatus, deriveInvoiceAmounts } from '@/lib/invoiceStatus';
@@ -551,55 +551,69 @@ export default function InvoiceScreen() {
       {/* Top bar */}
       <View
         style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingHorizontal: 20,
-          paddingTop: 6,
-          paddingBottom: 14,
           backgroundColor: theme.surface,
           borderBottomWidth: 1,
           borderBottomColor: theme.border,
         }}
       >
-        <Pressable
-          onPress={() => safeBack()}
-          hitSlop={HIT_SLOP_8}
-          style={({ pressed }) => ({
-            width: 40,
-            height: 40,
-            borderRadius: 20,
+        <View
+          style={{
+            flexDirection: 'row',
             alignItems: 'center',
-            justifyContent: 'center',
-            opacity: pressed ? 0.55 : 1,
-          })}
+            justifyContent: 'space-between',
+            paddingHorizontal: 20,
+            paddingTop: 6,
+            paddingBottom: 14,
+            width: '100%',
+            maxWidth: CONTENT_MAX_WIDTH,
+            alignSelf: 'center',
+          }}
         >
-          <Feather name="arrow-left" size={20} color={theme.ink} />
-        </Pressable>
+          <Pressable
+            onPress={() => safeBack()}
+            hitSlop={HIT_SLOP_8}
+            style={({ pressed }) => ({
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: pressed ? 0.55 : 1,
+            })}
+          >
+            <Feather name="arrow-left" size={20} color={theme.ink} />
+          </Pressable>
 
-        <Text style={{ fontSize: 17, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
-          Order Details
-        </Text>
+          <Text style={{ fontSize: 17, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+            Order Details
+          </Text>
 
-        <Pressable
-          onPress={onShare}
-          hitSlop={HIT_SLOP_8}
-          style={({ pressed }) => ({
-            width: 40,
-            height: 40,
-            borderRadius: 20,
-            alignItems: 'center',
-            justifyContent: 'center',
-            opacity: pressed ? 0.55 : 1,
-          })}
-        >
-          <Feather name="share" size={18} color={theme.ink} />
-        </Pressable>
+          <Pressable
+            onPress={onShare}
+            hitSlop={HIT_SLOP_8}
+            style={({ pressed }) => ({
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: pressed ? 0.55 : 1,
+            })}
+          >
+            <Feather name="share" size={18} color={theme.ink} />
+          </Pressable>
+        </View>
       </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 140, paddingTop: 16 }}
+        contentContainerStyle={{
+          paddingBottom: 140,
+          paddingTop: 16,
+          width: '100%',
+          maxWidth: CONTENT_MAX_WIDTH,
+          alignSelf: 'center',
+        }}
       >
         {/* Order Stepper (Lifecycle Tracking) */}
         <View style={{ paddingHorizontal: 16 }}>
@@ -1011,11 +1025,12 @@ export default function InvoiceScreen() {
           paddingBottom: Platform.OS === 'ios' ? 28 : 16,
         }}
       >
+        <View style={{ width: '100%', maxWidth: CONTENT_MAX_WIDTH, alignSelf: 'center' }}>
         {status === 'canceled' || order?.status === 'canceled' ? (
           <View
             style={{
               height: 48,
-              borderRadius: 12,
+              borderRadius: radii.pill,
               backgroundColor: theme.panel,
               borderWidth: 1,
               borderColor: theme.border,
@@ -1034,7 +1049,7 @@ export default function InvoiceScreen() {
           <View
             style={{
               height: 48,
-              borderRadius: 12,
+              borderRadius: radii.pill,
               backgroundColor: theme.panel,
               borderWidth: 1,
               borderColor: theme.border,
@@ -1057,7 +1072,7 @@ export default function InvoiceScreen() {
               style={({ pressed }) => [
                 {
                   height: 48,
-                  borderRadius: 12,
+                  borderRadius: radii.pill,
                   backgroundColor: theme.ink,
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -1100,7 +1115,7 @@ export default function InvoiceScreen() {
             <View
               style={{
                 height: 48,
-                borderRadius: 12,
+                borderRadius: radii.pill,
                 backgroundColor: isDark ? 'rgba(108, 71, 255, 0.12)' : '#F2F3FE',
                 borderWidth: 1,
                 borderColor: isDark ? 'rgba(108, 71, 255, 0.25)' : '#DCDFFE',
@@ -1126,7 +1141,7 @@ export default function InvoiceScreen() {
               style={({ pressed }) => [
                 {
                   height: 48,
-                  borderRadius: 12,
+                  borderRadius: radii.pill,
                   backgroundColor: theme.primary,
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -1160,7 +1175,7 @@ export default function InvoiceScreen() {
             style={({ pressed }) => [
               {
                 height: 48,
-                borderRadius: 12,
+                borderRadius: radii.pill,
                 backgroundColor: theme.primary,
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -1186,7 +1201,7 @@ export default function InvoiceScreen() {
             style={({ pressed }) => [
               {
                 height: 48,
-                borderRadius: 12,
+                borderRadius: radii.pill,
                 backgroundColor: theme.primary,
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -1208,7 +1223,7 @@ export default function InvoiceScreen() {
               style={({ pressed }) => [
                 {
                   height: 48,
-                  borderRadius: 12,
+                  borderRadius: radii.pill,
                   backgroundColor: theme.primary,
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -1235,7 +1250,7 @@ export default function InvoiceScreen() {
               style={({ pressed }) => [
                 {
                   height: 40,
-                  borderRadius: 12,
+                  borderRadius: radii.pill,
                   borderWidth: 1,
                   borderColor: theme.border,
                   backgroundColor: theme.panel,
@@ -1267,7 +1282,7 @@ export default function InvoiceScreen() {
             style={({ pressed }) => [
               {
                 height: 48,
-                borderRadius: 12,
+                borderRadius: radii.pill,
                 backgroundColor: theme.ink,
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -1287,7 +1302,7 @@ export default function InvoiceScreen() {
             style={({ pressed }) => [
               {
                 height: 48,
-                borderRadius: 12,
+                borderRadius: radii.pill,
                 backgroundColor: theme.ink,
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -1302,6 +1317,7 @@ export default function InvoiceScreen() {
             </Text>
           </Pressable>
         ) : null}
+        </View>
       </View>
 
       {/* Cancel Order Modal */}

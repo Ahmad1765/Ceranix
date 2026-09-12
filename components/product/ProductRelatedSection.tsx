@@ -17,7 +17,7 @@ import { ListingCard } from '@/components/ListingCard';
 import {
   CARD_GAP,
   CARD_OUTER_PAD,
-  CARD_WIDTH,
+  useProductDimensions,
   tap,
 } from '@/components/product/shared';
 
@@ -53,6 +53,7 @@ export const ProductRelatedSection = memo(function ProductRelatedSection({
   onLayout,
 }: ProductRelatedSectionProps) {
   const { theme } = useTheme();
+  const { cardWidth } = useProductDimensions();
   return (
     <View style={{ marginTop: 22 }} onLayout={onLayout}>
       {/* Tab Pills: Seller's Items vs Similar Items */}
@@ -130,8 +131,8 @@ export const ProductRelatedSection = memo(function ProductRelatedSection({
               }}
             >
               {similarItems.map((item) => (
-                <View key={item.id} style={{ width: CARD_WIDTH }}>
-                  <ListingCard listing={item} width={CARD_WIDTH} />
+                <View key={item.id} style={{ width: cardWidth }}>
+                  <ListingCard listing={item} width={cardWidth} />
                 </View>
               ))}
             </View>

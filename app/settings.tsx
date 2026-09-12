@@ -25,6 +25,7 @@ import { useAuth } from '@/lib/auth';
 import { safeBack } from '@/lib/nav';
 import { tap } from '@/lib/haptics';
 import { useTheme } from '@/context/ThemeContext';
+import { CONTENT_MAX_WIDTH } from '@/lib/responsive';
 import {
   SectionCard,
   Row,
@@ -59,49 +60,67 @@ export default function SettingsScreen() {
       {/* Top Header */}
       <View
         style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingHorizontal: 20,
-          paddingTop: 8,
-          paddingBottom: 14,
+          borderBottomWidth: 1,
+          borderBottomColor: theme.border,
+          backgroundColor: theme.surface,
         }}
       >
-        <Pressable
-          onPress={() => safeBack()}
-          hitSlop={12}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
+        <View
           style={{
-            width: 38,
-            height: 38,
-            borderRadius: 19,
-            backgroundColor: theme.surface,
+            flexDirection: 'row',
             alignItems: 'center',
-            justifyContent: 'center',
-            borderWidth: 1,
-            borderColor: theme.border,
+            justifyContent: 'space-between',
+            paddingHorizontal: 20,
+            paddingTop: 8,
+            paddingBottom: 14,
+            width: '100%',
+            maxWidth: CONTENT_MAX_WIDTH,
+            alignSelf: 'center',
           }}
         >
-          <Feather name="arrow-left" size={18} color={theme.text} />
-        </Pressable>
-        <Text
-          style={{
-            fontSize: 13,
-            fontWeight: '700',
-            color: theme.text,
-            letterSpacing: 1.4,
-            textTransform: 'uppercase',
-          }}
-        >
-          Settings
-        </Text>
-        <View style={{ width: 38 }} />
+          <Pressable
+            onPress={() => safeBack()}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            style={({ pressed }) => ({
+              width: 38,
+              height: 38,
+              borderRadius: 19,
+              backgroundColor: theme.surface,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderWidth: 1,
+              borderColor: theme.border,
+              opacity: pressed ? 0.7 : 1,
+            })}
+          >
+            <Feather name="arrow-left" size={18} color={theme.text} />
+          </Pressable>
+          <Text
+            style={{
+              fontSize: 13,
+              fontWeight: '700',
+              color: theme.text,
+              letterSpacing: 1.4,
+              textTransform: 'uppercase',
+            }}
+          >
+            Settings
+          </Text>
+          <View style={{ width: 38 }} />
+        </View>
       </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 60 }}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingBottom: 60,
+          width: '100%',
+          maxWidth: CONTENT_MAX_WIDTH,
+          alignSelf: 'center',
+        }}
       >
         {/* Profile / Account Hero */}
         <SettingsHero

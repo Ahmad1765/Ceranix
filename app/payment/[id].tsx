@@ -17,14 +17,14 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { getOptimizedImageUrl, cardImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/context/ThemeContext';
-import { type as typography } from '@/lib/theme';
+import { type as typography, radii } from '@/lib/theme';
 import { useListingQuery } from '@/lib/queries';
 import { queryClient } from '@/lib/queryClient';
 import { qk } from '@/lib/queries/keys';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { safeBack } from '@/lib/nav';
-import { HIT_SLOP_8 } from '@/lib/responsive';
+import { HIT_SLOP_8, CONTENT_MAX_WIDTH } from '@/lib/responsive';
 import { supabase } from '@/lib/supabase';
 import { buyerProtectionFee, formatPrice, getShippingFee } from '@/lib/fees';
 import {
@@ -548,43 +548,58 @@ export default function PaymentScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top', 'bottom']}>
       <View
         style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingHorizontal: 16,
-          paddingTop: 12,
-          paddingBottom: 12,
           borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: theme.border,
           backgroundColor: theme.surface,
         }}
       >
-        <Pressable
-          onPress={() => safeBack()}
-          hitSlop={HIT_SLOP_8}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          style={({ pressed }) => [
-            {
-              width: 36,
-              height: 36,
-              alignItems: 'center',
-              justifyContent: 'center',
-            },
-            pressed && { opacity: 0.6 },
-          ]}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 16,
+            paddingTop: 12,
+            paddingBottom: 12,
+            width: '100%',
+            maxWidth: CONTENT_MAX_WIDTH,
+            alignSelf: 'center',
+          }}
         >
-          <Feather name="x" size={22} color={theme.ink} />
-        </Pressable>
-        <Text style={{ fontSize: 16, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
-          {isBundle ? 'Bundle Checkout' : 'Payment'}
-        </Text>
-        <View style={{ width: 36 }} />
+          <Pressable
+            onPress={() => safeBack()}
+            hitSlop={HIT_SLOP_8}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            style={({ pressed }) => [
+              {
+                width: 36,
+                height: 36,
+                alignItems: 'center',
+                justifyContent: 'center',
+              },
+              pressed && { opacity: 0.6 },
+            ]}
+          >
+            <Feather name="x" size={22} color={theme.ink} />
+          </Pressable>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+            {isBundle ? 'Bundle Checkout' : 'Payment'}
+          </Text>
+          <View style={{ width: 36 }} />
+        </View>
       </View>
 
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 18, paddingBottom: 30 }}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingTop: 18,
+          paddingBottom: 30,
+          width: '100%',
+          maxWidth: CONTENT_MAX_WIDTH,
+          alignSelf: 'center',
+        }}
         showsVerticalScrollIndicator={false}
       >
         {isBundle ? (
@@ -1116,46 +1131,54 @@ export default function PaymentScreen() {
       {/* ── Fixed Footer: Trust Note + Pay Button ── */}
       <View
         style={{
-          paddingHorizontal: 20,
-          paddingTop: 10,
-          paddingBottom: Platform.OS === 'ios' ? 12 : 18,
           borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: theme.border,
           backgroundColor: theme.surface,
+          paddingTop: 10,
+          paddingBottom: Platform.OS === 'ios' ? 12 : 18,
         }}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
-          <Feather name="lock" size={11} color={theme.muteSoft} style={{ marginRight: 5 }} />
-          <Text style={{ fontSize: 11.5, color: theme.muteSoft, fontFamily: typography.family.sans }}>
-            This is a secure encrypted payment
-          </Text>
-        </View>
-
-        <Pressable
-          onPress={handlePay}
-          disabled={paying || (isBundle && bundleFetchStatus !== 'success')}
-          style={({ pressed }) => {
-            const isBlocked = paying || (isBundle && bundleFetchStatus !== 'success');
-            return [
-              {
-                height: 48,
-                backgroundColor: isBlocked && !paying ? (isDark ? '#374151' : '#D1D5DB') : theme.purple,
-                borderRadius: 10,
-                alignItems: 'center',
-                justifyContent: 'center',
-              },
-              (pressed || paying) && !isBlocked && { opacity: 0.88, transform: [{ scale: 0.99 }] },
-            ];
+        <View
+          style={{
+            width: '100%',
+            maxWidth: CONTENT_MAX_WIDTH,
+            alignSelf: 'center',
+            paddingHorizontal: 20,
           }}
         >
-          {paying ? (
-            <ActivityIndicator color="#FFFFFF" size="small" />
-          ) : (
-            <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF', fontFamily: typography.family.sansBold, letterSpacing: 0.2 }}>
-              {isBundle && bundleFetchStatus === 'loading' ? 'Loading bundle...' : 'Pay'}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+            <Feather name="lock" size={11} color={theme.muteSoft} style={{ marginRight: 5 }} />
+            <Text style={{ fontSize: 11.5, color: theme.muteSoft, fontFamily: typography.family.sans }}>
+              This is a secure encrypted payment
             </Text>
-          )}
-        </Pressable>
+          </View>
+
+          <Pressable
+            onPress={handlePay}
+            disabled={paying || (isBundle && bundleFetchStatus !== 'success')}
+            style={({ pressed }) => {
+              const isBlocked = paying || (isBundle && bundleFetchStatus !== 'success');
+              return [
+                {
+                  height: 48,
+                  backgroundColor: isBlocked && !paying ? (isDark ? '#374151' : '#D1D5DB') : theme.purple,
+                  borderRadius: radii.pill,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                },
+                (pressed || paying) && !isBlocked && { opacity: 0.88, transform: [{ scale: 0.99 }] },
+              ];
+            }}
+          >
+            {paying ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF', fontFamily: typography.family.sansBold, letterSpacing: 0.2 }}>
+                {isBundle && bundleFetchStatus === 'loading' ? 'Loading bundle...' : 'Pay'}
+              </Text>
+            )}
+          </Pressable>
+        </View>
       </View>
 
       {/* Address Edit Sheet */}

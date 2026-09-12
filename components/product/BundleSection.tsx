@@ -16,8 +16,7 @@ import {
   BRAND_PURPLE,
   CARD_OUTER_PAD,
   CARD_GAP,
-  CARD_WIDTH,
-  CARD_IMAGE_HEIGHT,
+  useProductDimensions,
   conditionLabel,
 } from './shared';
 
@@ -41,6 +40,7 @@ export function BundleSection({
   onSendBundleOffer: (totalAfterDiscount: number, selectedIds: string[]) => void;
 }) {
   const { theme } = useTheme();
+  const { cardWidth } = useProductDimensions();
   const username = listing.seller.username;
   const isSold = listing.is_sold;
 
@@ -80,8 +80,8 @@ export function BundleSection({
             }}
           >
             {activeSellerItems.map((item) => (
-              <View key={item.id} style={{ width: CARD_WIDTH }}>
-                <ListingCard listing={item} width={CARD_WIDTH} />
+              <View key={item.id} style={{ width: cardWidth }}>
+                <ListingCard listing={item} width={cardWidth} />
               </View>
             ))}
           </View>
@@ -280,16 +280,17 @@ function SummaryRow({ label, value, accent }: { label: string; value: string; ac
 
 function BaseItemCard({ item }: { item: Listing }) {
   const { theme } = useTheme();
+  const { cardWidth, cardImageHeight } = useProductDimensions();
   const meta = [item.size, conditionLabel(item.condition)].filter(Boolean).join(' · ');
   const itemPrice = Number(item.price ?? 0);
   const { total: totalPrice } = priceBreakdown(itemPrice);
 
   return (
-    <View style={{ width: CARD_WIDTH, marginBottom: 4 }}>
+    <View style={{ width: cardWidth, marginBottom: 4 }}>
       <View
         style={{
-          width: CARD_WIDTH,
-          height: CARD_IMAGE_HEIGHT,
+          width: cardWidth,
+          height: cardImageHeight,
           borderRadius: 14,
           overflow: 'hidden',
           backgroundColor: theme.panel,
@@ -361,16 +362,17 @@ function BundleSelectCard({
   onOpen: () => void;
 }) {
   const { theme } = useTheme();
+  const { cardWidth, cardImageHeight } = useProductDimensions();
   const meta = [item.size, conditionLabel(item.condition)].filter(Boolean).join(' · ');
   const itemPrice = Number(item.price ?? 0);
   const { total: totalPrice } = priceBreakdown(itemPrice);
 
   return (
-    <View style={{ width: CARD_WIDTH, marginBottom: 4 }}>
+    <View style={{ width: cardWidth, marginBottom: 4 }}>
       <View
         style={{
-          width: CARD_WIDTH,
-          height: CARD_IMAGE_HEIGHT,
+          width: cardWidth,
+          height: cardImageHeight,
           borderRadius: 14,
           overflow: 'hidden',
           backgroundColor: theme.panel,
