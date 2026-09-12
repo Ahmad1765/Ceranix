@@ -26,7 +26,7 @@ import { useToast } from '@/lib/toast';
 import { safeBack } from '@/lib/nav';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { supabase } from '@/lib/supabase';
-import { buyerProtectionFee, formatPrice, shippingFee } from '@/lib/fees';
+import { buyerProtectionFee, formatPrice, shippingFee, getShippingFee } from '@/lib/fees';
 import {
   computeBundlePricing,
   sanitizeBundleItemIds,
@@ -43,7 +43,7 @@ import { paymentService, normalizeAddressInput } from '@/lib/paymentService';
 import { ShippingAddressSchema } from '@/lib/schemas/order';
 import { getOrCreateConversation } from '@/lib/chat';
 import { SELECT_LISTING_WITH_SELLER } from '@/lib/listings';
-import type { ShippingAddress, Listing } from '@/types';
+import type { ShippingAddress, Listing, ShippingMethod } from '@/types';
 
 function tap(style: 'light' | 'medium' = 'light') {
   if (Platform.OS !== 'ios') return;
@@ -171,6 +171,7 @@ export default function PaymentScreen() {
     Boolean(paymentMethodParam && paymentMethodParam !== 'card'),
   );
   const [fulfillment, setFulfillment] = useState<string>(fulfillmentParam || 'delivery');
+  const [shippingMethod, setShippingMethod] = useState<ShippingMethod>('managed');
 
   useEffect(() => {
     if (paymentMethodParam === 'cod' || paymentMethodParam === 'apple_pay') {
@@ -302,7 +303,7 @@ export default function PaymentScreen() {
   });
 
   const bpFee = buyerProtectionFee(itemPrice);
-  const deliveryFee = fulfillment === 'handshake' ? 0 : shippingFee(itemPrice);
+  const deliveryFee = fulfillment === 'handshake' ? 0 : getShippingFee(shippingMethod);
   const salesTax = 0;
   const totalAmount = Math.round((itemPrice + bpFee + deliveryFee + salesTax) * 100) / 100;
 
@@ -465,6 +466,7 @@ export default function PaymentScreen() {
         listingPrice: Number(listing.price),
         offerAmount: itemPrice,
         shippingAddress,
+        shippingMethod,
       });
 
       if (!result.success) {
@@ -725,7 +727,9 @@ export default function PaymentScreen() {
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4.5 }}>
-            <Text style={{ fontSize: 14, color: theme.mute, fontFamily: typography.family.sans }}>Shipping</Text>
+            <Text style={{ fontSize: 14, color: theme.mute, fontFamily: typography.family.sans }}>
+              {shippingMethod === 'managed' ? 'Ceranix Delivery' : 'Shipping (Self-Ship)'}
+            </Text>
             <Text style={[{ fontSize: 14, color: theme.ink, fontFamily: typography.family.sansMedium }, deliveryFee === 0 && { color: '#10B981', fontWeight: '600' }]}>
               {deliveryFee > 0 ? formatPrice(deliveryFee) : 'Free'}
             </Text>
@@ -755,6 +759,125 @@ export default function PaymentScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 2 }}>
             <Text style={{ fontSize: 15, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>Total to pay</Text>
             <Text style={{ fontSize: 16, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>{formatPrice(totalAmount)}</Text>
+          </View>
+        </View>
+
+        {/* ── Section: Delivery Option ── */}
+        <View style={{ marginTop: 6, marginBottom: 16 }}>
+          <Text style={{ fontSize: 12.5, fontWeight: '600', color: theme.muteSoft, fontFamily: typography.family.sansSemibold, marginBottom: 10 }}>
+            Delivery Option
+          </Text>
+
+          <View style={{ gap: 10 }}>
+            {/* Option 1: Ceranix Managed Delivery */}
+            <Pressable
+              onPress={() => {
+                tap('light');
+                setShippingMethod('managed');
+              }}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: shippingMethod === 'managed' }}
+              style={({ pressed }) => [
+                {
+                  padding: 14,
+                  borderRadius: 14,
+                  borderWidth: 1.5,
+                  borderColor: shippingMethod === 'managed' ? theme.primary : theme.border,
+                  backgroundColor: shippingMethod === 'managed' ? (isDark ? 'rgba(108, 71, 255, 0.12)' : '#F2F3FE') : theme.white,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                },
+                pressed && { opacity: 0.8 },
+              ]}
+            >
+              <View
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 10,
+                  borderWidth: 2,
+                  borderColor: shippingMethod === 'managed' ? theme.primary : theme.border,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: 12,
+                }}
+              >
+                {shippingMethod === 'managed' && (
+                  <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: theme.primary }} />
+                )}
+              </View>
+
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Feather name="shield" size={14} color={theme.primary} />
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+                    Ceranix Managed Delivery
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 12.5, color: theme.mute, fontFamily: typography.family.sans, marginTop: 2 }}>
+                  Doorstep pickup from seller & tracked courier delivery
+                </Text>
+              </View>
+
+              <Text style={{ fontSize: 13.5, fontWeight: '700', color: theme.primary, fontFamily: typography.family.sansBold }}>
+                +Rs 250
+              </Text>
+            </Pressable>
+
+            {/* Option 2: Direct / Seller Transfer */}
+            <Pressable
+              onPress={() => {
+                tap('light');
+                setShippingMethod('self_ship');
+              }}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: shippingMethod === 'self_ship' }}
+              style={({ pressed }) => [
+                {
+                  padding: 14,
+                  borderRadius: 14,
+                  borderWidth: 1.5,
+                  borderColor: shippingMethod === 'self_ship' ? theme.primary : theme.border,
+                  backgroundColor: shippingMethod === 'self_ship' ? (isDark ? 'rgba(108, 71, 255, 0.12)' : '#F2F3FE') : theme.white,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                },
+                pressed && { opacity: 0.8 },
+              ]}
+            >
+              <View
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 10,
+                  borderWidth: 2,
+                  borderColor: shippingMethod === 'self_ship' ? theme.primary : theme.border,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: 12,
+                }}
+              >
+                {shippingMethod === 'self_ship' && (
+                  <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: theme.primary }} />
+                )}
+              </View>
+
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Feather name="truck" size={14} color={theme.ink} />
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+                    Direct / Seller Transfer
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 12.5, color: theme.mute, fontFamily: typography.family.sans, marginTop: 2 }}>
+                  Seller ships directly or coordinates transfer
+                </Text>
+              </View>
+
+              <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#10B981', fontFamily: typography.family.sansBold }}>
+                Free
+              </Text>
+            </Pressable>
           </View>
         </View>
 

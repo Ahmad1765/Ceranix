@@ -38,7 +38,10 @@ export interface User {
   following_count?: number;
   // Category slugs captured at onboarding (feed personalization, future use).
   interests?: string[] | null;
+  is_admin?: boolean;
 }
+
+export type Profile = User;
 
 export interface ShippingAddress {
   id: string;
@@ -85,6 +88,7 @@ export type FulfillmentStatus =
   | 'canceled';
 
 export type FulfillmentType = 'direct' | 'dropship';
+export type ShippingMethod = 'managed' | 'self_ship';
 
 // A row of public.orders — record of payments, fulfillment lifecycle, and Cash on Delivery orders.
 export interface Order {
@@ -95,6 +99,9 @@ export interface Order {
   amount_cents: number;
   fee_cents: number;
   currency: string;
+  shipping_method?: ShippingMethod | null;
+  shipping_fee_cents?: number | null;
+  seller_pickup_address?: ValidatedShippingAddress | null;
   stripe_session_id?: string | null;
   stripe_payment_intent?: string | null;
   offer_message_id?: string | null;

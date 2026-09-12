@@ -8,7 +8,31 @@ import {
   orderTotal,
   priceBreakdown,
   formatPrice,
+  MANAGED_SHIPPING_FEE,
+  getShippingFee,
+  shippingFee,
 } from '@/lib/fees';
+
+describe('getShippingFee', () => {
+  it('returns MANAGED_SHIPPING_FEE (250 PKR) for managed delivery', () => {
+    expect(getShippingFee('managed')).toBe(MANAGED_SHIPPING_FEE);
+    expect(getShippingFee('managed')).toBe(250);
+  });
+
+  it('returns 0 for self_ship delivery', () => {
+    expect(getShippingFee('self_ship')).toBe(0);
+  });
+
+  it('defaults to 0 for null or undefined', () => {
+    expect(getShippingFee(null)).toBe(0);
+    expect(getShippingFee(undefined)).toBe(0);
+  });
+
+  it('supports shippingFee helper with shipping method', () => {
+    expect(shippingFee(500, 'managed')).toBe(250);
+    expect(shippingFee(500, 'self_ship')).toBe(0);
+  });
+});
 
 describe('buyerProtectionFee', () => {
   it('calculates percentage fee correctly', () => {

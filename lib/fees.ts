@@ -14,6 +14,8 @@
 // IMPORTANT: the edge function re-implements this same math in Deno
 // (supabase/functions/create-checkout-session). Keep the two in sync.
 
+import type { ShippingMethod } from '@/types';
+
 /** Choose 'flat' for a fixed fee, or 'percentage' for a % of item price. */
 export const BUYER_PROTECTION_MODE: 'flat' | 'percentage' = 'percentage';
 
@@ -27,10 +29,29 @@ export const BUYER_PROTECTION_FEE = 6;
  */
 export const BUYER_PROTECTION_PERCENTAGE = 6;
 
-/** Default shipping fee in PKR (free / zero-fee basis). */
+/** Platform-managed delivery fee in PKR (doorstep pickup from seller + delivery by Ceranix). */
+export const MANAGED_SHIPPING_FEE = 250;
+
+/** Default shipping fee in PKR (free / zero-fee platform basis for self-ship). */
 export const DEFAULT_SHIPPING_FEE = 0;
 
-export function shippingFee(itemPrice?: number | string | null | undefined): number {
+/**
+ * Calculates shipping fee depending on chosen shipping method.
+ * 'managed'   -> PKR 250 flat platform courier fee.
+ * 'self_ship' -> PKR 0 platform fee (seller transfers/ships directly).
+ */
+export function getShippingFee(method?: ShippingMethod | string | null): number {
+  if (method === 'managed') {
+    return MANAGED_SHIPPING_FEE;
+  }
+  return DEFAULT_SHIPPING_FEE;
+}
+
+export function shippingFee(
+  itemPrice?: number | string | null | undefined,
+  method?: ShippingMethod | string | null,
+): number {
+  if (method) return getShippingFee(method);
   return DEFAULT_SHIPPING_FEE;
 }
 

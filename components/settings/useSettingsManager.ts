@@ -40,8 +40,8 @@ export const SUPPORT_EMAIL = 'support@carrinex.app';
 export const TERMS_URL = `${APP_URL}/terms`;
 export const PRIVACY_URL = `${APP_URL}/privacy`;
 
-export type Section = 'shop' | 'verify' | 'enhance' | 'account' | 'help';
-export const SECTIONS: readonly Section[] = ['shop', 'verify', 'enhance', 'account', 'help'];
+export type Section = 'admin' | 'shop' | 'verify' | 'enhance' | 'account' | 'help';
+export const SECTIONS: readonly Section[] = ['admin', 'shop', 'verify', 'enhance', 'account', 'help'];
 export type Busy = 'logout' | 'delete' | 'password' | null;
 
 export function useSettingsManager() {

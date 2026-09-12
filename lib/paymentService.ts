@@ -6,7 +6,7 @@ import {
   ShippingAddressSchema,
   type ValidatedShippingAddress,
 } from '@/types/validation/order';
-import type { Order, PaymentMethod, OrderStatus, FulfillmentStatus } from '@/types';
+import type { Order, PaymentMethod, OrderStatus, FulfillmentStatus, ShippingMethod } from '@/types';
 
 export interface CheckoutRequest {
   listingId: string;
@@ -16,6 +16,7 @@ export interface CheckoutRequest {
   listingPrice?: number;
   offerAmount?: number | null;
   shippingAddress?: unknown;
+  shippingMethod?: ShippingMethod;
   deliveryNotes?: string | null;
   bundleItemIds?: string[];
 }
@@ -106,6 +107,7 @@ export class CodPaymentProvider implements PaymentProvider {
         p_shipping_address: validatedAddress,
         p_offer_amount: request.offerAmount ?? null,
         p_delivery_notes: request.deliveryNotes?.trim() || validatedAddress.deliveryInstructions || null,
+        p_shipping_method: request.shippingMethod ?? 'managed',
       });
 
       if (!error && data) {
@@ -127,6 +129,7 @@ export class CodPaymentProvider implements PaymentProvider {
                 p_shipping_address: validatedAddress,
                 p_offer_amount: null,
                 p_delivery_notes: request.deliveryNotes?.trim() || validatedAddress.deliveryInstructions || null,
+                p_shipping_method: request.shippingMethod ?? 'managed',
               });
               if (bundleErr) {
                 console.warn('[paymentService] cod bundled item checkout failed', bundleId, bundleErr);
@@ -278,6 +281,7 @@ export class StripePaymentProvider implements PaymentProvider {
         p_shipping_address: validatedAddress,
         p_offer_amount: request.offerAmount ?? null,
         p_delivery_notes: request.deliveryNotes?.trim() || null,
+        p_shipping_method: request.shippingMethod ?? 'managed',
       });
 
       if (!error && data) {
@@ -292,6 +296,7 @@ export class StripePaymentProvider implements PaymentProvider {
                 p_shipping_address: validatedAddress,
                 p_offer_amount: null,
                 p_delivery_notes: request.deliveryNotes?.trim() || null,
+                p_shipping_method: request.shippingMethod ?? 'managed',
               });
               if (bundleErr) {
                 console.warn('[paymentService] card bundled item checkout failed', bundleId, bundleErr);
@@ -695,6 +700,7 @@ export class PaymentService {
     trackingNumber,
     supplierOrderId,
     supplierName,
+    sellerPickupAddress,
   }: {
     orderId: string;
     targetStatus: FulfillmentStatus;
@@ -702,6 +708,7 @@ export class PaymentService {
     trackingNumber?: string;
     supplierOrderId?: string;
     supplierName?: string;
+    sellerPickupAddress?: ValidatedShippingAddress | any;
   }): Promise<Order> {
     const { data, error } = await supabase.rpc('advance_order_fulfillment', {
       p_order_id: orderId,
@@ -710,6 +717,7 @@ export class PaymentService {
       p_tracking_number: trackingNumber?.trim() || null,
       p_supplier_order_id: supplierOrderId?.trim() || null,
       p_supplier_name: supplierName?.trim() || null,
+      p_seller_pickup_address: sellerPickupAddress ?? null,
     });
 
     if (error) {
@@ -807,6 +815,50 @@ export class PaymentService {
     }
 
     return data as Order;
+  }
+
+  /**
+   * Admin-only query to fetch orders across the platform for logistics and dispatch management.
+   * Includes listing, buyer, and seller profiles.
+   */
+  async fetchAdminLogisticsOrders(
+    statusFilter?: string,
+    limit: number = 50,
+  ): Promise<Order[]> {
+    let query = supabase
+      .from('orders')
+      .select(`
+        *,
+        listing:listings(id, title, price, images, brand, category),
+        buyer:profiles!orders_buyer_id_fkey(id, username, full_name, avatar_url),
+        seller:profiles!orders_seller_id_fkey(id, username, full_name, avatar_url)
+      `)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (statusFilter && statusFilter !== 'all') {
+      if (statusFilter === 'packing') {
+        query = query.eq('fulfillment_status', 'packing');
+      } else if (statusFilter === 'shifting') {
+        query = query.eq('fulfillment_status', 'shifting');
+      } else if (statusFilter === 'delivered') {
+        query = query.eq('fulfillment_status', 'delivered');
+      } else if (statusFilter === 'disputed') {
+        query = query.or('fulfillment_status.eq.disputed,status.eq.disputed');
+      } else {
+        query = query.eq('fulfillment_status', statusFilter);
+      }
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      if (!isDemoMode()) {
+        console.warn('[paymentService] fetchAdminLogisticsOrders error:', error.message);
+        throw new Error(error.message);
+      }
+      return [];
+    }
+    return (data as Order[]) ?? [];
   }
 }
 

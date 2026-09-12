@@ -114,6 +114,28 @@ export default function SettingsScreen() {
           onSignIn={() => router.push('/auth/login')}
         />
 
+        {/* Administration Section (Admins Only) */}
+        {profile?.is_admin && (
+          <SectionCard
+            icon="truck"
+            title="Administration"
+            subtitle="Platform management & logistics"
+            expanded={mgr.open === 'admin'}
+            onToggle={() => mgr.toggleSection('admin')}
+          >
+            <Row
+              label="Admin Logistics Hub"
+              desc="Manage courier dispatch, pickup & tracking"
+              onPress={() => {
+                tap('light');
+                router.push('/admin/logistics' as any);
+              }}
+              chevron
+              badge="ADMIN"
+            />
+          </SectionCard>
+        )}
+
         {/* 1. Purchases & Sales Accordion */}
         <SectionCard
           icon="shopping-bag"

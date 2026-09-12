@@ -381,5 +381,72 @@ describe('PaymentService Dispatcher & Seller Completion', () => {
     expect(result.error).toContain('failed-card-bundle-id');
     expect(result.failedBundleItemIds).toEqual(['failed-card-bundle-id']);
   });
+
+  it('passes shippingMethod to process_checkout RPC', async () => {
+    const provider = new CodPaymentProvider();
+    const rpcSpy = vi.spyOn(supabase, 'rpc').mockResolvedValueOnce({
+      data: {
+        id: 'order-shipping-method-123',
+        amount_cents: 100000,
+        status: 'pending',
+        shipping_method: 'managed',
+      },
+      error: null,
+    } as any);
+
+    const result = await provider.processCheckout({
+      listingId: 'listing-method-test',
+      paymentMethod: 'cod',
+      shippingMethod: 'managed',
+      shippingAddress: {
+        recipient_name: 'Test Buyer',
+        phone: '03001234567',
+        line1: '123 Test St',
+        city: 'Lahore',
+        state: 'Punjab',
+        postal_code: '54000',
+        country: 'Pakistan',
+      },
+    });
+
+    expect(rpcSpy).toHaveBeenCalledWith(
+      'process_checkout',
+      expect.objectContaining({
+        p_shipping_method: 'managed',
+      }),
+    );
+    expect(result.success).toBe(true);
+  });
+
+  it('passes sellerPickupAddress to advance_order_fulfillment RPC', async () => {
+    const rpcSpy = vi.spyOn(supabase, 'rpc').mockResolvedValueOnce({
+      data: {
+        id: 'order-pickup-123',
+        fulfillment_status: 'packing',
+        seller_pickup_address: { city: 'Lahore', line1: 'Street 5' },
+      },
+      error: null,
+    } as any);
+
+    const updated = await paymentService.advanceOrderFulfillment({
+      orderId: 'order-pickup-123',
+      targetStatus: 'packing',
+      sellerPickupAddress: { city: 'Lahore', line1: 'Street 5' },
+    });
+
+    expect(rpcSpy).toHaveBeenCalledWith(
+      'advance_order_fulfillment',
+      expect.objectContaining({
+        p_target_status: 'packing',
+        p_seller_pickup_address: { city: 'Lahore', line1: 'Street 5' },
+      }),
+    );
+    expect(updated.id).toBe('order-pickup-123');
+  });
+
+  it('fetches admin logistics orders with status filtering', async () => {
+    const orders = await paymentService.fetchAdminLogisticsOrders('packing', 20);
+    expect(Array.isArray(orders)).toBe(true);
+  });
 });
 

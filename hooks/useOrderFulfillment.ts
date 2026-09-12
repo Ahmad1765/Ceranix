@@ -17,6 +17,7 @@ export interface UseOrderFulfillmentReturn {
       trackingNumber?: string;
       supplierOrderId?: string;
       supplierName?: string;
+      sellerPickupAddress?: any;
     },
   ) => Promise<boolean>;
   openDispute: (reason: string, evidenceUrls?: string[]) => Promise<boolean>;
@@ -114,6 +115,7 @@ export function useOrderFulfillment(
         trackingNumber?: string;
         supplierOrderId?: string;
         supplierName?: string;
+        sellerPickupAddress?: any;
       },
     ): Promise<boolean> => {
       if (!orderId || !order) return false;
@@ -134,6 +136,7 @@ export function useOrderFulfillment(
           tracking_number: meta?.trackingNumber ?? prev.tracking_number,
           supplier_order_id: meta?.supplierOrderId ?? prev.supplier_order_id,
           supplier_name: meta?.supplierName ?? prev.supplier_name,
+          seller_pickup_address: meta?.sellerPickupAddress ?? prev.seller_pickup_address,
           packed_at: targetStatus === 'packing' ? new Date().toISOString() : prev.packed_at,
           shifted_at: targetStatus === 'shifting' ? new Date().toISOString() : prev.shifted_at,
           shipped_at: targetStatus === 'shifting' ? new Date().toISOString() : prev.shipped_at,
@@ -151,6 +154,7 @@ export function useOrderFulfillment(
           trackingNumber: meta?.trackingNumber,
           supplierOrderId: meta?.supplierOrderId,
           supplierName: meta?.supplierName,
+          sellerPickupAddress: meta?.sellerPickupAddress,
         });
 
         setOrder(updated);

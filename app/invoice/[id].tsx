@@ -25,6 +25,7 @@ import { OrderStepper } from '@/components/orders/OrderStepper';
 import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { CancelOrderModal } from '@/components/orders/CancelOrderModal';
 import { MarkShippedModal } from '@/components/orders/MarkShippedModal';
+import { SellerPickupModal, type SellerPickupAddressInput } from '@/components/orders/SellerPickupModal';
 import { cardImageUrl, getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 
 function tap(style: 'light' | 'medium' = 'light') {
@@ -84,9 +85,24 @@ export default function InvoiceScreen() {
   const [completingReceipt, setCompletingReceipt] = useState(false);
   const [advancingPacking, setAdvancingPacking] = useState(false);
   const [openingDispute, setOpeningDispute] = useState(false);
+  const [showPickupModal, setShowPickupModal] = useState(false);
+  const [sellerDefaultAddress, setSellerDefaultAddress] = useState<any>(null);
 
   const priceRef = useRef(listing?.price);
   priceRef.current = listing?.price;
+
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase
+      .from('shipping_addresses')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('is_default', true)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) setSellerDefaultAddress(data);
+      });
+  }, [user?.id]);
 
   useEffect(() => {
     if (!id) return;
@@ -334,9 +350,40 @@ export default function InvoiceScreen() {
     }
   };
 
+  // Seller Confirm Pickup Address & Start Packing (Managed Delivery)
+  const handleConfirmPickupAndPack = async (address: SellerPickupAddressInput) => {
+    if (!order?.id || advancingPacking) return;
+    setAdvancingPacking(true);
+    try {
+      const updated = await paymentService.advanceOrderFulfillment({
+        orderId: order.id,
+        targetStatus: 'packing',
+        sellerPickupAddress: address,
+      });
+      setOrder(updated);
+      toast.show('Pickup address confirmed & order marked as Packing', {
+        variant: 'default',
+        icon: 'check',
+      });
+    } catch (e: any) {
+      toast.show(e?.message || 'Failed to update order status', {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
+      throw e;
+    } finally {
+      setAdvancingPacking(false);
+    }
+  };
+
   // Seller Start Packing Handler
   const handleStartPacking = async () => {
     if (!order?.id || advancingPacking) return;
+    // If order is managed delivery, require confirming pickup address first
+    if ((order as any)?.shipping_method === 'managed' || !(order as any)?.shipping_method) {
+      setShowPickupModal(true);
+      return;
+    }
     tap('medium');
     setAdvancingPacking(true);
     try {
@@ -619,6 +666,43 @@ export default function InvoiceScreen() {
               <Text style={{ fontSize: 16, fontWeight: '800', color: theme.purple, marginTop: 4, fontFamily: typography.family.sansBold }}>
                 {formatPrice(itemPrice)}
               </Text>
+
+              {/* Delivery Method Badge */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
+                {(order as any)?.shipping_method === 'self_ship' ? (
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: theme.panel,
+                      paddingHorizontal: 8,
+                      paddingVertical: 3,
+                      borderRadius: 6,
+                    }}
+                  >
+                    <Feather name="truck" size={11} color={theme.mute} style={{ marginRight: 4 }} />
+                    <Text style={{ fontSize: 11.5, fontWeight: '600', color: theme.mute, fontFamily: typography.family.sansSemibold }}>
+                      Direct / Seller Transfer
+                    </Text>
+                  </View>
+                ) : (
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: isDark ? 'rgba(108, 71, 255, 0.15)' : '#F2F3FE',
+                      paddingHorizontal: 8,
+                      paddingVertical: 3,
+                      borderRadius: 6,
+                    }}
+                  >
+                    <Feather name="shield" size={11} color={theme.primary} style={{ marginRight: 4 }} />
+                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: theme.primary, fontFamily: typography.family.sansBold }}>
+                      Ceranix Managed Delivery
+                    </Text>
+                  </View>
+                )}
+              </View>
             </View>
           </View>
         </View>
@@ -679,6 +763,50 @@ export default function InvoiceScreen() {
           </View>
         )}
 
+        {/* Seller Pickup Address Card */}
+        {order?.seller_pickup_address && (isSeller || (profile as any)?.is_admin) && (
+          <View
+            style={{
+              marginHorizontal: 16,
+              backgroundColor: theme.white,
+              borderRadius: 16,
+              padding: 16,
+              borderWidth: 1,
+              borderColor: theme.border,
+              marginBottom: 14,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+              <Feather name="package" size={16} color={theme.primary} style={{ marginRight: 8 }} />
+              <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+                Seller Pickup Address
+              </Text>
+            </View>
+
+            {(() => {
+              const pAddr = order.seller_pickup_address as any;
+              return (
+                <>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: theme.ink, fontFamily: typography.family.sansSemibold, marginBottom: 2 }}>
+                    {pAddr.recipientName || pAddr.recipient_name || 'Seller'}
+                  </Text>
+                  <Text style={{ fontSize: 13, color: theme.mute, fontFamily: typography.family.sans, lineHeight: 18 }}>
+                    {[pAddr.line1, pAddr.line2].filter(Boolean).join(', ')}
+                  </Text>
+                  <Text style={{ fontSize: 13, color: theme.mute, fontFamily: typography.family.sans }}>
+                    {[pAddr.city, pAddr.state, pAddr.postalCode || pAddr.postal_code, pAddr.country].filter(Boolean).join(', ')}
+                  </Text>
+                  {pAddr.phone ? (
+                    <Text style={{ fontSize: 12.5, color: theme.muteSoft, fontFamily: typography.family.sans, marginTop: 4 }}>
+                      📞 {pAddr.phone}
+                    </Text>
+                  ) : null}
+                </>
+              );
+            })()}
+          </View>
+        )}
+
         {/* Payment & Breakdown Card */}
         <View
           style={{
@@ -701,8 +829,10 @@ export default function InvoiceScreen() {
           <MetaRow label="Buyer Protection" theme={theme}>
             <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#10B981', fontFamily: typography.family.sansBold }}>Free</Text>
           </MetaRow>
-          <MetaRow label="Standard Shipping" theme={theme}>
-            <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#10B981', fontFamily: typography.family.sansBold }}>Free</Text>
+          <MetaRow label="Delivery Method" theme={theme}>
+            <Text style={{ fontSize: 13.5, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+              {(order as any)?.shipping_method === 'self_ship' ? 'Self-Ship (Free)' : 'Ceranix Managed (+Rs 250)'}
+            </Text>
           </MetaRow>
 
           <View style={{ height: 1, backgroundColor: theme.border, marginVertical: 10 }} />
@@ -900,6 +1030,30 @@ export default function InvoiceScreen() {
               </Pressable>
             )}
           </View>
+        ) : isSeller && order?.fulfillment_status === 'packing' && ((order as any)?.shipping_method === 'managed' || !(order as any)?.shipping_method) ? (
+          <View style={{ width: '100%', gap: 8 }}>
+            <View
+              style={{
+                height: 48,
+                borderRadius: 12,
+                backgroundColor: isDark ? 'rgba(108, 71, 255, 0.12)' : '#F2F3FE',
+                borderWidth: 1,
+                borderColor: isDark ? 'rgba(108, 71, 255, 0.25)' : '#DCDFFE',
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+              }}
+            >
+              <Feather name="clock" size={16} color={theme.primary} />
+              <Text style={{ fontSize: 14, fontWeight: '700', color: theme.primary, fontFamily: typography.family.sansBold }}>
+                Ceranix Arranging Courier Pickup
+              </Text>
+            </View>
+            <Text style={{ fontSize: 12, color: theme.mute, textAlign: 'center', fontFamily: typography.family.sans }}>
+              We will collect the package from your confirmed pickup address.
+            </Text>
+          </View>
         ) : isSeller && (order?.fulfillment_status === 'packing' || (!order?.fulfillment_status && isOrderActive && !isShipped)) ? (
           <View style={{ width: '100%', gap: 8 }}>
             <Pressable
@@ -1075,6 +1229,15 @@ export default function InvoiceScreen() {
         visible={showShipModal}
         onClose={() => setShowShipModal(false)}
         onConfirmShipped={handleMarkShipped}
+      />
+
+      {/* Seller Pickup Modal (Managed Delivery) */}
+      <SellerPickupModal
+        visible={showPickupModal}
+        onClose={() => setShowPickupModal(false)}
+        onConfirmPickup={handleConfirmPickupAndPack}
+        initialAddress={sellerDefaultAddress}
+        defaultContactName={profile?.full_name || profile?.username}
       />
     </SafeAreaView>
   );
