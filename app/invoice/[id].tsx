@@ -13,7 +13,7 @@ import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { safeBack } from '@/lib/nav';
 import { HIT_SLOP_8 } from '@/lib/responsive';
-import { buyerProtectionFee, formatPrice } from '@/lib/fees';
+import { buyerProtectionFee, formatPrice, MANAGED_SHIPPING_FEE } from '@/lib/fees';
 import { fetchOrderForListing, type Order } from '@/lib/payments';
 import { deriveInvoiceStatus, deriveInvoiceAmounts } from '@/lib/invoiceStatus';
 import { confirm } from '@/lib/confirm';
@@ -831,7 +831,9 @@ export default function InvoiceScreen() {
           </MetaRow>
           <MetaRow label="Delivery Method" theme={theme}>
             <Text style={{ fontSize: 13.5, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
-              {(order as any)?.shipping_method === 'self_ship' ? 'Self-Ship (Free)' : 'Ceranix Managed (+Rs 250)'}
+              {order?.shipping_method === 'self_ship'
+                ? 'Self-Ship (Free)'
+                : `Ceranix Managed (+${formatPrice(order?.shipping_fee_cents != null ? order.shipping_fee_cents / 100 : MANAGED_SHIPPING_FEE)})`}
             </Text>
           </MetaRow>
 

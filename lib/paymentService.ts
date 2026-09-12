@@ -741,7 +741,10 @@ export class PaymentService {
 
     capture('fulfillment_advanced', { order_id: orderId, target_status: targetStatus });
     notifyOrderUpdated((data as Order)?.listing_id);
-    return data as Order;
+    return {
+      ...(data as Order),
+      ...(sellerPickupAddress ? { seller_pickup_address: sellerPickupAddress } : {}),
+    };
   }
 
   /**
@@ -831,20 +834,31 @@ export class PaymentService {
         *,
         listing:listings(id, title, price, images, brand, category),
         buyer:profiles!orders_buyer_id_fkey(id, username, full_name, avatar_url),
-        seller:profiles!orders_seller_id_fkey(id, username, full_name, avatar_url)
+        seller:profiles!orders_seller_id_fkey(id, username, full_name, avatar_url),
+        order_seller_pickups(pickup_address)
       `)
       .order('created_at', { ascending: false })
       .limit(limit);
 
-    if (statusFilter && statusFilter !== 'all') {
-      if (statusFilter === 'packing') {
-        query = query.eq('fulfillment_status', 'packing');
+    if (statusFilter && statusFilter !== 'everything') {
+      if (statusFilter === 'all') {
+        query = query
+          .not('status', 'in', '("canceled","refunded","failed","refund_due")')
+          .neq('fulfillment_status', 'canceled');
+      } else if (statusFilter === 'packing') {
+        query = query
+          .eq('fulfillment_status', 'packing')
+          .not('status', 'in', '("canceled","refunded","failed","refund_due")');
       } else if (statusFilter === 'shifting') {
-        query = query.eq('fulfillment_status', 'shifting');
+        query = query
+          .eq('fulfillment_status', 'shifting')
+          .not('status', 'in', '("canceled","refunded","failed","refund_due")');
       } else if (statusFilter === 'delivered') {
         query = query.eq('fulfillment_status', 'delivered');
       } else if (statusFilter === 'disputed') {
         query = query.or('fulfillment_status.eq.disputed,status.eq.disputed');
+      } else if (statusFilter === 'canceled') {
+        query = query.or('fulfillment_status.eq.canceled,status.eq.canceled,status.eq.refunded,status.eq.failed,status.eq.refund_due');
       } else {
         query = query.eq('fulfillment_status', statusFilter);
       }
@@ -858,7 +872,25 @@ export class PaymentService {
       }
       return [];
     }
-    return (data as Order[]) ?? [];
+    return (((data as any[]) ?? []).map((row) => {
+      const rawPickup = row.order_seller_pickups;
+      const pickupObj = Array.isArray(rawPickup) ? rawPickup[0] : rawPickup;
+      return {
+        ...row,
+        seller_pickup_address: pickupObj?.pickup_address ?? row.seller_pickup_address ?? null,
+      };
+    })) as Order[];
+  }
+
+  /**
+   * Securely fetch seller pickup address for an order (restricted to seller and admins).
+   */
+  async getOrderSellerPickup(orderId: string): Promise<ValidatedShippingAddress | null> {
+    const { data, error } = await supabase.rpc('get_order_seller_pickup', {
+      p_order_id: orderId,
+    });
+    if (error) return null;
+    return (data as ValidatedShippingAddress) ?? null;
   }
 }
 

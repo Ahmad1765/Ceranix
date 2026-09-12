@@ -16,7 +16,10 @@ security definer
 set search_path = ''
 as $$
 begin
-  if coalesce(auth.role(), '') = 'service_role' then
+  -- Allow bypass for database administrators, service role, or SQL editor sessions
+  if coalesce(auth.role(), '') in ('service_role', 'supabase_admin')
+     or current_user in ('postgres', 'supabase_admin', 'dashboard_user')
+     or session_user in ('postgres', 'supabase_admin', 'dashboard_user') then
     return new;
   end if;
 
@@ -62,6 +65,29 @@ create trigger trg_guard_profile_trust
 
 revoke execute on function public.guard_profile_trust_fields() from public, anon, authenticated;
 
+-- Helper function to grant or revoke admin status safely from SQL Editor / migrations
+create or replace function public.set_admin_user(
+  target_identifier text,
+  make_admin boolean default true
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform set_config('app.auth_override_is_admin', 'authorized', true);
+  update public.profiles
+     set is_admin = make_admin
+   where lower(username) = lower(target_identifier)
+      or id::text = target_identifier;
+  perform set_config('app.auth_override_is_admin', 'off', true);
+end;
+$$;
+
+revoke execute on function public.set_admin_user(text, boolean) from public, anon, authenticated;
+grant execute on function public.set_admin_user(text, boolean) to service_role, postgres;
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 2. ORDERS: Dual Logistics Method, Shipping Fee, and Seller Pickup Address
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -69,11 +95,96 @@ revoke execute on function public.guard_profile_trust_fields() from public, anon
 alter table public.orders
   add column if not exists shipping_method text not null default 'managed'
     check (shipping_method in ('managed', 'self_ship')),
-  add column if not exists shipping_fee_cents integer not null default 0,
-  add column if not exists seller_pickup_address jsonb;
+  add column if not exists shipping_fee_cents integer not null default 0;
+
+-- Drop seller_pickup_address from public.orders if present to protect seller contact/location from buyer-facing SELECT
+alter table public.orders
+  drop column if exists seller_pickup_address;
 
 create index if not exists orders_shipping_method_idx
   on public.orders(shipping_method, fulfillment_status);
+
+-- Dedicated, separately protected table for seller pickup address.
+-- Strict RLS ensures only the verified seller and platform admins have read/write access.
+create table if not exists public.order_seller_pickups (
+  order_id uuid primary key references public.orders(id) on delete cascade,
+  seller_id uuid not null references public.profiles(id) on delete cascade,
+  pickup_address jsonb not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.order_seller_pickups enable row level security;
+
+drop policy if exists "Sellers and admins can view seller pickups" on public.order_seller_pickups;
+create policy "Sellers and admins can view seller pickups"
+  on public.order_seller_pickups
+  for select to authenticated
+  using (
+    (select auth.uid()) = seller_id
+    or exists (select 1 from public.profiles where id = (select auth.uid()) and is_admin = true)
+  );
+
+drop policy if exists "Sellers and admins can insert seller pickups" on public.order_seller_pickups;
+create policy "Sellers and admins can insert seller pickups"
+  on public.order_seller_pickups
+  for insert to authenticated
+  with check (
+    (select auth.uid()) = seller_id
+    or exists (select 1 from public.profiles where id = (select auth.uid()) and is_admin = true)
+  );
+
+drop policy if exists "Sellers and admins can update seller pickups" on public.order_seller_pickups;
+create policy "Sellers and admins can update seller pickups"
+  on public.order_seller_pickups
+  for update to authenticated
+  using (
+    (select auth.uid()) = seller_id
+    or exists (select 1 from public.profiles where id = (select auth.uid()) and is_admin = true)
+  );
+
+-- Dedicated RPC for seller or admin to fetch pickup address securely
+create or replace function public.get_order_seller_pickup(p_order_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_caller_id uuid;
+  v_order record;
+  v_is_admin boolean := false;
+  v_pickup jsonb;
+begin
+  v_caller_id := auth.uid();
+  if v_caller_id is null then
+    raise exception 'Authentication required' using errcode = '42501';
+  end if;
+
+  select id, seller_id, buyer_id into v_order
+    from public.orders
+   where id = p_order_id;
+
+  if not found then
+    return null;
+  end if;
+
+  v_is_admin := coalesce((select is_admin from public.profiles where id = v_caller_id), false);
+
+  if v_caller_id <> v_order.seller_id and not v_is_admin then
+    raise exception 'Access denied to seller pickup address' using errcode = '42501';
+  end if;
+
+  select pickup_address into v_pickup
+    from public.order_seller_pickups
+   where order_id = p_order_id;
+
+  return v_pickup;
+end;
+$$;
+
+revoke execute on function public.get_order_seller_pickup(uuid) from public, anon;
+grant execute on function public.get_order_seller_pickup(uuid) to authenticated, service_role;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 3. ORDERS RLS: Grant Verified Admins Platform-Wide Read Access
@@ -135,11 +246,11 @@ begin
     raise exception 'Order not found' using errcode = 'P0002';
   end if;
 
-  -- Check if caller is verified platform admin
-  select coalesce(is_admin, false)
-    into v_is_admin
-    from public.profiles
-   where id = v_caller_id;
+  -- Check if caller is verified platform admin (guarantee false if no matching profile row exists)
+  v_is_admin := coalesce(
+    (select is_admin from public.profiles where id = v_caller_id),
+    false
+  );
 
   -- 3. STRICT ROLE-BASED ACTOR AUTHORIZATION (ALLOW SELLER OR ADMIN)
   if p_target_status in ('packing', 'shifting') then
@@ -196,10 +307,18 @@ begin
          courier_name = coalesce(p_courier, courier_name),
          tracking_number = coalesce(p_tracking_number, tracking_number),
          supplier_order_id = coalesce(p_supplier_order_id, supplier_order_id),
-         supplier_name = coalesce(p_supplier_name, supplier_name),
-         seller_pickup_address = coalesce(p_seller_pickup_address, seller_pickup_address)
+         supplier_name = coalesce(p_supplier_name, supplier_name)
    where id = p_order_id
   returning * into v_order;
+
+  -- Upsert seller pickup address into separately protected table if provided
+  if p_seller_pickup_address is not null then
+    insert into public.order_seller_pickups (order_id, seller_id, pickup_address)
+    values (p_order_id, v_order.seller_id, p_seller_pickup_address)
+    on conflict (order_id) do update
+      set pickup_address = excluded.pickup_address,
+          updated_at = now();
+  end if;
 
   -- 6. DISPATCH REALTIME AUDIT MESSAGE IN CONVERSATION THREAD
   select id
@@ -292,11 +411,15 @@ declare
   v_session_id text;
   v_payment_intent text;
 begin
-  -- 1. Verify caller exclusively from auth.uid()
-  v_caller_id := coalesce(p_buyer_id, auth.uid());
+  -- 1. Derive caller exclusively from auth.uid()
+  v_caller_id := auth.uid();
 
   if v_caller_id is null then
     raise exception 'Authentication required' using errcode = '42501';
+  end if;
+
+  if p_buyer_id is not null and p_buyer_id <> v_caller_id then
+    raise exception 'Provided buyer_id does not match authenticated user' using errcode = '42501';
   end if;
 
   if p_shipping_address is null then

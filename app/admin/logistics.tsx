@@ -31,7 +31,7 @@ import { getOptimizedImageUrl, cardImageUrl, IMAGE_TRANSITION } from '@/lib/imag
 import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import type { Order } from '@/types';
 
-type FilterTab = 'all' | 'packing' | 'shifting' | 'delivered' | 'disputed';
+type FilterTab = 'all' | 'packing' | 'shifting' | 'delivered' | 'disputed' | 'canceled';
 
 const COURIER_PRESETS = ['TCS', 'Leopards', 'Trax', 'PostEx', 'M&P', 'Custom'];
 
@@ -76,6 +76,8 @@ export default function AdminLogisticsScreen() {
   }, [activeFilter, toast]);
 
   useEffect(() => {
+    if (!profile?.is_admin) return;
+
     setLoading(true);
     loadOrders();
 
@@ -94,7 +96,7 @@ export default function AdminLogisticsScreen() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [loadOrders]);
+  }, [loadOrders, profile?.is_admin]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -119,7 +121,15 @@ export default function AdminLogisticsScreen() {
       return;
     }
 
-    const finalCourier = courier === 'Custom' ? (customCourier.trim() || 'Courier') : courier;
+    if (courier === 'Custom' && !customCourier.trim()) {
+      toast.show('Custom courier name is required', {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
+      return;
+    }
+
+    const finalCourier = courier === 'Custom' ? customCourier.trim() : courier;
     tap('medium');
     setDispatching(true);
 
@@ -159,11 +169,36 @@ export default function AdminLogisticsScreen() {
     setShowDispatchModal(true);
   };
 
-  // Filtered orders list by search query
+  // Filtered orders list by search query and active tab
   const filteredOrders = useMemo(() => {
-    if (!searchQuery.trim()) return orders;
+    let list = orders;
+
+    // Filter out canceled orders in 'all' view; show canceled specifically in 'canceled' view
+    if (activeFilter === 'all') {
+      list = list.filter((o) => {
+        const isCanceled =
+          o.status === 'canceled' ||
+          o.status === 'refunded' ||
+          o.status === 'failed' ||
+          o.status === 'refund_due' ||
+          (o as any).fulfillment_status === 'canceled';
+        return !isCanceled;
+      });
+    } else if (activeFilter === 'canceled') {
+      list = list.filter((o) => {
+        const isCanceled =
+          o.status === 'canceled' ||
+          o.status === 'refunded' ||
+          o.status === 'failed' ||
+          o.status === 'refund_due' ||
+          (o as any).fulfillment_status === 'canceled';
+        return isCanceled;
+      });
+    }
+
+    if (!searchQuery.trim()) return list;
     const q = searchQuery.toLowerCase().trim();
-    return orders.filter((o) => {
+    return list.filter((o) => {
       const title = (o as any).listing?.title?.toLowerCase() || '';
       const ref = o.id.toLowerCase();
       const buyerName = ((o as any).buyer?.full_name || (o as any).buyer?.username || '').toLowerCase();
@@ -177,7 +212,7 @@ export default function AdminLogisticsScreen() {
         city.includes(q)
       );
     });
-  }, [orders, searchQuery]);
+  }, [orders, searchQuery, activeFilter]);
 
   if (authLoading) {
     return (
@@ -187,17 +222,18 @@ export default function AdminLogisticsScreen() {
     );
   }
 
-  // Admin Access Guard
+  // Admin Access Guard: Non-admins are completely locked out and silently redirected
   if (!profile?.is_admin) {
     return <Redirect href="/" />;
   }
 
   const filterTabs: { id: FilterTab; label: string }[] = [
-    { id: 'all', label: 'All Orders' },
+    { id: 'all', label: 'All Active' },
     { id: 'packing', label: 'Needs Pickup' },
     { id: 'shifting', label: 'In Transit' },
     { id: 'delivered', label: 'Delivered' },
     { id: 'disputed', label: 'Disputed' },
+    { id: 'canceled', label: 'Canceled' },
   ];
 
   return (
@@ -360,6 +396,8 @@ export default function AdminLogisticsScreen() {
           <Text style={{ fontSize: 13, color: theme.mute, textAlign: 'center', marginTop: 4, fontFamily: typography.family.sans }}>
             {searchQuery
               ? 'Try searching with a different term'
+              : activeFilter === 'canceled'
+              ? 'No canceled orders found.'
               : 'No orders currently in this fulfillment stage.'}
           </Text>
         </View>
@@ -378,12 +416,18 @@ export default function AdminLogisticsScreen() {
             gap: 14,
           }}
           renderItem={({ item }) => {
+            const isCanceled =
+              item.status === 'canceled' ||
+              item.status === 'refunded' ||
+              item.status === 'failed' ||
+              item.status === 'refund_due' ||
+              (item as any).fulfillment_status === 'canceled';
             const isManaged = (item as any).shipping_method === 'managed' || !(item as any).shipping_method;
-            const isNeedsPickup = item.fulfillment_status === 'packing';
-            const isInTransit = item.fulfillment_status === 'shifting';
-            const isDelivered = item.fulfillment_status === 'delivered';
-            const isDisputed = item.fulfillment_status === 'disputed' || item.status === 'disputed';
-            const isCompleted = item.fulfillment_status === 'completed' || item.status === 'completed';
+            const isNeedsPickup = !isCanceled && item.fulfillment_status === 'packing';
+            const isInTransit = !isCanceled && item.fulfillment_status === 'shifting';
+            const isDelivered = !isCanceled && item.fulfillment_status === 'delivered';
+            const isDisputed = !isCanceled && (item.fulfillment_status === 'disputed' || item.status === 'disputed');
+            const isCompleted = !isCanceled && (item.fulfillment_status === 'completed' || item.status === 'completed');
 
             const listing = (item as any).listing;
             const heroImage = listing ? cardImageUrl(listing, 0) : '';
@@ -398,7 +442,7 @@ export default function AdminLogisticsScreen() {
                   backgroundColor: theme.white,
                   borderRadius: 16,
                   borderWidth: 1,
-                  borderColor: isNeedsPickup ? theme.primary : theme.border,
+                  borderColor: isCanceled ? 'rgba(239, 68, 68, 0.35)' : isNeedsPickup ? theme.primary : theme.border,
                   padding: 16,
                   shadowColor: '#000',
                   shadowOffset: { width: 0, height: 2 },
@@ -442,7 +486,9 @@ export default function AdminLogisticsScreen() {
                       paddingHorizontal: 9,
                       paddingVertical: 3,
                       borderRadius: 12,
-                      backgroundColor: isDisputed
+                      backgroundColor: isCanceled
+                        ? 'rgba(239, 68, 68, 0.12)'
+                        : isDisputed
                         ? 'rgba(239, 68, 68, 0.12)'
                         : isNeedsPickup
                         ? 'rgba(108, 71, 255, 0.15)'
@@ -457,7 +503,9 @@ export default function AdminLogisticsScreen() {
                       style={{
                         fontSize: 11,
                         fontWeight: '700',
-                        color: isDisputed
+                        color: isCanceled
+                          ? '#EF4444'
+                          : isDisputed
                           ? '#EF4444'
                           : isNeedsPickup
                           ? theme.primary
@@ -470,7 +518,9 @@ export default function AdminLogisticsScreen() {
                         textTransform: 'capitalize',
                       }}
                     >
-                      {item.fulfillment_status || item.status}
+                      {isCanceled
+                        ? (item.status === 'refunded' ? 'Refunded' : 'Canceled')
+                        : (item.fulfillment_status || item.status)}
                     </Text>
                   </View>
                 </View>
@@ -637,8 +687,38 @@ export default function AdminLogisticsScreen() {
                   </View>
                 )}
 
+                {/* Cancellation Notice Banner */}
+                {isCanceled && (
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                      borderRadius: 10,
+                      padding: 10,
+                      marginBottom: 12,
+                      borderWidth: 1,
+                      borderColor: 'rgba(239, 68, 68, 0.2)',
+                      gap: 8,
+                    }}
+                  >
+                    <Feather name="x-circle" size={15} color="#EF4444" />
+                    <Text
+                      style={{
+                        flex: 1,
+                        fontSize: 12,
+                        color: '#EF4444',
+                        fontFamily: typography.family.sansMedium,
+                      }}
+                      numberOfLines={2}
+                    >
+                      {(item as any).cancel_reason ? `Canceled: ${(item as any).cancel_reason}` : 'Order was canceled. No shipping required.'}
+                    </Text>
+                  </View>
+                )}
+
                 {/* Primary Action */}
-                {isNeedsPickup ? (
+                {isNeedsPickup && !isCanceled ? (
                   <Pressable
                     onPress={() => openDispatch(item)}
                     style={({ pressed }) => [

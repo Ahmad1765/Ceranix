@@ -18,6 +18,9 @@ vi.mock('@/lib/supabase', () => ({
     from: vi.fn(() => ({
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
+      neq: vi.fn().mockReturnThis(),
+      not: vi.fn().mockReturnThis(),
+      or: vi.fn().mockReturnThis(),
       order: vi.fn().mockReturnThis(),
       limit: vi.fn().mockReturnThis(),
       maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
@@ -445,8 +448,14 @@ describe('PaymentService Dispatcher & Seller Completion', () => {
   });
 
   it('fetches admin logistics orders with status filtering', async () => {
-    const orders = await paymentService.fetchAdminLogisticsOrders('packing', 20);
-    expect(Array.isArray(orders)).toBe(true);
+    const packingOrders = await paymentService.fetchAdminLogisticsOrders('packing', 20);
+    expect(Array.isArray(packingOrders)).toBe(true);
+
+    const allOrders = await paymentService.fetchAdminLogisticsOrders('all', 20);
+    expect(Array.isArray(allOrders)).toBe(true);
+
+    const canceledOrders = await paymentService.fetchAdminLogisticsOrders('canceled', 20);
+    expect(Array.isArray(canceledOrders)).toBe(true);
   });
 });
 

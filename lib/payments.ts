@@ -33,14 +33,20 @@ export async function fetchOrderForListing(
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "id, status, fulfillment_status, fulfillment_type, amount_cents, fee_cents, currency, payment_method, shipping_address, delivery_notes, courier_name, tracking_number, cancel_reason, cancelled_by, dispute_reason, dispute_evidence_urls, disputed_at, dispute_resolved_at, payment_authorized_at, packed_at, shifted_at, shipped_at, delivered_at, completed_at, cod_paid_at, supplier_name, supplier_order_id, created_at, listing_id, buyer_id, seller_id",
+      "id, status, fulfillment_status, fulfillment_type, amount_cents, fee_cents, currency, payment_method, shipping_method, shipping_fee_cents, order_seller_pickups(pickup_address), shipping_address, delivery_notes, courier_name, tracking_number, cancel_reason, cancelled_by, dispute_reason, dispute_evidence_urls, disputed_at, dispute_resolved_at, payment_authorized_at, packed_at, shifted_at, shipped_at, delivered_at, completed_at, cod_paid_at, supplier_name, supplier_order_id, created_at, listing_id, buyer_id, seller_id",
     )
     .eq("listing_id", listingId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (error) throw new Error(error.message);
-  return (data as Order) ?? null;
+  if (!data) return null;
+  const rawPickup = (data as any).order_seller_pickups;
+  const pickupObj = Array.isArray(rawPickup) ? rawPickup[0] : rawPickup;
+  return {
+    ...(data as any),
+    seller_pickup_address: pickupObj?.pickup_address ?? null,
+  } as Order;
 }
 
 // An order joined to the item it paid for, as the order history needs it.
