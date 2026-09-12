@@ -267,8 +267,9 @@ export default function InvoiceScreen() {
   const seller = listing.seller;
   const isSeller = Boolean(user?.id && (user.id === listing.seller_id || user.id === seller?.id));
   const isBuyer = Boolean(user?.id && order?.buyer_id && user.id === order.buyer_id);
+  const isAdmin = Boolean(profile?.is_admin);
   const invoiceNumber = deriveInvoiceNumber(listing.id);
-  const buyerName = displayName(profile?.full_name, profile?.username);
+  const buyerName = isBuyer ? displayName(profile?.full_name, profile?.username) : 'Buyer';
   const status = deriveInvoiceStatus(order, confirming);
   const heroImage = cardImageUrl(listing, 0);
   const mapsUrl = generateMapsLink(order?.shipping_address);
@@ -833,7 +834,7 @@ export default function InvoiceScreen() {
             <Text style={{ fontSize: 13.5, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
               {order?.shipping_method === 'self_ship'
                 ? 'Self-Ship (Free)'
-                : `Ceranix Managed (+${formatPrice(order?.shipping_fee_cents != null ? order.shipping_fee_cents / 100 : MANAGED_SHIPPING_FEE)})`}
+                : `Ceranix Managed (+${formatPrice((order?.shipping_fee_cents && order.shipping_fee_cents > 0) ? order.shipping_fee_cents / 100 : MANAGED_SHIPPING_FEE)})`}
             </Text>
           </MetaRow>
 
@@ -859,28 +860,90 @@ export default function InvoiceScreen() {
 
         {/* Quick Order Actions Strip */}
         <View style={{ paddingHorizontal: 16, gap: 8 }}>
-          {/* Chat with Seller / Buyer */}
-          <Pressable
-            onPress={handleContactOtherUser}
-            style={({ pressed }) => [
-              {
-                height: 46,
-                borderRadius: 12,
-                backgroundColor: theme.surface,
-                borderWidth: 1,
-                borderColor: theme.border,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-              },
-              pressed && { opacity: 0.75 },
-            ]}
-          >
-            <Feather name="message-circle" size={16} color={theme.ink} style={{ marginRight: 8 }} />
-            <Text style={{ fontSize: 14, fontWeight: '600', color: theme.ink, fontFamily: typography.family.sansSemibold }}>
-              {isSeller ? 'Message Buyer' : 'Message Seller'}
-            </Text>
-          </Pressable>
+          {/* Chat with Seller / Buyer (Participant only) */}
+          {(isSeller || isBuyer) && (
+            <Pressable
+              onPress={handleContactOtherUser}
+              style={({ pressed }) => [
+                {
+                  height: 46,
+                  borderRadius: 12,
+                  backgroundColor: theme.surface,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                },
+                pressed && { opacity: 0.75 },
+              ]}
+            >
+              <Feather name="message-circle" size={16} color={theme.ink} style={{ marginRight: 8 }} />
+              <Text style={{ fontSize: 14, fontWeight: '600', color: theme.ink, fontFamily: typography.family.sansSemibold }}>
+                {isSeller ? 'Message Buyer' : 'Message Seller'}
+              </Text>
+            </Pressable>
+          )}
+
+          {/* Admin Participant Profile Shortcuts */}
+          {isAdmin && !isSeller && !isBuyer && (
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {order?.buyer_id && (
+                <Pressable
+                  onPress={() => {
+                    tap('light');
+                    router.push(`/user/${order.buyer_id}` as any);
+                  }}
+                  style={({ pressed }) => [
+                    {
+                      flex: 1,
+                      height: 42,
+                      borderRadius: 12,
+                      backgroundColor: theme.surface,
+                      borderWidth: 1,
+                      borderColor: theme.border,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    },
+                    pressed && { opacity: 0.75 },
+                  ]}
+                >
+                  <Feather name="user" size={14} color={theme.ink} style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: theme.ink, fontFamily: typography.family.sansSemibold }}>
+                    Buyer Profile
+                  </Text>
+                </Pressable>
+              )}
+              {(seller?.id || listing.seller_id) && (
+                <Pressable
+                  onPress={() => {
+                    tap('light');
+                    router.push(`/user/${seller?.id || listing.seller_id}` as any);
+                  }}
+                  style={({ pressed }) => [
+                    {
+                      flex: 1,
+                      height: 42,
+                      borderRadius: 12,
+                      backgroundColor: theme.surface,
+                      borderWidth: 1,
+                      borderColor: theme.border,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    },
+                    pressed && { opacity: 0.75 },
+                  ]}
+                >
+                  <Feather name="user" size={14} color={theme.ink} style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: theme.ink, fontFamily: typography.family.sansSemibold }}>
+                    Seller Profile
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          )}
 
           {/* Seller Share Dispatch Slip */}
           {isSeller && (
@@ -905,8 +968,8 @@ export default function InvoiceScreen() {
             </Pressable>
           )}
 
-          {/* Cancel Order Action (Active Orders Only) */}
-          {isOrderActive && (
+          {/* Cancel Order Action (Active Orders Only: Buyer or Seller only) */}
+          {(isBuyer || isSeller) && isOrderActive && (
             <Pressable
               onPress={() => setShowCancelModal(true)}
               style={({ pressed }) => [
@@ -1195,7 +1258,30 @@ export default function InvoiceScreen() {
               )}
             </Pressable>
           </View>
-        ) : (
+        ) : isAdmin ? (
+          <Pressable
+            onPress={() => {
+              tap('light');
+              router.push('/admin/logistics' as any);
+            }}
+            style={({ pressed }) => [
+              {
+                height: 48,
+                borderRadius: 12,
+                backgroundColor: theme.ink,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+              },
+              pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
+            ]}
+          >
+            <Feather name="arrow-left" size={16} color={theme.background} style={{ marginRight: 8 }} />
+            <Text style={{ fontSize: 15, fontWeight: '700', color: theme.background, fontFamily: typography.family.sansBold }}>
+              Return to Logistics Hub
+            </Text>
+          </Pressable>
+        ) : isBuyer || isSeller ? (
           <Pressable
             onPress={handleContactOtherUser}
             style={({ pressed }) => [
@@ -1215,7 +1301,7 @@ export default function InvoiceScreen() {
               {isSeller ? 'Chat with Buyer' : 'Chat with Seller'}
             </Text>
           </Pressable>
-        )}
+        ) : null}
       </View>
 
       {/* Cancel Order Modal */}

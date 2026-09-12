@@ -16,9 +16,8 @@ security definer
 set search_path = ''
 as $$
 begin
-  -- Allow bypass for database administrators, service role, or SQL editor sessions
+  -- Allow bypass for database administrators, service role, or direct SQL editor sessions
   if coalesce(auth.role(), '') in ('service_role', 'supabase_admin')
-     or current_user in ('postgres', 'supabase_admin', 'dashboard_user')
      or session_user in ('postgres', 'supabase_admin', 'dashboard_user') then
     return new;
   end if;
@@ -95,11 +94,19 @@ grant execute on function public.set_admin_user(text, boolean) to service_role, 
 alter table public.orders
   add column if not exists shipping_method text not null default 'managed'
     check (shipping_method in ('managed', 'self_ship')),
-  add column if not exists shipping_fee_cents integer not null default 0;
+  add column if not exists shipping_fee_cents integer;
 
--- Drop seller_pickup_address from public.orders if present to protect seller contact/location from buyer-facing SELECT
+-- Backfill existing managed orders with default PKR 250 fee (25000 cents) if unrecorded, self_ship gets 0
+update public.orders
+   set shipping_fee_cents = case
+         when shipping_method = 'managed' then 25000
+         else 0
+       end
+ where shipping_fee_cents is null;
+
 alter table public.orders
-  drop column if exists seller_pickup_address;
+  alter column shipping_fee_cents set default 0,
+  alter column shipping_fee_cents set not null;
 
 create index if not exists orders_shipping_method_idx
   on public.orders(shipping_method, fulfillment_status);
@@ -113,6 +120,29 @@ create table if not exists public.order_seller_pickups (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Backfill existing non-null seller_pickup_address values into order_seller_pickups before dropping column
+do $$
+begin
+  if exists (
+    select 1
+      from information_schema.columns
+     where table_schema = 'public'
+       and table_name = 'orders'
+       and column_name = 'seller_pickup_address'
+  ) then
+    insert into public.order_seller_pickups (order_id, seller_id, pickup_address)
+    select o.id, o.seller_id, o.seller_pickup_address
+      from public.orders o
+     where o.seller_pickup_address is not null
+    on conflict (order_id) do update
+      set pickup_address = excluded.pickup_address,
+          updated_at = now();
+
+    alter table public.orders
+      drop column seller_pickup_address;
+  end if;
+end $$;
 
 alter table public.order_seller_pickups enable row level security;
 
@@ -130,8 +160,19 @@ create policy "Sellers and admins can insert seller pickups"
   on public.order_seller_pickups
   for insert to authenticated
   with check (
-    (select auth.uid()) = seller_id
-    or exists (select 1 from public.profiles where id = (select auth.uid()) and is_admin = true)
+    exists (
+      select 1
+        from public.orders o
+       where o.id = order_seller_pickups.order_id
+         and o.seller_id = (select auth.uid())
+         and o.seller_id = order_seller_pickups.seller_id
+    )
+    or exists (
+      select 1
+        from public.profiles
+       where id = (select auth.uid())
+         and is_admin = true
+    )
   );
 
 drop policy if exists "Sellers and admins can update seller pickups" on public.order_seller_pickups;
@@ -139,8 +180,18 @@ create policy "Sellers and admins can update seller pickups"
   on public.order_seller_pickups
   for update to authenticated
   using (
-    (select auth.uid()) = seller_id
-    or exists (select 1 from public.profiles where id = (select auth.uid()) and is_admin = true)
+    exists (
+      select 1
+        from public.orders o
+       where o.id = order_seller_pickups.order_id
+         and o.seller_id = (select auth.uid())
+    )
+    or exists (
+      select 1
+        from public.profiles
+       where id = (select auth.uid())
+         and is_admin = true
+    )
   );
 
 -- Dedicated RPC for seller or admin to fetch pickup address securely
