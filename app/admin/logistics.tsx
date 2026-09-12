@@ -28,7 +28,6 @@ import { formatPrice } from '@/lib/fees';
 import { paymentService } from '@/lib/paymentService';
 import { supabase } from '@/lib/supabase';
 import { getOptimizedImageUrl, cardImageUrl, IMAGE_TRANSITION } from '@/lib/images';
-import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import type { Order } from '@/types';
 
 type FilterTab = 'all' | 'packing' | 'shifting' | 'delivered' | 'disputed' | 'canceled';

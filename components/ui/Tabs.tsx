@@ -1,7 +1,8 @@
 import { View, Pressable, ScrollView } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
-import { colors, radii } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
+import { radii } from '@/lib/theme';
 
 type Tab<T extends string> = {
   value: T;
@@ -30,14 +31,16 @@ export function Tabs<T extends string>({
   variant = 'pill',
   accent = 'ink',
 }: PillProps<T>) {
+  const { theme, isDark } = useTheme();
+
   if (variant === 'underline') {
-    const activeColor = accent === 'primary' ? colors.primary : colors.ink2;
+    const activeColor = accent === 'primary' ? theme.purple : theme.ink;
     return (
       <View
         style={{
           flexDirection: 'row',
           borderBottomWidth: 1,
-          borderBottomColor: colors.hairline,
+          borderBottomColor: isDark ? theme.border : theme.hairline,
         }}
       >
         {tabs.map((t) => {
@@ -61,14 +64,14 @@ export function Tabs<T extends string>({
                   <Feather
                     name={t.icon}
                     size={14}
-                    color={active ? activeColor : colors.muteSoft}
+                    color={active ? activeColor : theme.muteSoft}
                   />
                 )}
                 <Text
                   style={{
                     fontSize: 13.5,
                     fontWeight: active ? '800' : '600',
-                    color: active ? activeColor : colors.muteSoft,
+                    color: active ? activeColor : theme.muteSoft,
                   }}
                 >
                   {t.label}
@@ -78,7 +81,7 @@ export function Tabs<T extends string>({
                     style={{
                       fontSize: 11,
                       fontWeight: '800',
-                      color: active ? colors.pinkDeep : colors.muteSoft,
+                      color: active ? (isDark ? '#FFFFFF' : theme.pinkDeep) : theme.muteSoft,
                     }}
                   >
                     {t.count}
@@ -123,8 +126,12 @@ export function Tabs<T extends string>({
               paddingHorizontal: 20,
               paddingVertical: 9,
               borderRadius: radii.pill,
-              backgroundColor: active ? colors.primarySoft : colors.surface,
-              borderColor: active ? colors.primary : '#E5E5E5',
+              backgroundColor: active
+                ? isDark ? 'rgba(255, 255, 255, 0.12)' : theme.primarySoft
+                : isDark ? theme.panel : theme.surface,
+              borderColor: active
+                ? isDark ? '#FFFFFF' : theme.ink
+                : isDark ? theme.border : theme.hairline,
               borderWidth: 1,
               flexDirection: 'row',
               alignItems: 'center',
@@ -137,7 +144,7 @@ export function Tabs<T extends string>({
               style={{
                 fontSize: 15,
                 fontWeight: '500',
-                color: active ? colors.ink : colors.mute,
+                color: active ? theme.ink : theme.mute,
               }}
             >
               {t.label}
@@ -148,7 +155,9 @@ export function Tabs<T extends string>({
                   paddingHorizontal: 6,
                   paddingVertical: 1,
                   borderRadius: 999,
-                  backgroundColor: active ? colors.primary : colors.panel,
+                  backgroundColor: active
+                    ? isDark ? '#FFFFFF' : theme.ink
+                    : isDark ? 'rgba(255, 255, 255, 0.1)' : theme.panel,
                   minWidth: 18,
                   alignItems: 'center',
                 }}
@@ -157,7 +166,7 @@ export function Tabs<T extends string>({
                   style={{
                     fontSize: 10,
                     fontWeight: '800',
-                    color: active ? colors.white : colors.ink,
+                    color: active ? (isDark ? '#111111' : '#FFFFFF') : theme.ink,
                   }}
                 >
                   {t.count}

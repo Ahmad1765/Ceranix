@@ -1,5 +1,6 @@
 import { View, Platform, ViewStyle } from 'react-native';
-import { colors, radii } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
+import { ThemeTokens, radii } from '@/lib/theme';
 
 type Props = {
   children: React.ReactNode;
@@ -18,7 +19,8 @@ export function Card({
   style,
   elevated = false,
 }: Props) {
-  const sty = stylesFor(variant);
+  const { theme, isDark } = useTheme();
+  const sty = stylesFor(variant, theme, isDark);
   return (
     <View
       style={[
@@ -28,7 +30,7 @@ export function Card({
           padding: pad,
           borderWidth: sty.bw,
           borderColor: sty.bc,
-          ...(elevated
+          ...(elevated && !isDark
             ? Platform.select({
                 ios: {
                   shadowColor: '#000',
@@ -49,16 +51,24 @@ export function Card({
   );
 }
 
-function stylesFor(v: NonNullable<Props['variant']>) {
+function stylesFor(v: NonNullable<Props['variant']>, theme: ThemeTokens, isDark: boolean) {
   switch (v) {
     case 'soft':
-      return { bg: colors.panel, bw: 1, bc: colors.hairline };
+      return { bg: theme.panel, bw: 1, bc: isDark ? theme.border : theme.hairline };
     case 'pink':
-      return { bg: colors.pinkSoft, bw: 0, bc: 'transparent' };
+      return { bg: isDark ? 'rgba(255, 255, 255, 0.06)' : theme.pinkSoft, bw: 0, bc: 'transparent' };
     case 'ink':
-      return { bg: colors.ink, bw: 0, bc: 'transparent' };
+      return {
+        bg: isDark ? theme.panel : '#111111',
+        bw: isDark ? 1 : 0,
+        bc: isDark ? theme.border : 'transparent',
+      };
     case 'paper':
     default:
-      return { bg: colors.white, bw: 1, bc: colors.hairline };
+      return {
+        bg: isDark ? theme.surface : '#FFFFFF',
+        bw: 1,
+        bc: isDark ? theme.border : theme.hairline,
+      };
   }
 }

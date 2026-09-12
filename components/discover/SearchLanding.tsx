@@ -12,8 +12,8 @@
 // Presentational: every tap emits a typed action the host applies. Deliberately
 // un-animated — see the note on the entrance animation below.
 
-import { memo, useCallback, useState, useEffect } from 'react';
-import { View, Pressable, useWindowDimensions, Platform } from 'react-native';
+import { memo, useCallback, useState, useEffect, useMemo } from 'react';
+import { View, Pressable, Platform } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
@@ -98,11 +98,6 @@ export function SearchLanding({
   onTopic: (action: TopicAction, topic?: TopicDef) => void;
   activeChipId?: string | null;
 }) {
-  // Tile width in px rather than '48%' — a percentage width sharing a
-  // flex-wrap row with `gap` resolves too narrow on native (RN 0.81's Yoga)
-  // and packs three tiles per row. Same fix as AestheticsPanel.
-  const { width: winWidth } = useWindowDimensions();
-  const tileWidth = (winWidth - PAD * 2 - GAP) / 2;
   const [selectedId, setSelectedId] = useState<string | null>(activeChipId ?? null);
 
   useEffect(() => {
@@ -130,6 +125,19 @@ export function SearchLanding({
     [onTopic],
   );
 
+  // Group topics into pairs of two for a rock-solid, responsive 2-column grid.
+  // Using explicit rows with flex: 1 eliminates subpixel rounding and Yoga flexWrap
+  // bugs where calculated pixel widths overflow the row on devices with odd screen
+  // widths or fractional DPRs (e.g. 393px iPhone 14/15/16 Pro, Pixel), which previously
+  // caused every tile to wrap onto its own row in a single column.
+  const topicRows = useMemo(() => {
+    const rows: TopicDef[][] = [];
+    for (let i = 0; i < TOPIC_TILES.length; i += 2) {
+      rows.push(TOPIC_TILES.slice(i, i + 2));
+    }
+    return rows;
+  }, []);
+
   return (
     <View style={{ paddingHorizontal: PAD, marginTop: 20 }}>
       <SectionLabel>Browse</SectionLabel>
@@ -146,15 +154,19 @@ export function SearchLanding({
 
       <View style={{ marginTop: 24 }}>
         <SectionLabel>Topics</SectionLabel>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: GAP, marginTop: 10 }}>
-          {TOPIC_TILES.map((t) => (
-            <TopicTile
-              key={t.id}
-              topic={t}
-              width={tileWidth}
-              cover={covers[t.id]}
-              onSelect={handleSelectTopic}
-            />
+        <View style={{ gap: GAP, marginTop: 10 }}>
+          {topicRows.map((row, rowIdx) => (
+            <View key={rowIdx} style={{ flexDirection: 'row', gap: GAP }}>
+              {row.map((t) => (
+                <TopicTile
+                  key={t.id}
+                  topic={t}
+                  cover={covers[t.id]}
+                  onSelect={handleSelectTopic}
+                />
+              ))}
+              {row.length === 1 ? <View style={{ flex: 1 }} /> : null}
+            </View>
           ))}
         </View>
       </View>
@@ -239,12 +251,10 @@ const BrowseChipView = memo(function BrowseChipView({
 // ── Topic tile ──────────────────────────────────────────────────────────────
 const TopicTile = memo(function TopicTile({
   topic,
-  width,
   cover,
   onSelect,
 }: {
   topic: TopicDef;
-  width: number;
   cover?: string;
   onSelect: (action: TopicAction) => void;
 }) {
@@ -256,7 +266,8 @@ const TopicTile = memo(function TopicTile({
       accessibilityRole="button"
       accessibilityLabel={`Browse ${topic.label}`}
       style={({ pressed }) => ({
-        width,
+        flex: 1,
+        minWidth: 0,
         flexDirection: 'row',
         alignItems: 'center',
         gap: 9,

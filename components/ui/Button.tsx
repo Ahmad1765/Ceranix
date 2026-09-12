@@ -1,7 +1,8 @@
 import { Pressable, View, ActivityIndicator, Platform } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
-import { colors, radii } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
+import { ThemeTokens, radii } from '@/lib/theme';
 
 type Variant = 'primary' | 'gradient' | 'ghost' | 'dark' | 'soft' | 'text';
 type Size = 'sm' | 'md' | 'lg';
@@ -33,9 +34,10 @@ export function Button({
   disabled,
   full,
 }: Props) {
+  const { theme, isDark } = useTheme();
   const height = HEIGHTS[size];
   const fontSize = FONTS[size];
-  const styles = stylesFor(variant, disabled);
+  const styles = stylesFor(variant, theme, isDark, disabled);
 
   return (
     <Pressable
@@ -63,7 +65,7 @@ export function Button({
           backgroundColor: styles.bg,
           borderWidth: styles.bw,
           borderColor: styles.bc,
-          ...shadowFor(variant),
+          ...shadowFor(variant, isDark),
         }}
       >
         {!iconRight && icon && !loading && (
@@ -87,29 +89,64 @@ export function Button({
   );
 }
 
-function stylesFor(v: Variant, disabled?: boolean) {
+function stylesFor(v: Variant, theme: ThemeTokens, isDark: boolean, disabled?: boolean) {
   if (disabled) {
-    return { bg: colors.panel, fg: colors.muteSoft, bw: 0, bc: 'transparent' };
+    return {
+      bg: isDark ? '#222222' : theme.panel,
+      fg: theme.muteSoft,
+      bw: 0,
+      bc: 'transparent',
+    };
   }
   switch (v) {
     case 'primary':
     case 'gradient':
-      return { bg: colors.purple, fg: colors.white, bw: 0, bc: 'transparent' };
+      return {
+        bg: theme.purple,
+        fg: '#FFFFFF',
+        bw: 0,
+        bc: 'transparent',
+      };
     case 'dark':
-      return { bg: colors.ink, fg: colors.white, bw: 0, bc: 'transparent' };
+      return {
+        bg: isDark ? theme.panel : '#111111',
+        fg: isDark ? theme.ink : '#FFFFFF',
+        bw: isDark ? 1 : 0,
+        bc: isDark ? theme.border : 'transparent',
+      };
     case 'soft':
-      return { bg: colors.purpleSoft, fg: colors.purple, bw: 0, bc: 'transparent' };
+      return {
+        bg: theme.purpleSoft,
+        fg: isDark ? '#A78BFA' : theme.purple,
+        bw: 0,
+        bc: 'transparent',
+      };
     case 'ghost':
-      return { bg: colors.white, fg: colors.ink, bw: 1, bc: colors.hairline };
+      return {
+        bg: isDark ? theme.surface : '#FFFFFF',
+        fg: theme.ink,
+        bw: 1,
+        bc: isDark ? theme.border : theme.hairline,
+      };
     case 'text':
-      return { bg: 'transparent', fg: colors.purple, bw: 0, bc: 'transparent' };
+      return {
+        bg: 'transparent',
+        fg: isDark ? '#A78BFA' : theme.purple,
+        bw: 0,
+        bc: 'transparent',
+      };
     default:
-      return { bg: colors.panel, fg: colors.muteSoft, bw: 0, bc: 'transparent' };
+      return {
+        bg: isDark ? theme.panel : '#F6F6F6',
+        fg: theme.muteSoft,
+        bw: 0,
+        bc: 'transparent',
+      };
   }
 }
 
-function shadowFor(v: Variant) {
-  if (v === 'ghost' || v === 'text' || v === 'soft') return {};
+function shadowFor(v: Variant, isDark: boolean) {
+  if (isDark || v === 'ghost' || v === 'text' || v === 'soft') return {};
   const rgb = v === 'primary' || v === 'gradient' ? '108,71,255' : '0,0,0';
   const box = `0px 4px 10px rgba(${rgb},0.16)`;
   return Platform.select({

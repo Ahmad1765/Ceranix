@@ -26,7 +26,7 @@ import { useToast } from '@/lib/toast';
 import { safeBack } from '@/lib/nav';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { supabase } from '@/lib/supabase';
-import { buyerProtectionFee, formatPrice, shippingFee, getShippingFee } from '@/lib/fees';
+import { buyerProtectionFee, formatPrice, getShippingFee } from '@/lib/fees';
 import {
   computeBundlePricing,
   sanitizeBundleItemIds,

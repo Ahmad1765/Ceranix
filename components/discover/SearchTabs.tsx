@@ -7,7 +7,7 @@
 // meaningless to the rest of the screen.
 
 import { useEffect, useMemo, useState } from 'react';
-import { View, Pressable, ScrollView, Animated, Platform, useWindowDimensions } from 'react-native';
+import { View, Pressable, ScrollView, Animated, Platform } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
@@ -196,15 +196,27 @@ export function AestheticsPanel({
   // An odd count leaves one tile alone on the last row instead of a paired
   // grid — floor to an even count so every row always reads as a pair.
   const evenTags = tags.length % 2 === 1 ? tags.slice(0, -1) : tags;
-  // Width computed in px rather than '48%' — a percentage width sharing a
-  // flex-wrap row with `gap` resolves too narrow on native (RN 0.81's Yoga),
-  // packing 3 tiles per row instead of 2 and squeezing the label to nothing.
-  const { width: winWidth } = useWindowDimensions();
-  const tileWidth = (winWidth - PAD * 2 - TAG_TILE_GAP) / 2;
+  // Group into pairs of two for a rock-solid, responsive 2-column grid.
+  // Using explicit rows with flex: 1 eliminates subpixel rounding and Yoga flexWrap
+  // bugs where calculated pixel widths overflow the row on devices with odd screen
+  // widths or fractional DPRs (e.g. 393px iPhone 14/15/16 Pro, Pixel).
+  const rows = useMemo(() => {
+    const result: TagIndexEntry[][] = [];
+    for (let i = 0; i < evenTags.length; i += 2) {
+      result.push(evenTags.slice(i, i + 2));
+    }
+    return result;
+  }, [evenTags]);
+
   return (
-    <View style={{ paddingHorizontal: PAD, flexDirection: 'row', flexWrap: 'wrap', gap: TAG_TILE_GAP }}>
-      {evenTags.map((t) => (
-        <TagTile key={t.tag} entry={t} width={tileWidth} onPress={() => onOpen(t.tag)} />
+    <View style={{ paddingHorizontal: PAD, gap: TAG_TILE_GAP }}>
+      {rows.map((row, rowIdx) => (
+        <View key={rowIdx} style={{ flexDirection: 'row', gap: TAG_TILE_GAP }}>
+          {row.map((t) => (
+            <TagTile key={t.tag} entry={t} onPress={() => onOpen(t.tag)} />
+          ))}
+          {row.length === 1 ? <View style={{ flex: 1 }} /> : null}
+        </View>
       ))}
     </View>
   );
@@ -216,11 +228,9 @@ export function AestheticsPanel({
 // muted grey, thumb portrait on the right.
 function TagTile({
   entry,
-  width,
   onPress,
 }: {
   entry: TagIndexEntry;
-  width: number;
   onPress: () => void;
 }) {
   const { tag, count } = entry;
@@ -231,7 +241,7 @@ function TagTile({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`Explore ${label}, ${count.toLocaleString()} outfits`}
-      style={({ pressed }) => ({ width, transform: [{ scale: pressed ? 0.97 : 1 }] })}
+      style={({ pressed }) => ({ flex: 1, minWidth: 0, transform: [{ scale: pressed ? 0.97 : 1 }] })}
     >
       <View
         style={{

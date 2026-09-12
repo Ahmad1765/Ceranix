@@ -164,7 +164,7 @@ export function ThumbButton({
             borderColor: colorStyles.borderColor,
             borderRadius: radii.pill,
           },
-          getVariantShadow(variant, disabled),
+          getVariantShadow(variant, isDark, disabled),
           style,
         ]}
       >
@@ -204,7 +204,11 @@ export function ThumbButton({
                   styles.badgeContainer,
                   {
                     backgroundColor:
-                      variant === 'primary' ? 'rgba(255,255,255,0.25)' : theme.primarySoft,
+                      variant === 'primary'
+                        ? 'rgba(255,255,255,0.25)'
+                        : isDark
+                          ? 'rgba(255,255,255,0.12)'
+                          : theme.primarySoft,
                   },
                 ]}
               >
@@ -212,7 +216,7 @@ export function ThumbButton({
                   style={[
                     styles.badgeText,
                     {
-                      color: variant === 'primary' ? '#FFFFFF' : theme.primary,
+                      color: variant === 'primary' ? '#FFFFFF' : theme.ink,
                       fontSize: fontSize - 2,
                     },
                   ]}
@@ -256,7 +260,7 @@ function getColorStyles(
   switch (variant) {
     case 'primary':
       return {
-        bg: isDark ? theme.purple : theme.primary,
+        bg: theme.purple,
         fg: '#FFFFFF',
         borderWidth: 0,
         borderColor: 'transparent',
@@ -264,17 +268,17 @@ function getColorStyles(
     case 'secondary':
     case 'ghost':
       return {
-        bg: theme.surface,
+        bg: isDark ? theme.surface : '#FFFFFF',
         fg: theme.ink,
         borderWidth: 1,
-        borderColor: theme.hairline,
+        borderColor: isDark ? theme.border : theme.hairline,
       };
     case 'dark':
       return {
-        bg: isDark ? '#FFFFFF' : '#111111',
-        fg: isDark ? '#111111' : '#FFFFFF',
-        borderWidth: 0,
-        borderColor: 'transparent',
+        bg: isDark ? theme.panel : '#111111',
+        fg: isDark ? theme.ink : '#FFFFFF',
+        borderWidth: isDark ? 1 : 0,
+        borderColor: isDark ? theme.border : 'transparent',
       };
     case 'soft':
       return {
@@ -299,7 +303,7 @@ function getColorStyles(
       };
     default:
       return {
-        bg: isDark ? theme.purple : theme.primary,
+        bg: theme.purple,
         fg: '#FFFFFF',
         borderWidth: 0,
         borderColor: 'transparent',
@@ -307,46 +311,25 @@ function getColorStyles(
   }
 }
 
-function getVariantShadow(variant: ButtonVariant, disabled?: boolean): ViewStyle {
-  if (disabled || variant === 'ghost' || variant === 'secondary' || variant === 'text' || variant === 'soft') {
+function getVariantShadow(variant: ButtonVariant, isDark: boolean, disabled?: boolean): ViewStyle {
+  if (isDark || disabled || variant !== 'primary') {
     return {};
   }
 
-  if (variant === 'primary') {
-    return Platform.select({
-      ios: {
-        shadowColor: '#6C47FF',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.28,
-        shadowRadius: 10,
-      },
-      android: {
-        elevation: 3,
-      },
-      default: {
-        boxShadow: '0 4px 14px rgba(108, 71, 255, 0.24)',
-      },
-    }) as ViewStyle;
-  }
-
-  if (variant === 'dark') {
-    return Platform.select({
-      ios: {
-        shadowColor: '#0F0F0F',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 2,
-      },
-      default: {
-        boxShadow: '0 3px 10px rgba(15, 15, 15, 0.18)',
-      },
-    }) as ViewStyle;
-  }
-
-  return {};
+  return Platform.select({
+    ios: {
+      shadowColor: '#6C47FF',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.28,
+      shadowRadius: 10,
+    },
+    android: {
+      elevation: 3,
+    },
+    default: {
+      boxShadow: '0 4px 14px rgba(108, 71, 255, 0.24)',
+    },
+  }) as ViewStyle;
 }
 
 const styles = StyleSheet.create({

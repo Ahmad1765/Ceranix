@@ -1,7 +1,8 @@
 import { Pressable, View } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
-import { colors, radii } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
+import { ThemeTokens, radii } from '@/lib/theme';
 
 type Tone = 'pink' | 'ink' | 'ghost' | 'amber' | 'soft' | 'panel';
 
@@ -24,7 +25,8 @@ export function Chip({
   count,
   size = 'md',
 }: Props) {
-  const sty = stylesFor(active ? 'selected' : tone);
+  const { theme, isDark } = useTheme();
+  const sty = stylesFor(active ? 'selected' : tone, theme, isDark);
   const padX = 12;
   const fs = 12;
 
@@ -55,7 +57,9 @@ export function Chip({
             height: 16,
             minWidth: 16,
             borderRadius: 8,
-            backgroundColor: active ? colors.pink : colors.pinkSoft,
+            backgroundColor: active
+              ? isDark ? 'rgba(255, 255, 255, 0.2)' : theme.pink
+              : isDark ? 'rgba(255, 255, 255, 0.1)' : theme.pinkSoft,
             alignItems: 'center',
             justifyContent: 'center',
           }}
@@ -64,7 +68,7 @@ export function Chip({
             style={{
               fontSize: 9.5,
               fontWeight: '800',
-              color: active ? colors.white : colors.pinkDeep,
+              color: active ? '#FFFFFF' : theme.ink,
               lineHeight: 11,
             }}
           >
@@ -86,22 +90,47 @@ export function Chip({
   );
 }
 
-function stylesFor(t: Tone | 'selected') {
+function stylesFor(t: Tone | 'selected', theme: ThemeTokens, isDark: boolean) {
   switch (t) {
     case 'selected':
-      return { bg: colors.selected, fg: colors.ink, bw: 1, bc: colors.border };
+      return {
+        bg: isDark ? theme.panel : theme.selected,
+        fg: theme.ink,
+        bw: 1,
+        bc: theme.border,
+      };
     case 'pink':
-      return { bg: colors.pinkSoft, fg: colors.pinkDeep, bw: 0, bc: 'transparent' };
+      return {
+        bg: isDark ? 'rgba(255, 255, 255, 0.08)' : theme.pinkSoft,
+        fg: isDark ? '#FFFFFF' : theme.pinkDeep,
+        bw: 0,
+        bc: 'transparent',
+      };
     case 'ink':
-      return { bg: colors.ink, fg: colors.white, bw: 0, bc: 'transparent' };
+      return {
+        bg: isDark ? theme.panel : '#111111',
+        fg: isDark ? theme.ink : '#FFFFFF',
+        bw: isDark ? 1 : 0,
+        bc: isDark ? theme.border : 'transparent',
+      };
     case 'amber':
-      return { bg: colors.primarySoft, fg: colors.primaryDeep, bw: 0, bc: 'transparent' };
+      return {
+        bg: isDark ? 'rgba(255, 255, 255, 0.08)' : theme.primarySoft,
+        fg: isDark ? '#FFFFFF' : theme.primaryDeep,
+        bw: 0,
+        bc: 'transparent',
+      };
     case 'soft':
-      return { bg: colors.panel, fg: colors.ink2, bw: 0, bc: 'transparent' };
+      return { bg: theme.panel, fg: theme.ink, bw: 0, bc: 'transparent' };
     case 'panel':
-      return { bg: colors.panel, fg: colors.ink2, bw: 1, bc: colors.hairline };
+      return { bg: theme.panel, fg: theme.ink, bw: 1, bc: isDark ? theme.border : theme.hairline };
     case 'ghost':
     default:
-      return { bg: colors.white, fg: colors.ink2, bw: 1, bc: colors.hairline };
+      return {
+        bg: isDark ? theme.surface : '#FFFFFF',
+        fg: theme.ink,
+        bw: 1,
+        bc: isDark ? theme.border : theme.hairline,
+      };
   }
 }
