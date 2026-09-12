@@ -434,14 +434,24 @@ describe('PaymentService Dispatcher & Seller Completion', () => {
     const updated = await paymentService.advanceOrderFulfillment({
       orderId: 'order-pickup-123',
       targetStatus: 'packing',
-      sellerPickupAddress: { city: 'Lahore', line1: 'Street 5' },
+      sellerPickupAddress: {
+        recipientName: 'Seller Ahmad',
+        phone: '03001234567',
+        line1: 'Street 5',
+        city: 'Lahore',
+      },
     });
 
     expect(rpcSpy).toHaveBeenCalledWith(
       'advance_order_fulfillment',
       expect.objectContaining({
         p_target_status: 'packing',
-        p_seller_pickup_address: { city: 'Lahore', line1: 'Street 5' },
+        p_seller_pickup_address: {
+          recipientName: 'Seller Ahmad',
+          phone: '03001234567',
+          line1: 'Street 5',
+          city: 'Lahore',
+        },
       }),
     );
     expect(updated.id).toBe('order-pickup-123');

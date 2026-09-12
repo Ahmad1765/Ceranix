@@ -6,7 +6,7 @@ import {
   ShippingAddressSchema,
   type ValidatedShippingAddress,
 } from '@/types/validation/order';
-import type { Order, PaymentMethod, OrderStatus, FulfillmentStatus, ShippingMethod } from '@/types';
+import type { Order, PaymentMethod, OrderStatus, FulfillmentStatus, ShippingMethod, SellerPickupAddress } from '@/types';
 
 export interface CheckoutRequest {
   listingId: string;
@@ -708,7 +708,7 @@ export class PaymentService {
     trackingNumber?: string;
     supplierOrderId?: string;
     supplierName?: string;
-    sellerPickupAddress?: ValidatedShippingAddress | any;
+    sellerPickupAddress?: SellerPickupAddress | null;
   }): Promise<Order> {
     const { data, error } = await supabase.rpc('advance_order_fulfillment', {
       p_order_id: orderId,
@@ -885,12 +885,12 @@ export class PaymentService {
   /**
    * Securely fetch seller pickup address for an order (restricted to seller and admins).
    */
-  async getOrderSellerPickup(orderId: string): Promise<ValidatedShippingAddress | null> {
+  async getOrderSellerPickup(orderId: string): Promise<SellerPickupAddress | null> {
     const { data, error } = await supabase.rpc('get_order_seller_pickup', {
       p_order_id: orderId,
     });
     if (error) return null;
-    return (data as ValidatedShippingAddress) ?? null;
+    return (data as SellerPickupAddress) ?? null;
   }
 }
 

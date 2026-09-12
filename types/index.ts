@@ -90,6 +90,14 @@ export type FulfillmentStatus =
 export type FulfillmentType = 'direct' | 'dropship';
 export type ShippingMethod = 'managed' | 'self_ship';
 
+export interface SellerPickupAddress {
+  recipientName: string;
+  phone: string;
+  line1: string;
+  line2?: string;
+  city: string;
+}
+
 // A row of public.orders — record of payments, fulfillment lifecycle, and Cash on Delivery orders.
 export interface Order {
   id: string;
@@ -101,7 +109,7 @@ export interface Order {
   currency: string;
   shipping_method?: ShippingMethod | null;
   shipping_fee_cents?: number | null;
-  seller_pickup_address?: ValidatedShippingAddress | null;
+  seller_pickup_address?: SellerPickupAddress | null;
   stripe_session_id?: string | null;
   stripe_payment_intent?: string | null;
   offer_message_id?: string | null;

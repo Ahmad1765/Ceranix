@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Pressable,
@@ -75,33 +75,52 @@ export default function AdminLogisticsScreen() {
     }
   }, [activeFilter, toast]);
 
+  const loadOrdersRef = useRef(loadOrders);
+  loadOrdersRef.current = loadOrders;
+
+  // Initial load and filter change effect
+  useEffect(() => {
+    if (!profile?.is_admin) return;
+    setLoading(true);
+    loadOrders();
+  }, [loadOrders, profile?.is_admin]);
+
+  // Supabase Realtime for instant multi-admin & seller synchronization (created once, debounced)
   useEffect(() => {
     if (!profile?.is_admin) return;
 
-    setLoading(true);
-    loadOrders();
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-    // Supabase Realtime for instant multi-admin & seller synchronization
     const channel = supabase
       .channel('admin_logistics_realtime')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders' },
         () => {
-          loadOrders();
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            loadOrdersRef.current();
+          }, 300);
         },
       )
       .subscribe();
 
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
-  }, [loadOrders, profile?.is_admin]);
+  }, [profile?.is_admin]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     loadOrders();
   }, [loadOrders]);
+
+  const closeDispatchModal = useCallback(() => {
+    if (dispatching) return;
+    setShowDispatchModal(false);
+    setSelectedOrder(null);
+  }, [dispatching]);
 
   // Copy helper with feedback
   const copyToClipboard = async (text: string, label: string) => {
@@ -777,7 +796,7 @@ export default function AdminLogisticsScreen() {
         visible={showDispatchModal}
         transparent
         animationType="slide"
-        onRequestClose={dispatching ? undefined : () => setShowDispatchModal(false)}
+        onRequestClose={closeDispatchModal}
         statusBarTranslucent
       >
         <View
@@ -791,7 +810,7 @@ export default function AdminLogisticsScreen() {
         >
           <Pressable
             style={StyleSheet.absoluteFill}
-            onPress={dispatching ? undefined : () => setShowDispatchModal(false)}
+            onPress={closeDispatchModal}
           />
 
           <View
@@ -829,9 +848,21 @@ export default function AdminLogisticsScreen() {
               </View>
 
               <Pressable
-                onPress={() => setShowDispatchModal(false)}
+                onPress={closeDispatchModal}
+                disabled={dispatching}
                 hitSlop={HIT_SLOP_8}
-                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: theme.panel, alignItems: 'center', justifyContent: 'center' }}
+                style={({ pressed }) => [
+                  {
+                    width: 32,
+                    height: 32,
+                    borderRadius: 16,
+                    backgroundColor: theme.panel,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  },
+                  dispatching && { opacity: 0.4 },
+                  pressed && { opacity: 0.7 },
+                ]}
               >
                 <Feather name="x" size={18} color={theme.mute} />
               </Pressable>
