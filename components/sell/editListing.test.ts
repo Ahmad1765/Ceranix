@@ -309,5 +309,11 @@ describe('parseTagInput (TagsSheet tag-processing)', () => {
     const result = parseTagInput('vintage, y2k', existing);
     expect(result).toEqual(existing);
   });
+
+  it('honors lower custom limits and copies at most maxTags from existingTags', () => {
+    const existing = ['t1', 't2', 't3', 't4', 't5'];
+    const result = parseTagInput('t6, t7', existing, 3);
+    expect(result).toEqual(['t1', 't2', 't3']);
+  });
 });
 

@@ -11,7 +11,8 @@ test.describe('iPhone Product Card Slider', () => {
     await expect(card).toBeVisible({ timeout: 10_000 });
 
     const carousel = page.getByTestId('listing-card-carousel').first();
-    const box = (await carousel.isVisible()) ? await carousel.boundingBox() : await card.boundingBox();
+    await expect(carousel).toBeVisible({ timeout: 10_000 });
+    const box = await carousel.boundingBox();
     expect(box).not.toBeNull();
     if (!box) return;
 

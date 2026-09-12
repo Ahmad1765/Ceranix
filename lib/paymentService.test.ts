@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { supabase } from '@/lib/supabase';
 import {
   paymentService,
   CodPaymentProvider,
@@ -152,6 +153,36 @@ describe('CheckoutPayloadSchema (offerAmount & Order Validation)', () => {
     expect(CheckoutPayloadSchema.safeParse({ ...validPayload, offerAmount: 15.123 }).success).toBe(false);
     expect(CheckoutPayloadSchema.safeParse({ ...validPayload, offerAmount: 9.999 }).success).toBe(false);
   });
+
+  it('validates optional bundleItemIds with valid UUIDs', () => {
+    expect(
+      CheckoutPayloadSchema.safeParse({
+        ...validPayload,
+        bundleItemIds: [
+          '33333333-3333-3333-3333-333333333333',
+          '44444444-4444-4444-4444-444444444444',
+        ],
+      }).success,
+    ).toBe(true);
+
+    expect(
+      CheckoutPayloadSchema.safeParse({
+        ...validPayload,
+        bundleItemIds: [],
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects bundleItemIds containing non-UUID values', () => {
+    const res = CheckoutPayloadSchema.safeParse({
+      ...validPayload,
+      bundleItemIds: ['not-a-uuid'],
+    });
+    expect(res.success).toBe(false);
+    if (!res.success) {
+      expect(res.error.issues[0].message).toBe('Invalid bundle item ID');
+    }
+  });
 });
 
 describe('CodPaymentProvider (Atomic RPC integration)', () => {
@@ -270,6 +301,85 @@ describe('PaymentService Dispatcher & Seller Completion', () => {
     });
     expect(received.status).toBe('completed');
     expect(received.id).toBe('order-recv-123');
+  });
+
+  it('records failed bundled item and returns partial-failure when bundled item RPC fails in COD', async () => {
+    const provider = new CodPaymentProvider();
+    (supabase.rpc as any).mockImplementation(async (fn: any, args: any) => {
+      if (args?.p_listing_id === 'primary-listing-id') {
+        return {
+          data: {
+            id: 'order-primary-123',
+            amount_cents: 100000,
+            status: 'pending',
+          },
+          error: null,
+        } as any;
+      }
+      return {
+        data: null,
+        error: { message: 'Listing is already sold' },
+      } as any;
+    });
+
+    const result = await provider.processCheckout({
+      listingId: 'primary-listing-id',
+      bundleItemIds: ['failed-bundle-id'],
+      paymentMethod: 'cod',
+      shippingAddress: {
+        recipient_name: 'Test Buyer',
+        phone: '03001234567',
+        line1: '123 Test St',
+        city: 'Lahore',
+        state: 'Punjab',
+        postal_code: '54000',
+        country: 'Pakistan',
+      },
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('failed-bundle-id');
+    expect(result.failedBundleItemIds).toEqual(['failed-bundle-id']);
+    expect(result.orderId).toBe('order-primary-123');
+  });
+
+  it('records failed bundled item and returns partial-failure when bundled item RPC fails in Card', async () => {
+    const provider = new StripePaymentProvider();
+    (supabase.rpc as any).mockImplementation(async (fn: any, args: any) => {
+      if (args?.p_listing_id === 'primary-card-listing-id') {
+        return {
+          data: {
+            id: 'order-card-123',
+            amount_cents: 200000,
+            status: 'paid',
+          },
+          error: null,
+        } as any;
+      }
+      return {
+        data: null,
+        error: { message: 'Listing unavailable' },
+      } as any;
+    });
+
+    const result = await provider.processCheckout({
+      listingId: 'primary-card-listing-id',
+      bundleItemIds: ['failed-card-bundle-id'],
+      paymentMethod: 'card',
+      shippingAddress: {
+        recipient_name: 'Card Buyer',
+        phone: '03001234567',
+        line1: '456 Test Ave',
+        city: 'Lahore',
+        state: 'Punjab',
+        postal_code: '54000',
+        country: 'Pakistan',
+      },
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('failed-card-bundle-id');
+    expect(result.failedBundleItemIds).toEqual(['failed-card-bundle-id']);
   });
 });
 

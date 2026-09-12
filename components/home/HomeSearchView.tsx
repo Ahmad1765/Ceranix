@@ -144,10 +144,18 @@ export const HomeSearchView = memo(function HomeSearchView({
 
   const [localSavedKeys, setLocalSavedKeys] = useState<Set<string>>(new Set());
 
-  // Load local saved searches so guests & offline states persist
+  const storageKey = user?.id
+    ? `@ceranix_saved_searches_local:${user.id}`
+    : '@ceranix_saved_searches_local:guest';
+
+  // Load local saved searches scoped to active user / guest; clear previous user keys on auth change
   useEffect(() => {
-    AsyncStorage.getItem('@ceranix_saved_searches_local')
+    setLocalSavedKeys(new Set());
+    let isMounted = true;
+
+    AsyncStorage.getItem(storageKey)
       .then((raw) => {
+        if (!isMounted) return;
         if (raw) {
           try {
             const arr = JSON.parse(raw);
@@ -158,7 +166,11 @@ export const HomeSearchView = memo(function HomeSearchView({
         }
       })
       .catch(() => {});
-  }, []);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [storageKey]);
 
   const effectiveSearchInfo = useMemo(() => {
     const trimmed = query.trim();
@@ -218,7 +230,7 @@ export const HomeSearchView = memo(function HomeSearchView({
         next.delete(key);
       }
       AsyncStorage.setItem(
-        '@ceranix_saved_searches_local',
+        storageKey,
         JSON.stringify(Array.from(next)),
       ).catch(() => {});
       return next;
@@ -274,7 +286,7 @@ export const HomeSearchView = memo(function HomeSearchView({
         console.warn('[saved-searches] sync error', err);
       }
     }
-  }, [effectiveSearchInfo, isSaved, user, savedSearchesQ.data, query, searchFilters, toast]);
+  }, [effectiveSearchInfo, isSaved, user, savedSearchesQ.data, query, searchFilters, toast, storageKey]);
 
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
@@ -362,6 +374,7 @@ export const HomeSearchView = memo(function HomeSearchView({
   });
 
   const hasQuery = query.trim().length > 0;
+  const canSwitchTabs = !hasSubmitted || hasQuery;
   const tabWidth = screenWidth / 2;
 
   // Real-time interpolated translation for sliding green indicator bar
@@ -427,12 +440,15 @@ export const HomeSearchView = memo(function HomeSearchView({
     return list;
   }, [listingResults, searchFilters]);
 
-  // Re-sync scrollX and pager offset on resize or activeTab change
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+
+  // Re-sync scrollX and pager offset on resize only (activeTab driven programmatically by handleTabPress)
   useEffect(() => {
-    const targetX = activeTab === 'listings' ? 0 : screenWidth;
+    const targetX = activeTabRef.current === 'listings' ? 0 : screenWidth;
     scrollX.setValue(targetX);
     pagerRef.current?.scrollTo({ x: targetX, animated: false });
-  }, [screenWidth, activeTab, scrollX]);
+  }, [screenWidth, scrollX]);
 
   // ── Core Search Execution ───────────────────────────────────────────────────
   const runSearch = useCallback(
@@ -1295,8 +1311,8 @@ export const HomeSearchView = memo(function HomeSearchView({
       </View>
 
       <Animated.View style={contentAnimatedStyle}>
-        {/* ── Tab Switcher ('Items' & 'Members') - Hidden in results ─ */}
-        {!hasSubmitted && !hasQuery && (
+        {/* ── Tab Switcher ('Items' & 'Members') ─────────────────────────────── */}
+        {canSwitchTabs && (
           <View
             style={{
               flexDirection: 'row',
@@ -1383,7 +1399,7 @@ export const HomeSearchView = memo(function HomeSearchView({
           ref={pagerRef}
           horizontal
           pagingEnabled
-          scrollEnabled={!hasSubmitted && !hasQuery}
+          scrollEnabled={canSwitchTabs}
           showsHorizontalScrollIndicator={false}
           contentOffset={{ x: activeTab === 'listings' ? 0 : screenWidth, y: 0 }}
           onScroll={handleScroll}
@@ -1392,7 +1408,7 @@ export const HomeSearchView = memo(function HomeSearchView({
           style={[
             { flex: 1 },
             Platform.OS === 'web' && ({
-              scrollSnapType: !hasSubmitted && !hasQuery ? 'x mandatory' : 'none',
+              scrollSnapType: canSwitchTabs ? 'x mandatory' : 'none',
               WebkitOverflowScrolling: 'touch',
             } as any),
           ]}

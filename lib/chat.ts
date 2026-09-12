@@ -289,7 +289,8 @@ export async function acceptChatOffer(offerMessageId: string): Promise<Order | n
 }
 
 /**
- * Creates a counter-offer linked to a parent offer, marking the parent offer as 'countered'.
+ * Atomically creates a counter-offer linked to a parent offer, locking the parent offer
+ * and transitioning it to 'countered' within a single database transaction.
  */
 export async function counterOffer(args: {
   conversationId: string;
@@ -300,29 +301,17 @@ export async function counterOffer(args: {
 }): Promise<ChatMessage | null> {
   if (!Number.isFinite(args.amount) || args.amount <= 0) return null;
   const amountValue = Number(args.amount.toFixed(2));
-
-  // Mark parent offer as countered
-  await updateOfferStatus(args.parentOfferId, 'countered');
-
   const defaultNote = `Counter-Offer: ${formatPrice(amountValue)}`;
-  const { data, error } = await supabase
-    .from('messages')
-    .insert({
-      conversation_id: args.conversationId,
-      sender_id: args.senderId,
-      content: args.note?.trim() || defaultNote,
-      kind: 'offer',
-      parent_offer_id: args.parentOfferId,
-      metadata: {
-        amount: amountValue,
-        currency: 'PKR',
-        note: args.note?.trim() || null,
-        counter_to: args.parentOfferId,
-      },
-      offer_status: 'pending',
-    })
-    .select('id, conversation_id, sender_id, content, kind, metadata, offer_status, parent_offer_id, created_at, updated_at')
-    .single();
+  const content = args.note?.trim() || defaultNote;
+
+  const { data, error } = await supabase.rpc('counter_chat_offer', {
+    p_parent_offer_id: args.parentOfferId,
+    p_amount: amountValue,
+    p_note: args.note?.trim() || null,
+    p_content: content,
+    p_conversation_id: args.conversationId,
+    p_sender_id: args.senderId,
+  });
 
   if (error) {
     console.warn('[chat] counterOffer', error.message);

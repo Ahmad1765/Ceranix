@@ -162,6 +162,21 @@ describe('toSupabaseThumbnailUrl', () => {
     expect(toSupabaseThumbnailUrl('https://example.com/photo.jpg')).toBe('https://example.com/photo.jpg');
     expect(toSupabaseThumbnailUrl('')).toBe('');
   });
+
+  it('handles relative URL fallback for extensionless, query dots, and existing _thumb', () => {
+    const relThumb = '/storage/v1/object/public/listing-images/a/raw_image_thumb?token=foo.bar';
+    expect(toSupabaseThumbnailUrl(relThumb)).toBe(relThumb);
+
+    const relNormal = '/storage/v1/object/public/listing-images/a/photo.jpg?token=foo.bar#frag.ment';
+    expect(toSupabaseThumbnailUrl(relNormal)).toBe(
+      '/storage/v1/object/public/listing-images/a/photo_thumb.jpg?token=foo.bar#frag.ment',
+    );
+
+    const relExtLess = '/storage/v1/object/public/listing-images/a/raw_image?token=foo.bar';
+    expect(toSupabaseThumbnailUrl(relExtLess)).toBe(
+      '/storage/v1/object/public/listing-images/a/raw_image_thumb?token=foo.bar',
+    );
+  });
 });
 
 describe('getOptimizedImageUrl with edge image proxy enabled', () => {

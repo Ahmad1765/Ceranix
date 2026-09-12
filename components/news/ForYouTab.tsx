@@ -55,7 +55,7 @@ export function ForYouTab({ bottomInset = 24 }: { bottomInset?: number }) {
         actor: {
           id: seller?.id || 'curator',
           username: seller?.username || BRAND,
-          full_name: seller?.full_name || 'Recommended for you',
+          full_name: seller?.full_name || seller?.username || 'Creator',
           avatar_url: seller?.avatar_url,
         },
         listing,

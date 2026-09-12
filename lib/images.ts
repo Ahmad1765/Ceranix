@@ -50,13 +50,18 @@ export function toSupabaseThumbnailUrl(url: string): string {
     }
     return parsed.toString();
   } catch {
-    if (url.includes('_thumb.')) return url;
-    const lastSlash = url.lastIndexOf('/');
-    const dot = url.lastIndexOf('.');
+    const queryHashIdx = url.search(/[?#]/);
+    const path = queryHashIdx !== -1 ? url.slice(0, queryHashIdx) : url;
+    const suffix = queryHashIdx !== -1 ? url.slice(queryHashIdx) : '';
+
+    if (path.includes('_thumb.') || path.endsWith('_thumb')) return url;
+
+    const lastSlash = path.lastIndexOf('/');
+    const dot = path.lastIndexOf('.');
     if (dot > lastSlash) {
-      return `${url.slice(0, dot)}_thumb${url.slice(dot)}`;
+      return `${path.slice(0, dot)}_thumb${path.slice(dot)}${suffix}`;
     }
-    return `${url}_thumb`;
+    return `${path}_thumb${suffix}`;
   }
 }
 

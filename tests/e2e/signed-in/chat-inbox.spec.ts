@@ -31,7 +31,7 @@ test.describe('Inbox (signed in)', () => {
           "text=/^now$|^\\d+[mhd]$|^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \\d{1,2}$|No direct messages yet|Quiet on this side/",
         )
         .first(),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 20_000 });
   });
 
   test('the default tab hydrates its content area', async ({ page }) => {

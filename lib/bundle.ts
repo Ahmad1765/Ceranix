@@ -69,7 +69,10 @@ export function computeBundlePricing(
       ? Math.min(30, Math.max(0, sellerDiscountPct))
       : 0;
 
-  const pct = customPct > 0 ? Math.max(tier.pct, customPct) : tier.pct;
+  const pct =
+    itemCount >= BUNDLE_MIN_ITEMS && customPct > 0
+      ? Math.max(tier.pct, customPct)
+      : tier.pct;
   const qualifies = itemCount >= BUNDLE_MIN_ITEMS && pct > 0;
   // Round to cents so the buyer is never charged a fraction of a cent.
   const savings = qualifies ? Math.round(((subtotal * pct) / 100) * 100) / 100 : 0;

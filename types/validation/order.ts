@@ -78,7 +78,7 @@ export const CheckoutPayloadSchema = z.object({
     .optional()
     .nullable(),
   deliveryNotes: z.string().max(300).optional().nullable(),
-  bundleItemIds: z.array(z.string()).optional(),
+  bundleItemIds: z.array(z.string().uuid('Invalid bundle item ID')).optional(),
 });
 
 export type ValidatedCheckoutPayload = z.infer<typeof CheckoutPayloadSchema>;

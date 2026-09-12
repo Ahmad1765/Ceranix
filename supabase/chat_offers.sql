@@ -52,7 +52,10 @@ begin
 
   if exists (select 1 from _conv_duplicates) then
     select exists (
-      select 1 from pg_trigger where tgname = 'trg_validate_offer_status_update'
+      select 1
+      from pg_trigger
+      where tgname = 'trg_validate_offer_status_update'
+        and tgrelid = 'public.messages'::regclass
     ) into has_offer_trigger;
 
     if has_offer_trigger then

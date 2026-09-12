@@ -192,7 +192,11 @@ export function getSearchTokenVariants(token: string): string[] {
   } else if (t.endsWith('ss')) {
     variants.add(t + 'es');
   } else if (t.endsWith('es') && t.length > 3) {
-    variants.add(t.slice(0, -2));
+    const pre = t[t.length - 3];
+    const isConsonant = /[^aeiou]/i.test(pre);
+    if (isConsonant) {
+      variants.add(t.slice(0, -2));
+    }
     if (!t.endsWith('sses')) {
       variants.add(t.slice(0, -1));
     }

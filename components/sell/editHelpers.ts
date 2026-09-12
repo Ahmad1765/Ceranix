@@ -96,7 +96,7 @@ export function parseTagInput(
   maxTags = 10,
 ): string[] {
   const parts = candidate.split(',');
-  const next = [...existingTags];
+  const next = existingTags.slice(0, Math.max(0, maxTags));
   for (const part of parts) {
     const raw = part.trim().replace(/#/g, '').toLowerCase();
     if (raw && !next.includes(raw) && next.length < maxTags) {

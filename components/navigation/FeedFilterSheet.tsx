@@ -279,11 +279,8 @@ export function FeedFilterSheet({
     if (resultCount !== undefined && !isDirty) {
       return `Show results (${resultCount})`;
     }
-    if (activeCount > 0) {
-      return `Show results (${activeCount})`;
-    }
     return 'Show results';
-  }, [resultCount, isDirty, activeCount]);
+  }, [resultCount, isDirty]);
 
   // Dynamic Theme-Aware Styles
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);

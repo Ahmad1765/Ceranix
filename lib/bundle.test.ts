@@ -21,6 +21,15 @@ describe('bundle discount policy', () => {
     expect(p.total).toBe(100);
   });
 
+  it('a single item with positive sellerDiscountPct retains 0% discount and does not qualify', () => {
+    const p = computeBundlePricing(100, [], 20);
+    expect(p.itemCount).toBe(1);
+    expect(p.pct).toBe(0);
+    expect(p.qualifies).toBe(false);
+    expect(p.savings).toBe(0);
+    expect(p.total).toBe(100);
+  });
+
   it('applies each published tier at its item-count threshold', () => {
     // base item + (count-1) add-ons priced at 0 so only the percentage matters.
     const expectations: Record<number, number> = { 2: 5, 3: 10, 4: 15, 5: 20 };

@@ -28,19 +28,13 @@ test.describe('Browse chips styling and interaction', () => {
     await trendingChip.hover();
 
     // Verify filled background on hover/interaction (not transparent)
-    const hoveredBg = await trendingChip.evaluate((el) => {
-      return window.getComputedStyle(el).backgroundColor;
-    });
-    expect(hoveredBg).not.toBe('rgba(0, 0, 0, 0)');
+    await expect(trendingChip).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
 
     // Move mouse away
     await page.mouse.move(0, 0);
 
     // Verify it reverts back to transparent when unhovered
-    const unhoveredBg = await trendingChip.evaluate((el) => {
-      return window.getComputedStyle(el).backgroundColor;
-    });
-    expect(unhoveredBg).toBe('rgba(0, 0, 0, 0)');
+    await expect(trendingChip).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   });
 
   test('Active Browse chip displays filled background according to current query state', async ({
@@ -59,16 +53,10 @@ test.describe('Browse chips styling and interaction', () => {
 
     // The selected chip should have filled background even without hover
     await page.mouse.move(0, 0);
-    const activeBg = await lowestPriceChip.evaluate((el) => {
-      return window.getComputedStyle(el).backgroundColor;
-    });
-    expect(activeBg).not.toBe('rgba(0, 0, 0, 0)');
+    await expect(lowestPriceChip).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
 
     // Other unselected chips like "Trending" remain transparent
     const trendingChip = page.getByRole('button', { name: 'Browse trending' });
-    const inactiveBg = await trendingChip.evaluate((el) => {
-      return window.getComputedStyle(el).backgroundColor;
-    });
-    expect(inactiveBg).toBe('rgba(0, 0, 0, 0)');
+    await expect(trendingChip).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   });
 });

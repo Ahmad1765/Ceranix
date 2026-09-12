@@ -189,7 +189,12 @@ begin
   end if;
 
   -- 5. COMPUTE PRICING
-  v_item_price := (v_message.metadata->>'amount')::numeric;
+  if (v_message.metadata->>'amount') ~ '^\s*[0-9]+(\.[0-9]+)?\s*$' then
+    v_item_price := (v_message.metadata->>'amount')::numeric;
+  else
+    v_item_price := null;
+  end if;
+
   if v_item_price is null or v_item_price <= 0 then
     v_item_price := v_listing.price;
   end if;

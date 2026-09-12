@@ -467,6 +467,10 @@ export default function PaymentScreen() {
         shippingAddress,
       });
 
+      if (!result.success) {
+        throw new Error(result.error || result.message || 'Checkout failed');
+      }
+
       // Update local query cache and feed queries to immediately reflect atomic server transaction sold state
       const allItemIds = Array.from(new Set([String(listing.id), ...bundleItemIds]));
       allItemIds.forEach((itemId) => {

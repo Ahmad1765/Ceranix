@@ -47,10 +47,12 @@ export function normalizeCustomPrice(
   customMin: string | null | undefined,
   customMax: string | null | undefined,
 ): { priceMin: number | null; priceMax: number | null } {
-  const minVal = customMin?.trim() ? parseFloat(customMin) : null;
-  const maxVal = customMax?.trim() ? parseFloat(customMax) : null;
-  let priceMin = minVal !== null && !isNaN(minVal) ? Math.max(0, minVal) : null;
-  let priceMax = maxVal !== null && !isNaN(maxVal) ? Math.max(0, maxVal) : null;
+  const trimmedMin = customMin?.trim();
+  const trimmedMax = customMax?.trim();
+  const minVal = trimmedMin ? Number(trimmedMin) : null;
+  const maxVal = trimmedMax ? Number(trimmedMax) : null;
+  let priceMin = minVal !== null && Number.isFinite(minVal) ? Math.max(0, minVal) : null;
+  let priceMax = maxVal !== null && Number.isFinite(maxVal) ? Math.max(0, maxVal) : null;
   if (priceMin !== null && priceMax !== null && priceMin > priceMax) {
     const temp = priceMin;
     priceMin = priceMax;

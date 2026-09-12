@@ -94,7 +94,7 @@ Stripe webhooks can occasionally deliver duplicate events. To prevent duplicate 
 Rather than relying on client-side date checks, background sweeps run at the database level:
 - Scheduled via Supabase `pg_cron` running every 5 minutes:
   - Sweeps offers with `offer_status in ('proposed', 'pending')` older than 48 hours $\to$ marks `expired`.
-  - Sweeps orders with `fulfillment_status = 'awaiting_payment'` older than 15 minutes $\to$ marks `failed`, unlocks listing (`is_sold = false`).
+  - Sweeps orders with `fulfillment_status = 'awaiting_payment'` older than 15 minutes $\to$ marks `status = 'failed'` (and `fulfillment_status = 'canceled'`), unlocks listing (`is_sold = false`).
 
 ### 4.3 Flexible Packing vs Supplier Processing (Dropship Support)
 - Column `fulfillment_type text not null default 'direct' check (fulfillment_type in ('direct', 'dropship'))`.

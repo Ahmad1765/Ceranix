@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   isSupportConversation,
   isDirectConversation,
+  generateSupportResponse,
   SUPPORT_BOT_USER_ID,
   SUPPORT_BOT_USERNAME,
 } from '@/lib/support';
@@ -109,6 +110,39 @@ describe('support & direct conversation helpers', () => {
         seller_id: SUPPORT_BOT_USER_ID,
       };
       expect(isDirectConversation(conv)).toBe(false);
+    });
+  });
+
+  describe('generateSupportResponse', () => {
+    it('returns default assistant greeting when query has no matching keywords', () => {
+      const response = generateSupportResponse('hello, what is the meaning of life?');
+      expect(response).toContain("Hi there! I'm the Ceranix Support Assistant");
+    });
+
+    it('matches single whole-term keyword correctly', () => {
+      const response = generateSupportResponse('Can I track my item?');
+      expect(response).toContain('Tracking Your Order');
+    });
+
+    it('rejects partial substring matches for keywords', () => {
+      // "disorder" contains "order" as substring, but is not a whole-term match
+      // "disembarked" contains "bank" as substring, but is not a whole-term match
+      const response = generateSupportResponse('There was disorder when the passengers disembarked.');
+      expect(response).toContain("Hi there! I'm the Ceranix Support Assistant");
+    });
+
+    it('scores entries and returns the highest-scoring topic rather than the first match', () => {
+      // Mentions "order" (1 match for Tracking topic)
+      // but mentions "protection", "refund", and "damaged" (3 matches for Buyer Protection topic)
+      const query = 'How does protection work on my order? I want a refund because the item was damaged.';
+      const response = generateSupportResponse(query);
+      expect(response).toContain('Ceranix Buyer Protection');
+      expect(response).not.toContain('Tracking Your Order');
+    });
+
+    it('matches multi-word phrases as whole terms', () => {
+      const response = generateSupportResponse('where is my shipment?');
+      expect(response).toContain('Tracking Your Order');
     });
   });
 });

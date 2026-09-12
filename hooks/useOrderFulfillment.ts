@@ -57,9 +57,7 @@ export function useOrderFulfillment(
         .maybeSingle();
 
       if (fetchErr) throw fetchErr;
-      if (data) {
-        setOrder(data as Order);
-      }
+      setOrder(data ? (data as Order) : null);
     } catch (err: any) {
       console.warn('[useOrderFulfillment] fetch error:', err.message);
       setError(err.message);

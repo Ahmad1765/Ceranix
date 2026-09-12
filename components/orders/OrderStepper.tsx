@@ -9,8 +9,8 @@ import type { FulfillmentStatus, FulfillmentType } from '@/types';
 
 export interface OrderStepperProps {
   status?: string;
-  fulfillmentStatus?: FulfillmentStatus | string;
-  fulfillmentType?: FulfillmentType | string;
+  fulfillmentStatus?: FulfillmentStatus | string | null;
+  fulfillmentType?: FulfillmentType | string | null;
   paymentMethod?: string;
   shippedAt?: string | null;
   courierName?: string | null;

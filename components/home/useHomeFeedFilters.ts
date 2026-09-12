@@ -61,6 +61,15 @@ export function isValidCategory(v: unknown): v is Category {
   return typeof v === 'string' && VALID_CATEGORIES.has(v as Category);
 }
 
+export function getValidChipIcon(
+  icon: unknown,
+  fallback: keyof typeof Feather.glyphMap = 'box',
+): keyof typeof Feather.glyphMap {
+  return typeof icon === 'string' && icon in Feather.glyphMap
+    ? (icon as keyof typeof Feather.glyphMap)
+    : fallback;
+}
+
 const FEED_SORTS: FeedSort[] = ['relevance', 'newest', 'price_asc', 'price_desc', 'popular'];
 
 type UseHomeFeedFiltersProps = {
@@ -129,9 +138,9 @@ export function useHomeFeedFilters({
       setQuery('');
       if (category) {
         const label = params.chipLabel
-          ? decodeURIComponent(params.chipLabel)
+          ? params.chipLabel
           : category.charAt(0).toUpperCase() + category.slice(1);
-        const icon = (params.chipIcon as any) || 'box';
+        const icon = getValidChipIcon(params.chipIcon, 'box');
         const newChip: DynamicFilterChip = {
           id: `category:${category}`,
           label,
@@ -156,12 +165,11 @@ export function useHomeFeedFilters({
           });
         } else {
           const label = params.chipLabel
-            ? decodeURIComponent(params.chipLabel)
+            ? params.chipLabel
             : sort === 'newest'
             ? 'New'
             : 'Lowest price';
-          const icon =
-            (params.chipIcon as any) || (sort === 'newest' ? 'zap' : 'arrow-down');
+          const icon = getValidChipIcon(params.chipIcon, 'box');
           const newChip: DynamicFilterChip = {
             id: `sort:${sort}`,
             label,
@@ -189,9 +197,9 @@ export function useHomeFeedFilters({
           setActiveChip(newChip.id);
         } else {
           const label = params.chipLabel
-            ? decodeURIComponent(params.chipLabel)
+            ? params.chipLabel
             : params.tab.charAt(0).toUpperCase() + params.tab.slice(1);
-          const icon = (params.chipIcon as any) || 'hash';
+          const icon = getValidChipIcon(params.chipIcon, 'box');
           const newChip: DynamicFilterChip = {
             id: `tab:${params.tab}`,
             label,

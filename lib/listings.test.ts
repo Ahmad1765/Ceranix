@@ -75,6 +75,22 @@ describe('getSearchTokenVariants plural/singular logic', () => {
     expect(bagsVariants).toContain('bags');
     expect(bagsVariants).toContain('bag');
   });
+
+  it('avoids overly broad stems for vowel-preceded es endings like shoes and toes', () => {
+    const shoesVariants = getSearchTokenVariants('shoes');
+    expect(shoesVariants).toContain('shoes');
+    expect(shoesVariants).toContain('shoe');
+    expect(shoesVariants).not.toContain('sho');
+
+    const toesVariants = getSearchTokenVariants('toes');
+    expect(toesVariants).toContain('toes');
+    expect(toesVariants).toContain('toe');
+    expect(toesVariants).not.toContain('to');
+
+    const watchesVariants = getSearchTokenVariants('watches');
+    expect(watchesVariants).toContain('watches');
+    expect(watchesVariants).toContain('watch');
+  });
 });
 
 describe('searchListings candidate pool cap', () => {

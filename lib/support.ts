@@ -137,14 +137,37 @@ export function isDirectConversation(conv: ConversationRow | null | undefined): 
   return !isTransactionalConversation(conv) && !isSupportConversation(conv);
 }
 
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function matchesKeyword(text: string, kw: string): boolean {
+  const regex = new RegExp(`\\b${escapeRegex(kw.toLowerCase())}\\b`, 'i');
+  return regex.test(text);
+}
+
 export function generateSupportResponse(query: string): string {
   const clean = query.toLowerCase().trim();
 
-  // Find best matching topic
+  let bestMatch: (typeof KNOWLEDGE_BASE)[number] | null = null;
+  let highestScore = 0;
+
+  // Find highest scoring topic by number of matched whole-term keywords
   for (const item of KNOWLEDGE_BASE) {
-    if (item.keywords.some((kw) => clean.includes(kw))) {
-      return item.answer;
+    let score = 0;
+    for (const kw of item.keywords) {
+      if (matchesKeyword(clean, kw)) {
+        score += 1;
+      }
     }
+    if (score > highestScore) {
+      highestScore = score;
+      bestMatch = item;
+    }
+  }
+
+  if (bestMatch && highestScore > 0) {
+    return bestMatch.answer;
   }
 
   // Default intelligent assistant response

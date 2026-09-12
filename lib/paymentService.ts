@@ -31,6 +31,7 @@ export interface CheckoutResult {
   sessionId?: string;
   message?: string;
   error?: string;
+  failedBundleItemIds?: string[];
 }
 
 export interface PaymentProvider {
@@ -115,10 +116,11 @@ export class CodPaymentProvider implements PaymentProvider {
           amount_cents: data.amount_cents,
         });
 
+        const failedBundleIds: string[] = [];
         if (request.bundleItemIds?.length) {
           for (const bundleId of request.bundleItemIds) {
             try {
-              await supabase.rpc('process_checkout', {
+              const { error: bundleErr } = await supabase.rpc('process_checkout', {
                 p_listing_id: bundleId,
                 p_buyer_id: request.buyerId ?? null,
                 p_payment_method: 'cod',
@@ -126,10 +128,28 @@ export class CodPaymentProvider implements PaymentProvider {
                 p_offer_amount: null,
                 p_delivery_notes: request.deliveryNotes?.trim() || validatedAddress.deliveryInstructions || null,
               });
+              if (bundleErr) {
+                console.warn('[paymentService] cod bundled item checkout failed', bundleId, bundleErr);
+                failedBundleIds.push(bundleId);
+              }
             } catch (err) {
               console.warn('[paymentService] cod bundled item checkout failed', bundleId, err);
+              failedBundleIds.push(bundleId);
             }
           }
+        }
+
+        if (failedBundleIds.length > 0) {
+          return {
+            success: false,
+            orderId: data.id,
+            order: data as Order,
+            paymentMethod: 'cod',
+            status: 'pending',
+            error: `Failed to checkout bundled items: ${failedBundleIds.join(', ')}`,
+            message: 'Primary order placed, but some bundled items failed to checkout',
+            failedBundleItemIds: failedBundleIds,
+          };
         }
 
         return {
@@ -246,6 +266,7 @@ export class StripePaymentProvider implements PaymentProvider {
     let backendOrder: Order | null = null;
     let cardRpcError: Error | null = null;
     let validatedAddress: ValidatedShippingAddress | null = null;
+    const failedBundleIds: string[] = [];
     try {
       const normalized = request.shippingAddress ? normalizeAddressInput(request.shippingAddress) : null;
       validatedAddress = normalized ? ShippingAddressSchema.parse(normalized) : null;
@@ -264,7 +285,7 @@ export class StripePaymentProvider implements PaymentProvider {
         if (request.bundleItemIds?.length) {
           for (const bundleId of request.bundleItemIds) {
             try {
-              await supabase.rpc('process_checkout', {
+              const { error: bundleErr } = await supabase.rpc('process_checkout', {
                 p_listing_id: bundleId,
                 p_buyer_id: request.buyerId ?? null,
                 p_payment_method: 'card',
@@ -272,8 +293,13 @@ export class StripePaymentProvider implements PaymentProvider {
                 p_offer_amount: null,
                 p_delivery_notes: request.deliveryNotes?.trim() || null,
               });
+              if (bundleErr) {
+                console.warn('[paymentService] card bundled item checkout failed', bundleId, bundleErr);
+                failedBundleIds.push(bundleId);
+              }
             } catch (err) {
               console.warn('[paymentService] card bundled item checkout failed', bundleId, err);
+              failedBundleIds.push(bundleId);
             }
           }
         }
@@ -323,6 +349,21 @@ export class StripePaymentProvider implements PaymentProvider {
     });
 
     const status = (backendOrder?.status as any) || 'paid';
+
+    if (failedBundleIds.length > 0) {
+      return {
+        success: false,
+        orderId: mockOrderId,
+        order: mockOrder,
+        sessionId: mockSessionId,
+        clientSecret: `${mockPaymentIntent}_secret_test`,
+        paymentMethod: 'card',
+        status,
+        error: `Failed to checkout bundled items: ${failedBundleIds.join(', ')}`,
+        message: 'Primary order placed, but some bundled items failed to checkout',
+        failedBundleItemIds: failedBundleIds,
+      };
+    }
 
     return {
       success: true,

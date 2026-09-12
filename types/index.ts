@@ -100,8 +100,8 @@ export interface Order {
   offer_message_id?: string | null;
   payment_method?: PaymentMethod;
   status: OrderStatus;
-  fulfillment_status?: FulfillmentStatus;
-  fulfillment_type?: FulfillmentType;
+  fulfillment_status?: FulfillmentStatus | null;
+  fulfillment_type?: FulfillmentType | null;
   supplier_name?: string | null;
   supplier_order_id?: string | null;
   shipping_address?: ValidatedShippingAddress | null;

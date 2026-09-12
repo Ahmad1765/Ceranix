@@ -125,11 +125,18 @@ export const NewsActivityRow = memo(function NewsActivityRow({ item }: { item: A
     : null;
   const targetUserName = targetUser?.full_name || targetUser?.username || 'user';
 
+  const accessibilityLabel =
+    item.kind === 'price_drop'
+      ? `Price drop: ${item.listing.title || 'listing'}`
+      : item.kind === 'search_alert'
+        ? `Search alert: ${item.searchLabel}`
+        : `Activity: ${actorName}`;
+
   return (
     <Pressable
       onPress={handlePress}
       accessibilityRole="button"
-      accessibilityLabel={`Activity: ${actorName}`}
+      accessibilityLabel={accessibilityLabel}
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',

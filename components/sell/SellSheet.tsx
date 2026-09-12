@@ -320,7 +320,9 @@ function SellForm({
   const isEditing = !!editingListing;
   const initialValues = useMemo(
     () => listingToSellFormValues(editingListing),
-    [editingListing],
+    // Only recompute initialValues when editing a different listing to avoid wiping unsaved edits on refetch
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [editingListing?.id],
   );
 
   const {

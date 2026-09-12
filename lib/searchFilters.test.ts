@@ -63,6 +63,12 @@ describe('SearchFilterChips & State logic', () => {
     expect(normalizeCustomPrice('', '50')).toEqual({ priceMin: null, priceMax: 50 });
     expect(normalizeCustomPrice('30', '')).toEqual({ priceMin: 30, priceMax: null });
     expect(normalizeCustomPrice('abc', 'xyz')).toEqual({ priceMin: null, priceMax: null });
+    // Rejects partial strings and Infinity
+    expect(normalizeCustomPrice('100abc', '50px')).toEqual({ priceMin: null, priceMax: null });
+    expect(normalizeCustomPrice('10abc', '20def')).toEqual({ priceMin: null, priceMax: null });
+    expect(normalizeCustomPrice('Infinity', '-Infinity')).toEqual({ priceMin: null, priceMax: null });
+    // Trims whitespace around valid numbers
+    expect(normalizeCustomPrice('  25  ', '  75  ')).toEqual({ priceMin: 25, priceMax: 75 });
     // Negative numbers clamped to 0
     expect(normalizeCustomPrice('-15', '50')).toEqual({ priceMin: 0, priceMax: 50 });
   });
