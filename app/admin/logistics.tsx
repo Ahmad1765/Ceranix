@@ -90,8 +90,9 @@ export default function AdminLogisticsScreen() {
 
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
+    const channelName = `admin_logistics_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const channel = supabase
-      .channel('admin_logistics_realtime')
+      .channel(channelName)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders' },

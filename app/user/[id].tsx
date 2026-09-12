@@ -23,6 +23,7 @@ import {
 } from '@/lib/queries';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
+import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/lib/theme';
 import { computeLevel } from '@/lib/levels';
 import { useGridDimensions, GRID_DRAW_DISTANCE } from '@/lib/responsive';
@@ -52,6 +53,7 @@ export default function UserProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const userId = typeof id === 'string' ? id : '';
   const insets = useSafeAreaInsets();
+  const { theme, isDark } = useTheme();
   const { user: authUser } = useAuth();
   const toast = useToast();
   const [shopFilter, setShopFilter] = useState<'all' | 'available' | 'sold'>('all');
@@ -683,9 +685,13 @@ export default function UserProfileScreen() {
                         borderRadius: 14,
                         alignItems: 'center',
                         justifyContent: 'center',
-                        backgroundColor: active ? colors.purple : colors.surface,
+                        backgroundColor: active
+                          ? isDark ? theme.panel : '#111111'
+                          : isDark ? theme.surface : theme.panel,
                         borderWidth: 1,
-                        borderColor: active ? colors.purple : colors.border,
+                        borderColor: active
+                          ? isDark ? theme.border : '#111111'
+                          : theme.border,
                         opacity: pressed ? 0.7 : 1,
                       })}
                     >
@@ -693,7 +699,7 @@ export default function UserProfileScreen() {
                         style={{
                           fontSize: 12,
                           fontWeight: active ? '700' : '600',
-                          color: active ? '#FFFFFF' : colors.ink,
+                          color: active ? '#FFFFFF' : theme.ink,
                         }}
                       >
                         {f.label}

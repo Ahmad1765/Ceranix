@@ -136,6 +136,14 @@ export function useSettingsManager() {
     if (lastHandledParam.current === target) return;
     lastHandledParam.current = target;
 
+    // Reset existing modal visibility state before dispatching new deep-link target
+    setShowBundle(false);
+    setShowAddress(false);
+    setShowPayout(false);
+    setShowVerify(false);
+    setShowTheme(false);
+    setShowSubscription(false);
+
     switch (target) {
       case 'bundle':
         setOpenSection('shop');

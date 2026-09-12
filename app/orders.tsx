@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Pressable,
@@ -286,11 +286,17 @@ function OrdersScreen() {
     }
   }, [justPaid, refetch]);
 
+  const refetchRef = useRef(refetch);
+  useEffect(() => {
+    refetchRef.current = refetch;
+  }, [refetch]);
+
   // Real-time synchronization for orders dashboard
   useEffect(() => {
     if (!user?.id) return;
+    const channelName = `user_orders_dash_${user.id}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const channel = supabase
-      .channel(`user_orders_dash_${user.id}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -299,7 +305,7 @@ function OrdersScreen() {
           table: 'orders',
         },
         () => {
-          refetch();
+          refetchRef.current?.();
         },
       )
       .subscribe();
@@ -307,7 +313,7 @@ function OrdersScreen() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id, refetch]);
+  }, [user?.id]);
 
   const rawRows = side === 'bought' ? allBoughtOrders : sold;
 

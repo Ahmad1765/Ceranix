@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { View, type TextStyle, type StyleProp } from 'react-native';
 import { Text } from '@/lib/rnText';
+import { tabularNumberStyle } from '@/lib/theme';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -56,8 +57,8 @@ export function AnimatedNumber({ value, style, height = 18 }: Props) {
   return (
     <View style={{ height, overflow: 'hidden' }}>
       <Animated.View style={animStyle}>
-        <Text style={[{ height, lineHeight: height }, style]}>{current}</Text>
-        <Text style={[{ height, lineHeight: height }, style]}>{next}</Text>
+        <Text style={[{ height, lineHeight: height }, tabularNumberStyle, style]}>{current}</Text>
+        <Text style={[{ height, lineHeight: height }, tabularNumberStyle, style]}>{next}</Text>
       </Animated.View>
     </View>
   );

@@ -76,8 +76,9 @@ export function useOrderFulfillment(
     fetchOrder();
 
     // Setup Supabase Realtime subscription for instant multi-device sync
+    const channelName = `order_realtime_${orderId}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const channel = supabase
-      .channel(`order_realtime_${orderId}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {

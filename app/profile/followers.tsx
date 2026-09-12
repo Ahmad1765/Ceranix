@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { safeBack } from '@/lib/nav';
 import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
+import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { Button, EmptyState } from '@/components/ui';
@@ -30,6 +31,7 @@ const keyById = (r: Row) => r.id;
 const EMPTY_ROWS: Row[] = [];
 
 export default function FollowersScreen() {
+  const { theme } = useTheme();
   const { user: authUser, profile: authProfile } = useAuth();
   const params = useLocalSearchParams<{ user?: string; username?: string }>();
   const targetId = (typeof params.user === 'string' && params.user) || authUser?.id || '';
@@ -109,7 +111,7 @@ export default function FollowersScreen() {
   };
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.background }}>
       <View
         style={{
           flexDirection: 'row',
@@ -121,13 +123,13 @@ export default function FollowersScreen() {
         }}
       >
         <Pressable onPress={() => safeBack()} hitSlop={HIT_SLOP_8} style={{ width: 38, height: 38, alignItems: 'center', justifyContent: 'center' }}>
-          <Feather name="chevron-left" size={24} color={colors.ink} />
+          <Feather name="chevron-left" size={24} color={theme.text} />
         </Pressable>
         <View style={{ flex: 1, alignItems: 'center' }}>
-          <Text style={{ fontSize: 15, fontWeight: '800', color: colors.ink }} numberOfLines={1}>
+          <Text style={{ fontSize: 15, fontWeight: '800', color: theme.text }} numberOfLines={1}>
             {headerName ? `@${headerName}` : 'Followers'}
           </Text>
-          <Text style={{ fontSize: 12, color: colors.mute, marginTop: 1 }}>Followers</Text>
+          <Text style={{ fontSize: 12, color: theme.mute, marginTop: 1 }}>Followers</Text>
         </View>
         <View style={{ width: 38 }} />
       </View>
@@ -203,6 +205,7 @@ function UserRow({
   busy: boolean;
   onToggle: () => void;
 }) {
+  const { theme } = useTheme();
   const avatar = row.avatar_url ? getOptimizedImageUrl(row.avatar_url, { width: 120 }) : null;
   const initial = (row.full_name || row.username || 'U').trim().charAt(0).toUpperCase();
 
@@ -214,7 +217,7 @@ function UserRow({
         alignItems: 'center',
         paddingHorizontal: 16,
         paddingVertical: 10,
-        backgroundColor: pressed ? colors.panel : 'transparent',
+        backgroundColor: pressed ? theme.panel : 'transparent',
       })}
     >
       <View
@@ -223,7 +226,7 @@ function UserRow({
           height: 48,
           borderRadius: 24,
           overflow: 'hidden',
-          backgroundColor: colors.primarySoft,
+          backgroundColor: theme.primarySoft,
           alignItems: 'center',
           justifyContent: 'center',
           marginRight: 12,
@@ -238,18 +241,18 @@ function UserRow({
             transition={IMAGE_TRANSITION}
           />
         ) : (
-          <Text style={{ fontSize: 18, fontWeight: '900', color: colors.primary }}>{initial}</Text>
+          <Text style={{ fontSize: 18, fontWeight: '900', color: theme.primary }}>{initial}</Text>
         )}
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <Text style={{ fontSize: 14, fontWeight: '800', color: colors.ink }} numberOfLines={1}>
+          <Text style={{ fontSize: 14, fontWeight: '800', color: theme.text }} numberOfLines={1}>
             {row.full_name || row.username}
           </Text>
           {row.is_verified && <ShieldCheckIcon size={14} />}
         </View>
 
-        <Text style={{ fontSize: 12.5, color: colors.mute, marginTop: 1 }} numberOfLines={1}>
+        <Text style={{ fontSize: 12.5, color: theme.mute, marginTop: 1 }} numberOfLines={1}>
           @{row.username}
         </Text>
       </View>

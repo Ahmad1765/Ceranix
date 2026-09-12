@@ -171,8 +171,9 @@ export default function InvoiceScreen() {
   // Real-time synchronization for order changes across devices
   useEffect(() => {
     if (!order?.id) return;
+    const channelName = `order_rt_invoice_${order.id}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const channel = supabase
-      .channel(`order_rt_invoice_${order.id}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {

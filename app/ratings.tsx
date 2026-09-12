@@ -4,11 +4,13 @@ import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
 import { useAuth } from '@/lib/auth';
-import { colors, radii } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
+import { colors, radii, tabularNumberStyle } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { safeBack } from '@/lib/nav';
 
 export default function RatingsScreen() {
+  const { theme } = useTheme();
   const { profile, refreshProfile } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -28,7 +30,7 @@ export default function RatingsScreen() {
   const showStars = Math.max(0, Math.min(5, Math.round(rating)));
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.background }}>
       {/* Top bar */}
       <View
         style={{
@@ -39,7 +41,7 @@ export default function RatingsScreen() {
           paddingTop: 6,
           paddingBottom: 8,
           borderBottomWidth: 1,
-          borderBottomColor: colors.hairline,
+          borderBottomColor: theme.hairline,
         }}
       >
         <Pressable
@@ -53,9 +55,9 @@ export default function RatingsScreen() {
             opacity: pressed ? 0.6 : 1,
           })}
         >
-          <Feather name="chevron-left" size={24} color={colors.ink} />
+          <Feather name="chevron-left" size={24} color={theme.text} />
         </Pressable>
-        <Text style={{ fontSize: 16, fontWeight: '800', color: colors.ink }}>Ratings</Text>
+        <Text style={{ fontSize: 16, fontWeight: '800', color: theme.text }}>Ratings</Text>
         <View style={{ width: 38 }} />
       </View>
 
@@ -87,13 +89,16 @@ export default function RatingsScreen() {
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 8 }}>
             <Text
-              style={{
-                fontSize: 64,
-                fontWeight: '900',
-                color: 'white',
-                letterSpacing: -3,
-                lineHeight: 66,
-              }}
+              style={[
+                {
+                  fontSize: 64,
+                  fontWeight: '900',
+                  color: 'white',
+                  letterSpacing: -3,
+                  lineHeight: 66,
+                },
+                tabularNumberStyle,
+              ]}
             >
               {rating.toFixed(1)}
             </Text>
@@ -118,15 +123,15 @@ export default function RatingsScreen() {
 
         {/* Achievements */}
         <View style={{ marginTop: 18 }}>
-          <Text style={{ fontSize: 13, fontWeight: '800', color: colors.mute, letterSpacing: 0.6, marginBottom: 10 }}>
+          <Text style={{ fontSize: 13, fontWeight: '800', color: theme.mute, letterSpacing: 0.6, marginBottom: 10 }}>
             ACHIEVEMENTS
           </Text>
           <View
             style={{
-              backgroundColor: colors.white,
+              backgroundColor: theme.panel,
               borderRadius: radii.xl,
               borderWidth: 1,
-              borderColor: colors.hairline,
+              borderColor: theme.border,
               overflow: 'hidden',
             }}
           >
@@ -153,7 +158,7 @@ export default function RatingsScreen() {
                       width: 40,
                       height: 40,
                       borderRadius: 20,
-                      backgroundColor: row.done ? colors.purpleSoft : colors.panel,
+                      backgroundColor: row.done ? theme.purpleSoft : theme.surface,
                       alignItems: 'center',
                       justifyContent: 'center',
                       marginRight: 12,
@@ -162,14 +167,14 @@ export default function RatingsScreen() {
                     <Feather
                       name={row.done ? 'check' : row.icon}
                       size={16}
-                      color={row.done ? colors.purple : colors.muteSoft}
+                      color={row.done ? theme.purple : theme.muteSoft}
                     />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: row.done ? colors.ink : colors.mute }}>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: row.done ? theme.text : theme.mute }}>
                       {row.label}
                     </Text>
-                    <Text style={{ fontSize: 12, color: colors.mute, marginTop: 2 }}>{row.hint}</Text>
+                    <Text style={{ fontSize: 12, color: theme.mute, marginTop: 2 }}>{row.hint}</Text>
                   </View>
                   {row.done && (
                     <View
@@ -187,7 +192,7 @@ export default function RatingsScreen() {
                   )}
                 </View>
                 {i < arr.length - 1 && (
-                  <View style={{ height: 1, backgroundColor: colors.hairline, marginLeft: 66 }} />
+                  <View style={{ height: 1, backgroundColor: theme.hairline, marginLeft: 66 }} />
                 )}
               </View>
             ))}

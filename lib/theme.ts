@@ -1,7 +1,9 @@
 // Carrinex monotone design tokens. Single source of truth.
 // Dynamic light/dark monotone palettes.
 
-import { Platform } from 'react-native';
+import { Platform, TextStyle } from 'react-native';
+
+export const tabularNumberStyle: TextStyle = { fontVariant: ['tabular-nums'] };
 
 // ── Monotone Palettes ───────────────────────────────────────────────────
 

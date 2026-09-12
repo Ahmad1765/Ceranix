@@ -317,7 +317,7 @@ function SupportPage({
         contentContainerStyle={{
           paddingHorizontal: 16,
           paddingTop: 14,
-          paddingBottom: bottomInset + 30,
+          paddingBottom: bottomInset + 100,
         }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />
@@ -399,7 +399,7 @@ function SupportPage({
             style={{
               height: 44,
               borderRadius: radii.pill,
-              backgroundColor: theme.primary,
+              backgroundColor: theme.purple,
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center',
@@ -585,7 +585,7 @@ function PushNotificationBanner({ onDismiss }: { onDismiss: () => void }) {
           paddingHorizontal: 13,
           paddingVertical: 8,
           borderRadius: radii.pill,
-          backgroundColor: theme.primary,
+          backgroundColor: theme.ink,
           opacity: pressed ? 0.85 : 1,
         })}
       >
@@ -593,7 +593,7 @@ function PushNotificationBanner({ onDismiss }: { onDismiss: () => void }) {
           style={{
             fontFamily: typography.family.sansBold,
             fontSize: 12.5,
-            color: colors.white,
+            color: theme.background,
           }}
         >
           Enable

@@ -94,10 +94,10 @@ function stylesFor(t: Tone | 'selected', theme: ThemeTokens, isDark: boolean) {
   switch (t) {
     case 'selected':
       return {
-        bg: isDark ? theme.panel : theme.selected,
-        fg: theme.ink,
+        bg: isDark ? theme.panel : '#111111',
+        fg: '#FFFFFF',
         bw: 1,
-        bc: theme.border,
+        bc: isDark ? theme.border : '#111111',
       };
     case 'pink':
       return {

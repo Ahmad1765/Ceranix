@@ -16,6 +16,7 @@ import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 import { fetchFollowingMask, toggleFollow } from '@/lib/follows';
 import { useToast } from '@/lib/toast';
 import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
+import { useTheme } from '@/context/ThemeContext';
 import { colors, radii, type } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import type { TagIndexEntry } from '@/lib/searchIndex';
@@ -95,6 +96,7 @@ function SegmentPill({
   active: boolean;
   onPress: () => void;
 }) {
+  const { theme, isDark } = useTheme();
   const [colorAnim] = useState(() => new Animated.Value(active ? 1 : 0));
   const [scaleAnim] = useState(() => new Animated.Value(1));
 
@@ -111,11 +113,11 @@ function SegmentPill({
 
   const backgroundColor = colorAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [colors.white, 'rgba(108,71,255,0.12)'],
+    outputRange: [isDark ? theme.surface : theme.panel, isDark ? theme.panel : '#111111'],
   });
   const borderColor = colorAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['#E5E5E5', colors.purple],
+    outputRange: [theme.border, isDark ? theme.border : '#111111'],
   });
 
   return (
@@ -141,19 +143,21 @@ function SegmentPill({
       <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
         <Animated.View
           style={{
-            paddingHorizontal: 16,
-            paddingVertical: 8,
+            height: 28,
+            paddingHorizontal: 14,
             borderRadius: radii.pill,
             borderWidth: 1,
             backgroundColor,
             borderColor,
+            justifyContent: 'center',
+            alignItems: 'center',
           }}
         >
           <Text
             style={{
-              fontSize: 13,
+              fontSize: 12,
               fontFamily: type.family.sansBold,
-              color: active ? colors.ink : colors.mute,
+              color: active ? '#FFFFFF' : theme.mute,
             }}
           >
             {label}

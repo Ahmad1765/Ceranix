@@ -11,6 +11,7 @@ import * as Haptics from 'expo-haptics';
 import { Text } from '@/lib/rnText';
 import { formatPrice } from '@/lib/currency';
 import { useTheme } from '@/context/ThemeContext';
+import { tabularNumberStyle } from '@/lib/theme';
 
 export interface ProductActionBarProps {
   price?: number;
@@ -243,6 +244,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     fontFamily: 'Inter_700Bold',
+    ...tabularNumberStyle,
   },
   buyButton: {
     flex: 1,
@@ -258,6 +260,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontFamily: 'Inter_700Bold',
     letterSpacing: 0.2,
+    ...tabularNumberStyle,
   },
   soldContainer: {
     height: 48,
