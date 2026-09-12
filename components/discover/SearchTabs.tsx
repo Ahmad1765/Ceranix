@@ -122,6 +122,7 @@ function SegmentPill({
 
   return (
     <Pressable
+      hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
       onPress={onPress}
       onPressIn={() =>
         Animated.spring(scaleAnim, { toValue: 0.93, useNativeDriver: USE_NATIVE_DRIVER, speed: 30, bounciness: 4 }).start()

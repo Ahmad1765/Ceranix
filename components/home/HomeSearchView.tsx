@@ -374,7 +374,7 @@ export const HomeSearchView = memo(function HomeSearchView({
   });
 
   const hasQuery = query.trim().length > 0;
-  const canSwitchTabs = !hasSubmitted || hasQuery;
+  const canSwitchTabs = !hasSubmitted && !hasQuery;
   const tabWidth = screenWidth / 2;
 
   // Real-time interpolated translation for sliding green indicator bar
@@ -1310,9 +1310,8 @@ export const HomeSearchView = memo(function HomeSearchView({
         </Pressable>
       </View>
 
-      <Animated.View style={contentAnimatedStyle}>
-        {/* ── Tab Switcher ('Items' & 'Members') ─────────────────────────────── */}
-        {canSwitchTabs && (
+        {/* ── Tab Switcher ('Items' & 'Members') - Hidden in results ─────────── */}
+        {!hasSubmitted && !hasQuery && (
           <View
             style={{
               flexDirection: 'row',
@@ -1399,7 +1398,7 @@ export const HomeSearchView = memo(function HomeSearchView({
           ref={pagerRef}
           horizontal
           pagingEnabled
-          scrollEnabled={canSwitchTabs}
+          scrollEnabled={!hasSubmitted && !hasQuery}
           showsHorizontalScrollIndicator={false}
           contentOffset={{ x: activeTab === 'listings' ? 0 : screenWidth, y: 0 }}
           onScroll={handleScroll}
@@ -1408,7 +1407,7 @@ export const HomeSearchView = memo(function HomeSearchView({
           style={[
             { flex: 1 },
             Platform.OS === 'web' && ({
-              scrollSnapType: canSwitchTabs ? 'x mandatory' : 'none',
+              scrollSnapType: !hasSubmitted && !hasQuery ? 'x mandatory' : 'none',
               WebkitOverflowScrolling: 'touch',
             } as any),
           ]}
@@ -1537,6 +1536,5 @@ export const HomeSearchView = memo(function HomeSearchView({
           </View>
         </ScrollView>
       </Animated.View>
-    </Animated.View>
   );
 });
