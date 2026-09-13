@@ -117,6 +117,7 @@ export async function syncContacts(
   // 2. Batch Hashing with JS Bridge Yielding
   const uniqueHashesSet = new Set<string>();
   const unmatchedList: UnmatchedContact[] = [];
+  const hashToContactIds = new Map<string, Set<string>>();
 
   for (let i = 0; i < totalContacts; i += BATCH_HASH_SIZE) {
     const batch = contacts.slice(i, i + BATCH_HASH_SIZE);
@@ -124,6 +125,7 @@ export async function syncContacts(
     await Promise.all(
       batch.map(async (c) => {
         const contactName = c.name || [c.firstName, c.lastName].filter(Boolean).join(' ') || 'Friend';
+        const contactId = c.id || `${i}-${contactName}`;
         let firstPhone: string | undefined;
         let firstEmail: string | undefined;
 
@@ -136,6 +138,10 @@ export async function syncContacts(
                 if (!firstPhone) firstPhone = e164;
                 const h = await hashContactValue(e164);
                 uniqueHashesSet.add(h);
+                if (!hashToContactIds.has(h)) {
+                  hashToContactIds.set(h, new Set());
+                }
+                hashToContactIds.get(h)!.add(contactId);
               }
             }
           }
@@ -150,6 +156,10 @@ export async function syncContacts(
                 if (!firstEmail) firstEmail = normEmail;
                 const h = await hashContactValue(normEmail);
                 uniqueHashesSet.add(h);
+                if (!hashToContactIds.has(h)) {
+                  hashToContactIds.set(h, new Set());
+                }
+                hashToContactIds.get(h)!.add(contactId);
               }
             }
           }
@@ -157,7 +167,7 @@ export async function syncContacts(
 
         if (firstPhone || firstEmail) {
           unmatchedList.push({
-            id: c.id || `${i}-${contactName}`,
+            id: contactId,
             name: contactName,
             phoneNumber: firstPhone,
             email: firstEmail,
@@ -178,6 +188,7 @@ export async function syncContacts(
   report('matching', 0, allHashes.length, 'Matching friends on Ceranix…');
 
   const matchedFriendsMap = new Map<string, MatchedFriend>();
+  const matchedContactIds = new Set<string>();
 
   for (let i = 0; i < allHashes.length; i += RPC_CHUNK_SIZE) {
     const chunk = allHashes.slice(i, i + RPC_CHUNK_SIZE);
@@ -195,7 +206,17 @@ export async function syncContacts(
               avatar_url: row.avatar_url,
               is_verified: !!row.is_verified,
               followers_count: Number(row.followers_count || 0),
+              matched_hash: row.matched_hash,
             });
+          }
+
+          if (row.matched_hash && hashToContactIds.has(row.matched_hash)) {
+            const ids = hashToContactIds.get(row.matched_hash);
+            if (ids) {
+              for (const cid of ids) {
+                matchedContactIds.add(cid);
+              }
+            }
           }
         }
       }
@@ -207,11 +228,15 @@ export async function syncContacts(
   }
 
   const matchedFriends = Array.from(matchedFriendsMap.values());
+  // Remove matched contacts so they no longer appear in the invite list
+  const filteredUnmatchedContacts = unmatchedList.filter(
+    (contact) => !matchedContactIds.has(contact.id),
+  );
   report('completed', totalContacts, totalContacts, `Found ${matchedFriends.length} friends on Ceranix`);
 
   return {
     matchedFriends,
-    unmatchedContacts: unmatchedList,
+    unmatchedContacts: filteredUnmatchedContacts,
   };
 }
 

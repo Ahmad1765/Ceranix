@@ -33,10 +33,57 @@ create policy "Users manage own contact hashes"
   using ((select auth.uid()) = user_id)
   with check ((select auth.uid()) = user_id);
 
+-- Ensure project's rate_limit_events table exists for call accounting
+create table if not exists public.rate_limit_events (
+  id         bigint generated always as identity primary key,
+  user_id    uuid not null references auth.users (id) on delete cascade,
+  action     text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists rate_limit_events_lookup_idx
+  on public.rate_limit_events (user_id, action, created_at desc);
+
+alter table public.rate_limit_events enable row level security;
+
+create or replace function public.enforce_rate_limit(
+  p_action text,
+  p_limit  int,
+  p_window interval
+) returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid   uuid := auth.uid();
+  v_count int;
+begin
+  if v_uid is null then
+    return;
+  end if;
+
+  select count(*) into v_count
+  from public.rate_limit_events
+  where user_id = v_uid
+    and action = p_action
+    and created_at > now() - p_window;
+
+  if v_count >= p_limit then
+    raise exception 'rate_limit_exceeded'
+      using
+        errcode = 'P0001',
+        message = format('Rate limit reached for %s (max %s per %s).', p_action, p_limit, p_window),
+        hint    = 'Please slow down and try again shortly.';
+  end if;
+
+  insert into public.rate_limit_events (user_id, action) values (v_uid, p_action);
+end;
+$$;
+
 -- 3) Match Contacts RPC (SECURITY DEFINER) -----------------------------------
 -- Given an array of up to 500 peppered hashes from the viewer's device address
--- book, returns matching registered profiles.
--- NOTE: Never returns the hashes themselves or any raw contact details.
+-- book, returns matching registered profiles and the matched hash value.
 create or replace function public.match_contacts(p_hashes text[])
 returns table (
   id uuid,
@@ -44,7 +91,8 @@ returns table (
   full_name text,
   avatar_url text,
   is_verified boolean,
-  followers_count integer
+  followers_count integer,
+  matched_hash text
 )
 language plpgsql
 security definer
@@ -58,9 +106,21 @@ begin
     return;
   end if;
 
+  -- 1) Retain existing null / empty array handling
   if p_hashes is null or array_length(p_hashes, 1) = 0 then
     return;
   end if;
+
+  -- 2) Enforce documented 500-hash payload limit before performing any scan
+  if array_length(p_hashes, 1) > 500 then
+    raise exception 'Payload exceeds maximum limit of 500 hashes per request (got %)', array_length(p_hashes, 1)
+      using
+        errcode = '22000',
+        hint = 'Batch contact hashes into chunks of 500 or fewer.';
+  end if;
+
+  -- 3) Enforce per-authenticated-user rate limit (max 30 match calls per 1 minute)
+  perform public.enforce_rate_limit('match_contacts', 30, interval '1 minute');
 
   return query
   select distinct
@@ -69,7 +129,8 @@ begin
     p.full_name,
     p.avatar_url,
     coalesce(p.is_verified, false) as is_verified,
-    coalesce(p.followers_count, 0) as followers_count
+    coalesce(p.followers_count, 0) as followers_count,
+    h.hash_value as matched_hash
   from public.user_contact_hashes h
   join public.profiles p on p.id = h.user_id
   where h.user_id <> v_viewer_id

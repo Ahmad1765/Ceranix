@@ -13,6 +13,7 @@ export type MatchedFriend = {
   avatar_url: string | null;
   is_verified: boolean;
   followers_count: number;
+  matched_hash?: string;
 };
 
 export type UnmatchedContact = {
