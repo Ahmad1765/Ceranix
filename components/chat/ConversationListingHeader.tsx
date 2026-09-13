@@ -16,6 +16,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
 import { buyerProtectionFee } from '@/lib/fees';
 import { ThumbButton } from '@/components/ui';
+import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { ListingThumb, type ListingStatus } from './ListingThumb';
 import type { ConversationRow } from '@/lib/chat';
 
@@ -79,17 +80,20 @@ export function ConversationListingHeader({
             {listing?.price != null ? formatPrice(listing.price) : '—'}
           </Text>
           {listing?.price != null && (
-            <Text
-              numberOfLines={1}
-              style={{
-                fontFamily: typography.family.sans,
-                fontSize: 11,
-                color: theme.mute,
-                marginTop: 1,
-              }}
-            >
-              {`${formatPrice(listing.price + buyerProtectionFee(listing.price))} Includes Buyer Protection 🛡️`}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 }}>
+              <Text
+                numberOfLines={1}
+                style={{
+                  fontFamily: typography.family.sans,
+                  fontSize: 11,
+                  color: theme.mute,
+                  flexShrink: 1,
+                }}
+              >
+                {`${formatPrice(listing.price + buyerProtectionFee(listing.price))} Includes Buyer Protection`}
+              </Text>
+              <ShieldCheckIcon size={12} />
+            </View>
           )}
         </View>
       </View>

@@ -509,7 +509,7 @@ function OutgoingOfferBubble({
       {/* Paid Guarantee note */}
       {isPaid && (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8 }}>
-          <Feather name="check-circle" size={12} color="#10B981" />
+          <ShieldCheckIcon size={14} />
           <Text
             style={{
               fontFamily: typography.family.sansMedium,
@@ -517,7 +517,7 @@ function OutgoingOfferBubble({
               color: '#10B981',
             }}
           >
-            Paid · Buyer Protection active 🛡️
+            Paid · Buyer Protection active
           </Text>
         </View>
       )}
