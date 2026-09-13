@@ -17,5 +17,5 @@ const STYLES = {
 
 export function tap(style: keyof typeof STYLES = 'light') {
   if (Platform.OS !== 'ios') return;
-  Haptics.impactAsync(STYLES[style]);
+  Haptics.impactAsync(STYLES[style]).catch(() => {});
 }

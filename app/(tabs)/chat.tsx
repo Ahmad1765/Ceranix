@@ -771,7 +771,7 @@ export default function InboxScreen() {
           justifyContent: 'space-between',
           paddingHorizontal: 20,
           paddingTop: 8,
-          paddingBottom: 21,
+          paddingBottom: 16,
         }}
       >
         <View style={{ width: 38 }} />
@@ -785,28 +785,27 @@ export default function InboxScreen() {
         >
           Inbox
         </Text>
-        <Pressable
+
+        <PressableScale
           onPress={() => {
             haptic();
             router.push('/friends' as any);
           }}
-          hitSlop={HIT_SLOP_8}
           accessibilityRole="button"
           accessibilityLabel="Find friends"
-          style={({ pressed }) => ({
+          style={{
             width: 38,
             height: 38,
             borderRadius: 19,
-            backgroundColor: theme.surface,
+            backgroundColor: theme.panel,
             alignItems: 'center',
             justifyContent: 'center',
             borderWidth: 1,
-            borderColor: theme.hairline,
-            opacity: pressed ? 0.7 : 1,
-          })}
+            borderColor: theme.border,
+          }}
         >
-          <Feather name="user-plus" size={17} color={theme.ink} />
-        </Pressable>
+          <Feather name="users" size={17} color={theme.ink} />
+        </PressableScale>
       </View>
 
       {/* Underline tabs */}

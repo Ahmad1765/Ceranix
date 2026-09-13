@@ -30,24 +30,37 @@ export type SyncProgress = {
   message: string;
 };
 
+export type ContactsPermissionStatus = {
+  granted: boolean;
+  canAskAgain: boolean;
+  accessPrivileges?: 'all' | 'limited' | 'none';
+  status: 'granted' | 'denied' | 'undetermined';
+};
+
 export type ContactSyncResult = {
   matchedFriends: MatchedFriend[];
   unmatchedContacts: UnmatchedContact[];
+  accessPrivileges?: 'all' | 'limited' | 'none';
 };
 
 export const isContactsSyncSupported = false;
 
-export async function requestContactsPermission(): Promise<boolean> {
-  return false;
+export async function getContactsPermissionStatus(): Promise<ContactsPermissionStatus> {
+  return { granted: false, canAskAgain: false, accessPrivileges: 'none', status: 'denied' };
+}
+
+export async function requestContactsPermission(): Promise<ContactsPermissionStatus> {
+  return { granted: false, canAskAgain: false, accessPrivileges: 'none', status: 'denied' };
+}
+
+export async function presentAccessPicker(): Promise<string[] | null> {
+  return null;
 }
 
 export async function syncContacts(
   _onProgress?: (progress: SyncProgress) => void,
 ): Promise<ContactSyncResult> {
-  return {
-    matchedFriends: [],
-    unmatchedContacts: [],
-  };
+  throw new Error('Contact sync is only supported in the mobile iOS & Android apps. Use the share options to invite friends.');
 }
 
 export async function registerMyHashes(

@@ -6,6 +6,8 @@ import {
   ActivityIndicator,
   Platform,
   RefreshControl,
+  Alert,
+  Linking,
 } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,6 +29,7 @@ import { searchUsers, fetchSuggestedFollows, toggleFollow, type FollowListRow } 
 import {
   isContactsSyncSupported,
   syncContacts,
+  presentAccessPicker,
   type MatchedFriend,
   type UnmatchedContact,
   type SyncProgress,
@@ -63,6 +66,7 @@ export default function FriendsScreen() {
   const [unmatchedContacts, setUnmatchedContacts] = useState<UnmatchedContact[]>([]);
   const [hasSynced, setHasSynced] = useState(false);
   const [showUnmatched, setShowUnmatched] = useState(false);
+  const [accessPrivileges, setAccessPrivileges] = useState<'all' | 'limited' | 'none' | undefined>(undefined);
 
   // QR Modal State
   const [showQrSheet, setShowQrSheet] = useState(false);
@@ -157,6 +161,9 @@ export default function FriendsScreen() {
 
       setMatchedFriends(result.matchedFriends);
       setUnmatchedContacts(result.unmatchedContacts);
+      if (result.accessPrivileges) {
+        setAccessPrivileges(result.accessPrivileges);
+      }
       setHasSynced(true);
 
       if (result.matchedFriends.length > 0) {
@@ -171,10 +178,33 @@ export default function FriendsScreen() {
         });
       }
     } catch (err: any) {
-      toast.show(err?.message || 'Failed to sync contacts', {
-        variant: 'default',
-        icon: 'alert-triangle',
-      });
+      if (err?.code === 'PERMISSION_PERMANENTLY_DENIED') {
+        if (Platform.OS === 'ios' || Platform.OS === 'android') {
+          Alert.alert(
+            'Contacts Access Needed',
+            'To discover friends from your address book, Carrinex needs Contacts access. Please enable Contacts in Settings.',
+            [
+              { text: 'Not Now', style: 'cancel' },
+              {
+                text: 'Open Settings',
+                onPress: () => {
+                  Linking.openSettings().catch(() => {});
+                },
+              },
+            ],
+          );
+        } else {
+          toast.show(err.message || 'Contacts permission is disabled in Settings', {
+            variant: 'default',
+            icon: 'alert-triangle',
+          });
+        }
+      } else {
+        toast.show(err?.message || 'Failed to sync contacts', {
+          variant: 'default',
+          icon: 'alert-triangle',
+        });
+      }
     } finally {
       setIsSyncing(false);
     }
@@ -529,6 +559,36 @@ export default function FriendsScreen() {
                     </>
                   )}
                 </PressableScale>
+
+                {/* iOS 18 Limited Contacts Picker */}
+                {accessPrivileges === 'limited' && (
+                  <PressableScale
+                    onPress={async () => {
+                      tap('light');
+                      const selected = await presentAccessPicker();
+                      if (selected && selected.length > 0) {
+                        handleSyncContacts();
+                      }
+                    }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      height: 36,
+                      borderRadius: radii.pill,
+                      backgroundColor: theme.panel,
+                      borderWidth: 1,
+                      borderColor: theme.border,
+                      marginTop: 10,
+                    }}
+                  >
+                    <Feather name="plus-circle" size={14} color={theme.ink} />
+                    <Text style={{ fontSize: 12.5, fontWeight: '600', color: theme.ink }}>
+                      Select More Contacts (iOS 18)
+                    </Text>
+                  </PressableScale>
+                )}
               </View>
             ) : (
               /* ── Web-Friendly Social Hero Card ── */
@@ -616,9 +676,9 @@ export default function FriendsScreen() {
 
                 {/* Direct Channel Pills */}
                 <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <Pressable
+                  <PressableScale
                     onPress={() => shareViaWhatsApp(profile?.username, profile?.full_name)}
-                    style={({ pressed }) => ({
+                    style={{
                       flex: 1,
                       height: 36,
                       borderRadius: radii.pill,
@@ -629,18 +689,17 @@ export default function FriendsScreen() {
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: 6,
-                      opacity: pressed ? 0.7 : 1,
-                    })}
+                    }}
                   >
-                    <Ionicons name="logo-whatsapp" size={15} color="#25D366" />
+                    <Ionicons name="logo-whatsapp" size={15} color={theme.ink} />
                     <Text style={{ fontSize: 12, fontWeight: '600', color: theme.text }}>
                       WhatsApp
                     </Text>
-                  </Pressable>
+                  </PressableScale>
 
-                  <Pressable
+                  <PressableScale
                     onPress={() => shareViaSMS(profile?.username, profile?.full_name)}
-                    style={({ pressed }) => ({
+                    style={{
                       flex: 1,
                       height: 36,
                       borderRadius: radii.pill,
@@ -651,18 +710,17 @@ export default function FriendsScreen() {
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: 6,
-                      opacity: pressed ? 0.7 : 1,
-                    })}
+                    }}
                   >
                     <Feather name="message-circle" size={14} color={theme.text} />
                     <Text style={{ fontSize: 12, fontWeight: '600', color: theme.text }}>
                       Messages
                     </Text>
-                  </Pressable>
+                  </PressableScale>
 
-                  <Pressable
+                  <PressableScale
                     onPress={() => setShowQrSheet(true)}
-                    style={({ pressed }) => ({
+                    style={{
                       flex: 1,
                       height: 36,
                       borderRadius: radii.pill,
@@ -673,14 +731,13 @@ export default function FriendsScreen() {
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: 6,
-                      opacity: pressed ? 0.7 : 1,
-                    })}
+                    }}
                   >
                     <Ionicons name="qr-code-outline" size={14} color={theme.text} />
                     <Text style={{ fontSize: 12, fontWeight: '600', color: theme.text }}>
                       QR Code
                     </Text>
-                  </Pressable>
+                  </PressableScale>
                 </View>
 
                 {/* Mobile App Sync Note */}

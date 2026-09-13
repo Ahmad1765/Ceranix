@@ -12,6 +12,7 @@
  * 5. Privacy: Raw numbers/emails NEVER leave the device.
  */
 
+import { Platform } from 'react-native';
 import * as Contacts from 'expo-contacts';
 import * as Crypto from 'expo-crypto';
 import * as Localization from 'expo-localization';
@@ -27,9 +28,10 @@ import type {
   UnmatchedContact,
   SyncProgress,
   ContactSyncResult,
+  ContactsPermissionStatus,
 } from './contacts';
 
-export type { MatchedFriend, UnmatchedContact, SyncProgress, ContactSyncResult };
+export type { MatchedFriend, UnmatchedContact, SyncProgress, ContactSyncResult, ContactsPermissionStatus };
 
 export const isContactsSyncSupported = true;
 
@@ -64,16 +66,55 @@ export async function hashContactValue(value: string): Promise<string> {
 }
 
 /**
+ * Checks current native address book permissions without prompting.
+ */
+export async function getContactsPermissionStatus(): Promise<ContactsPermissionStatus> {
+  try {
+    const res = await Contacts.getPermissionsAsync();
+    const isGranted = res.granted || res.status === 'granted';
+    return {
+      granted: isGranted,
+      canAskAgain: res.canAskAgain,
+      accessPrivileges: (res as any).accessPrivileges ?? (isGranted ? 'all' : 'none'),
+      status: res.status as any,
+    };
+  } catch (err) {
+    console.warn('[contacts.native] getContactsPermissionStatus error:', err);
+    return { granted: false, canAskAgain: false, accessPrivileges: 'none', status: 'denied' };
+  }
+}
+
+/**
  * Requests native address book permissions.
  */
-export async function requestContactsPermission(): Promise<boolean> {
+export async function requestContactsPermission(): Promise<ContactsPermissionStatus> {
   try {
-    const { status } = await Contacts.requestPermissionsAsync();
-    return status === 'granted';
+    const res = await Contacts.requestPermissionsAsync();
+    const isGranted = res.granted || res.status === 'granted';
+    return {
+      granted: isGranted,
+      canAskAgain: res.canAskAgain,
+      accessPrivileges: (res as any).accessPrivileges ?? (isGranted ? 'all' : 'none'),
+      status: res.status as any,
+    };
   } catch (err) {
     console.warn('[contacts.native] requestContactsPermission error:', err);
-    return false;
+    return { granted: false, canAskAgain: false, accessPrivileges: 'none', status: 'denied' };
   }
+}
+
+/**
+ * Presents native iOS 18+ contact access picker modal for limited access mode.
+ */
+export async function presentAccessPicker(): Promise<string[] | null> {
+  try {
+    if (Platform.OS === 'ios' && typeof (Contacts as any).presentAccessPickerAsync === 'function') {
+      return await (Contacts as any).presentAccessPickerAsync();
+    }
+  } catch (err) {
+    console.warn('[contacts.native] presentAccessPicker error:', err);
+  }
+  return null;
 }
 
 /**
@@ -91,13 +132,29 @@ export async function syncContacts(
     });
   };
 
-  report('reading', 0, 0, 'Accessing address book…');
+  report('reading', 0, 0, 'Checking address book permission…');
 
-  const granted = await requestContactsPermission();
-  if (!granted) {
-    report('error', 0, 0, 'Address book permission not granted');
-    return { matchedFriends: [], unmatchedContacts: [] };
+  // Check current permissions first
+  let perm = await getContactsPermissionStatus();
+  if (!perm.granted) {
+    if (perm.status === 'undetermined' || perm.canAskAgain) {
+      perm = await requestContactsPermission();
+    }
   }
+
+  if (!perm.granted) {
+    report('error', 0, 0, 'Address book permission not granted');
+    const isPermanentlyDenied = !perm.canAskAgain;
+    const err = new Error(
+      isPermanentlyDenied
+        ? 'Contacts access is disabled in iOS Settings. Please enable Contacts permission in Settings to find friends.'
+        : 'Contacts permission was not granted.',
+    );
+    (err as any).code = isPermanentlyDenied ? 'PERMISSION_PERMANENTLY_DENIED' : 'PERMISSION_DENIED';
+    throw err;
+  }
+
+  report('reading', 0, 0, 'Accessing address book…');
 
   // 1. Fetch contacts
   const { data: contacts } = await Contacts.getContactsAsync({
@@ -237,6 +294,7 @@ export async function syncContacts(
   return {
     matchedFriends,
     unmatchedContacts: filteredUnmatchedContacts,
+    accessPrivileges: perm.accessPrivileges,
   };
 }
 

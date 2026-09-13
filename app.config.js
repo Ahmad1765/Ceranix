@@ -48,6 +48,12 @@ module.exports = () => ({
     ios: {
       supportsTablet: false,
       bundleIdentifier: 'com.carrinex.app',
+      infoPlist: {
+        NSContactsUsageDescription: 'Allow Carrinex to access your contacts to find friends on the app.',
+        NSCameraUsageDescription: 'Carrinex needs camera access to take photos of items to sell.',
+        NSPhotoLibraryUsageDescription: 'Carrinex needs access to your photos to upload listings.',
+        LSApplicationQueriesSchemes: ['whatsapp', 'sms'],
+      },
     },
     android: {
       adaptiveIcon: {

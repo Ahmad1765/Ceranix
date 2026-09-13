@@ -61,3 +61,5 @@ describe('Social Invite Links & URLs', () => {
     expect(msg).toContain('/user/@vintage_vault');
   });
 });
+
+
