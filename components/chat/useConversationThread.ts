@@ -333,6 +333,14 @@ export function useConversationThread(
         };
         pinnedRef.current = true;
         setMessages((prev) => [...prev, temp]);
+      } else {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === tId
+              ? { ...m, content: imageUrl, metadata: { ...m.metadata, image_url: imageUrl } }
+              : m,
+          ),
+        );
       }
 
       let saved: ChatMessage | null = null;
@@ -473,8 +481,9 @@ export function useConversationThread(
     async (messageId: string): Promise<boolean> => {
       if (!user || !conversationId) return false;
 
-      const targetMsg = messagesRef.current.find((m) => m.id === messageId);
-      if (!targetMsg) return false;
+      const targetIndex = messagesRef.current.findIndex((m) => m.id === messageId);
+      if (targetIndex === -1) return false;
+      const targetMsg = messagesRef.current[targetIndex];
 
       // Discard optimistic / pending / failed temp messages immediately
       if (messageId.startsWith('temp-') || targetMsg.pending || targetMsg.failed) {
@@ -483,8 +492,17 @@ export function useConversationThread(
       }
 
       // Optimistically remove from state
-      const rollback = messagesRef.current;
       setMessages((prev) => prev.filter((m) => m.id !== messageId));
+
+      const rollback = () => {
+        setMessages((current) => {
+          if (current.some((m) => m.id === targetMsg.id)) return current;
+          const next = [...current];
+          const insertIdx = Math.min(Math.max(0, targetIndex), next.length);
+          next.splice(insertIdx, 0, targetMsg);
+          return next;
+        });
+      };
 
       try {
         const ok = await deleteMessage({
@@ -494,7 +512,7 @@ export function useConversationThread(
         });
 
         if (!ok) {
-          setMessages(rollback);
+          rollback();
           return false;
         }
 
@@ -502,16 +520,18 @@ export function useConversationThread(
         if (isImageMessage(targetMsg)) {
           const imgUrl = getMessageImageUrl(targetMsg);
           if (imgUrl && imgUrl.includes('/listing-images/')) {
-            deleteListingImages([imgUrl]).catch((err) => {
+            try {
+              await deleteListingImages([imgUrl]);
+            } catch (err) {
               console.warn('[chat] deleteListingImages cleanup error', err);
-            });
+            }
           }
         }
 
         return true;
       } catch (err) {
         console.warn('[chat] handleDeleteMessage error', err);
-        setMessages(rollback);
+        rollback();
         return false;
       }
     },

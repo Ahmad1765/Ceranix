@@ -256,38 +256,6 @@ function OrdersPageContent({
   if (loading && orders.length === 0) {
     return <OrdersSkeleton />;
   }
-  if (orders.length === 0) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', padding: 24 }}>
-        <EmptyState
-          icon="shopping-bag"
-          title={
-            filter === 'in_progress'
-              ? side === 'bought'
-                ? 'No orders in progress'
-                : 'No sales in progress'
-              : filter === 'canceled'
-              ? side === 'bought'
-                ? 'No canceled orders'
-                : 'No canceled sales'
-              : filter === 'completed'
-              ? side === 'bought'
-                ? 'No completed orders'
-                : 'No completed sales'
-              : side === 'bought'
-              ? 'No orders'
-              : 'No sales'
-          }
-          description="When you buy or sell items, they will show up here."
-          cta={{
-            label: side === 'bought' ? 'Browse items' : 'List an item',
-            onPress: () => (side === 'bought' ? onBrowse() : onList()),
-            icon: side === 'bought' ? 'search' : 'plus',
-          }}
-        />
-      </View>
-    );
-  }
 
   return (
     <FlatList
@@ -297,7 +265,10 @@ function OrdersPageContent({
       ItemSeparatorComponent={() => (
         <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.border, marginLeft: 88 }} />
       )}
-      contentContainerStyle={{ paddingVertical: 4, paddingBottom: 40 }}
+      contentContainerStyle={[
+        { paddingVertical: 4, paddingBottom: 40 },
+        orders.length === 0 && { flexGrow: 1, justifyContent: 'center' },
+      ]}
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
@@ -305,6 +276,36 @@ function OrdersPageContent({
           onRefresh={onRefresh}
           tintColor={theme.purple}
         />
+      }
+      ListEmptyComponent={
+        <View style={{ flex: 1, justifyContent: 'center', padding: 24 }}>
+          <EmptyState
+            icon="shopping-bag"
+            title={
+              filter === 'in_progress'
+                ? side === 'bought'
+                  ? 'No orders in progress'
+                  : 'No sales in progress'
+                : filter === 'canceled'
+                ? side === 'bought'
+                  ? 'No canceled orders'
+                  : 'No canceled sales'
+                : filter === 'completed'
+                ? side === 'bought'
+                  ? 'No completed orders'
+                  : 'No completed sales'
+                : side === 'bought'
+                ? 'No orders'
+                : 'No sales'
+            }
+            description="When you buy or sell items, they will show up here."
+            cta={{
+              label: side === 'bought' ? 'Browse items' : 'List an item',
+              onPress: () => (side === 'bought' ? onBrowse() : onList()),
+              icon: side === 'bought' ? 'search' : 'plus',
+            }}
+          />
+        </View>
       }
     />
   );
@@ -461,12 +462,15 @@ function OrdersScreen() {
     }
   };
 
+  const sideRef = useRef(side);
+  sideRef.current = side;
+
   useEffect(() => {
     if (screenWidth <= 0) return;
-    const targetX = side === 'sold' ? 0 : screenWidth;
+    const targetX = sideRef.current === 'sold' ? 0 : screenWidth;
     scrollX.setValue(targetX);
     pagerRef.current?.scrollTo({ x: targetX, animated: false });
-  }, [screenWidth]);
+  }, [screenWidth, scrollX]);
 
   const onRefresh = useCallback(() => {
     refetch();

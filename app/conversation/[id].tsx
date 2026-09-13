@@ -326,6 +326,7 @@ export default function ConversationScreen() {
   // ── Image Picking & Sending ──────────────────────────────────────────────
   const handlePickAndSendImage = useCallback(async () => {
     if (!user || !conversationId || uploadingImage) return;
+    let tempId: string | null = null;
     try {
       if (Platform.OS !== 'web') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -347,7 +348,7 @@ export default function ConversationScreen() {
       };
 
       // Optimistic message shown in thread immediately
-      const tempId = `temp-${Date.now()}`;
+      tempId = `temp-${Date.now()}`;
       const tempMsg = {
         id: tempId,
         conversation_id: conversationId,
@@ -372,6 +373,9 @@ export default function ConversationScreen() {
       // Deliver the server message
       await thread.handleSendImage(publicUrl, tempId);
     } catch (err: any) {
+      if (tempId) {
+        thread.handleDeleteMessage(tempId);
+      }
       console.warn('[conversation] send image error', err);
       toast.show(err?.message || 'Failed to send image', {
         variant: 'default',

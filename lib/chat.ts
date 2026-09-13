@@ -526,7 +526,6 @@ export function subscribeToMessages(
         event: 'DELETE',
         schema: 'public',
         table: 'messages',
-        filter: `conversation_id=eq.${conversationId}`,
       },
       (payload) => {
         const id = (payload.old as any)?.id;

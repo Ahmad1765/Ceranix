@@ -357,14 +357,6 @@ export const HomeSearchView = memo(function HomeSearchView({
     };
   });
 
-  const contentAnimatedStyle = useAnimatedStyle(() => {
-    const opacity = interpolate(animProgress.value, [0, 0.2, 1], [0, 0.8, 1], Extrapolation.CLAMP);
-    return {
-      flex: 1,
-      opacity,
-    };
-  });
-
   const { cardWidth } = useGridDimensions({
     min: 2,
     max: 4,
@@ -606,16 +598,18 @@ export const HomeSearchView = memo(function HomeSearchView({
           handleClose();
           return;
         }
-        if (deltaX < 0 && activeTab === 'listings') {
-          // Swipe left -> go to Seller
-          handleTabPress('seller');
-        } else if (deltaX > 0 && activeTab === 'seller') {
-          // Swipe right -> go to Listings
-          handleTabPress('listings');
+        if (canSwitchTabs) {
+          if (deltaX < 0 && activeTab === 'listings') {
+            // Swipe left -> go to Seller
+            handleTabPress('seller');
+          } else if (deltaX > 0 && activeTab === 'seller') {
+            // Swipe right -> go to Listings
+            handleTabPress('listings');
+          }
         }
       }
     },
-    [activeTab, handleTabPress, handleClose],
+    [activeTab, handleTabPress, handleClose, canSwitchTabs],
   );
 
   // Suggestion selection from pre-search suggestions list
@@ -1311,7 +1305,7 @@ export const HomeSearchView = memo(function HomeSearchView({
       </View>
 
         {/* ── Tab Switcher ('Items' & 'Members') - Hidden in results ─────────── */}
-        {!hasSubmitted && !hasQuery && (
+        {canSwitchTabs && (
           <View
             style={{
               flexDirection: 'row',
@@ -1398,7 +1392,7 @@ export const HomeSearchView = memo(function HomeSearchView({
           ref={pagerRef}
           horizontal
           pagingEnabled
-          scrollEnabled={!hasSubmitted && !hasQuery}
+          scrollEnabled={canSwitchTabs}
           showsHorizontalScrollIndicator={false}
           contentOffset={{ x: activeTab === 'listings' ? 0 : screenWidth, y: 0 }}
           onScroll={handleScroll}
@@ -1407,7 +1401,7 @@ export const HomeSearchView = memo(function HomeSearchView({
           style={[
             { flex: 1 },
             Platform.OS === 'web' && ({
-              scrollSnapType: !hasSubmitted && !hasQuery ? 'x mandatory' : 'none',
+              scrollSnapType: canSwitchTabs ? 'x mandatory' : 'none',
               WebkitOverflowScrolling: 'touch',
             } as any),
           ]}
