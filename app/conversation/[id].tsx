@@ -374,7 +374,11 @@ export default function ConversationScreen() {
       await thread.handleSendImage(publicUrl, tempId);
     } catch (err: any) {
       if (tempId) {
-        thread.handleDeleteMessage(tempId);
+        try {
+          await thread.handleDeleteMessage(tempId);
+        } catch (cleanupErr) {
+          console.warn('[conversation] cleanup temp message error', cleanupErr);
+        }
       }
       console.warn('[conversation] send image error', err);
       toast.show(err?.message || 'Failed to send image', {

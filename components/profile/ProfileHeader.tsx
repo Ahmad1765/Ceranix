@@ -42,6 +42,11 @@ export const ProfileHeader = memo(function ProfileHeader({
         onPress={() => router.push('/profile/edit')}
         actions={[
           {
+            icon: 'person-add-outline',
+            label: 'Find friends',
+            onPress: () => router.push('/friends' as any),
+          },
+          {
             icon: 'share-outline',
             label: 'Share profile',
             onPress: onShare,

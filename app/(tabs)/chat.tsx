@@ -766,13 +766,15 @@ export default function InboxScreen() {
       {/* Header */}
       <View
         style={{
+          flexDirection: 'row',
           alignItems: 'center',
-          justifyContent: 'center',
-          paddingHorizontal: 32,
+          justifyContent: 'space-between',
+          paddingHorizontal: 20,
           paddingTop: 8,
           paddingBottom: 21,
         }}
       >
+        <View style={{ width: 38 }} />
         <Text
           style={{
             fontFamily: typography.family.sansBold,
@@ -783,6 +785,28 @@ export default function InboxScreen() {
         >
           Inbox
         </Text>
+        <Pressable
+          onPress={() => {
+            haptic();
+            router.push('/friends' as any);
+          }}
+          hitSlop={HIT_SLOP_8}
+          accessibilityRole="button"
+          accessibilityLabel="Find friends"
+          style={({ pressed }) => ({
+            width: 38,
+            height: 38,
+            borderRadius: 19,
+            backgroundColor: theme.surface,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderWidth: 1,
+            borderColor: theme.hairline,
+            opacity: pressed ? 0.7 : 1,
+          })}
+        >
+          <Feather name="user-plus" size={17} color={theme.ink} />
+        </Pressable>
       </View>
 
       {/* Underline tabs */}

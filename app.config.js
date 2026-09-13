@@ -122,6 +122,13 @@ module.exports = () => ({
           project: 'ceranix-vg',
         },
       ],
+      'expo-localization',
+      [
+        'expo-contacts',
+        {
+          contactsPermission: 'Allow Carrinex to access your contacts to find friends on the app.',
+        },
+      ],
     ],
     web: {
       favicon: './assets/images/favicon.png',

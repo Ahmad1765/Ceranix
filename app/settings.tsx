@@ -194,6 +194,16 @@ export default function SettingsScreen() {
           />
           <Divider />
           <Row
+            label="Find & invite friends"
+            desc="Search members or sync contacts"
+            onPress={() => {
+              tap('light');
+              router.push('/friends' as any);
+            }}
+            chevron
+          />
+          <Divider />
+          <Row
             label="Share your profile"
             desc={profile?.username ? `@${profile.username}` : 'Send a link to your shop'}
             onPress={() => {
