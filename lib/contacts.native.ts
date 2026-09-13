@@ -145,9 +145,12 @@ export async function syncContacts(
   if (!perm.granted) {
     report('error', 0, 0, 'Address book permission not granted');
     const isPermanentlyDenied = !perm.canAskAgain;
+    const settingsMessage = Platform.OS === 'ios'
+      ? 'Contacts access is disabled in iOS Settings. Please enable Contacts permission in Settings to find friends.'
+      : 'Contacts access is disabled in Android Settings. Please enable Contacts permission in Settings to find friends.';
     const err = new Error(
       isPermanentlyDenied
-        ? 'Contacts access is disabled in iOS Settings. Please enable Contacts permission in Settings to find friends.'
+        ? settingsMessage
         : 'Contacts permission was not granted.',
     );
     (err as any).code = isPermanentlyDenied ? 'PERMISSION_PERMANENTLY_DENIED' : 'PERMISSION_DENIED';

@@ -63,6 +63,9 @@ begin
     return;
   end if;
 
+  -- Serialize rate-limit check per user and action to prevent race conditions
+  perform pg_advisory_xact_lock(hashtext(v_uid::text), hashtext(p_action));
+
   select count(*) into v_count
   from public.rate_limit_events
   where user_id = v_uid

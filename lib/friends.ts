@@ -78,7 +78,9 @@ export async function shareInviteLink(
  */
 export async function shareViaWhatsApp(username?: string | null, fullName?: string | null): Promise<boolean> {
   const message = getInviteMessage(username, fullName);
-  const text = encodeURIComponent(message);
+  const profileUrl = getProfileInviteUrl(username);
+  const fullMessage = `${message}\n${profileUrl}`;
+  const text = encodeURIComponent(fullMessage);
   const nativeUrl = `whatsapp://send?text=${text}`;
   const webUrl = `https://wa.me/?text=${text}`;
 
@@ -122,7 +124,7 @@ export async function shareViaWhatsApp(username?: string | null, fullName?: stri
   } catch (error) {
     console.warn('[friends] shareViaWhatsApp error, falling back to Share:', error);
     try {
-      const res = await Share.share({ message: `${message}\n${getProfileInviteUrl(username)}` });
+      const res = await Share.share({ message: fullMessage });
       return res.action === Share.sharedAction;
     } catch {
       return false;
@@ -139,7 +141,9 @@ export async function shareViaSMS(
   phoneNumber?: string,
 ): Promise<boolean> {
   const message = getInviteMessage(username, fullName);
-  const body = encodeURIComponent(message);
+  const profileUrl = getProfileInviteUrl(username);
+  const fullMessage = `${message}\n${profileUrl}`;
+  const body = encodeURIComponent(fullMessage);
   const cleanPhone = phoneNumber ? phoneNumber.replace(/[^\d+]/g, '') : '';
   const target = cleanPhone;
   const isApple = isAppleDevice();
@@ -155,7 +159,7 @@ export async function shareViaSMS(
           await (navigator as any).share({
             title: BRAND,
             text: message,
-            url: getProfileInviteUrl(username),
+            url: profileUrl,
           });
           return true;
         } catch (shareErr: any) {
@@ -187,12 +191,12 @@ export async function shareViaSMS(
     }
     // On iOS devices where sms scheme is not supported (e.g. iPad, iPod, or simulator),
     // seamlessly fall back to the system share sheet
-    const res = await Share.share({ message: `${message}\n${getProfileInviteUrl(username)}` });
+    const res = await Share.share({ message: fullMessage });
     return res.action === Share.sharedAction;
   } catch (error) {
     console.warn('[friends] shareViaSMS error, falling back to Share:', error);
     try {
-      const res = await Share.share({ message: `${message}\n${getProfileInviteUrl(username)}` });
+      const res = await Share.share({ message: fullMessage });
       return res.action === Share.sharedAction;
     } catch {
       return false;

@@ -66,7 +66,7 @@ describe('lib/friends', () => {
     expect(mockSetStringAsync).not.toHaveBeenCalled();
   });
 
-  it('shareViaSMS on web formats URL properly and sets location', async () => {
+  it('shareViaSMS on web formats URL properly with encoded profile URL and sets location', async () => {
     const { shareViaSMS } = await import('./friends');
     const mockLocation = { href: '' };
     vi.stubGlobal('window', { location: mockLocation });
@@ -77,9 +77,11 @@ describe('lib/friends', () => {
     const res = await shareViaSMS('testuser', 'Test User', '+1234567890');
     expect(res).toBe(true);
     expect(mockLocation.href).toContain('sms:+1234567890&body=');
+    // Verify encoded profile URL is part of the body
+    expect(mockLocation.href).toContain(encodeURIComponent('/user/@testuser'));
   });
 
-  it('shareViaWhatsApp on mobile web navigates directly to wa.me', async () => {
+  it('shareViaWhatsApp on mobile web navigates directly to wa.me with encoded profile URL', async () => {
     const { shareViaWhatsApp } = await import('./friends');
     const mockLocation = { href: '' };
     vi.stubGlobal('window', { location: mockLocation });
@@ -90,5 +92,7 @@ describe('lib/friends', () => {
     const res = await shareViaWhatsApp('testuser', 'Test User');
     expect(res).toBe(true);
     expect(mockLocation.href).toContain('https://wa.me/?text=');
+    // Verify encoded profile URL is part of the query parameter
+    expect(mockLocation.href).toContain(encodeURIComponent('/user/@testuser'));
   });
 });
