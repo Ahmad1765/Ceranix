@@ -37,6 +37,7 @@ export type MessageAction = {
   id: string;
   label: string;
   icon: keyof typeof Feather.glyphMap;
+  tone?: 'default' | 'destructive';
   onPress: () => void;
 };
 
@@ -226,36 +227,44 @@ export function ReactionPicker({
                   paddingVertical: 6,
                 }}
               >
-                {actions.map((a) => (
-                  <Pressable
-                    key={a.id}
-                    accessibilityRole="button"
-                    accessibilityLabel={a.label}
-                    onPress={() => {
-                      onClose();
-                      a.onPress();
-                    }}
-                    style={({ pressed }) => ({
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 8,
-                      paddingVertical: 16,
-                      backgroundColor: pressed ? theme.panel : 'transparent',
-                    })}
-                  >
-                    <Feather name={a.icon} size={17} color={theme.ink} />
-                    <Text
-                      style={{
-                        fontFamily: typography.family.sansSemibold,
-                        fontSize: 16,
-                        color: theme.ink,
+                {actions.map((a) => {
+                  const isDestructive = a.tone === 'destructive';
+                  const actionColor = isDestructive ? (theme.danger ?? '#EF4444') : theme.ink;
+                  return (
+                    <Pressable
+                      key={a.id}
+                      accessibilityRole="button"
+                      accessibilityLabel={a.label}
+                      onPress={() => {
+                        onClose();
+                        a.onPress();
                       }}
+                      style={({ pressed }) => ({
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                        paddingVertical: 16,
+                        backgroundColor: pressed
+                          ? isDestructive
+                            ? 'rgba(239, 68, 68, 0.08)'
+                            : theme.panel
+                          : 'transparent',
+                      })}
                     >
-                      {a.label}
-                    </Text>
-                  </Pressable>
-                ))}
+                      <Feather name={a.icon} size={17} color={actionColor} />
+                      <Text
+                        style={{
+                          fontFamily: typography.family.sansSemibold,
+                          fontSize: 16,
+                          color: actionColor,
+                        }}
+                      >
+                        {a.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
             </SafeAreaView>
           )}

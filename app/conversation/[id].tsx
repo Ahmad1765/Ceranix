@@ -32,11 +32,17 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { safeBack } from '@/lib/nav';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
+import * as ImagePicker from 'expo-image-picker';
+import * as Haptics from 'expo-haptics';
+import { uploadListingImages, type LocalImage } from '@/lib/upload';
+import { FullscreenImageViewer } from '@/components/product/FullscreenImageViewer';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { type as typography } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
+import { confirm } from '@/lib/confirm';
+import { isImageMessage } from '@/lib/chat';
 import { EmptyState, SafeContainer } from '@/components/ui';
 import { explainCoverage } from '@/components/SafetyBanner';
 import { HIT_SLOP_8 } from '@/lib/responsive';
@@ -60,22 +66,79 @@ import {
 } from '@/components/chat';
 
 /** Breathing room under composer when software keyboard is up */
-const DOCK_GAP_KEYBOARD = 10;
+const DOCK_GAP_KEYBOARD = 6;
 const EMPTY_REACTIONS: string[] = [];
 
-function useKeyboardVisible(): boolean {
-  const [visible, setVisible] = useState(false);
+function useChatKeyboardLayout() {
+  const [keyboardUp, setKeyboardUp] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [webViewportHeight, setWebViewportHeight] = useState<number | null>(null);
+
   useEffect(() => {
+    // 1. Native Keyboard Events (iOS & Android)
     const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const show = Keyboard.addListener(showEvt, () => setVisible(true));
-    const hide = Keyboard.addListener(hideEvt, () => setVisible(false));
+
+    const showSub = Keyboard.addListener(showEvt, (e) => {
+      setKeyboardUp(true);
+      const h = e?.endCoordinates?.height ?? 0;
+      setKeyboardHeight(h);
+    });
+
+    const hideSub = Keyboard.addListener(hideEvt, () => {
+      setKeyboardUp(false);
+      setKeyboardHeight(0);
+    });
+
+    // 2. Web VisualViewport Events (Mobile Safari / iOS WebKit / Chrome Mobile)
+    let cleanupWeb: (() => void) | null = null;
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const onViewportChange = () => {
+        const vv = window.visualViewport;
+        if (!vv) return;
+
+        const currentHeight = vv.height;
+        const totalHeight = window.innerHeight;
+        const diff = Math.max(0, totalHeight - currentHeight);
+
+        // Virtual keyboard is active on mobile web if visual viewport shrunk (> 60px)
+        const isUp = diff > 60;
+        setKeyboardUp(isUp);
+        setKeyboardHeight(isUp ? diff : 0);
+        setWebViewportHeight(isUp ? currentHeight : null);
+
+        // Prevent iOS Safari from scrolling window.scrollY and pushing the header off screen
+        if (isUp) {
+          if (window.scrollY !== 0 || document.body.scrollTop !== 0) {
+            window.scrollTo({ left: 0, top: 0, behavior: 'instant' as any });
+            document.body.scrollTop = 0;
+          }
+        }
+      };
+
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', onViewportChange);
+        window.visualViewport.addEventListener('scroll', onViewportChange);
+      }
+      window.addEventListener('scroll', onViewportChange, { passive: true });
+
+      cleanupWeb = () => {
+        if (window.visualViewport) {
+          window.visualViewport.removeEventListener('resize', onViewportChange);
+          window.visualViewport.removeEventListener('scroll', onViewportChange);
+        }
+        window.removeEventListener('scroll', onViewportChange);
+      };
+    }
+
     return () => {
-      show.remove();
-      hide.remove();
+      showSub.remove();
+      hideSub.remove();
+      cleanupWeb?.();
     };
   }, []);
-  return visible;
+
+  return { keyboardUp, keyboardHeight, webViewportHeight };
 }
 
 export default function ConversationScreen() {
@@ -86,7 +149,7 @@ export default function ConversationScreen() {
   const { theme } = useTheme();
   const toast = useToast();
   const insets = useSafeAreaInsets();
-  const keyboardUp = useKeyboardVisible();
+  const { keyboardUp, webViewportHeight } = useChatKeyboardLayout();
 
   // ── Custom Domain Hooks ──────────────────────────────────────────────────
   const thread = useConversationThread(conversationId, user, prefillParam);
@@ -98,6 +161,8 @@ export default function ConversationScreen() {
   const [plusOpen, setPlusOpen] = useState(false);
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
 
   // ── Navigation & Clipboard Helpers ───────────────────────────────────────
   const openListing = useCallback(() => {
@@ -115,10 +180,44 @@ export default function ConversationScreen() {
     toast.show('Copied', { variant: 'success', icon: 'check' });
   }, [pressed?.msg, toast]);
 
-  const messageActions: MessageAction[] = useMemo(
-    () => [{ id: 'copy', label: 'Copy', icon: 'copy', onPress: handleCopy }],
-    [handleCopy],
-  );
+  const handleDeleteMessage = useCallback(async () => {
+    const msg = pressed?.msg;
+    if (!msg || !user) return;
+    const isImage = isImageMessage(msg);
+
+    const ok = await confirm({
+      title: isImage ? 'Delete photo?' : 'Delete message?',
+      message: 'This message will be deleted for everyone in this conversation. This cannot be undone.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      destructive: true,
+    });
+    if (!ok) return;
+
+    const success = await thread.handleDeleteMessage(msg.id);
+    if (!success) {
+      toast.show("Couldn't delete message", { variant: 'default', icon: 'alert-triangle' });
+    } else {
+      toast.show(isImage ? 'Photo deleted' : 'Message deleted', { variant: 'success', icon: 'check' });
+    }
+  }, [pressed?.msg, thread, toast, user]);
+
+  const messageActions: MessageAction[] = useMemo(() => {
+    const actions: MessageAction[] = [
+      { id: 'copy', label: 'Copy', icon: 'copy', onPress: handleCopy },
+    ];
+    if (pressed?.msg && user && pressed.msg.sender_id === user.id) {
+      const isImage = isImageMessage(pressed.msg);
+      actions.push({
+        id: 'delete',
+        label: isImage ? 'Delete photo' : 'Delete message',
+        icon: 'trash-2',
+        tone: 'destructive',
+        onPress: handleDeleteMessage,
+      });
+    }
+    return actions;
+  }, [handleCopy, handleDeleteMessage, pressed?.msg, user]);
 
   // ── Context Action Sheets Menus ──────────────────────────────────────────
   const plusActions: ChatAction[] = useMemo(
@@ -158,6 +257,18 @@ export default function ConversationScreen() {
 
   const overflowActions: ChatAction[] = useMemo(
     () => [
+      ...(thread.canOffer
+        ? [
+            {
+              id: 'offer',
+              label: 'Make an offer',
+              hint: thread.convListingPrice ? `Listed at ${formatPrice(thread.convListingPrice)}` : undefined,
+              icon: 'tag' as const,
+              tone: 'primary' as const,
+              onPress: () => setOfferVisible(true),
+            },
+          ]
+        : []),
       ...(thread.other?.id
         ? [
             {
@@ -209,8 +320,67 @@ export default function ConversationScreen() {
           ]
         : []),
     ],
-    [thread.other, thread.convListingId, openListing, block.isBlocked, block.handleToggleBlock],
+    [thread.other, thread.canOffer, thread.convListingPrice, thread.convListingId, openListing, block.isBlocked, block.handleToggleBlock],
   );
+
+  // ── Image Picking & Sending ──────────────────────────────────────────────
+  const handlePickAndSendImage = useCallback(async () => {
+    if (!user || !conversationId || uploadingImage) return;
+    try {
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.8,
+        base64: true,
+      });
+
+      if (result.canceled || !result.assets?.[0]) return;
+
+      setUploadingImage(true);
+      const asset = result.assets[0];
+      const localImg: LocalImage = {
+        uri: asset.uri,
+        base64: asset.base64 ?? null,
+      };
+
+      // Optimistic message shown in thread immediately
+      const tempId = `temp-${Date.now()}`;
+      const tempMsg = {
+        id: tempId,
+        conversation_id: conversationId,
+        sender_id: user.id,
+        content: asset.uri,
+        kind: 'text' as const,
+        metadata: { image_url: asset.uri },
+        offer_status: null,
+        created_at: new Date().toISOString(),
+        pending: true,
+      };
+      thread.addOptimisticMessage(tempMsg);
+
+      // Upload image via the standard upload pipeline
+      const uploaded = await uploadListingImages([localImg], user.id);
+      const publicUrl = uploaded[0]?.url;
+
+      if (!publicUrl) {
+        throw new Error('Could not upload photo');
+      }
+
+      // Deliver the server message
+      await thread.handleSendImage(publicUrl, tempId);
+    } catch (err: any) {
+      console.warn('[conversation] send image error', err);
+      toast.show(err?.message || 'Failed to send image', {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
+    } finally {
+      setUploadingImage(false);
+    }
+  }, [conversationId, thread, toast, uploadingImage, user]);
 
   // ── Message Thread Row Renderer ──────────────────────────────────────────
   const renderRow = useCallback(
@@ -247,6 +417,7 @@ export default function ConversationScreen() {
           }}
           onRetry={() => thread.handleRetry(item.msg)}
           onLongPress={(anchor) => setPressed({ msg: item.msg, anchor })}
+          onImagePress={(url) => setFullscreenImage(url)}
         />
       );
     },
@@ -304,7 +475,20 @@ export default function ConversationScreen() {
       noScroll
       edges={['top', 'left', 'right']}
       backgroundColor={theme.background}
-      style={{ flex: 1 }}
+      style={[
+        { flex: 1 },
+        Platform.OS === 'web' && webViewportHeight != null
+          ? ({
+              height: webViewportHeight,
+              maxHeight: webViewportHeight,
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              overflow: 'hidden',
+            } as any)
+          : null,
+      ]}
     >
       {/* Floating Header — absolutely positioned like the product page */}
       <LinearGradient
@@ -344,6 +528,13 @@ export default function ConversationScreen() {
         }}
         onContentSizeChange={thread.followEnd}
         onScroll={thread.onScroll}
+        onScrollBeginDrag={() => {
+          if (Platform.OS === 'web' && typeof document !== 'undefined') {
+            if (document.activeElement instanceof HTMLElement && document.activeElement.tagName === 'TEXTAREA') {
+              document.activeElement.blur();
+            }
+          }
+        }}
         scrollEventThrottle={16}
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
@@ -378,14 +569,16 @@ export default function ConversationScreen() {
       />
 
       {/* Floating Bottom Composer / Block Banner Dock */}
-      <View
+      <LinearGradient
+        colors={['transparent', theme.background, theme.background]}
+        locations={[0, 0.35, 1]}
         style={{
           position: 'absolute',
           bottom: 0,
           left: 0,
           right: 0,
           zIndex: 30,
-          backgroundColor: 'transparent',
+          paddingTop: 12,
           paddingBottom: keyboardUp ? DOCK_GAP_KEYBOARD : Math.max(insets.bottom + 10, 20),
         }}
         pointerEvents="box-none"
@@ -406,7 +599,22 @@ export default function ConversationScreen() {
             value={thread.input}
             onChangeText={thread.setInput}
             onSend={thread.handleSend}
+            onSendImage={handlePickAndSendImage}
+            uploadingImage={uploadingImage}
             onPlus={() => setPlusOpen(true)}
+            onFocus={() => {
+              if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                requestAnimationFrame(() => {
+                  window.scrollTo({ left: 0, top: 0, behavior: 'instant' as any });
+                  document.body.scrollTop = 0;
+                });
+                setTimeout(() => {
+                  window.scrollTo({ left: 0, top: 0, behavior: 'instant' as any });
+                  document.body.scrollTop = 0;
+                  thread.followEnd();
+                }, 80);
+              }
+            }}
           />
         ) : (
           <ConversationBlockedBanner
@@ -414,7 +622,7 @@ export default function ConversationScreen() {
             onUnblock={block.handleToggleBlock}
           />
         )}
-      </View>
+      </LinearGradient>
 
       {/* Pop-up Reaction Picker */}
       <ReactionPicker
@@ -451,6 +659,14 @@ export default function ConversationScreen() {
           const success = await thread.handleSendOffer(amount, '');
           if (success) setOfferVisible(false);
         }}
+      />
+
+      {/* Fullscreen Photo Viewer */}
+      <FullscreenImageViewer
+        visible={!!fullscreenImage}
+        images={fullscreenImage ? [fullscreenImage] : []}
+        initialIndex={0}
+        onClose={() => setFullscreenImage(null)}
       />
     </SafeContainer>
   );

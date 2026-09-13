@@ -152,7 +152,7 @@ function usePreventViewportZoomOnWeb() {
     }
     meta.setAttribute(
       'content',
-      'width=device-width, initial-scale=1, viewport-fit=cover'
+      'width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content'
     );
 
     // Prevent iOS Safari auto-zoom on input focus while preserving user pinch-to-zoom
@@ -170,10 +170,10 @@ function usePreventViewportZoomOnWeb() {
       document.head.appendChild(style);
     }
 
-    // On iOS Safari, when keyboard dismisses or input blurs, ensure horizontal viewport offset is reset to 0
+    // On iOS Safari, when keyboard dismisses or input blurs, ensure horizontal and vertical viewport offsets are reset
     const handleFocusOut = () => {
       if (typeof window !== 'undefined') {
-        window.scrollTo({ left: 0, top: window.scrollY, behavior: 'instant' as any });
+        window.scrollTo({ left: 0, top: 0, behavior: 'instant' as any });
       }
     };
     window.addEventListener('focusout', handleFocusOut);

@@ -6,6 +6,7 @@ import {
   Platform,
   StyleSheet,
   ViewStyle,
+  StyleProp,
   ScrollViewProps,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -33,9 +34,9 @@ export interface SafeContainerProps {
   /** NativeWind / Tailwind className */
   className?: string;
   /** Custom container style */
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   /** Custom scrollview content container style (when mode='scroll') */
-  contentContainerStyle?: ViewStyle;
+  contentContainerStyle?: StyleProp<ViewStyle>;
   /** ScrollView props pass-through (when mode='scroll') */
   scrollViewProps?: Omit<ScrollViewProps, 'style' | 'contentContainerStyle'>;
 }

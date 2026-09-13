@@ -35,8 +35,15 @@ function InboxRowImpl({
   const fromMe = !!conv.last_sender_id && conv.last_sender_id === userId;
   const displayName = other?.full_name || other?.username || 'Unknown';
   const initial = displayName.trim().charAt(0).toUpperCase();
+  const isImage = Boolean(
+    conv.last_message && (
+      conv.last_message.startsWith('http') &&
+      (conv.last_message.includes('listing-images') || conv.last_message.match(/\.(jpg|jpeg|png|webp|gif)/i))
+    )
+  );
+  const previewText = isImage ? '📷 Photo' : conv.last_message;
   const preview = conv.last_message
-    ? `${fromMe ? 'You: ' : ''}${conv.last_message}`
+    ? `${fromMe ? 'You: ' : ''}${previewText}`
     : 'Tap to start the conversation';
 
   return (

@@ -47,6 +47,7 @@ import {
   getConversation,
   markConversationRead,
   sendMessage,
+  deleteMessage,
   sendOffer,
   acceptChatOffer,
   counterOffer,
@@ -55,10 +56,13 @@ import {
   subscribeToReactions,
   updateOfferStatus,
   otherParticipant,
+  isImageMessage,
+  getMessageImageUrl,
   type ChatMessage,
   type ConversationRow,
   type MessageReaction,
 } from '@/lib/chat';
+import { deleteListingImages } from '@/lib/upload';
 import { buildThreadRows, listingStatus, type ThreadRow } from '@/components/chat';
 
 export function useConversationThread(
@@ -76,6 +80,9 @@ export function useConversationThread(
   const [reactions, setReactions] = useState<MessageReaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [input, setInput] = useState(initialInput);
+
+  const messagesRef = useRef<ChatMessage[]>(messages);
+  messagesRef.current = messages;
 
   useEffect(() => {
     setInput(initialInput);
@@ -129,6 +136,9 @@ export function useConversationThread(
         if (event.type === 'insert') {
           if (prev.some((m) => m.id === event.message.id)) return prev;
           return [...prev, event.message];
+        }
+        if (event.type === 'delete') {
+          return prev.filter((m) => m.id !== event.messageId);
         }
         return prev.map((m) => (m.id === event.message.id ? { ...m, ...event.message } : m));
       });
@@ -300,14 +310,73 @@ export function useConversationThread(
     deliver(text, temp.id);
   }, [conversationId, deliver, input, user]);
 
+  const addOptimisticMessage = useCallback((msg: ChatMessage) => {
+    pinnedRef.current = true;
+    setMessages((prev) => [...prev, msg]);
+  }, []);
+
+  const handleSendImage = useCallback(
+    async (imageUrl: string, tempId?: string) => {
+      if (!user || !conversationId) return;
+      const tId = tempId || `temp-${Date.now()}`;
+      if (!tempId) {
+        const temp: ChatMessage = {
+          id: tId,
+          conversation_id: conversationId,
+          sender_id: user.id,
+          content: imageUrl,
+          kind: 'text',
+          metadata: { image_url: imageUrl },
+          offer_status: null,
+          created_at: new Date().toISOString(),
+          pending: true,
+        };
+        pinnedRef.current = true;
+        setMessages((prev) => [...prev, temp]);
+      }
+
+      let saved: ChatMessage | null = null;
+      let failure: unknown = null;
+      try {
+        saved = await sendMessage({
+          conversationId,
+          senderId: user.id,
+          content: imageUrl,
+          metadata: { image_url: imageUrl },
+        });
+      } catch (e) {
+        failure = e;
+      }
+
+      if (saved) {
+        const delivered = saved;
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === delivered.id)) return prev.filter((m) => m.id !== tId);
+          return prev.map((m) => (m.id === tId ? delivered : m));
+        });
+        return;
+      }
+
+      console.warn('[conversation] send image failed', failure ?? 'insert returned no row');
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tId ? { ...m, pending: false, failed: true } : m)),
+      );
+    },
+    [conversationId, user],
+  );
+
   const handleRetry = useCallback(
     (msg: ChatMessage) => {
       setMessages((prev) =>
         prev.map((m) => (m.id === msg.id ? { ...m, pending: true, failed: false } : m)),
       );
-      deliver(msg.content, msg.id);
+      if (isImageMessage(msg)) {
+        handleSendImage(getMessageImageUrl(msg) || msg.content, msg.id);
+      } else {
+        deliver(msg.content, msg.id);
+      }
     },
-    [deliver],
+    [deliver, handleSendImage],
   );
 
   // ── Offer Workflows ──────────────────────────────────────────────────────
@@ -399,6 +468,56 @@ export function useConversationThread(
     [conversationId, toast, user],
   );
 
+  // ── Message Deletion ───────────────────────────────────────────────────
+  const handleDeleteMessage = useCallback(
+    async (messageId: string): Promise<boolean> => {
+      if (!user || !conversationId) return false;
+
+      const targetMsg = messagesRef.current.find((m) => m.id === messageId);
+      if (!targetMsg) return false;
+
+      // Discard optimistic / pending / failed temp messages immediately
+      if (messageId.startsWith('temp-') || targetMsg.pending || targetMsg.failed) {
+        setMessages((prev) => prev.filter((m) => m.id !== messageId));
+        return true;
+      }
+
+      // Optimistically remove from state
+      const rollback = messagesRef.current;
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+
+      try {
+        const ok = await deleteMessage({
+          conversationId,
+          messageId,
+          userId: user.id,
+        });
+
+        if (!ok) {
+          setMessages(rollback);
+          return false;
+        }
+
+        // Clean up storage object if this message was an uploaded photo
+        if (isImageMessage(targetMsg)) {
+          const imgUrl = getMessageImageUrl(targetMsg);
+          if (imgUrl && imgUrl.includes('/listing-images/')) {
+            deleteListingImages([imgUrl]).catch((err) => {
+              console.warn('[chat] deleteListingImages cleanup error', err);
+            });
+          }
+        }
+
+        return true;
+      } catch (err) {
+        console.warn('[chat] handleDeleteMessage error', err);
+        setMessages(rollback);
+        return false;
+      }
+    },
+    [conversationId, user],
+  );
+
   // ── Reporting ────────────────────────────────────────────────────────────
   const handleReport = useCallback(
     async (reason: string) => {
@@ -443,7 +562,10 @@ export function useConversationThread(
     myReactionOn,
     handleReact,
     handleSend,
+    handleSendImage,
+    addOptimisticMessage,
     handleRetry,
+    handleDeleteMessage,
     handleSendOffer,
     handleCounterOffer,
     handleOfferResponse,

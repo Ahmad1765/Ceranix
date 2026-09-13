@@ -8,7 +8,7 @@
 // down each side instead of as chrome inside every message.
 
 import { memo, useCallback, useRef } from 'react';
-import { Platform, Pressable, View } from 'react-native';
+import { Platform, Pressable, View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
@@ -17,7 +17,7 @@ import { PressableScale } from '@/components/PressableScale';
 import { radii, shadow, type as typography } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
-import type { ChatMessage } from '@/lib/chat';
+import { isImageMessage, getMessageImageUrl, type ChatMessage } from '@/lib/chat';
 import type { Anchor } from './ReactionPicker';
 import { bubbleStamp } from './format';
 import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
@@ -51,6 +51,8 @@ export type MessageRowProps = {
   onRetry: () => void;
   /** Long-press: opens the reaction bar over the measured bubble. */
   onLongPress: (anchor: Anchor) => void;
+  /** Tap on image: opens fullscreen viewer */
+  onImagePress?: (imageUrl: string) => void;
 };
 
 // ── Meta line ─────────────────────────────────────────────────────────────
@@ -959,6 +961,56 @@ function OfferBubble(
   );
 }
 
+// ── Image ─────────────────────────────────────────────────────────────────
+
+function ImageBubble({
+  msg,
+  mine,
+  grouped,
+  lastOfGroup,
+}: Pick<MessageRowProps, 'msg' | 'mine' | 'grouped' | 'lastOfGroup'>) {
+  const { theme } = useTheme();
+  const imageUrl = getMessageImageUrl(msg) || msg.content;
+
+  return (
+    <View
+      style={{
+        borderRadius: BUBBLE_RADIUS,
+        borderTopRightRadius: mine && grouped ? TAIL_RADIUS : BUBBLE_RADIUS,
+        borderTopLeftRadius: !mine && grouped ? TAIL_RADIUS : BUBBLE_RADIUS,
+        borderBottomRightRadius: mine && lastOfGroup ? TAIL_RADIUS : BUBBLE_RADIUS,
+        borderBottomLeftRadius: !mine && lastOfGroup ? TAIL_RADIUS : BUBBLE_RADIUS,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: theme.border,
+        backgroundColor: theme.panel,
+        width: 220,
+        height: 220,
+        alignSelf: mine ? 'flex-end' : 'flex-start',
+      }}
+    >
+      <Image
+        source={{ uri: imageUrl }}
+        style={{ width: '100%', height: '100%' }}
+        contentFit="cover"
+        transition={200}
+      />
+      {msg.pending && (
+        <View
+          style={{
+            ...StyleSheet.absoluteFillObject,
+            backgroundColor: 'rgba(0, 0, 0, 0.35)',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <ActivityIndicator size="small" color="#FFFFFF" />
+        </View>
+      )}
+    </View>
+  );
+}
+
 // ── Text ──────────────────────────────────────────────────────────────────
 
 function TextBubble({
@@ -1068,7 +1120,7 @@ function MessageRowImpl(props: MessageRowProps) {
   const bubbleRef = useRef<View>(null);
 
   // A message that hasn't landed yet has no server id to hang a reaction off.
-  const canReact = msg.kind !== 'system' && !msg.pending && !msg.failed;
+  const canReact = msg.kind !== 'system' && !msg.pending;
 
   const handleLongPress = useCallback(() => {
     if (!canReact) return;
@@ -1133,19 +1185,46 @@ function MessageRowImpl(props: MessageRowProps) {
 
         <Pressable
           ref={bubbleRef}
+          onPress={() => {
+            if (isImageMessage(msg)) {
+              props.onImagePress?.(getMessageImageUrl(msg) || msg.content);
+            }
+          }}
           onLongPress={canReact ? handleLongPress : undefined}
           // Long enough not to fire while someone is scrolling with a finger
           // resting on a bubble, short enough to feel deliberate.
           delayLongPress={320}
+          {...(Platform.OS === 'web'
+            ? ({
+                onContextMenu: (e: any) => {
+                  if (canReact) {
+                    e.preventDefault?.();
+                    handleLongPress();
+                  }
+                },
+              } as any)
+            : null)}
           accessibilityRole={canReact ? 'button' : undefined}
-          accessibilityLabel={canReact ? 'Message. Long press to react' : undefined}
+          accessibilityLabel={
+            isImageMessage(msg)
+              ? 'Photo message. Tap to view full size'
+              : canReact
+                ? 'Message. Long press to react'
+                : undefined
+          }
           style={{
-            maxWidth: msg.kind === 'offer' ? (mine ? '86%' : '82%') : '78%',
+            maxWidth: msg.kind === 'offer' ? (mine ? '86%' : '82%') : isImageMessage(msg) ? '78%' : '78%',
             alignItems: mine ? 'flex-end' : 'flex-start',
             alignSelf: mine ? 'flex-end' : 'flex-start',
           }}
         >
-          {msg.kind === 'offer' ? <OfferBubble {...props} /> : <TextBubble {...props} />}
+          {msg.kind === 'offer' ? (
+            <OfferBubble {...props} />
+          ) : isImageMessage(msg) ? (
+            <ImageBubble {...props} />
+          ) : (
+            <TextBubble {...props} />
+          )}
           <ReactionChip reactions={reactions} mine={mine} />
         </Pressable>
       </View>

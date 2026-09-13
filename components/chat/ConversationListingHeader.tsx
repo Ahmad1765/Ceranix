@@ -126,17 +126,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
     borderWidth: 1,
-    // iOS shadow
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    // Android elevation
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 5,
     elevation: 2,
-    // Web shadow
     ...Platform.select({
       web: {
-        boxShadow: '0 1px 4px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.06)',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04)',
       } as any,
     }),
   },

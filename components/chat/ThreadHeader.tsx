@@ -52,7 +52,7 @@ export function ThreadHeader({
           width: 40,
           height: 40,
           borderRadius: 20,
-          backgroundColor: theme.surface,
+          backgroundColor: theme.panel,
           borderWidth: 1,
           borderColor: theme.hairline,
           alignItems: 'center',
@@ -75,7 +75,7 @@ export function ThreadHeader({
           flexDirection: 'row',
           alignItems: 'center',
           gap: 10,
-          backgroundColor: theme.surface,
+          backgroundColor: theme.panel,
           borderWidth: 1,
           borderColor: theme.hairline,
           borderRadius: 24,
@@ -131,7 +131,7 @@ export function ThreadHeader({
                 borderRadius: 6,
                 backgroundColor: '#00C853',
                 borderWidth: 2,
-                borderColor: theme.surface,
+                borderColor: theme.panel,
               }}
             />
           )}
@@ -179,7 +179,7 @@ export function ThreadHeader({
           width: 40,
           height: 40,
           borderRadius: 20,
-          backgroundColor: theme.surface,
+          backgroundColor: theme.panel,
           borderWidth: 1,
           borderColor: theme.hairline,
           alignItems: 'center',
@@ -196,17 +196,14 @@ export function ThreadHeader({
 
 const styles = StyleSheet.create({
   shadow: {
-    // iOS
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    // Android
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 5,
     elevation: 2,
-    // Web
     ...Platform.select({
       web: {
-        boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04)',
       } as any,
     }),
   },

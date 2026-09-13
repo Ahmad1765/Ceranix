@@ -8,7 +8,7 @@
 // the same measurement, capped at MAX_INPUT_HEIGHT before it starts scrolling.
 
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
-import { View, Platform, StyleSheet, type NativeSyntheticEvent, type TextInputContentSizeChangeEventData } from 'react-native';
+import { View, Platform, StyleSheet, ActivityIndicator, type NativeSyntheticEvent, type TextInputContentSizeChangeEventData } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -27,17 +27,25 @@ export function Composer({
   value,
   onChangeText,
   onSend,
+  onSendImage,
   onPlus,
+  onFocus,
+  onBlur,
   placeholder = 'Write a message…',
   disabledReason,
+  uploadingImage = false,
 }: {
   value: string;
   onChangeText: (t: string) => void;
   onSend: () => void;
-  onPlus: () => void;
+  onSendImage?: () => void;
+  onPlus?: () => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
   placeholder?: string;
   /** When set, the composer is replaced by this line — e.g. listing removed. */
   disabledReason?: string | null;
+  uploadingImage?: boolean;
 }) {
   const { theme, isDark } = useTheme();
   const armed = value.trim().length > 0;
@@ -108,11 +116,13 @@ export function Composer({
         backgroundColor: 'transparent',
       }}
     >
-      {/* Standalone Circular "+" Button */}
+      {/* Standalone Circular Image Button */}
       <PressableScale
-        onPress={onPlus}
+        onPress={onSendImage || onPlus}
         scaleTo={0.92}
-        accessibilityLabel="More actions"
+        disabled={uploadingImage}
+        accessibilityLabel="Send image"
+        accessibilityRole="button"
         style={[
           {
             width: PLUS_BUTTON_SIZE,
@@ -124,11 +134,16 @@ export function Composer({
             alignItems: 'center',
             justifyContent: 'center',
             marginBottom: 0,
+            opacity: uploadingImage ? 0.6 : 1,
           },
           btnShadow,
         ]}
       >
-        <Feather name="plus" size={20} color={theme.ink} />
+        {uploadingImage ? (
+          <ActivityIndicator size="small" color={theme.ink} />
+        ) : (
+          <Feather name="plus" size={20} color={theme.ink} />
+        )}
       </PressableScale>
 
       {/* Unified Capsule / Rounded Input Container */}
@@ -175,6 +190,8 @@ export function Composer({
                   }
                 : undefined
             }
+            onFocus={onFocus}
+            onBlur={onBlur}
             onContentSizeChange={onContentSize}
             multiline
             {...({ enableAccessoryView: false } as any)}
@@ -254,17 +271,14 @@ export function Composer({
 
 const styles = StyleSheet.create({
   shadow: {
-    // iOS
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    // Android
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 5,
     elevation: 2,
-    // Web
     ...Platform.select({
       web: {
-        boxShadow: '0 1px 4px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.06)',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04)',
       } as any,
     }),
   },

@@ -28,6 +28,8 @@ export interface ChatMessage {
     is_bundle?: boolean;
     bundle_item_ids?: string[];
     bundle_count?: number;
+    image_url?: string;
+    thumb_url?: string;
   } | null;
   offer_status: OfferStatus | null;
   parent_offer_id?: string | null;
@@ -195,6 +197,8 @@ export async function sendMessage(args: {
   conversationId: string;
   senderId: string;
   content: string;
+  kind?: MessageKind;
+  metadata?: Record<string, any> | null;
 }): Promise<ChatMessage | null> {
   const trimmed = args.content.trim();
   if (!trimmed) return null;
@@ -204,7 +208,8 @@ export async function sendMessage(args: {
       conversation_id: args.conversationId,
       sender_id: args.senderId,
       content: trimmed,
-      kind: 'text',
+      kind: args.kind ?? 'text',
+      metadata: args.metadata ?? null,
     })
     .select('id, conversation_id, sender_id, content, kind, metadata, offer_status, created_at, updated_at')
     .single();
@@ -213,6 +218,72 @@ export async function sendMessage(args: {
     return null;
   }
   return data as unknown as ChatMessage;
+}
+
+export function isImageMessage(msg: ChatMessage): boolean {
+  if (msg.metadata?.image_url) return true;
+  if (typeof msg.content === 'string') {
+    const trimmed = msg.content.trim();
+    return Boolean(
+      trimmed.startsWith('data:image/') ||
+      trimmed.startsWith('file://') ||
+      trimmed.startsWith('blob:') ||
+      trimmed.match(/^https?:\/\/.+\.(jpg|jpeg|png|webp|gif)(\?.*)?$/i) ||
+      (trimmed.startsWith('https://') && trimmed.includes('/storage/v1/object/public/listing-images/'))
+    );
+  }
+  return false;
+}
+
+export function getMessageImageUrl(msg: ChatMessage): string | null {
+  if (msg.metadata?.image_url) return msg.metadata.image_url;
+  if (typeof msg.content === 'string') {
+    const trimmed = msg.content.trim();
+    if (
+      trimmed.startsWith('data:image/') ||
+      trimmed.startsWith('file://') ||
+      trimmed.startsWith('blob:') ||
+      trimmed.match(/^https?:\/\/.+\.(jpg|jpeg|png|webp|gif)(\?.*)?$/i) ||
+      (trimmed.startsWith('https://') && trimmed.includes('/storage/v1/object/public/listing-images/'))
+    ) {
+      return trimmed;
+    }
+  }
+  return null;
+}
+
+export async function deleteMessage(args: {
+  conversationId: string;
+  messageId: string;
+  userId: string;
+}): Promise<boolean> {
+  const { conversationId, messageId, userId } = args;
+  try {
+    // 1. First try direct delete under RLS
+    const { error } = await supabase
+      .from('messages')
+      .delete()
+      .eq('id', messageId)
+      .eq('sender_id', userId)
+      .eq('conversation_id', conversationId);
+
+    if (!error) return true;
+
+    // 2. If direct delete hits RLS or constraint, attempt secure RPC fallback
+    console.warn('[chat] direct delete failed, attempting delete_chat_message RPC:', error.message);
+    const { data, error: rpcErr } = await supabase.rpc('delete_chat_message', {
+      p_message_id: messageId,
+      p_conversation_id: conversationId,
+    });
+    if (rpcErr) {
+      console.warn('[chat] delete_chat_message RPC failed:', rpcErr.message);
+      return false;
+    }
+    return Boolean(data);
+  } catch (err) {
+    console.warn('[chat] deleteMessage exception:', err);
+    return false;
+  }
 }
 
 export async function sendOffer(args: {
@@ -419,7 +490,8 @@ export function subscribeToReactions(
 
 export type MessageEvent =
   | { type: 'insert'; message: ChatMessage }
-  | { type: 'update'; message: ChatMessage };
+  | { type: 'update'; message: ChatMessage }
+  | { type: 'delete'; messageId: string };
 
 export function subscribeToMessages(
   conversationId: string,
@@ -447,6 +519,19 @@ export function subscribeToMessages(
         filter: `conversation_id=eq.${conversationId}`,
       },
       (payload) => onEvent({ type: 'update', message: payload.new as ChatMessage }),
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'messages',
+        filter: `conversation_id=eq.${conversationId}`,
+      },
+      (payload) => {
+        const id = (payload.old as any)?.id;
+        if (id) onEvent({ type: 'delete', messageId: id });
+      },
     )
     .subscribe();
 
