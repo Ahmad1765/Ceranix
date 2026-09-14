@@ -792,7 +792,9 @@ export const HomeSearchView = memo(function HomeSearchView({
             width: 44,
             height: 44,
             borderRadius: radii.md,
-            backgroundColor: isDark ? 'rgba(108, 71, 255, 0.16)' : '#EDE9FE',
+            backgroundColor: isDark ? '#0F0F0F' : '#FFFFFF',
+            borderWidth: 1,
+            borderColor: isDark ? 'rgba(108, 71, 255, 0.4)' : 'rgba(108, 71, 255, 0.25)',
             alignItems: 'center',
             justifyContent: 'center',
           }}
@@ -995,7 +997,9 @@ export const HomeSearchView = memo(function HomeSearchView({
             width: 44,
             height: 44,
             borderRadius: radii.md,
-            backgroundColor: isDark ? 'rgba(108, 71, 255, 0.16)' : '#EDE9FE',
+            backgroundColor: isDark ? '#0F0F0F' : '#FFFFFF',
+            borderWidth: 1,
+            borderColor: isDark ? 'rgba(108, 71, 255, 0.4)' : 'rgba(108, 71, 255, 0.25)',
             alignItems: 'center',
             justifyContent: 'center',
           }}

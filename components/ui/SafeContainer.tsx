@@ -80,6 +80,7 @@ function useSafeContainerVisualViewport(enabled: boolean) {
       window.visualViewport.addEventListener('scroll', onViewportChange);
     }
     window.addEventListener('scroll', onViewportChange, { passive: true });
+    onViewportChange();
 
     return () => {
       if (window.visualViewport) {
