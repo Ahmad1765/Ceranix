@@ -46,22 +46,26 @@ export interface SafeContainerProps {
  * Handles top notch, Dynamic Island, status bar, and bottom home indicator
  * dynamically using react-native-safe-area-context.
  */
-export function SafeContainer({
-  children,
-  edges = ['top', 'bottom', 'left', 'right'],
-  mode = 'view',
-  noScroll = false,
-  stickyFooter,
-  extraBottomPadding = 0,
-  backgroundColor: bgOverride,
-  className = '',
-  style,
-  contentContainerStyle,
-  scrollViewProps,
-}: SafeContainerProps) {
-  const insets = useSafeAreaInsets();
-  const { theme } = useTheme();
-  const backgroundColor = bgOverride ?? theme.background;
+export const SafeContainer = React.forwardRef<View, SafeContainerProps>(
+  function SafeContainer(
+    {
+      children,
+      edges = ['top', 'bottom', 'left', 'right'],
+      mode = 'view',
+      noScroll = false,
+      stickyFooter,
+      extraBottomPadding = 0,
+      backgroundColor: bgOverride,
+      className = '',
+      style,
+      contentContainerStyle,
+      scrollViewProps,
+    }: SafeContainerProps,
+    ref
+  ) {
+    const insets = useSafeAreaInsets();
+    const { theme } = useTheme();
+    const backgroundColor = bgOverride ?? theme.background;
 
   const edgePadding = React.useMemo(() => {
     return {
@@ -89,6 +93,7 @@ export function SafeContainer({
   if (mode === 'view') {
     return (
       <View
+        ref={ref}
         className={className}
         style={[
           styles.fill,
@@ -122,6 +127,7 @@ export function SafeContainer({
   if (mode === 'scroll') {
     return (
       <View
+        ref={ref}
         className={className}
         style={[
           styles.fill,
@@ -162,6 +168,7 @@ export function SafeContainer({
   // Keyboard Avoiding Mode (for forms, chat threads, authentication, checkout flows)
   return (
     <KeyboardAvoidingView
+      ref={ref as any}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       className={className}
@@ -205,7 +212,7 @@ export function SafeContainer({
       )}
     </KeyboardAvoidingView>
   );
-}
+});
 
 const styles = StyleSheet.create({
   fill: {

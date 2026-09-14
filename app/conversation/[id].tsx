@@ -16,7 +16,7 @@
 //    tangled inside UI render trees. They are self-contained, easily testable hooks.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   FlatList,
@@ -69,10 +69,11 @@ import {
 const DOCK_GAP_KEYBOARD = 6;
 const EMPTY_REACTIONS: string[] = [];
 
-function useChatKeyboardLayout() {
+function useChatKeyboardLayout(containerRef?: React.RefObject<any>) {
   const [keyboardUp, setKeyboardUp] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [webViewportHeight, setWebViewportHeight] = useState<number | null>(null);
+  const [webViewportOffsetTop, setWebViewportOffsetTop] = useState(0);
 
   useEffect(() => {
     // 1. Native Keyboard Events (iOS & Android)
@@ -93,11 +94,37 @@ function useChatKeyboardLayout() {
     // 2. Web VisualViewport Events (Mobile Safari / iOS WebKit / Chrome Mobile)
     let cleanupWeb: (() => void) | null = null;
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const applyDirectStyles = (isUp: boolean, height: number, offsetTop: number) => {
+        if (containerRef?.current) {
+          const el = containerRef.current as unknown as HTMLElement;
+          if (el && el.style) {
+            if (isUp) {
+              el.style.position = 'fixed';
+              el.style.top = `${offsetTop}px`;
+              el.style.left = '0px';
+              el.style.right = '0px';
+              el.style.height = `${height}px`;
+              el.style.maxHeight = `${height}px`;
+              el.style.overflow = 'hidden';
+            } else {
+              el.style.position = '';
+              el.style.top = '';
+              el.style.left = '';
+              el.style.right = '';
+              el.style.height = '';
+              el.style.maxHeight = '';
+              el.style.overflow = '';
+            }
+          }
+        }
+      };
+
       const onViewportChange = () => {
         const vv = window.visualViewport;
         if (!vv) return;
 
         const currentHeight = vv.height;
+        const offsetTop = vv.offsetTop;
         const totalHeight = window.innerHeight;
         const diff = Math.max(0, totalHeight - currentHeight);
 
@@ -106,13 +133,14 @@ function useChatKeyboardLayout() {
         setKeyboardUp(isUp);
         setKeyboardHeight(isUp ? diff : 0);
         setWebViewportHeight(isUp ? currentHeight : null);
+        setWebViewportOffsetTop(isUp ? offsetTop : 0);
 
-        // Prevent iOS Safari from scrolling window.scrollY and pushing the header off screen
-        if (isUp) {
-          if (window.scrollY !== 0 || document.body.scrollTop !== 0) {
-            window.scrollTo({ left: 0, top: 0, behavior: 'instant' as any });
-            document.body.scrollTop = 0;
-          }
+        applyDirectStyles(isUp, currentHeight, offsetTop);
+
+        // Keep page/document scroll pinned to top on iOS Safari
+        if (window.scrollY !== 0 || (document.body && document.body.scrollTop !== 0)) {
+          window.scrollTo({ left: 0, top: 0, behavior: 'instant' as any });
+          if (document.body) document.body.scrollTop = 0;
         }
       };
 
@@ -128,6 +156,7 @@ function useChatKeyboardLayout() {
           window.visualViewport.removeEventListener('scroll', onViewportChange);
         }
         window.removeEventListener('scroll', onViewportChange);
+        applyDirectStyles(false, 0, 0);
       };
     }
 
@@ -136,9 +165,9 @@ function useChatKeyboardLayout() {
       hideSub.remove();
       cleanupWeb?.();
     };
-  }, []);
+  }, [containerRef]);
 
-  return { keyboardUp, keyboardHeight, webViewportHeight };
+  return { keyboardUp, keyboardHeight, webViewportHeight, webViewportOffsetTop };
 }
 
 export default function ConversationScreen() {
@@ -149,7 +178,28 @@ export default function ConversationScreen() {
   const { theme } = useTheme();
   const toast = useToast();
   const insets = useSafeAreaInsets();
-  const { keyboardUp, webViewportHeight } = useChatKeyboardLayout();
+  const containerRef = useRef<any>(null);
+  const { keyboardUp, webViewportHeight, webViewportOffsetTop } = useChatKeyboardLayout(containerRef);
+
+  // Prevent document body scrolling on mobile web when in a conversation
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    const html = document.documentElement;
+    const body = document.body;
+    const origHtmlOverflow = html.style.overflow;
+    const origBodyOverflow = body.style.overflow;
+    const origBodyHeight = body.style.height;
+
+    html.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+    body.style.height = '100%';
+
+    return () => {
+      html.style.overflow = origHtmlOverflow;
+      body.style.overflow = origBodyOverflow;
+      body.style.height = origBodyHeight;
+    };
+  }, []);
 
   // ── Custom Domain Hooks ──────────────────────────────────────────────────
   const thread = useConversationThread(conversationId, user, prefillParam);
@@ -479,6 +529,7 @@ export default function ConversationScreen() {
 
   return (
     <SafeContainer
+      ref={containerRef}
       mode="keyboard-avoiding"
       noScroll
       edges={['top', 'left', 'right']}
@@ -490,7 +541,7 @@ export default function ConversationScreen() {
               height: webViewportHeight,
               maxHeight: webViewportHeight,
               position: 'fixed',
-              top: 0,
+              top: webViewportOffsetTop,
               left: 0,
               right: 0,
               overflow: 'hidden',
@@ -612,15 +663,23 @@ export default function ConversationScreen() {
             onPlus={() => setPlusOpen(true)}
             onFocus={() => {
               if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                window.scrollTo({ left: 0, top: 0, behavior: 'instant' as any });
+                if (document.body) document.body.scrollTop = 0;
                 requestAnimationFrame(() => {
                   window.scrollTo({ left: 0, top: 0, behavior: 'instant' as any });
-                  document.body.scrollTop = 0;
+                  if (document.body) document.body.scrollTop = 0;
                 });
                 setTimeout(() => {
                   window.scrollTo({ left: 0, top: 0, behavior: 'instant' as any });
-                  document.body.scrollTop = 0;
+                  if (document.body) document.body.scrollTop = 0;
                   thread.followEnd();
-                }, 80);
+                }, 100);
+              }
+            }}
+            onBlur={() => {
+              if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                window.scrollTo({ left: 0, top: 0, behavior: 'instant' as any });
+                if (document.body) document.body.scrollTop = 0;
               }
             }}
           />
