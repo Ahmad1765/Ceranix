@@ -65,7 +65,7 @@ export function explainCoverage() {
 }
 
 export function SafetyBanner({ context = 'shop', title, body, style, onLinkPress, bare = false }: Props) {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const preset = PRESETS[context];
   const onLink = () => {
     if (Platform.OS === 'ios') Haptics.selectionAsync();
@@ -77,7 +77,7 @@ export function SafetyBanner({ context = 'shop', title, body, style, onLinkPress
       style={[
         {
           flexDirection: 'row',
-          alignItems: 'flex-start',
+          alignItems: 'center',
           gap: 12,
           padding: bare ? 0 : 14,
           borderRadius: radii.xl,
@@ -88,7 +88,18 @@ export function SafetyBanner({ context = 'shop', title, body, style, onLinkPress
         style,
       ]}
     >
-      <ShieldCheckIcon size={32} style={{ marginTop: 1 }} />
+      <View
+        style={{
+          width: 44,
+          height: 44,
+          borderRadius: 14,
+          backgroundColor: isDark ? 'rgba(83, 86, 238, 0.16)' : '#F2F3FE',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <ShieldCheckIcon size={22} variant="solid" bgColor="transparent" />
+      </View>
 
       <View style={{ flex: 1 }}>
         <Text
