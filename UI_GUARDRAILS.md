@@ -117,6 +117,15 @@ These rules protect the runtime from silent crashes, style collapse, and mobile/
 
 ---
 
+### Rule 2.6: Mobile Safari Viewport & Keyboard Docking (`components/ui/SafeContainer.tsx`)
+- **The Invariant:** On mobile web (iOS Safari), virtual keyboard appearances trigger WebKit's two-viewport model (`visualViewport.offsetTop` and `visualViewport.height`). Pinned full-screen or bottom-docked containers (like chat composers or sticky action bars) must sync with `visualViewport.offsetTop` and must never use uncompensated `position: fixed; top: 0` without offset tracking.
+- **The Risk:** In Mobile Safari, focusing an input causes WebKit to pan the visual viewport upward (~180–250px). A naive `position: fixed; top: 0` element remains relative to the layout viewport, which pushes the top header off the screen and leaves a massive empty gap above the keyboard.
+- **Enforced Pattern:**
+  - Always use `<SafeContainer mode="keyboard-avoiding">` or bind container styles to `window.visualViewport`'s `offsetTop` and `height`.
+  - When in full-screen pinned modes (like chat), lock `html` and `body` `overflow: hidden; height: 100%` on web to prevent iOS Safari from rubber-banding or scrolling the root canvas.
+
+---
+
 ## 3. Strict Design Language Invariants ("The Quiet Atelier" - `DESIGN.md`)
 
 Carrinex is a disciplined, quiet-luxury resale marketplace. Restraint communicates trust.
@@ -155,6 +164,7 @@ The following files represent high-risk architectural hubs. Any AI asked to modi
 | `components/ListingCard.tsx` | Feed Performance | Renders in `FlashList`. Uses raw `expo-image`, cached like states, unified `<ShieldCheckIcon>`, and strict 4:5 aspect ratio. |
 | `components/chat/ListingBar.tsx` | Transaction Flow | Pinned to bottom above chat composer deliberately to keep negotiation item in context. |
 | `components/GuestGate.tsx` | Auth Guard | Guards authenticated actions; prevents unauthenticated RPC errors. |
+| `components/ui/SafeContainer.tsx` | Layout / Viewport Engine | Mobile-native safe area and keyboard avoiding container with iOS Safari visualViewport synchronization. |
 | `app/_layout.tsx` | Root Providers | Controls font preloading, Sentry, Alert shim, and React Query offline persistence. |
 
 ---
@@ -179,6 +189,7 @@ Before proceeding with a user request, match it against this matrix:
 | *"Add a second prominent purple button next to 'Buy Now'"* | 🔴 **YES** | Violates One Primary Action Rule. | Keep 'Buy Now' as primary purple; make 'Make Offer' ghost or dark. |
 | *"Add an unauthenticated quick checkout / chat"* | 🔴 **YES** | Bypasses `GuestGate` security, crashing Supabase RPC queries. | Wrap the action in `guestGate.gate(() => proceed())`. |
 | *"Make unselected buttons, search bars, or chips grey (#F6F6F6)"* | 🔴 **YES** | Violates Paper White Resting State; makes active controls look disabled/greyed out. | Use Paper White (`theme.panel` / `#FFFFFF` in light mode) with hairline border (`theme.border`) for resting controls. |
+| *"Use naive 'position: fixed; top: 0' on mobile web chat or forms"* | 🔴 **YES** | Violates Mobile Safari Viewport Sync Rule (Rule 2.6). Pushes headers off-screen and leaves blank space above keyboard. | Use `<SafeContainer mode="keyboard-avoiding">` with `top: visualViewport.offsetTop` and `height: visualViewport.height`. |
 | *"Add dark mode styling for this new component"* | 🟢 **NO** | Safe, provided `useTheme()` tokens are used. | Use `const { theme, isDark } = useTheme();` and bind to `theme.surface`, `theme.panel`, etc. |
 
 ---

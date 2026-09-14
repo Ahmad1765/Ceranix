@@ -42,6 +42,58 @@ export interface SafeContainerProps {
 }
 
 /**
+ * Hooks into Mobile Safari's visualViewport to prevent headers from getting pushed
+ * off-screen and eliminate empty gaps above the keyboard on iOS Web.
+ */
+function useSafeContainerVisualViewport(enabled: boolean) {
+  const [viewportStyle, setViewportStyle] = React.useState<ViewStyle | null>(null);
+
+  React.useEffect(() => {
+    if (!enabled || Platform.OS !== 'web' || typeof window === 'undefined') return;
+
+    const onViewportChange = () => {
+      const vv = window.visualViewport;
+      if (!vv) return;
+
+      const currentHeight = vv.height;
+      const offsetTop = vv.offsetTop;
+      const totalHeight = window.innerHeight;
+      const isUp = totalHeight - currentHeight > 60;
+
+      if (isUp) {
+        setViewportStyle({
+          position: 'fixed' as any,
+          top: offsetTop,
+          left: 0,
+          right: 0,
+          height: currentHeight,
+          maxHeight: currentHeight,
+          overflow: 'hidden',
+        });
+      } else {
+        setViewportStyle(null);
+      }
+    };
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', onViewportChange);
+      window.visualViewport.addEventListener('scroll', onViewportChange);
+    }
+    window.addEventListener('scroll', onViewportChange, { passive: true });
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', onViewportChange);
+        window.visualViewport.removeEventListener('scroll', onViewportChange);
+      }
+      window.removeEventListener('scroll', onViewportChange);
+    };
+  }, [enabled]);
+
+  return viewportStyle;
+}
+
+/**
  * Mobile-native SafeContainer.
  * Handles top notch, Dynamic Island, status bar, and bottom home indicator
  * dynamically using react-native-safe-area-context.
@@ -66,6 +118,7 @@ export const SafeContainer = React.forwardRef<View, SafeContainerProps>(
     const insets = useSafeAreaInsets();
     const { theme } = useTheme();
     const backgroundColor = bgOverride ?? theme.background;
+    const webViewportStyle = useSafeContainerVisualViewport(mode === 'keyboard-avoiding');
 
   const edgePadding = React.useMemo(() => {
     return {
@@ -181,6 +234,7 @@ export const SafeContainer = React.forwardRef<View, SafeContainerProps>(
           paddingRight: edgePadding.paddingRight,
         },
         style,
+        webViewportStyle,
       ]}
     >
       {noScroll ? (
