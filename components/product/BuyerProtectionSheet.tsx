@@ -70,20 +70,13 @@ export function BuyerProtectionSheet({
           />
 
           {/* Shield badge */}
-          <View
+          <ShieldCheckIcon
+            size={64}
             style={{
               alignSelf: 'center',
               marginBottom: 16,
-              width: 72,
-              height: 72,
-              borderRadius: 36,
-              backgroundColor: theme.purpleSoft,
-              alignItems: 'center',
-              justifyContent: 'center',
             }}
-          >
-            <ShieldCheckIcon size={38} />
-          </View>
+          />
 
 
           <Text

@@ -88,19 +88,7 @@ export function SafetyBanner({ context = 'shop', title, body, style, onLinkPress
         style,
       ]}
     >
-      <View
-        style={{
-          width: 32,
-          height: 32,
-          borderRadius: 16,
-          backgroundColor: theme.purpleSoft,
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginTop: 1,
-        }}
-      >
-        <ShieldCheckIcon size={17} />
-      </View>
+      <ShieldCheckIcon size={32} style={{ marginTop: 1 }} />
 
       <View style={{ flex: 1 }}>
         <Text
