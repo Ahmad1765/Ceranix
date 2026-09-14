@@ -144,7 +144,7 @@ function SegmentPill({
       <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
         <Animated.View
           style={{
-            height: 28,
+            height: 30,
             paddingHorizontal: 14,
             borderRadius: radii.pill,
             borderWidth: 1,

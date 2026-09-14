@@ -168,13 +168,13 @@ function ToggleChip({ label, active, onPress, icon, disabled }: { label: string;
       accessibilityRole="switch"
       accessibilityState={{ checked: active }}
       style={{
-        height: 28,
+        height: 30,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 5,
         paddingHorizontal: 12,
-        borderRadius: 14,
+        borderRadius: 15,
         borderWidth: 1,
         borderColor: active ? '#6C47FF' : 'rgba(15,15,15,0.12)',
         backgroundColor: active ? 'rgba(108,71,255,0.08)' : '#fff',

@@ -352,7 +352,7 @@ export default function AdminLogisticsScreen() {
         </View>
       </View>
 
-      {/* ── Status Filter Chips (Strict 28px Standard) ── */}
+      {/* ── Status Filter Chips (Strict 30px Standard) ── */}
       <View style={{ paddingVertical: 10 }}>
         <ScrollView
           horizontal
@@ -370,8 +370,8 @@ export default function AdminLogisticsScreen() {
                 }}
                 style={({ pressed }) => [
                   {
-                    height: 28,
-                    borderRadius: 14,
+                    height: 30,
+                    borderRadius: 15,
                     paddingHorizontal: 14,
                     alignItems: 'center',
                     justifyContent: 'center',

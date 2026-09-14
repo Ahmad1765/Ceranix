@@ -348,7 +348,7 @@ export default function LoginScreen() {
                   flexDirection: 'row',
                   alignItems: 'center',
                   paddingHorizontal: 12,
-                  height: 28,
+                  height: 30,
                   borderRadius: 999,
                   backgroundColor: 'rgba(255,255,255,0.16)',
                   marginBottom: 18,

@@ -224,24 +224,39 @@ const BrowseChipView = memo(function BrowseChipView({
       accessibilityLabel={`Browse ${chip.label.toLowerCase()}`}
       accessibilityState={{ selected }}
       style={({ pressed }) => {
-        const isFilled = selected || pressed || hovered;
+        const isActive = selected;
         return {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: 5,
-          height: 28,
-          paddingHorizontal: 12,
+          gap: 6,
+          height: 30,
+          paddingHorizontal: 13,
           borderRadius: radii.pill,
           borderWidth: 1,
-          borderColor: theme.border,
-          backgroundColor: isFilled ? theme.selected : 'transparent',
+          borderColor: isActive ? theme.ink : theme.border,
+          backgroundColor: isActive
+            ? theme.ink
+            : pressed || hovered
+              ? theme.surface
+              : theme.panel,
           transform: [{ scale: pressed ? 0.96 : 1 }],
         };
       }}
     >
-      <Feather name={chip.icon} size={12} color={colors.purple} />
-      <Text style={{ fontSize: 12, fontFamily: type.family.sansBold, color: theme.ink }}>
+      <Feather
+        name={chip.icon}
+        size={13}
+        color={selected ? theme.background : theme.ink}
+      />
+      <Text
+        style={{
+          fontSize: 12.5,
+          fontFamily: type.family.sansBold,
+          color: selected ? theme.background : theme.ink,
+          letterSpacing: -0.2,
+        }}
+      >
         {chip.label}
       </Text>
     </Pressable>

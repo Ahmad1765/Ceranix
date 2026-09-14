@@ -17,20 +17,20 @@ export interface FilterSlidersIconProps {
  *
  * Design Spec:
  * - 3 horizontal tracks with hollow circular slider knobs matching the quiet atelier aesthetic
- * - Top Track (y=7): knob on left (cx=8.5, cy=7, r=1.9)
- * - Middle Track (y=12): knob on right (cx=15.5, cy=12, r=1.9)
- * - Bottom Track (y=17): knob on left (cx=8.5, cy=17, r=1.9)
+ * - Top Track (y=7): knob on right (cx=15.5, cy=7, r=1.9)
+ * - Middle Track (y=12): knob on left (cx=8.5, cy=12, r=1.9)
+ * - Bottom Track (y=17): knob on right (cx=15.5, cy=17, r=1.9)
  * - Standard 24x24 viewBox for optical harmony alongside Feather and Ionicons
  * - Continuous lines connect seamlessly to the knobs without broken gaps
  */
-const TRACKS_PATH = 'M4 7h2.6 M10.4 7H20 M4 12h9.6 M17.4 12H20 M4 17h2.6 M10.4 17H20';
+const TRACKS_PATH = 'M4 7h9.6 M17.4 7H20 M4 12h2.6 M10.4 12H20 M4 17h9.6 M17.4 17H20';
 
 export function FilterSlidersIcon({
-  size = 19,
+  size = 20,
   width,
   height,
   color,
-  strokeWidth = 1.65,
+  strokeWidth = 1.7,
   style,
 }: FilterSlidersIconProps) {
   const { theme } = useTheme();
@@ -51,9 +51,9 @@ export function FilterSlidersIcon({
         strokeLinejoin="round"
       >
         <Path d={TRACKS_PATH} />
-        <Circle cx={8.5} cy={7} r={1.9} />
-        <Circle cx={15.5} cy={12} r={1.9} />
-        <Circle cx={8.5} cy={17} r={1.9} />
+        <Circle cx={15.5} cy={7} r={1.9} />
+        <Circle cx={8.5} cy={12} r={1.9} />
+        <Circle cx={15.5} cy={17} r={1.9} />
       </Svg>
     </View>
   );

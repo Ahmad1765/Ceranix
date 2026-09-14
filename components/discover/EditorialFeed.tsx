@@ -342,7 +342,7 @@ function Chip({ label, onPress }: { label: string; onPress: () => void }) {
         alignItems: 'center',
         justifyContent: 'center',
         gap: 5,
-        height: 28,
+        height: 30,
         paddingHorizontal: 12,
         borderRadius: radii.pill,
         borderWidth: 1,

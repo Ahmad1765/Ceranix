@@ -12,6 +12,7 @@ import { View, Pressable, ScrollView, Platform } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { FilterSlidersIcon } from '@/components/ui';
 import { radii, shadow, type as typography } from '@/lib/theme';
@@ -55,7 +56,7 @@ export const FeedSearch = memo(function FeedSearch({
   unreadNotificationsCount,
   onPressNotifications,
 }: FeedSearchProps) {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const inputRef = useRef<any>(null);
   const searching = value.trim().length > 0;
   const hasFilters = filterCount > 0;
@@ -211,19 +212,20 @@ export const FeedSearch = memo(function FeedSearch({
                 width: 44,
                 height: 44,
                 borderRadius: 22,
-                backgroundColor: hasFilters ? theme.ink : (pressed ? theme.surface : theme.panel),
+                backgroundColor: pressed ? theme.surface : theme.panel,
                 borderWidth: 1,
-                borderColor: hasFilters ? theme.ink : theme.border,
+                borderColor: theme.border,
                 alignItems: 'center',
                 justifyContent: 'center',
                 transform: [{ scale: pressed ? 0.94 : 1 }],
+                position: 'relative',
                 outlineStyle: 'none',
                 ...shadow.sm,
               } as any)}
             >
               <FilterSlidersIcon
-                size={19}
-                color={hasFilters ? theme.background : theme.ink}
+                size={18}
+                color={theme.ink}
               />
               {hasFilters && (
                 <View
@@ -348,7 +350,7 @@ export const ChipRow = memo(function ChipRow({
       contentContainerStyle={{
         paddingHorizontal: 16,
         gap: 8,
-        paddingVertical: 6,
+        paddingVertical: 9.5,
         alignItems: 'center',
       }}
     >
@@ -361,9 +363,9 @@ export const ChipRow = memo(function ChipRow({
         accessibilityRole="button"
         accessibilityLabel="Browse For you"
         style={({ pressed }) => ({
-          height: 28,
+          height: 30,
           paddingHorizontal: 12,
-          borderRadius: 14,
+          borderRadius: 15,
           backgroundColor: isForYouActive ? theme.selected : theme.white,
           borderWidth: 1,
           borderColor: isForYouActive ? 'transparent' : theme.border,
@@ -374,11 +376,12 @@ export const ChipRow = memo(function ChipRow({
           transform: [{ scale: pressed ? 0.96 : 1 }],
         })}
       >
-        <Feather name="zap" size={12} color={theme.ink} />
+        <Ionicons name="sparkles" size={13} color={theme.ink} />
         <Text
           style={{
             fontFamily: typography.family.sansBold,
-            fontSize: 12.5,
+            fontSize: 13,
+            lineHeight: 18,
             letterSpacing: -0.2,
             color: theme.ink,
           }}
@@ -396,9 +399,9 @@ export const ChipRow = memo(function ChipRow({
         accessibilityRole="button"
         accessibilityLabel={`Browse ${dynamicChip.label}`}
         style={({ pressed }) => ({
-          height: 28,
+          height: 30,
           paddingHorizontal: 12,
-          borderRadius: 14,
+          borderRadius: 15,
           backgroundColor: isDynamicActive ? theme.selected : theme.white,
           borderWidth: 1,
           borderColor: isDynamicActive ? 'transparent' : theme.border,
@@ -411,13 +414,14 @@ export const ChipRow = memo(function ChipRow({
       >
         <Feather
           name={dynamicChip.icon}
-          size={12}
+          size={13}
           color={theme.ink}
         />
         <Text
           style={{
             fontFamily: typography.family.sansBold,
-            fontSize: 12.5,
+            fontSize: 13,
+            lineHeight: 18,
             letterSpacing: -0.2,
             color: theme.ink,
           }}
@@ -434,9 +438,9 @@ export const ChipRow = memo(function ChipRow({
         }}
         accessibilityLabel="Create alert"
         style={({ pressed }) => ({
-          width: 28,
-          height: 28,
-          borderRadius: 14,
+          width: 30,
+          height: 30,
+          borderRadius: 15,
           backgroundColor: theme.white,
           borderWidth: 1,
           borderColor: theme.border,
@@ -463,9 +467,9 @@ export const ChipRow = memo(function ChipRow({
               onDeleteChip(s);
             }}
             style={({ pressed }) => ({
-              height: 28,
+              height: 30,
               paddingHorizontal: 12,
-              borderRadius: 14,
+              borderRadius: 15,
               backgroundColor: active ? theme.selected : theme.white,
               borderWidth: 1,
               borderColor: active ? 'transparent' : theme.border,
@@ -479,7 +483,8 @@ export const ChipRow = memo(function ChipRow({
             <Text
               style={{
                 fontFamily: typography.family.sansMedium,
-                fontSize: 12.5,
+                fontSize: 13,
+                lineHeight: 18,
                 letterSpacing: -0.2,
                 color: theme.ink,
               }}

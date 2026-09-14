@@ -637,9 +637,9 @@ function OrdersScreen() {
               }}
               style={({ pressed }) => [
                 {
-                  height: 28,
+                  height: 30,
                   paddingHorizontal: 14,
-                  borderRadius: 14,
+                  borderRadius: 15,
                   alignItems: 'center',
                   justifyContent: 'center',
                   borderWidth: 1,

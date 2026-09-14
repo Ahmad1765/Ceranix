@@ -32,7 +32,6 @@ import { useToast } from '@/lib/toast';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/lib/auth';
 import { useSearchHistory } from '@/hooks/useSearchHistory';
-import { BinocularsIcon } from '@/components/ui/BinocularsIcon';
 import { searchUsers } from '@/lib/follows';
 import { searchListings } from '@/lib/listings';
 import { getSearchSuggestions } from '@/lib/searchSuggestions';
@@ -772,46 +771,60 @@ export const HomeSearchView = memo(function HomeSearchView({
             });
           }
         }}
+        accessibilityRole="button"
+        accessibilityLabel="Save your search"
         style={({ pressed }) => ({
           flexDirection: 'row',
           alignItems: 'center',
-          borderWidth: 1.2,
-          borderColor: isDark ? theme.border : '#123D2E',
-          borderRadius: 0,
+          borderWidth: 1,
+          borderColor: theme.border,
+          borderRadius: radii.lg,
           paddingVertical: 14,
           paddingHorizontal: 14,
-          backgroundColor: 'transparent',
+          minHeight: 80,
+          backgroundColor: isDark ? theme.surface : theme.panel,
           gap: 14,
           opacity: pressed ? 0.88 : 1,
         })}
       >
-        <BinocularsIcon width={52} height={46} />
+        <View
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: radii.md,
+            backgroundColor: isDark ? 'rgba(108, 71, 255, 0.16)' : '#EDE9FE',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Feather name="bookmark" size={22} color={theme.purple} />
+        </View>
 
-        <View style={{ flex: 1, minWidth: 0 }}>
+        <View style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
           <Text
             style={{
               fontSize: 15.5,
+              lineHeight: 20,
               fontWeight: '700',
               fontFamily: typography.family.sansBold,
               color: theme.text,
               letterSpacing: -0.2,
             }}
           >
-            Save your searches
+            Save your search
           </Text>
           <Text
             style={{
               fontSize: 13,
+              lineHeight: 18,
               fontFamily: typography.family.sansMedium,
               color: theme.mute,
               marginTop: 2,
             }}
           >
-            Choose from recently searched
+            Never miss a drop with alerts for your favorite searches
           </Text>
         </View>
-
-        <Feather name="chevron-right" size={20} color={theme.mute} />
       </Pressable>
 
       {/* Previous searches Section */}
@@ -835,13 +848,13 @@ export const HomeSearchView = memo(function HomeSearchView({
                 key={item.term}
                 onPress={() => handleSelectTag(item.term, item.tab)}
                 style={({ pressed }) => ({
-                  height: 28,
+                  height: 30,
                   flexDirection: 'row',
                   alignItems: 'center',
                   backgroundColor: isDark ? theme.surface : theme.panel,
                   borderWidth: 1,
                   borderColor: theme.border,
-                  borderRadius: 14,
+                  borderRadius: 15,
                   paddingLeft: 12,
                   paddingRight: 8,
                   gap: 6,
@@ -922,11 +935,11 @@ export const HomeSearchView = memo(function HomeSearchView({
               key={term}
               onPress={() => handleSelectTag(term, 'listings')}
               style={({ pressed }) => ({
-                height: 28,
+                height: 30,
                 backgroundColor: isDark ? theme.surface : theme.panel,
                 borderWidth: 1,
                 borderColor: theme.border,
-                borderRadius: 14,
+                borderRadius: 15,
                 paddingHorizontal: 12,
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -972,6 +985,7 @@ export const HomeSearchView = memo(function HomeSearchView({
           borderRadius: radii.lg,
           paddingVertical: 14,
           paddingHorizontal: 14,
+          minHeight: 80,
           backgroundColor: isDark ? theme.surface : theme.panel,
           gap: 14,
         }}
@@ -989,10 +1003,11 @@ export const HomeSearchView = memo(function HomeSearchView({
           <Feather name="users" size={22} color={theme.purple} />
         </View>
 
-        <View style={{ flex: 1, minWidth: 0 }}>
+        <View style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
           <Text
             style={{
               fontSize: 15.5,
+              lineHeight: 20,
               fontWeight: '700',
               fontFamily: typography.family.sansBold,
               color: theme.text,
@@ -1004,6 +1019,7 @@ export const HomeSearchView = memo(function HomeSearchView({
           <Text
             style={{
               fontSize: 13,
+              lineHeight: 18,
               fontFamily: typography.family.sansMedium,
               color: theme.mute,
               marginTop: 2,
@@ -1035,13 +1051,13 @@ export const HomeSearchView = memo(function HomeSearchView({
                 key={item.term}
                 onPress={() => handleSelectTag(item.term, 'seller')}
                 style={({ pressed }) => ({
-                  height: 28,
+                  height: 30,
                   flexDirection: 'row',
                   alignItems: 'center',
                   backgroundColor: isDark ? theme.surface : theme.panel,
                   borderWidth: 1,
                   borderColor: theme.border,
-                  borderRadius: 14,
+                  borderRadius: 15,
                   paddingLeft: 12,
                   paddingRight: 8,
                   gap: 6,
@@ -1100,11 +1116,11 @@ export const HomeSearchView = memo(function HomeSearchView({
               key={seller}
               onPress={() => handleSelectTag(seller, 'seller')}
               style={({ pressed }) => ({
-                height: 28,
+                height: 30,
                 backgroundColor: isDark ? theme.surface : theme.panel,
                 borderWidth: 1,
                 borderColor: theme.border,
-                borderRadius: 14,
+                borderRadius: 15,
                 paddingHorizontal: 12,
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -1320,17 +1336,19 @@ export const HomeSearchView = memo(function HomeSearchView({
               style={{
                 flex: 1,
                 alignItems: 'center',
-                paddingVertical: 12,
+                justifyContent: 'center',
+                height: 46,
               }}
             >
               <Text
                 style={{
                   fontSize: 16,
-                  fontWeight: activeTab === 'listings' ? '700' : '500',
+                  lineHeight: 22,
+                  fontWeight: activeTab === 'listings' ? '600' : '400',
                   fontFamily:
                     activeTab === 'listings'
-                      ? typography.family.sansBold
-                      : typography.family.sansMedium,
+                      ? typography.family.sansSemibold
+                      : typography.family.sans,
                   color: activeTab === 'listings' ? theme.text : theme.mute,
                   letterSpacing: -0.2,
                 }}
@@ -1345,17 +1363,19 @@ export const HomeSearchView = memo(function HomeSearchView({
               style={{
                 flex: 1,
                 alignItems: 'center',
-                paddingVertical: 12,
+                justifyContent: 'center',
+                height: 46,
               }}
             >
               <Text
                 style={{
                   fontSize: 16,
-                  fontWeight: activeTab === 'seller' ? '700' : '500',
+                  lineHeight: 22,
+                  fontWeight: activeTab === 'seller' ? '600' : '400',
                   fontFamily:
                     activeTab === 'seller'
-                      ? typography.family.sansBold
-                      : typography.family.sansMedium,
+                      ? typography.family.sansSemibold
+                      : typography.family.sans,
                   color: activeTab === 'seller' ? theme.text : theme.mute,
                   letterSpacing: -0.2,
                 }}

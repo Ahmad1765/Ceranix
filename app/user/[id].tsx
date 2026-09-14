@@ -680,9 +680,9 @@ export default function UserProfileScreen() {
                       accessibilityRole="button"
                       accessibilityState={{ selected: active }}
                       style={({ pressed }) => ({
-                        height: 28,
+                        height: 30,
                         paddingHorizontal: 12,
-                        borderRadius: 14,
+                        borderRadius: 15,
                         alignItems: 'center',
                         justifyContent: 'center',
                         backgroundColor: active

@@ -855,7 +855,7 @@ export default function FriendsScreen() {
                             shareViaSMS(profile?.username, profile?.full_name, c.phoneNumber)
                           }
                           style={{
-                            height: 28,
+                            height: 30,
                             paddingHorizontal: 12,
                             borderRadius: radii.pill,
                             backgroundColor: theme.panel,
@@ -1012,14 +1012,14 @@ function UserRow({
         </Text>
       </View>
 
-      {/* Follow Toggle Button (Universal 28px Chip Standard) */}
+      {/* Follow Toggle Button (Universal 30px Chip Standard) */}
       <PressableScale
         onPress={(e) => {
           e.stopPropagation();
           onToggleFollow();
         }}
         style={{
-          height: 28,
+          height: 30,
           paddingHorizontal: 14,
           borderRadius: radii.pill,
           backgroundColor: isFollowing ? theme.panel : theme.ink,

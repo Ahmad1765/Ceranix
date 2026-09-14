@@ -33,7 +33,7 @@ export function Chip({
   const Inner = (
     <View
       style={{
-        height: 28,
+        height: 30,
         paddingHorizontal: padX,
         borderRadius: radii.pill,
         backgroundColor: sty.bg,

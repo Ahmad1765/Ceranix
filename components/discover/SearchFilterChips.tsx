@@ -1345,7 +1345,7 @@ function createStyles(theme: ThemeTokens, isDark: boolean) {
     chip: {
       flexDirection: 'row',
       alignItems: 'center',
-      height: 28,
+      height: 30,
       paddingHorizontal: 11,
       borderRadius: radii.pill,
       borderWidth: 1,
@@ -1551,7 +1551,7 @@ function createStyles(theme: ThemeTokens, isDark: boolean) {
       paddingVertical: 10,
     },
     sizeChip: {
-      height: 28,
+      height: 30,
       paddingHorizontal: 12,
       borderRadius: radii.pill,
       borderWidth: 1,
@@ -1659,7 +1659,7 @@ function createStyles(theme: ThemeTokens, isDark: boolean) {
       marginBottom: 14,
     },
     pricePresetChip: {
-      height: 28,
+      height: 30,
       paddingHorizontal: 12,
       borderRadius: radii.pill,
       backgroundColor: isDark ? theme.surface : '#F3F4F6',
