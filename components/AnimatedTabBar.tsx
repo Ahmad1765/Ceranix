@@ -4,7 +4,6 @@ import Animated, {
   useSharedValue,
   useDerivedValue,
   useAnimatedStyle,
-  useAnimatedReaction,
   useAnimatedRef,
   measure,
   withSpring,
@@ -16,122 +15,70 @@ import Animated, {
 import type { DerivedValue } from 'react-native-reanimated';
 import { Gesture, GestureDetector, PointerType } from 'react-native-gesture-handler';
 import type { GestureStateChangeEvent, GestureUpdateEvent } from 'react-native-gesture-handler';
-import { BlurView } from 'expo-blur';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useTheme } from '@/context/ThemeContext';
+import { Text } from '@/lib/rnText';
+import {
+  HomeTabIcon,
+  CategoriesTabIcon,
+  SellTabIcon,
+  InboxTabIcon,
+  AccountTabIcon,
+} from '@/components/navigation/TabBarIcons';
 
-// Clean Instagram-style dock: white pill, icon-only, a single soft-purple disc
-// that slides behind the active tab. Palette-locked (purple accent, ink icons,
-// white surface). No labels, no ghost word — just a smooth, quiet bar.
+// Traditional bottom tab bar: full-width, icon + label, solid background.
+// Light mode = soft grey; Dark mode = near-black.
 //
 // ---------------------------------------------------------------------------
-// Threading model — the thing to preserve if you edit this file.
+// Threading model — preserved from the original floating dock.
 //
-// This bar renders on every screen in the app, and its gesture runs on top of
-// whatever list is scrolling underneath. So NOTHING about a touch is allowed to
-// reach React. Reanimated's own performance guide is explicit about this:
-// "avoid calling runOnJS in onUpdate", and don't sync worklet callbacks with
-// React state in frequently-updated handlers.
+// This bar renders on every screen. Its gesture runs on top of whatever list is
+// scrolling underneath, so NOTHING about a touch reaches React.
 //
-// Concretely:
-//   • Item geometry lives in `layouts` (a shared value), written once per
-//     onLayout — not in useState. Measuring the bar therefore costs zero
-//     renders instead of one render per tab.
-//   • Hit-testing (`indexAtX`) is a worklet, so a drag resolves which tab is
-//     under the finger on the UI thread.
+//   • Item geometry lives in `layouts` (shared value), written once per
+//     onLayout — not in useState.
+//   • Hit-testing (`indexAtX`) is a worklet on the UI thread.
 //   • The highlighted tab is `highlight` (a derived shared value). Each TabItem
-//     reads it inside useAnimatedStyle, so dragging across the bar animates six
-//     icons and the disc without re-rendering a single React component.
+//     reads it inside useAnimatedStyle so the active icon animates without any
+//     React re-render.
 //   • The JS thread is crossed exactly twice per interaction: a selection
-//     haptic when the previewed tab changes, and `select()` on release. Both
-//     are per-event, never per-frame.
-//
-// React state here would mean a full tab-bar render every frame of every drag,
-// on top of the list already scrolling behind it.
+//     haptic and `select()` on release.
 // ---------------------------------------------------------------------------
-const DISC_FILL = 'rgba(15,15,15,0.08)'; // neutral grey disc (ink @8%)
 
-// The dock's translucent fill. Two values because only iOS still layers a real
-// blur behind it (see BLUR_ENABLED below); on Android/web the fill has to carry
-// the frosted look on its own, so it composites to the same opacity the
-// blur+fill stack used to produce.
-//
-// Derivation, so this isn't a magic number: expo-blur's own
-// `getBackgroundColor(44, 'light')` is rgba(249,249,249,0.343), and it sat on
-// top of a 0.86 white fill. Composited that is 1 - (1 - 0.86) * (1 - 0.343)
-// = 0.908. Hence 0.91 on the platforms that drop the blur layer.
-const FILL_WITH_BLUR = 'rgba(255,255,255,0.86)';
-const FILL_SOLO = 'rgba(255,255,255,0.91)';
+const BAR_HEIGHT = 56;
+const ICON = 24;
 
-// Blur is iOS-only, on purpose, and it is a performance decision rather than a
-// design one — the dock is composited over a scrolling FlashList on every
-// screen in the app.
-//
-//   • iOS — kept. UIVisualEffectView is GPU-composited and genuinely cheap.
-//     This is also where the glass reads best.
-//   • Android — dropped. expo-blur's Android support is documented as
-//     experimental and "may cause performance and graphical issues";
-//     `dimezisBlurView` re-snapshots the view tree below it every frame. It was
-//     also barely visible: intensity 28 with the default `blurReductionFactor`
-//     of 4 is an effective radius of ~7, underneath a 0.86-opaque white fill.
-//   • Web — dropped. It compiled to `backdrop-filter: blur(8.8px)
-//     saturate(180%)`, which re-reads the pixels beneath the dock on every
-//     frame the backdrop changes — i.e. the entire time the feed is scrolling —
-//     and backdrop-filter on a viewport-pinned element is a known scroll-jank
-//     source in Safari. Only ~9% of the backdrop was visible through it.
-//
-// To put the frosted layer back on a platform, add it here and swap that
-// platform's fill to FILL_WITH_BLUR. Nothing else needs to change.
-const BLUR_ENABLED = Platform.OS === 'ios';
-const BAR_FILL = BLUR_ENABLED ? FILL_WITH_BLUR : FILL_SOLO;
-
-const BAR_HEIGHT = 62;
-const ICON = 26;
-const DISC = 46; // sliding highlight diameter
-// Snappy, premium settle for the slide + morph.
-const SLIDE = { damping: 18, stiffness: 260, mass: 0.9 } as const;
+// Animation configs
 const POP = { damping: 12, stiffness: 220, mass: 0.7 } as const;
 const FADE_OUT = { duration: 180 } as const;
 
 const HAPTICS = Platform.OS !== 'web';
 
-// Background warm-up. Every tab is mounted ahead of time so switching is a
-// visibility toggle rather than a lazy mount — the behaviour every big social
-// app has, and the reason their tab bars feel instant.
-//
-// Staggered rather than all-at-once: four screens mounted in one JS task is the
-// same stall, just moved to startup. One every WARM_STEP lets the feed finish
-// its first paint and its images in between.
-// ponytail: fixed delays, tuned by hand. If a slow device shows the warm-up
-// fighting first paint, gate the first one on InteractionManager instead.
-const WARM_DELAY = 1200; // after the first screen has settled
-const WARM_STEP = 350; // between each subsequent screen
+// Background warm-up: mount every tab ahead of time so switching is instant.
+const WARM_DELAY = 1200;
+const WARM_STEP = 350;
 
-const ICONS: Record<
-  string,
-  { outline: keyof typeof Ionicons.glyphMap; filled: keyof typeof Ionicons.glyphMap }
-> = {
-  index: { outline: 'home-outline', filled: 'home' },
-  // Compass, not a magnifier: this tab opens the browse sheet, and a compass is
-  // the "wander" glyph in every app in this category.
-  discover: { outline: 'compass-outline', filled: 'compass' },
-  wardrobe: { outline: 'shirt-outline', filled: 'shirt' },
-  // Unused — Sell renders as the pill below — but kept so ICONS stays total
-  // over the route list and the `?? ICONS.index` fallback never fires for it.
-  upload: { outline: 'add', filled: 'add' },
-  // Tailless box rather than `chatbubble`: reads as an inbox, and sits squarer
-  // next to the house and the compass.
-  chat: { outline: 'chatbox-outline', filled: 'chatbox' },
-  profile: { outline: 'person-outline', filled: 'person' },
-};
 
-// Sell renders as a filled pill instead of the outline/filled glyph pair — it's
-// the one tab that is an ACTION rather than a place. A rounded rectangle, not a
-// circle, so it doesn't read as a sixth icon.
-const PILL = { width: 42, height: 30, radius: 9 } as const;
+
+
+function renderTabIcon(routeName: string, active: boolean, color: string, size: number, bgColor?: string) {
+  switch (routeName) {
+    case 'index':
+      return <HomeTabIcon active={active} color={color} size={size} />;
+    case 'discover':
+      return <CategoriesTabIcon active={active} color={color} size={size} />;
+    case 'upload':
+      return <SellTabIcon active={active} color={color} size={size} bgColor={bgColor} />;
+    case 'chat':
+      return <InboxTabIcon active={active} color={color} size={size} bgColor={bgColor} />;
+    case 'profile':
+      return <AccountTabIcon active={active} color={color} size={size} bgColor={bgColor} />;
+    default:
+      return <HomeTabIcon active={active} color={color} size={size} />;
+  }
+}
 
 type ItemLayout = { x: number; width: number };
 
@@ -158,11 +105,6 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
   const reduced = useReducedMotion();
   const { isDark } = useTheme();
 
-  const dockBg = isDark ? 'rgba(24, 24, 24, 0.94)' : BAR_FILL;
-  const dockBorder = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.7)';
-  const discFill = isDark ? 'rgba(255, 255, 255, 0.14)' : DISC_FILL;
-  const blurTint = isDark ? 'dark' : 'light';
-
   const routes = state.routes.filter(
     (r) => StyleSheet.flatten(descriptors[r.key].options.tabBarItemStyle)?.display !== 'none',
   );
@@ -171,27 +113,16 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
   const activePos = routes.findIndex((r) => r.key === activeKey);
 
   // ---- shared values (UI thread) ----
-  // Item geometry. Written from onLayout; read by the hit-test worklet and by
-  // the disc reaction. `pendingLayouts` is the JS-side buffer so each onLayout
-  // publishes one immutable snapshot rather than mutating in place.
   const layouts = useSharedValue<ItemLayout[]>([]);
   const pendingLayouts = useRef<ItemLayout[]>([]);
-  // Measured only on the keyboard path — see resolveIndex.
   const containerRef = useAnimatedRef<Animated.View>();
 
   const activeIdx = useSharedValue(activePos);
-  const previewIdx = useSharedValue(NO_PREVIEW); // tab under the finger mid-drag
+  const previewIdx = useSharedValue(NO_PREVIEW);
   const committed = useSharedValue(false);
+  const mount = useSharedValue(0);
 
-  const discX = useSharedValue(0);
-  const pressV = useSharedValue(1); // disc squish on touch
-  const mount = useSharedValue(0); // entrance
-
-  // Preview wins while dragging; otherwise the real route. Everything visual
-  // hangs off this one value, which is also why releasing on a tab whose
-  // tabPress is preventDefault-ed (Discover, Sell — they open sheets instead of
-  // navigating) now settles the disc back on the active tab instead of
-  // stranding it under the tab that was pressed.
+  // Preview wins while dragging; otherwise the real route.
   const highlight = useDerivedValue(() =>
     previewIdx.value === NO_PREVIEW ? activeIdx.value : previewIdx.value,
   );
@@ -204,21 +135,6 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
     mount.value = reduced ? 1 : withDelay(60, withSpring(1, { damping: 16, stiffness: 150 }));
   }, [mount, reduced]);
 
-  // Slide the disc whenever the highlighted tab — or its measured position —
-  // changes. `prev === null` is the first run, i.e. initial measurement, which
-  // must land without animating.
-  useAnimatedReaction(
-    () => {
-      const l = layouts.value[highlight.value];
-      return l ? l.x + l.width / 2 - DISC / 2 : null;
-    },
-    (target, prev) => {
-      if (target === null) return;
-      discX.value = prev == null || reduced ? target : withSpring(target, SLIDE);
-    },
-    [reduced],
-  );
-
   // ---- JS thread: only ever reached on release ----
   const select = (pos: number) => {
     const route = routes[pos];
@@ -230,9 +146,6 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
     const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
     if (!focused && !event.defaultPrevented) {
       if (HAPTICS) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      // Dev-only switch timing. Two rAFs lands after the commit that follows
-      // navigate(), so this is press -> new screen on screen. Delete once the
-      // tab-switch cost is understood; it costs nothing in a release build.
       const t0 = __DEV__ ? Date.now() : 0;
       navigation.navigate(route.name);
       if (__DEV__) {
@@ -243,35 +156,17 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
         );
       }
     }
-    // Hand the disc back to `activeIdx`. If the press navigated, that value is
-    // already the new tab; if it was preventDefault-ed, the disc springs home.
     previewIdx.value = NO_PREVIEW;
   };
 
   // Mount the tab under the finger BEFORE the finger lifts.
-  //
-  // Tab screens are lazy: the first press on one mounts its whole tree — five
-  // queries and a FlashList on Home — synchronously, inside the same JS task
-  // that handles the release. That single blocking mount is what reads as "the
-  // tab bar is laggy". Preloading on touch-DOWN moves it ~100-250ms earlier, so
-  // it overlaps the press instead of stalling the transition.
-  //
-  // Touch-down only, never on drag preview: preloading every tab a finger
-  // slides over would mount four screens mid-gesture, which is the jank this is
-  // meant to remove.
   const preload = (pos: number) => {
     const route = routes[pos];
     if (!route || route.key === activeKey) return;
     navigation.preload(route.name);
   };
 
-  // Latest-ref indirection, so `selectAt` is stable forever and the memoized
-  // gesture below never has to be torn down and re-attached just because a
-  // navigation changed which route is focused. Written in an effect rather than
-  // during render — React Compiler is enabled on this project, and a ref
-  // mutated during render is a Rules of React violation it would bail out on.
-  // The initial value is already correct, and a gesture cannot fire before the
-  // first effect flush.
+  // Latest-ref indirection so the memoized gesture never tears down.
   const selectRef = useRef(select);
   const preloadRef = useRef(preload);
   useEffect(() => {
@@ -281,8 +176,7 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
   const selectAt = useCallback((pos: number) => selectRef.current(pos), []);
   const preloadAt = useCallback((pos: number) => preloadRef.current(pos), []);
 
-  // Warm every other tab once, shortly after mount. `preload()` skips whichever
-  // route is focused, so this never touches the screen the user is looking at.
+  // Warm every other tab once, shortly after mount.
   const warmed = useRef(false);
   useEffect(() => {
     if (warmed.current || count === 0) return;
@@ -294,25 +188,7 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
   }, [count, preloadAt]);
 
   // ---- gesture (worklets only) ----
-  // Memoized because a new Gesture object detaches and re-attaches the native
-  // handler, and this component re-renders on every navigation. Deps are
-  // primitives only, so this is built once per tab-count change.
   const gesture = useMemo(() => {
-    // Which tab an event landed on.
-    //
-    // Pointer events carry an `x` already relative to the dock, so the common
-    // path is a straight lookup. Keyboard events do not: react-native-web
-    // renders each tab as a real <button tabindex="0">, and RNGH's built-in
-    // KeyboardEventManager turns Enter/Space on one into a synthetic tap — but
-    // it derives coordinates from the *focused button's* bounding box, so it
-    // reports `x = button.width / 2`. On a five-tab dock that constant always
-    // falls inside tab 0, which is why keyboard activation used to navigate
-    // Home no matter which tab you had focused.
-    //
-    // `absoluteX` is correct in that case (it is the focused button's viewport
-    // centre), so for PointerType.KEY we convert it into dock-local space with
-    // a one-off measure. That runs only on the keyboard path — never during a
-    // drag, where a per-frame measure would be a layout read every frame.
     const resolveIndex = (
       e:
         | GestureStateChangeEvent<{ x: number; absoluteX: number; pointerType: PointerType }>
@@ -326,13 +202,10 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
       return indexAtX(layouts.value, e.x, count);
     };
 
-    // Drag engages after a few px of travel; a quick stationary touch falls
-    // through to the Tap gesture and selects.
     const pan = Gesture.Pan()
       .minDistance(6)
       .onBegin((e) => {
         committed.value = false;
-        pressV.value = withTiming(0.9, { duration: 110 });
         const pos = resolveIndex(e);
         previewIdx.value = pos;
         runOnJS(preloadAt)(pos);
@@ -350,7 +223,6 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
         runOnJS(selectAt)(pos);
       })
       .onFinalize(() => {
-        pressV.value = withSpring(1, POP);
         if (!committed.value) previewIdx.value = NO_PREVIEW;
       });
 
@@ -362,12 +234,7 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
       });
 
     return Gesture.Race(pan, tap);
-  }, [count, committed, containerRef, layouts, pressV, previewIdx, selectAt, preloadAt]);
-
-  const discStyle = useAnimatedStyle(() => ({
-    opacity: mount.value,
-    transform: [{ translateX: discX.value }, { scale: pressV.value }],
-  }));
+  }, [count, committed, containerRef, layouts, previewIdx, selectAt, preloadAt]);
 
   const barStyle = useAnimatedStyle(() => ({
     opacity: mount.value,
@@ -381,15 +248,13 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
       style={[
         {
           position: 'absolute',
-          left: 20,
-          right: 20,
-          // Android was pinned to a flat 22 here, which predates SDK 54 making
-          // edge-to-edge mandatory: insets.bottom is now the real system bar, so
-          // a fixed 22 tucks the dock under the navigation bar on 3-button
-          // devices (~48dp) while looking fine on gesture nav (~24dp) and on web.
-          // Honouring the inset on both platforms clears it; the 22/14 floors
-          // keep the resting position identical where the inset is small.
-          bottom: Math.max(insets.bottom, Platform.OS === 'android' ? 22 : 14),
+          left: 0,
+          right: 0,
+          bottom: 0,
+          paddingBottom: insets.bottom,
+          backgroundColor: isDark ? '#1C1C1C' : '#F4F4F5',
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
         },
         barStyle,
       ]}
@@ -400,50 +265,8 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
           style={{
             flexDirection: 'row',
             height: BAR_HEIGHT,
-            borderRadius: BAR_HEIGHT / 2,
-            borderCurve: 'continuous',
-            paddingHorizontal: 6,
-            backgroundColor: dockBg,
-            borderWidth: 1,
-            borderColor: dockBorder,
-            boxShadow: isDark
-              ? '0px 2px 8px rgba(0,0,0,0.5), 0px 14px 30px rgba(0,0,0,0.6)'
-              : '0px 2px 6px rgba(0,0,0,0.05), 0px 14px 30px rgba(0,0,0,0.12)',
-            elevation: 16,
           }}
         >
-          {/* Frosted glass fill — iOS only, see BLUR_ENABLED. */}
-          {BLUR_ENABLED ? (
-            <BlurView
-              tint={blurTint}
-              intensity={44}
-              pointerEvents="none"
-              style={{
-                ...StyleSheet.absoluteFillObject,
-                borderRadius: BAR_HEIGHT / 2,
-                borderCurve: 'continuous',
-                overflow: 'hidden',
-              }}
-            />
-          ) : null}
-
-          {/* Sliding highlight disc */}
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              {
-                position: 'absolute',
-                top: (BAR_HEIGHT - DISC) / 2,
-                left: 0,
-                width: DISC,
-                height: DISC,
-                borderRadius: DISC / 2,
-                backgroundColor: discFill,
-              },
-              discStyle,
-            ]}
-          />
-
           {routes.map((route, pos) => {
             const { options } = descriptors[route.key];
             const label =
@@ -459,13 +282,12 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
                 selected={pos === activePos}
                 reduced={reduced}
                 label={label}
+                isDark={isDark}
                 onLayout={(e: LayoutChangeEvent) => {
                   const { x, width } = e.nativeEvent.layout;
                   const cur = pendingLayouts.current[pos];
                   if (cur && cur.x === x && cur.width === width) return;
                   pendingLayouts.current[pos] = { x, width };
-                  // Publish an immutable snapshot: shared values only propagate
-                  // to the UI thread on assignment, not on mutation.
                   layouts.value = pendingLayouts.current.slice();
                 }}
               />
@@ -484,6 +306,7 @@ function TabItem({
   selected,
   reduced,
   label,
+  isDark,
   onLayout,
 }: {
   index: number;
@@ -492,27 +315,28 @@ function TabItem({
   selected: boolean;
   reduced: boolean;
   label: string;
+  isDark: boolean;
   onLayout: (e: LayoutChangeEvent) => void;
 }) {
-  const { theme } = useTheme();
-  const icon = ICONS[routeName] ?? ICONS.index;
+  const activeColor = isDark ? '#FFFFFF' : '#111111';
+  const inactiveColor = isDark ? '#C5C5C5' : '#777777';
+  const barBg = isDark ? '#1C1C1C' : '#F4F4F5';
 
-  // Derived from `highlight` on the UI thread, so this item animates during a
-  // drag without React knowing the drag is happening.
+  // Derived from `highlight` on the UI thread — animates without React knowing.
   const active = useDerivedValue(() => {
     const on = highlight.value === index;
     if (reduced) return on ? 1 : 0;
     return on ? withSpring(1, POP) : withTiming(0, FADE_OUT);
   }, [index, reduced]);
 
-  // Whole icon grows a touch when active.
+  // Subtle scale bump on the active icon.
   const wrapStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 1 + active.value * 0.06 }],
+    transform: [{ scale: 1 + active.value * 0.04 }],
   }));
   const outlineStyle = useAnimatedStyle(() => ({ opacity: 1 - active.value }));
   const filledStyle = useAnimatedStyle(() => ({
     opacity: active.value,
-    transform: [{ scale: 0.55 + active.value * 0.45 }],
+    transform: [{ scale: 0.9 + active.value * 0.1 }],
   }));
 
   return (
@@ -521,36 +345,33 @@ function TabItem({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ selected }}
-      style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+      style={{
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingTop: 6,
+        paddingBottom: 2,
+      }}
     >
-      {routeName === 'upload' ? (
-        <Animated.View
-          style={[
-            {
-              width: PILL.width,
-              height: PILL.height,
-              borderRadius: PILL.radius,
-              borderCurve: 'continuous',
-              backgroundColor: theme.text,
-              alignItems: 'center',
-              justifyContent: 'center',
-            },
-            wrapStyle,
-          ]}
-        >
-          <Ionicons name="add" size={22} color={theme.background} />
+      <Animated.View style={[{ width: ICON, height: ICON }, wrapStyle]}>
+        <Animated.View style={[StyleSheet.absoluteFill, outlineStyle]}>
+          {renderTabIcon(routeName, false, inactiveColor, ICON, barBg)}
         </Animated.View>
-      ) : (
-        <Animated.View style={[{ width: ICON, height: ICON }, wrapStyle]}>
-          <Animated.View style={[StyleSheet.absoluteFill, outlineStyle]}>
-            <Ionicons name={icon.outline} size={ICON} color={theme.text} />
-          </Animated.View>
-          <Animated.View style={[StyleSheet.absoluteFill, filledStyle]}>
-            <Ionicons name={icon.filled} size={ICON} color={theme.text} />
-          </Animated.View>
+        <Animated.View style={[StyleSheet.absoluteFill, filledStyle]}>
+          {renderTabIcon(routeName, true, activeColor, ICON, barBg)}
         </Animated.View>
-      )}
+      </Animated.View>
+      <Text
+        style={{
+          fontSize: 10,
+          lineHeight: 12,
+          marginTop: 4,
+          color: selected ? activeColor : inactiveColor,
+          fontWeight: selected ? '600' : '500',
+        }}
+      >
+        {label}
+      </Text>
     </View>
   );
 }
-

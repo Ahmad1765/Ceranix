@@ -15,7 +15,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="index" options={{ title: 'Home' }} />
       <Tabs.Screen
         name="discover"
-        options={{ title: 'Discover' }}
+        options={{ title: 'Categories' }}
         listeners={{
           tabPress: (e) => {
             e.preventDefault();
@@ -43,8 +43,8 @@ export default function TabsLayout() {
           },
         }}
       />
-      <Tabs.Screen name="chat" options={{ title: 'Chat' }} />
-      <Tabs.Screen name="profile" options={{ title: 'My profile' }} />
+      <Tabs.Screen name="chat" options={{ title: 'Inbox' }} />
+      <Tabs.Screen name="profile" options={{ title: 'Account' }} />
     </Tabs>
   );
 }

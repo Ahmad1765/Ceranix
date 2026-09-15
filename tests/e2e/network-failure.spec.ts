@@ -132,7 +132,7 @@ test.describe('Network failures', () => {
     // then intercepts the click on Home, so the old Discover→Home round trip
     // never actually left Home. Chat is a real route.
     // Icon-only dock — address tabs by accessible role/name, not text.
-    await page.getByRole('button', { name: 'Chat' }).click();
+    await page.getByRole('button', { name: 'Inbox' }).click();
     await page.getByRole('button', { name: 'Home' }).click();
     await page.waitForTimeout(2500);
     // We accept either: real listings now visible, OR the empty state still

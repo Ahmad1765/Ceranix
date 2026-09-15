@@ -47,13 +47,9 @@ test.describe('Responsive layout', () => {
   });
 
   test('bottom tab bar exposes all five tabs', async ({ page }) => {
-    // The dock is ICON-ONLY — components/AnimatedTabBar.tsx renders no Text for
-    // a tab ("No labels, no ghost word"). Each tab is a View carrying
-    // accessibilityRole="button" + accessibilityLabel={title}, so the name is
-    // reachable through the accessibility tree and NOT through getByText.
-    // tab-navigation.spec.ts already queries them this way; this spec was
-    // written against the older labelled bar and never updated.
-    for (const label of ['Home', 'Discover', 'Sell', 'Chat', 'My profile']) {
+    // The dock renders icon + label for each tab. Each tab carries
+    // accessibilityRole="button" + accessibilityLabel={title}.
+    for (const label of ['Home', 'Categories', 'Sell', 'Inbox', 'Account']) {
       await expect(page.getByRole('button', { name: label }).first()).toBeVisible();
     }
   });

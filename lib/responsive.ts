@@ -119,19 +119,18 @@ export const GRID_DRAW_DISTANCE = 700;
 // instead of stretching edge-to-edge on tablets/web.
 export const CONTENT_MAX_WIDTH = 720;
 
-// The floating tab bar (components/AnimatedTabBar) is absolutely positioned and
+// The bottom tab bar (components/AnimatedTabBar) is absolutely positioned and
 // overlays screen content — it does NOT reserve layout space. Screens inside the
 // (tabs) group must pad the bottom of their scroll content (and any sticky CTA
 // bar) by this much, or the bar covers the last row / buttons beneath it.
-// AnimatedTabBar's own BAR_HEIGHT is 62; the extra 6 here is deliberate slack so
-// content clears the dock's shadow, not just its box. Keep it >= 62.
-export const TAB_BAR_HEIGHT = 68;
+// AnimatedTabBar's BAR_HEIGHT is 56; the extra 6 is deliberate slack so content
+// clears the bar's border, not just its box. Keep it >= 56.
+export const TAB_BAR_HEIGHT = 62;
 export function useTabBarClearance(extra = 12): number {
   const insets = useSafeAreaInsets();
-  // AnimatedTabBar sits at max(insets.bottom, android ? 22 : 14). These floors
-  // are rounded up rather than mirrored exactly, for the same slack reason.
-  const bottomOffset = Platform.OS === 'ios' ? Math.max(insets.bottom, 16) : 24;
-  return bottomOffset + TAB_BAR_HEIGHT + extra;
+  // The bar sits flush at the bottom with internal paddingBottom = insets.bottom.
+  // Content clearance = bar content height + insets + extra breathing room.
+  return TAB_BAR_HEIGHT + insets.bottom + extra;
 }
 
 // Hit-slop preset for small icon buttons (improves touch target on phones).

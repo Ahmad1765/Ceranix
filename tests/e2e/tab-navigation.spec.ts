@@ -3,9 +3,8 @@
 // which is also a valid destination for "the route works".
 //
 // Tabs are located by role + accessible name, never by getByText: the tab bar
-// is icon-only (AnimatedTabBar renders glyphs, and the label survives solely
-// as the button's aria-label), so a text locator matches nothing and times
-// out. That mismatch is what made this file look chronically flaky.
+// is icon-only (AnimatedTabBar renders glyphs and labels, and the label also
+// serves as the button's aria-label).
 
 import { test, expect, waitForAppReady, discoverSearch } from './helpers/page';
 
@@ -21,8 +20,8 @@ test.describe('Tab navigation', () => {
     await expect(page.getByPlaceholder('Search your feed')).toBeVisible();
   });
 
-  test('Chat tab routes to the inbox', async ({ page }) => {
-    await page.getByRole('button', { name: 'Chat' }).click();
+  test('Inbox tab routes to the inbox', async ({ page }) => {
+    await page.getByRole('button', { name: 'Inbox' }).click();
     await page.waitForURL(/\/chat/);
     await expect(
       page.getByText(/Inbox|Sign in to chat|It's quiet here/).first(),
@@ -33,8 +32,8 @@ test.describe('Tab navigation', () => {
   // current screen (components/discover/DiscoverSheet.tsx). Picking something
   // in the sheet is what navigates, so this asserts both halves.
   // Located by role/aria-label, not text: the tab bar is icon-only.
-  test('Discover tab opens the search sheet, which routes on pick', async ({ page }) => {
-    await page.getByRole('button', { name: 'Discover' }).click();
+  test('Categories tab opens the search sheet, which routes on pick', async ({ page }) => {
+    await page.getByRole('button', { name: 'Categories' }).click();
     await expect(page.getByPlaceholder(/^Search \w+\.\.\.$/)).toBeVisible();
     await expect(page.getByText('Browse', { exact: true })).toBeVisible();
     await expect(page.getByText('Topics', { exact: true })).toBeVisible();
@@ -53,8 +52,8 @@ test.describe('Tab navigation', () => {
     ).toBeVisible();
   });
 
-  test('My profile tab routes (auth gate or profile)', async ({ page }) => {
-    await page.getByRole('button', { name: 'My profile' }).click();
+  test('Account tab routes (auth gate or profile)', async ({ page }) => {
+    await page.getByRole('button', { name: 'Account' }).click();
     await expect(
       page.getByText(/Posts|Continue as guest|Your story[\s\S]*starts now\./i).first(),
     ).toBeVisible();
