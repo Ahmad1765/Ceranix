@@ -224,7 +224,7 @@ export const FeedSearch = memo(function FeedSearch({
               } as any)}
             >
               <FilterSlidersIcon
-                size={18}
+                size={26}
                 color={theme.ink}
               />
               {hasFilters && (
@@ -289,9 +289,9 @@ export const FeedSearch = memo(function FeedSearch({
                 ...shadow.sm,
               } as any)}
             >
-              <Feather
-                name="bell"
-                size={17}
+              <Ionicons
+                name="notifications-outline"
+                size={21}
                 color={theme.ink}
               />
               {!!unreadNotificationsCount && unreadNotificationsCount > 0 && (

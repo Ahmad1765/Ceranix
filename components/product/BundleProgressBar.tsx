@@ -130,19 +130,14 @@ export function BundleProgressBar({
             </Text>
           </View>
 
-          {/* 3-Dot Icon replacing the downward arrow */}
-          <Pressable
-            onPress={handleOpenInfo}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Bundle discounts information"
-            style={({ pressed }) => ({
+          {/* 3-Dot Icon indicator */}
+          <View
+            style={{
               padding: 4,
-              opacity: pressed ? 0.6 : 1,
-            })}
+            }}
           >
             <Feather name="more-horizontal" size={20} color={theme.mute} />
-          </Pressable>
+          </View>
         </View>
 
         {/* Progress Bar Track with Milestone Step Dots */}

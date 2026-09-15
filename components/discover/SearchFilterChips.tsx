@@ -122,6 +122,7 @@ function haptic() {
 
 type ModalType =
   | null
+  | 'all'
   | 'category'
   | 'brand'
   | 'size'
@@ -149,6 +150,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
 
   const [activeModal, setActiveModal] = useState<ModalType>(null);
+  const [prevModal, setPrevModal] = useState<ModalType>(null);
   const [brandInput, setBrandInput] = useState('');
   const [customMin, setCustomMin] = useState(() =>
     filters.priceMin != null ? String(filters.priceMin) : '',
@@ -174,9 +176,26 @@ export const SearchFilterChips = memo(function SearchFilterChips({
     return `${resultCount} results`;
   }, [resultCount]);
 
-  // Close modals
+  // Open sub-modal from all filters modal
+  const openSubModal = useCallback((modal: ModalType) => {
+    setPrevModal(activeModal);
+    setActiveModal(modal);
+  }, [activeModal]);
+
+  // Back or close from sub-modal
+  const handleSubModalClose = useCallback(() => {
+    if (prevModal) {
+      setActiveModal(prevModal);
+      setPrevModal(null);
+    } else {
+      setActiveModal(null);
+    }
+  }, [prevModal]);
+
+  // Close modals completely
   const closeModal = useCallback(() => {
     setActiveModal(null);
+    setPrevModal(null);
   }, []);
 
   // Category Toggle
@@ -188,9 +207,9 @@ export const SearchFilterChips = memo(function SearchFilterChips({
         category: prev.category === catId ? null : catId,
         subcategory: null,
       }));
-      closeModal();
+      handleSubModalClose();
     },
-    [onUpdateFilter, closeModal],
+    [onUpdateFilter, handleSubModalClose],
   );
 
   // Brand Toggle / Set
@@ -201,9 +220,9 @@ export const SearchFilterChips = memo(function SearchFilterChips({
         ...prev,
         brand: prev.brand?.toLowerCase() === brandName?.toLowerCase() ? null : brandName,
       }));
-      closeModal();
+      handleSubModalClose();
     },
-    [onUpdateFilter, closeModal],
+    [onUpdateFilter, handleSubModalClose],
   );
 
   const handleApplyCustomBrand = useCallback(() => {
@@ -253,9 +272,9 @@ export const SearchFilterChips = memo(function SearchFilterChips({
         priceMin: min,
         priceMax: max,
       }));
-      closeModal();
+      handleSubModalClose();
     },
-    [onUpdateFilter, closeModal],
+    [onUpdateFilter, handleSubModalClose],
   );
 
   const handleApplyCustomPrice = useCallback(() => {
@@ -266,8 +285,8 @@ export const SearchFilterChips = memo(function SearchFilterChips({
       priceMin,
       priceMax,
     }));
-    closeModal();
-  }, [customMin, customMax, onUpdateFilter, closeModal]);
+    handleSubModalClose();
+  }, [customMin, customMax, onUpdateFilter, handleSubModalClose]);
 
   // Color Toggle
   const handleSelectColor = useCallback(
@@ -277,9 +296,9 @@ export const SearchFilterChips = memo(function SearchFilterChips({
         ...prev,
         color: prev.color === colorName ? null : colorName,
       }));
-      closeModal();
+      handleSubModalClose();
     },
-    [onUpdateFilter, closeModal],
+    [onUpdateFilter, handleSubModalClose],
   );
 
   // Material Toggle
@@ -290,9 +309,9 @@ export const SearchFilterChips = memo(function SearchFilterChips({
         ...prev,
         material: prev.material === mat ? null : mat,
       }));
-      closeModal();
+      handleSubModalClose();
     },
-    [onUpdateFilter, closeModal],
+    [onUpdateFilter, handleSubModalClose],
   );
 
   // Sort Toggle
@@ -303,9 +322,9 @@ export const SearchFilterChips = memo(function SearchFilterChips({
         ...prev,
         sort: sortId === 'relevance' ? null : sortId,
       }));
-      closeModal();
+      handleSubModalClose();
     },
-    [onUpdateFilter, closeModal],
+    [onUpdateFilter, handleSubModalClose],
   );
 
   // Active labels on chips
@@ -374,7 +393,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
             if (onOpenFullFilter) {
               onOpenFullFilter();
             } else {
-              setActiveModal('category');
+              setActiveModal('all');
             }
           }}
           style={({ pressed }) => [
@@ -384,7 +403,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
             { transform: [{ scale: pressed ? 0.96 : 1 }] },
           ]}
           accessibilityRole="button"
-          accessibilityLabel={onOpenFullFilter ? 'Open all filters' : 'Open category modal'}
+          accessibilityLabel={onOpenFullFilter ? 'Open all filters' : 'Open filters modal'}
         >
           <FilterSlidersIcon
             size={14.5}
@@ -710,6 +729,276 @@ export const SearchFilterChips = memo(function SearchFilterChips({
 
       {/* ── 3. Quick Sub-Modals / Bottom Sheets ────────────────────────────── */}
 
+      {/* All Filters Modal */}
+      <Modal
+        visible={activeModal === 'all'}
+        transparent
+        animationType="fade"
+        onRequestClose={closeModal}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={closeModal}>
+          <Pressable style={[styles.modalCard, { maxHeight: '90%' }]} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <FilterSlidersIcon size={16} color={theme.text} />
+                <Text style={styles.modalTitle}>Filters</Text>
+                {activeCount > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{activeCount}</Text>
+                  </View>
+                )}
+              </View>
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                {activeCount > 0 && (
+                  <Pressable
+                    onPress={() => {
+                      haptic();
+                      onUpdateFilter(() => ({
+                        category: null,
+                        subcategory: null,
+                        brand: null,
+                        sizes: [],
+                        conditions: [],
+                        priceMin: null,
+                        priceMax: null,
+                        color: null,
+                        material: null,
+                        sort: null,
+                      }));
+                    }}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Reset all filters"
+                  >
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontFamily: typography.family.sansBold,
+                        color: theme.ink,
+                        textDecorationLine: 'underline',
+                      }}
+                    >
+                      Clear all
+                    </Text>
+                  </Pressable>
+                )}
+                <Pressable hitSlop={10} onPress={closeModal} style={styles.modalCloseBtn} accessibilityLabel="Close filters modal">
+                  <Feather name="x" size={18} color={theme.text} />
+                </Pressable>
+              </View>
+            </View>
+
+            <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
+              {/* Row 1: Sort by */}
+              <Pressable
+                onPress={() => openSubModal('sort')}
+                style={({ pressed }) => [
+                  styles.filterSummaryRow,
+                  filters.sort ? styles.filterSummaryRowActive : null,
+                  { opacity: pressed ? 0.75 : 1 },
+                ]}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                  <Feather name="bar-chart-2" size={16} color={filters.sort ? theme.purple : theme.mute} />
+                  <Text style={[styles.filterSummaryLabel, filters.sort ? styles.filterSummaryLabelActive : null]}>
+                    Sort by
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={[styles.filterSummaryValue, filters.sort ? styles.filterSummaryValueActive : null]}>
+                    {sortLabel}
+                  </Text>
+                  <Feather name="chevron-right" size={15} color={theme.mute} />
+                </View>
+              </Pressable>
+
+              {/* Row 2: Category */}
+              <Pressable
+                onPress={() => openSubModal('category')}
+                style={({ pressed }) => [
+                  styles.filterSummaryRow,
+                  filters.category ? styles.filterSummaryRowActive : null,
+                  { opacity: pressed ? 0.75 : 1 },
+                ]}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                  <Feather name="layers" size={16} color={filters.category ? theme.purple : theme.mute} />
+                  <Text style={[styles.filterSummaryLabel, filters.category ? styles.filterSummaryLabelActive : null]}>
+                    Category
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={[styles.filterSummaryValue, filters.category ? styles.filterSummaryValueActive : null]}>
+                    {categoryLabel}
+                  </Text>
+                  <Feather name="chevron-right" size={15} color={theme.mute} />
+                </View>
+              </Pressable>
+
+              {/* Row 3: Brand */}
+              <Pressable
+                onPress={() => openSubModal('brand')}
+                style={({ pressed }) => [
+                  styles.filterSummaryRow,
+                  filters.brand ? styles.filterSummaryRowActive : null,
+                  { opacity: pressed ? 0.75 : 1 },
+                ]}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                  <Feather name="tag" size={16} color={filters.brand ? theme.purple : theme.mute} />
+                  <Text style={[styles.filterSummaryLabel, filters.brand ? styles.filterSummaryLabelActive : null]}>
+                    Brand
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={[styles.filterSummaryValue, filters.brand ? styles.filterSummaryValueActive : null]}>
+                    {brandLabel}
+                  </Text>
+                  <Feather name="chevron-right" size={15} color={theme.mute} />
+                </View>
+              </Pressable>
+
+              {/* Row 4: Size */}
+              <Pressable
+                onPress={() => openSubModal('size')}
+                style={({ pressed }) => [
+                  styles.filterSummaryRow,
+                  filters.sizes.length > 0 ? styles.filterSummaryRowActive : null,
+                  { opacity: pressed ? 0.75 : 1 },
+                ]}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                  <Feather name="maximize-2" size={16} color={filters.sizes.length > 0 ? theme.purple : theme.mute} />
+                  <Text style={[styles.filterSummaryLabel, filters.sizes.length > 0 ? styles.filterSummaryLabelActive : null]}>
+                    Size
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={[styles.filterSummaryValue, filters.sizes.length > 0 ? styles.filterSummaryValueActive : null]}>
+                    {sizeLabel}
+                  </Text>
+                  <Feather name="chevron-right" size={15} color={theme.mute} />
+                </View>
+              </Pressable>
+
+              {/* Row 5: Condition */}
+              <Pressable
+                onPress={() => openSubModal('condition')}
+                style={({ pressed }) => [
+                  styles.filterSummaryRow,
+                  filters.conditions.length > 0 ? styles.filterSummaryRowActive : null,
+                  { opacity: pressed ? 0.75 : 1 },
+                ]}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                  <Feather name="check-circle" size={16} color={filters.conditions.length > 0 ? theme.purple : theme.mute} />
+                  <Text style={[styles.filterSummaryLabel, filters.conditions.length > 0 ? styles.filterSummaryLabelActive : null]}>
+                    Condition
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={[styles.filterSummaryValue, filters.conditions.length > 0 ? styles.filterSummaryValueActive : null]}>
+                    {conditionLabel}
+                  </Text>
+                  <Feather name="chevron-right" size={15} color={theme.mute} />
+                </View>
+              </Pressable>
+
+              {/* Row 6: Price */}
+              <Pressable
+                onPress={() => openSubModal('price')}
+                style={({ pressed }) => [
+                  styles.filterSummaryRow,
+                  filters.priceMin != null || filters.priceMax != null ? styles.filterSummaryRowActive : null,
+                  { opacity: pressed ? 0.75 : 1 },
+                ]}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                  <Feather name="dollar-sign" size={16} color={filters.priceMin != null || filters.priceMax != null ? theme.purple : theme.mute} />
+                  <Text style={[styles.filterSummaryLabel, filters.priceMin != null || filters.priceMax != null ? styles.filterSummaryLabelActive : null]}>
+                    Price
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={[styles.filterSummaryValue, filters.priceMin != null || filters.priceMax != null ? styles.filterSummaryValueActive : null]}>
+                    {priceLabel}
+                  </Text>
+                  <Feather name="chevron-right" size={15} color={theme.mute} />
+                </View>
+              </Pressable>
+
+              {/* Row 7: Color */}
+              <Pressable
+                onPress={() => openSubModal('color')}
+                style={({ pressed }) => [
+                  styles.filterSummaryRow,
+                  filters.color ? styles.filterSummaryRowActive : null,
+                  { opacity: pressed ? 0.75 : 1 },
+                ]}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                  <Feather name="disc" size={16} color={filters.color ? theme.purple : theme.mute} />
+                  <Text style={[styles.filterSummaryLabel, filters.color ? styles.filterSummaryLabelActive : null]}>
+                    Color
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={[styles.filterSummaryValue, filters.color ? styles.filterSummaryValueActive : null]}>
+                    {colorLabel}
+                  </Text>
+                  <Feather name="chevron-right" size={15} color={theme.mute} />
+                </View>
+              </Pressable>
+
+              {/* Row 8: Material */}
+              <Pressable
+                onPress={() => openSubModal('material')}
+                style={({ pressed }) => [
+                  styles.filterSummaryRow,
+                  filters.material ? styles.filterSummaryRowActive : null,
+                  { opacity: pressed ? 0.75 : 1 },
+                ]}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                  <Feather name="feather" size={16} color={filters.material ? theme.purple : theme.mute} />
+                  <Text style={[styles.filterSummaryLabel, filters.material ? styles.filterSummaryLabelActive : null]}>
+                    Material
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={[styles.filterSummaryValue, filters.material ? styles.filterSummaryValueActive : null]}>
+                    {materialLabel}
+                  </Text>
+                  <Feather name="chevron-right" size={15} color={theme.mute} />
+                </View>
+              </Pressable>
+            </ScrollView>
+
+            {/* Bottom Apply CTA Button */}
+            <Pressable
+              onPress={() => {
+                haptic();
+                closeModal();
+              }}
+              style={({ pressed }) => ({
+                marginTop: 14,
+                height: 46,
+                borderRadius: radii.pill,
+                backgroundColor: theme.purple,
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: pressed ? 0.88 : 1,
+              })}
+            >
+              <Text style={{ fontSize: 14.5, fontFamily: typography.family.sansBold, color: '#FFFFFF' }}>
+                {resultCount > 0 ? `Show ${formattedCountText}` : 'Apply filters'}
+              </Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* Category Modal */}
       <Modal
         visible={activeModal === 'category'}
@@ -720,7 +1009,14 @@ export const SearchFilterChips = memo(function SearchFilterChips({
         <Pressable style={styles.modalBackdrop} onPress={closeModal}>
           <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Category</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                {prevModal && (
+                  <Pressable hitSlop={8} onPress={handleSubModalClose} style={styles.modalCloseBtn} accessibilityLabel="Back to all filters">
+                    <Feather name="chevron-left" size={18} color={theme.text} />
+                  </Pressable>
+                )}
+                <Text style={styles.modalTitle}>Category</Text>
+              </View>
               <Pressable hitSlop={10} onPress={closeModal} style={styles.modalCloseBtn} accessibilityLabel="Close category modal">
                 <Feather name="x" size={18} color={theme.text} />
               </Pressable>
@@ -788,7 +1084,14 @@ export const SearchFilterChips = memo(function SearchFilterChips({
         <Pressable style={styles.modalBackdrop} onPress={closeModal}>
           <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Brand</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                {prevModal && (
+                  <Pressable hitSlop={8} onPress={handleSubModalClose} style={styles.modalCloseBtn} accessibilityLabel="Back to all filters">
+                    <Feather name="chevron-left" size={18} color={theme.text} />
+                  </Pressable>
+                )}
+                <Text style={styles.modalTitle}>Brand</Text>
+              </View>
               <Pressable hitSlop={10} onPress={closeModal} style={styles.modalCloseBtn} accessibilityLabel="Close brand modal">
                 <Feather name="x" size={18} color={theme.text} />
               </Pressable>
@@ -874,7 +1177,14 @@ export const SearchFilterChips = memo(function SearchFilterChips({
         <Pressable style={styles.modalBackdrop} onPress={closeModal}>
           <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Size</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                {prevModal && (
+                  <Pressable hitSlop={8} onPress={handleSubModalClose} style={styles.modalCloseBtn} accessibilityLabel="Back to all filters">
+                    <Feather name="chevron-left" size={18} color={theme.text} />
+                  </Pressable>
+                )}
+                <Text style={styles.modalTitle}>Size</Text>
+              </View>
               <Pressable hitSlop={10} onPress={closeModal} style={styles.modalCloseBtn} accessibilityLabel="Close size modal">
                 <Feather name="x" size={18} color={theme.text} />
               </Pressable>
@@ -914,7 +1224,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
               >
                 <Text style={styles.modalClearBtnText}>Clear</Text>
               </Pressable>
-              <Pressable onPress={closeModal} style={styles.modalDoneBtn}>
+              <Pressable onPress={handleSubModalClose} style={styles.modalDoneBtn}>
                 <Text style={styles.modalDoneBtnText}>Done</Text>
               </Pressable>
             </View>
@@ -932,7 +1242,14 @@ export const SearchFilterChips = memo(function SearchFilterChips({
         <Pressable style={styles.modalBackdrop} onPress={closeModal}>
           <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Condition</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                {prevModal && (
+                  <Pressable hitSlop={8} onPress={handleSubModalClose} style={styles.modalCloseBtn} accessibilityLabel="Back to all filters">
+                    <Feather name="chevron-left" size={18} color={theme.text} />
+                  </Pressable>
+                )}
+                <Text style={styles.modalTitle}>Condition</Text>
+              </View>
               <Pressable hitSlop={10} onPress={closeModal} style={styles.modalCloseBtn} accessibilityLabel="Close condition modal">
                 <Feather name="x" size={18} color={theme.text} />
               </Pressable>
@@ -983,7 +1300,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
               >
                 <Text style={styles.modalClearBtnText}>Clear</Text>
               </Pressable>
-              <Pressable onPress={closeModal} style={styles.modalDoneBtn}>
+              <Pressable onPress={handleSubModalClose} style={styles.modalDoneBtn}>
                 <Text style={styles.modalDoneBtnText}>Done</Text>
               </Pressable>
             </View>
@@ -1001,7 +1318,14 @@ export const SearchFilterChips = memo(function SearchFilterChips({
         <Pressable style={styles.modalBackdrop} onPress={closeModal}>
           <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Price Range</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                {prevModal && (
+                  <Pressable hitSlop={8} onPress={handleSubModalClose} style={styles.modalCloseBtn} accessibilityLabel="Back to all filters">
+                    <Feather name="chevron-left" size={18} color={theme.text} />
+                  </Pressable>
+                )}
+                <Text style={styles.modalTitle}>Price Range</Text>
+              </View>
               <Pressable hitSlop={10} onPress={closeModal} style={styles.modalCloseBtn} accessibilityLabel="Close price modal">
                 <Feather name="x" size={18} color={theme.text} />
               </Pressable>
@@ -1092,7 +1416,14 @@ export const SearchFilterChips = memo(function SearchFilterChips({
         <Pressable style={styles.modalBackdrop} onPress={closeModal}>
           <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Color</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                {prevModal && (
+                  <Pressable hitSlop={8} onPress={handleSubModalClose} style={styles.modalCloseBtn} accessibilityLabel="Back to all filters">
+                    <Feather name="chevron-left" size={18} color={theme.text} />
+                  </Pressable>
+                )}
+                <Text style={styles.modalTitle}>Color</Text>
+              </View>
               <Pressable hitSlop={10} onPress={closeModal} style={styles.modalCloseBtn} accessibilityLabel="Close color modal">
                 <Feather name="x" size={18} color={theme.text} />
               </Pressable>
@@ -1177,7 +1508,14 @@ export const SearchFilterChips = memo(function SearchFilterChips({
         <Pressable style={styles.modalBackdrop} onPress={closeModal}>
           <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Material</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                {prevModal && (
+                  <Pressable hitSlop={8} onPress={handleSubModalClose} style={styles.modalCloseBtn} accessibilityLabel="Back to all filters">
+                    <Feather name="chevron-left" size={18} color={theme.text} />
+                  </Pressable>
+                )}
+                <Text style={styles.modalTitle}>Material</Text>
+              </View>
               <Pressable hitSlop={10} onPress={closeModal} style={styles.modalCloseBtn} accessibilityLabel="Close material modal">
                 <Feather name="x" size={18} color={theme.text} />
               </Pressable>
@@ -1235,7 +1573,14 @@ export const SearchFilterChips = memo(function SearchFilterChips({
         <Pressable style={styles.modalBackdrop} onPress={closeModal}>
           <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Sort by</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                {prevModal && (
+                  <Pressable hitSlop={8} onPress={handleSubModalClose} style={styles.modalCloseBtn} accessibilityLabel="Back to all filters">
+                    <Feather name="chevron-left" size={18} color={theme.text} />
+                  </Pressable>
+                )}
+                <Text style={styles.modalTitle}>Sort by</Text>
+              </View>
               <Pressable hitSlop={10} onPress={closeModal} style={styles.modalCloseBtn} accessibilityLabel="Close sort modal">
                 <Feather name="x" size={18} color={theme.text} />
               </Pressable>
@@ -1543,6 +1888,40 @@ function createStyles(theme: ThemeTokens, isDark: boolean) {
     checkboxActive: {
       backgroundColor: theme.purple,
       borderColor: theme.purple,
+    },
+    filterSummaryRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 13,
+      paddingHorizontal: 12,
+      borderRadius: radii.md,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+    },
+    filterSummaryRowActive: {
+      backgroundColor: isDark ? 'rgba(108, 71, 255, 0.12)' : 'rgba(108, 71, 255, 0.05)',
+    },
+    filterSummaryLabel: {
+      fontSize: 14.5,
+      fontFamily: typography.family.sansMedium,
+      color: theme.text,
+      fontWeight: '500',
+    },
+    filterSummaryLabelActive: {
+      fontWeight: '700',
+      fontFamily: typography.family.sansBold,
+      color: theme.text,
+    },
+    filterSummaryValue: {
+      fontSize: 13,
+      fontFamily: typography.family.sans,
+      color: theme.mute,
+    },
+    filterSummaryValueActive: {
+      fontFamily: typography.family.sansBold,
+      fontWeight: '700',
+      color: theme.purple,
     },
     wrapGrid: {
       flexDirection: 'row',

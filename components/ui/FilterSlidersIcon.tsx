@@ -26,11 +26,11 @@ export interface FilterSlidersIconProps {
 const TRACKS_PATH = 'M4 7h9.6 M17.4 7H20 M4 12h2.6 M10.4 12H20 M4 17h9.6 M17.4 17H20';
 
 export function FilterSlidersIcon({
-  size = 20,
+  size = 19,
   width,
   height,
   color,
-  strokeWidth = 1.7,
+  strokeWidth = 1.65,
   style,
 }: FilterSlidersIconProps) {
   const { theme } = useTheme();
@@ -58,4 +58,3 @@ export function FilterSlidersIcon({
     </View>
   );
 }
-

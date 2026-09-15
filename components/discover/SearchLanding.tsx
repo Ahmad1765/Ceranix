@@ -230,9 +230,9 @@ const BrowseChipView = memo(function BrowseChipView({
           alignItems: 'center',
           justifyContent: 'center',
           gap: 6,
-          height: 30,
-          paddingHorizontal: 13,
-          borderRadius: radii.pill,
+          height: 32,
+          paddingHorizontal: 12,
+          borderRadius: 10,
           borderWidth: 1,
           borderColor: isActive ? theme.ink : theme.border,
           backgroundColor: isActive
