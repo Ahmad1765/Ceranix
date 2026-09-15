@@ -98,7 +98,7 @@ export function SafetyBanner({ context = 'shop', title, body, style, onLinkPress
           justifyContent: 'center',
         }}
       >
-        <ShieldCheckIcon size={22} variant="solid" bgColor="transparent" />
+        <ShieldCheckIcon size={22} bgColor="transparent" />
       </View>
 
       <View style={{ flex: 1 }}>
