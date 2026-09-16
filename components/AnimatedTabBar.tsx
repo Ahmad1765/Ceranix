@@ -252,7 +252,7 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
           right: 0,
           bottom: 0,
           paddingBottom: insets.bottom,
-          backgroundColor: isDark ? '#1C1C1C' : '#F4F4F5',
+          backgroundColor: isDark ? '#1C1C1C' : '#FFFFFF',
           borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
         },
@@ -319,8 +319,8 @@ function TabItem({
   onLayout: (e: LayoutChangeEvent) => void;
 }) {
   const activeColor = isDark ? '#FFFFFF' : '#111111';
-  const inactiveColor = isDark ? '#C5C5C5' : '#777777';
-  const barBg = isDark ? '#1C1C1C' : '#F4F4F5';
+  const inactiveColor = isDark ? '#D4D4D4' : '#767678';
+  const barBg = isDark ? '#1C1C1C' : '#FFFFFF';
 
   // Derived from `highlight` on the UI thread — animates without React knowing.
   const active = useDerivedValue(() => {

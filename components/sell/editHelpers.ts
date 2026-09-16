@@ -23,6 +23,7 @@ export function createDefaultSellValues(): SellFormValues {
     gender: 'women',
     tags: [],
     parcelSize: null,
+    authenticity: null,
   };
 }
 
@@ -51,6 +52,7 @@ export function listingToSellFormValues(listing: Listing | null | undefined): Se
     gender: (listing.gender as Gender) || 'women',
     tags: Array.isArray(listing.tags) ? listing.tags : [],
     parcelSize: (listing.parcel_size as ParcelSize) || null,
+    authenticity: (listing.authenticity as any) || null,
   };
 }
 

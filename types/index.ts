@@ -15,6 +15,8 @@ export type Category =
   | 'beauty'
   | 'other';
 
+export type Authenticity = 'original' | 'inspired' | 'replica' | 'not_sure';
+
 export interface User {
   id: string;
   username: string;
@@ -202,6 +204,10 @@ export interface Listing {
   material?: string | null;
   // Optional shipping parcel size, one of 'small' | 'medium' | 'large'. Null on legacy rows.
   parcel_size?: string | null;
+  // Authenticity declaration (original | inspired | replica | not_sure)
+  authenticity?: Authenticity | null;
+  // Taxonomy version applied when creating/updating the listing (e.g. 3)
+  taxonomy_version?: number | null;
   user_has_liked?: boolean;
   created_at: string;
 }

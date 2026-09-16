@@ -47,6 +47,16 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { SellFormSchema, type SellFormValues } from '@/lib/schemas/sell';
 import { createDefaultSellValues, listingToSellFormValues, patchListingInCache } from './editHelpers';
 
+import { BrandSheet } from '@/components/sell/BrandSheet';
+import { AuthenticitySheet } from '@/components/sell/AuthenticitySheet';
+import {
+  smartClassify,
+  checkBrandCategoryCompatibility,
+  UNBRANDED_LOCAL_TAILOR,
+  TAXONOMY_VERSION,
+  type CategorySuggestion,
+} from '@/lib/taxonomy';
+
 const DISPLAY_BOLD = typography.family.sansBold;
 
 const CONDITIONS: SelectOption<Condition>[] = [
@@ -75,7 +85,7 @@ const DESCRIPTION_MAX = 1000;
 const CONTENT_MAX_WIDTH = 600;
 
 type ActiveSheet =
-  | 'category' | 'brand' | 'size' | 'condition' | 'colors' | 'gender' | 'tags'
+  | 'category' | 'brand' | 'authenticity' | 'size' | 'condition' | 'colors' | 'gender' | 'tags'
   | 'price' | 'parcel' | null;
 
 // ── Context ──────────────────────────────────────────────────────────────
@@ -349,6 +359,7 @@ function SellForm({
   const subcategory = watch('subcategory');
   const price = watch('price');
   const brand = watch('brand');
+  const authenticity = watch('authenticity');
   const size = watch('size');
   const condition = watch('condition');
   const color = watch('color');
@@ -356,9 +367,23 @@ function SellForm({
   const tags = watch('tags');
   const parcelSize = watch('parcelSize');
 
-  const suggestion = useMemo(() => suggestSubcategory(title || ''), [title]);
-  const showSuggestion =
-    !!suggestion && (suggestion.category !== category || suggestion.sub.id !== subcategory);
+  const [isCustomBrand, setIsCustomBrand] = useState(false);
+  const [debouncedTitle, setDebouncedTitle] = useState(title || '');
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedTitle(title || '');
+    }, 250);
+    return () => clearTimeout(handler);
+  }, [title]);
+
+  const classification = useMemo(() => {
+    return smartClassify(debouncedTitle, gender);
+  }, [debouncedTitle, gender]);
+
+  const compatibility = useMemo(() => {
+    return checkBrandCategoryCompatibility(brand, subcategory);
+  }, [brand, subcategory]);
 
   const tile = useMemo(() => {
     const pagePad = 16 * 2;
@@ -393,13 +418,19 @@ function SellForm({
 
   const resetForm = () => {
     reset(createDefaultSellValues());
+    setIsCustomBrand(false);
   };
+
+  const isBrandEntered = Boolean(brand && brand.trim().length > 0);
+  const isBrandedItem = isBrandEntered && brand !== UNBRANDED_LOCAL_TAILOR;
+  const isAuthenticityValid = !isBrandedItem || Boolean(authenticity);
 
   const canPublish =
     title?.trim().length > 0 &&
     parseFloat(price || '0') > 0 &&
     slots.length > 0 &&
-    (!hasSubcategories(category) || !!subcategory);
+    (!hasSubcategories(category) || !!subcategory) &&
+    isAuthenticityValid;
 
   const onValidSubmit = async (formData: SellFormValues) => {
     if (!user) {
@@ -477,6 +508,8 @@ function SellForm({
           size: formData.size?.trim() || null,
           condition: formData.condition,
           parcel_size: formData.parcelSize || null,
+          authenticity: formData.authenticity || null,
+          taxonomy_version: TAXONOMY_VERSION,
           images: finalUrls,
           thumbnails: finalThumbs,
           tags: formData.tags || [],
@@ -485,10 +518,20 @@ function SellForm({
         let result: { ok: boolean; error?: string; count?: number };
         try {
           result = await updateListing(editingListing.id, updatePayload);
+
+          if (
+            !result.ok &&
+            (result.error?.includes('authenticity') || result.error?.includes('taxonomy_version'))
+          ) {
+            delete (updatePayload as any).authenticity;
+            delete (updatePayload as any).taxonomy_version;
+            result = await updateListing(editingListing.id, updatePayload);
+          }
+
           if (!result.ok) {
             throw new Error(result.error || 'Failed to update listing');
           }
-        } catch (updateErr) {
+        } catch (updateErr: any) {
           const newlyUploadedUrls = uploadedNewImages.map((u) => u.url);
           if (newlyUploadedUrls.length > 0) {
             await deleteListingImages(newlyUploadedUrls).catch(() => {});
@@ -537,35 +580,53 @@ function SellForm({
       urls = uploaded.map((u) => u.url);
       thumbs = uploaded.map((u) => u.thumbUrl);
 
-      const { data, error } = await supabase
+      const listingPayload: any = {
+        seller_id: user.id,
+        title: formData.title.trim(),
+        description: formData.description?.trim() || null,
+        price: priceNum,
+        category: formData.category,
+        subcategory: formData.subcategory || null,
+        color: formData.color || null,
+        gender: formData.gender,
+        brand: formData.brand?.trim() || null,
+        size: formData.size?.trim() || null,
+        condition: formData.condition,
+        parcel_size: formData.parcelSize || null,
+        images: urls,
+        thumbnails: thumbs,
+        is_sold: false,
+        tags: formData.tags || [],
+      };
+
+      if (formData.authenticity) {
+        listingPayload.authenticity = formData.authenticity;
+      }
+      listingPayload.taxonomy_version = TAXONOMY_VERSION;
+
+      let insertRes = await supabase
         .from('listings')
-        .insert({
-          seller_id: user.id,
-          title: formData.title.trim(),
-          description: formData.description?.trim() || null,
-          price: priceNum,
-          category: formData.category,
-          subcategory: formData.subcategory || null,
-          color: formData.color || null,
-          gender: formData.gender,
-          brand: formData.brand?.trim() || null,
-          size: formData.size?.trim() || null,
-          condition: formData.condition,
-          parcel_size: formData.parcelSize || null,
-          images: urls,
-          thumbnails: thumbs,
-          is_sold: false,
-          tags: formData.tags || [],
-        })
+        .insert(listingPayload)
         .select('id')
         .single();
 
-      if (error) {
-        await deleteListingImages(urls);
-        throw error;
+      // Graceful fallback if database column hasn't been migrated yet
+      if (insertRes.error && (insertRes.error.message?.includes('authenticity') || insertRes.error.message?.includes('taxonomy_version'))) {
+        delete listingPayload.authenticity;
+        delete listingPayload.taxonomy_version;
+        insertRes = await supabase
+          .from('listings')
+          .insert(listingPayload)
+          .select('id')
+          .single();
       }
 
-      const newId = data!.id as string;
+      if (insertRes.error) {
+        await deleteListingImages(urls);
+        throw insertRes.error;
+      }
+
+      const newId = insertRes.data!.id as string;
 
       const sellerSeed: Listing['seller'] = {
         id: user.id,
@@ -594,6 +655,8 @@ function SellForm({
         size: formData.size?.trim() || null,
         condition: formData.condition,
         parcel_size: formData.parcelSize || null,
+        authenticity: formData.authenticity || null,
+        taxonomy_version: TAXONOMY_VERSION,
         images: urls,
         thumbnails: thumbs,
         is_sold: false,
@@ -623,6 +686,8 @@ function SellForm({
       toast.show('Please add at least one photo', { variant: 'default', icon: 'camera' });
     } else if (errors.subcategory) {
       toast.show('Please choose a category and subcategory', { variant: 'default', icon: 'grid' });
+    } else if (errors.authenticity) {
+      toast.show(errors.authenticity.message ?? 'Please declare item authenticity', { variant: 'default', icon: 'shield' });
     } else if (errors.price) {
       toast.show(errors.price.message ?? 'Please enter a valid price', { variant: 'default', icon: 'dollar-sign' });
     } else if (errors.title) {
@@ -1008,6 +1073,126 @@ function SellForm({
                   {errors.title.message}
                 </Text>
               ) : null}
+
+              {/* Dual-Row Horizontal Suggestion Banner (Smart Classification) */}
+              {(classification.suggestedCategories.length > 0 || classification.suggestedBrands.length > 0) ? (
+                <View style={{ marginTop: 10, gap: 6 }}>
+                  {/* Row 1: Suggested Categories */}
+                  {classification.suggestedCategories.length > 0 ? (
+                    <View>
+                      <Text style={{ fontSize: 11, fontFamily: DISPLAY_BOLD, color: theme.mute, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4, paddingHorizontal: 2 }}>
+                        Suggested Category
+                      </Text>
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={{ gap: 8 }}
+                      >
+                        {classification.suggestedCategories.map((cat) => {
+                          const isApplied = category === cat.rootCategory && subcategory === cat.subcategoryId;
+                          return (
+                            <Pressable
+                              key={`${cat.code}-${cat.subcategoryId}`}
+                              onPress={() => {
+                                if (Platform.OS !== 'web') {
+                                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                                }
+                                setValue('category', cat.rootCategory, { shouldValidate: true });
+                                setValue('subcategory', cat.subcategoryId, { shouldValidate: true });
+                                if (cat.gender) {
+                                  setValue('gender', cat.gender, { shouldValidate: true });
+                                }
+                              }}
+                              style={({ pressed }) => ({
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 6,
+                                height: 30,
+                                paddingHorizontal: 12,
+                                borderRadius: 15,
+                                borderWidth: 1,
+                                borderColor: isApplied ? theme.ink : theme.border,
+                                backgroundColor: isApplied ? theme.ink : theme.panel,
+                                opacity: pressed ? 0.8 : 1,
+                              })}
+                            >
+                              <Feather name="zap" size={12} color={isApplied ? theme.background : theme.ink} />
+                              <Text
+                                style={{
+                                  fontSize: 12,
+                                  fontFamily: isApplied ? DISPLAY_BOLD : typography.family.sansMedium,
+                                  color: isApplied ? theme.background : theme.ink,
+                                }}
+                              >
+                                {cat.label}
+                              </Text>
+                              {isApplied && <Feather name="check" size={11} color={theme.background} />}
+                            </Pressable>
+                          );
+                        })}
+                      </ScrollView>
+                    </View>
+                  ) : null}
+
+                  {/* Row 2: Suggested Brands */}
+                  {classification.suggestedBrands.length > 0 ? (
+                    <View style={{ marginTop: 2 }}>
+                      <Text style={{ fontSize: 11, fontFamily: DISPLAY_BOLD, color: theme.mute, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4, paddingHorizontal: 2 }}>
+                        Suggested Brands
+                      </Text>
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={{ gap: 8 }}
+                      >
+                        {classification.suggestedBrands.map((bName) => {
+                          const isApplied = brand?.toLowerCase() === bName.toLowerCase();
+                          return (
+                            <Pressable
+                              key={bName}
+                              onPress={() => {
+                                if (Platform.OS !== 'web') {
+                                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                                }
+                                setValue('brand', bName, { shouldValidate: true });
+                                setIsCustomBrand(false);
+                                if (bName === UNBRANDED_LOCAL_TAILOR) {
+                                  setValue('authenticity', null, { shouldValidate: true });
+                                } else if (!authenticity) {
+                                  setTimeout(() => setActiveSheet('authenticity'), 200);
+                                }
+                              }}
+                              style={({ pressed }) => ({
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 5,
+                                height: 30,
+                                paddingHorizontal: 12,
+                                borderRadius: 15,
+                                borderWidth: 1,
+                                borderColor: isApplied ? theme.ink : theme.border,
+                                backgroundColor: isApplied ? theme.ink : theme.panel,
+                                opacity: pressed ? 0.8 : 1,
+                              })}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 12,
+                                  fontFamily: isApplied ? DISPLAY_BOLD : typography.family.sansMedium,
+                                  color: isApplied ? theme.background : theme.ink,
+                                }}
+                              >
+                                {bName}
+                              </Text>
+                              {isApplied && <Feather name="check" size={11} color={theme.background} />}
+                            </Pressable>
+                          );
+                        })}
+                      </ScrollView>
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
             </View>
 
             {/* Description Input */}
@@ -1100,50 +1285,43 @@ function SellForm({
               onPress={() => setActiveSheet('category')}
             />
 
-            {showSuggestion ? (
+            {!compatibility.compatible && compatibility.advisory ? (
               <View
                 style={{
-                  paddingHorizontal: 16,
-                  paddingVertical: 10,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingHorizontal: 14,
+                  paddingVertical: 9,
                   backgroundColor: theme.surface,
                   borderBottomWidth: 1,
                   borderBottomColor: theme.border,
+                  gap: 8,
                 }}
               >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                  <Feather name="info" size={13} color={theme.ink} />
+                  <Text style={{ fontSize: 11.5, color: theme.ink, flex: 1 }} numberOfLines={2}>
+                    {compatibility.advisory}
+                  </Text>
+                </View>
                 <Pressable
                   onPress={() => {
-                    if (Platform.OS !== 'web') {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                    }
-                    setValue('category', suggestion!.category, { shouldValidate: true });
-                    setValue('subcategory', suggestion!.sub.id, { shouldValidate: true });
+                    setValue('brand', UNBRANDED_LOCAL_TAILOR, { shouldValidate: true });
+                    setValue('authenticity', null, { shouldValidate: true });
                   }}
-                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                   style={({ pressed }) => ({
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    paddingHorizontal: 12,
-                    paddingVertical: 8,
-                    borderRadius: radii.lg,
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: radii.sm,
                     backgroundColor: theme.panel,
                     borderWidth: 1,
                     borderColor: theme.border,
                     opacity: pressed ? 0.7 : 1,
                   })}
                 >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
-                    <Feather name="zap" size={13} color={theme.ink} />
-                    <Text
-                      numberOfLines={1}
-                      style={{ fontSize: 12.5, fontFamily: DISPLAY_BOLD, color: theme.ink }}
-                    >
-                      Suggested: {CATEGORIES.find((c) => c.id === suggestion!.category)?.label} ▸{' '}
-                      {suggestion!.sub.label}
-                    </Text>
-                  </View>
-                  <Text style={{ fontSize: 12, fontFamily: DISPLAY_BOLD, color: theme.mute }}>
-                    Apply
+                  <Text style={{ fontSize: 11, fontFamily: DISPLAY_BOLD, color: theme.ink }}>
+                    Switch
                   </Text>
                 </Pressable>
               </View>
@@ -1156,6 +1334,47 @@ function SellForm({
               placeholder="Add brand"
               onPress={() => setActiveSheet('brand')}
             />
+
+            {isBrandedItem ? (
+              <>
+                <RowField
+                  icon="shield"
+                  label="Authenticity"
+                  value={
+                    authenticity === 'original'
+                      ? 'Original'
+                      : authenticity === 'inspired'
+                        ? 'Master Copy / Inspired'
+                        : authenticity === 'replica'
+                          ? 'Replica'
+                          : authenticity === 'not_sure'
+                            ? 'Not Sure'
+                            : ''
+                  }
+                  placeholder="Declare authenticity"
+                  onPress={() => {
+                    if (!isCustomBrand) {
+                      setActiveSheet('authenticity');
+                    }
+                  }}
+                />
+                {isCustomBrand ? (
+                  <View
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 6,
+                      backgroundColor: theme.surface,
+                      borderBottomWidth: 1,
+                      borderBottomColor: theme.border,
+                    }}
+                  >
+                    <Text style={{ fontSize: 11.5, color: theme.mute }}>
+                      Custom/unverified brands are set to &ldquo;Not Sure&rdquo; by default.
+                    </Text>
+                  </View>
+                ) : null}
+              </>
+            ) : null}
 
             <RowField
               icon="maximize-2"
@@ -1211,6 +1430,21 @@ function SellForm({
               }}
             >
               {errors.subcategory.message}
+            </Text>
+          ) : null}
+
+          {errors.authenticity?.message ? (
+            <Text
+              accessibilityRole="alert"
+              style={{
+                fontSize: 12,
+                color: theme.danger ?? '#EF4444',
+                paddingHorizontal: 4,
+                paddingTop: 4,
+                fontFamily: typography.family.sansMedium,
+              }}
+            >
+              {errors.authenticity.message}
             </Text>
           ) : null}
 
@@ -1316,18 +1550,38 @@ function SellForm({
         visible={activeSheet === 'category'}
         category={category}
         subcategory={subcategory ?? null}
+        selectedBrand={brand}
         onChange={(c, s) => {
           setValue('category', c, { shouldValidate: true });
           setValue('subcategory', s, { shouldValidate: true });
         }}
         onClose={() => setActiveSheet(null)}
       />
-      <TextFieldSheet
+      <BrandSheet
         visible={activeSheet === 'brand'}
-        title="Brand"
-        placeholder="e.g. Zara, Nike, Vintage"
         value={brand}
-        onChange={(b) => setValue('brand', b, { shouldValidate: true })}
+        categoryCode={category}
+        subcategoryId={subcategory}
+        onSelectBrand={(bName, isCustom) => {
+          setValue('brand', bName, { shouldValidate: true });
+          setIsCustomBrand(!!isCustom);
+          if (bName === UNBRANDED_LOCAL_TAILOR) {
+            setValue('authenticity', null, { shouldValidate: true });
+          } else if (isCustom) {
+            setValue('authenticity', 'not_sure', { shouldValidate: true });
+          } else {
+            if (!authenticity) {
+              setTimeout(() => setActiveSheet('authenticity'), 200);
+            }
+          }
+        }}
+        onClose={() => setActiveSheet(null)}
+      />
+      <AuthenticitySheet
+        visible={activeSheet === 'authenticity'}
+        brandName={brand}
+        value={authenticity}
+        onChange={(auth) => setValue('authenticity', auth, { shouldValidate: true })}
         onClose={() => setActiveSheet(null)}
       />
       <TextFieldSheet

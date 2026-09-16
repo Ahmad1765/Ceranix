@@ -586,6 +586,8 @@ export type UpdateListingInput = {
   size?: string | null;
   condition?: Listing['condition'];
   parcel_size?: string | null;
+  authenticity?: Listing['authenticity'];
+  taxonomy_version?: number | null;
   images?: string[];
   thumbnails?: string[];
   tags?: string[];

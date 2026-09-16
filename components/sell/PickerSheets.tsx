@@ -394,12 +394,14 @@ export function CategorySheet({
   visible,
   category,
   subcategory,
+  selectedBrand,
   onChange,
   onClose,
 }: {
   visible: boolean;
   category: Category;
   subcategory: string | null;
+  selectedBrand?: string | null;
   onChange: (category: Category, subcategory: string | null) => void;
   onClose: () => void;
 }) {
@@ -420,7 +422,30 @@ export function CategorySheet({
 
   return (
     <BottomSheet visible={visible} title="Category" onClose={onClose}>
-      {/* Category Pills */}
+      {selectedBrand && selectedBrand !== 'Unbranded / Local Tailor' ? (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            borderRadius: radii.md,
+            backgroundColor: theme.surface,
+            borderWidth: 1,
+            borderColor: theme.border,
+            marginBottom: 14,
+          }}
+        >
+          <Feather name="info" size={13} color={theme.ink} />
+          <Text style={{ fontSize: 12, color: theme.ink, flex: 1 }}>
+            Choosing category for{' '}
+            <Text style={{ fontFamily: DISPLAY_BOLD }}>{selectedBrand}</Text>
+          </Text>
+        </View>
+      ) : null}
+
+      {/* Category Pills (Universal 30px Standard) */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
         {CATEGORIES.map((c) => {
           const active = cat === c.id;
@@ -442,20 +467,20 @@ export function CategorySheet({
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 6,
+                height: 30,
                 paddingHorizontal: 14,
-                paddingVertical: 9,
-                borderRadius: radii.pill,
+                borderRadius: 15,
                 borderWidth: 1,
                 borderColor: active ? theme.ink : theme.border,
                 backgroundColor: active ? theme.ink : theme.panel,
                 transform: [{ scale: pressed ? 0.97 : 1 }],
               })}
             >
-              <Feather name={c.icon} size={14} color={active ? theme.background : theme.ink} />
+              <Feather name={c.icon} size={13} color={active ? theme.background : theme.ink} />
               <Text
                 style={{
-                  fontSize: 13,
-                  fontFamily: DISPLAY_BOLD,
+                  fontSize: 12.5,
+                  fontFamily: active ? DISPLAY_BOLD : type.family.sansMedium,
                   color: active ? theme.background : theme.ink,
                 }}
               >

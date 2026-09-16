@@ -75,8 +75,8 @@ test.describe('Network failures', () => {
     // icon-only (components/AnimatedTabBar.tsx renders no Text for a tab), so
     // tabs are reachable only through accessibilityRole/Label — getByText can
     // never match one.
-    await page.getByRole('button', { name: 'Discover' }).click();
-    // The Discover TAB opens the search sheet in its landing state, whose box
+    await page.getByRole('button', { name: 'Categories' }).click();
+    // The Categories TAB opens the search sheet in its landing state, whose box
     // reads "Search Carrinex..." — discoverSearch() matches the per-tab copy on
     // the Discover SCREEN ("Search items, brands, sellers", …), which this flow
     // never reaches. The app was behaving correctly the whole time: the sheet

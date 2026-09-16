@@ -107,6 +107,7 @@ export const SellFormSchema = z
       .array(z.string())
       .max(10, 'Maximum 10 tags allowed'),
     parcelSize: z.enum(PARCEL_SIZE_VALUES).nullable(),
+    authenticity: z.enum(['original', 'inspired', 'replica', 'not_sure']).nullable().optional(),
   })
   .superRefine((data, ctx) => {
     if (hasSubcategories(data.category)) {
@@ -121,6 +122,20 @@ export const SellFormSchema = z
           path: ['subcategory'],
         });
       }
+    }
+
+    // Authenticity required for branded listings (except Unbranded / Local Tailor)
+    const brandTrimmed = (data.brand || '').trim();
+    if (
+      brandTrimmed.length > 0 &&
+      brandTrimmed !== 'Unbranded / Local Tailor' &&
+      !data.authenticity
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Please select the authenticity of this branded item',
+        path: ['authenticity'],
+      });
     }
   });
 
