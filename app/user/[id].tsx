@@ -663,7 +663,7 @@ export default function UserProfileScreen() {
             )}
 
             {/* Available / Sold Filter Chips */}
-            {activeTab === 'shop' && soldCount > 0 && availableCount > 0 && (
+            {activeTab === 'shop' && soldCount > 0 && availableCount > 0 ? (
               <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingVertical: 10 }}>
                 {(
                   [
@@ -708,6 +708,8 @@ export default function UserProfileScreen() {
                   );
                 })}
               </View>
+            ) : (
+              activeTab === 'shop' && <View style={{ height: 12 }} />
             )}
 
             {/* Empty States */}
