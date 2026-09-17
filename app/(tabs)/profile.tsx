@@ -45,7 +45,6 @@ import { BRAND, APP_URL } from '@/lib/brand';
 import { errorMessage } from '@/lib/errors';
 import { useSellSheet } from '@/components/sell/SellSheet';
 import {
-  ProfileDetailsTab,
   ProfileGridRow,
   ProfileHeader,
   ProfileListingTabs,
@@ -69,7 +68,6 @@ function ProfileScreenInner() {
   const [activeTab, setActiveTab] = useState<ProfileTab>(() => {
     if (params.tab === 'collections' || params.tab === 'saved') return 'collections';
     if (params.tab === 'liked') return 'liked';
-    if (params.tab === 'details') return 'details';
     return 'selling';
   });
 
@@ -80,8 +78,6 @@ function ProfileScreenInner() {
       setActiveTab('liked');
     } else if (params.tab === 'selling') {
       setActiveTab('selling');
-    } else if (params.tab === 'details') {
-      setActiveTab('details');
     }
   }, [params.tab]);
 
@@ -287,15 +283,6 @@ function ProfileScreenInner() {
               onPostItem={() => openSellSheet()}
             />
 
-            {/* 4. Details / Credentials Tab */}
-            {activeTab === 'details' && (
-              <ProfileDetailsTab
-                profile={profile}
-                selling={selling}
-                shopLikes={shopLikes}
-                onShare={handleShareProfile}
-              />
-            )}
           </>
         }
       />

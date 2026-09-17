@@ -49,7 +49,7 @@ export const ProfileListingTabs = memo(function ProfileListingTabs({
 }: ProfileListingTabsProps) {
   return (
     <>
-      {/* ── 4-Segment Icon Tab Bar ── */}
+      {/* ── 3-Segment Icon Tab Bar ── */}
       <View
         style={{
           flexDirection: 'row',
@@ -161,41 +161,10 @@ export const ProfileListingTabs = memo(function ProfileListingTabs({
           )}
         </Pressable>
 
-        {/* Tab 4: Details / Credentials */}
-        <Pressable
-          onPress={() => setActiveTab('details')}
-          accessibilityRole="tab"
-          accessibilityLabel="Details"
-          accessibilityState={{ selected: activeTab === 'details' }}
-          style={{
-            flex: 1,
-            alignItems: 'center',
-            paddingVertical: 12,
-            position: 'relative',
-          }}
-        >
-          <Ionicons
-            name={activeTab === 'details' ? 'person' : 'person-outline'}
-            size={20}
-            color={activeTab === 'details' ? colors.ink : colors.mute}
-          />
-          {activeTab === 'details' && (
-            <View
-              style={{
-                position: 'absolute',
-                bottom: -1,
-                height: 2.5,
-                width: 44,
-                backgroundColor: colors.ink,
-                borderRadius: 2,
-              }}
-            />
-          )}
-        </Pressable>
       </View>
 
       {/* ── Playlist / Category Chips Strip ── */}
-      {(activeTab === 'selling' || activeTab === 'collections') && (
+      {activeTab === 'selling' || activeTab === 'collections' ? (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -314,11 +283,12 @@ export const ProfileListingTabs = memo(function ProfileListingTabs({
             </Pressable>
           )}
         </ScrollView>
+      ) : (
+        <View style={{ height: 12 }} />
       )}
 
       {/* ── Empty States for Lists ── */}
-      {activeTab !== 'details' &&
-        (loadingListings ? (
+      {loadingListings ? (
           <View style={{ paddingVertical: 40, alignItems: 'center' }}>
             <ActivityIndicator color={colors.purple} />
           </View>
@@ -355,7 +325,7 @@ export const ProfileListingTabs = memo(function ProfileListingTabs({
               }
             />
           </View>
-        ) : null)}
+        ) : null}
     </>
   );
 });
