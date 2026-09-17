@@ -163,8 +163,8 @@ export const ProfileListingTabs = memo(function ProfileListingTabs({
 
       </View>
 
-      {/* ── Playlist / Category Chips Strip ── */}
-      {activeTab === 'selling' || activeTab === 'collections' ? (
+      {/* ── Playlist / Category Chips Strip (Collections Tab) ── */}
+      {activeTab === 'collections' ? (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -211,77 +211,74 @@ export const ProfileListingTabs = memo(function ProfileListingTabs({
                 fontWeight: '600',
               }}
             >
-              {activeTab === 'collections' ? savedCount : sellingCount}
+              {savedCount}
             </Text>
           </Pressable>
 
-          {activeTab === 'collections' &&
-            saveLists.map((list) => {
-              const isListActive = activeListId === list.id;
-              return (
-                <Pressable
-                  key={list.id}
-                  onPress={() => setActiveListId(list.id)}
-                  onLongPress={() => onManageList(list)}
-                  style={({ pressed }) => ({
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 5,
-                    height: 30,
-                    paddingHorizontal: 12,
-                    borderRadius: 15,
-                    backgroundColor: isListActive ? colors.purple : colors.surface,
-                    borderWidth: 1,
-                    borderColor: isListActive ? colors.purple : colors.border,
-                    opacity: pressed ? 0.7 : 1,
-                  })}
+          {saveLists.map((list) => {
+            const isListActive = activeListId === list.id;
+            return (
+              <Pressable
+                key={list.id}
+                onPress={() => setActiveListId(list.id)}
+                onLongPress={() => onManageList(list)}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 5,
+                  height: 30,
+                  paddingHorizontal: 12,
+                  borderRadius: 15,
+                  backgroundColor: isListActive ? colors.purple : colors.surface,
+                  borderWidth: 1,
+                  borderColor: isListActive ? colors.purple : colors.border,
+                  opacity: pressed ? 0.7 : 1,
+                })}
+              >
+                <Ionicons
+                  name="play-circle-outline"
+                  size={14}
+                  color={isListActive ? '#FFFFFF' : colors.ink}
+                />
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: '700',
+                    color: isListActive ? '#FFFFFF' : colors.ink,
+                  }}
                 >
-                  <Ionicons
-                    name="play-circle-outline"
-                    size={14}
-                    color={isListActive ? '#FFFFFF' : colors.ink}
-                  />
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      fontWeight: '700',
-                      color: isListActive ? '#FFFFFF' : colors.ink,
-                    }}
-                  >
-                    {list.name}
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      color: isListActive ? 'rgba(255,255,255,0.85)' : colors.mute,
-                      fontWeight: '600',
-                    }}
-                  >
-                    {list.item_count ?? 0}
-                  </Text>
-                </Pressable>
-              );
-            })}
+                  {list.name}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 11,
+                    color: isListActive ? 'rgba(255,255,255,0.85)' : colors.mute,
+                    fontWeight: '600',
+                  }}
+                >
+                  {list.item_count ?? 0}
+                </Text>
+              </Pressable>
+            );
+          })}
 
-          {activeTab === 'collections' && (
-            <Pressable
-              onPress={onCreateList}
-              style={({ pressed }) => ({
-                width: 30,
-                height: 30,
-                borderRadius: 15,
-                borderWidth: 1,
-                borderColor: colors.border,
-                backgroundColor: colors.surface,
-                alignItems: 'center',
-                justifyContent: 'center',
-                opacity: pressed ? 0.7 : 1,
-              })}
-            >
-              <Feather name="plus" size={14} color={colors.ink} />
-            </Pressable>
-          )}
+          <Pressable
+            onPress={onCreateList}
+            style={({ pressed }) => ({
+              width: 30,
+              height: 30,
+              borderRadius: 15,
+              borderWidth: 1,
+              borderColor: colors.border,
+              backgroundColor: colors.surface,
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: pressed ? 0.7 : 1,
+            })}
+          >
+            <Feather name="plus" size={14} color={colors.ink} />
+          </Pressable>
         </ScrollView>
       ) : (
         <View style={{ height: 12 }} />
