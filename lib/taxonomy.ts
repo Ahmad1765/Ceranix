@@ -313,10 +313,6 @@ const BRAND_BY_LOWER = new Map<string, TaxonomyBrand>(
   TAXONOMY_BRANDS.map((b) => [b.name.toLowerCase(), b]),
 );
 
-const CATEGORY_BY_CODE = new Map<string, TaxonomyCategory>(
-  TAXONOMY_CATEGORIES.map((c) => [c.code, c]),
-);
-
 // High-frequency Eastern wear brands prioritizing Shalwar Kameez / Kurtas
 const EASTERN_WEAR_PREFERRED_BRANDS = [
   'Khaadi',

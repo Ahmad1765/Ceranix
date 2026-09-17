@@ -18,6 +18,7 @@ import { ImageCarousel } from '@/components/product/ImageCarousel';
 import { PopIcon, type PopIconHandle } from '@/components/product/PopIcon';
 import { AnimatedNumber } from '@/components/AnimatedNumber';
 import { BRAND_PURPLE, HAIRLINE } from '@/components/product/shared';
+import { SoldBadge } from '@/components/ui/SoldBadge';
 import { radii } from '@/lib/theme';
 
 type ProductHeroSectionProps = {
@@ -80,34 +81,7 @@ export const ProductHeroSection = memo(function ProductHeroSection({
             zIndex: 20,
           }}
         >
-          <View
-            style={{
-              backgroundColor: theme.ink,
-              paddingHorizontal: 20,
-              paddingVertical: 8,
-              borderRadius: radii.pill,
-              borderWidth: 1,
-              borderColor: theme.border,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 3 },
-              shadowOpacity: 0.25,
-              shadowRadius: 6,
-              elevation: 4,
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 15,
-                fontWeight: '700',
-                color: theme.background,
-                letterSpacing: 0.6,
-                fontFamily: 'Inter_700Bold',
-                textTransform: 'uppercase',
-              }}
-            >
-              Sold
-            </Text>
-          </View>
+          <SoldBadge size="lg" />
         </View>
       )}
 

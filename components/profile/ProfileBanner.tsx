@@ -1,6 +1,7 @@
 import { View, Pressable, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { Text } from '@/lib/rnText';
+import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { colors, shadow } from '@/lib/theme';
@@ -17,7 +18,8 @@ export function bannerSizeFor(viewportWidth: number): { width: number; height: n
 }
 
 export type BannerAction = {
-  icon: React.ComponentProps<typeof Ionicons>['name'];
+  icon: string;
+  family?: 'feather' | 'ionicons';
   label: string;
   onPress: () => void;
   /** Tints the glyph purple — the on state of a toggle. */
@@ -78,44 +80,56 @@ export function ProfileBanner({
               width: 38,
               height: 38,
               borderRadius: 19,
-              backgroundColor: colors.surface,
+              backgroundColor: pressed ? colors.surface : colors.panel,
               borderWidth: 1,
               borderColor: colors.border,
               alignItems: 'center',
               justifyContent: 'center',
-              opacity: pressed ? 0.75 : 1,
+              opacity: pressed ? 0.85 : 1,
             })}
           >
-            <Ionicons name="chevron-back" size={20} color={colors.ink} />
+            <Feather name="chevron-left" size={20} color={colors.ink} />
           </Pressable>
         ) : (
           <View style={{ width: 38, height: 38 }} />
         )}
 
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          {actions?.map((a) => (
-            <Pressable
-              key={a.label}
-              onPress={a.onPress}
-              hitSlop={6}
-              accessibilityRole="button"
-              accessibilityLabel={a.label}
-              accessibilityState={{ selected: !!a.active }}
-              style={({ pressed }) => ({
-                width: 38,
-                height: 38,
-                borderRadius: 19,
-                backgroundColor: colors.surface,
-                borderWidth: 1,
-                borderColor: colors.border,
-                alignItems: 'center',
-                justifyContent: 'center',
-                opacity: pressed ? 0.75 : 1,
-              })}
-            >
-              <Ionicons name={a.icon} size={19} color={a.active ? colors.purple : colors.ink} />
-            </Pressable>
-          ))}
+          {actions?.map((a) => {
+            const isIonicons =
+              a.family === 'ionicons' ||
+              a.icon.includes('-outline') ||
+              a.icon.includes('-sharp');
+            const iconColor = a.active ? colors.purple : colors.ink;
+
+            return (
+              <Pressable
+                key={a.label}
+                onPress={a.onPress}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={a.label}
+                accessibilityState={{ selected: !!a.active }}
+                style={({ pressed }) => ({
+                  width: 38,
+                  height: 38,
+                  borderRadius: 19,
+                  backgroundColor: pressed ? colors.surface : colors.panel,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: pressed ? 0.85 : 1,
+                })}
+              >
+                {isIonicons ? (
+                  <Ionicons name={a.icon as any} size={19} color={iconColor} />
+                ) : (
+                  <Feather name={a.icon as any} size={18} color={iconColor} />
+                )}
+              </Pressable>
+            );
+          })}
         </View>
       </View>
 

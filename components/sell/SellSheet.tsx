@@ -32,7 +32,7 @@ import { emitListingCreated } from '@/lib/listingEvents';
 import { invalidateFresh } from '@/lib/freshness';
 import { router } from 'expo-router';
 import type { Condition, Gender, Listing } from '@/types';
-import { CATEGORIES, categoryLabel, hasSubcategories, subcategoryLabel, suggestSubcategory } from '@/lib/categories';
+import { categoryLabel, hasSubcategories, subcategoryLabel } from '@/lib/categories';
 import { formatPrice, CURRENCY_SYMBOL } from '@/lib/currency';
 import { itemColorLabel } from '@/lib/itemColors';
 import { SafetyBanner } from '@/components/SafetyBanner';
@@ -54,7 +54,6 @@ import {
   checkBrandCategoryCompatibility,
   UNBRANDED_LOCAL_TAILOR,
   TAXONOMY_VERSION,
-  type CategorySuggestion,
 } from '@/lib/taxonomy';
 
 const DISPLAY_BOLD = typography.family.sansBold;

@@ -78,7 +78,7 @@ export function ListingThumb({
             bottom: 0,
             paddingVertical: 2.5,
             alignItems: 'center',
-            backgroundColor: theme.ink,
+            backgroundColor: status === 'sold' ? '#6C47FF' : theme.ink,
           }}
         >
           <Text
@@ -88,7 +88,7 @@ export function ListingThumb({
               fontSize: 9,
               lineHeight: 11,
               letterSpacing: 0.2,
-              color: theme.background,
+              color: '#FFFFFF',
             }}
           >
             {label}

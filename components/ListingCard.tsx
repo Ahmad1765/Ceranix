@@ -40,6 +40,7 @@ import { isLiked as fetchIsLiked, toggleLike } from '@/lib/listings';
 import { useGuestGate } from '@/components/GuestGate';
 import { PopIcon, type PopIconHandle } from '@/components/product/PopIcon';
 import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
+import { SoldBadge } from '@/components/ui/SoldBadge';
 import { BRAND_PURPLE, conditionLabel } from '@/components/product/shared';
 import { colors, radii, shadow } from '@/lib/theme';
 import type { Listing } from '@/types';
@@ -1064,33 +1065,7 @@ export const ListingCard = memo(function ListingCard({ listing, width }: Props) 
               zIndex: 10,
             }}
           >
-            <View
-              style={{
-                backgroundColor: colors.ink,
-                paddingHorizontal: 14,
-                paddingVertical: 6,
-                borderRadius: radii.pill,
-                borderWidth: 1,
-                borderColor: colors.border,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.22,
-                shadowRadius: 4,
-                elevation: 3,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontFamily: 'Inter_700Bold',
-                  color: colors.background,
-                  letterSpacing: 0.4,
-                  textTransform: 'uppercase',
-                }}
-              >
-                Sold
-              </Text>
-            </View>
+            <SoldBadge size="md" />
           </View>
         )}
       </View>

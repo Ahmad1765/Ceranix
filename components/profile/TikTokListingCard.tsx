@@ -6,6 +6,7 @@ import Feather from '@expo/vector-icons/Feather';
 import { router } from 'expo-router';
 import { cardImageUrl, getOptimizedImageUrl } from '@/lib/images';
 import { formatPrice } from '@/lib/currency';
+import { SoldBadge } from '@/components/ui/SoldBadge';
 import type { Listing } from '@/types';
 
 interface Props {
@@ -84,30 +85,7 @@ export const TikTokListingCard = memo(function TikTokListingCard({ listing, widt
             justifyContent: 'center',
           }}
         >
-          <View
-            style={{
-              backgroundColor: '#D4FF00',
-              paddingHorizontal: 12,
-              paddingVertical: 5,
-              borderRadius: 4,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.18,
-              shadowRadius: 4,
-              elevation: 3,
-            }}
-          >
-            <Text
-              style={{
-                color: '#000000',
-                fontSize: 12,
-                fontWeight: '900',
-                fontFamily: 'Inter_700Bold',
-              }}
-            >
-              Sold
-            </Text>
-          </View>
+          <SoldBadge size="md" />
         </View>
       )}
     </Pressable>

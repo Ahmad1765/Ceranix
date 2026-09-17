@@ -10,7 +10,6 @@ import {
   TAXONOMY_CATEGORIES,
   UNBRANDED_LOCAL_TAILOR,
   type BrandTier,
-  type TaxonomyBrand,
   getBrandsForCategory,
 } from '@/lib/taxonomy';
 import * as Haptics from 'expo-haptics';

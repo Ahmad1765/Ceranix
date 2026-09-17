@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Pressable, Platform, Alert } from 'react-native';
+import { View, Pressable, Platform } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import { radii, type as typography } from '@/lib/theme';
