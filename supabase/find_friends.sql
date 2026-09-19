@@ -84,6 +84,8 @@ begin
 end;
 $$;
 
+revoke all on function public.enforce_rate_limit(text, int, interval) from public;
+
 -- 3) Match Contacts RPC (SECURITY DEFINER) -----------------------------------
 -- Given an array of up to 500 peppered hashes from the viewer's device address
 -- book, returns matching registered profiles and the matched hash value.
@@ -167,8 +169,30 @@ begin
     raise exception 'Not authenticated';
   end if;
 
-  -- Insert or ignore phone hashes
+  -- 1) Enforce per-authenticated-user rate limit before processing arrays or mutating rows
+  perform public.enforce_rate_limit('register_my_contact_hashes', 30, interval '1 minute');
+
+  -- 2) Enforce small maximum size for each hash array
+  if p_phone_hashes is not null and coalesce(array_length(p_phone_hashes, 1), 0) > 10 then
+    raise exception 'Payload exceeds maximum limit of 10 phone hashes per request (got %)', array_length(p_phone_hashes, 1)
+      using
+        errcode = '22000',
+        hint = 'Provide 10 or fewer phone hashes.';
+  end if;
+
+  if p_email_hashes is not null and coalesce(array_length(p_email_hashes, 1), 0) > 10 then
+    raise exception 'Payload exceeds maximum limit of 10 email hashes per request (got %)', array_length(p_email_hashes, 1)
+      using
+        errcode = '22000',
+        hint = 'Provide 10 or fewer email hashes.';
+  end if;
+
+  -- 3) Replace existing phone hashes for current user if phone hashes are supplied
   if p_phone_hashes is not null then
+    delete from public.user_contact_hashes
+     where user_id = v_viewer_id
+       and hash_type = 'phone';
+
     foreach v_hash in array p_phone_hashes loop
       if v_hash is not null and length(trim(v_hash)) > 0 then
         insert into public.user_contact_hashes (user_id, hash_type, hash_value)
@@ -178,8 +202,12 @@ begin
     end loop;
   end if;
 
-  -- Insert or ignore email hashes
+  -- 4) Replace existing email hashes for current user if email hashes are supplied
   if p_email_hashes is not null then
+    delete from public.user_contact_hashes
+     where user_id = v_viewer_id
+       and hash_type = 'email';
+
     foreach v_hash in array p_email_hashes loop
       if v_hash is not null and length(trim(v_hash)) > 0 then
         insert into public.user_contact_hashes (user_id, hash_type, hash_value)

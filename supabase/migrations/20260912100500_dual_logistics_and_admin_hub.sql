@@ -192,6 +192,21 @@ create policy "Sellers and admins can update seller pickups"
        where id = (select auth.uid())
          and is_admin = true
     )
+  )
+  with check (
+    exists (
+      select 1
+        from public.orders o
+       where o.id = order_seller_pickups.order_id
+         and o.seller_id = (select auth.uid())
+         and o.seller_id = order_seller_pickups.seller_id
+    )
+    or exists (
+      select 1
+        from public.profiles
+       where id = (select auth.uid())
+         and is_admin = true
+    )
   );
 
 -- Dedicated RPC for seller or admin to fetch pickup address securely

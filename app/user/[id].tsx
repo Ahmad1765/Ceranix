@@ -6,7 +6,7 @@ import {
   RefreshControl,
   Share,
   ActivityIndicator,
-  Alert,
+  Platform,
   ScrollView,
 } from 'react-native';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
@@ -31,13 +31,15 @@ import { getOrCreateConversation } from '@/lib/chat';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { useTheme } from '@/context/ThemeContext';
-import { colors } from '@/lib/theme';
+import { colors, radii } from '@/lib/theme';
 import { useGridDimensions, GRID_DRAW_DISTANCE } from '@/lib/responsive';
 import { useFadeIn } from '@/lib/motion';
 import { APP_URL, BRAND } from '@/lib/brand';
+import * as Clipboard from 'expo-clipboard';
 import type { Listing } from '@/types';
 import type { SaveList } from '@/lib/saves';
 import { EmptyState } from '@/components/ui';
+import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { SafeContainer } from '@/components/ui/SafeContainer';
 import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import {
@@ -121,6 +123,12 @@ export default function UserProfileScreen() {
   const handleShare = async () => {
     if (!profile) return;
     const url = `${APP_URL}/user/${profile.id}`;
+    if (Platform.OS === 'web') {
+      try {
+        await Clipboard.setStringAsync(url);
+        toast.show('Profile link copied to clipboard', { variant: 'success', icon: 'link' });
+      } catch {}
+    }
     try {
       await Share.share({ message: `Check out @${profile.username} on ${BRAND}\n${url}`, url });
     } catch {
@@ -134,38 +142,9 @@ export default function UserProfileScreen() {
     },
   });
 
+  const [moreOptionsOpen, setMoreOptionsOpen] = useState(false);
   const handleMore = () => {
-    if (!profile) return;
-    const userLabel = `@${profile.username}`;
-    Alert.alert(
-      userLabel,
-      'Options',
-      [
-        {
-          text: 'Share Profile',
-          onPress: handleShare,
-        },
-        ...(!isSelf
-          ? [
-              {
-                text: followed ? 'Unfollow' : 'Follow',
-                onPress: handleFollowToggle,
-              },
-              {
-                text: 'Report User',
-                style: 'destructive' as const,
-                onPress: () => safety.reportUser(profile.id, profile.username),
-              },
-              {
-                text: 'Block User',
-                style: 'destructive' as const,
-                onPress: () => safety.blockUser(profile.id, profile.username),
-              },
-            ]
-          : []),
-        { text: 'Cancel', style: 'cancel' as const },
-      ],
-    );
+    setMoreOptionsOpen(true);
   };
 
   const isCollectionsPublic = profile?.saved_collection_privacy !== 'private';
@@ -324,8 +303,8 @@ export default function UserProfileScreen() {
                 onBack={() => safeBack()}
                 actions={[
                   {
-                    icon: 'ellipsis-horizontal',
-                    family: 'ionicons',
+                    icon: 'more-horizontal',
+                    family: 'feather',
                     label: 'More options',
                     onPress: handleMore,
                   },
@@ -933,6 +912,309 @@ export default function UserProfileScreen() {
           </>
         }
       />
+
+      <BottomSheetModal
+        visible={moreOptionsOpen}
+        onClose={() => setMoreOptionsOpen(false)}
+        title={`@${profile.username}`}
+        subtitle={displayName !== `@${profile.username}` ? displayName : 'Profile options'}
+        autoHeight
+      >
+        <View style={{ paddingBottom: 16, gap: 8 }}>
+          {/* Share Profile */}
+          <Pressable
+            onPress={() => {
+              setMoreOptionsOpen(false);
+              handleShare();
+            }}
+            style={({ pressed }) => ({
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingVertical: 14,
+              paddingHorizontal: 16,
+              borderRadius: radii.xl,
+              backgroundColor: pressed ? colors.surface : colors.panel,
+              borderWidth: 1,
+              borderColor: colors.border,
+              gap: 14,
+            })}
+          >
+            <View
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 19,
+                backgroundColor: colors.surface,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Feather name="share-2" size={18} color={colors.ink} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: colors.ink }}>
+                Share profile
+              </Text>
+              <Text style={{ fontSize: 12.5, color: colors.mute }}>
+                Copy link or share to other apps
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={16} color={colors.mute} />
+          </Pressable>
+
+          {!isSelf ? (
+            <>
+              {/* Follow / Unfollow */}
+              <Pressable
+                onPress={() => {
+                  setMoreOptionsOpen(false);
+                  handleFollowToggle();
+                }}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 14,
+                  paddingHorizontal: 16,
+                  borderRadius: radii.xl,
+                  backgroundColor: pressed ? colors.surface : colors.panel,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  gap: 14,
+                })}
+              >
+                <View
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 19,
+                    backgroundColor: colors.surface,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Feather name={followed ? 'user-minus' : 'user-plus'} size={18} color={colors.ink} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: colors.ink }}>
+                    {followed ? 'Unfollow' : 'Follow'}
+                  </Text>
+                  <Text style={{ fontSize: 12.5, color: colors.mute }}>
+                    {followed ? 'Stop receiving updates in feed' : 'See new listings in your Following feed'}
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={16} color={colors.mute} />
+              </Pressable>
+
+              {/* Message */}
+              <Pressable
+                onPress={() => {
+                  setMoreOptionsOpen(false);
+                  handleDirectMessage();
+                }}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 14,
+                  paddingHorizontal: 16,
+                  borderRadius: radii.xl,
+                  backgroundColor: pressed ? colors.surface : colors.panel,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  gap: 14,
+                })}
+              >
+                <View
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 19,
+                    backgroundColor: colors.surface,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Feather name="message-circle" size={18} color={colors.ink} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: colors.ink }}>
+                    Send message
+                  </Text>
+                  <Text style={{ fontSize: 12.5, color: colors.mute }}>
+                    Chat directly with this creator
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={16} color={colors.mute} />
+              </Pressable>
+
+              {/* Report User */}
+              <Pressable
+                onPress={() => {
+                  setMoreOptionsOpen(false);
+                  safety.reportUser(profile.id, profile.username);
+                }}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 14,
+                  paddingHorizontal: 16,
+                  borderRadius: radii.xl,
+                  backgroundColor: pressed ? colors.surface : colors.panel,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  gap: 14,
+                })}
+              >
+                <View
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 19,
+                    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Feather name="flag" size={18} color="#EF4444" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#EF4444' }}>
+                    Report user
+                  </Text>
+                  <Text style={{ fontSize: 12.5, color: colors.mute }}>
+                    Flag policy violations or suspicious behavior
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={16} color="#EF4444" />
+              </Pressable>
+
+              {/* Block User */}
+              <Pressable
+                onPress={() => {
+                  setMoreOptionsOpen(false);
+                  safety.blockUser(profile.id, profile.username);
+                }}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 14,
+                  paddingHorizontal: 16,
+                  borderRadius: radii.xl,
+                  backgroundColor: pressed ? colors.surface : colors.panel,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  gap: 14,
+                })}
+              >
+                <View
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 19,
+                    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Feather name="slash" size={18} color="#EF4444" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#EF4444' }}>
+                    Block user
+                  </Text>
+                  <Text style={{ fontSize: 12.5, color: colors.mute }}>
+                    Hide all items and prevent future messages
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={16} color="#EF4444" />
+              </Pressable>
+            </>
+          ) : (
+            <>
+              {/* Edit Profile */}
+              <Pressable
+                onPress={() => {
+                  setMoreOptionsOpen(false);
+                  router.push('/profile/edit' as any);
+                }}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 14,
+                  paddingHorizontal: 16,
+                  borderRadius: radii.xl,
+                  backgroundColor: pressed ? colors.surface : colors.panel,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  gap: 14,
+                })}
+              >
+                <View
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 19,
+                    backgroundColor: colors.surface,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Feather name="edit-2" size={18} color={colors.ink} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: colors.ink }}>
+                    Edit profile
+                  </Text>
+                  <Text style={{ fontSize: 12.5, color: colors.mute }}>
+                    Update your photo, bio, or handle
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={16} color={colors.mute} />
+              </Pressable>
+
+              {/* Settings */}
+              <Pressable
+                onPress={() => {
+                  setMoreOptionsOpen(false);
+                  router.push('/settings' as any);
+                }}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 14,
+                  paddingHorizontal: 16,
+                  borderRadius: radii.xl,
+                  backgroundColor: pressed ? colors.surface : colors.panel,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  gap: 14,
+                })}
+              >
+                <View
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 19,
+                    backgroundColor: colors.surface,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Feather name="settings" size={18} color={colors.ink} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: colors.ink }}>
+                    Settings
+                  </Text>
+                  <Text style={{ fontSize: 12.5, color: colors.mute }}>
+                    Privacy, account, and preferences
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={16} color={colors.mute} />
+              </Pressable>
+            </>
+          )}
+        </View>
+      </BottomSheetModal>
     </SafeContainer>
   );
 }

@@ -96,10 +96,12 @@ export function ProfileBanner({
 
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           {actions?.map((a) => {
-            const isIonicons =
-              a.family === 'ionicons' ||
-              a.icon.includes('-outline') ||
-              a.icon.includes('-sharp');
+            const isFeather =
+              a.family === 'feather' ||
+              a.icon === 'more-horizontal' ||
+              a.icon === 'more-vertical' ||
+              a.icon === 'ellipsis-horizontal';
+            const iconName = a.icon === 'ellipsis-horizontal' ? 'more-horizontal' : a.icon;
             const iconColor = a.active ? colors.purple : colors.ink;
 
             return (
@@ -122,10 +124,10 @@ export function ProfileBanner({
                   opacity: pressed ? 0.85 : 1,
                 })}
               >
-                {isIonicons ? (
-                  <Ionicons name={a.icon as any} size={19} color={iconColor} />
+                {isFeather ? (
+                  <Feather name={iconName as any} size={20} color={iconColor} />
                 ) : (
-                  <Feather name={a.icon as any} size={18} color={iconColor} />
+                  <Ionicons name={a.icon as any} size={19} color={iconColor} />
                 )}
               </Pressable>
             );
