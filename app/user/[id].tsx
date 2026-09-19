@@ -6,6 +6,8 @@ import {
   RefreshControl,
   Share,
   ActivityIndicator,
+  Alert,
+  ScrollView,
 } from 'react-native';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { Text } from '@/lib/rnText';
@@ -20,30 +22,32 @@ import {
   useUserListingsQuery,
   useFollowStateQuery,
   useToggleFollow,
+  useSavedListingsQuery,
+  useLikedListingsQuery,
+  useSaveListsQuery,
+  useListingsInListQuery,
 } from '@/lib/queries';
+import { getOrCreateConversation } from '@/lib/chat';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { useTheme } from '@/context/ThemeContext';
 import { colors } from '@/lib/theme';
-import { computeLevel } from '@/lib/levels';
 import { useGridDimensions, GRID_DRAW_DISTANCE } from '@/lib/responsive';
 import { useFadeIn } from '@/lib/motion';
 import { APP_URL, BRAND } from '@/lib/brand';
 import type { Listing } from '@/types';
+import type { SaveList } from '@/lib/saves';
 import { EmptyState } from '@/components/ui';
 import { SafeContainer } from '@/components/ui/SafeContainer';
 import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import {
   ProfileBanner,
-  InfoCard,
-  CredentialList,
-  sellerCredentials,
   formatCount,
 } from '@/components/profile';
 import { ListingCard } from '@/components/ListingCard';
 import { useUserSafetyActions } from '@/hooks/useUserSafetyActions';
 
-type SellerTab = 'shop' | 'details';
+type SellerTab = 'shop' | 'liked' | 'collections';
 
 const EMPTY_LISTINGS: Listing[] = [];
 const HORIZONTAL_PAD = 12;
@@ -132,13 +136,91 @@ export default function UserProfileScreen() {
 
   const handleMore = () => {
     if (!profile) return;
-    safety.showSafetySheet(profile.id, profile.username);
+    const userLabel = `@${profile.username}`;
+    Alert.alert(
+      userLabel,
+      'Options',
+      [
+        {
+          text: 'Share Profile',
+          onPress: handleShare,
+        },
+        ...(!isSelf
+          ? [
+              {
+                text: followed ? 'Unfollow' : 'Follow',
+                onPress: handleFollowToggle,
+              },
+              {
+                text: 'Report User',
+                style: 'destructive' as const,
+                onPress: () => safety.reportUser(profile.id, profile.username),
+              },
+              {
+                text: 'Block User',
+                style: 'destructive' as const,
+                onPress: () => safety.blockUser(profile.id, profile.username),
+              },
+            ]
+          : []),
+        { text: 'Cancel', style: 'cancel' as const },
+      ],
+    );
+  };
+
+  const isCollectionsPublic = profile?.saved_collection_privacy !== 'private';
+  const savedQ = useSavedListingsQuery(isCollectionsPublic ? userId : null);
+  const savedListings = savedQ.data ?? EMPTY_LISTINGS;
+  const saveListsQ = useSaveListsQuery(isCollectionsPublic ? userId : null);
+  const saveLists = saveListsQ.data ?? [];
+  const [activeListId, setActiveListId] = useState<string | null>(null);
+  const listItemsQ = useListingsInListQuery(activeListId);
+  const listItems = listItemsQ.data ?? EMPTY_LISTINGS;
+
+  const likedQ = useLikedListingsQuery(userId);
+  const likedListings = likedQ.data ?? EMPTY_LISTINGS;
+
+  const visibleSavedListings = useMemo(
+    () => (activeListId ? listItems : savedListings),
+    [activeListId, listItems, savedListings],
+  );
+
+  const [messagingBusy, setMessagingBusy] = useState(false);
+  const handleDirectMessage = async () => {
+    if (!authUser) {
+      toast.show('Sign in to message creators', { variant: 'info', icon: 'log-in' });
+      router.push('/auth/login' as any);
+      return;
+    }
+    if (!userId || authUser.id === userId || messagingBusy) return;
+
+    setMessagingBusy(true);
+    try {
+      const conv = await getOrCreateConversation({
+        buyerId: authUser.id,
+        sellerId: userId,
+      });
+      if (conv?.id) {
+        router.push(`/conversation/${conv.id}` as any);
+      } else {
+        toast.show('Could not open conversation', { variant: 'default', icon: 'alert-triangle' });
+      }
+    } catch (err: any) {
+      toast.show(err?.message ?? 'Could not open conversation', { variant: 'default', icon: 'alert-triangle' });
+    } finally {
+      setMessagingBusy(false);
+    }
   };
 
   const onRefresh = () => {
     if (!userId) return;
     profileQ.refetch();
     listingsQ.refetch();
+    likedQ.refetch();
+    if (isCollectionsPublic) {
+      savedQ.refetch();
+      saveListsQ.refetch();
+    }
     if (authUser?.id) followQ.refetch();
   };
 
@@ -153,13 +235,19 @@ export default function UserProfileScreen() {
   );
 
   const gridRows = useMemo(() => {
-    if (activeTab !== 'shop') return [] as Listing[][];
+    let list: Listing[] = [];
+    if (activeTab === 'shop') list = visibleListings;
+    else if (activeTab === 'liked') list = likedListings;
+    else if (activeTab === 'collections') {
+      list = isCollectionsPublic ? visibleSavedListings : [];
+    }
+    if (list.length === 0) return [] as Listing[][];
     const out: Listing[][] = [];
-    for (let i = 0; i < visibleListings.length; i += columns) {
-      out.push(visibleListings.slice(i, i + columns));
+    for (let i = 0; i < list.length; i += columns) {
+      out.push(list.slice(i, i + columns));
     }
     return out;
-  }, [activeTab, visibleListings, columns]);
+  }, [activeTab, visibleListings, likedListings, isCollectionsPublic, visibleSavedListings, columns]);
 
   const renderRow = useCallback(
     ({ item }: { item: Listing[] }) => <GridRow row={item} columns={columns} cardW={cardW} />,
@@ -211,20 +299,6 @@ export default function UserProfileScreen() {
   const totalSales = Number(profile.total_sales ?? 0);
   const totalLikes = listings.reduce((sum, l) => sum + (l.likes ?? 0), 0);
 
-  const sellerStats = {
-    totalSales,
-    rating,
-    listingsCount: listings.length,
-    totalLikes,
-    followers: profile.followers_count ?? 0,
-  };
-  const sellerLevel = computeLevel(sellerStats).current;
-
-  const credentials = sellerCredentials(
-    profile,
-    { listingsCount: listings.length, totalLikes },
-    { viewer: 'visitor' },
-  );
 
   return (
     <SafeContainer edges={['top', 'left', 'right']} backgroundColor={colors.background} style={{ flex: 1 }}>
@@ -250,22 +324,11 @@ export default function UserProfileScreen() {
                 onBack={() => safeBack()}
                 actions={[
                   {
-                    icon: 'information-circle-outline',
-                    label: 'Seller details',
-                    onPress: () => setActiveTab('details'),
-                    active: activeTab === 'details',
+                    icon: 'ellipsis-horizontal',
+                    family: 'ionicons',
+                    label: 'More options',
+                    onPress: handleMore,
                   },
-                  ...(isSelf
-                    ? []
-                    : [
-                        {
-                          icon: followed ? ('heart' as const) : ('heart-outline' as const),
-                          label: followed ? `Unfollow @${profile.username}` : `Follow @${profile.username}`,
-                          onPress: handleFollowToggle,
-                          active: followed,
-                        },
-                        { icon: 'ellipsis-horizontal' as const, label: 'More options', onPress: handleMore },
-                      ]),
                 ]}
               />
 
@@ -399,9 +462,8 @@ export default function UserProfileScreen() {
                     </Pressable>
 
                     <Pressable
-                      onPress={() => {
-                        router.push(`/conversation/new?user=${userId}` as any);
-                      }}
+                      onPress={handleDirectMessage}
+                      disabled={messagingBusy}
                       accessibilityRole="button"
                       accessibilityLabel="Message seller"
                       style={({ pressed }) => ({
@@ -411,13 +473,17 @@ export default function UserProfileScreen() {
                         backgroundColor: colors.surface,
                         alignItems: 'center',
                         justifyContent: 'center',
-                        opacity: pressed ? 0.75 : 1,
+                        opacity: pressed || messagingBusy ? 0.75 : 1,
                         transform: [{ scale: pressed ? 0.97 : 1 }],
                       })}
                     >
-                      <Text style={{ fontSize: 14.5, fontWeight: '600', color: colors.ink }}>
-                        Message
-                      </Text>
+                      {messagingBusy ? (
+                        <ActivityIndicator size="small" color={colors.ink} />
+                      ) : (
+                        <Text style={{ fontSize: 14.5, fontWeight: '600', color: colors.ink }}>
+                          Message
+                        </Text>
+                      )}
                     </Pressable>
 
                     <Pressable
@@ -538,7 +604,7 @@ export default function UserProfileScreen() {
               </View>
             </Animated.View>
 
-            {/* Tab Navigation Strip (Shop / Details) */}
+            {/* ── 3-Segment Icon Tab Bar (Icon Only, Matching My Profile) ── */}
             <View
               style={{
                 flexDirection: 'row',
@@ -548,9 +614,12 @@ export default function UserProfileScreen() {
                 backgroundColor: colors.background,
               }}
             >
-              {/* Tab 1: Shop / Grid */}
+              {/* Tab 1: Selling / Shop */}
               <Pressable
                 onPress={() => setActiveTab('shop')}
+                accessibilityRole="tab"
+                accessibilityLabel="Shop"
+                accessibilityState={{ selected: activeTab === 'shop' }}
                 style={{
                   flex: 1,
                   alignItems: 'center',
@@ -558,29 +627,18 @@ export default function UserProfileScreen() {
                   position: 'relative',
                 }}
               >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Ionicons
-                    name={activeTab === 'shop' ? 'grid' : 'grid-outline'}
-                    size={20}
-                    color={activeTab === 'shop' ? colors.ink : colors.mute}
-                  />
-                  <Text
-                    style={{
-                      fontSize: 13.5,
-                      fontWeight: activeTab === 'shop' ? '700' : '500',
-                      color: activeTab === 'shop' ? colors.ink : colors.mute,
-                    }}
-                  >
-                    Shop ({listings.length})
-                  </Text>
-                </View>
+                <Ionicons
+                  name={activeTab === 'shop' ? 'grid' : 'grid-outline'}
+                  size={20}
+                  color={activeTab === 'shop' ? colors.ink : colors.mute}
+                />
                 {activeTab === 'shop' && (
                   <View
                     style={{
                       position: 'absolute',
                       bottom: -1,
                       height: 2.5,
-                      width: 48,
+                      width: 44,
                       backgroundColor: colors.ink,
                       borderRadius: 2,
                     }}
@@ -588,9 +646,12 @@ export default function UserProfileScreen() {
                 )}
               </Pressable>
 
-              {/* Tab 2: Details */}
+              {/* Tab 2: Liked */}
               <Pressable
-                onPress={() => setActiveTab('details')}
+                onPress={() => setActiveTab('liked')}
+                accessibilityRole="tab"
+                accessibilityLabel="Liked"
+                accessibilityState={{ selected: activeTab === 'liked' }}
                 style={{
                   flex: 1,
                   alignItems: 'center',
@@ -598,29 +659,50 @@ export default function UserProfileScreen() {
                   position: 'relative',
                 }}
               >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Ionicons
-                    name={activeTab === 'details' ? 'person' : 'person-outline'}
-                    size={20}
-                    color={activeTab === 'details' ? colors.ink : colors.mute}
-                  />
-                  <Text
-                    style={{
-                      fontSize: 13.5,
-                      fontWeight: activeTab === 'details' ? '700' : '500',
-                      color: activeTab === 'details' ? colors.ink : colors.mute,
-                    }}
-                  >
-                    Details
-                  </Text>
-                </View>
-                {activeTab === 'details' && (
+                <Ionicons
+                  name={activeTab === 'liked' ? 'heart' : 'heart-outline'}
+                  size={21}
+                  color={activeTab === 'liked' ? colors.ink : colors.mute}
+                />
+                {activeTab === 'liked' && (
                   <View
                     style={{
                       position: 'absolute',
                       bottom: -1,
                       height: 2.5,
-                      width: 48,
+                      width: 44,
+                      backgroundColor: colors.ink,
+                      borderRadius: 2,
+                    }}
+                  />
+                )}
+              </Pressable>
+
+              {/* Tab 3: Saved / Collections */}
+              <Pressable
+                onPress={() => setActiveTab('collections')}
+                accessibilityRole="tab"
+                accessibilityLabel="Collections"
+                accessibilityState={{ selected: activeTab === 'collections' }}
+                style={{
+                  flex: 1,
+                  alignItems: 'center',
+                  paddingVertical: 12,
+                  position: 'relative',
+                }}
+              >
+                <Ionicons
+                  name={activeTab === 'collections' ? 'bookmark' : 'bookmark-outline'}
+                  size={20}
+                  color={activeTab === 'collections' ? colors.ink : colors.mute}
+                />
+                {activeTab === 'collections' && (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      bottom: -1,
+                      height: 2.5,
+                      width: 44,
                       backgroundColor: colors.ink,
                       borderRadius: 2,
                     }}
@@ -629,37 +711,105 @@ export default function UserProfileScreen() {
               </Pressable>
             </View>
 
-            {/* Details Content */}
-            {activeTab === 'details' && (
-              <View style={{ paddingVertical: 14 }}>
-                <InfoCard icon="user" title="About me">
+            {/* ── Playlist Strip (Collections Tab when public) ── */}
+            {activeTab === 'collections' && isCollectionsPublic && saveLists.length > 0 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  gap: 8,
+                }}
+              >
+                <Pressable
+                  onPress={() => setActiveListId(null)}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 5,
+                    height: 30,
+                    paddingHorizontal: 12,
+                    borderRadius: 15,
+                    backgroundColor: activeListId === null ? colors.purple : colors.surface,
+                    borderWidth: 1,
+                    borderColor: activeListId === null ? colors.purple : colors.border,
+                    opacity: pressed ? 0.7 : 1,
+                  })}
+                >
+                  <Ionicons
+                    name="play-circle-outline"
+                    size={14}
+                    color={activeListId === null ? '#FFFFFF' : colors.ink}
+                  />
                   <Text
                     style={{
-                      fontSize: 14,
-                      lineHeight: 20,
-                      color: profile.bio ? colors.ink : colors.muteSoft,
+                      fontSize: 12,
+                      fontWeight: '700',
+                      color: activeListId === null ? '#FFFFFF' : colors.ink,
                     }}
                   >
-                    {profile.bio?.trim()
-                      ? profile.bio
-                      : `${displayName} hasn't written a bio yet.`}
+                    All Items
                   </Text>
-                </InfoCard>
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      color: activeListId === null ? 'rgba(255,255,255,0.85)' : colors.mute,
+                      fontWeight: '600',
+                    }}
+                  >
+                    {savedListings.length}
+                  </Text>
+                </Pressable>
 
-                {sellerLevel.id >= 2 ? (
-                  <InfoCard icon="award" title="Seller Level">
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: colors.purple }}>
-                      {sellerLevel.name}
-                    </Text>
-                  </InfoCard>
-                ) : null}
-
-                {credentials.length > 0 ? (
-                  <InfoCard icon="shield" title="Seller credentials">
-                    <CredentialList rows={credentials} />
-                  </InfoCard>
-                ) : null}
-              </View>
+                {saveLists.map((list) => {
+                  const isListActive = activeListId === list.id;
+                  return (
+                    <Pressable
+                      key={list.id}
+                      onPress={() => setActiveListId(list.id)}
+                      style={({ pressed }) => ({
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 5,
+                        height: 30,
+                        paddingHorizontal: 12,
+                        borderRadius: 15,
+                        backgroundColor: isListActive ? colors.purple : colors.surface,
+                        borderWidth: 1,
+                        borderColor: isListActive ? colors.purple : colors.border,
+                        opacity: pressed ? 0.7 : 1,
+                      })}
+                    >
+                      <Ionicons
+                        name="play-circle-outline"
+                        size={14}
+                        color={isListActive ? '#FFFFFF' : colors.ink}
+                      />
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: '700',
+                          color: isListActive ? '#FFFFFF' : colors.ink,
+                        }}
+                      >
+                        {list.name}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          color: isListActive ? 'rgba(255,255,255,0.85)' : colors.mute,
+                          fontWeight: '600',
+                        }}
+                      >
+                        {list.item_count}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
             )}
 
             {/* Available / Sold Filter Chips */}
@@ -723,6 +873,60 @@ export default function UserProfileScreen() {
                       ? 'Sold items will show up here.'
                       : `${displayName} has no active items right now.`
                   }
+                />
+              </View>
+            )}
+
+            {activeTab === 'liked' && gridRows.length === 0 && (
+              <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                <EmptyState
+                  icon="heart"
+                  title="No liked items"
+                  description={`${displayName} hasn't liked any items yet.`}
+                />
+              </View>
+            )}
+
+            {activeTab === 'collections' && !isCollectionsPublic && (
+              <View style={{ paddingVertical: 48, alignItems: 'center', paddingHorizontal: 24 }}>
+                <View
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: 28,
+                    backgroundColor: colors.panel,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 14,
+                  }}
+                >
+                  <Feather name="lock" size={24} color={colors.ink} />
+                </View>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: colors.ink }}>
+                  This collection is private
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: colors.mute,
+                    marginTop: 4,
+                    textAlign: 'center',
+                    maxWidth: 280,
+                  }}
+                >
+                  @{profile.username} has set their saved collection to private.
+                </Text>
+              </View>
+            )}
+
+            {activeTab === 'collections' && isCollectionsPublic && gridRows.length === 0 && (
+              <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                <EmptyState
+                  icon="bookmark"
+                  title="No saved items yet"
+                  description={`${displayName} hasn't added any items to their collection yet.`}
                 />
               </View>
             )}

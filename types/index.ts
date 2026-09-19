@@ -11,11 +11,20 @@ export type Category =
   | 'shoes'
   | 'bags'
   | 'accessories'
-  | 'electronics'
   | 'beauty'
   | 'other';
 
 export type Authenticity = 'original' | 'inspired' | 'replica' | 'not_sure';
+
+export interface ListingLiker {
+  id: string;
+  user_id: string;
+  username: string;
+  full_name?: string | null;
+  avatar_url?: string | null;
+  is_verified?: boolean;
+  created_at: string;
+}
 
 export interface User {
   id: string;
@@ -34,6 +43,7 @@ export interface User {
   // Settings-driven fields (optional for backwards compat with existing reads)
   vacation_mode?: boolean;
   bundle_discount_pct?: number;
+  saved_collection_privacy?: 'public' | 'private';
   is_verified?: boolean;
   is_pro?: boolean;
   followers_count?: number;

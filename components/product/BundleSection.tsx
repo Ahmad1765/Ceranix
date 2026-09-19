@@ -49,7 +49,7 @@ export function BundleSection({
   const selectedItems = activeSellerItems.filter((s) => selectedIds.has(s.id));
   const selectedItemIds = selectedItems.map((s) => s.id);
 
-  // If the current listing is already sold, bundling is unavailable — show other available items to browse
+  // If the current listing is already sold, bundling is unavailable — show other available items to browse cleanly
   if (isSold) {
     return (
       <View style={{ paddingTop: 18 }}>

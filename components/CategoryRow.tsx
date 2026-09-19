@@ -10,7 +10,6 @@ const CATEGORIES: { label: string; value: Category; icon: keyof typeof Feather.g
   { label: 'Shoes', value: 'shoes', icon: 'compass', accent: colors.panel },
   { label: 'Bags', value: 'bags', icon: 'briefcase', accent: colors.primarySoft },
   { label: 'Accessories', value: 'accessories', icon: 'watch', accent: colors.panel },
-  { label: 'Electronics', value: 'electronics', icon: 'monitor', accent: colors.primarySoft },
   { label: 'Beauty', value: 'beauty', icon: 'droplet', accent: colors.panel },
 ];
 

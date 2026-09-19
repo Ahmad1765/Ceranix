@@ -42,12 +42,6 @@ const QUICK_REPLIES_LISTING = [
   'Is the price negotiable?',
 ];
 
-const QUICK_REPLIES_PROFILE = [
-  'Hi! Love your closet.',
-  'Hi! Do you do discounts on bundles?',
-  'Hi! Are you open to offers?',
-  'Hi! When do you usually dispatch orders?',
-];
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
   const { theme } = useTheme();
@@ -143,6 +137,23 @@ export default function NewConversationScreen() {
       );
     }
   }, [bundleItemPricesQ.isError, bundleItemPricesQ.error, toast]);
+  // If navigating to message a user directly from their profile without a listing,
+  // redirect straight to that user's inbox conversation thread
+  useEffect(() => {
+    if (!listingId && targetUserId && !isSupport && user) {
+      getOrCreateConversation({
+        buyerId: user.id,
+        sellerId: targetUserId,
+        listingId: null,
+      }).then((conv) => {
+        if (conv?.id) {
+          router.replace(`/conversation/${conv.id}` as any);
+        }
+      }).catch((err) => {
+        captureError(err, { fn: 'conversationNew.directRedirect' });
+      });
+    }
+  }, [listingId, targetUserId, isSupport, user]);
 
   // Base price reference for offer presets and ceiling.
   // Non-bundle: listing.price (authoritative from the DB).
@@ -816,40 +827,42 @@ export default function NewConversationScreen() {
                 </View>
               </View>
 
-              {/* Quick replies */}
-              <View style={{ marginTop: 18 }}>
-                <Eyebrow>Quick starters</Eyebrow>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                  {(listing ? QUICK_REPLIES_LISTING : QUICK_REPLIES_PROFILE).map((q) => {
-                    const active = message === q;
-                    return (
-                      <PressableScale
-                        key={q}
-                        onPress={() => setMessage(q)}
-                        style={{
-                          paddingHorizontal: 13,
-                          paddingVertical: 8,
-                          borderRadius: radii.pill,
-                          borderWidth: 1,
-                          borderColor: active ? theme.primary : theme.border,
-                          backgroundColor: active ? theme.primarySoft : theme.panel,
-                        }}
-                      >
-                        <Text
+              {/* Quick replies (listing inquiries only) */}
+              {listing && (
+                <View style={{ marginTop: 18 }}>
+                  <Eyebrow>Quick starters</Eyebrow>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                    {QUICK_REPLIES_LISTING.map((q) => {
+                      const active = message === q;
+                      return (
+                        <PressableScale
+                          key={q}
+                          onPress={() => setMessage(q)}
                           style={{
-                            fontSize: 13,
-                            fontFamily: type.family.sansMedium,
-                            color: active ? theme.primary : theme.ink,
+                            paddingHorizontal: 13,
+                            paddingVertical: 8,
+                            borderRadius: radii.pill,
+                            borderWidth: 1,
+                            borderColor: active ? theme.primary : theme.border,
+                            backgroundColor: active ? theme.primarySoft : theme.panel,
                           }}
-                          numberOfLines={1}
                         >
-                          {q}
-                        </Text>
-                      </PressableScale>
-                    );
-                  })}
+                          <Text
+                            style={{
+                              fontSize: 13,
+                              fontFamily: type.family.sansMedium,
+                              color: active ? theme.primary : theme.ink,
+                            }}
+                            numberOfLines={1}
+                          >
+                            {q}
+                          </Text>
+                        </PressableScale>
+                      );
+                    })}
+                  </View>
                 </View>
-              </View>
+              )}
 
               {/* Message Send Button */}
               <View style={{ marginTop: 24 }}>

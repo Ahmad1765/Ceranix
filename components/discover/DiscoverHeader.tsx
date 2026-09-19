@@ -13,6 +13,7 @@ import { Text, TextInput } from '@/lib/rnText';
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import Animated from 'react-native-reanimated';
+import { BellIcon } from '@/components/ui';
 import { colors, radii } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { DiscoverSegments, type DiscoverTab } from './SearchTabs';
@@ -73,7 +74,7 @@ export const DiscoverHeader = memo(function DiscoverHeader({
             opacity: pressed ? 0.7 : 1,
           })}
         >
-          <Feather name="bell" size={16} color={colors.ink} />
+          <BellIcon size={18} color={colors.ink} />
         </Pressable>
       </View>
 

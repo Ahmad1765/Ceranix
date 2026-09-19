@@ -86,7 +86,7 @@ export const NewsUnderlineTabs = memo(function NewsUnderlineTabs({
     <View
       style={{
         borderBottomWidth: 1,
-        borderBottomColor: theme.hairline,
+        borderBottomColor: theme.border,
         backgroundColor: theme.background,
       }}
     >

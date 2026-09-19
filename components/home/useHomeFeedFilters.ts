@@ -54,7 +54,7 @@ export const DEFAULT_TRENDING_CHIP: DynamicFilterChip = {
 };
 
 const VALID_CATEGORIES: ReadonlySet<Category> = new Set<Category>([
-  'clothing', 'shoes', 'bags', 'accessories', 'electronics', 'beauty', 'other',
+  'clothing', 'shoes', 'bags', 'accessories', 'beauty', 'other',
 ]);
 
 export function isValidCategory(v: unknown): v is Category {
@@ -127,35 +127,15 @@ export function useHomeFeedFilters({
     }
 
     const sort = FEED_SORTS.find((s) => s === params.sort);
-    const category = isValidCategory(params.category) ? params.category : null;
     const q = params.q?.trim();
-    if (!sort && !category && !q && !params.n && !params.tab) return;
+    if (!sort && !q && !params.n && !params.tab) return;
 
     if (q) {
       setQuery(q);
       setActiveChip(FOR_YOU);
     } else {
       setQuery('');
-      if (category) {
-        const label = params.chipLabel
-          ? params.chipLabel
-          : category.charAt(0).toUpperCase() + category.slice(1);
-        const icon = getValidChipIcon(params.chipIcon, 'box');
-        const newChip: DynamicFilterChip = {
-          id: `category:${category}`,
-          label,
-          icon,
-          category,
-          isDefaultTrending: false,
-        };
-        setDynamicChip(newChip);
-        setActiveChip(newChip.id);
-        setFilters({
-          ...EMPTY_FEED_FILTERS,
-          category,
-          sort: 'relevance',
-        });
-      } else if (sort) {
+      if (sort) {
         if (sort === 'popular') {
           setDynamicChip(DEFAULT_TRENDING_CHIP);
           setActiveChip(TRENDING);
@@ -215,7 +195,6 @@ export function useHomeFeedFilters({
     scrollToTop();
   }, [
     params.sort,
-    params.category,
     params.q,
     params.n,
     params.tab,

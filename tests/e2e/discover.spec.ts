@@ -16,7 +16,6 @@ const TOPIC_LABELS = [
   'Shoes',
   'Bags',
   'Accessories',
-  'Electronics',
   'Beauty',
   'Other',
   'All items',

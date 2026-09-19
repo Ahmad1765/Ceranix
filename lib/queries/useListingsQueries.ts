@@ -36,6 +36,7 @@ import {
   setListingSold,
   toggleLike,
   updateListing,
+  fetchListingLikers,
   SELECT_LISTING_WITH_SELLER,
 } from '@/lib/listings';
 import {
@@ -283,5 +284,17 @@ export function useSavedListingsQuery(userId: string | null) {
     queryKey: qk.savedListings(userId),
     enabled: !!userId,
     queryFn: (): Promise<Listing[]> => fetchSavedListings(userId as string),
+  });
+}
+
+/**
+ * Members who liked a specific listing.
+ */
+export function useListingLikersQuery(listingId: string | null | undefined) {
+  return useQuery({
+    queryKey: qk.listingLikers(listingId),
+    enabled: !!listingId,
+    queryFn: () => fetchListingLikers(listingId as string),
+    staleTime: 30_000,
   });
 }

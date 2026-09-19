@@ -16,3 +16,4 @@ export { ProductDetailsTable } from './ProductDetailsTable';
 export { ProductRelatedSection } from './ProductRelatedSection';
 export { useProductEngagement } from './useProductEngagement';
 export { useProductBundle } from './useProductBundle';
+export { LikersSheet } from './LikersSheet';

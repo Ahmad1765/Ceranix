@@ -21,8 +21,10 @@ import {
   tap,
   timeAgo,
 } from '@/components/product/shared';
-import { BUNDLE_TIERS } from '@/lib/bundle';
-import type { Listing } from '@/types';
+import type { Listing, ListingLiker } from '@/types';
+import { Platform } from 'react-native';
+
+const FIGTREE_FONT = Platform.OS === 'web' ? 'Figtree, sans-serif' : 'Figtree';
 
 type ProductOverviewHeaderProps = {
   listing: Listing;
@@ -30,14 +32,16 @@ type ProductOverviewHeaderProps = {
   onOpenBpSheet: () => void;
   hasBundleItems?: boolean;
   onScrollToBundle?: () => void;
+  likers?: ListingLiker[];
+  onOpenLikersSheet?: () => void;
 };
 
 export const ProductOverviewHeader = memo(function ProductOverviewHeader({
   listing,
   bpFee,
   onOpenBpSheet,
-  hasBundleItems = false,
-  onScrollToBundle,
+  likers,
+  onOpenLikersSheet,
 }: ProductOverviewHeaderProps) {
   const { theme, isDark } = useTheme();
   const heartCount = Math.max(0, Number(listing.likes ?? 0));
@@ -63,12 +67,60 @@ export const ProductOverviewHeader = memo(function ProductOverviewHeader({
   return (
     <View style={{ paddingHorizontal: 20, paddingTop: 22, paddingBottom: 14 }}>
       {heartCount > 0 && (
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 6 }}>
-          <Feather name="heart" size={12} color={theme.mute} />
-          <Text style={{ fontSize: 12, color: theme.mute, fontFamily: 'Inter_500Medium' }}>
-            Liked by <Text style={{ fontFamily: 'Inter_700Bold', color: theme.ink }}>{heartCount} {heartCount === 1 ? 'person' : 'people'}</Text>
+        <Pressable
+          onPress={() => {
+            tap('light');
+            onOpenLikersSheet?.();
+          }}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="View who liked this item"
+          style={({ pressed }) => ({
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginBottom: 8,
+            alignSelf: 'flex-start',
+            opacity: pressed ? 0.7 : 1,
+          })}
+        >
+          <Text
+            style={{
+              fontSize: 13,
+              color: theme.mute,
+              fontFamily: FIGTREE_FONT,
+            }}
+          >
+            Liked by{' '}
+            {likers && likers.length > 0 ? (
+              likers.length === 1 ? (
+                <Text style={{ fontWeight: '700', color: theme.ink, fontFamily: FIGTREE_FONT }}>
+                  @{likers[0].username}
+                </Text>
+              ) : likers.length === 2 ? (
+                <>
+                  <Text style={{ fontWeight: '700', color: theme.ink, fontFamily: FIGTREE_FONT }}>
+                    @{likers[0].username}
+                  </Text>
+                  {' and '}
+                  <Text style={{ fontWeight: '700', color: theme.ink, fontFamily: FIGTREE_FONT }}>
+                    @{likers[1].username}
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text style={{ fontWeight: '700', color: theme.ink, fontFamily: FIGTREE_FONT }}>
+                    @{likers[0].username}
+                  </Text>
+                  {` and ${heartCount > 1 ? heartCount - 1 : likers.length - 1} others`}
+                </>
+              )
+            ) : (
+              <Text style={{ fontWeight: '700', color: theme.ink, fontFamily: FIGTREE_FONT }}>
+                {heartCount} {heartCount === 1 ? 'person' : 'people'}
+              </Text>
+            )}
           </Text>
-        </View>
+        </Pressable>
       )}
 
       <Text
@@ -154,39 +206,6 @@ export const ProductOverviewHeader = memo(function ProductOverviewHeader({
           </Pressable>
         ) : null}
 
-        {hasBundleItems && (
-          <Pressable
-            onPress={() => {
-              tap('selection');
-              onScrollToBundle?.();
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={`Up to ${BUNDLE_TIERS[BUNDLE_TIERS.length - 1].pct}% off when you bundle items from this seller`}
-            style={({ pressed }) => ({
-              backgroundColor: isDark ? 'rgba(83, 86, 238, 0.16)' : '#F2F3FE',
-              borderRadius: 12,
-              paddingHorizontal: 16,
-              paddingVertical: 14,
-              marginTop: 14,
-              opacity: pressed ? 0.75 : 1,
-            })}
-          >
-            <Text
-              style={{
-                fontSize: 15,
-                lineHeight: 22,
-                fontFamily: 'Inter_400Regular',
-                color: theme.ink,
-              }}
-            >
-              Up to{' '}
-              <Text style={{ fontFamily: 'Inter_600SemiBold', color: '#5356EE' }}>
-                {BUNDLE_TIERS[BUNDLE_TIERS.length - 1].pct}% off
-              </Text>{' '}
-              when you bundle items from this seller
-            </Text>
-          </Pressable>
-        )}
       </View>
     </View>
   );

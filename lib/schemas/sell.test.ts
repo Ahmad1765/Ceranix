@@ -17,6 +17,7 @@ describe('SellFormSchema', () => {
     gender: 'men',
     tags: ['vintage', 'leather', 'jacket'],
     parcelSize: 'medium',
+    authenticity: 'original' as const,
   };
 
   it('validates a complete valid listing payload', () => {

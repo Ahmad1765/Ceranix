@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { Listing } from '@/types';
+import type { Listing, ListingLiker } from '@/types';
 import { putCachedListings } from '@/lib/listingCache';
 import { getLikedIds, updateLikedCache } from '@/lib/engagementCache';
 import { captureError } from '@/lib/sentry';
@@ -660,4 +660,34 @@ export async function toggleLike(
   }
   updateLikedCache(userId, listingId, true);
   return true;
+}
+
+export async function fetchListingLikers(listingId: string): Promise<ListingLiker[]> {
+  if (!listingId) return [];
+  try {
+    const { data, error } = await supabase
+      .from('listing_likes')
+      .select('id, user_id, created_at, profiles:user_id(username, full_name, avatar_url, is_verified)')
+      .eq('listing_id', listingId)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error || !data) return [];
+
+    return data.map((row: any) => {
+      const p = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+      return {
+        id: row.id,
+        user_id: row.user_id,
+        username: p?.username || 'user',
+        full_name: p?.full_name || null,
+        avatar_url: p?.avatar_url || null,
+        is_verified: !!p?.is_verified,
+        created_at: row.created_at,
+      };
+    });
+  } catch (err) {
+    console.warn('[listings] fetchListingLikers error', err);
+    return [];
+  }
 }

@@ -59,7 +59,6 @@ import {
   MessageRow,
   ReactionPicker,
   SafetyNote,
-  SellerIntroBubble,
   ThreadHeader,
   useConversationBlock,
   useConversationThread,
@@ -598,18 +597,7 @@ export default function ConversationScreen() {
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
-          <>
-            <SafetyNote onPress={explainCoverage} />
-            {thread.other?.username ? (
-              <SellerIntroBubble
-                name={thread.other.username}
-                location={(thread.other as any).location ?? null}
-                lastSeen={null}
-                rating={(thread.other as any).rating ? Number((thread.other as any).rating).toFixed(1) : null}
-                reviewCount={(thread.other as any).total_sales ?? (thread.other as any).reviews_count ?? null}
-              />
-            ) : null}
-          </>
+          <SafetyNote onPress={explainCoverage} />
         }
         ListEmptyComponent={
           <View style={{ paddingHorizontal: 32, paddingVertical: 16 }}>

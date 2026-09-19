@@ -1,24 +1,35 @@
-import { View, Pressable, Modal, ScrollView, Platform } from 'react-native';
+import { useEffect } from 'react';
+import { View, Pressable, Modal, ScrollView, Platform, BackHandler } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import { useTheme } from '@/context/ThemeContext';
-import { radii, type } from '@/lib/theme';
+import { type } from '@/lib/theme';
 import * as Haptics from 'expo-haptics';
 
 const DISPLAY_BOLD = type.family.sansBold;
 
-interface Props {
+export interface FullPagePickerProps {
   visible: boolean;
   title: string;
+  subtitle?: string;
   onClose: () => void;
   children: React.ReactNode;
   footer?: React.ReactNode;
   scroll?: boolean;
+  headerRight?: React.ReactNode;
 }
 
-// Shared bottom-sheet shell for sell-flow row pickers (Category, Brand,
-// Condition, Colors, Price, Parcel size…)
-export function BottomSheet({ visible, title, onClose, children, footer, scroll = true }: Props) {
+export function FullPagePicker({
+  visible,
+  title,
+  subtitle,
+  onClose,
+  children,
+  footer,
+  scroll = true,
+  headerRight,
+}: FullPagePickerProps) {
   const { theme } = useTheme();
   const Content = scroll ? ScrollView : View;
 
@@ -29,83 +40,167 @@ export function BottomSheet({ visible, title, onClose, children, footer, scroll 
     onClose();
   };
 
+  // Hardware back button integration on Android
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !visible) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleClose();
+      return true;
+    });
+    return () => sub.remove();
+  }, [visible]);
+
+  // Escape key & history sync on Web
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !visible) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    // Sync with browser history so the browser's Back button closes the full-page picker
+    const stateId = `sell_picker_${Date.now()}`;
+    try {
+      window.history.pushState({ sellPicker: stateId }, '', window.location.href);
+    } catch {}
+
+    const handlePopState = () => {
+      onClose();
+    };
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [visible]);
+
+  if (!visible) return null;
+
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <Pressable
-        onPress={handleClose}
-        style={{ flex: 1, backgroundColor: theme.overlay, justifyContent: 'flex-end' }}
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="fullScreen"
+      transparent={false}
+      onRequestClose={handleClose}
+    >
+      <SafeAreaView
+        edges={['top', 'bottom']}
+        style={{
+          flex: 1,
+          backgroundColor: theme.background,
+        }}
       >
-        <Pressable
-          onPress={(e) => e.stopPropagation()}
+        {/* Full Page Navigation Header */}
+        <View
           style={{
+            height: 56,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 16,
+            borderBottomWidth: 1,
+            borderBottomColor: theme.border,
             backgroundColor: theme.surface,
-            borderTopLeftRadius: radii['3xl'],
-            borderTopRightRadius: radii['3xl'],
-            borderTopWidth: 1,
-            borderColor: theme.border,
-            paddingTop: 12,
-            maxHeight: '88%',
           }}
         >
-          {/* Grab handle */}
-          <View
-            style={{
-              alignSelf: 'center',
-              width: 38,
-              height: 4.5,
-              borderRadius: 3,
-              backgroundColor: theme.border,
-              marginBottom: 14,
-            }}
-          />
-
-          {/* Header */}
-          <View
-            style={{
-              flexDirection: 'row',
+          {/* Back button (< arrow) */}
+          <Pressable
+            onPress={handleClose}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            style={({ pressed }) => ({
+              width: 40,
+              height: 40,
+              borderRadius: 20,
               alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingHorizontal: 20,
-              paddingBottom: 14,
-              borderBottomWidth: 1,
-              borderBottomColor: theme.border,
-              marginBottom: 16,
-            }}
+              justifyContent: 'center',
+              backgroundColor: pressed ? theme.panel : 'transparent',
+              marginLeft: -6,
+            })}
           >
-            <Text style={{ fontFamily: DISPLAY_BOLD, fontSize: 18, color: theme.ink, letterSpacing: -0.3 }}>
+            <Feather name="arrow-left" size={22} color={theme.ink} />
+          </Pressable>
+
+          {/* Title & subtitle */}
+          <View style={{ flex: 1, alignItems: 'center', paddingHorizontal: 8 }}>
+            <Text
+              numberOfLines={1}
+              style={{
+                fontFamily: DISPLAY_BOLD,
+                fontSize: 17,
+                color: theme.ink,
+                letterSpacing: -0.2,
+                textAlign: 'center',
+              }}
+            >
               {title}
             </Text>
-            <Pressable
-              hitSlop={12}
-              onPress={handleClose}
-              accessibilityRole="button"
-              accessibilityLabel="Close"
-              style={({ pressed }) => ({
-                width: 32,
-                height: 32,
-                borderRadius: 16,
-                backgroundColor: pressed ? theme.panel : 'transparent',
-                alignItems: 'center',
-                justifyContent: 'center',
-              })}
-            >
-              <Feather name="x" size={19} color={theme.mute} />
-            </Pressable>
+            {subtitle ? (
+              <Text
+                numberOfLines={1}
+                style={{
+                  fontSize: 12,
+                  color: theme.mute,
+                  marginTop: 1,
+                  textAlign: 'center',
+                }}
+              >
+                {subtitle}
+              </Text>
+            ) : null}
           </View>
 
-          <Content
-            {...(scroll
-              ? { showsVerticalScrollIndicator: false, keyboardShouldPersistTaps: 'handled' as const }
-              : {})}
-            contentContainerStyle={scroll ? { paddingHorizontal: 20, paddingBottom: 20 } : undefined}
-          >
-            {scroll ? children : <View style={{ paddingHorizontal: 20, paddingBottom: 20 }}>{children}</View>}
-          </Content>
+          {/* Right spacer or custom action */}
+          <View style={{ width: 40, alignItems: 'flex-end', marginRight: -6 }}>
+            {headerRight || <View style={{ width: 40 }} />}
+          </View>
+        </View>
 
-          {footer}
-        </Pressable>
-      </Pressable>
+        {/* Full Page Content */}
+        <Content
+          {...(scroll
+            ? {
+                style: { flex: 1 },
+                showsVerticalScrollIndicator: true,
+                keyboardShouldPersistTaps: 'handled' as const,
+                contentContainerStyle: {
+                  paddingHorizontal: 20,
+                  paddingTop: 20,
+                  paddingBottom: footer ? 24 : 60,
+                },
+              }
+            : {
+                style: {
+                  flex: 1,
+                  paddingHorizontal: 20,
+                  paddingTop: 20,
+                  paddingBottom: footer ? 24 : 60,
+                },
+              })}
+        >
+          {children}
+        </Content>
+
+        {/* Sticky Footer */}
+        {footer ? (
+          <View
+            style={{
+              backgroundColor: theme.surface,
+            }}
+          >
+            {footer}
+          </View>
+        ) : null}
+      </SafeAreaView>
     </Modal>
   );
 }
 
+// Re-export BottomSheet as alias so all existing pickers seamlessly render as full pages
+export const BottomSheet = FullPagePicker;

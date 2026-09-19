@@ -5,17 +5,19 @@ import { useTheme } from '@/context/ThemeContext';
 import { EmptyState } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useNewFromFollowedQuery, useFeedListingsQuery } from '@/lib/queries';
+import { useOpenedNewsIds } from '@/lib/newsStorage';
 import { NewsActivityRow, type ActivityItem } from './NewsActivityRow';
 import type { Listing } from '@/types';
 
 function RowSeparator() {
   const { theme } = useTheme();
-  return <View style={{ height: 1, backgroundColor: theme.hairline, marginLeft: 72 }} />;
+  return <View style={{ height: 1, backgroundColor: theme.border, width: '100%' }} />;
 }
 
 export function FollowingTab({ bottomInset = 24 }: { bottomInset?: number }) {
   const { theme } = useTheme();
   const { user } = useAuth();
+  const { openedIds } = useOpenedNewsIds();
   const userId = user?.id ?? null;
 
   // Followed listings
@@ -38,22 +40,24 @@ export function FollowingTab({ bottomInset = 24 }: { bottomInset?: number }) {
 
     const source = followedListings.length > 0 ? followedListings : communityListings;
 
-    return source.map((listing: Listing) => {
-      const seller = listing.seller;
-      return {
-        id: `listing-${listing.id}`,
-        kind: 'listing_created',
-        actor: {
-          id: seller?.id || 'seller',
-          username: seller?.username || 'Seller',
-          full_name: seller?.full_name || seller?.username || 'Creator',
-          avatar_url: seller?.avatar_url,
-        },
-        listing,
-        created_at: listing.created_at,
-      };
-    });
-  }, [followedQ.data, communityQ.data]);
+    return source
+      .map((listing: Listing) => {
+        const seller = listing.seller;
+        return {
+          id: `listing-${listing.id}`,
+          kind: 'listing_created' as const,
+          actor: {
+            id: seller?.id || 'seller',
+            username: seller?.username || 'Seller',
+            full_name: seller?.full_name || seller?.username || 'Creator',
+            avatar_url: seller?.avatar_url,
+          },
+          listing,
+          created_at: listing.created_at,
+        };
+      })
+      .filter((item) => !openedIds.has(item.id));
+  }, [followedQ.data, communityQ.data, openedIds]);
 
   const renderItem = useCallback(
     ({ item }: { item: ActivityItem }) => <NewsActivityRow item={item} />,

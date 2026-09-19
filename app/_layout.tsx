@@ -104,6 +104,9 @@ const AESTHETIC_FONTS = withFontDisplay(
     Inter_600SemiBold,
     Inter_700Bold,
     Inter_700Bold_Italic,
+    HansenGrotesque_Bold: require('../assets/fonts/HansenGrotesque-Bold.ttf'),
+    HansenGrotesque_Regular: require('../assets/fonts/HansenGrotesque.ttf'),
+    Figtree: require('../assets/fonts/Figtree.ttf'),
   },
   Font.FontDisplay.BLOCK,
 );
@@ -324,6 +327,10 @@ function RootLayoutNav() {
           />
           <Stack.Screen
             name="invoice/[id]"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="sell"
             options={{ headerShown: false }}
           />
           <Stack.Screen

@@ -55,13 +55,13 @@ const HERO_CARDS: CategoryTileData[] = [
 
 const GRID_CARDS: CategoryTileData[] = [
   {
-    key: 'electronics',
-    eyebrow: 'Tech',
-    title: 'Electronics',
-    tagline: 'Phones · audio · games',
+    key: 'accessories',
+    eyebrow: 'Accents',
+    title: 'Accessories',
+    tagline: 'Watches · jewelry · belts',
     accent: '#6C47FF',
-    icon: 'hardware-chip-outline',
-    src: require('../assets/images/categories/electronics.jpg'),
+    icon: 'watch-outline',
+    src: require('../assets/images/categories/editors.jpg'),
   },
   {
     key: 'beauty',
@@ -103,7 +103,7 @@ const QUICK_CATS: { key: string; label: string; sticker: StickerSpec }[] = [
   { key: 'deals', label: 'Deals', sticker: { icon: 'pricetag', color: '#FF4D8D', deep: '#8E1247' } },
   { key: 'sneakers', label: 'Sneakers', sticker: { icon: 'flash', color: '#FFB03A', deep: '#8A4D00' } },
   { key: 'streetwear', label: 'Streetwear', sticker: { icon: 'flame', color: '#FF5757', deep: '#7E1010' } },
-  { key: 'electronics', label: 'Tech', sticker: { icon: 'hardware-chip', color: '#36C5F0', deep: '#0B5570' } },
+  { key: 'accessories', label: 'Accessories', sticker: { icon: 'watch', color: '#36C5F0', deep: '#0B5570' } },
   { key: 'beauty', label: 'Beauty', sticker: { icon: 'flower', color: '#F45BC0', deep: '#771254' } },
   { key: 'vintage', label: 'Vintage', sticker: { icon: 'leaf', color: '#33D6A6', deep: '#0A5C44' } },
 ];
@@ -126,7 +126,7 @@ const DISPLAY_TO_ROUTE: Record<string, DiscoverRoute> = {
   editors: { category: 'trending' },
 
   // Grid
-  electronics: { category: 'electronics' },
+  accessories: { category: 'accessories' },
   beauty: { category: 'beauty' },
   home: { q: 'home' },
   handbags: { category: 'bags' },

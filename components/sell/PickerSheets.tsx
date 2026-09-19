@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { View, Pressable, Platform } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
@@ -221,6 +221,159 @@ export function TextFieldSheet({
   );
 }
 
+// ── Size (full-page category-aware size selector) ───────────────────────────
+export function SizeSheet({
+  visible,
+  categoryCode,
+  value,
+  onChange,
+  onClose,
+}: {
+  visible: boolean;
+  categoryCode?: string;
+  value: string;
+  onChange: (v: string) => void;
+  onClose: () => void;
+}) {
+  const { theme } = useTheme();
+  const [draft, setDraft] = useState(value);
+
+  useEffect(() => {
+    if (visible) setDraft(value);
+  }, [visible]);
+
+  const save = (valToSave?: string) => {
+    const finalVal = (valToSave ?? draft).trim();
+    onChange(finalVal);
+    onClose();
+  };
+
+  const quickSizes = useMemo(() => {
+    if (categoryCode === 'CAT-04' || categoryCode === 'shoes') {
+      return [
+        'US 6', 'US 6.5', 'US 7', 'US 7.5', 'US 8', 'US 8.5',
+        'US 9', 'US 9.5', 'US 10', 'US 10.5', 'US 11', 'US 12',
+        'EU 38', 'EU 39', 'EU 40', 'EU 41', 'EU 42', 'EU 43', 'EU 44', 'EU 45',
+      ];
+    }
+    if (categoryCode === 'CAT-05' || categoryCode === 'bags') {
+      return ['Small', 'Medium', 'Large', 'Mini', 'Oversized', 'One Size'];
+    }
+    if (categoryCode === 'CAT-06' || categoryCode === 'accessories' || categoryCode === 'CAT-07' || categoryCode === 'beauty') {
+      return ['One Size', 'Small', 'Medium', 'Large'];
+    }
+    return ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'One Size'];
+  }, [categoryCode]);
+
+  return (
+    <BottomSheet
+      visible={visible}
+      title="Size"
+      onClose={onClose}
+      footer={<SaveButton onPress={() => save()} label="Save Size" />}
+    >
+      <Text style={{ fontSize: 13, color: theme.mute, marginBottom: 16 }}>
+        Select a standard size or enter custom dimensions below.
+      </Text>
+
+      {/* Quick Pick */}
+      <View style={{ marginBottom: 20 }}>
+        <Text
+          style={{
+            fontSize: 12,
+            fontFamily: DISPLAY_BOLD,
+            color: theme.ink,
+            marginBottom: 10,
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+          }}
+        >
+          Quick Select
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {quickSizes.map((qs) => {
+            const active = draft.trim().toLowerCase() === qs.toLowerCase();
+            return (
+              <Pressable
+                key={qs}
+                onPress={() => {
+                  if (Platform.OS !== 'web') {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  }
+                  setDraft(qs);
+                  save(qs);
+                }}
+                style={({ pressed }) => ({
+                  paddingHorizontal: 16,
+                  paddingVertical: 10,
+                  borderRadius: radii.pill,
+                  borderWidth: 1,
+                  borderColor: active ? theme.ink : theme.border,
+                  backgroundColor: active ? theme.ink : theme.panel,
+                  opacity: pressed ? 0.8 : 1,
+                  transform: [{ scale: pressed ? 0.97 : 1 }],
+                })}
+              >
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontFamily: active ? DISPLAY_BOLD : type.family.sansMedium,
+                    color: active ? theme.background : theme.ink,
+                  }}
+                >
+                  {qs}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* Custom Size */}
+      <View style={{ marginTop: 4 }}>
+        <Text
+          style={{
+            fontSize: 12,
+            fontFamily: DISPLAY_BOLD,
+            color: theme.ink,
+            marginBottom: 8,
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+          }}
+        >
+          Custom Size
+        </Text>
+        <View
+          style={{
+            borderWidth: 1,
+            borderColor: theme.border,
+            borderRadius: radii.xl,
+            backgroundColor: theme.panel,
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+          }}
+        >
+          <TextInput
+            value={draft}
+            onChangeText={setDraft}
+            placeholder="e.g. 32/30, 38R, 75B, 8.5 Wide"
+            placeholderTextColor={theme.muteSoft ?? theme.mute}
+            style={
+              {
+                fontSize: 16,
+                color: theme.ink,
+                padding: 0,
+                outlineStyle: 'none',
+                outlineWidth: 0,
+              } as any
+            }
+          />
+        </View>
+      </View>
+    </BottomSheet>
+  );
+}
+
 // ── Price (hero numeric input) ──────────────────────────────────────────────
 export function PriceSheet({
   visible,
@@ -245,7 +398,7 @@ export function PriceSheet({
   };
 
   return (
-    <BottomSheet visible={visible} title="Price" onClose={onClose} footer={<SaveButton onPress={save} />}>
+    <BottomSheet visible={visible} title="Set Price" onClose={onClose} footer={<SaveButton onPress={save} label="Set Price" />}>
       <View
         style={{
           borderWidth: 1,
@@ -309,6 +462,77 @@ export function PriceSheet({
       <Text style={{ fontSize: 12.5, color: theme.mute, marginTop: 10, paddingHorizontal: 4 }}>
         Set a fair price based on condition and brand to sell quickly.
       </Text>
+
+      {/* Quick Price Increment Pills */}
+      <View style={{ marginTop: 20, marginBottom: 18 }}>
+        <Text
+          style={{
+            fontSize: 12,
+            fontFamily: DISPLAY_BOLD,
+            color: theme.ink,
+            marginBottom: 10,
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+          }}
+        >
+          Common Price Presets
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {[500, 1000, 1500, 2000, 2500, 3000, 5000, 10000].map((pVal) => {
+            const active = draft === String(pVal);
+            return (
+              <Pressable
+                key={pVal}
+                onPress={() => setDraft(String(pVal))}
+                style={({ pressed }) => ({
+                  paddingHorizontal: 14,
+                  paddingVertical: 8,
+                  borderRadius: radii.pill,
+                  borderWidth: 1,
+                  borderColor: active ? theme.ink : theme.border,
+                  backgroundColor: active ? theme.ink : theme.panel,
+                  opacity: pressed ? 0.8 : 1,
+                  transform: [{ scale: pressed ? 0.97 : 1 }],
+                })}
+              >
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontFamily: active ? DISPLAY_BOLD : type.family.sansMedium,
+                    color: active ? theme.background : theme.ink,
+                  }}
+                >
+                  {CURRENCY_SYMBOL} {pVal.toLocaleString()}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* Transparent Fee Explanation */}
+      <View
+        style={{
+          padding: 16,
+          borderRadius: radii.xl,
+          backgroundColor: theme.panel,
+          borderWidth: 1,
+          borderColor: theme.border,
+          gap: 8,
+        }}
+      >
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Text style={{ fontSize: 13, color: theme.mute }}>Buyer Protection (covered by buyer)</Text>
+          <Text style={{ fontSize: 13, fontFamily: DISPLAY_BOLD, color: theme.ink }}>5%</Text>
+        </View>
+        <View style={{ height: 1, backgroundColor: theme.border }} />
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Text style={{ fontSize: 13, fontFamily: DISPLAY_BOLD, color: theme.ink }}>Your estimated earnings</Text>
+          <Text style={{ fontSize: 16, fontFamily: DISPLAY_BOLD, color: theme.ink }}>
+            {CURRENCY_SYMBOL} {draft && !isNaN(parseFloat(draft)) ? parseFloat(draft).toLocaleString() : '0'}
+          </Text>
+        </View>
+      </View>
     </BottomSheet>
   );
 }
@@ -642,7 +866,7 @@ export function TagsSheet({
   };
 
   return (
-    <BottomSheet visible={visible} title="Tags" onClose={onClose} footer={<SaveButton onPress={save} />}>
+    <BottomSheet visible={visible} title="Tags" onClose={onClose} footer={<SaveButton onPress={save} label="Done" />}>
       <Text style={{ fontSize: 13, color: theme.mute, marginBottom: 12 }}>
         Add keywords like style, aesthetics, or fit to help buyers discover your item (up to 10).
       </Text>
@@ -713,6 +937,47 @@ export function TagsSheet({
             } as any
           }
         />
+      </View>
+
+      {/* Suggested Popular Tags */}
+      <View style={{ marginTop: 20 }}>
+        <Text
+          style={{
+            fontSize: 12,
+            fontFamily: DISPLAY_BOLD,
+            color: theme.ink,
+            marginBottom: 10,
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+          }}
+        >
+          Suggested Tags
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {['vintage', 'y2k', 'streetwear', 'casual', 'formal', 'summer', 'minimalist', 'oversized', 'classic', 'aesthetic']
+            .filter((st) => !tags.includes(st))
+            .slice(0, 8)
+            .map((st) => (
+              <Pressable
+                key={st}
+                onPress={() => addFromDraft(st)}
+                style={({ pressed }) => ({
+                  paddingHorizontal: 12,
+                  paddingVertical: 7,
+                  borderRadius: radii.pill,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                  backgroundColor: theme.panel,
+                  opacity: pressed ? 0.8 : 1,
+                  transform: [{ scale: pressed ? 0.97 : 1 }],
+                })}
+              >
+                <Text style={{ fontSize: 12.5, color: theme.ink, fontFamily: type.family.sansMedium }}>
+                  + #{st}
+                </Text>
+              </Pressable>
+            ))}
+        </View>
       </View>
     </BottomSheet>
   );

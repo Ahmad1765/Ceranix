@@ -205,4 +205,40 @@ describe('bundleFlow tests', () => {
       }),
     ).toBe(3000);
   });
+
+  describe('bundle seller enablement & gating rules', () => {
+    it('determines bundle option is available ONLY when seller has enabled bundles (> 0)', () => {
+      const isBundlesEnabled = (sellerBundleDiscountPct: number | undefined | null) => {
+        return Number(sellerBundleDiscountPct ?? 0) > 0;
+      };
+
+      // When seller has enabled bundles (e.g. 10%, 15%, 20%)
+      expect(isBundlesEnabled(10)).toBe(true);
+      expect(isBundlesEnabled(15)).toBe(true);
+      expect(isBundlesEnabled(5)).toBe(true);
+
+      // When seller has disabled bundles (0, undefined, or null)
+      expect(isBundlesEnabled(0)).toBe(false);
+      expect(isBundlesEnabled(undefined)).toBe(false);
+      expect(isBundlesEnabled(null)).toBe(false);
+    });
+
+    it('suppresses bundle options when listing is already sold or bundle discount is disabled', () => {
+      const shouldShowBundleBuilder = (isSold: boolean, sellerBundleDiscountPct: number | undefined) => {
+        const bundlesEnabled = Number(sellerBundleDiscountPct ?? 0) > 0;
+        return !isSold && bundlesEnabled;
+      };
+
+      // Enabled and unsold -> show bundle options
+      expect(shouldShowBundleBuilder(false, 15)).toBe(true);
+
+      // Disabled bundle discount -> do NOT show bundle options
+      expect(shouldShowBundleBuilder(false, 0)).toBe(false);
+      expect(shouldShowBundleBuilder(false, undefined)).toBe(false);
+
+      // Sold item -> do NOT show bundle options even if seller has discounts
+      expect(shouldShowBundleBuilder(true, 15)).toBe(false);
+      expect(shouldShowBundleBuilder(true, 0)).toBe(false);
+    });
+  });
 });

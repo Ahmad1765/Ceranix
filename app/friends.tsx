@@ -20,7 +20,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { useToast } from '@/lib/toast';
 import { tap } from '@/lib/haptics';
 import { safeBack } from '@/lib/nav';
-import { radii, colors } from '@/lib/theme';
+import { radii, colors, type as typography, shadow } from '@/lib/theme';
 import { CONTENT_MAX_WIDTH, HIT_SLOP_8 } from '@/lib/responsive';
 import { PressableScale } from '@/components/PressableScale';
 import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
@@ -223,7 +223,7 @@ export default function FriendsScreen() {
         style={{
           borderBottomWidth: 1,
           borderBottomColor: theme.hairline,
-          backgroundColor: theme.surface,
+          backgroundColor: theme.background,
         }}
       >
         <View
@@ -248,22 +248,24 @@ export default function FriendsScreen() {
               width: 38,
               height: 38,
               borderRadius: 19,
-              backgroundColor: theme.surface,
+              backgroundColor: theme.panel,
               alignItems: 'center',
               justifyContent: 'center',
               borderWidth: 1,
               borderColor: theme.border,
               opacity: pressed ? 0.7 : 1,
+              ...shadow.sm,
             })}
           >
-            <Feather name="arrow-left" size={18} color={theme.text} />
+            <Feather name="arrow-left" size={19} color={theme.ink} />
           </Pressable>
 
           <Text
             style={{
-              fontSize: 16,
+              fontFamily: typography.family.sansBold,
+              fontSize: 17,
               fontWeight: '800',
-              color: theme.text,
+              color: theme.ink,
               letterSpacing: -0.3,
             }}
           >
@@ -283,15 +285,16 @@ export default function FriendsScreen() {
               width: 38,
               height: 38,
               borderRadius: 19,
-              backgroundColor: theme.surface,
+              backgroundColor: theme.panel,
               alignItems: 'center',
               justifyContent: 'center',
               borderWidth: 1,
               borderColor: theme.border,
               opacity: pressed ? 0.7 : 1,
+              ...shadow.sm,
             })}
           >
-            <Ionicons name="qr-code-outline" size={18} color={theme.text} />
+            <Ionicons name="qr-code-outline" size={18} color={theme.ink} />
           </Pressable>
         </View>
       </View>
@@ -326,6 +329,7 @@ export default function FriendsScreen() {
             borderColor: theme.border,
             paddingHorizontal: 14,
             marginBottom: 20,
+            ...shadow.sm,
           }}
         >
           <Feather name="search" size={17} color={theme.mute} style={{ marginRight: 8 }} />
@@ -339,8 +343,9 @@ export default function FriendsScreen() {
             returnKeyType="search"
             style={{
               flex: 1,
-              fontSize: 14,
-              color: theme.text,
+              fontFamily: typography.family.sans,
+              fontSize: 14.5,
+              color: theme.ink,
               paddingVertical: 0,
             }}
           />
@@ -381,19 +386,21 @@ export default function FriendsScreen() {
                 style={{
                   paddingVertical: 36,
                   alignItems: 'center',
-                  backgroundColor: theme.surface,
-                  borderRadius: radii.xl,
+                  backgroundColor: theme.panel,
+                  borderRadius: radii['2xl'],
                   borderWidth: 1,
-                  borderColor: theme.hairline,
+                  borderColor: theme.border,
                   paddingHorizontal: 20,
+                  ...shadow.sm,
                 }}
               >
                 <Feather name="user-x" size={32} color={theme.muteSoft} style={{ marginBottom: 10 }} />
-                <Text style={{ fontSize: 15, fontWeight: '700', color: theme.ink }}>
+                <Text style={{ fontFamily: typography.family.sansBold, fontSize: 15, fontWeight: '700', color: theme.ink }}>
                   No member found
                 </Text>
                 <Text
                   style={{
+                    fontFamily: typography.family.sans,
                     fontSize: 13,
                     color: theme.mute,
                     textAlign: 'center',
@@ -416,7 +423,7 @@ export default function FriendsScreen() {
                   }}
                 >
                   <Feather name="send" size={14} color={theme.background} />
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: theme.background }}>
+                  <Text style={{ fontFamily: typography.family.sansBold, fontSize: 13, fontWeight: '700', color: theme.background }}>
                     Invite to Ceranix
                   </Text>
                 </PressableScale>
@@ -443,12 +450,13 @@ export default function FriendsScreen() {
               /* ── Native Address Book Hero Card ── */
               <View
                 style={{
-                  backgroundColor: theme.surface,
+                  backgroundColor: theme.panel,
                   borderRadius: radii['2xl'],
                   borderWidth: 1,
-                  borderColor: theme.hairline,
+                  borderColor: theme.border,
                   padding: 18,
                   marginBottom: 24,
+                  ...shadow.sm,
                 }}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 }}>
@@ -462,13 +470,13 @@ export default function FriendsScreen() {
                       justifyContent: 'center',
                     }}
                   >
-                    <Feather name="users" size={20} color={theme.primary} />
+                    <Feather name="users" size={20} color={theme.purple} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 16, fontWeight: '800', color: theme.ink, letterSpacing: -0.2 }}>
+                    <Text style={{ fontFamily: typography.family.sansBold, fontSize: 16, fontWeight: '800', color: theme.ink, letterSpacing: -0.2 }}>
                       Find Phone Contacts
                     </Text>
-                    <Text style={{ fontSize: 12.5, color: theme.mute, marginTop: 1 }}>
+                    <Text style={{ fontFamily: typography.family.sans, fontSize: 12.5, color: theme.mute, marginTop: 1 }}>
                       Discover people you know already on Ceranix
                     </Text>
                   </View>
@@ -480,15 +488,17 @@ export default function FriendsScreen() {
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: 6,
-                    backgroundColor: theme.panel,
+                    backgroundColor: isDark ? theme.surface : '#F7F7F8',
                     borderRadius: radii.md,
                     paddingHorizontal: 10,
                     paddingVertical: 7,
                     marginBottom: 14,
+                    borderWidth: 1,
+                    borderColor: theme.hairline,
                   }}
                 >
                   <Feather name="lock" size={13} color={theme.mute} />
-                  <Text style={{ fontSize: 11.5, color: theme.mute, flex: 1 }}>
+                  <Text style={{ fontFamily: typography.family.sans, fontSize: 11.5, color: theme.mute, flex: 1 }}>
                     End-to-end device hashing. Raw numbers are never stored.
                   </Text>
                 </View>
@@ -594,15 +604,16 @@ export default function FriendsScreen() {
               /* ── Web-Friendly Social Hero Card ── */
               <View
                 style={{
-                  backgroundColor: theme.surface,
+                  backgroundColor: theme.panel,
                   borderRadius: radii['2xl'],
                   borderWidth: 1,
-                  borderColor: theme.hairline,
+                  borderColor: theme.border,
                   padding: 18,
                   marginBottom: 24,
+                  ...shadow.sm,
                 }}
               >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 }}>
                   <View
                     style={{
                       width: 44,
@@ -613,20 +624,20 @@ export default function FriendsScreen() {
                       justifyContent: 'center',
                     }}
                   >
-                    <Feather name="send" size={20} color={theme.primary} />
+                    <Feather name="send" size={19} color={theme.purple} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 16, fontWeight: '800', color: theme.ink, letterSpacing: -0.2 }}>
+                    <Text style={{ fontFamily: typography.family.sansBold, fontSize: 16, fontWeight: '800', color: theme.ink, letterSpacing: -0.2 }}>
                       Invite Friends & Share Closet
                     </Text>
-                    <Text style={{ fontSize: 12.5, color: theme.mute, marginTop: 1 }}>
+                    <Text style={{ fontFamily: typography.family.sans, fontSize: 12.5, color: theme.mute, marginTop: 2 }}>
                       Share your profile link across messaging apps
                     </Text>
                   </View>
                 </View>
 
                 {/* Web Action Strip */}
-                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
                   <PressableScale
                     onPress={() => shareInviteLink(profile?.username, profile?.full_name)}
                     style={{
@@ -641,7 +652,7 @@ export default function FriendsScreen() {
                     }}
                   >
                     <Feather name="share-2" size={15} color="#FFFFFF" />
-                    <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#FFFFFF' }}>
+                    <Text style={{ fontFamily: typography.family.sansBold, fontSize: 13.5, fontWeight: '700', color: '#FFFFFF' }}>
                       Share Link
                     </Text>
                   </PressableScale>
@@ -658,17 +669,18 @@ export default function FriendsScreen() {
                       height: 42,
                       paddingHorizontal: 16,
                       borderRadius: radii.pill,
-                      backgroundColor: theme.panel,
+                      backgroundColor: isDark ? theme.surface : theme.panel,
                       borderWidth: 1,
                       borderColor: theme.border,
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: 6,
+                      ...shadow.sm,
                     }}
                   >
-                    <Feather name="copy" size={14} color={theme.text} />
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: theme.text }}>
+                    <Feather name="copy" size={14} color={theme.ink} />
+                    <Text style={{ fontFamily: typography.family.sansSemibold, fontSize: 13, fontWeight: '600', color: theme.ink }}>
                       Copy
                     </Text>
                   </PressableScale>
@@ -682,17 +694,18 @@ export default function FriendsScreen() {
                       flex: 1,
                       height: 36,
                       borderRadius: radii.pill,
-                      backgroundColor: theme.panel,
+                      backgroundColor: isDark ? theme.surface : theme.panel,
                       borderWidth: 1,
                       borderColor: theme.border,
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: 6,
+                      ...shadow.sm,
                     }}
                   >
                     <Ionicons name="logo-whatsapp" size={15} color={theme.ink} />
-                    <Text style={{ fontSize: 12, fontWeight: '600', color: theme.text }}>
+                    <Text style={{ fontFamily: typography.family.sansSemibold, fontSize: 12, fontWeight: '600', color: theme.ink }}>
                       WhatsApp
                     </Text>
                   </PressableScale>
@@ -703,17 +716,18 @@ export default function FriendsScreen() {
                       flex: 1,
                       height: 36,
                       borderRadius: radii.pill,
-                      backgroundColor: theme.panel,
+                      backgroundColor: isDark ? theme.surface : theme.panel,
                       borderWidth: 1,
                       borderColor: theme.border,
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: 6,
+                      ...shadow.sm,
                     }}
                   >
-                    <Feather name="message-circle" size={14} color={theme.text} />
-                    <Text style={{ fontSize: 12, fontWeight: '600', color: theme.text }}>
+                    <Feather name="message-circle" size={14} color={theme.ink} />
+                    <Text style={{ fontFamily: typography.family.sansSemibold, fontSize: 12, fontWeight: '600', color: theme.ink }}>
                       Messages
                     </Text>
                   </PressableScale>
@@ -724,17 +738,18 @@ export default function FriendsScreen() {
                       flex: 1,
                       height: 36,
                       borderRadius: radii.pill,
-                      backgroundColor: theme.panel,
+                      backgroundColor: isDark ? theme.surface : theme.panel,
                       borderWidth: 1,
                       borderColor: theme.border,
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: 6,
+                      ...shadow.sm,
                     }}
                   >
-                    <Ionicons name="qr-code-outline" size={14} color={theme.text} />
-                    <Text style={{ fontSize: 12, fontWeight: '600', color: theme.text }}>
+                    <Ionicons name="qr-code-outline" size={14} color={theme.ink} />
+                    <Text style={{ fontFamily: typography.family.sansSemibold, fontSize: 12, fontWeight: '600', color: theme.ink }}>
                       QR Code
                     </Text>
                   </PressableScale>
@@ -753,7 +768,7 @@ export default function FriendsScreen() {
                   }}
                 >
                   <Feather name="smartphone" size={13} color={theme.muteSoft} />
-                  <Text style={{ fontSize: 11.5, color: theme.mute, flex: 1 }}>
+                  <Text style={{ fontFamily: typography.family.sans, fontSize: 11.5, color: theme.mute, flex: 1 }}>
                     Automatic contact sync is available in our iOS & Android mobile apps.
                   </Text>
                 </View>
@@ -830,12 +845,13 @@ export default function FriendsScreen() {
                           flexDirection: 'row',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          backgroundColor: theme.surface,
+                          backgroundColor: theme.panel,
                           borderRadius: radii.xl,
                           paddingHorizontal: 14,
                           paddingVertical: 10,
                           borderWidth: 1,
-                          borderColor: theme.hairline,
+                          borderColor: theme.border,
+                          ...shadow.sm,
                         }}
                       >
                         <View style={{ flex: 1, marginRight: 12 }}>
@@ -880,12 +896,13 @@ export default function FriendsScreen() {
             <View>
               <Text
                 style={{
+                  fontFamily: typography.family.sansBold,
                   fontSize: 11,
                   fontWeight: '700',
                   letterSpacing: 1.0,
                   textTransform: 'uppercase',
                   color: theme.muteSoft,
-                  marginBottom: 10,
+                  marginBottom: 12,
                   paddingHorizontal: 2,
                 }}
               >
@@ -899,13 +916,51 @@ export default function FriendsScreen() {
               ) : suggestedUsers.length === 0 ? (
                 <View
                   style={{
-                    padding: 20,
+                    paddingVertical: 28,
+                    paddingHorizontal: 20,
                     alignItems: 'center',
-                    backgroundColor: theme.surface,
-                    borderRadius: radii.xl,
+                    justifyContent: 'center',
+                    backgroundColor: theme.panel,
+                    borderRadius: radii['2xl'],
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    ...shadow.sm,
                   }}
                 >
-                  <Text style={{ fontSize: 13, color: theme.mute }}>No suggestions available</Text>
+                  <View
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
+                      backgroundColor: isDark ? theme.surface : '#F7F7F8',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: 10,
+                    }}
+                  >
+                    <Feather name="users" size={20} color={theme.muteSoft} />
+                  </View>
+                  <Text
+                    style={{
+                      fontFamily: typography.family.sansSemibold,
+                      fontSize: 14,
+                      fontWeight: '600',
+                      color: theme.ink,
+                    }}
+                  >
+                    No suggestions yet
+                  </Text>
+                  <Text
+                    style={{
+                      fontFamily: typography.family.sans,
+                      fontSize: 12,
+                      color: theme.mute,
+                      marginTop: 3,
+                      textAlign: 'center',
+                    }}
+                  >
+                    Search by name or username above to find your friends
+                  </Text>
                 </View>
               ) : (
                 <View style={{ gap: 8 }}>
@@ -959,13 +1014,14 @@ function UserRow({
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: theme.surface,
+        backgroundColor: theme.panel,
         borderRadius: radii.xl,
         borderWidth: 1,
-        borderColor: theme.hairline,
+        borderColor: theme.border,
         paddingHorizontal: 14,
         paddingVertical: 10,
         opacity: pressed ? 0.85 : 1,
+        ...shadow.sm,
       })}
     >
       {/* Avatar */}

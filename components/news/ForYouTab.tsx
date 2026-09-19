@@ -5,18 +5,20 @@ import { useTheme } from '@/context/ThemeContext';
 import { EmptyState } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { usePriceDropsQuery, useMyFeedListingsQuery } from '@/lib/queries';
+import { useOpenedNewsIds } from '@/lib/newsStorage';
 import { BRAND } from '@/lib/brand';
 import { NewsActivityRow, type ActivityItem } from './NewsActivityRow';
 import type { Listing } from '@/types';
 
 function RowSeparator() {
   const { theme } = useTheme();
-  return <View style={{ height: 1, backgroundColor: theme.hairline, marginLeft: 72 }} />;
+  return <View style={{ height: 1, backgroundColor: theme.border, width: '100%' }} />;
 }
 
 export function ForYouTab({ bottomInset = 24 }: { bottomInset?: number }) {
   const { theme } = useTheme();
   const { user } = useAuth();
+  const { openedIds } = useOpenedNewsIds();
   const userId = user?.id ?? null;
 
   const priceDropsQ = usePriceDropsQuery(userId);
@@ -63,8 +65,8 @@ export function ForYouTab({ bottomInset = 24 }: { bottomInset?: number }) {
       });
     });
 
-    return list;
-  }, [priceDropsQ.data, myFeedQ.data]);
+    return list.filter((item) => !openedIds.has(item.id));
+  }, [priceDropsQ.data, myFeedQ.data, openedIds]);
 
   const renderItem = useCallback(
     ({ item }: { item: ActivityItem }) => <NewsActivityRow item={item} />,

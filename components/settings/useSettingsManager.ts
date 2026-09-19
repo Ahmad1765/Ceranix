@@ -45,7 +45,7 @@ export const SECTIONS: readonly Section[] = ['admin', 'shop', 'verify', 'enhance
 export type Busy = 'logout' | 'delete' | 'password' | null;
 
 export function useSettingsManager() {
-  const { user, session, signOut, refreshProfile } = useAuth();
+  const { user, profile, session, signOut, refreshProfile } = useAuth();
   const toast = useToast();
   const params = useLocalSearchParams<{ open?: string }>();
 
@@ -239,6 +239,36 @@ export function useSettingsManager() {
         variant: 'success',
         icon: 'check',
       });
+    },
+    [user?.id, refreshProfile, toast],
+  );
+
+  const savedCollectionPrivacy: 'public' | 'private' = profile?.saved_collection_privacy ?? 'public';
+
+  const setSavedCollectionPrivacy = useCallback(
+    async (privacy: 'public' | 'private') => {
+      if (!user?.id) return;
+      const { error } = await supabase
+        .from('profiles')
+        .update({ saved_collection_privacy: privacy })
+        .eq('id', user.id);
+      if (error) {
+        toast.show('Could not update collection privacy', {
+          variant: 'default',
+          icon: 'alert-triangle',
+        });
+        return;
+      }
+      await refreshProfile();
+      toast.show(
+        privacy === 'public'
+          ? 'Saved collection is now Public'
+          : 'Saved collection is now Private',
+        {
+          variant: 'success',
+          icon: 'check',
+        },
+      );
     },
     [user?.id, refreshProfile, toast],
   );
@@ -543,6 +573,8 @@ export function useSettingsManager() {
     setShowSubscription,
     setVacationMode,
     setBundlePct,
+    savedCollectionPrivacy,
+    setSavedCollectionPrivacy,
     saveAddress,
     removeAddress,
     savePayout,

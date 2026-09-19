@@ -14,7 +14,7 @@ import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
-import { FilterSlidersIcon } from '@/components/ui';
+import { FilterSlidersIcon, BellIcon } from '@/components/ui';
 import { radii, shadow, type as typography } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 import {
@@ -41,6 +41,7 @@ type FeedSearchProps = {
   onOpenFilter: () => void;
   unreadNotificationsCount?: number;
   onPressNotifications?: () => void;
+  onOpenShareProfile?: () => void;
 };
 
 export const FeedSearch = memo(function FeedSearch({
@@ -55,6 +56,7 @@ export const FeedSearch = memo(function FeedSearch({
   onOpenFilter,
   unreadNotificationsCount,
   onPressNotifications,
+  onOpenShareProfile,
 }: FeedSearchProps) {
   const { theme, isDark } = useTheme();
   const inputRef = useRef<any>(null);
@@ -289,11 +291,7 @@ export const FeedSearch = memo(function FeedSearch({
                 ...shadow.sm,
               } as any)}
             >
-              <Ionicons
-                name="notifications-outline"
-                size={21}
-                color={theme.ink}
-              />
+              <BellIcon size={20} color={theme.ink} />
               {!!unreadNotificationsCount && unreadNotificationsCount > 0 && (
                 <View
                   style={{
@@ -310,6 +308,33 @@ export const FeedSearch = memo(function FeedSearch({
                 />
               )}
             </Pressable>
+
+            {/* Share Profile button (QR Code) */}
+            {onOpenShareProfile && (
+              <Pressable
+                onPress={() => {
+                  haptic();
+                  onOpenShareProfile();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Share profile"
+                style={({ pressed }) => ({
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: pressed ? theme.surface : theme.panel,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transform: [{ scale: pressed ? 0.94 : 1 }],
+                  outlineStyle: 'none',
+                  ...shadow.sm,
+                } as any)}
+              >
+                <Ionicons name="qr-code-outline" size={19} color={theme.ink} />
+              </Pressable>
+            )}
           </>
         )}
       </View>

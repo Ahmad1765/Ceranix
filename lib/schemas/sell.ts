@@ -8,7 +8,6 @@ export const CATEGORY_VALUES: [Category, ...Category[]] = [
   'shoes',
   'bags',
   'accessories',
-  'electronics',
   'beauty',
   'other',
 ];

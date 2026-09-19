@@ -18,13 +18,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect, router } from 'expo-router';
+import { useFocusEffect, router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/context/ThemeContext';
 import { useToast } from '@/lib/toast';
 import { cardImageUrl, getOptimizedImageUrl, prefetchImages } from '@/lib/images';
 import { DropAlertSheet } from '@/components/DropAlertSheet';
 import { FeedFilterSheet } from '@/components/navigation/FeedFilterSheet';
+import { ProfileQrSheet } from '@/components/profile/ProfileQrSheet';
 import {
   useMyFeedListingsQuery,
   useFeedListingsQuery,
@@ -56,10 +57,31 @@ const EMPTY_SAVED_SEARCHES: SavedSearch[] = [];
 export default function HomeScreen() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
-  const { user, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const toast = useToast();
   const [alertSheetOpen, setAlertSheetOpen] = useState(false);
   const [searchModeOpen, setSearchModeOpen] = useState(false);
+  const [initialSearchCategory, setInitialSearchCategory] = useState<string | null>(null);
+  const [initialSearchQuery, setInitialSearchQuery] = useState<string>('');
+  const [showShareModal, setShowShareModal] = useState(false);
+
+  const params = useLocalSearchParams<{
+    searchOpen?: string;
+    searchCategory?: string;
+    searchQuery?: string;
+    category?: string;
+  }>();
+
+  useEffect(() => {
+    const cat = params.searchCategory || (params.searchOpen === '1' ? params.category : undefined);
+    const query = params.searchQuery;
+
+    if (params.searchOpen === '1' || cat || query) {
+      if (cat !== undefined) setInitialSearchCategory(cat);
+      if (query !== undefined) setInitialSearchQuery(query);
+      setSearchModeOpen(true);
+    }
+  }, [params.searchOpen, params.searchCategory, params.searchQuery, params.category]);
 
   const listRef = useRef<FlashListRef<Listing[]>>(null);
   const scrollToTop = useCallback(() => {
@@ -189,6 +211,7 @@ export default function HomeScreen() {
         onOpenFilter: () => feedFilter.setFilterOpen(true),
         unreadNotificationsCount: unreadNotifications,
         onPressNotifications: () => router.push('/news' as any),
+        onOpenShareProfile: () => setShowShareModal(true),
       }}
       chipProps={{
         savedSearches,
@@ -244,7 +267,21 @@ export default function HomeScreen() {
       {searchModeOpen && (
         <View style={[StyleSheet.absoluteFillObject, { zIndex: 100, elevation: 10 }]}>
           <HomeSearchView
-            onClose={() => setSearchModeOpen(false)}
+            onClose={() => {
+              setSearchModeOpen(false);
+              setInitialSearchCategory(null);
+              setInitialSearchQuery('');
+              if (params.searchOpen || params.searchCategory || params.searchQuery || params.category) {
+                router.setParams({
+                  searchOpen: undefined,
+                  searchCategory: undefined,
+                  searchQuery: undefined,
+                  category: undefined,
+                });
+              }
+            }}
+            initialCategory={initialSearchCategory}
+            initialQuery={initialSearchQuery}
             onOpenSavedAlerts={() => {
               if (!user?.id) {
                 toast.show('Sign in to create drop alerts', { variant: 'info', icon: 'log-in' });
@@ -273,6 +310,13 @@ export default function HomeScreen() {
           onCreated={() => searchesRefetch()}
         />
       ) : null}
+
+      <ProfileQrSheet
+        visible={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        username={profile?.username}
+        fullName={profile?.full_name}
+      />
     </SafeAreaView>
   );
 }

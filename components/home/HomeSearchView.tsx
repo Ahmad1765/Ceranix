@@ -33,7 +33,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/lib/auth';
 import { useSearchHistory } from '@/hooks/useSearchHistory';
 import { searchUsers } from '@/lib/follows';
-import { searchListings } from '@/lib/listings';
+import { searchListings, fetchListingsResult } from '@/lib/listings';
 import { getSearchSuggestions } from '@/lib/searchSuggestions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createSavedSearch, deleteSavedSearch } from '@/lib/savedSearches';
@@ -50,7 +50,7 @@ import {
 import { ListingCard } from '@/components/ListingCard';
 import { useGridDimensions } from '@/lib/responsive';
 import { radii, type as typography } from '@/lib/theme';
-import type { Listing } from '@/types';
+import type { Category, Listing } from '@/types';
 
 function haptic() {
   if (Platform.OS !== 'web') {
@@ -72,7 +72,7 @@ const POPULAR_SEARCHES = [
   'Zara',
   'Denim',
   'Watches',
-  'Electronics',
+  'Boots',
 ];
 
 // Reference seed sellers matching the exact mockups
@@ -102,6 +102,7 @@ interface HomeSearchViewProps {
   onOpenSavedAlerts?: () => void;
   initialQuery?: string;
   initialTab?: SearchTab;
+  initialCategory?: string | null;
 }
 
 export const HomeSearchView = memo(function HomeSearchView({
@@ -109,6 +110,7 @@ export const HomeSearchView = memo(function HomeSearchView({
   onOpenSavedAlerts,
   initialQuery = '',
   initialTab = 'listings',
+  initialCategory,
 }: HomeSearchViewProps) {
   const toast = useToast();
   const { theme, isDark } = useTheme();
@@ -116,9 +118,12 @@ export const HomeSearchView = memo(function HomeSearchView({
   const inputRef = useRef<any>(null);
   const pagerRef = useRef<ScrollView>(null);
 
+  const isCategorySearch = !!initialCategory && initialCategory !== 'all';
   const [query, setQuery] = useState(initialQuery);
   const [activeTab, setActiveTab] = useState<SearchTab>(initialTab);
-  const [hasSubmitted, setHasSubmitted] = useState(initialQuery.trim().length > 0);
+  const [hasSubmitted, setHasSubmitted] = useState(
+    initialQuery.trim().length > 0 || !!initialCategory,
+  );
   const { previousSearches, historyItems, addSearch, removeSearch } = useSearchHistory();
 
   const suggestions = useMemo(
@@ -132,7 +137,10 @@ export const HomeSearchView = memo(function HomeSearchView({
 
   const [sellerResults, setSellerResults] = useState<SellerResult[]>([]);
   const [listingResults, setListingResults] = useState<Listing[]>([]);
-  const [searchFilters, setSearchFilters] = useState<SearchFilterState>(EMPTY_SEARCH_FILTERS);
+  const [searchFilters, setSearchFilters] = useState<SearchFilterState>(() => ({
+    ...EMPTY_SEARCH_FILTERS,
+    category: isCategorySearch ? (initialCategory as Category) : null,
+  }));
   const [loading, setLoading] = useState(false);
 
   const scrollX = useRef(new RNAnimated.Value(initialTab === 'listings' ? 0 : screenWidth)).current;
@@ -365,7 +373,7 @@ export const HomeSearchView = memo(function HomeSearchView({
   });
 
   const hasQuery = query.trim().length > 0;
-  const canSwitchTabs = !hasSubmitted && !hasQuery;
+  const canSwitchTabs = !hasSubmitted && !hasQuery && !searchFilters.category;
   const tabWidth = screenWidth / 2;
 
   // Real-time interpolated translation for sliding green indicator bar
@@ -443,10 +451,10 @@ export const HomeSearchView = memo(function HomeSearchView({
 
   // ── Core Search Execution ───────────────────────────────────────────────────
   const runSearch = useCallback(
-    async (searchTerm: string, requestId: number) => {
+    async (searchTerm: string, categoryFilter: Category | null, requestId: number) => {
       const trimmed = searchTerm.trim();
 
-      if (!trimmed) {
+      if (!trimmed && !categoryFilter && !hasSubmitted) {
         if (searchRequestIdRef.current === requestId) {
           setSellerResults([]);
           setListingResults([]);
@@ -459,10 +467,30 @@ export const HomeSearchView = memo(function HomeSearchView({
       setLoading(true);
 
       try {
-        const [usersResult, listingsResult] = await Promise.all([
-          searchUsers(trimmed, 25).catch(() => []),
-          searchListings({ query: trimmed, limit: 40 }).catch(() => ({ ok: false, rows: [] })),
-        ]);
+        let usersResult: any[] = [];
+        let listingsResult: { ok: boolean; rows?: Listing[] } = { ok: false, rows: [] };
+
+        if (trimmed) {
+          [usersResult, listingsResult] = await Promise.all([
+            searchUsers(trimmed, 25).catch(() => []),
+            searchListings({ query: trimmed, limit: 40 }).catch(() => ({ ok: false, rows: [] })),
+          ]);
+        } else if (categoryFilter) {
+          [usersResult, listingsResult] = await Promise.all([
+            searchUsers(categoryFilter, 25).catch(() => []),
+            fetchListingsResult({
+              category: categoryFilter,
+              limit: 60,
+            }).catch(() => ({ ok: false, rows: [] })),
+          ]);
+        } else {
+          [usersResult, listingsResult] = await Promise.all([
+            searchUsers('', 25).catch(() => []),
+            fetchListingsResult({
+              limit: 60,
+            }).catch(() => ({ ok: false, rows: [] })),
+          ]);
+        }
 
         if (searchRequestIdRef.current !== requestId) return;
 
@@ -481,12 +509,14 @@ export const HomeSearchView = memo(function HomeSearchView({
 
         // Match seed mock sellers in development builds only (__DEV__)
         if (__DEV__) {
-          const qLower = trimmed.toLowerCase();
-          const matchingSeeds = SEED_SELLERS.filter(
-            (m) =>
-              m.username.toLowerCase().includes(qLower) ||
-              m.full_name.toLowerCase().includes(qLower),
-          );
+          const matchTerm = (trimmed || categoryFilter || '').toLowerCase();
+          const matchingSeeds = matchTerm
+            ? SEED_SELLERS.filter(
+                (m) =>
+                  m.username.toLowerCase().includes(matchTerm) ||
+                  m.full_name.toLowerCase().includes(matchTerm),
+              )
+            : SEED_SELLERS;
 
           for (const seed of matchingSeeds) {
             if (!combinedSellers.some((s) => s.username.toLowerCase() === seed.username.toLowerCase())) {
@@ -514,15 +544,16 @@ export const HomeSearchView = memo(function HomeSearchView({
         }
       }
     },
-    [],
+    [hasSubmitted],
   );
 
   useEffect(() => {
     const trimmed = query.trim();
     // Increment searchRequestId immediately when query changes so in-flight searches immediately become stale
     const requestId = ++searchRequestIdRef.current;
+    const cat = searchFilters.category;
 
-    if (!trimmed) {
+    if (!trimmed && !cat && !hasSubmitted) {
       setSellerResults([]);
       setListingResults([]);
       setLoading(false);
@@ -530,11 +561,11 @@ export const HomeSearchView = memo(function HomeSearchView({
     }
 
     const timer = setTimeout(() => {
-      runSearch(trimmed, requestId);
-    }, 150);
+      runSearch(trimmed, cat, requestId);
+    }, trimmed ? 150 : 0);
 
     return () => clearTimeout(timer);
-  }, [query, runSearch]);
+  }, [query, searchFilters.category, hasSubmitted, runSearch]);
 
   // Handle Tab Switch by clicking header
   const handleTabPress = useCallback(
@@ -656,8 +687,11 @@ export const HomeSearchView = memo(function HomeSearchView({
       addSearch(trimmed, activeTab);
       setHasSubmitted(true);
       Keyboard.dismiss();
+    } else if (searchFilters.category) {
+      setHasSubmitted(true);
+      Keyboard.dismiss();
     }
-  }, [query, activeTab, addSearch]);
+  }, [query, activeTab, addSearch, searchFilters.category]);
 
   // ── Render Seller Row (Exact match to Image 2) ─────────────────────────────
   const renderSellerItem = useCallback(
@@ -758,80 +792,9 @@ export const HomeSearchView = memo(function HomeSearchView({
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40 }}
     >
-      {/* Save your searches Banner Card */}
-      <Pressable
-        onPress={() => {
-          haptic();
-          if (onOpenSavedAlerts) {
-            onOpenSavedAlerts();
-          } else {
-            toast.show('Select or type a search to save alerts', {
-              variant: 'info',
-              icon: 'bookmark',
-            });
-          }
-        }}
-        accessibilityRole="button"
-        accessibilityLabel="Save your search"
-        style={({ pressed }) => ({
-          flexDirection: 'row',
-          alignItems: 'center',
-          borderWidth: 1,
-          borderColor: theme.border,
-          borderRadius: radii.lg,
-          paddingVertical: 14,
-          paddingHorizontal: 14,
-          minHeight: 80,
-          backgroundColor: isDark ? theme.surface : theme.panel,
-          gap: 14,
-          opacity: pressed ? 0.88 : 1,
-        })}
-      >
-        <View
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: radii.md,
-            backgroundColor: isDark ? '#0F0F0F' : '#FFFFFF',
-            borderWidth: 1,
-            borderColor: isDark ? 'rgba(108, 71, 255, 0.4)' : 'rgba(108, 71, 255, 0.25)',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Feather name="bookmark" size={22} color={theme.purple} />
-        </View>
-
-        <View style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
-          <Text
-            style={{
-              fontSize: 15.5,
-              lineHeight: 20,
-              fontWeight: '700',
-              fontFamily: typography.family.sansBold,
-              color: theme.text,
-              letterSpacing: -0.2,
-            }}
-          >
-            Save your search
-          </Text>
-          <Text
-            style={{
-              fontSize: 13,
-              lineHeight: 18,
-              fontFamily: typography.family.sansMedium,
-              color: theme.mute,
-              marginTop: 2,
-            }}
-          >
-            Never miss a drop with alerts for your favorite searches
-          </Text>
-        </View>
-      </Pressable>
-
       {/* Previous searches Section */}
       {historyItems.length > 0 && (
-        <View style={{ marginTop: 24 }}>
+        <View style={{ marginTop: 8 }}>
           <Text
             style={{
               fontSize: 15,
@@ -1165,62 +1128,72 @@ export const HomeSearchView = memo(function HomeSearchView({
       onTouchStart={Platform.OS === 'web' ? handleTouchStart : undefined}
       onTouchEnd={Platform.OS === 'web' ? handleTouchEnd : undefined}
     >
-      {/* ── Top Header Row (Plick layout: [<] [ 🔍 Search ... (x) ] [ ⭐ ] ) ─── */}
+      {/* ── Top Header Row (Plick layout before searching; results layout with Star after search) ─── */}
       <View
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          paddingHorizontal: 12,
+          paddingHorizontal: 16,
           paddingTop: 8,
           paddingBottom: 8,
-          gap: 10,
+          gap: 12,
           borderBottomWidth: 0,
         }}
       >
-        {/* Back Button '<' (Exact same as Plick) */}
-        <Pressable
-          onPress={handleClose}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          style={({ pressed }) => ({
-            width: 36,
-            height: 44,
-            alignItems: 'center',
-            justifyContent: 'center',
-            opacity: pressed ? 0.6 : 1,
-            transform: [{ scale: pressed ? 0.94 : 1 }],
-          })}
-        >
-          <Feather
-            name="chevron-left"
-            size={28}
-            color={theme.text}
-          />
-        </Pressable>
+        {/* Back Button '<' (Visible only in results mode after a search has been made) */}
+        {hasSubmitted && (
+          <Pressable
+            onPress={() => {
+              haptic();
+              setHasSubmitted(false);
+              setQuery('');
+              setSearchFilters(EMPTY_SEARCH_FILTERS);
+              ++searchRequestIdRef.current;
+              setSellerResults([]);
+              setListingResults([]);
+              setLoading(false);
+            }}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Back to search"
+            style={({ pressed }) => ({
+              width: 32,
+              height: 46,
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: pressed ? 0.6 : 1,
+              transform: [{ scale: pressed ? 0.94 : 1 }],
+            })}
+          >
+            <Feather
+              name="chevron-left"
+              size={28}
+              color={theme.text}
+            />
+          </Pressable>
+        )}
 
-        {/* Search Input Box */}
+        {/* Search Input Box (Plick reference: clean light grey pill) */}
         <Animated.View
           style={[
             {
               flex: 1,
               flexDirection: 'row',
               alignItems: 'center',
-              backgroundColor: theme.panel,
+              backgroundColor: isDark ? theme.surface : '#F4F4F5',
               borderRadius: radii.pill,
               paddingLeft: 14,
               paddingRight: 10,
-              height: 44,
-              borderWidth: 1,
-              borderColor: theme.border,
+              height: 46,
+              borderWidth: 0,
             },
             searchBarAnimatedStyle,
           ]}
         >
           <Feather
             name="search"
-            size={16}
-            color={theme.mute}
+            size={18}
+            color={isDark ? "#9CA3AF" : "#6B7280"}
             style={{ flexShrink: 0 }}
           />
           <TextInput
@@ -1236,8 +1209,12 @@ export const HomeSearchView = memo(function HomeSearchView({
               }
             }}
             onSubmitEditing={handleSubmitSearch}
-            placeholder="Search"
-            placeholderTextColor={theme.mute}
+            placeholder={
+              searchFilters.category
+                ? `Search in ${searchFilters.category.charAt(0).toUpperCase() + searchFilters.category.slice(1)}`
+                : "Search"
+            }
+            placeholderTextColor={isDark ? "#9CA3AF" : "#8E8E93"}
             autoFocus={Platform.OS === 'web'}
             returnKeyType="search"
             autoCapitalize="none"
@@ -1247,9 +1224,9 @@ export const HomeSearchView = memo(function HomeSearchView({
                 flex: 1,
                 minWidth: 0,
                 flexShrink: 1,
-                marginLeft: 9,
+                marginLeft: 10,
                 marginRight: 6,
-                fontFamily: typography.family.sansMedium,
+                fontFamily: typography.family.sans,
                 fontSize: 16,
                 letterSpacing: -0.15,
                 color: theme.text,
@@ -1260,68 +1237,100 @@ export const HomeSearchView = memo(function HomeSearchView({
             }
           />
 
-          {hasQuery && (
-            <Pressable
-              onPress={() => {
-                haptic();
-                setQuery('');
+          {/* Clear "✕" icon inside search pill */}
+          <Pressable
+            onPress={() => {
+              haptic();
+              setQuery('');
+              if (!searchFilters.category) {
                 setHasSubmitted(false);
                 ++searchRequestIdRef.current;
                 setSellerResults([]);
                 setListingResults([]);
                 setLoading(false);
-              }}
-              hitSlop={8}
-              accessibilityLabel="Clear search"
-              style={{
-                width: 22,
-                height: 22,
-                borderRadius: 11,
-                backgroundColor: isDark ? theme.surface : 'rgba(0,0,0,0.06)',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginRight: 2,
-              }}
-            >
-              <Feather name="x" size={13} color={theme.mute} />
-            </Pressable>
-          )}
+              }
+              inputRef.current?.focus?.();
+            }}
+            hitSlop={8}
+            accessibilityLabel="Clear search"
+            style={{
+              width: 24,
+              height: 24,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginRight: 2,
+              opacity: query.length > 0 ? 1 : 0.45,
+            }}
+          >
+            <Feather name="x" size={16} color={isDark ? "#9CA3AF" : "#6B7280"} />
+          </Pressable>
         </Animated.View>
 
-        {/* Save Your Search Star Button on Right */}
-        <Pressable
-          onPress={handleToggleSaveSearch}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={isSaved ? "Saved search active" : "Save this search"}
-          style={({ pressed }) => ({
-            width: 44,
-            height: 44,
-            borderRadius: 22,
-            backgroundColor: isSaved
-              ? (isDark ? 'rgba(245, 158, 11, 0.22)' : '#FEF3C7')
-              : (isDark ? theme.panel : theme.surface),
-            borderWidth: 1,
-            borderColor: isSaved
-              ? (isDark ? 'rgba(245, 158, 11, 0.5)' : '#FDE68A')
-              : theme.border,
-            alignItems: 'center',
-            justifyContent: 'center',
-            opacity: pressed ? 0.75 : 1,
-            transform: [{ scale: pressed ? 0.92 : 1 }],
-            shadowColor: isSaved ? '#F59E0B' : '#000000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: isSaved ? 0.35 : 0.05,
-            shadowRadius: 6,
-            elevation: isSaved ? 3 : 1,
-          })}
-        >
-          <Ionicons
-            name={isSaved ? "star" : "star-outline"}
-            size={21}
-            color={isSaved ? "#F59E0B" : (isDark ? "#9CA3AF" : "#6B7280")}
-          />
-        </Pressable>
+        {/* Before Searching: Underlined 'Close' button matching Plick reference */}
+        {!hasSubmitted && (
+          <Pressable
+            onPress={handleClose}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            style={({ pressed }) => ({
+              paddingLeft: 4,
+              paddingRight: 0,
+              paddingVertical: 8,
+              opacity: pressed ? 0.6 : 1,
+              justifyContent: 'center',
+              alignItems: 'center',
+            })}
+          >
+            <Text
+              style={{
+                fontFamily: typography.family.sansMedium,
+                fontSize: 16,
+                color: theme.ink,
+                textDecorationLine: 'underline',
+              }}
+            >
+              Close
+            </Text>
+          </Pressable>
+        )}
+
+        {/* After Searching: Save Your Search Star / Favourite Button */}
+        {hasSubmitted && (
+          <Pressable
+            onPress={handleToggleSaveSearch}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={isSaved ? "Saved search active" : "Save this search"}
+            style={({ pressed }) => ({
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              backgroundColor: isSaved
+                ? (isDark ? 'rgba(245, 158, 11, 0.22)' : '#FEF3C7')
+                : (isDark ? theme.panel : theme.surface),
+              borderWidth: 1,
+              borderColor: isSaved
+                ? (isDark ? 'rgba(245, 158, 11, 0.5)' : '#FDE68A')
+                : theme.border,
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: pressed ? 0.75 : 1,
+              transform: [{ scale: pressed ? 0.92 : 1 }],
+              shadowColor: isSaved ? '#F59E0B' : '#000000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: isSaved ? 0.35 : 0.05,
+              shadowRadius: 6,
+              elevation: isSaved ? 3 : 1,
+            })}
+          >
+            <Ionicons
+              name={isSaved ? "star" : "star-outline"}
+              size={21}
+              color={isSaved ? "#F59E0B" : (isDark ? "#9CA3AF" : "#6B7280")}
+            />
+          </Pressable>
+        )}
       </View>
 
         {/* ── Tab Switcher ('Items' & 'Members') - Hidden in results ─────────── */}
@@ -1330,8 +1339,9 @@ export const HomeSearchView = memo(function HomeSearchView({
             style={{
               flexDirection: 'row',
               borderBottomWidth: 1,
-              borderBottomColor: theme.border,
+              borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
               position: 'relative',
+              backgroundColor: theme.background,
             }}
           >
             {/* Items Tab */}
@@ -1341,20 +1351,24 @@ export const HomeSearchView = memo(function HomeSearchView({
                 flex: 1,
                 alignItems: 'center',
                 justifyContent: 'center',
-                height: 46,
+                height: 48,
               }}
             >
               <Text
                 style={{
-                  fontSize: 16,
-                  lineHeight: 22,
-                  fontWeight: activeTab === 'listings' ? '600' : '400',
+                  fontSize: 17,
+                  lineHeight: 24,
+                  fontWeight: activeTab === 'listings' ? '700' : '400',
                   fontFamily:
                     activeTab === 'listings'
-                      ? typography.family.sansSemibold
-                      : typography.family.sans,
-                  color: activeTab === 'listings' ? theme.text : theme.mute,
-                  letterSpacing: -0.2,
+                      ? (Platform.OS === 'web'
+                          ? 'HansenGrotesque, HansenGrotesque-Bold, "HansenGrotesque Bold", -apple-system, BlinkMacSystemFont, sans-serif'
+                          : 'HansenGrotesque_Bold')
+                      : (Platform.OS === 'web'
+                          ? 'HansenGrotesque, HansenGrotesque-Regular, "HansenGrotesque Regular", -apple-system, BlinkMacSystemFont, sans-serif'
+                          : 'HansenGrotesque_Regular'),
+                  color: activeTab === 'listings' ? (isDark ? '#FFFFFF' : '#000000') : (isDark ? '#AAAAAA' : '#111111'),
+                  letterSpacing: -0.1,
                 }}
               >
                 Items
@@ -1368,20 +1382,24 @@ export const HomeSearchView = memo(function HomeSearchView({
                 flex: 1,
                 alignItems: 'center',
                 justifyContent: 'center',
-                height: 46,
+                height: 48,
               }}
             >
               <Text
                 style={{
-                  fontSize: 16,
-                  lineHeight: 22,
-                  fontWeight: activeTab === 'seller' ? '600' : '400',
+                  fontSize: 17,
+                  lineHeight: 24,
+                  fontWeight: activeTab === 'seller' ? '700' : '400',
                   fontFamily:
                     activeTab === 'seller'
-                      ? typography.family.sansSemibold
-                      : typography.family.sans,
-                  color: activeTab === 'seller' ? theme.text : theme.mute,
-                  letterSpacing: -0.2,
+                      ? (Platform.OS === 'web'
+                          ? 'HansenGrotesque, HansenGrotesque-Bold, "HansenGrotesque Bold", -apple-system, BlinkMacSystemFont, sans-serif'
+                          : 'HansenGrotesque_Bold')
+                      : (Platform.OS === 'web'
+                          ? 'HansenGrotesque, HansenGrotesque-Regular, "HansenGrotesque Regular", -apple-system, BlinkMacSystemFont, sans-serif'
+                          : 'HansenGrotesque_Regular'),
+                  color: activeTab === 'seller' ? (isDark ? '#FFFFFF' : '#000000') : (isDark ? '#AAAAAA' : '#111111'),
+                  letterSpacing: -0.1,
                 }}
               >
                 Members
@@ -1395,14 +1413,14 @@ export const HomeSearchView = memo(function HomeSearchView({
                 bottom: 0,
                 left: 0,
                 width: tabWidth,
-                height: 3,
+                height: 3.5,
                 transform: [{ translateX: indicatorTranslateX }],
               }}
             >
               <View
                 style={{
                   width: '100%',
-                  height: 3,
+                  height: 3.5,
                   backgroundColor: theme.purple,
                   borderRadius: 0,
                 }}
@@ -1442,9 +1460,9 @@ export const HomeSearchView = memo(function HomeSearchView({
               } as any),
             ]}
           >
-            {!hasQuery ? (
+            {(!hasQuery && !searchFilters.category && !hasSubmitted) ? (
               renderListingsIdleLanding
-            ) : !hasSubmitted ? (
+            ) : (hasQuery && !hasSubmitted) ? (
               <PreSearchSuggestions
                 query={query}
                 suggestions={suggestions}
@@ -1488,7 +1506,11 @@ export const HomeSearchView = memo(function HomeSearchView({
                 ) : (
                   <View style={{ paddingVertical: 48, paddingHorizontal: 20, alignItems: 'center' }}>
                     <Text style={{ fontSize: 14, color: theme.mute, textAlign: 'center' }}>
-                      No listings found matching “{query}”
+                      {hasQuery
+                        ? `No listings found matching “${query}”`
+                        : searchFilters.category
+                        ? `No listings found in ${searchFilters.category.charAt(0).toUpperCase() + searchFilters.category.slice(1)}`
+                        : 'No listings found'}
                     </Text>
                   </View>
                 )}
@@ -1508,7 +1530,7 @@ export const HomeSearchView = memo(function HomeSearchView({
               } as any),
             ]}
           >
-            {!hasQuery ? (
+            {(!hasQuery && !searchFilters.category && !hasSubmitted) ? (
               renderMembersIdleLanding
             ) : loading ? (
               <View style={{ paddingVertical: 40, alignItems: 'center' }}>
@@ -1522,32 +1544,39 @@ export const HomeSearchView = memo(function HomeSearchView({
                 keyboardShouldPersistTaps="handled"
                 contentContainerStyle={{ paddingBottom: 40 }}
                 ListHeaderComponent={
-                  hasQuery ? (
-                    <View
+                  <View
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 12,
+                      borderBottomWidth: 1,
+                      borderBottomColor: theme.border,
+                    }}
+                  >
+                    <Text
                       style={{
-                        paddingHorizontal: 16,
-                        paddingVertical: 12,
-                        borderBottomWidth: 1,
-                        borderBottomColor: theme.border,
+                        fontSize: 14,
+                        fontWeight: '600',
+                        color: theme.text,
                       }}
                     >
-                      <Text
-                        style={{
-                          fontSize: 14,
-                          fontWeight: '600',
-                          color: theme.text,
-                        }}
-                      >
-                        {sellerResults.length} {sellerResults.length === 1 ? 'member' : 'members'}
-                      </Text>
-                    </View>
-                  ) : null
+                      {sellerResults.length} {sellerResults.length === 1 ? 'member' : 'members'}
+                      {hasQuery
+                        ? ` for “${query}”`
+                        : searchFilters.category
+                        ? ` in ${searchFilters.category.charAt(0).toUpperCase() + searchFilters.category.slice(1)}`
+                        : ''}
+                    </Text>
+                  </View>
                 }
               />
             ) : (
               <View style={{ paddingVertical: 48, paddingHorizontal: 20, alignItems: 'center' }}>
                 <Text style={{ fontSize: 14, color: theme.mute, textAlign: 'center' }}>
-                  No sellers found matching “{query}”
+                  {hasQuery
+                    ? `No sellers found matching “${query}”`
+                    : searchFilters.category
+                    ? `No sellers found in ${searchFilters.category.charAt(0).toUpperCase() + searchFilters.category.slice(1)}`
+                    : 'No sellers found'}
                 </Text>
               </View>
             )}

@@ -7,10 +7,10 @@ import { useTheme } from '@/context/ThemeContext';
 import { BottomSheet } from './BottomSheet';
 import {
   TAXONOMY_BRANDS,
-  TAXONOMY_CATEGORIES,
   UNBRANDED_LOCAL_TAILOR,
   type BrandTier,
   getBrandsForCategory,
+  getRecommendedBrandsForCategory,
 } from '@/lib/taxonomy';
 import * as Haptics from 'expo-haptics';
 
@@ -50,27 +50,47 @@ export function BrandSheet({
   const [query, setQuery] = useState('');
   const [selectedTier, setSelectedTier] = useState<BrandTier | 'All'>('All');
 
-  const recommendedBrands = useMemo(() => {
-    if (!categoryCode && !subcategoryId) return [];
-    const taxonomyCode =
-      (subcategoryId
-        ? TAXONOMY_CATEGORIES.find((c) => c.subcategories.some((s) => s.id === subcategoryId))?.code
-        : undefined) || (categoryCode?.startsWith('CAT-') ? categoryCode : undefined);
-    if (!taxonomyCode && !subcategoryId) return [];
-    return getBrandsForCategory(taxonomyCode || '', subcategoryId).slice(0, 8);
+  // Brands strictly matching the selected category and/or subcategory
+  const categoryBrands = useMemo(() => {
+    if (!categoryCode && !subcategoryId) return TAXONOMY_BRANDS;
+    return getBrandsForCategory(categoryCode || '', subcategoryId);
   }, [categoryCode, subcategoryId]);
+
+  // Recommended brands strictly for this category selection (top curated)
+  const recommendedBrands = useMemo(() => {
+    return getRecommendedBrandsForCategory(categoryCode, subcategoryId);
+  }, [categoryCode, subcategoryId]);
+
+  // Available tiers that actually exist within the active category
+  const availableTiers = useMemo(() => {
+    const set = new Set<string>();
+    categoryBrands.forEach((b) => set.add(b.tier));
+    return TIERS.filter((t) => t === 'All' || set.has(t));
+  }, [categoryBrands]);
 
   const filteredBrands = useMemo(() => {
     const q = query.trim().toLowerCase();
+    const hasCategoryFilter = Boolean(categoryCode || subcategoryId);
+
+    if (hasCategoryFilter) {
+      // STRICT FILTERING: When a category is active, ONLY search within this category's brands
+      return categoryBrands.filter((b) => {
+        const matchTier = selectedTier === 'All' || b.tier === selectedTier;
+        const matchQuery = !q || b.name.toLowerCase().includes(q) || b.categoryRelevance.toLowerCase().includes(q);
+        return matchTier && matchQuery;
+      });
+    }
+
+    // When no category is specified, search across all brands
     return TAXONOMY_BRANDS.filter((b) => {
       const matchTier = selectedTier === 'All' || b.tier === selectedTier;
       const matchQuery = !q || b.name.toLowerCase().includes(q) || b.categoryRelevance.toLowerCase().includes(q);
       return matchTier && matchQuery;
     });
-  }, [query, selectedTier]);
+  }, [categoryBrands, categoryCode, subcategoryId, query, selectedTier]);
 
   const trimmedQuery = query.trim();
-  const exactMatchExists = TAXONOMY_BRANDS.some(
+  const exactMatchExists = filteredBrands.some(
     (b) => b.name.toLowerCase() === trimmedQuery.toLowerCase(),
   );
 
@@ -104,7 +124,7 @@ export function BrandSheet({
         <TextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="Search 110+ brands or enter custom…"
+          placeholder="Search brands or enter custom…"
           placeholderTextColor={theme.muteSoft ?? theme.mute}
           autoCapitalize="words"
           autoCorrect={false}
@@ -128,46 +148,48 @@ export function BrandSheet({
       </View>
 
       {/* Tier Filter Chips (Universal 30px Standard) */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 8, paddingBottom: 14 }}
-      >
-        {TIERS.map((tier) => {
-          const active = selectedTier === tier;
-          return (
-            <Pressable
-              key={tier}
-              onPress={() => setSelectedTier(tier)}
-              style={({ pressed }) => ({
-                height: 30,
-                paddingHorizontal: 14,
-                borderRadius: 15,
-                borderWidth: 1,
-                borderColor: active ? theme.ink : theme.border,
-                backgroundColor: active ? theme.ink : theme.panel,
-                alignItems: 'center',
-                justifyContent: 'center',
-                opacity: pressed ? 0.8 : 1,
-                transform: [{ scale: pressed ? 0.97 : 1 }],
-              })}
-            >
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontFamily: active ? DISPLAY_BOLD : typography.family.sansMedium,
-                  color: active ? theme.background : theme.ink,
-                }}
+      {availableTiers.length > 2 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 8, paddingBottom: 14 }}
+        >
+          {availableTiers.map((tier) => {
+            const active = selectedTier === tier;
+            return (
+              <Pressable
+                key={tier}
+                onPress={() => setSelectedTier(tier)}
+                style={({ pressed }) => ({
+                  height: 30,
+                  paddingHorizontal: 14,
+                  borderRadius: 15,
+                  borderWidth: 1,
+                  borderColor: active ? theme.ink : theme.border,
+                  backgroundColor: active ? theme.ink : theme.panel,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: pressed ? 0.8 : 1,
+                  transform: [{ scale: pressed ? 0.97 : 1 }],
+                })}
               >
-                {tier}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontFamily: active ? DISPLAY_BOLD : typography.family.sansMedium,
+                    color: active ? theme.background : theme.ink,
+                  }}
+                >
+                  {tier}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      )}
 
       <ScrollView
-        style={{ maxHeight: 380 }}
+        style={{ maxHeight: Platform.OS === 'web' ? 520 : 440, minHeight: 260 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -323,6 +345,11 @@ export function BrandSheet({
           {filteredBrands.length === 0 && !trimmedQuery && (
             <Text style={{ fontSize: 13, color: theme.mute, textAlign: 'center', paddingVertical: 20 }}>
               No brands found in this tier.
+            </Text>
+          )}
+          {filteredBrands.length === 0 && Boolean(trimmedQuery) && (
+            <Text style={{ fontSize: 13, color: theme.mute, textAlign: 'center', paddingVertical: 20 }}>
+              No matching brands in this category. Tap above to add as a custom brand.
             </Text>
           )}
         </View>

@@ -455,8 +455,9 @@ function DiscoverSheetBody({ onClose }: { onClose: () => void }) {
     const q = query.trim();
     if (!q) return;
     setQuery('');
-    go(`/?q=${encodeURIComponent(q)}`);
-  }, [query, go]);
+    onClose();
+    router.push(withNonce(`/?searchOpen=1&searchQuery=${encodeURIComponent(q)}`) as any);
+  }, [query, onClose]);
 
   const onBrowse = useCallback(
     (action: BrowseAction, chip?: { label: string; icon: keyof typeof Feather.glyphMap }) => {
@@ -476,16 +477,12 @@ function DiscoverSheetBody({ onClose }: { onClose: () => void }) {
   );
 
   const onTopic = useCallback(
-    (action: TopicAction, topic?: { label: string; icon: keyof typeof Feather.glyphMap }) => {
-      if (action.kind === 'all') {
-        go('/?resetTrending=1');
-        return;
-      }
-      const label = topic?.label ?? action.category;
-      const icon = topic?.icon ?? 'box';
-      go(`/?category=${action.category}&chipLabel=${encodeURIComponent(label)}&chipIcon=${icon}`);
+    (action: TopicAction) => {
+      onClose();
+      const cat = action.kind === 'all' ? 'all' : action.category;
+      router.push(withNonce(`/?searchOpen=1&searchCategory=${cat}`) as any);
     },
-    [go],
+    [onClose],
   );
 
   const suggestions = useMemo(
@@ -496,9 +493,10 @@ function DiscoverSheetBody({ onClose }: { onClose: () => void }) {
   const handleSelectSuggestion = useCallback(
     (term: string) => {
       setQuery('');
-      go(`/?q=${encodeURIComponent(term)}`);
+      onClose();
+      router.push(withNonce(`/?searchOpen=1&searchQuery=${encodeURIComponent(term)}`) as any);
     },
-    [go],
+    [onClose],
   );
 
   const handlePopulateSuggestion = useCallback(

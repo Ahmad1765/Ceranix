@@ -230,14 +230,30 @@ export async function getOrCreateSupportConversation(userId: string): Promise<Co
   });
 
   if (created) {
-    // Send welcome message
-    await sendMessage({
-      conversationId: created.id,
-      senderId: SUPPORT_BOT_USER_ID,
-      content:
-        `👋 Welcome to Ceranix Support!\n\n` +
-        `How can we assist you today? Feel free to ask about your orders, Buyer Protection, payments, or selling on Ceranix.`,
-    });
+    // Send welcome message via secure RPC or fallback
+    const welcomeMsg =
+      `👋 Welcome to Ceranix Support!\n\n` +
+      `How can we assist you today? Feel free to ask about your orders, Buyer Protection, payments, or selling on Ceranix.`;
+
+    try {
+      const { data, error } = await supabase.rpc('dispatch_support_bot_reply', {
+        p_conversation_id: created.id,
+        p_content: welcomeMsg,
+      });
+      if (error || !data) {
+        await sendMessage({
+          conversationId: created.id,
+          senderId: SUPPORT_BOT_USER_ID,
+          content: welcomeMsg,
+        });
+      }
+    } catch {
+      await sendMessage({
+        conversationId: created.id,
+        senderId: SUPPORT_BOT_USER_ID,
+        content: welcomeMsg,
+      });
+    }
   }
 
   return created;
@@ -270,7 +286,7 @@ export async function sendSupportBotReply(conversationId: string, userMessage: s
       content: replyText,
     });
   } catch (err) {
-    console.warn('[support] bot reply failed', err);
-    throw err;
+    console.warn('[support] bot reply fallback error', err);
+    return null;
   }
 }

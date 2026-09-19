@@ -71,6 +71,7 @@ export const qk = {
   sellerOtherListings: (sellerId: string | null, excludeId: string | null) =>
     [SELLER_OTHER_LISTINGS_PREFIX, sellerId, excludeId] as const,
   similarListings: (listingId: string | null) => [SIMILAR_LISTINGS_PREFIX, listingId] as const,
+  listingLikers: (listingId: string | null | undefined) => ['listingLikers', listingId] as const,
 
   // ── Social & Follows ───────────────────────────────────────────────────────
   followState: (viewerId: string | null, targetId: string) =>

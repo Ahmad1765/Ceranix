@@ -15,10 +15,11 @@
 //    expand the relevant section or modal sheet upon arrival.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { useEffect } from 'react';
 import { View, Pressable, ScrollView, Platform, ActivityIndicator, Linking } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import Constants from 'expo-constants';
 import { useAuth } from '@/lib/auth';
@@ -48,12 +49,20 @@ import {
 export default function SettingsScreen() {
   const { profile, user, session } = useAuth();
   const { theme, mode, isDark, setThemeMode } = useTheme();
+  const params = useLocalSearchParams<{ open?: string }>();
 
   const mgr = useSettingsManager();
 
   const vacationOn = !!profile?.vacation_mode;
   const bundlePct = profile?.bundle_discount_pct ?? 0;
   const bundleOn = bundlePct > 0;
+
+  useEffect(() => {
+    if (params.open === 'bundle') {
+      mgr.setShowBundle(true);
+      mgr.setOpen('verify');
+    }
+  }, [params.open]);
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.background }}>
@@ -276,6 +285,21 @@ export default function SettingsScreen() {
             }}
             chevron
           />
+          <Divider />
+          <Row
+            label="Bundle discounts"
+            desc={
+              bundleOn
+                ? `${bundlePct}% discount on bundles of 2+ items`
+                : 'Disabled — offer discounts when buyers bundle'
+            }
+            onPress={() => {
+              tap('light');
+              mgr.setShowBundle(true);
+            }}
+            chevron
+            badge={bundleOn ? `${bundlePct}% OFF` : 'OFF'}
+          />
         </SectionCard>
 
         {/* 3. Enhance Experience & Personalization Accordion */}
@@ -322,6 +346,19 @@ export default function SettingsScreen() {
               mgr.setShowTheme(true);
             }}
             chevron
+          />
+          <Divider />
+          <ToggleRow
+            label="Public Saved Collection"
+            desc={
+              mgr.savedCollectionPrivacy === 'public'
+                ? 'Public — other users can view your collections on your profile'
+                : 'Private — only you can view your saved collections'
+            }
+            value={mgr.savedCollectionPrivacy === 'public'}
+            onValueChange={(val) => {
+              mgr.setSavedCollectionPrivacy(val ? 'public' : 'private');
+            }}
           />
           <Divider />
           <Row
@@ -552,6 +589,16 @@ export default function SettingsScreen() {
       <SubscriptionSheet
         visible={mgr.showSubscription}
         onClose={() => mgr.setShowSubscription(false)}
+      />
+
+      <BundleDiscountSheet
+        visible={mgr.showBundle}
+        currentPct={bundlePct}
+        onClose={() => mgr.setShowBundle(false)}
+        onSave={async (pct) => {
+          await mgr.setBundlePct(pct);
+          mgr.setShowBundle(false);
+        }}
       />
     </SafeAreaView>
   );

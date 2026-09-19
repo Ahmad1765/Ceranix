@@ -25,7 +25,7 @@ function haptic() {
 
 function RowSeparator() {
   const { theme } = useTheme();
-  return <View style={{ height: 1, backgroundColor: theme.hairline, marginLeft: 72 }} />;
+  return <View style={{ height: 1, backgroundColor: theme.border, width: '100%' }} />;
 }
 
 export function SearchesTab({ bottomInset = 24 }: { bottomInset?: number }) {

@@ -97,21 +97,6 @@ export const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    id: 'electronics',
-    label: 'Electronics',
-    icon: 'smartphone',
-    subs: [
-      { id: 'phones', label: 'Phones', kw: ['phone', 'iphone', 'samsung', 'pixel'] },
-      { id: 'laptops', label: 'Laptops', kw: ['laptop', 'macbook', 'notebook'] },
-      { id: 'tablets', label: 'Tablets', kw: ['tablet', 'ipad'] },
-      { id: 'audio', label: 'Audio', kw: ['headphone', 'earbud', 'airpod', 'speaker', 'audio'] },
-      { id: 'cameras', label: 'Cameras', kw: ['camera', 'lens', 'gopro'] },
-      { id: 'gaming', label: 'Gaming', kw: ['console', 'playstation', 'xbox', 'nintendo', 'switch', 'gaming'] },
-      { id: 'wearables', label: 'Wearables', kw: ['smartwatch', 'apple watch', 'fitbit', 'wearable'] },
-      { id: 'accessories', label: 'Accessories', kw: ['charger', 'cable', 'case'] },
-    ],
-  },
-  {
     id: 'beauty',
     label: 'Beauty',
     icon: 'droplet',

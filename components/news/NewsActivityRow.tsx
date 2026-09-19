@@ -9,6 +9,7 @@ import { getOptimizedImageUrl, cardImageUrl, IMAGE_TRANSITION } from '@/lib/imag
 import { radii, type as typography } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { relativeTime } from '@/components/chat/format';
+import { markNewsItemOpened } from '@/lib/newsStorage';
 import type { Listing } from '@/types';
 
 export type ActivityItem =
@@ -79,6 +80,7 @@ export const NewsActivityRow = memo(function NewsActivityRow({ item }: { item: A
 
   const handlePress = () => {
     haptic();
+    markNewsItemOpened(item.id);
     switch (item.kind) {
       case 'listing_created':
       case 'listing_liked':

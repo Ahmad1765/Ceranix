@@ -39,7 +39,7 @@ import { SafetyBanner } from '@/components/SafetyBanner';
 import { radii, type as typography } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 import {
-  SingleSelectSheet, TextFieldSheet, PriceSheet, ColorSheet, CategorySheet, TagsSheet,
+  SingleSelectSheet, TextFieldSheet, SizeSheet, PriceSheet, ColorSheet, CategorySheet, TagsSheet,
   type SelectOption,
 } from '@/components/sell/PickerSheets';
 import { useForm, Controller } from 'react-hook-form';
@@ -73,7 +73,7 @@ const GENDERS: SelectOption<Gender>[] = [
 
 type ParcelSize = 'small' | 'medium' | 'large';
 const PARCEL_SIZES: SelectOption<ParcelSize>[] = [
-  { value: 'small', label: 'Small', hint: 'Fits in a shoebox — accessories, small electronics' },
+  { value: 'small', label: 'Small', hint: 'Fits in a shoebox — shoes, accessories, small items' },
   { value: 'medium', label: 'Medium', hint: 'Fits in a shopping bag — tops, shoes, folded clothing' },
   { value: 'large', label: 'Large', hint: 'Larger than a shopping bag — coats, bulky items' },
 ];
@@ -100,53 +100,42 @@ export function useSellSheet(): SellSheetApi {
   return ctx;
 }
 
+import { useGuestGate } from '@/components/GuestGate';
+
 export function SellSheetProvider({ children }: { children: ReactNode }) {
-  const [visible, setVisible] = useState(false);
-  const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
-  const [editingListing, setEditingListing] = useState<Listing | null>(null);
   const { user } = useAuth();
+  const guestGate = useGuestGate();
 
   const open = useCallback((listingToEdit?: Listing | null) => {
     if (!user?.id) {
-      router.push('/auth/login');
+      guestGate.prompt({
+        title: 'Sign in to sell',
+        message: 'List your pre-loved fashion in seconds to thousands of buyers.',
+        cta: 'Sign in to start selling',
+      });
       return false;
     }
-    setOwnerUserId(user.id);
-    setEditingListing(listingToEdit ?? null);
-    setVisible(true);
+    if (listingToEdit?.id) {
+      router.push(`/sell?id=${listingToEdit.id}` as any);
+    } else {
+      router.push('/sell' as any);
+    }
     return true;
-  }, [user]);
+  }, [user, guestGate]);
 
   const close = useCallback(() => {
-    setVisible(false);
-    setOwnerUserId(null);
-    setEditingListing(null);
-  }, []);
-
-  useEffect(() => {
-    if (visible && (!user?.id || user.id !== ownerUserId)) {
-      close();
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(tabs)');
     }
-  }, [visible, user?.id, ownerUserId, close]);
+  }, []);
 
   const api = useMemo(() => ({ open, close }), [open, close]);
 
   return (
     <Ctx.Provider value={api}>
       {children}
-      <Modal
-        visible={visible}
-        animationType="slide"
-        onRequestClose={close}
-        statusBarTranslucent
-        navigationBarTranslucent
-      >
-        {visible ? (
-          <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-            <SellForm editingListing={editingListing} onClose={close} />
-          </SafeAreaProvider>
-        ) : null}
-      </Modal>
     </Ctx.Provider>
   );
 }
@@ -312,7 +301,7 @@ function RowField({
   );
 }
 
-function SellForm({
+export function SellForm({
   editingListing,
   onClose,
 }: {
@@ -1583,10 +1572,9 @@ function SellForm({
         onChange={(auth) => setValue('authenticity', auth, { shouldValidate: true })}
         onClose={() => setActiveSheet(null)}
       />
-      <TextFieldSheet
+      <SizeSheet
         visible={activeSheet === 'size'}
-        title="Size"
-        placeholder="e.g. S, M, L, 42, One Size"
+        categoryCode={category}
         value={size}
         onChange={(s) => setValue('size', s, { shouldValidate: true })}
         onClose={() => setActiveSheet(null)}

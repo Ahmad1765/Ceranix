@@ -41,7 +41,6 @@ export function countActiveFilters(f: FeedFilters): number {
   count += f.conditions.length;
   count += f.sizes.length;
   if (f.priceMin != null || f.priceMax != null) count += 1;
-  if (f.sort !== 'relevance') count += 1;
   return count;
 }
 
@@ -50,7 +49,6 @@ const CATEGORIES: { id: Category; label: string; icon: keyof typeof Feather.glyp
   { id: 'shoes', label: 'Shoes', icon: 'box' },
   { id: 'bags', label: 'Bags', icon: 'briefcase' },
   { id: 'accessories', label: 'Accessories', icon: 'watch' },
-  { id: 'electronics', label: 'Tech', icon: 'smartphone' },
   { id: 'beauty', label: 'Beauty', icon: 'droplet' },
   { id: 'other', label: 'Other', icon: 'grid' },
 ];

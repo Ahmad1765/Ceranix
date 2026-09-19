@@ -38,6 +38,7 @@ import type { Listing } from '@/types';
 import {
   useDeleteListing,
   useFollowStateQuery,
+  useListingLikersQuery,
   useListingQuery,
   useSellerOtherListingsQuery,
   useSetListingSold,
@@ -78,6 +79,7 @@ import { useSellSheet } from '@/components/sell/SellSheet';
 import { BuyerProtectionSheet } from '@/components/product/BuyerProtectionSheet';
 import { errorMessage } from '@/lib/errors';
 import {
+  LikersSheet,
   ProductDetailsTable,
   ProductHeaderNav,
   ProductHeroSection,
@@ -109,6 +111,7 @@ export default function ProductScreen() {
   const [showStickyHeader, setShowStickyHeader] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
   const [offerLoading, setOfferLoading] = useState(false);
+  const [likersVisible, setLikersVisible] = useState(false);
 
   // Imperative pop icon animation handles
   const heartAnimRef = useRef<PopIconHandle>(null);
@@ -124,12 +127,14 @@ export default function ProductScreen() {
   const listingQ = useListingQuery(productIdParam, withFallbackSeller);
   const listing = listingQ.data ?? null;
 
-  // ── Related Listings Queries ─────────────────────────────────────────────
+  // ── Related Listings & Likers Queries ────────────────────────────────────
   const sellerItemsQ = useSellerOtherListingsQuery(
     listing?.seller_id ?? null,
     listing?.id ?? null,
   );
   const similarItemsQ = useSimilarListingsQuery(productIdParam ?? null);
+  const likersQ = useListingLikersQuery(productIdParam ?? null);
+  const likers = likersQ.data ?? [];
   const sellerItems = (sellerItemsQ.data ?? EMPTY_LISTINGS).filter((s) => !s.is_sold);
   const similarItems = (similarItemsQ.data ?? EMPTY_LISTINGS).filter((s) => !s.is_sold);
 
@@ -602,13 +607,9 @@ export default function ProductScreen() {
         <ProductOverviewHeader
           listing={listing}
           bpFee={bpFee}
-          hasBundleItems={sellerItems.length > 0}
           onOpenBpSheet={() => engagement.setBpVisible(true)}
-          onScrollToBundle={() => {
-            if (bundleSectionYRef.current != null) {
-              mainScrollRef.current?.scrollTo({ y: bundleSectionYRef.current, animated: true });
-            }
-          }}
+          likers={likers}
+          onOpenLikersSheet={() => setLikersVisible(true)}
         />
 
         {/* 4. Seller Profile Card */}
@@ -763,6 +764,12 @@ export default function ProductScreen() {
           onClose={() => engagement.setSellerOptionsVisible(false)}
         />
       ) : null}
+
+      <LikersSheet
+        visible={likersVisible}
+        listingId={listing.id}
+        onClose={() => setLikersVisible(false)}
+      />
     </View>
   );
 }

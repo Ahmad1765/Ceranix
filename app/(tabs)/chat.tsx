@@ -23,7 +23,7 @@ import {
 import { useInboxQuery } from '@/lib/queries';
 import { colors, radii, shadow, type as typography } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
-import { EmptyState } from '@/components/ui';
+import { EmptyState, BellIcon, UserPlusIcon } from '@/components/ui';
 import { InboxRow, InboxSkeleton } from '@/components/chat';
 import { HIT_SLOP_8, useTabBarClearance } from '@/lib/responsive';
 import { PressableScale } from '@/components/PressableScale';
@@ -547,7 +547,7 @@ function PushNotificationBanner({ onDismiss }: { onDismiss: () => void }) {
           justifyContent: 'center',
         }}
       >
-        <Feather name="bell" size={17} color={theme.primary} />
+        <BellIcon size={18} color={theme.primary} />
       </View>
 
       <View style={{ flex: 1 }}>
@@ -797,14 +797,15 @@ export default function InboxScreen() {
             width: 38,
             height: 38,
             borderRadius: 19,
-            backgroundColor: theme.panel,
+            backgroundColor: theme.surface,
             alignItems: 'center',
             justifyContent: 'center',
             borderWidth: 1,
-            borderColor: theme.border,
+            borderColor: theme.hairline,
+            ...shadow.sm,
           }}
         >
-          <Feather name="users" size={17} color={theme.ink} />
+          <UserPlusIcon size={19} color={theme.ink} strokeWidth={1.85} />
         </PressableScale>
       </View>
 

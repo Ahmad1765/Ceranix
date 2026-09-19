@@ -102,6 +102,7 @@ export const TAXONOMY_CATEGORIES: TaxonomyCategory[] = [
       { id: 'heels_sandals', label: 'Heels & Sandals', kw: ['heel', 'heels', 'stiletto', 'sandal', 'sandals', 'pump', 'platform', 'wedge'] },
       { id: 'sports_shoes', label: 'Sports Shoes', kw: ['cleats', 'running shoe', 'tennis shoe', 'athletic', 'sport shoe'] },
       { id: 'boots', label: 'Boots', kw: ['boot', 'boots', 'chelsea', 'ankle boot'] },
+      { id: 'flats', label: 'Flats', kw: ['flat', 'flats', 'ballet', 'slip on'] },
     ],
   },
   {
@@ -209,6 +210,22 @@ export const TAXONOMY_BRANDS: TaxonomyBrand[] = [
   { name: 'Servis', tier: 'Footwear', categoryRelevance: 'Footwear', categoryCodes: ['CAT-04'] },
   { name: 'Bata', tier: 'Footwear', categoryRelevance: 'Footwear', categoryCodes: ['CAT-04'] },
   { name: 'Jordans', tier: 'Footwear', categoryRelevance: 'Footwear', categoryCodes: ['CAT-04'] },
+  { name: 'Stylo', tier: 'Footwear', categoryRelevance: 'Footwear, Heels, Sandals', categoryCodes: ['CAT-04'] },
+  { name: 'ECS', tier: 'Footwear', categoryRelevance: 'Footwear, Heels, Sandals', categoryCodes: ['CAT-04'] },
+  { name: 'Insignia', tier: 'Footwear', categoryRelevance: 'Footwear, Luxury Footwear', categoryCodes: ['CAT-04'] },
+  { name: 'Hush Puppies', tier: 'Footwear', categoryRelevance: 'Footwear, Casual & Formal', categoryCodes: ['CAT-04'] },
+  { name: 'Mochari', tier: 'Footwear', categoryRelevance: 'Footwear, Handcrafted Khussas', categoryCodes: ['CAT-04'] },
+  { name: 'New Balance', tier: 'Footwear', categoryRelevance: 'Footwear, Sneakers', categoryCodes: ['CAT-04'] },
+  { name: 'Converse', tier: 'Footwear', categoryRelevance: 'Footwear, Sneakers', categoryCodes: ['CAT-04'] },
+  { name: 'Vans', tier: 'Footwear', categoryRelevance: 'Footwear, Sneakers', categoryCodes: ['CAT-04'] },
+  { name: 'Skechers', tier: 'Footwear', categoryRelevance: 'Footwear, Walking & Athletic', categoryCodes: ['CAT-04'] },
+  { name: 'Aldo', tier: 'Footwear', categoryRelevance: 'Footwear, Shoes, Bags', categoryCodes: ['CAT-04', 'CAT-05'] },
+  { name: 'Clarks', tier: 'Footwear', categoryRelevance: 'Footwear, Casual & Formal Shoes', categoryCodes: ['CAT-04'] },
+  { name: 'Crocs', tier: 'Footwear', categoryRelevance: 'Footwear, Clogs & Sandals', categoryCodes: ['CAT-04'] },
+  { name: 'Under Armour', tier: 'Moderate / Mass', categoryRelevance: 'Footwear, Activewear', categoryCodes: ['CAT-01', 'CAT-02', 'CAT-04'] },
+  { name: 'ASICS', tier: 'Footwear', categoryRelevance: 'Footwear, Running & Athletic Shoes', categoryCodes: ['CAT-04'] },
+  { name: 'Christian Louboutin', tier: 'Premium / Luxury', categoryRelevance: 'Footwear, Luxury Heels & Shoes', categoryCodes: ['CAT-04'] },
+  { name: 'Jimmy Choo', tier: 'Premium / Luxury', categoryRelevance: 'Footwear, Luxury Shoes & Bags', categoryCodes: ['CAT-04', 'CAT-05'] },
 
   // Local Luxury / Couture
   { name: 'Elan', tier: 'Local Luxury / Couture', categoryRelevance: "Women's Clothing", categoryCodes: ['CAT-01'] },
@@ -282,6 +299,32 @@ export const TAXONOMY_BRANDS: TaxonomyBrand[] = [
   { name: 'DITA', tier: 'Eyewear', categoryRelevance: 'Sunglasses, Eyeglasses', categoryCodes: ['CAT-05'] },
   { name: 'Persol', tier: 'Eyewear', categoryRelevance: 'Sunglasses, Eyeglasses', categoryCodes: ['CAT-05'] },
   { name: 'Police', tier: 'Eyewear', categoryRelevance: 'Sunglasses', categoryCodes: ['CAT-05'] },
+
+  // Bags & Leather
+  { name: 'Tory Burch', tier: 'Premium / Luxury', categoryRelevance: 'Bags, Shoes, Accessories', categoryCodes: ['CAT-04', 'CAT-05'] },
+  { name: 'Kate Spade', tier: 'Premium / Luxury', categoryRelevance: 'Bags, Accessories', categoryCodes: ['CAT-05'] },
+  { name: 'Charles & Keith', tier: 'Moderate / Mass', categoryRelevance: 'Bags, Footwear', categoryCodes: ['CAT-04', 'CAT-05'] },
+
+  // Watches & Jewelry
+  { name: 'Casio', tier: 'Moderate / Mass', categoryRelevance: 'Watches', categoryCodes: ['CAT-06'] },
+  { name: 'Seiko', tier: 'Moderate / Mass', categoryRelevance: 'Watches', categoryCodes: ['CAT-06'] },
+  { name: 'Pandora', tier: 'Moderate / Mass', categoryRelevance: 'Jewelry', categoryCodes: ['CAT-06'] },
+  { name: 'Swarovski', tier: 'Premium / Luxury', categoryRelevance: 'Jewelry, Accessories', categoryCodes: ['CAT-06'] },
+
+  // Beauty & Grooming
+  { name: 'Huda Beauty', tier: 'Moderate / Mass', categoryRelevance: 'Beauty, Makeup, Cosmetics', categoryCodes: ['CAT-07'] },
+  { name: 'MAC Cosmetics', tier: 'Moderate / Mass', categoryRelevance: 'Beauty, Makeup, Cosmetics', categoryCodes: ['CAT-07'] },
+  { name: 'Sephora', tier: 'Moderate / Mass', categoryRelevance: 'Beauty, Skincare, Makeup', categoryCodes: ['CAT-07'] },
+  { name: 'Fenty Beauty', tier: 'Moderate / Mass', categoryRelevance: 'Beauty, Makeup, Skincare', categoryCodes: ['CAT-07'] },
+  { name: 'Charlotte Tilbury', tier: 'Premium / Luxury', categoryRelevance: 'Beauty, Luxury Makeup & Skincare', categoryCodes: ['CAT-07'] },
+  { name: 'The Ordinary', tier: 'Moderate / Mass', categoryRelevance: 'Beauty, Skincare', categoryCodes: ['CAT-07'] },
+  { name: 'NARS', tier: 'Moderate / Mass', categoryRelevance: 'Beauty, Makeup', categoryCodes: ['CAT-07'] },
+  { name: 'Maybelline', tier: 'Moderate / Mass', categoryRelevance: 'Beauty, Makeup, Cosmetics', categoryCodes: ['CAT-07'] },
+  { name: "L'Oreal", tier: 'Moderate / Mass', categoryRelevance: 'Beauty, Skincare, Haircare, Makeup', categoryCodes: ['CAT-07'] },
+  { name: 'Clinique', tier: 'Moderate / Mass', categoryRelevance: 'Beauty, Skincare', categoryCodes: ['CAT-07'] },
+  { name: 'Rare Beauty', tier: 'Moderate / Mass', categoryRelevance: 'Beauty, Makeup', categoryCodes: ['CAT-07'] },
+  { name: 'Saeed Ghani', tier: 'Local Mass', categoryRelevance: 'Beauty, Fragrances, Skincare, Haircare', categoryCodes: ['CAT-07'] },
+  { name: 'Hemani', tier: 'Local Mass', categoryRelevance: 'Beauty, Fragrances, Skincare', categoryCodes: ['CAT-07'] },
 ];
 
 // ── Policy Guardrails: Derived Directly from Brand Tiers ───────────────────
@@ -642,13 +685,36 @@ export function smartClassify(
 
 // ── Two-Way Graph Helpers ─────────────────────────────────────────────────
 
+/** Returns normalized category codes ('CAT-01', 'CAT-04', etc.) matching category/subcategory */
+export function getCategoryCodesForSelection(
+  categoryCodeOrRoot?: string | null,
+  subcategoryId?: string | null,
+): string[] {
+  if (subcategoryId) {
+    const cat = TAXONOMY_CATEGORIES.find((c) => c.subcategories.some((s) => s.id === subcategoryId));
+    if (cat) return [cat.code];
+  }
+  if (!categoryCodeOrRoot) return [];
+  const normalized = categoryCodeOrRoot.toLowerCase().trim();
+  if (normalized.startsWith('cat-')) return [categoryCodeOrRoot.toUpperCase()];
+  if (normalized === 'shoes' || normalized === 'footwear') return ['CAT-04'];
+  if (normalized === 'bags') return ['CAT-05'];
+  if (normalized === 'accessories') return ['CAT-06', 'CAT-05'];
+  if (normalized === 'beauty') return ['CAT-07'];
+  if (normalized === 'clothing') return ['CAT-01', 'CAT-02', 'CAT-03'];
+  return [];
+}
+
 /** Returns brands belonging to or relevant to a given category code or subcategory */
 export function getBrandsForCategory(
   categoryCodeOrRoot: string,
   subcategoryId?: string | null,
 ): TaxonomyBrand[] {
+  const norm = (categoryCodeOrRoot || '').toLowerCase().trim();
+  const sub = (subcategoryId || '').toLowerCase().trim();
+
   // If Men's Eastern
-  if (subcategoryId === 'kurta_shalwar_kameez') {
+  if (sub === 'kurta_shalwar_kameez') {
     return TAXONOMY_BRANDS.filter(
       (b) =>
         b.categoryCodes.includes('CAT-02') &&
@@ -658,21 +724,159 @@ export function getBrandsForCategory(
           b.tier === 'Local Luxury / Couture'),
     );
   }
-  // If Footwear
-  if (categoryCodeOrRoot === 'CAT-04' || categoryCodeOrRoot === 'shoes') {
+  // If Footwear / Shoes
+  if (
+    norm === 'cat-04' ||
+    norm === 'shoes' ||
+    norm === 'footwear' ||
+    ['sneakers', 'formal_shoes', 'khussas_chappals', 'heels_sandals', 'sports_shoes', 'boots', 'flats'].includes(sub)
+  ) {
     return TAXONOMY_BRANDS.filter((b) => b.categoryCodes.includes('CAT-04'));
   }
   // If Eyewear
-  if (subcategoryId === 'sunglasses' || subcategoryId === 'eyeglasses') {
-    return TAXONOMY_BRANDS.filter((b) => b.tier === 'Eyewear' || b.categoryRelevance.includes('Eyewear'));
+  if (sub === 'sunglasses' || sub === 'eyeglasses') {
+    return TAXONOMY_BRANDS.filter((b) => b.tier === 'Eyewear' || b.categoryRelevance.includes('Eyewear') || b.categoryRelevance.includes('Sunglasses'));
+  }
+  // If Beauty
+  if (norm === 'cat-07' || norm === 'beauty') {
+    return TAXONOMY_BRANDS.filter((b) => b.categoryCodes.includes('CAT-07'));
+  }
+  // If Bags
+  if (norm === 'cat-05' || norm === 'bags' || ['handbags_totes', 'backpacks', 'wallets_clutches'].includes(sub)) {
+    return TAXONOMY_BRANDS.filter((b) => b.categoryCodes.includes('CAT-05') && (b.categoryRelevance.toLowerCase().includes('bag') || b.categoryRelevance.toLowerCase().includes('wallet') || b.categoryRelevance.toLowerCase().includes('clutch')));
   }
 
-  const matchCode = TAXONOMY_CATEGORIES.find(
-    (c) => c.code === categoryCodeOrRoot || c.rootCategory === categoryCodeOrRoot,
-  )?.code;
+  const codes = getCategoryCodesForSelection(categoryCodeOrRoot, subcategoryId);
+  if (codes.length === 0) return TAXONOMY_BRANDS;
 
-  if (!matchCode) return TAXONOMY_BRANDS;
-  return TAXONOMY_BRANDS.filter((b) => b.categoryCodes.includes(matchCode));
+  return TAXONOMY_BRANDS.filter((b) => b.categoryCodes.some((code) => codes.includes(code)));
+}
+
+const RECOMMENDED_BY_CATEGORY: Record<string, string[]> = {
+  shoes: [
+    'Nike',
+    'Adidas',
+    'Jordans',
+    'New Balance',
+    'Converse',
+    'Vans',
+    'Puma',
+    'Bata',
+    'Servis',
+    'Borjan',
+    'Stylo',
+    'Hush Puppies',
+    'Skechers',
+    'Reebok',
+    'Aldo',
+    'Clarks',
+  ],
+  clothing: [
+    'Khaadi',
+    'Sapphire',
+    'Sana Safinaz',
+    'Maria B',
+    'Zara',
+    'H&M',
+    'Gul Ahmed',
+    'Limelight',
+    'Alkaram Studio',
+    'Bonanza Satrangi',
+    'Asim Jofa',
+    'Elan',
+    'Baroque',
+    'Agha Noor',
+    'J. (Junaid Jamshed)',
+    'Outfitters',
+    "Levi's",
+  ],
+  bags: [
+    'Louis Vuitton',
+    'Gucci',
+    'Coach',
+    'Michael Kors',
+    'Chanel',
+    'Prada',
+    'Dior',
+    'Fossil',
+    'Tory Burch',
+    'Kate Spade',
+    'Charles & Keith',
+  ],
+  accessories: [
+    'Rolex',
+    'Cartier',
+    'Ray-Ban',
+    'Oakley',
+    'Fossil',
+    'Casio',
+    'Seiko',
+    'Michael Kors',
+    'DITA',
+    'Persol',
+    'Pandora',
+    'Swarovski',
+  ],
+  beauty: [
+    'Huda Beauty',
+    'MAC Cosmetics',
+    'Sephora',
+    'Fenty Beauty',
+    'Charlotte Tilbury',
+    'The Ordinary',
+    'NARS',
+    'Maybelline',
+    "L'Oreal",
+    'Clinique',
+    'Rare Beauty',
+    'Saeed Ghani',
+    'Hemani',
+  ],
+};
+
+/**
+ * Returns strictly curated, high-relevance recommended brands for a given category/subcategory.
+ * Guarantees that selecting Shoes only recommends Footwear brands, Beauty only recommends Beauty brands, etc.
+ */
+export function getRecommendedBrandsForCategory(
+  categoryCodeOrRoot?: string | null,
+  subcategoryId?: string | null,
+): TaxonomyBrand[] {
+  const norm = (categoryCodeOrRoot || '').toLowerCase().trim();
+  const sub = (subcategoryId || '').toLowerCase().trim();
+
+  let key = 'clothing';
+  if (
+    norm === 'shoes' ||
+    norm === 'cat-04' ||
+    norm === 'footwear' ||
+    ['sneakers', 'formal_shoes', 'khussas_chappals', 'heels_sandals', 'sports_shoes', 'boots', 'flats'].includes(sub)
+  ) {
+    key = 'shoes';
+  } else if (norm === 'beauty' || norm === 'cat-07') {
+    key = 'beauty';
+  } else if (norm === 'bags' || ['handbags_totes', 'backpacks', 'wallets_clutches'].includes(sub)) {
+    key = 'bags';
+  } else if (norm === 'accessories' || norm === 'cat-06' || ['sunglasses', 'eyeglasses', 'watches', 'fashion_jewelry', 'ethnic_traditional_jewelry'].includes(sub)) {
+    key = 'accessories';
+  } else if (norm === 'clothing' || norm.startsWith('cat-01') || norm.startsWith('cat-02') || norm.startsWith('cat-03')) {
+    key = 'clothing';
+  } else {
+    // If no category selected
+    return TAXONOMY_BRANDS.slice(0, 12);
+  }
+
+  const names = RECOMMENDED_BY_CATEGORY[key] || [];
+  const results: TaxonomyBrand[] = [];
+
+  for (const name of names) {
+    const brand = BRAND_BY_LOWER.get(name.toLowerCase());
+    if (brand && !results.some((r) => r.name.toLowerCase() === brand.name.toLowerCase())) {
+      results.push(brand);
+    }
+  }
+
+  return results;
 }
 
 /** Returns categories relevant to a selected brand */

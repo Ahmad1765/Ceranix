@@ -16,7 +16,6 @@ const CATEGORY_LABEL: Record<Category, string> = {
   shoes: 'Shoes',
   bags: 'Bags',
   accessories: 'Accessories',
-  electronics: 'Tech',
   beauty: 'Beauty',
   other: 'Other',
 };
