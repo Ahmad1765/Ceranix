@@ -25,6 +25,28 @@ describe('SellFormSchema', () => {
     expect(result.success).toBe(true);
   });
 
+  it('rejects a branded item with null authenticity and reports the authenticity field', () => {
+    const result = SellFormSchema.safeParse({
+      ...validPayload,
+      brand: 'AllSaints',
+      authenticity: null,
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].path).toContain('authenticity');
+      expect(result.error.issues[0].message).toBe('Please select the authenticity of this branded item');
+    }
+  });
+
+  it('accepts the "Unbranded / Local Tailor" sentinel with null authenticity', () => {
+    const result = SellFormSchema.safeParse({
+      ...validPayload,
+      brand: 'Unbranded / Local Tailor',
+      authenticity: null,
+    });
+    expect(result.success).toBe(true);
+  });
+
   it('fails if no photo slots are provided', () => {
     const result = SellFormSchema.safeParse({ ...validPayload, slots: [] });
     expect(result.success).toBe(false);

@@ -5,6 +5,7 @@ import {
   getCategoryCodesForSelection,
   checkBrandCategoryCompatibility,
   TAXONOMY_BRANDS,
+  smartClassify,
 } from './taxonomy';
 import { CATEGORIES } from './categories';
 import { CATEGORY_VALUES } from './schemas/sell';
@@ -130,5 +131,21 @@ describe('Category & Brand Relevance Algorithm', () => {
     const categoryIds = CATEGORIES.map((c) => c.id);
     expect(categoryIds).not.toContain('electronics');
     expect((CATEGORY_VALUES as readonly string[])).not.toContain('electronics');
+  });
+
+  it('correctly classifies eyewear with rootCategory as accessories', () => {
+    const sunglassesResult = smartClassify('Ray-Ban Aviator Sunglasses');
+    expect(sunglassesResult.suggestedCategories[0]).toMatchObject({
+      code: 'CAT-05',
+      rootCategory: 'accessories',
+      subcategoryId: 'sunglasses',
+    });
+
+    const framesResult = smartClassify('Tom Ford Optical Frames');
+    expect(framesResult.suggestedCategories[0]).toMatchObject({
+      code: 'CAT-05',
+      rootCategory: 'accessories',
+      subcategoryId: 'eyeglasses',
+    });
   });
 });

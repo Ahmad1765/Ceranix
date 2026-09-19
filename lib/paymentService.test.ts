@@ -12,19 +12,24 @@ vi.mock('react-native', () => ({
   NativeModules: {},
 }));
 
+const mockQueryBuilder = {
+  select: vi.fn().mockReturnThis(),
+  eq: vi.fn().mockReturnThis(),
+  neq: vi.fn().mockReturnThis(),
+  not: vi.fn().mockReturnThis(),
+  or: vi.fn().mockReturnThis(),
+  order: vi.fn().mockReturnThis(),
+  limit: vi.fn().mockReturnThis(),
+  maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+  then: vi.fn((onfulfilled?: ((value: any) => any) | null, onrejected?: ((reason: any) => any) | null) =>
+    Promise.resolve({ data: [], error: null }).then(onfulfilled, onrejected),
+  ),
+};
+
 vi.mock('@/lib/supabase', () => ({
   supabase: {
     rpc: vi.fn().mockResolvedValue({ data: null, error: { message: 'function not found' } }),
-    from: vi.fn(() => ({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      neq: vi.fn().mockReturnThis(),
-      not: vi.fn().mockReturnThis(),
-      or: vi.fn().mockReturnThis(),
-      order: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-    })),
+    from: vi.fn(() => mockQueryBuilder),
     functions: {
       invoke: vi.fn(),
     },
@@ -458,14 +463,32 @@ describe('PaymentService Dispatcher & Seller Completion', () => {
   });
 
   it('fetches admin logistics orders with status filtering', async () => {
+    mockQueryBuilder.not.mockClear();
+    mockQueryBuilder.or.mockClear();
+
     const packingOrders = await paymentService.fetchAdminLogisticsOrders('packing', 20);
     expect(Array.isArray(packingOrders)).toBe(true);
+    expect(mockQueryBuilder.not).toHaveBeenCalledWith(
+      'status',
+      'in',
+      '("canceled","refunded","failed","refund_due")',
+    );
+
+    mockQueryBuilder.not.mockClear();
 
     const allOrders = await paymentService.fetchAdminLogisticsOrders('all', 20);
     expect(Array.isArray(allOrders)).toBe(true);
+    expect(mockQueryBuilder.not).toHaveBeenCalledWith(
+      'status',
+      'in',
+      '("canceled","refunded","failed","refund_due")',
+    );
 
     const canceledOrders = await paymentService.fetchAdminLogisticsOrders('canceled', 20);
     expect(Array.isArray(canceledOrders)).toBe(true);
+    expect(mockQueryBuilder.or).toHaveBeenCalledWith(
+      'fulfillment_status.eq.canceled,status.eq.canceled,status.eq.refunded,status.eq.failed,status.eq.refund_due',
+    );
   });
 });
 

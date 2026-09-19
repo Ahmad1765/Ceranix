@@ -8,9 +8,9 @@ import {
   ActivityIndicator,
   Platform,
   StyleSheet,
-  KeyboardAvoidingView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeContainer } from '@/components/ui/SafeContainer';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import { tap } from '@/lib/haptics';
@@ -112,8 +112,11 @@ export function SellerPickupModal({
       onRequestClose={saving ? undefined : onClose}
       statusBarTranslucent
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      <SafeContainer
+        mode="keyboard-avoiding"
+        noScroll
+        edges={[]}
+        backgroundColor="transparent"
         style={{ flex: 1 }}
       >
         <View
@@ -428,7 +431,7 @@ export function SellerPickupModal({
             </ScrollView>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </SafeContainer>
     </Modal>
   );
 }

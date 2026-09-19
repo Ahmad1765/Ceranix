@@ -210,6 +210,7 @@ function RowField({
   placeholder,
   onPress,
   isLast = false,
+  disabled = false,
 }: {
   icon?: keyof typeof Feather.glyphMap;
   label: string;
@@ -217,9 +218,11 @@ function RowField({
   placeholder: string;
   onPress: () => void;
   isLast?: boolean;
+  disabled?: boolean;
 }) {
   const { theme } = useTheme();
   const handlePress = () => {
+    if (disabled) return;
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     }
@@ -230,9 +233,11 @@ function RowField({
 
   return (
     <Pressable
-      onPress={handlePress}
-      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-      accessibilityRole="button"
+      onPress={disabled ? undefined : handlePress}
+      disabled={disabled}
+      hitSlop={disabled ? undefined : { top: 6, bottom: 6, left: 6, right: 6 }}
+      accessibilityRole={disabled ? undefined : 'button'}
+      accessibilityState={{ disabled }}
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',
@@ -242,7 +247,7 @@ function RowField({
         minHeight: 52,
         borderBottomWidth: isLast ? 0 : 1,
         borderBottomColor: theme.border,
-        backgroundColor: pressed ? (theme.primarySoft ?? 'rgba(0,0,0,0.04)') : 'transparent',
+        backgroundColor: !disabled && pressed ? (theme.primarySoft ?? 'rgba(0,0,0,0.04)') : 'transparent',
       })}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -295,7 +300,7 @@ function RowField({
             {placeholder}
           </Text>
         )}
-        <Feather name="chevron-right" size={16} color={theme.mute} />
+        {!disabled && <Feather name="chevron-right" size={16} color={theme.mute} />}
       </View>
     </Pressable>
   );
@@ -503,14 +508,17 @@ export function SellForm({
           tags: formData.tags || [],
         };
 
-        let result: { ok: boolean; error?: string; count?: number };
+        let result: Awaited<ReturnType<typeof updateListing>>;
         try {
           result = await updateListing(editingListing.id, updatePayload);
 
-          if (
-            !result.ok &&
-            (result.error?.includes('authenticity') || result.error?.includes('taxonomy_version'))
-          ) {
+          const isMissingColumn =
+            result.code === '42703' ||
+            result.code === 'PGRST204' ||
+            /column .* does not exist/i.test(result.error || '') ||
+            /could not find the .* column/i.test(result.error || '');
+
+          if (!result.ok && isMissingColumn) {
             delete (updatePayload as any).authenticity;
             delete (updatePayload as any).taxonomy_version;
             result = await updateListing(editingListing.id, updatePayload);
@@ -599,7 +607,14 @@ export function SellForm({
         .single();
 
       // Graceful fallback if database column hasn't been migrated yet
-      if (insertRes.error && (insertRes.error.message?.includes('authenticity') || insertRes.error.message?.includes('taxonomy_version'))) {
+      const isMissingColumn =
+        insertRes.error &&
+        (insertRes.error.code === '42703' ||
+          insertRes.error.code === 'PGRST204' ||
+          /column .* does not exist/i.test(insertRes.error.message || '') ||
+          /could not find the .* column/i.test(insertRes.error.message || ''));
+
+      if (isMissingColumn) {
         delete listingPayload.authenticity;
         delete listingPayload.taxonomy_version;
         insertRes = await supabase
@@ -1340,6 +1355,7 @@ export function SellForm({
                             : ''
                   }
                   placeholder="Declare authenticity"
+                  disabled={isCustomBrand}
                   onPress={() => {
                     if (!isCustomBrand) {
                       setActiveSheet('authenticity');

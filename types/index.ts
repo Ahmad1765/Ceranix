@@ -121,6 +121,7 @@ export interface Order {
   currency: string;
   shipping_method?: ShippingMethod | null;
   shipping_fee_cents?: number | null;
+  /** Attached value sourced through get_order_seller_pickup(p_order_id); not returned by standard reads of public.orders. */
   seller_pickup_address?: SellerPickupAddress | null;
   stripe_session_id?: string | null;
   stripe_payment_intent?: string | null;

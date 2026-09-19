@@ -10,7 +10,9 @@ import {
   Linking,
 } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeContainer } from '@/components/ui/SafeContainer';
+import { BRAND } from '@/lib/brand';
 import { router } from 'expo-router';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
@@ -41,12 +43,16 @@ import {
   copyInviteLink,
 } from '@/lib/friends';
 import { ProfileQrSheet } from '@/components/profile/ProfileQrSheet';
+import { useFollowingMaskQuery } from '@/lib/queries/useProfileQueries';
+import { useQueryClient } from '@tanstack/react-query';
+import { qk } from '@/lib/queries/keys';
 
 export default function FriendsScreen() {
   const insets = useSafeAreaInsets();
   const { theme, isDark } = useTheme();
   const { user, profile } = useAuth();
   const toast = useToast();
+  const queryClient = useQueryClient();
 
   // Search State
   const [searchQuery, setSearchQuery] = useState('');
@@ -58,6 +64,22 @@ export default function FriendsScreen() {
   const [suggestedUsers, setSuggestedUsers] = useState<FollowListRow[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(true);
   const [followingMap, setFollowingMap] = useState<Record<string, boolean>>({});
+
+  // Helper to extract follow state directly from rows if present
+  const updateFollowingFromRows = useCallback((rows: (FollowListRow | MatchedFriend | any)[]) => {
+    const updates: Record<string, boolean> = {};
+    for (const row of rows) {
+      if (!row?.id) continue;
+      if (typeof row.is_following === 'boolean') {
+        updates[row.id] = row.is_following;
+      } else if (typeof row.isFollowing === 'boolean') {
+        updates[row.id] = row.isFollowing;
+      }
+    }
+    if (Object.keys(updates).length > 0) {
+      setFollowingMap((prev) => ({ ...prev, ...updates }));
+    }
+  }, []);
 
   // Contact Sync State
   const [isSyncing, setIsSyncing] = useState(false);
@@ -71,12 +93,37 @@ export default function FriendsScreen() {
   // QR Modal State
   const [showQrSheet, setShowQrSheet] = useState(false);
 
+  // Compute all visible profile IDs across sections
+  const listedUserIds = useMemo(() => {
+    const ids = new Set<string>();
+    suggestedUsers.forEach((u) => u?.id && ids.add(u.id));
+    searchResults.forEach((u) => u?.id && ids.add(u.id));
+    matchedFriends.forEach((u) => u?.id && ids.add(u.id));
+    return Array.from(ids);
+  }, [suggestedUsers, searchResults, matchedFriends]);
+
+  // Mask query to establish follow status for all listed profiles
+  const maskQuery = useFollowingMaskQuery(user?.id ?? null, 'friends', listedUserIds);
+
+  useEffect(() => {
+    if (!maskQuery.data) return;
+    const maskSet = new Set(maskQuery.data);
+    setFollowingMap((prev) => {
+      const next = { ...prev };
+      for (const id of listedUserIds) {
+        next[id] = maskSet.has(id);
+      }
+      return next;
+    });
+  }, [maskQuery.data, listedUserIds]);
+
   // Load initial suggestions
   const loadSuggestions = useCallback(async () => {
     try {
       setLoadingSuggestions(true);
       const res = await fetchSuggestedFollows(user?.id ?? null, 12);
       setSuggestedUsers(res as FollowListRow[]);
+      updateFollowingFromRows(res as any[]);
     } catch (e) {
       console.warn('[friends] loadSuggestions error:', e);
     } finally {
@@ -107,6 +154,7 @@ export default function FriendsScreen() {
       try {
         const rows = await searchUsers(trimmed, 20);
         setSearchResults(rows);
+        updateFollowingFromRows(rows as any[]);
       } catch (err) {
         console.warn('[friends] searchUsers error:', err);
       } finally {
@@ -130,6 +178,15 @@ export default function FriendsScreen() {
     try {
       const res = await toggleFollow(user.id, targetId, currentFollowingState);
       setFollowingMap((prev) => ({ ...prev, [targetId]: res.isFollowing }));
+      queryClient.setQueriesData<string[]>(
+        { queryKey: qk.followingMaskScope(user.id, 'friends') },
+        (old) => {
+          const list = old ?? [];
+          return res.isFollowing
+            ? (list.includes(targetId) ? list : [...list, targetId])
+            : list.filter((id) => id !== targetId);
+        },
+      );
     } catch {
       // Rollback on failure
       setFollowingMap((prev) => ({ ...prev, [targetId]: currentFollowingState }));
@@ -160,6 +217,7 @@ export default function FriendsScreen() {
       });
 
       setMatchedFriends(result.matchedFriends);
+      updateFollowingFromRows(result.matchedFriends as any[]);
       setUnmatchedContacts(result.unmatchedContacts);
       if (result.accessPrivileges) {
         setAccessPrivileges(result.accessPrivileges);
@@ -182,7 +240,7 @@ export default function FriendsScreen() {
         if (Platform.OS === 'ios' || Platform.OS === 'android') {
           Alert.alert(
             'Contacts Access Needed',
-            'To discover friends from your address book, Carrinex needs Contacts access. Please enable Contacts in Settings.',
+            `To discover friends from your address book, ${BRAND} needs Contacts access. Please enable Contacts in Settings.`,
             [
               { text: 'Not Now', style: 'cancel' },
               {
@@ -217,7 +275,13 @@ export default function FriendsScreen() {
   }, [syncProgress]);
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.background }}>
+    <SafeContainer
+      mode="keyboard-avoiding"
+      noScroll
+      edges={['top']}
+      backgroundColor={theme.background}
+      style={{ flex: 1 }}
+    >
       {/* Top Bar */}
       <View
         style={{
@@ -987,7 +1051,7 @@ export default function FriendsScreen() {
         username={profile?.username}
         fullName={profile?.full_name}
       />
-    </SafeAreaView>
+    </SafeContainer>
   );
 }
 

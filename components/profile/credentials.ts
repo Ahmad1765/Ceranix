@@ -1,4 +1,5 @@
 import { computeLevel } from '@/lib/levels';
+import { isBundlesEnabled } from '@/lib/bundle';
 import type { User } from '@/types';
 import type { Credential } from './CredentialList';
 
@@ -74,7 +75,7 @@ export function sellerCredentials(
   if (memberSince) {
     rows.push({ key: 'since', icon: 'clock', label: 'Member since', value: String(memberSince) });
   }
-  if (showActionableFacts && (profile.bundle_discount_pct ?? 0) > 0) {
+  if (showActionableFacts && isBundlesEnabled(profile.bundle_discount_pct)) {
     rows.push({
       key: 'bundle',
       icon: 'percent',

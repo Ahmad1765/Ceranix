@@ -598,7 +598,7 @@ export type UpdateListingInput = {
 export async function updateListing(
   listingId: string,
   input: UpdateListingInput,
-): Promise<{ ok: boolean; error?: string; count?: number }> {
+): Promise<{ ok: boolean; error?: string; code?: string; count?: number }> {
   const { data, error } = await supabase
     .from('listings')
     .update(input)
@@ -606,7 +606,7 @@ export async function updateListing(
     .select('id');
   if (error) {
     console.warn('[listings] updateListing', error.message);
-    return { ok: false, error: error.message };
+    return { ok: false, error: error.message, code: error.code };
   }
   const count = data?.length ?? 0;
   if (count === 0) {
@@ -672,7 +672,12 @@ export async function fetchListingLikers(listingId: string): Promise<ListingLike
       .order('created_at', { ascending: false })
       .limit(50);
 
-    if (error || !data) return [];
+    if (error) {
+      console.warn('[listings] fetchListingLikers error', error.message);
+      throw error;
+    }
+
+    if (!data) return [];
 
     return data.map((row: any) => {
       const p = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
@@ -688,6 +693,6 @@ export async function fetchListingLikers(listingId: string): Promise<ListingLike
     });
   } catch (err) {
     console.warn('[listings] fetchListingLikers error', err);
-    return [];
+    throw err;
   }
 }

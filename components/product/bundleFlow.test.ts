@@ -5,6 +5,7 @@ import {
   isOfferAmountValid,
   sanitizeBundleItemIds,
   computeCheckoutItemPrice,
+  isBundlesEnabled,
 } from '@/lib/bundle';
 import { sendOffer } from '@/lib/chat';
 import { serializeBundleIds } from '@/components/product/useProductBundle';
@@ -208,10 +209,6 @@ describe('bundleFlow tests', () => {
 
   describe('bundle seller enablement & gating rules', () => {
     it('determines bundle option is available ONLY when seller has enabled bundles (> 0)', () => {
-      const isBundlesEnabled = (sellerBundleDiscountPct: number | undefined | null) => {
-        return Number(sellerBundleDiscountPct ?? 0) > 0;
-      };
-
       // When seller has enabled bundles (e.g. 10%, 15%, 20%)
       expect(isBundlesEnabled(10)).toBe(true);
       expect(isBundlesEnabled(15)).toBe(true);
@@ -225,7 +222,7 @@ describe('bundleFlow tests', () => {
 
     it('suppresses bundle options when listing is already sold or bundle discount is disabled', () => {
       const shouldShowBundleBuilder = (isSold: boolean, sellerBundleDiscountPct: number | undefined) => {
-        const bundlesEnabled = Number(sellerBundleDiscountPct ?? 0) > 0;
+        const bundlesEnabled = isBundlesEnabled(sellerBundleDiscountPct);
         return !isSold && bundlesEnabled;
       };
 

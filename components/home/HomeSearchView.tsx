@@ -1146,6 +1146,7 @@ export const HomeSearchView = memo(function HomeSearchView({
             onPress={() => {
               haptic();
               setHasSubmitted(false);
+              inputRef.current?.focus?.();
               setQuery('');
               setSearchFilters(EMPTY_SEARCH_FILTERS);
               ++searchRequestIdRef.current;
@@ -1530,7 +1531,7 @@ export const HomeSearchView = memo(function HomeSearchView({
               } as any),
             ]}
           >
-            {(!hasQuery && !searchFilters.category && !hasSubmitted) ? (
+            {((!hasQuery && !searchFilters.category) || !hasSubmitted) ? (
               renderMembersIdleLanding
             ) : loading ? (
               <View style={{ paddingVertical: 40, alignItems: 'center' }}>

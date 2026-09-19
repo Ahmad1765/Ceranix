@@ -841,7 +841,7 @@ export default function PaymentScreen() {
                 </View>
 
                 <Text style={{ fontSize: 13.5, fontWeight: '700', color: theme.primary, fontFamily: typography.family.sansBold }}>
-                  +Rs 250
+                  +{formatPrice(getShippingFee('managed'))}
                 </Text>
               </Pressable>
 

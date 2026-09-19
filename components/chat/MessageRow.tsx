@@ -1120,7 +1120,7 @@ function MessageRowImpl(props: MessageRowProps) {
   const bubbleRef = useRef<View>(null);
 
   // A message that hasn't landed yet has no server id to hang a reaction off.
-  const canReact = msg.kind !== 'system' && !msg.pending;
+  const canReact = msg.kind !== 'system' && !msg.pending && !msg.failed;
 
   const handleLongPress = useCallback(() => {
     if (!canReact) return;

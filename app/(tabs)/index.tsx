@@ -211,7 +211,7 @@ export default function HomeScreen() {
         onOpenFilter: () => feedFilter.setFilterOpen(true),
         unreadNotificationsCount: unreadNotifications,
         onPressNotifications: () => router.push('/news' as any),
-        onOpenShareProfile: () => setShowShareModal(true),
+        onOpenShareProfile: profile?.username ? () => setShowShareModal(true) : undefined,
       }}
       chipProps={{
         savedSearches,
@@ -311,12 +311,14 @@ export default function HomeScreen() {
         />
       ) : null}
 
-      <ProfileQrSheet
-        visible={showShareModal}
-        onClose={() => setShowShareModal(false)}
-        username={profile?.username}
-        fullName={profile?.full_name}
-      />
+      {profile?.username ? (
+        <ProfileQrSheet
+          visible={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          username={profile.username}
+          fullName={profile?.full_name}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }

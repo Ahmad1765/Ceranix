@@ -67,6 +67,21 @@ import {
 import { deleteListingImages } from '@/lib/upload';
 import { buildThreadRows, listingStatus, type ThreadRow } from '@/components/chat';
 
+const FETCH_MESSAGES_TIMEOUT = Symbol('FETCH_MESSAGES_TIMEOUT');
+
+async function cleanupMessageImage(msg: ChatMessage) {
+  if (isImageMessage(msg)) {
+    const imgUrl = getMessageImageUrl(msg);
+    if (imgUrl && imgUrl.includes('/listing-images/')) {
+      try {
+        await deleteListingImages([imgUrl]);
+      } catch (err) {
+        console.warn('[chat] deleteListingImages cleanup error', err);
+      }
+    }
+  }
+}
+
 export function useConversationThread(
   conversationId: string,
   user: AuthUser | null,
@@ -86,6 +101,9 @@ export function useConversationThread(
   const messagesRef = useRef<ChatMessage[]>(messages);
   messagesRef.current = messages;
 
+  const canceledTempIdsRef = useRef<Set<string>>(new Set());
+  const activeDeliveriesRef = useRef<Map<string, Promise<ChatMessage | null>>>(new Map());
+
   useEffect(() => {
     setInput(initialInput);
   }, [conversationId, initialInput]);
@@ -98,12 +116,20 @@ export function useConversationThread(
 
     (async () => {
       let loaded:
-        | [Awaited<ReturnType<typeof getConversation>>, ChatMessage[], MessageReaction[]]
+        | [
+            Awaited<ReturnType<typeof getConversation>>,
+            ChatMessage[] | typeof FETCH_MESSAGES_TIMEOUT,
+            MessageReaction[],
+          ]
         | null = null;
       try {
         loaded = await Promise.all([
           withTimeout(getConversation(conversationId), 12_000, null),
-          withTimeout(fetchMessages(conversationId), 12_000, []),
+          withTimeout<ChatMessage[] | typeof FETCH_MESSAGES_TIMEOUT>(
+            fetchMessages(conversationId),
+            12_000,
+            FETCH_MESSAGES_TIMEOUT,
+          ),
           withTimeout(fetchReactions(conversationId), 12_000, [] as MessageReaction[]),
         ]);
       } catch (e) {
@@ -113,8 +139,10 @@ export function useConversationThread(
       if (cancelled) return;
       if (loaded !== null) {
         setConv(loaded[0]);
-        let initialMsgs = loaded[1];
-        if (isSupportConversation(loaded[0]) && initialMsgs.length === 0) {
+        const msgsResult = loaded[1];
+        const isTimeout = msgsResult === FETCH_MESSAGES_TIMEOUT;
+        let initialMsgs: ChatMessage[] = isTimeout ? [] : msgsResult;
+        if (!isTimeout && isSupportConversation(loaded[0]) && initialMsgs.length === 0) {
           initialMsgs = [
             {
               id: 'support-welcome-initial',
@@ -271,68 +299,82 @@ export function useConversationThread(
     async (text: string, tempId: string) => {
       if (!user || !conversationId) return;
 
-      let saved: ChatMessage | null = null;
-      let failure: unknown = null;
-      try {
-        saved = await sendMessage({ conversationId, senderId: user.id, content: text });
-      } catch (e) {
-        failure = e;
-      }
-
-      const delivered = saved;
-      if (delivered) {
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === delivered.id)) return prev.filter((m) => m.id !== tempId);
-          return prev.map((m) => (m.id === tempId ? delivered : m));
-        });
-
-        // Trigger intelligent support concierge automated response if talking to Support
-        if (isSupport) {
-          try {
-            const botReply = await sendSupportBotReply(conversationId, text);
-            if (botReply) {
-              setMessages((prev) => {
-                if (prev.some((m) => m.id === botReply.id)) return prev;
-                return [...prev, botReply];
-              });
-            } else {
-              // Optimistic local reply ensuring responsive assistant behavior
-              const fallbackMsg: ChatMessage = {
-                id: `bot-${Date.now()}`,
-                conversation_id: conversationId,
-                sender_id: SUPPORT_BOT_USER_ID,
-                content: generateSupportResponse(text),
-                kind: 'text',
-                metadata: null,
-                offer_status: null,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              };
-              setMessages((prev) => [...prev, fallbackMsg]);
-            }
-          } catch (err: any) {
-            console.error('[conversation] support bot reply failed', err);
-            const fallbackMsg: ChatMessage = {
-              id: `bot-${Date.now()}`,
-              conversation_id: conversationId,
-              sender_id: SUPPORT_BOT_USER_ID,
-              content: generateSupportResponse(text),
-              kind: 'text',
-              metadata: null,
-              offer_status: null,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            };
-            setMessages((prev) => [...prev, fallbackMsg]);
-          }
-        }
+      if (canceledTempIdsRef.current.has(tempId)) {
+        canceledTempIdsRef.current.delete(tempId);
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
         return;
       }
 
-      console.warn('[conversation] send failed', failure ?? 'insert returned no row');
-      setMessages((prev) =>
-        prev.map((m) => (m.id === tempId ? { ...m, pending: false, failed: true } : m)),
-      );
+      const deliverPromise = (async (): Promise<ChatMessage | null> => {
+        let saved: ChatMessage | null = null;
+        let failure: unknown = null;
+        try {
+          saved = await sendMessage({ conversationId, senderId: user.id, content: text });
+        } catch (e) {
+          failure = e;
+        }
+
+        if (canceledTempIdsRef.current.has(tempId)) {
+          setMessages((prev) => prev.filter((m) => m.id !== tempId && (!saved || m.id !== saved.id)));
+          return saved;
+        }
+
+        const delivered = saved;
+        if (delivered) {
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === delivered.id)) return prev.filter((m) => m.id !== tempId);
+            return prev.map((m) => (m.id === tempId ? delivered : m));
+          });
+
+          // Trigger intelligent support concierge automated response if talking to Support
+          if (isSupport) {
+            let botReply: ChatMessage | null = null;
+            try {
+              botReply = await sendSupportBotReply(conversationId, text);
+            } catch (err) {
+              console.warn('[conversation] support bot reply error', err);
+            }
+
+            if (!botReply) {
+              try {
+                botReply = await sendMessage({
+                  conversationId,
+                  senderId: SUPPORT_BOT_USER_ID,
+                  content: generateSupportResponse(text),
+                });
+              } catch (persistErr) {
+                console.warn('[conversation] support bot fallback persist failed', persistErr);
+              }
+            }
+
+            if (botReply) {
+              setMessages((prev) => {
+                if (prev.some((m) => m.id === botReply!.id)) return prev;
+                return [...prev, botReply!];
+              });
+            } else {
+              toast.show('Support is temporarily unavailable. Please try again.', {
+                variant: 'default',
+                icon: 'alert-triangle',
+              });
+            }
+          }
+          return delivered;
+        }
+
+        console.warn('[conversation] send failed', failure ?? 'insert returned no row');
+        setMessages((prev) =>
+          prev.map((m) => (m.id === tempId ? { ...m, pending: false, failed: true } : m)),
+        );
+        return null;
+      })();
+
+      activeDeliveriesRef.current.set(tempId, deliverPromise);
+      try {
+        await deliverPromise;
+      } finally {
+        activeDeliveriesRef.current.delete(tempId);
+      }
     },
     [conversationId, isSupport, toast, user],
   );
@@ -367,6 +409,18 @@ export function useConversationThread(
     async (imageUrl: string, tempId?: string) => {
       if (!user || !conversationId) return;
       const tId = tempId || `temp-${Date.now()}`;
+
+      if (canceledTempIdsRef.current.has(tId)) {
+        canceledTempIdsRef.current.delete(tId);
+        if (imageUrl && imageUrl.includes('/listing-images/')) {
+          deleteListingImages([imageUrl]).catch((err) =>
+            console.warn('[chat] deleteListingImages cleanup error', err),
+          );
+        }
+        setMessages((prev) => prev.filter((m) => m.id !== tId));
+        return;
+      }
+
       if (!tempId) {
         const temp: ChatMessage = {
           id: tId,
@@ -391,32 +445,47 @@ export function useConversationThread(
         );
       }
 
-      let saved: ChatMessage | null = null;
-      let failure: unknown = null;
+      const sendPromise = (async (): Promise<ChatMessage | null> => {
+        let saved: ChatMessage | null = null;
+        let failure: unknown = null;
+        try {
+          saved = await sendMessage({
+            conversationId,
+            senderId: user.id,
+            content: imageUrl,
+            metadata: { image_url: imageUrl },
+          });
+        } catch (e) {
+          failure = e;
+        }
+
+        if (canceledTempIdsRef.current.has(tId)) {
+          setMessages((prev) => prev.filter((m) => m.id !== tId && (!saved || m.id !== saved.id)));
+          return saved;
+        }
+
+        if (saved) {
+          const delivered = saved;
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === delivered.id)) return prev.filter((m) => m.id !== tId);
+            return prev.map((m) => (m.id === tId ? delivered : m));
+          });
+          return delivered;
+        }
+
+        console.warn('[conversation] send image failed', failure ?? 'insert returned no row');
+        setMessages((prev) =>
+          prev.map((m) => (m.id === tId ? { ...m, pending: false, failed: true } : m)),
+        );
+        return null;
+      })();
+
+      activeDeliveriesRef.current.set(tId, sendPromise);
       try {
-        saved = await sendMessage({
-          conversationId,
-          senderId: user.id,
-          content: imageUrl,
-          metadata: { image_url: imageUrl },
-        });
-      } catch (e) {
-        failure = e;
+        await sendPromise;
+      } finally {
+        activeDeliveriesRef.current.delete(tId);
       }
-
-      if (saved) {
-        const delivered = saved;
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === delivered.id)) return prev.filter((m) => m.id !== tId);
-          return prev.map((m) => (m.id === tId ? delivered : m));
-        });
-        return;
-      }
-
-      console.warn('[conversation] send image failed', failure ?? 'insert returned no row');
-      setMessages((prev) =>
-        prev.map((m) => (m.id === tId ? { ...m, pending: false, failed: true } : m)),
-      );
     },
     [conversationId, user],
   );
@@ -530,21 +599,61 @@ export function useConversationThread(
       if (!user || !conversationId) return false;
 
       const targetIndex = messagesRef.current.findIndex((m) => m.id === messageId);
-      if (targetIndex === -1) return false;
-      const targetMsg = messagesRef.current[targetIndex];
+      const targetMsg = targetIndex !== -1 ? messagesRef.current[targetIndex] : null;
 
-      // Discard optimistic / pending / failed temp messages immediately
-      if (messageId.startsWith('temp-') || targetMsg.pending || targetMsg.failed) {
+      if (!targetMsg && !activeDeliveriesRef.current.has(messageId)) {
+        return false;
+      }
+
+      // 1. Failed messages: preserve immediate local removal, but clean up referenced uploaded photo
+      if (targetMsg?.failed) {
+        await cleanupMessageImage(targetMsg);
         setMessages((prev) => prev.filter((m) => m.id !== messageId));
         return true;
       }
 
-      // Optimistically remove from state
+      // 2. Pending messages with active delivery:
+      // Track canceled temporary ID, defer deletion until delivery finishes,
+      // and do not report as successfully deleted while delivery is active.
+      const activeDelivery = activeDeliveriesRef.current.get(messageId);
+      if (activeDelivery) {
+        canceledTempIdsRef.current.add(messageId);
+        setMessages((prev) => prev.filter((m) => m.id !== messageId));
+        const saved = await activeDelivery;
+        canceledTempIdsRef.current.delete(messageId);
+        if (saved) {
+          try {
+            const ok = await deleteMessage({
+              conversationId,
+              messageId: saved.id,
+              userId: user.id,
+            });
+            await cleanupMessageImage(saved);
+            return ok;
+          } catch (err) {
+            console.warn('[chat] deleteMessage for deferred temp message failed', err);
+            return false;
+          }
+        }
+        return true;
+      }
+
+      // 3. Temporary or pending messages not currently active in delivery pipeline
+      if (messageId.startsWith('temp-') || targetMsg?.pending) {
+        canceledTempIdsRef.current.add(messageId);
+        if (targetMsg) {
+          await cleanupMessageImage(targetMsg);
+        }
+        setMessages((prev) => prev.filter((m) => m.id !== messageId));
+        return true;
+      }
+
+      // 4. Persisted messages: optimistically remove, delete on server, rollback on failure
       setMessages((prev) => prev.filter((m) => m.id !== messageId));
 
       const rollback = () => {
         setMessages((current) => {
-          if (current.some((m) => m.id === targetMsg.id)) return current;
+          if (!targetMsg || current.some((m) => m.id === targetMsg.id)) return current;
           const next = [...current];
           const insertIdx = Math.min(Math.max(0, targetIndex), next.length);
           next.splice(insertIdx, 0, targetMsg);
@@ -564,16 +673,8 @@ export function useConversationThread(
           return false;
         }
 
-        // Clean up storage object if this message was an uploaded photo
-        if (isImageMessage(targetMsg)) {
-          const imgUrl = getMessageImageUrl(targetMsg);
-          if (imgUrl && imgUrl.includes('/listing-images/')) {
-            try {
-              await deleteListingImages([imgUrl]);
-            } catch (err) {
-              console.warn('[chat] deleteListingImages cleanup error', err);
-            }
-          }
+        if (targetMsg) {
+          await cleanupMessageImage(targetMsg);
         }
 
         return true;

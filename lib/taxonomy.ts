@@ -628,10 +628,9 @@ export function smartClassify(
     }
   } else if (isEyewear) {
     const subcat = norm.includes('frame') || norm.includes('optical') ? 'eyeglasses' : 'sunglasses';
-    const isAccessory = ['eyeglasses', 'sunglasses', 'belts', 'scarves_dupattas', 'caps_hats'].includes(subcat);
     candidates.push({
       code: 'CAT-05',
-      rootCategory: isAccessory ? 'accessories' : 'bags',
+      rootCategory: 'accessories',
       subcategoryId: subcat,
       categoryLabel: 'Bags & Accessories',
       subcategoryLabel: norm.includes('frame') || norm.includes('optical') ? 'Eyeglasses / Optical Frames' : 'Sunglasses',
@@ -914,6 +913,7 @@ export function checkBrandCategoryCompatibility(
     const isFootwearSub = [
       'sneakers',
       'formal_shoes',
+      'flats',
       'khussas_chappals',
       'heels_sandals',
       'sports_shoes',

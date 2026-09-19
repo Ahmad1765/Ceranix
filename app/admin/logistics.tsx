@@ -586,7 +586,7 @@ export default function AdminLogisticsScreen() {
                       {listing?.title || 'Marketplace Item'}
                     </Text>
                     <Text style={{ fontSize: 12, color: theme.mute, marginTop: 2, fontFamily: typography.family.sans }}>
-                      Amount: {formatPrice(item.amount_cents / 100)} · {item.payment_method === 'cod' ? '💵 Cash on Delivery' : '💳 Paid Online'}
+                      Amount: {formatPrice((item.amount_cents + (item.shipping_fee_cents ?? 0)) / 100)} · {item.payment_method === 'cod' ? '💵 Cash on Delivery' : '💳 Paid Online'}
                     </Text>
                   </View>
 

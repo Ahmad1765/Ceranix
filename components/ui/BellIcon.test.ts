@@ -26,23 +26,46 @@ vi.mock('@/context/ThemeContext', () => ({
 
 import { BellIcon, BELL_OUTLINE_PATH, BELL_FILLED_PATH } from './BellIcon';
 
+function render(element: React.ReactElement<any>) {
+  const Component = element.type as any;
+  const renderFn = Component.type || Component;
+  return renderFn(element.props);
+}
+
 describe('BellIcon Component', () => {
-  it('renders BellIcon element with default size 20', () => {
-    const element = React.createElement(BellIcon);
-    expect(element.type).toBe(BellIcon);
-    expect(element.props).toEqual({});
+  it('renders outline variant with default size 20 and theme ink color', () => {
+    const rendered = render(React.createElement(BellIcon));
+    const svg = rendered.props.children;
+    const path = svg.props.children;
+
+    expect(svg.props.width).toBe(20);
+    expect(svg.props.height).toBe(20);
+    expect(svg.props.viewBox).toBe('0 0 24 24');
+
+    expect(path.props.d).toBe(BELL_OUTLINE_PATH);
+    expect(path.props.fill).toBe('#0F0F0F');
+    expect(path.props.fillRule).toBe('evenodd');
+    expect(path.props.clipRule).toBe('evenodd');
   });
 
-  it('accepts custom size, color, and filled props', () => {
-    const custom = React.createElement(BellIcon, {
-      size: 24,
-      color: '#6C47FF',
-      filled: true,
-    });
+  it('renders filled variant with custom size, color, and nonzero fillRule', () => {
+    const rendered = render(
+      React.createElement(BellIcon, {
+        size: 24,
+        color: '#6C47FF',
+        filled: true,
+      }),
+    );
+    const svg = rendered.props.children;
+    const path = svg.props.children;
 
-    expect(custom.props.size).toBe(24);
-    expect(custom.props.color).toBe('#6C47FF');
-    expect(custom.props.filled).toBe(true);
+    expect(svg.props.width).toBe(24);
+    expect(svg.props.height).toBe(24);
+
+    expect(path.props.d).toBe(BELL_FILLED_PATH);
+    expect(path.props.fill).toBe('#6C47FF');
+    expect(path.props.fillRule).toBe('nonzero');
+    expect(path.props.clipRule).toBe('nonzero');
   });
 
   it('exports valid SVG path constants matching the design', () => {

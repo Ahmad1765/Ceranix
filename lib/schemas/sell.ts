@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { Category, Condition, Gender } from '@/types';
 import { hasSubcategories, CATEGORIES } from '@/lib/categories';
 import { CURRENCY_SYMBOL } from '@/lib/currency';
+import { UNBRANDED_LOCAL_TAILOR } from '@/lib/taxonomy';
 
 export const CATEGORY_VALUES: [Category, ...Category[]] = [
   'clothing',
@@ -127,7 +128,7 @@ export const SellFormSchema = z
     const brandTrimmed = (data.brand || '').trim();
     if (
       brandTrimmed.length > 0 &&
-      brandTrimmed !== 'Unbranded / Local Tailor' &&
+      brandTrimmed !== UNBRANDED_LOCAL_TAILOR &&
       !data.authenticity
     ) {
       ctx.addIssue({

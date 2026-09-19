@@ -1,6 +1,6 @@
 import React from 'react';
 import { type ViewStyle } from 'react-native';
-import Svg, { Path, Circle, G } from 'react-native-svg';
+import Svg, { Path, Circle } from 'react-native-svg';
 import { useTheme } from '@/context/ThemeContext';
 
 export interface ShieldCheckIconProps {
@@ -38,21 +38,18 @@ export function ShieldCheckIcon({
     return (
       <Svg width={w} height={h} viewBox="0 0 24 24" fill="none" style={style}>
         {showCircle && <Circle cx={12} cy={12} r={12} fill={circleFill} />}
-        <G transform="translate(-5.4, -5.4) scale(1.45)">
-          {/* Mercari shield — filled solid, scaled from 48x48 → 24x24 */}
-          <Path
-            d="M12.033 6.8s-2.93 1.424-5.833 1.424v.168c0 .838.044 1.634.154 2.367.33 2.47 1.233 4.398 2.729 6.01l.066.084c.594.628 1.255 1.131 1.937 1.529.198.125.925.419.925.419s.726-.293.925-.419c.704-.377 1.343-.9 1.937-1.529l.066-.084c1.035-1.11 1.783-2.387 2.245-3.874.22-.67.33-1.361.44-2.136.088-.733.176-1.529.176-2.367v-.168c-2.833 0-5.767-1.424-5.767-1.424z"
-            fill={iconColor}
-          />
-          {/* Mercari checkmark — scaled from 48x48 → 24x24 */}
-          <Path
-            d="M9.4 12.013l1.932 1.787 3.668-3.4"
-            stroke="#FFFFFF"
-            strokeWidth={1.8 / 1.45}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </G>
+        {/* Solid brand shield with crisp white checkmark */}
+        <Path
+          d="M12 2.5C8 2.5 4.5 4.2 4.5 10C4.5 15.8 8.5 19.6 12 21.2C15.5 19.6 19.5 15.8 19.5 10C19.5 4.2 16 2.5 12 2.5Z"
+          fill={iconColor}
+        />
+        <Path
+          d="M8.5 11.8L10.8 14.1L15.8 9.1"
+          stroke="#FFFFFF"
+          strokeWidth={2.2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </Svg>
     );
   }
@@ -62,22 +59,19 @@ export function ShieldCheckIcon({
     const boldSw = strokeWidth ?? 2;
     return (
       <Svg width={w} height={h} viewBox="0 0 24 24" fill="none" style={style}>
-        <G transform="translate(-5.4, -5.4) scale(1.45)">
-          {/* Mercari shield outline — scaled from 48x48 → 24x24 */}
-          <Path
-            d="M12.033 6.8s-2.93 1.424-5.833 1.424v.168c0 .838.044 1.634.154 2.367.33 2.47 1.233 4.398 2.729 6.01l.066.084c.594.628 1.255 1.131 1.937 1.529.198.125.925.419.925.419s.726-.293.925-.419c.704-.377 1.343-.9 1.937-1.529l.066-.084c1.035-1.11 1.783-2.387 2.245-3.874.22-.67.33-1.361.44-2.136.088-.733.176-1.529.176-2.367v-.168c-2.833 0-5.767-1.424-5.767-1.424z"
-            stroke={iconColor}
-            strokeWidth={boldSw / 1.45}
-            strokeLinejoin="round"
-          />
-          <Path
-            d="M9.4 12.013l1.932 1.787 3.668-3.4"
-            stroke={iconColor}
-            strokeWidth={boldSw / 1.45}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </G>
+        <Path
+          d="M12 3C7.5 3 4.5 4.8 4.5 10.2C4.5 15.8 8.5 19.5 12 21C15.5 19.5 19.5 15.8 19.5 10.2C19.5 4.8 16.5 3 12 3Z"
+          stroke={iconColor}
+          strokeWidth={boldSw}
+          strokeLinejoin="round"
+        />
+        <Path
+          d="M8.5 11.5L10.8 13.8L15.8 8.8"
+          stroke={iconColor}
+          strokeWidth={boldSw}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </Svg>
     );
   }
@@ -85,23 +79,21 @@ export function ShieldCheckIcon({
   return (
     <Svg width={w} height={h} viewBox="0 0 24 24" fill="none" style={style}>
       {showCircle && <Circle cx={12} cy={12} r={12} fill={circleFill} />}
-      <G transform="translate(-5.4, -5.4) scale(1.45)">
-        {/* Mercari shield outline — scaled from 48x48 → 24x24 */}
-        <Path
-          d="M12.033 6.8s-2.93 1.424-5.833 1.424v.168c0 .838.044 1.634.154 2.367.33 2.47 1.233 4.398 2.729 6.01l.066.084c.594.628 1.255 1.131 1.937 1.529.198.125.925.419.925.419s.726-.293.925-.419c.704-.377 1.343-.9 1.937-1.529l.066-.084c1.035-1.11 1.783-2.387 2.245-3.874.22-.67.33-1.361.44-2.136.088-.733.176-1.529.176-2.367v-.168c-2.833 0-5.767-1.424-5.767-1.424z"
-          stroke={iconColor}
-          strokeWidth={sw / 1.45}
-          strokeLinejoin="round"
-        />
-        {/* Mercari checkmark */}
-        <Path
-          d="M9.4 12.013l1.932 1.787 3.668-3.4"
-          stroke={iconColor}
-          strokeWidth={sw / 1.45}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </G>
+      {/* Symmetrical luxury shield outline */}
+      <Path
+        d="M12 6.6C10 6.7 7.5 7.4 6.2 8V10.4C6.2 14.8 8.8 17.3 12 18.6C15.2 17.3 17.8 14.8 17.8 10.4V8C16.5 7.4 14 6.7 12 6.6Z"
+        stroke={iconColor}
+        strokeWidth={sw}
+        strokeLinejoin="round"
+      />
+      {/* Optically centered 45° checkmark */}
+      <Path
+        d="M9.3 11.7L11.3 13.7L15.1 9.9"
+        stroke={iconColor}
+        strokeWidth={sw}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </Svg>
   );
 }

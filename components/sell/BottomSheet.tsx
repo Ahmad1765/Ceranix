@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { View, Pressable, Modal, ScrollView, Platform, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/lib/rnText';
@@ -32,6 +32,7 @@ export function FullPagePicker({
 }: FullPagePickerProps) {
   const { theme } = useTheme();
   const Content = scroll ? ScrollView : View;
+  const closedByPopStateRef = useRef(false);
 
   const handleClose = () => {
     if (Platform.OS !== 'web') {
@@ -54,6 +55,8 @@ export function FullPagePicker({
   useEffect(() => {
     if (Platform.OS !== 'web' || !visible) return;
 
+    closedByPopStateRef.current = false;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         handleClose();
@@ -68,6 +71,7 @@ export function FullPagePicker({
     } catch {}
 
     const handlePopState = () => {
+      closedByPopStateRef.current = true;
       onClose();
     };
     window.addEventListener('popstate', handlePopState);
@@ -75,6 +79,9 @@ export function FullPagePicker({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('popstate', handlePopState);
+      if (!closedByPopStateRef.current && window.history.state?.sellPicker === stateId) {
+        window.history.back();
+      }
     };
   }, [visible]);
 

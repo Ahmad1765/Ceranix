@@ -58,7 +58,9 @@ function useSafeContainerVisualViewport(enabled: boolean) {
       const currentHeight = vv.height;
       const offsetTop = vv.offsetTop;
       const totalHeight = window.innerHeight;
-      const isUp = totalHeight - currentHeight > 60;
+      const scale = vv.scale ?? 1;
+      const isZoomed = Math.abs(scale - 1) > 0.01;
+      const isUp = !isZoomed && totalHeight - currentHeight > 60;
 
       if (isUp) {
         setViewportStyle({

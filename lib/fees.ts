@@ -47,8 +47,15 @@ export function getShippingFee(method?: ShippingMethod | string | null): number 
   return DEFAULT_SHIPPING_FEE;
 }
 
+/**
+ * Calculates shipping fee depending on chosen shipping method.
+ *
+ * @param _compatItemPrice - Retained strictly for legacy call-site compatibility;
+ *   platform delivery fees are determined by delivery method, not item price.
+ * @param method - Chosen shipping method ('managed' | 'self_ship').
+ */
 export function shippingFee(
-  itemPrice?: number | string | null | undefined,
+  _compatItemPrice?: number | string | null | undefined,
   method?: ShippingMethod | string | null,
 ): number {
   if (method) return getShippingFee(method);

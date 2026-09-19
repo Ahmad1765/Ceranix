@@ -157,7 +157,7 @@ export const LikersSheet = memo(function LikersSheet({
   onClose: () => void;
 }) {
   const { theme } = useTheme();
-  const { data: likers = [], isLoading } = useListingLikersQuery(visible ? listingId : null);
+  const { data: likers = [], isLoading, isError, refetch } = useListingLikersQuery(visible ? listingId : null);
 
   return (
     <BottomSheetModal visible={visible} title="Likes" onClose={onClose} autoHeight>
@@ -165,6 +165,59 @@ export const LikersSheet = memo(function LikersSheet({
         {isLoading ? (
           <View style={{ paddingVertical: 40, alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator color={theme.purple} />
+          </View>
+        ) : isError ? (
+          <View style={{ paddingVertical: 40, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
+            <Feather name="alert-circle" size={28} color="#EF4444" />
+            <Text
+              style={{
+                fontFamily: FIGTREE_FONT,
+                fontSize: 14,
+                fontWeight: '700',
+                color: theme.ink,
+                marginTop: 8,
+                textAlign: 'center',
+              }}
+            >
+              Could not load likes
+            </Text>
+            <Text
+              style={{
+                fontFamily: FIGTREE_FONT,
+                fontSize: 12.5,
+                color: theme.mute,
+                marginTop: 4,
+                textAlign: 'center',
+              }}
+            >
+              Please check your connection and try again.
+            </Text>
+            <Pressable
+              onPress={() => refetch()}
+              style={({ pressed }) => ({
+                marginTop: 14,
+                paddingHorizontal: 16,
+                height: 32,
+                borderRadius: 16,
+                backgroundColor: theme.panel,
+                borderWidth: 1,
+                borderColor: theme.border,
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
+              <Text
+                style={{
+                  fontSize: 12.5,
+                  fontWeight: '700',
+                  fontFamily: FIGTREE_FONT,
+                  color: theme.ink,
+                }}
+              >
+                Retry
+              </Text>
+            </Pressable>
           </View>
         ) : likers.length === 0 ? (
           <View style={{ paddingVertical: 40, alignItems: 'center', justifyContent: 'center' }}>

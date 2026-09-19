@@ -260,17 +260,18 @@ export async function deleteMessage(args: {
   const { conversationId, messageId, userId } = args;
   try {
     // 1. First try direct delete under RLS
-    const { error } = await supabase
+    const { data: deletedRows, error } = await supabase
       .from('messages')
       .delete()
       .eq('id', messageId)
       .eq('sender_id', userId)
-      .eq('conversation_id', conversationId);
+      .eq('conversation_id', conversationId)
+      .select('id');
 
-    if (!error) return true;
+    if (!error && deletedRows && deletedRows.length > 0) return true;
 
     // 2. If direct delete hits RLS or constraint, attempt secure RPC fallback
-    console.warn('[chat] direct delete failed, attempting delete_chat_message RPC:', error.message);
+    console.warn('[chat] direct delete failed, attempting delete_chat_message RPC:', error?.message ?? 'no row deleted');
     const { data, error: rpcErr } = await supabase.rpc('delete_chat_message', {
       p_message_id: messageId,
       p_conversation_id: conversationId,

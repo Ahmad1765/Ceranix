@@ -175,3 +175,12 @@ export function computeCheckoutItemPrice({
       : Number(listingPrice ?? 0))
   );
 }
+
+/**
+ * Determines whether bundle discounts are enabled for a seller.
+ * Returns true ONLY when the seller has configured a positive bundle discount percentage (> 0).
+ */
+export function isBundlesEnabled(sellerBundleDiscountPct: number | undefined | null): boolean {
+  return Number(sellerBundleDiscountPct ?? 0) > 0;
+}
+

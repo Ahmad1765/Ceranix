@@ -8,7 +8,9 @@ import { CATEGORIES, hasSubcategories } from '@/lib/categories';
 import { ITEM_COLORS } from '@/lib/itemColors';
 import { ColorSwatch } from '@/components/ColorSwatch';
 import { CURRENCY_SYMBOL, CURRENCY_CODE } from '@/lib/currency';
+import { BUYER_PROTECTION_PERCENTAGE } from '@/lib/fees';
 import type { Category } from '@/types';
+import { UNBRANDED_LOCAL_TAILOR } from '@/lib/taxonomy';
 import { BottomSheet } from './BottomSheet';
 import * as Haptics from 'expo-haptics';
 
@@ -523,7 +525,7 @@ export function PriceSheet({
       >
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <Text style={{ fontSize: 13, color: theme.mute }}>Buyer Protection (covered by buyer)</Text>
-          <Text style={{ fontSize: 13, fontFamily: DISPLAY_BOLD, color: theme.ink }}>5%</Text>
+          <Text style={{ fontSize: 13, fontFamily: DISPLAY_BOLD, color: theme.ink }}>{BUYER_PROTECTION_PERCENTAGE}%</Text>
         </View>
         <View style={{ height: 1, backgroundColor: theme.border }} />
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -646,7 +648,7 @@ export function CategorySheet({
 
   return (
     <BottomSheet visible={visible} title="Category" onClose={onClose}>
-      {selectedBrand && selectedBrand !== 'Unbranded / Local Tailor' ? (
+      {selectedBrand && selectedBrand !== UNBRANDED_LOCAL_TAILOR ? (
         <View
           style={{
             flexDirection: 'row',

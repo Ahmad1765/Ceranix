@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { View, Pressable, Alert, KeyboardAvoidingView, Platform, ScrollView, Animated, Easing, useWindowDimensions } from 'react-native';
+import { View, Pressable, Alert, Platform, Animated, Easing, useWindowDimensions } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeContainer } from '@/components/ui/SafeContainer';
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -217,17 +217,14 @@ export default function LoginScreen() {
       : 'Welcome\nback.';
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }} edges={['top']}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}
-      >
-        <ScrollView
-          contentContainerStyle={{ flexGrow: 1, paddingBottom: 24 }}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          bounces={false}
-        >
+    <SafeContainer
+      mode="keyboard-avoiding"
+      edges={['top']}
+      backgroundColor={colors.white}
+      style={{ flex: 1 }}
+      contentContainerStyle={{ flexGrow: 1, paddingBottom: 24 }}
+      scrollViewProps={{ bounces: false }}
+    >
           {/* Top bar */}
           <View
             style={{
@@ -708,9 +705,7 @@ export default function LoginScreen() {
               </View>
             )}
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+    </SafeContainer>
   );
 }
 

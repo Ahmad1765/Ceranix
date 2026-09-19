@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { View, Pressable, Platform } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
@@ -25,6 +25,15 @@ export function ProfileQrSheet({
   const { theme, isDark } = useTheme();
   const toast = useToast();
   const [copied, setCopied] = useState(false);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const inviteUrl = getProfileInviteUrl(username);
   const handle = username ? `@${username.replace(/^@+/, '')}` : BRAND;
@@ -35,7 +44,12 @@ export function ProfileQrSheet({
     if (ok) {
       setCopied(true);
       toast.show('Profile link copied to clipboard', { variant: 'default', icon: 'check' });
-      setTimeout(() => setCopied(false), 2500);
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+      copyTimeoutRef.current = setTimeout(() => {
+        setCopied(false);
+      }, 2500);
     }
   };
 

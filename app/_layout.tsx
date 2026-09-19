@@ -104,9 +104,6 @@ const AESTHETIC_FONTS = withFontDisplay(
     Inter_600SemiBold,
     Inter_700Bold,
     Inter_700Bold_Italic,
-    HansenGrotesque_Bold: require('../assets/fonts/HansenGrotesque-Bold.ttf'),
-    HansenGrotesque_Regular: require('../assets/fonts/HansenGrotesque.ttf'),
-    Figtree: require('../assets/fonts/Figtree.ttf'),
   },
   Font.FontDisplay.BLOCK,
 );
@@ -173,10 +170,10 @@ function usePreventViewportZoomOnWeb() {
       document.head.appendChild(style);
     }
 
-    // On iOS Safari, when keyboard dismisses or input blurs, ensure horizontal and vertical viewport offsets are reset
+    // On iOS Safari, when keyboard dismisses or input blurs, ensure horizontal viewport offset is reset to 0 while preserving vertical scroll
     const handleFocusOut = () => {
       if (typeof window !== 'undefined') {
-        window.scrollTo({ left: 0, top: 0, behavior: 'instant' as any });
+        window.scrollTo({ left: 0, top: window.scrollY ?? window.pageYOffset ?? 0, behavior: 'instant' as any });
       }
     };
     window.addEventListener('focusout', handleFocusOut);

@@ -5,8 +5,16 @@
  * Standard SHA-256 hashes of raw phone numbers can be reversed using precomputed
  * rainbow tables.
  *
- * Appending a deterministic Global Pepper before hashing prevents precomputed
- * lookup table attacks while preserving deterministic reciprocal matching.
+ * SECURITY NOTE:
+ * Because this pepper is bundled into the client application binary or exposed via
+ * `EXPO_PUBLIC_CONTACTS_PEPPER`, client-bundled peppers cannot prevent attackers from
+ * building precomputed lookup tables. Server-side peppering or hashed lookup is the
+ * stronger control.
+ *
+ * KEY ROTATION IMPACT:
+ * Changing `EXPO_PUBLIC_CONTACTS_PEPPER` invalidates existing hashes registered via
+ * `register_my_contact_hashes`. Any rotation requires client re-registration backfill
+ * or adding a version marker to stored hashes in the database.
  */
 
 const DEFAULT_PEPPER = 'crx_pepper_v1_carrinex_atelier_2026_q8';

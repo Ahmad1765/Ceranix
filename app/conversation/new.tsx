@@ -140,7 +140,7 @@ export default function NewConversationScreen() {
   // If navigating to message a user directly from their profile without a listing,
   // redirect straight to that user's inbox conversation thread
   useEffect(() => {
-    if (!listingId && targetUserId && !isSupport && user) {
+    if (!listingId && targetUserId && !isSupport && user && targetUserId !== user.id) {
       getOrCreateConversation({
         buyerId: user.id,
         sellerId: targetUserId,

@@ -93,15 +93,32 @@ export default function InvoiceScreen() {
 
   useEffect(() => {
     if (!user?.id) return;
+    let active = true;
+
     supabase
       .from('shipping_addresses')
       .select('*')
       .eq('user_id', user.id)
       .eq('is_default', true)
       .maybeSingle()
-      .then(({ data }) => {
-        if (data) setSellerDefaultAddress(data);
-      });
+      .then(
+        ({ data, error }) => {
+          if (!active) return;
+          if (error) {
+            console.warn('[invoice] seller default address query error:', error.message);
+            return;
+          }
+          if (data) setSellerDefaultAddress(data);
+        },
+        (err) => {
+          if (!active) return;
+          console.warn('[invoice] seller default address query failed:', err);
+        },
+      );
+
+    return () => {
+      active = false;
+    };
   }, [user?.id]);
 
   useEffect(() => {
