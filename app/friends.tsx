@@ -22,7 +22,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { useToast } from '@/lib/toast';
 import { tap } from '@/lib/haptics';
 import { safeBack } from '@/lib/nav';
-import { radii, colors, type as typography, shadow } from '@/lib/theme';
+import { radii, type as typography, shadow } from '@/lib/theme';
 import { CONTENT_MAX_WIDTH, HIT_SLOP_8 } from '@/lib/responsive';
 import { PressableScale } from '@/components/PressableScale';
 import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
@@ -129,7 +129,7 @@ export default function FriendsScreen() {
     } finally {
       setLoadingSuggestions(false);
     }
-  }, [user?.id]);
+  }, [user?.id, updateFollowingFromRows]);
 
   useEffect(() => {
     loadSuggestions();

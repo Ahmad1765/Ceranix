@@ -24,10 +24,11 @@ import {
   Platform,
   Pressable,
   ActivityIndicator,
+  Animated,
+  StyleSheet,
 } from 'react-native';
 import { Text } from '@/lib/rnText';
 import * as Clipboard from 'expo-clipboard';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, router } from 'expo-router';
 import { safeBack } from '@/lib/nav';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -212,6 +213,48 @@ export default function ConversationScreen() {
   const [reportOpen, setReportOpen] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
+
+  // ── Writing State & Product Overview Slide Animation ─────────────────────
+  const [isWriting, setIsWriting] = useState(false);
+  const slideAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.timing(slideAnim, {
+      toValue: isWriting ? 0 : 1,
+      duration: 220,
+      useNativeDriver: false,
+    }).start();
+  }, [isWriting, slideAnim]);
+
+  const overviewMaxHeight = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 72],
+  });
+
+  const overviewOpacity = slideAnim.interpolate({
+    inputRange: [0, 0.4, 1],
+    outputRange: [0, 0, 1],
+  });
+
+  const overviewTranslateY = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [16, 0],
+  });
+
+  const overviewMarginBottom = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 6],
+  });
+
+  // Ensure message list follows bottom when keyboard opens
+  useEffect(() => {
+    if (keyboardUp) {
+      const timer = setTimeout(() => {
+        thread.followEnd();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [keyboardUp, thread]);
 
   // ── Navigation & Clipboard Helpers ───────────────────────────────────────
   const openListing = useCallback(() => {
@@ -548,19 +591,14 @@ export default function ConversationScreen() {
           : null,
       ]}
     >
-      {/* Floating Header — absolutely positioned like the product page */}
-      <LinearGradient
-        colors={[theme.background, theme.background, 'transparent']}
-        locations={[0, 0.65, 1]}
+      {/* Top Header */}
+      <View
         style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 30,
-          borderBottomWidth: 0,
+          backgroundColor: theme.background,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: theme.hairline,
+          zIndex: 10,
         }}
-        pointerEvents="box-none"
       >
         <ThreadHeader
           name={thread.senderName}
@@ -570,7 +608,7 @@ export default function ConversationScreen() {
           onPressIdentity={thread.other?.id ? () => router.push(`/user/${thread.other!.id}` as any) : undefined}
           onOverflow={() => setOverflowOpen(true)}
         />
-      </LinearGradient>
+      </View>
 
       {/* Message Thread FlatList */}
       <FlatList
@@ -578,11 +616,12 @@ export default function ConversationScreen() {
         data={thread.rows}
         keyExtractor={(row) => row.key}
         renderItem={renderRow}
+        style={{ flex: 1 }}
         contentContainerStyle={{
           flexGrow: 1,
           justifyContent: 'flex-end',
-          paddingBottom: (thread.convListingId ? 140 : 80) + (keyboardUp ? DOCK_GAP_KEYBOARD : Math.max(insets.bottom + 10, 20)),
-          paddingTop: 64,
+          paddingTop: 8,
+          paddingBottom: 8,
         }}
         onContentSizeChange={thread.followEnd}
         onScroll={thread.onScroll}
@@ -615,44 +654,69 @@ export default function ConversationScreen() {
         }
       />
 
-      {/* Floating Bottom Composer / Block Banner Dock */}
-      <LinearGradient
-        colors={['transparent', theme.background, theme.background]}
-        locations={[0, 0.35, 1]}
+      {/* Bottom Composer / Order Overview Dock */}
+      <View
         style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          zIndex: 30,
-          paddingTop: 12,
-          paddingBottom: keyboardUp ? DOCK_GAP_KEYBOARD : Math.max(insets.bottom + 10, 20),
+          backgroundColor: theme.background,
+          zIndex: 10,
+          paddingTop: thread.convListingId ? 6 : 0,
+          paddingBottom: keyboardUp ? DOCK_GAP_KEYBOARD : Math.max(insets.bottom, 12),
         }}
-        pointerEvents="box-none"
       >
-        {/* Listing Header — floating card docked above the composer */}
-        <ConversationListingHeader
-          listing={thread.conv.listing}
-          listingId={thread.convListingId}
-          listingThumb={thread.listingThumb}
-          status={thread.status}
-          isSeller={thread.isSeller}
-          onPressListing={openListing}
-          onPressBuyNow={() => router.push(`/payment/${thread.convListingId}` as any)}
+        {/* Animated Order Overview (slides down when writing, slides up when leaving field) */}
+        {thread.convListingId && (
+          <Animated.View
+            pointerEvents={isWriting ? 'none' : 'auto'}
+            style={{
+              maxHeight: overviewMaxHeight,
+              opacity: overviewOpacity,
+              transform: [{ translateY: overviewTranslateY }],
+              marginBottom: overviewMarginBottom,
+              overflow: 'hidden',
+              paddingHorizontal: 12,
+              width: '100%',
+              maxWidth: 500,
+              alignSelf: 'center',
+            }}
+          >
+            <ConversationListingHeader
+              listing={thread.conv.listing}
+              listingId={thread.convListingId}
+              listingThumb={thread.listingThumb}
+              status={thread.status}
+              isSeller={thread.isSeller}
+              onPressListing={openListing}
+              onPressBuyNow={() => router.push(`/payment/${thread.convListingId}` as any)}
+            />
+          </Animated.View>
+        )}
+
+        {/* Light grey separating line between the message bar and product overview */}
+        <View
+          style={{
+            width: '100%',
+            height: 1,
+            backgroundColor: theme.hairline,
+          }}
         />
 
         {block.blockStatus === 'unblocked' ? (
           <Composer
             value={thread.input}
-            onChangeText={thread.setInput}
+            onChangeText={(text) => {
+              if (!isWriting) setIsWriting(true);
+              thread.setInput(text);
+            }}
             onSend={thread.handleSend}
             onSendImage={handlePickAndSendImage}
             uploadingImage={uploadingImage}
             onPlus={() => setPlusOpen(true)}
             onFocus={() => {
+              setIsWriting(true);
               if (Platform.OS === 'web' && typeof window !== 'undefined') {
                 window.scrollTo({ left: 0, top: 0, behavior: 'instant' as any });
                 if (document.body) document.body.scrollTop = 0;
+                if (document.documentElement) document.documentElement.scrollTop = 0;
                 requestAnimationFrame(() => {
                   window.scrollTo({ left: 0, top: 0, behavior: 'instant' as any });
                   if (document.body) document.body.scrollTop = 0;
@@ -662,12 +726,18 @@ export default function ConversationScreen() {
                   if (document.body) document.body.scrollTop = 0;
                   thread.followEnd();
                 }, 100);
+              } else {
+                setTimeout(() => {
+                  thread.followEnd();
+                }, 150);
               }
             }}
             onBlur={() => {
+              setIsWriting(false);
               if (Platform.OS === 'web' && typeof window !== 'undefined') {
                 window.scrollTo({ left: 0, top: 0, behavior: 'instant' as any });
                 if (document.body) document.body.scrollTop = 0;
+                if (document.documentElement) document.documentElement.scrollTop = 0;
               }
             }}
           />
@@ -677,7 +747,7 @@ export default function ConversationScreen() {
             onUnblock={block.handleToggleBlock}
           />
         )}
-      </LinearGradient>
+      </View>
 
       {/* Pop-up Reaction Picker */}
       <ReactionPicker
