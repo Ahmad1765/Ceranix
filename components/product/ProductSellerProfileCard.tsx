@@ -15,6 +15,7 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { PressableScale } from '@/components/PressableScale';
 import { useTheme } from '@/context/ThemeContext';
 import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 import { timeAgo } from '@/components/product/shared';
@@ -223,10 +224,13 @@ export const ProductSellerProfileCard = memo(function ProductSellerProfileCard({
           </View>
         ) : (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            {/* Follow Button */}
-            <Pressable
+            {/* Follow Button with Spring Scale & On-Button Status Icon */}
+            <PressableScale
               onPress={onFollowPress}
-              style={({ pressed }) => ({
+              scaleTo={0.93}
+              style={{
+                flexDirection: 'row',
+                gap: 4,
                 paddingHorizontal: 12,
                 paddingVertical: 5.5,
                 borderRadius: 999,
@@ -235,9 +239,13 @@ export const ProductSellerProfileCard = memo(function ProductSellerProfileCard({
                 borderColor: followed ? theme.border : theme.ink,
                 alignItems: 'center',
                 justifyContent: 'center',
-                opacity: pressed ? 0.8 : 1,
-              })}
+              }}
             >
+              {followed ? (
+                <Feather name="check" size={12} color={theme.ink} />
+              ) : (
+                <Feather name="plus" size={12} color={theme.background} />
+              )}
               <Text
                 style={{
                   fontSize: 12,
@@ -247,7 +255,7 @@ export const ProductSellerProfileCard = memo(function ProductSellerProfileCard({
               >
                 {followed ? 'Following' : 'Follow'}
               </Text>
-            </Pressable>
+            </PressableScale>
 
             {/* Message Icon */}
             <Pressable

@@ -20,7 +20,6 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { colors } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
-import { useToast } from '@/lib/toast';
 import { toggleLike } from '@/lib/listings';
 import { toggleSave } from '@/lib/saves';
 import { toggleFollow } from '@/lib/follows';
@@ -51,7 +50,6 @@ const Ctx = createContext<GuestGateApi | undefined>(undefined);
 export function GuestGateProvider({ children }: { children: ReactNode }) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const toast = useToast();
   const [content, setContent] = useState<GuestPrompt | null>(null);
   // The pending resume intent survives the trip to the auth screen.
   const resumeRef = useRef<ResumeIntent | null>(null);
@@ -87,19 +85,16 @@ export function GuestGateProvider({ children }: { children: ReactNode }) {
       try {
         if (intent.kind === 'like') {
           await toggleLike(intent.listingId, cur, false);
-          toast.show('Added to your favorites', { variant: 'success', icon: 'heart' });
         } else if (intent.kind === 'save') {
           await toggleSave(intent.listingId, cur, false);
-          toast.show('Saved', { variant: 'success', icon: 'bookmark' });
         } else if (intent.kind === 'follow') {
           await toggleFollow(cur, intent.sellerId, false);
-          toast.show('Following', { variant: 'info', icon: 'user-check' });
         }
       } catch {
         // Silent — the user can retry the action manually now that they're in.
       }
     })();
-  }, [user?.id, toast]);
+  }, [user?.id]);
 
   // Stable value so consumers' useCallback deps don't churn every render.
   const api = useMemo(() => ({ prompt }), [prompt]);

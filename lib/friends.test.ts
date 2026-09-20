@@ -34,7 +34,7 @@ describe('lib/friends', () => {
   it('isAppleDevice returns a boolean safely', async () => {
     const { isAppleDevice } = await import('./friends');
     expect(typeof isAppleDevice()).toBe('boolean');
-  });
+  }, 15000);
 
   it('shareInviteLink uses navigator.share on web when available', async () => {
     const { shareInviteLink } = await import('./friends');

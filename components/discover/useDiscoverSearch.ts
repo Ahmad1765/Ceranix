@@ -248,7 +248,6 @@ export function useDiscoverSearch({
       toast.show("Couldn't save the search", { variant: 'default', icon: 'alert-triangle' });
     } else {
       setSavedKey(currentSaveKey);
-      toast.show('Search saved', { variant: 'success', icon: 'bookmark' });
     }
     setSavingSearch(false);
   }, [user, currentSaveKey, savingSearch, query, browseCat, toast]);

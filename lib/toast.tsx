@@ -64,7 +64,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   // entire app. The useRef form also builds a throwaway Animated.Value on every
   // render (useRef keeps only the first); the lazy initializer runs once.
   // Semantics are identical: one instance per component lifetime.
-  const [translateY] = useState(() => new Animated.Value(-120));
+  const [translateY] = useState(() => new Animated.Value(50));
   const [opacity] = useState(() => new Animated.Value(0));
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const counter = useRef(0);
@@ -91,7 +91,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     (cb?: () => void) => {
       Animated.parallel([
         Animated.timing(translateY, {
-          toValue: -120,
+          toValue: 50,
           duration: 180,
           easing: Easing.in(Easing.cubic),
           useNativeDriver: USE_NATIVE_DRIVER,
@@ -175,9 +175,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         <Animated.View
           style={{
             position: 'absolute',
-            top: insets.top + 8,
+            bottom: Math.max(insets.bottom + 84, 96),
             left: 16,
             right: 16,
+            alignItems: 'center',
             zIndex: 10000,
             transform: [{ translateY }],
             opacity,
@@ -187,6 +188,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         >
           <View
             style={{
+              maxWidth: 420,
+              width: '100%',
               backgroundColor: v.bg,
               borderRadius: 14,
               flexDirection: 'row',
@@ -197,12 +200,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               ...Platform.select({
                 ios: {
                   shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 8 },
-                  shadowOpacity: 0.25,
-                  shadowRadius: 16,
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 14,
                 },
                 android: { elevation: 6 },
-                default: { boxShadow: '0px 8px 16px rgba(0,0,0,0.25)' },
+                default: { boxShadow: '0px 4px 16px rgba(0,0,0,0.20)' },
               }),
             }}
           >

@@ -2,7 +2,6 @@ import { View, Pressable } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import { tap } from '@/lib/haptics';
-import { useToast } from '@/lib/toast';
 import { useTheme, type ThemeMode } from '@/context/ThemeContext';
 import { SheetModal, SheetLabel } from './Sheet';
 
@@ -40,15 +39,10 @@ export function ThemeSheet({
   onClose: () => void;
 }) {
   const { theme, mode, isDark, setThemeMode } = useTheme();
-  const toast = useToast();
 
   const handleSelect = (nextMode: ThemeMode) => {
     tap('light');
     setThemeMode(nextMode);
-    toast.show(`Theme updated: ${nextMode.charAt(0).toUpperCase() + nextMode.slice(1)}`, {
-      variant: 'default',
-      icon: nextMode === 'dark' ? 'moon' : nextMode === 'light' ? 'sun' : 'monitor',
-    });
   };
 
   return (

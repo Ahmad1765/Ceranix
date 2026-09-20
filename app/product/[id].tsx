@@ -359,13 +359,8 @@ export default function ProductScreen() {
     } else {
       const nowFollowing = next.isFollowing;
       if (nowFollowing) capture('seller_followed', { seller_id: sellerId });
-      toast.show(nowFollowing ? `Following @${sellerHandle}` : 'Unfollowed', {
-        variant: nowFollowing ? 'info' : 'default',
-        icon: nowFollowing ? 'user-check' : 'user-x',
-        action: nowFollowing ? { label: 'Undo', onPress: undoFollow } : undefined,
-      });
     }
-  }, [user, sellerId, followBusy, listing?.seller?.username, followed, toggleFollowM, guestGate, toast]);
+  }, [user, sellerId, followBusy, followed, toggleFollowM, guestGate, toast]);
 
   const openChat = useCallback((mode: 'message' | 'offer') => {
     tap('medium');

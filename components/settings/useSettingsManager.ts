@@ -211,12 +211,8 @@ export function useSettingsManager() {
         return;
       }
       await refreshProfile();
-      toast.show(next ? 'Vacation mode on' : 'Vacation mode off', {
-        variant: next ? 'info' : 'default',
-        icon: next ? 'sun' : 'check',
-      });
     },
-    [user?.id, refreshProfile, toast],
+    [user?.id, refreshProfile],
   );
 
   const setBundlePct = useCallback(
@@ -235,12 +231,8 @@ export function useSettingsManager() {
         return;
       }
       await refreshProfile();
-      toast.show(clamped > 0 ? `Bundle discount: ${clamped}%` : 'Bundle discount off', {
-        variant: 'success',
-        icon: 'check',
-      });
     },
-    [user?.id, refreshProfile, toast],
+    [user?.id, refreshProfile],
   );
 
   const savedCollectionPrivacy: 'public' | 'private' = profile?.saved_collection_privacy ?? 'public';
@@ -260,17 +252,8 @@ export function useSettingsManager() {
         return;
       }
       await refreshProfile();
-      toast.show(
-        privacy === 'public'
-          ? 'Saved collection is now Public'
-          : 'Saved collection is now Private',
-        {
-          variant: 'success',
-          icon: 'check',
-        },
-      );
     },
-    [user?.id, refreshProfile, toast],
+    [user?.id, refreshProfile],
   );
 
   const openSystemSettings = useCallback(async () => {
