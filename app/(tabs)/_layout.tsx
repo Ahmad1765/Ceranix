@@ -16,6 +16,12 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="discover"
         options={{ title: 'Categories' }}
+        listeners={{
+          tabPress: (e) => {
+            e.preventDefault();
+            openDiscoverSheet();
+          },
+        }}
       />
       {/* Wardrobe tab hidden 2026-07-04. Route file app/(tabs)/wardrobe.tsx is untouched.
           To restore: swap options back to { title: 'Wardrobe' }. */}
