@@ -27,7 +27,7 @@ describe('SoldBadge Component', () => {
     expect(rendered.props.children.props.children).toBe('Sold');
     expect(rendered.props.style[0]).toMatchObject({
       backgroundColor: '#6C47FF',
-      borderRadius: 4,
+      borderRadius: 0,
       paddingHorizontal: 13,
       paddingVertical: 5.5,
     });

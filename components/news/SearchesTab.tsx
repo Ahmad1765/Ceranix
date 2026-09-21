@@ -14,6 +14,7 @@ import {
   useDeleteSavedSearch,
 } from '@/lib/queries';
 import { DropAlertSheet } from '@/components/DropAlertSheet';
+import { NewsSkeletonList } from './NewsRowSkeleton';
 import { radii, type as typography } from '@/lib/theme';
 import type { SavedSearch } from '@/lib/savedSearches';
 
@@ -266,41 +267,45 @@ export function SearchesTab({ bottomInset = 24 }: { bottomInset?: number }) {
         </Pressable>
       </View>
 
-      <FlatList
-        data={searches}
-        keyExtractor={(item) => item.id}
-        renderItem={renderSearchItem}
-        ItemSeparatorComponent={RowSeparator}
-        contentContainerStyle={
-          searches.length === 0 ? { flex: 1 } : { paddingBottom: bottomInset }
-        }
-        removeClippedSubviews={Platform.OS === 'android'}
-        ListEmptyComponent={
-          <EmptyState
-            icon="bookmark"
-            title="No saved searches yet"
-            description="Track your favorite brands, aesthetics, or categories to get instant alerts whenever new matching items drop."
-            cta={{
-              label: 'Create an alert',
-              icon: 'plus',
-              onPress: () => {
-                if (!userId) {
-                  router.push('/auth/login' as any);
-                } else {
-                  setAlertSheetOpen(true);
-                }
-              },
-            }}
-          />
-        }
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={theme.purple}
-          />
-        }
-      />
+      {searchesQ.isLoading && searches.length === 0 ? (
+        <NewsSkeletonList count={4} />
+      ) : (
+        <FlatList
+          data={searches}
+          keyExtractor={(item) => item.id}
+          renderItem={renderSearchItem}
+          ItemSeparatorComponent={RowSeparator}
+          contentContainerStyle={
+            searches.length === 0 ? { flex: 1 } : { paddingBottom: bottomInset }
+          }
+          removeClippedSubviews={Platform.OS === 'android'}
+          ListEmptyComponent={
+            <EmptyState
+              icon="bookmark"
+              title="No saved searches yet"
+              description="Track your favorite brands, aesthetics, or categories to get instant alerts whenever new matching items drop."
+              cta={{
+                label: 'Create an alert',
+                icon: 'plus',
+                onPress: () => {
+                  if (!userId) {
+                    router.push('/auth/login' as any);
+                  } else {
+                    setAlertSheetOpen(true);
+                  }
+                },
+              }}
+            />
+          }
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={theme.purple}
+            />
+          }
+        />
+      )}
 
       {userId ? (
         <DropAlertSheet

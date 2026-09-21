@@ -24,7 +24,7 @@ export const SoldBadge = memo(function SoldBadge({ size = 'md', style }: SoldBad
           backgroundColor: BRAND_PURPLE,
           paddingHorizontal: isLg ? 18 : isSm ? 10 : 13,
           paddingVertical: isLg ? 7 : isSm ? 4 : 5.5,
-          borderRadius: 4,
+          borderRadius: 0,
           alignItems: 'center',
           justifyContent: 'center',
           shadowColor: '#000',

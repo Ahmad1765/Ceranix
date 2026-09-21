@@ -148,6 +148,9 @@ export function useToggleLike(userId: string | null) {
       updateLikedCache(userId as string, listingId, currentlyLiked);
       if (ctx) patchListing(qc, listingId, { likes: ctx.prevLikes });
     },
+    onSettled: (_data, _error, { listingId }) => {
+      qc.invalidateQueries({ queryKey: qk.listingLikers(listingId) });
+    },
   });
 }
 

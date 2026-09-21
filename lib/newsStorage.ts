@@ -44,6 +44,30 @@ export async function markNewsItemOpened(id: string): Promise<void> {
   listeners.forEach((listener) => listener(cachedOpenedIds!));
 }
 
+export async function markNewsItemsOpened(ids: string[]): Promise<void> {
+  if (!ids || ids.length === 0) return;
+  const currentSet = await loadOpenedIds();
+  const items = Array.from(currentSet);
+  let changed = false;
+  for (const id of ids) {
+    if (id && !currentSet.has(id)) {
+      items.push(id);
+      currentSet.add(id);
+      changed = true;
+    }
+  }
+  if (!changed) return;
+
+  const trimmed = items.length > MAX_OPENED_NEWS_ITEMS ? items.slice(-MAX_OPENED_NEWS_ITEMS) : items;
+  cachedOpenedIds = new Set(trimmed);
+  try {
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+  } catch (e) {
+    console.warn('[newsStorage] failed to persist opened items', e);
+  }
+  listeners.forEach((listener) => listener(cachedOpenedIds!));
+}
+
 export function _resetOpenedNewsIdsForTesting(): void {
   cachedOpenedIds = null;
   listeners.clear();
@@ -52,6 +76,7 @@ export function _resetOpenedNewsIdsForTesting(): void {
 export function useOpenedNewsIds(): {
   openedIds: Set<string>;
   markOpened: (id: string) => Promise<void>;
+  markAllOpened: (ids: string[]) => Promise<void>;
   isOpened: (id: string) => boolean;
 } {
   const [openedIds, setOpenedIds] = useState<Set<string>>(cachedOpenedIds ?? new Set());
@@ -63,7 +88,7 @@ export function useOpenedNewsIds(): {
     });
 
     const handler = (newSet: Set<string>) => {
-      if (mounted) setOpenedIds(new Set(newSet));
+      if (mounted) setOpenedIds(newSet);
     };
 
     listeners.add(handler);
@@ -77,7 +102,11 @@ export function useOpenedNewsIds(): {
     await markNewsItemOpened(id);
   }, []);
 
+  const markAllOpened = useCallback(async (ids: string[]) => {
+    await markNewsItemsOpened(ids);
+  }, []);
+
   const isOpened = useCallback((id: string) => openedIds.has(id), [openedIds]);
 
-  return { openedIds, markOpened, isOpened };
+  return { openedIds, markOpened, markAllOpened, isOpened };
 }

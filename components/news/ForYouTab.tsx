@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { usePriceDropsQuery, useMyFeedListingsQuery } from '@/lib/queries';
 import { useOpenedNewsIds } from '@/lib/newsStorage';
 import { BRAND } from '@/lib/brand';
+import { NewsRowSkeleton, NewsSkeletonList } from './NewsRowSkeleton';
 import { NewsActivityRow, type ActivityItem } from './NewsActivityRow';
 import type { Listing } from '@/types';
 
@@ -24,6 +25,7 @@ export function ForYouTab({ bottomInset = 24 }: { bottomInset?: number }) {
   const priceDropsQ = usePriceDropsQuery(userId);
   const myFeedQ = useMyFeedListingsQuery(userId);
 
+  const isLoading = (userId ? priceDropsQ.isLoading || myFeedQ.isLoading : false);
   const refreshing = priceDropsQ.isRefetching || myFeedQ.isRefetching;
 
   const onRefresh = useCallback(async () => {
@@ -65,13 +67,23 @@ export function ForYouTab({ bottomInset = 24 }: { bottomInset?: number }) {
       });
     });
 
-    return list.filter((item) => !openedIds.has(item.id));
-  }, [priceDropsQ.data, myFeedQ.data, openedIds]);
+    return list;
+  }, [priceDropsQ.data, myFeedQ.data]);
 
   const renderItem = useCallback(
-    ({ item }: { item: ActivityItem }) => <NewsActivityRow item={item} />,
-    [],
+    ({ item }: { item: ActivityItem }) => (
+      <NewsActivityRow item={item} isRead={openedIds.has(item.id)} />
+    ),
+    [openedIds],
   );
+
+  if (isLoading && activities.length === 0) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.background }}>
+        <NewsSkeletonList count={5} />
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>

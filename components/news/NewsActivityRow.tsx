@@ -75,7 +75,13 @@ function haptic() {
   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 }
 
-export const NewsActivityRow = memo(function NewsActivityRow({ item }: { item: ActivityItem }) {
+export const NewsActivityRow = memo(function NewsActivityRow({
+  item,
+  isRead = false,
+}: {
+  item: ActivityItem;
+  isRead?: boolean;
+}) {
   const { theme } = useTheme();
 
   const handlePress = () => {
@@ -177,7 +183,7 @@ export const NewsActivityRow = memo(function NewsActivityRow({ item }: { item: A
             borderColor: theme.border,
           }}
         >
-          <Feather name="trending-down" size={18} color={theme.ink} />
+          <Feather name="trending-down" size={18} color={theme.purple} />
         </View>
       ) : (
         <View
@@ -254,7 +260,18 @@ export const NewsActivityRow = memo(function NewsActivityRow({ item }: { item: A
             <>
               {'Price dropped on '}
               <Text style={{ fontFamily: typography.family.sansBold }}>{`'${item.listing.title}'`}</Text>
-              {item.listing.new_price != null ? ` to Rs ${item.listing.new_price.toLocaleString()}` : ''}
+              {item.listing.new_price != null ? (
+                <>
+                  {item.listing.old_price != null && item.listing.old_price > item.listing.new_price ? (
+                    <Text style={{ color: theme.mute, textDecorationLine: 'line-through' }}>
+                      {` Rs ${item.listing.old_price.toLocaleString()}`}
+                    </Text>
+                  ) : null}
+                  <Text style={{ fontFamily: typography.family.sansBold, color: theme.purple }}>
+                    {` → Rs ${item.listing.new_price.toLocaleString()}`}
+                  </Text>
+                </>
+              ) : ''}
             </>
           )}
 
@@ -267,16 +284,28 @@ export const NewsActivityRow = memo(function NewsActivityRow({ item }: { item: A
           )}
         </Text>
 
-        <Text
-          style={{
-            fontFamily: typography.family.sans,
-            fontSize: 12,
-            color: theme.mute,
-            marginTop: 3,
-          }}
-        >
-          {relativeTime(item.created_at)}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
+          {!isRead && (
+            <View
+              style={{
+                width: 6.5,
+                height: 6.5,
+                borderRadius: 3.5,
+                backgroundColor: theme.purple,
+              }}
+            />
+          )}
+          <Text
+            style={{
+              fontFamily: typography.family.sans,
+              fontSize: 12,
+              color: !isRead ? theme.purple : theme.mute,
+              fontWeight: !isRead ? '600' : 'normal',
+            }}
+          >
+            {relativeTime(item.created_at)}
+          </Text>
+        </View>
       </View>
 
       {/* Right Column: Listing thumbnail or Target User avatar */}

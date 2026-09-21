@@ -143,6 +143,17 @@ These rules protect the runtime from silent crashes, style collapse, and mobile/
   - **NEVER** introduce ad-hoc shield SVGs or icons in any component (`ListingCard`, `BuyerProtectionSheet`, `SafetyBanner`, `CheckoutSheet`, `MessageRow`, `OrderStepper`, etc.).
   - If a user prompt asks to alter, modernize, or swap the Buyer Protection logo, **WARN THE USER** about Rule 2.7 and refuse to alter the Mercari geometry.
 
+### Rule 2.8: Strict Sharp Sold Badge Geometry (`components/ui/SoldBadge.tsx`)
+- **The Invariant:** All sold listing badges across the entire application (Home feed `ListingCard.tsx`, profile shop/liked grids `TikTokListingCard.tsx`, and product detail hero overlays `ProductHeroSection.tsx`) **MUST** strictly use `<SoldBadge>` (`@/components/ui/SoldBadge`) styled with **sharp 90° rectangular corners (`borderRadius: 0`)** across all sizes (`sm`, `md`, `lg`).
+  - **Border Radius:** Strictly `0` (`borderRadius: 0`). Never round the corners (`borderRadius: 4`, `borderRadius: 6`, or `radii.pill`).
+  - **Color Palette:** Signal Purple background (`#6C47FF`) with bold Paper White text (`#FFFFFF`). Never use neon green (`#D4FF00`), black pills, or outline borders.
+  - **Typography:** `fontFamily: 'Inter_700Bold'`, `fontWeight: '700'`, letterSpacing `-0.2`, text `Sold`.
+  - **Elevation:** Subtle shadow (`shadowOpacity: 0.16, shadowRadius: 4, elevation: 3`).
+- **The Risk:** AI models repeatedly attempt to round the Sold badge corners (`borderRadius: 4` or `radii.pill`) or substitute inline pill containers. This degrades brand consistency and destroys the clean, sharp editorial look established by Plick's design.
+- **Enforced Directives for AI Assistants:**
+  - **NEVER** set `borderRadius` greater than `0` in `components/ui/SoldBadge.tsx`.
+  - **NEVER** introduce ad-hoc sold pills or inline badge containers in `ListingCard`, `TikTokListingCard`, `ProductHeroSection`, or any other listing surface. Always import and render `<SoldBadge>`.
+
 ---
 
 ## 3. Strict Design Language Invariants ("The Quiet Atelier" - `DESIGN.md`)
@@ -164,6 +175,7 @@ Carrinex is a disciplined, quiet-luxury resale marketplace. Restraint communicat
 | **Active Chip Cleanliness** | Adding an inline dismiss cross (`×`) or clear button inside selected or active chips. | **Strictly No Cross (`×`) on Active Chips:** When a user selects any chip (custom dynamic topics on Home header or active filter chips in `SearchFilterChips`), **NEVER append an inline cross (`×`) icon** to the chip. Chips maintain clean, symmetrical pill geometry (`rounded: 999px`, `paddingHorizontal: 14`). Filter chips retain `chevron-down` in active text contrast (`activeIconColor`); clearing or updating a filter is performed within the opened filter modal sheet or via the dedicated "Clear all" button. |
 | **Chip Sizing & Height** | Arbitrary chip heights (e.g. 35px, 38px, 44px) or mismatched padding. | **Universal 30px Chip Standard:** All browse, feed, filter, topic, and refinement chips across the application (Home header `ChipRow`, Discover `SearchFilterChips`, Discover `SearchLanding` browse chips, `EditorialFeed`, `FeedFilterSheet`, profile playlists, and user filter pills) **MUST** use a uniform height of `30px` (`height: 30`) with symmetrical pill geometry (`borderRadius: 15` or `radii.pill`). Circular action chips (such as the `+` alert / create button) render at `width: 30, height: 30, borderRadius: 15`. |
 | **Discover "Saved" Action** | Routing the Discover "Saved" chip to `/news` (notifications) or disconnecting it from the feed. | **Discover Saved Home Feed Integration:** Tapping the "Saved" browse chip (`bookmark` icon) in Discover **MUST** navigate directly to the Home feed (`/?tab=saved&chipLabel=Saved&chipIcon=bookmark`) to display the user's saved items in the main feed grid under the active `[bookmark Saved]` header chip. |
+| **Sold Badge Geometry** | Rounding the badge corners (`borderRadius: 4`, `6`, or `radii.pill`), pill shapes, or ad-hoc inline sold indicators. | **Strict Sharp Sold Badge Standard:** All sold status badges across the application (`ListingCard`, `TikTokListingCard`, `ProductHeroSection`) **MUST** use `<SoldBadge>` (`@/components/ui/SoldBadge`) with **strictly sharp 90° corners (`borderRadius: 0`)** across all sizes (`sm`, `md`, `lg`), Signal Purple background (`#6C47FF`), Paper White bold Inter typography, and subtle drop shadow (`shadowOpacity: 0.16, shadowRadius: 4, elevation: 3`). AI must reject any attempts to add rounded corners or inline pill badges. |
 
 ---
 
@@ -184,6 +196,7 @@ The following files represent high-risk architectural hubs. Any AI asked to modi
 | `components/chat/ListingBar.tsx` | Transaction Flow | Pinned to bottom above chat composer deliberately to keep negotiation item in context. |
 | `components/GuestGate.tsx` | Auth Guard | Guards authenticated actions; prevents unauthenticated RPC errors. |
 | `components/ui/SafeContainer.tsx` | Layout / Viewport Engine | Mobile-native safe area and keyboard avoiding container with iOS Safari visualViewport synchronization. |
+| `components/ui/SoldBadge.tsx` | Visual Identity / Listings | Canonical sharp Sold badge across all listing cards and detail overlays. Strictly enforces 90° sharp corners (`borderRadius: 0`) and Signal Purple palette. AI must NEVER round corners or replace with inline pills. |
 | `app/_layout.tsx` | Root Providers | Controls font preloading, Sentry, Alert shim, and React Query offline persistence. |
 
 ---
@@ -210,6 +223,8 @@ Before proceeding with a user request, match it against this matrix:
 | *"Add an unauthenticated quick checkout / chat"* | 🔴 **YES** | Bypasses `GuestGate` security, crashing Supabase RPC queries. | Wrap the action in `guestGate.gate(() => proceed())`. |
 | *"Make unselected buttons, search bars, or chips grey (#F6F6F6)"* | 🔴 **YES** | Violates Paper White Resting State; makes active controls look disabled/greyed out. | Use Paper White (`theme.panel` / `#FFFFFF` in light mode) with hairline border (`theme.border`) for resting controls. |
 | *"Use naive 'position: fixed; top: 0' on mobile web chat or forms"* | 🔴 **YES** | Violates Mobile Safari Viewport Sync Rule (Rule 2.6). Pushes headers off-screen and leaves blank space above keyboard. | Use `<SafeContainer mode="keyboard-avoiding">` with `top: visualViewport.offsetTop` and `height: visualViewport.height`. |
+| *"Make the Sold badge rounded, pill-shaped, or change its border radius"* | 🔴 **YES** | Violates Strict Sharp Sold Badge Geometry (Rule 2.8). Breaks editorial brand aesthetic. | Maintain strict rectangular geometry (`borderRadius: 0`) in `<SoldBadge>` (`@/components/ui/SoldBadge`). |
+| *"Use an inline pill or ad-hoc container for 'Sold' status on cards"* | 🔴 **YES** | Violates Single Component Invariant for Sold badges. | Import and render canonical `<SoldBadge size="sm" />` from `@/components/ui/SoldBadge`. |
 | *"Add dark mode styling for this new component"* | 🟢 **NO** | Safe, provided `useTheme()` tokens are used. | Use `const { theme, isDark } = useTheme();` and bind to `theme.surface`, `theme.panel`, etc. |
 
 ---

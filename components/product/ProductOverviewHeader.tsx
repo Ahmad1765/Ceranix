@@ -24,7 +24,6 @@ import {
 import type { Listing, ListingLiker } from '@/types';
 import { Platform } from 'react-native';
 
-const FIGTREE_FONT = Platform.OS === 'web' ? 'Figtree, sans-serif' : 'Figtree';
 
 type ProductOverviewHeaderProps = {
   listing: Listing;
@@ -44,7 +43,7 @@ export const ProductOverviewHeader = memo(function ProductOverviewHeader({
   onOpenLikersSheet,
 }: ProductOverviewHeaderProps) {
   const { theme, isDark } = useTheme();
-  const heartCount = Math.max(0, Number(listing.likes ?? 0));
+  const heartCount = Math.max(0, Number(listing.likes ?? 0), likers?.length ?? 0);
   const itemPrice = Number(listing.price ?? 0);
 
   // Metadata segments (only non-empty values)
@@ -87,35 +86,34 @@ export const ProductOverviewHeader = memo(function ProductOverviewHeader({
             style={{
               fontSize: 13,
               color: theme.mute,
-              fontFamily: FIGTREE_FONT,
             }}
           >
             Liked by{' '}
             {likers && likers.length > 0 ? (
               likers.length === 1 ? (
-                <Text style={{ fontWeight: '700', color: theme.ink, fontFamily: FIGTREE_FONT }}>
+                <Text style={{ fontWeight: '700', color: theme.ink }}>
                   @{likers[0].username}
                 </Text>
               ) : likers.length === 2 ? (
                 <>
-                  <Text style={{ fontWeight: '700', color: theme.ink, fontFamily: FIGTREE_FONT }}>
+                  <Text style={{ fontWeight: '700', color: theme.ink }}>
                     @{likers[0].username}
                   </Text>
                   {' and '}
-                  <Text style={{ fontWeight: '700', color: theme.ink, fontFamily: FIGTREE_FONT }}>
+                  <Text style={{ fontWeight: '700', color: theme.ink }}>
                     @{likers[1].username}
                   </Text>
                 </>
               ) : (
                 <>
-                  <Text style={{ fontWeight: '700', color: theme.ink, fontFamily: FIGTREE_FONT }}>
+                  <Text style={{ fontWeight: '700', color: theme.ink }}>
                     @{likers[0].username}
                   </Text>
                   {` and ${heartCount > 1 ? heartCount - 1 : likers.length - 1} others`}
                 </>
               )
             ) : (
-              <Text style={{ fontWeight: '700', color: theme.ink, fontFamily: FIGTREE_FONT }}>
+              <Text style={{ fontWeight: '700', color: theme.ink }}>
                 {heartCount} {heartCount === 1 ? 'person' : 'people'}
               </Text>
             )}

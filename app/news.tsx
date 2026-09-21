@@ -8,6 +8,7 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
   LayoutChangeEvent,
+  Platform,
 } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,7 +17,15 @@ import { useTheme } from '@/context/ThemeContext';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { safeBack } from '@/lib/nav';
 import { useAuth } from '@/lib/auth';
-import { useActivityUnreadCount } from '@/lib/queries';
+import { useToast } from '@/lib/toast';
+import { useOpenedNewsIds } from '@/lib/newsStorage';
+import {
+  useActivityUnreadCount,
+  useNewFromFollowedQuery,
+  useFeedListingsQuery,
+  usePriceDropsQuery,
+  useMyFeedListingsQuery,
+} from '@/lib/queries';
 import {
   NewsUnderlineTabs,
   NEWS_TABS,
@@ -30,13 +39,55 @@ export default function NewsScreen() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const toast = useToast();
   const { width: pageWidth } = useWindowDimensions();
 
   const [activeTab, setActiveTab] = useState<NewsTab>('following');
   const [pagerHeight, setPagerHeight] = useState(0);
 
-  const unreadMatches = useActivityUnreadCount(user?.id ?? null);
-  const tabBadges = useMemo(() => ({ searches: unreadMatches }), [unreadMatches]);
+  const { openedIds, markAllOpened } = useOpenedNewsIds();
+  const userId = user?.id ?? null;
+
+  const followedQ = useNewFromFollowedQuery(userId);
+  const communityQ = useFeedListingsQuery({ tab: 'popular', limit: 16 });
+  const priceDropsQ = usePriceDropsQuery(userId);
+  const myFeedQ = useMyFeedListingsQuery(userId);
+  const unreadMatches = useActivityUnreadCount(userId);
+
+  const unreadFollowing = useMemo(() => {
+    const list = followedQ.data && followedQ.data.length > 0 ? followedQ.data : (communityQ.data ?? []);
+    return list.filter((l) => !openedIds.has(`listing-${l.id}`)).length;
+  }, [followedQ.data, communityQ.data, openedIds]);
+
+  const unreadForYou = useMemo(() => {
+    let count = 0;
+    (priceDropsQ.data ?? []).forEach((d) => {
+      if (!openedIds.has(`drop-${d.id}-${d.changed_at}`)) count++;
+    });
+    (myFeedQ.data ?? []).slice(0, 16).forEach((l) => {
+      if (!openedIds.has(`foryou-${l.id}`)) count++;
+    });
+    return count;
+  }, [priceDropsQ.data, myFeedQ.data, openedIds]);
+
+  const tabBadges = useMemo(
+    () => ({
+      following: unreadFollowing,
+      for_you: unreadForYou,
+      searches: unreadMatches,
+    }),
+    [unreadFollowing, unreadForYou, unreadMatches],
+  );
+
+  const handleMarkAllRead = useCallback(async () => {
+    const idsToMark: string[] = [];
+    (followedQ.data ?? []).forEach((l) => idsToMark.push(`listing-${l.id}`));
+    (communityQ.data ?? []).forEach((l) => idsToMark.push(`listing-${l.id}`));
+    (priceDropsQ.data ?? []).forEach((d) => idsToMark.push(`drop-${d.id}-${d.changed_at}`));
+    (myFeedQ.data ?? []).forEach((l) => idsToMark.push(`foryou-${l.id}`));
+    await markAllOpened(idsToMark);
+    toast.show('All notifications marked as read', { variant: 'info', icon: 'check-circle' });
+  }, [followedQ.data, communityQ.data, priceDropsQ.data, myFeedQ.data, markAllOpened, toast]);
 
   const pagerRef = useRef<FlatList<{ value: NewsTab; label: string }>>(null);
   const [scrollX] = useState(() => new Animated.Value(0));
@@ -88,7 +139,7 @@ export default function NewsScreen() {
       activeTabRef.current = tab;
       setActiveTab(tab);
       ignoreListenerUntilRef.current = Date.now() + 450;
-      pagerRef.current?.scrollToOffset({ offset: to * pageWidth, animated: true });
+      pagerRef.current?.scrollToOffset({ offset: to * pageWidth, animated: Platform.OS !== 'web' });
     },
     [pageWidth],
   );
@@ -124,6 +175,7 @@ export default function NewsScreen() {
   );
 
   const tabWidth = Math.min(pageWidth, 680);
+  const totalUnread = unreadFollowing + unreadForYou + unreadMatches;
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.background }}>
@@ -167,8 +219,37 @@ export default function NewsScreen() {
             News
           </Text>
 
-          {/* Spacer to keep title centered */}
-          <View style={{ width: 38, height: 38 }} />
+          {/* Right Action: Mark all read if unread exist, or balance spacer */}
+          {totalUnread > 0 ? (
+            <Pressable
+              onPress={handleMarkAllRead}
+              hitSlop={HIT_SLOP_8}
+              accessibilityRole="button"
+              accessibilityLabel="Mark all as read"
+              style={({ pressed }) => ({
+                height: 38,
+                paddingHorizontal: 8,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 4,
+                opacity: pressed ? 0.6 : 1,
+              })}
+            >
+              <Feather name="check-circle" size={15} color={theme.purple} />
+              <Text
+                style={{
+                  fontSize: 12.5,
+                  fontWeight: '600',
+                  color: theme.purple,
+                }}
+              >
+                Mark read
+              </Text>
+            </Pressable>
+          ) : (
+            <View style={{ width: 38, height: 38 }} />
+          )}
         </View>
 
         {/* Underline Tabs: Following | For you | Searches */}

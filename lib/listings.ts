@@ -667,7 +667,7 @@ export async function fetchListingLikers(listingId: string): Promise<ListingLike
   try {
     const { data, error } = await supabase
       .from('listing_likes')
-      .select('id, user_id, created_at, profiles:user_id(username, full_name, avatar_url, is_verified)')
+      .select('user_id, created_at, profiles:user_id(username, full_name, avatar_url, is_verified)')
       .eq('listing_id', listingId)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -682,7 +682,7 @@ export async function fetchListingLikers(listingId: string): Promise<ListingLike
     return data.map((row: any) => {
       const p = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
       return {
-        id: row.id,
+        id: `${row.user_id}-${listingId}`,
         user_id: row.user_id,
         username: p?.username || 'user',
         full_name: p?.full_name || null,

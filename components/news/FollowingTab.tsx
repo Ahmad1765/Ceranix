@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useNewFromFollowedQuery, useFeedListingsQuery } from '@/lib/queries';
 import { useOpenedNewsIds } from '@/lib/newsStorage';
+import { NewsRowSkeleton, NewsSkeletonList } from './NewsRowSkeleton';
 import { NewsActivityRow, type ActivityItem } from './NewsActivityRow';
 import type { Listing } from '@/types';
 
@@ -25,6 +26,7 @@ export function FollowingTab({ bottomInset = 24 }: { bottomInset?: number }) {
   // Community active listings as fallback/discover feed if followed is empty
   const communityQ = useFeedListingsQuery({ tab: 'popular', limit: 16 });
 
+  const isLoading = (userId ? followedQ.isLoading : false) || (communityQ.isLoading && !followedQ.data);
   const refreshing = followedQ.isRefetching || communityQ.isRefetching;
 
   const onRefresh = useCallback(async () => {
@@ -40,29 +42,37 @@ export function FollowingTab({ bottomInset = 24 }: { bottomInset?: number }) {
 
     const source = followedListings.length > 0 ? followedListings : communityListings;
 
-    return source
-      .map((listing: Listing) => {
-        const seller = listing.seller;
-        return {
-          id: `listing-${listing.id}`,
-          kind: 'listing_created' as const,
-          actor: {
-            id: seller?.id || 'seller',
-            username: seller?.username || 'Seller',
-            full_name: seller?.full_name || seller?.username || 'Creator',
-            avatar_url: seller?.avatar_url,
-          },
-          listing,
-          created_at: listing.created_at,
-        };
-      })
-      .filter((item) => !openedIds.has(item.id));
-  }, [followedQ.data, communityQ.data, openedIds]);
+    return source.map((listing: Listing) => {
+      const seller = listing.seller;
+      return {
+        id: `listing-${listing.id}`,
+        kind: 'listing_created' as const,
+        actor: {
+          id: seller?.id || 'seller',
+          username: seller?.username || 'Seller',
+          full_name: seller?.full_name || seller?.username || 'Creator',
+          avatar_url: seller?.avatar_url,
+        },
+        listing,
+        created_at: listing.created_at,
+      };
+    });
+  }, [followedQ.data, communityQ.data]);
 
   const renderItem = useCallback(
-    ({ item }: { item: ActivityItem }) => <NewsActivityRow item={item} />,
-    [],
+    ({ item }: { item: ActivityItem }) => (
+      <NewsActivityRow item={item} isRead={openedIds.has(item.id)} />
+    ),
+    [openedIds],
   );
+
+  if (isLoading && activities.length === 0) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.background }}>
+        <NewsSkeletonList count={5} />
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>

@@ -13,8 +13,6 @@ import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { radii } from '@/lib/theme';
 import type { ListingLiker } from '@/types';
 
-const FIGTREE_FONT = Platform.OS === 'web' ? 'Figtree, sans-serif' : 'Figtree';
-
 function LikerRow({ liker, onClose }: { liker: ListingLiker; onClose: () => void }) {
   const { theme } = useTheme();
   const { user } = useAuth();
@@ -80,7 +78,7 @@ function LikerRow({ liker, onClose }: { liker: ListingLiker; onClose: () => void
               justifyContent: 'center',
             }}
           >
-            <Text style={{ fontFamily: FIGTREE_FONT, fontSize: 16, fontWeight: '700', color: theme.ink }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: theme.ink }}>
               {initial}
             </Text>
           </View>
@@ -94,7 +92,6 @@ function LikerRow({ liker, onClose }: { liker: ListingLiker; onClose: () => void
                 fontSize: 14.5,
                 fontWeight: '700',
                 color: theme.ink,
-                fontFamily: FIGTREE_FONT,
               }}
             >
               {liker.full_name || liker.username}
@@ -106,7 +103,6 @@ function LikerRow({ liker, onClose }: { liker: ListingLiker; onClose: () => void
             style={{
               fontSize: 12.5,
               color: theme.mute,
-              fontFamily: FIGTREE_FONT,
               marginTop: 1,
             }}
           >
@@ -135,7 +131,6 @@ function LikerRow({ liker, onClose }: { liker: ListingLiker; onClose: () => void
             style={{
               fontSize: 12,
               fontWeight: '700',
-              fontFamily: FIGTREE_FONT,
               color: isFollowing ? theme.ink : theme.background,
             }}
           >
@@ -171,7 +166,6 @@ export const LikersSheet = memo(function LikersSheet({
             <Feather name="alert-circle" size={28} color="#EF4444" />
             <Text
               style={{
-                fontFamily: FIGTREE_FONT,
                 fontSize: 14,
                 fontWeight: '700',
                 color: theme.ink,
@@ -183,7 +177,6 @@ export const LikersSheet = memo(function LikersSheet({
             </Text>
             <Text
               style={{
-                fontFamily: FIGTREE_FONT,
                 fontSize: 12.5,
                 color: theme.mute,
                 marginTop: 4,
@@ -211,7 +204,6 @@ export const LikersSheet = memo(function LikersSheet({
                 style={{
                   fontSize: 12.5,
                   fontWeight: '700',
-                  fontFamily: FIGTREE_FONT,
                   color: theme.ink,
                 }}
               >
@@ -224,7 +216,6 @@ export const LikersSheet = memo(function LikersSheet({
             <Feather name="heart" size={28} color={theme.mute} />
             <Text
               style={{
-                fontFamily: FIGTREE_FONT,
                 fontSize: 14,
                 color: theme.mute,
                 marginTop: 8,
