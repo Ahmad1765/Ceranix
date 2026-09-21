@@ -1,10 +1,18 @@
-import { useState, useMemo } from 'react';
-import { View, Pressable, ScrollView, Platform } from 'react-native';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import {
+  View,
+  ScrollView,
+  Pressable,
+  Modal,
+  Platform,
+  BackHandler,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, TextInput } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
-import { radii, type as typography } from '@/lib/theme';
+import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/context/ThemeContext';
-import { BottomSheet } from './BottomSheet';
+import { colors, radii, type as typography } from '@/lib/theme';
 import {
   TAXONOMY_BRANDS,
   UNBRANDED_LOCAL_TAILOR,
@@ -12,7 +20,8 @@ import {
   getBrandsForCategory,
   getRecommendedBrandsForCategory,
 } from '@/lib/taxonomy';
-import * as Haptics from 'expo-haptics';
+import { categoryLabel, subcategoryLabel } from '@/lib/categories';
+import type { Category } from '@/types';
 
 const DISPLAY_BOLD = typography.family.sansBold;
 
@@ -46,9 +55,80 @@ export function BrandSheet({
   onSelectBrand: (brandName: string, isCustom?: boolean) => void;
   onClose: () => void;
 }) {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const [query, setQuery] = useState('');
   const [selectedTier, setSelectedTier] = useState<BrandTier | 'All'>('All');
+  const closedByPopStateRef = useRef(false);
+
+  useEffect(() => {
+    if (visible) {
+      setQuery('');
+      setSelectedTier('All');
+    }
+  }, [visible]);
+
+  const haptic = () => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
+  };
+
+  const handleClose = () => {
+    haptic();
+    onClose();
+  };
+
+  // Hardware back button on Android
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !visible) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleClose();
+      return true;
+    });
+    return () => sub.remove();
+  }, [visible]);
+
+  // Escape key & history sync on Web
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !visible) return;
+
+    closedByPopStateRef.current = false;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    const stateId = `sell_brand_${Date.now()}`;
+    try {
+      window.history.pushState({ sellBrand: stateId }, '', window.location.href);
+    } catch {}
+
+    const handlePopState = () => {
+      closedByPopStateRef.current = true;
+      onClose();
+    };
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('popstate', handlePopState);
+      if (!closedByPopStateRef.current && window.history.state?.sellBrand === stateId) {
+        window.history.back();
+      }
+    };
+  }, [visible]);
+
+  // Category context display name
+  const categoryContextName = useMemo(() => {
+    if (!categoryCode) return null;
+    if (subcategoryId) {
+      return subcategoryLabel(categoryCode as Category, subcategoryId);
+    }
+    return categoryLabel(categoryCode as Category);
+  }, [categoryCode, subcategoryId]);
 
   // Brands strictly matching the selected category and/or subcategory
   const categoryBrands = useMemo(() => {
@@ -56,7 +136,7 @@ export function BrandSheet({
     return getBrandsForCategory(categoryCode || '', subcategoryId);
   }, [categoryCode, subcategoryId]);
 
-  // Recommended brands strictly for this category selection (top curated)
+  // Recommended popular brands strictly for this category selection
   const recommendedBrands = useMemo(() => {
     return getRecommendedBrandsForCategory(categoryCode, subcategoryId);
   }, [categoryCode, subcategoryId]);
@@ -72,19 +152,14 @@ export function BrandSheet({
     const q = query.trim().toLowerCase();
     const hasCategoryFilter = Boolean(categoryCode || subcategoryId);
 
-    if (hasCategoryFilter) {
-      // STRICT FILTERING: When a category is active, ONLY search within this category's brands
-      return categoryBrands.filter((b) => {
-        const matchTier = selectedTier === 'All' || b.tier === selectedTier;
-        const matchQuery = !q || b.name.toLowerCase().includes(q) || b.categoryRelevance.toLowerCase().includes(q);
-        return matchTier && matchQuery;
-      });
-    }
+    const pool = hasCategoryFilter ? categoryBrands : TAXONOMY_BRANDS;
 
-    // When no category is specified, search across all brands
-    return TAXONOMY_BRANDS.filter((b) => {
+    return pool.filter((b) => {
       const matchTier = selectedTier === 'All' || b.tier === selectedTier;
-      const matchQuery = !q || b.name.toLowerCase().includes(q) || b.categoryRelevance.toLowerCase().includes(q);
+      const matchQuery =
+        !q ||
+        b.name.toLowerCase().includes(q) ||
+        b.categoryRelevance.toLowerCase().includes(q);
       return matchTier && matchQuery;
     });
   }, [categoryBrands, categoryCode, subcategoryId, query, selectedTier]);
@@ -95,265 +170,450 @@ export function BrandSheet({
   );
 
   const handleSelect = (brandName: string, isCustom = false) => {
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    }
+    haptic();
     onSelectBrand(brandName, isCustom);
     setQuery('');
     onClose();
   };
 
+  if (!visible) return null;
+
   return (
-    <BottomSheet visible={visible} title="Select Brand" onClose={onClose}>
-      {/* Search Input */}
-      <View
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="fullScreen"
+      transparent={false}
+      onRequestClose={handleClose}
+    >
+      <SafeAreaView
+        edges={['top', 'bottom']}
         style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 10,
-          borderWidth: 1,
-          borderColor: theme.border,
-          borderRadius: radii.xl,
-          backgroundColor: theme.panel,
-          paddingHorizontal: 14,
-          height: 44,
-          marginBottom: 12,
+          flex: 1,
+          backgroundColor: theme.background,
         }}
       >
-        <Feather name="search" size={16} color={theme.mute} />
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Search brands or enter custom…"
-          placeholderTextColor={theme.muteSoft ?? theme.mute}
-          autoCapitalize="words"
-          autoCorrect={false}
-          style={
-            {
-              flex: 1,
-              minWidth: 0,
-              fontSize: 14.5,
-              color: theme.ink,
-              padding: 0,
-              outlineStyle: 'none',
-              outlineWidth: 0,
-            } as any
-          }
-        />
-        {query.length > 0 && (
-          <Pressable onPress={() => setQuery('')} hitSlop={8}>
-            <Feather name="x" size={16} color={theme.mute} />
-          </Pressable>
-        )}
-      </View>
-
-      {/* Tier Filter Chips (Universal 30px Standard) */}
-      {availableTiers.length > 2 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 8, paddingBottom: 14 }}
-        >
-          {availableTiers.map((tier) => {
-            const active = selectedTier === tier;
-            return (
-              <Pressable
-                key={tier}
-                onPress={() => setSelectedTier(tier)}
-                style={({ pressed }) => ({
-                  height: 30,
-                  paddingHorizontal: 14,
-                  borderRadius: 15,
-                  borderWidth: 1,
-                  borderColor: active ? theme.ink : theme.border,
-                  backgroundColor: active ? theme.ink : theme.panel,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  opacity: pressed ? 0.8 : 1,
-                  transform: [{ scale: pressed ? 0.97 : 1 }],
-                })}
-              >
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontFamily: active ? DISPLAY_BOLD : typography.family.sansMedium,
-                    color: active ? theme.background : theme.ink,
-                  }}
-                >
-                  {tier}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      )}
-
-      <ScrollView
-        style={{ maxHeight: Platform.OS === 'web' ? 520 : 440, minHeight: 260 }}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Fast Action: Unbranded / Local Tailor */}
-        <Pressable
-          onPress={() => handleSelect(UNBRANDED_LOCAL_TAILOR, false)}
-          style={({ pressed }) => ({
+        {/* Full Page Navigation Header */}
+        <View
+          style={{
+            height: 56,
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
             paddingHorizontal: 16,
-            paddingVertical: 12,
-            borderRadius: radii.lg,
-            borderWidth: 1,
-            borderColor: value === UNBRANDED_LOCAL_TAILOR ? theme.ink : theme.border,
-            backgroundColor: value === UNBRANDED_LOCAL_TAILOR ? theme.surface : theme.panel,
-            marginBottom: 12,
-            opacity: pressed ? 0.8 : 1,
-          })}
+            borderBottomWidth: 1,
+            borderBottomColor: theme.border,
+            backgroundColor: theme.surface,
+          }}
         >
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Feather name="scissors" size={14} color={theme.ink} />
-              <Text style={{ fontSize: 14.5, fontFamily: DISPLAY_BOLD, color: theme.ink }}>
-                {UNBRANDED_LOCAL_TAILOR}
-              </Text>
-            </View>
-            <Text style={{ fontSize: 11.5, color: theme.mute, marginTop: 2 }}>
-              Custom stitched, tailor-made, or unbranded boutique garments
-            </Text>
-          </View>
-          {value === UNBRANDED_LOCAL_TAILOR && <Feather name="check" size={16} color={theme.ink} />}
-        </Pressable>
-
-        {/* Recommended for this category (if applicable and not searching) */}
-        {!query && recommendedBrands.length > 0 && selectedTier === 'All' && (
-          <View style={{ marginBottom: 14 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                fontFamily: DISPLAY_BOLD,
-                color: theme.mute,
-                textTransform: 'uppercase',
-                letterSpacing: 0.5,
-                marginBottom: 8,
-              }}
-            >
-              Recommended for your selection
-            </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {recommendedBrands.map((b) => (
-                <Pressable
-                  key={b.name}
-                  onPress={() => handleSelect(b.name)}
-                  style={({ pressed }) => ({
-                    height: 30,
-                    paddingHorizontal: 12,
-                    borderRadius: 15,
-                    borderWidth: 1,
-                    borderColor: value === b.name ? theme.ink : theme.border,
-                    backgroundColor: value === b.name ? theme.ink : theme.panel,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    opacity: pressed ? 0.8 : 1,
-                  })}
-                >
-                  <Text
-                    style={{
-                      fontSize: 12.5,
-                      fontFamily: value === b.name ? DISPLAY_BOLD : typography.family.sansMedium,
-                      color: value === b.name ? theme.background : theme.ink,
-                    }}
-                  >
-                    {b.name}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Custom Brand Fallback if query typed and no exact match */}
-        {trimmedQuery.length > 0 && !exactMatchExists && (
+          {/* Back button */}
           <Pressable
-            onPress={() => handleSelect(trimmedQuery, true)}
+            onPress={handleClose}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Close brand picker"
             style={({ pressed }) => ({
-              flexDirection: 'row',
+              width: 40,
+              height: 40,
+              borderRadius: 20,
               alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingHorizontal: 16,
-              paddingVertical: 12,
-              borderRadius: radii.lg,
-              borderWidth: 1,
-              borderColor: theme.border,
-              backgroundColor: theme.surface,
-              marginBottom: 10,
-              opacity: pressed ? 0.8 : 1,
+              justifyContent: 'center',
+              backgroundColor: pressed ? theme.panel : 'transparent',
+              marginLeft: -6,
             })}
           >
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 14, fontFamily: DISPLAY_BOLD, color: theme.ink }}>
-                Use &ldquo;{trimmedQuery}&rdquo;
-              </Text>
-              <Text style={{ fontSize: 11.5, color: theme.mute, marginTop: 2 }}>
-                Custom brand (sets authenticity to &ldquo;Not Sure&rdquo; for buyer safety)
-              </Text>
-            </View>
-            <Feather name="plus-circle" size={16} color={theme.ink} />
+            <Feather name="arrow-left" size={22} color={theme.ink} />
           </Pressable>
+
+          {/* Title & Subtitle */}
+          <View style={{ flex: 1, alignItems: 'center', paddingHorizontal: 8 }}>
+            <Text
+              numberOfLines={1}
+              style={{
+                fontFamily: DISPLAY_BOLD,
+                fontSize: 17,
+                color: theme.ink,
+                letterSpacing: -0.2,
+                textAlign: 'center',
+              }}
+            >
+              Select Brand
+            </Text>
+            {categoryContextName ? (
+              <Text
+                numberOfLines={1}
+                style={{
+                  fontSize: 12,
+                  color: theme.mute,
+                  marginTop: 1,
+                  textAlign: 'center',
+                }}
+              >
+                Filtered for {categoryContextName}
+              </Text>
+            ) : null}
+          </View>
+
+          {/* Spacer */}
+          <View style={{ width: 40 }} />
+        </View>
+
+        {/* Search Input */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 10,
+              borderWidth: 1,
+              borderColor: theme.border,
+              borderRadius: radii.xl,
+              backgroundColor: theme.panel,
+              paddingHorizontal: 14,
+              height: 44,
+            }}
+          >
+            <Feather name="search" size={16} color={theme.mute} />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder={
+                categoryContextName
+                  ? `Search ${categoryContextName.toLowerCase()} brands…`
+                  : 'Search brands or enter custom…'
+              }
+              placeholderTextColor={theme.muteSoft ?? theme.mute}
+              autoCapitalize="words"
+              autoCorrect={false}
+              style={
+                {
+                  flex: 1,
+                  minWidth: 0,
+                  fontSize: 14.5,
+                  color: theme.ink,
+                  padding: 0,
+                  outlineStyle: 'none',
+                } as any
+              }
+            />
+            {query.length > 0 && (
+              <Pressable onPress={() => setQuery('')} hitSlop={8}>
+                <Feather name="x" size={16} color={theme.mute} />
+              </Pressable>
+            )}
+          </View>
+        </View>
+
+        {/* Tier Filter Chips (Universal 30px Standard) */}
+        {availableTiers.length > 2 && !query && (
+          <View style={{ borderBottomWidth: 1, borderBottomColor: theme.border }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                gap: 8,
+              }}
+            >
+              {availableTiers.map((tier) => {
+                const active = selectedTier === tier;
+                return (
+                  <Pressable
+                    key={tier}
+                    onPress={() => {
+                      haptic();
+                      setSelectedTier(tier);
+                    }}
+                    style={({ pressed }) => ({
+                      height: 30,
+                      paddingHorizontal: 14,
+                      borderRadius: 15,
+                      borderWidth: 1,
+                      borderColor: active ? theme.ink : theme.border,
+                      backgroundColor: active ? theme.ink : theme.panel,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      opacity: pressed ? 0.8 : 1,
+                      transform: [{ scale: pressed ? 0.97 : 1 }],
+                    })}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontFamily: active ? DISPLAY_BOLD : typography.family.sansMedium,
+                        color: active ? theme.background : theme.ink,
+                      }}
+                    >
+                      {tier}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
         )}
 
-        {/* Brands Directory */}
-        <View style={{ gap: 4, paddingBottom: 16 }}>
-          {filteredBrands.map((brand) => {
-            const isSelected = value?.toLowerCase() === brand.name.toLowerCase();
-            return (
-              <Pressable
-                key={brand.name}
-                onPress={() => handleSelect(brand.name)}
-                style={({ pressed }) => ({
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  paddingHorizontal: 14,
-                  paddingVertical: 11,
-                  borderRadius: radii.md,
-                  backgroundColor: isSelected ? (theme.primarySoft ?? 'rgba(0,0,0,0.06)') : pressed ? theme.surface : 'transparent',
-                })}
-              >
-                <View style={{ flex: 1, paddingRight: 10 }}>
+        {/* Scrollable Brands Directory */}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
+        >
+          {/* Fast Action: Unbranded / Local Tailor */}
+          {!query && (
+            <Pressable
+              onPress={() => handleSelect(UNBRANDED_LOCAL_TAILOR, false)}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingHorizontal: 16,
+                paddingVertical: 14,
+                borderRadius: radii.lg,
+                borderWidth: 1,
+                borderColor:
+                  value === UNBRANDED_LOCAL_TAILOR ? colors.primary : theme.border,
+                backgroundColor:
+                  value === UNBRANDED_LOCAL_TAILOR
+                    ? isDark
+                      ? theme.surface
+                      : '#F2F3FE'
+                    : theme.panel,
+                marginTop: 10,
+                marginBottom: 14,
+                transform: [{ scale: pressed ? 0.98 : 1 }],
+              })}
+            >
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Feather name="scissors" size={16} color={colors.primary} />
                   <Text
                     style={{
-                      fontSize: 14.5,
-                      fontFamily: isSelected ? DISPLAY_BOLD : typography.family.sans,
+                      fontSize: 15,
+                      fontFamily: DISPLAY_BOLD,
                       color: theme.ink,
                     }}
                   >
-                    {brand.name}
-                  </Text>
-                  <Text style={{ fontSize: 11.5, color: theme.mute, marginTop: 1 }}>
-                    {brand.tier} • {brand.categoryRelevance}
+                    {UNBRANDED_LOCAL_TAILOR}
                   </Text>
                 </View>
-                {isSelected ? (
-                  <Feather name="check" size={16} color={theme.ink} />
-                ) : (
-                  <Feather name="chevron-right" size={14} color={theme.mute} />
-                )}
-              </Pressable>
-            );
-          })}
+                <Text style={{ fontSize: 12, color: theme.mute, marginTop: 3 }}>
+                  Custom stitched, tailor-made, or unbranded boutique items
+                </Text>
+              </View>
+              {value === UNBRANDED_LOCAL_TAILOR && (
+                <Feather name="check" size={18} color={colors.primary} />
+              )}
+            </Pressable>
+          )}
 
-          {filteredBrands.length === 0 && !trimmedQuery && (
-            <Text style={{ fontSize: 13, color: theme.mute, textAlign: 'center', paddingVertical: 20 }}>
-              No brands found in this tier.
-            </Text>
+          {/* ── ONLY POPULAR BRANDS RELEVANT TO THE SELECTED CATEGORY ── */}
+          {!query && recommendedBrands.length > 0 && selectedTier === 'All' && (
+            <View style={{ marginBottom: 18 }}>
+              <View style={{ paddingVertical: 8 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontFamily: DISPLAY_BOLD,
+                    color: theme.muteSoft,
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  {categoryContextName
+                    ? `Popular in ${categoryContextName} (${recommendedBrands.length})`
+                    : `Popular Brands (${recommendedBrands.length})`}
+                </Text>
+              </View>
+
+              {/* Universal 30px standard pill chips for quick popular selection */}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+                {recommendedBrands.map((b) => {
+                  const isSelected = value?.toLowerCase() === b.name.toLowerCase();
+                  return (
+                    <Pressable
+                      key={b.name}
+                      onPress={() => handleSelect(b.name)}
+                      style={({ pressed }) => ({
+                        height: 30,
+                        paddingHorizontal: 14,
+                        borderRadius: 15,
+                        borderWidth: 1,
+                        borderColor: isSelected ? theme.ink : theme.border,
+                        backgroundColor: isSelected ? theme.ink : theme.panel,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transform: [{ scale: pressed ? 0.97 : 1 }],
+                      })}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 12.5,
+                          fontFamily: isSelected
+                            ? DISPLAY_BOLD
+                            : typography.family.sansMedium,
+                          color: isSelected ? theme.background : theme.ink,
+                        }}
+                      >
+                        {b.name}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
           )}
-          {filteredBrands.length === 0 && Boolean(trimmedQuery) && (
-            <Text style={{ fontSize: 13, color: theme.mute, textAlign: 'center', paddingVertical: 20 }}>
-              No matching brands in this category. Tap above to add as a custom brand.
-            </Text>
+
+          {/* Custom Brand Fallback if query typed and no exact match */}
+          {trimmedQuery.length > 0 && !exactMatchExists && (
+            <Pressable
+              onPress={() => handleSelect(trimmedQuery, true)}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingHorizontal: 16,
+                paddingVertical: 14,
+                borderRadius: radii.lg,
+                borderWidth: 1,
+                borderColor: colors.primary,
+                backgroundColor: isDark ? theme.surface : '#F2F3FE',
+                marginTop: 6,
+                marginBottom: 14,
+                transform: [{ scale: pressed ? 0.98 : 1 }],
+              })}
+            >
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    fontSize: 15,
+                    fontFamily: DISPLAY_BOLD,
+                    color: colors.primary,
+                  }}
+                >
+                  Use &ldquo;{trimmedQuery}&rdquo;
+                </Text>
+                <Text style={{ fontSize: 12, color: theme.mute, marginTop: 3 }}>
+                  Custom brand (authenticity badge marked as &ldquo;Not Sure&rdquo;)
+                </Text>
+              </View>
+              <Feather name="plus-circle" size={18} color={colors.primary} />
+            </Pressable>
           )}
-        </View>
-      </ScrollView>
-    </BottomSheet>
+
+          {/* All Filtered Brands Directory */}
+          <View style={{ paddingTop: 4 }}>
+            <View style={{ paddingVertical: 6 }}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontFamily: DISPLAY_BOLD,
+                  color: theme.muteSoft,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
+                }}
+              >
+                {query
+                  ? `Matching Brands (${filteredBrands.length})`
+                  : categoryContextName
+                  ? `All ${categoryContextName} Brands (${filteredBrands.length})`
+                  : `All Brands (${filteredBrands.length})`}
+              </Text>
+            </View>
+
+            {filteredBrands.map((brand) => {
+              const isSelected = value?.toLowerCase() === brand.name.toLowerCase();
+              return (
+                <Pressable
+                  key={brand.name}
+                  onPress={() => handleSelect(brand.name)}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingVertical: 13,
+                    borderBottomWidth: 1,
+                    borderBottomColor: theme.border,
+                    backgroundColor: pressed ? theme.surface : 'transparent',
+                    gap: 12,
+                  })}
+                >
+                  {/* Brand Initial Badge */}
+                  <View
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 18,
+                      backgroundColor: isDark ? theme.surface : '#F2F3FE',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontFamily: DISPLAY_BOLD,
+                        fontSize: 14,
+                        color: colors.primary,
+                      }}
+                    >
+                      {brand.name.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+
+                  {/* Brand Information */}
+                  <View style={{ flex: 1, paddingRight: 8 }}>
+                    <Text
+                      style={{
+                        fontSize: 15,
+                        fontFamily: isSelected
+                          ? DISPLAY_BOLD
+                          : typography.family.sansMedium,
+                        color: isSelected ? colors.primary : theme.ink,
+                      }}
+                    >
+                      {brand.name}
+                    </Text>
+                    <Text
+                      numberOfLines={1}
+                      style={{ fontSize: 12, color: theme.muteSoft, marginTop: 1 }}
+                    >
+                      {brand.tier} • {brand.categoryRelevance}
+                    </Text>
+                  </View>
+
+                  {isSelected ? (
+                    <Feather name="check" size={18} color={colors.primary} />
+                  ) : (
+                    <Feather name="chevron-right" size={16} color={theme.muteSoft} />
+                  )}
+                </Pressable>
+              );
+            })}
+
+            {filteredBrands.length === 0 && (
+              <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                <Feather name="search" size={32} color={theme.muteSoft} />
+                <Text
+                  style={{
+                    fontFamily: DISPLAY_BOLD,
+                    fontSize: 15,
+                    color: theme.ink,
+                    marginTop: 12,
+                  }}
+                >
+                  No brands found
+                </Text>
+                <Text style={{ fontSize: 13, color: theme.mute, marginTop: 4 }}>
+                  {trimmedQuery
+                    ? `Tap "+ Use \"${trimmedQuery}\"" above to add as custom brand.`
+                    : 'No brands match the selected filter.'}
+                </Text>
+              </View>
+            )}
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
   );
 }
