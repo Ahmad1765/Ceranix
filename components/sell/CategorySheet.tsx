@@ -487,7 +487,7 @@ export function CategorySheet({
                   No categories found
                 </Text>
                 <Text style={{ fontSize: 13, color: theme.mute, marginTop: 4 }}>
-                  No match for "{query}". Try another search term.
+                  No match for &quot;{query}&quot;. Try another search term.
                 </Text>
               </View>
             )}
