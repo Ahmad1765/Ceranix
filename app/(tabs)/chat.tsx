@@ -23,7 +23,7 @@ import {
 import { useInboxQuery } from '@/lib/queries';
 import { colors, radii, shadow, type as typography } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
-import { EmptyState, BellIcon, UserPlusIcon } from '@/components/ui';
+import { EmptyState, BellIcon } from '@/components/ui';
 import { InboxRow, InboxSkeleton } from '@/components/chat';
 import { HIT_SLOP_8, useTabBarClearance } from '@/lib/responsive';
 import { PressableScale } from '@/components/PressableScale';
@@ -674,8 +674,8 @@ export default function InboxScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (inboxStale) inboxRefetch();
-    }, [inboxStale, inboxRefetch]),
+      inboxRefetch();
+    }, [inboxRefetch]),
   );
 
   useEffect(() => {
@@ -687,8 +687,8 @@ export default function InboxScreen() {
   }, [userId, inboxRefetch]);
 
   // Tab data partition:
-  // - Selling: listing or offer chats where user is seller
-  // - Buying: listing or offer chats where user is buyer
+  // - Selling: chats where user is seller (listing or direct)
+  // - Buying: chats where user is buyer (listing or direct)
   // - Support: chats involving Support Bot
   const pageData = useMemo<Record<ConversationTab | 'support', ConversationRow[]>>(() => {
     const uid = user?.id;
@@ -697,10 +697,10 @@ export default function InboxScreen() {
     }
     return {
       selling: conversations.filter(
-        (c) => c.seller_id === uid && isTransactionalConversation(c) && !isSupportConversation(c),
+        (c) => c.seller_id === uid && !isSupportConversation(c),
       ),
       buying: conversations.filter(
-        (c) => c.buyer_id === uid && isTransactionalConversation(c) && !isSupportConversation(c),
+        (c) => c.buyer_id === uid && !isSupportConversation(c),
       ),
       support: conversations.filter((c) => isSupportConversation(c)),
     };
@@ -732,7 +732,7 @@ export default function InboxScreen() {
       activeTabRef.current = tab;
       setActiveTab(tab);
       ignoreListenerUntilRef.current = Date.now() + 450;
-      pagerRef.current?.scrollToOffset({ offset: to * pageWidth, animated: true });
+      pagerRef.current?.scrollToOffset({ offset: to * pageWidth, animated: Platform.OS !== 'web' });
     },
     [pageWidth],
   );
@@ -768,45 +768,22 @@ export default function InboxScreen() {
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: 'center',
           paddingHorizontal: 20,
           paddingTop: 8,
-          paddingBottom: 16,
+          paddingBottom: 14,
         }}
       >
-        <View style={{ width: 38 }} />
         <Text
           style={{
             fontFamily: typography.family.sansBold,
-            fontSize: 17,
+            fontSize: 18,
             color: theme.ink,
             letterSpacing: -0.2,
           }}
         >
           Inbox
         </Text>
-
-        <PressableScale
-          onPress={() => {
-            haptic();
-            router.push('/friends' as any);
-          }}
-          accessibilityRole="button"
-          accessibilityLabel="Find friends"
-          style={{
-            width: 38,
-            height: 38,
-            borderRadius: 19,
-            backgroundColor: theme.surface,
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderWidth: 1,
-            borderColor: theme.hairline,
-            ...shadow.sm,
-          }}
-        >
-          <UserPlusIcon size={19} color={theme.ink} strokeWidth={1.85} />
-        </PressableScale>
       </View>
 
       {/* Underline tabs */}

@@ -197,7 +197,7 @@ export function useConversationThread(
   // ── Read Receipts Synchronization ────────────────────────────────────────
   useEffect(() => {
     if (!conversationId || !user?.id) return;
-    markConversationRead(conversationId).then(() => {
+    markConversationRead(conversationId, user.id).then(() => {
       queryClient.invalidateQueries({ queryKey: qk.inbox(user.id) });
     });
   }, [conversationId, user?.id, messages.length, queryClient]);

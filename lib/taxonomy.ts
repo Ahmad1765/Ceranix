@@ -929,3 +929,4 @@ export function checkBrandCategoryCompatibility(
 
   return { compatible: true };
 }
+

@@ -545,7 +545,7 @@ export function subscribeToInbox(
   onChange: () => void,
 ): () => void {
   // Conversations are bumped via trigger when a message lands. Re-listing on
-  // any conversation change involving the user keeps the inbox live.
+  // any conversation or message change involving the user keeps the inbox live.
   const channelName = `inbox:${userId}:${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const channel = supabase
     .channel(channelName)
@@ -566,6 +566,15 @@ export function subscribeToInbox(
         schema: 'public',
         table: 'conversations',
         filter: `seller_id=eq.${userId}`,
+      },
+      onChange,
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
       },
       onChange,
     )
@@ -603,11 +612,28 @@ export function isConversationUnread(conv: ConversationRow, userId: string): boo
 
 /** Stamps "I've seen this" for the calling participant. Fire-and-forget: a
  *  failed read receipt must never block opening a thread. */
-export async function markConversationRead(conversationId: string): Promise<void> {
+export async function markConversationRead(conversationId: string, userId?: string): Promise<void> {
   const { error } = await supabase.rpc('mark_conversation_read', {
     p_conversation_id: conversationId,
   });
-  if (error) console.warn('[chat] markConversationRead', error.message);
+  if (error) {
+    console.warn('[chat] markConversationRead RPC error, using direct table fallback:', error.message);
+    if (userId) {
+      const now = new Date().toISOString();
+      await Promise.allSettled([
+        supabase
+          .from('conversations')
+          .update({ buyer_last_read_at: now })
+          .eq('id', conversationId)
+          .eq('buyer_id', userId),
+        supabase
+          .from('conversations')
+          .update({ seller_last_read_at: now })
+          .eq('id', conversationId)
+          .eq('seller_id', userId),
+      ]);
+    }
+  }
 }
 
 export function otherParticipant(
