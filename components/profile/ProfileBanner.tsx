@@ -9,7 +9,7 @@ import { CONTENT_MAX_WIDTH } from '@/lib/responsive';
 import { getOptimizedImageUrl } from '@/lib/images';
 
 export const AVATAR_SIZE = 96;
-const RING = 3;
+const RING = 0;
 export const BANNER_ASPECT = 16 / 9;
 
 export function bannerSizeFor(viewportWidth: number): { width: number; height: number } {
@@ -55,7 +55,7 @@ export function ProfileBanner({
   onBack,
 }: Props) {
   const avatar = avatarUrl ? getOptimizedImageUrl(avatarUrl, { width: 192, quality: 80 }) : null;
-  const outer = AVATAR_SIZE + RING * 2;
+  const outer = AVATAR_SIZE;
 
   return (
     <View style={{ width: '100%', maxWidth: CONTENT_MAX_WIDTH, alignSelf: 'center' }}>
@@ -146,20 +146,19 @@ export function ProfileBanner({
             width: outer,
             height: outer,
             borderRadius: outer / 2,
-            backgroundColor: colors.surface,
-            padding: RING,
             opacity: onPress && pressed ? 0.85 : 1,
             ...shadow.sm,
           })}
         >
           <View
             style={{
-              flex: 1,
+              width: '100%',
+              height: '100%',
               borderRadius: AVATAR_SIZE / 2,
-              borderWidth: 2,
-              borderColor: colors.purple,
+              borderWidth: 1,
+              borderColor: colors.border,
               overflow: 'hidden',
-              backgroundColor: colors.purpleSoft,
+              backgroundColor: colors.surface,
               alignItems: 'center',
               justifyContent: 'center',
             }}
@@ -176,7 +175,7 @@ export function ProfileBanner({
                 accessibilityLabel={label}
               />
             ) : (
-              <Text style={{ fontSize: 32, fontWeight: '900', color: colors.purple }}>
+              <Text style={{ fontSize: 32, fontWeight: '800', color: colors.ink }}>
                 {initial}
               </Text>
             )}
@@ -188,8 +187,8 @@ export function ProfileBanner({
               accessibilityLabel="Verified account"
               style={{
                 position: 'absolute',
-                right: 0,
-                bottom: 0,
+                right: -2,
+                bottom: -2,
                 borderRadius: 14,
                 borderWidth: 2,
                 borderColor: colors.background,

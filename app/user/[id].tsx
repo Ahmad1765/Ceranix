@@ -63,6 +63,7 @@ export default function UserProfileScreen() {
   const { user: authUser } = useAuth();
   const toast = useToast();
   const [shopFilter, setShopFilter] = useState<'all' | 'available' | 'sold'>('all');
+  const [likedFilter, setLikedFilter] = useState<'all' | 'available' | 'sold'>('all');
   const [activeTab, setActiveTab] = useState<SellerTab>('shop');
 
   const fade = useFadeIn(0, 320);
@@ -213,10 +214,22 @@ export default function UserProfileScreen() {
     [listings, shopFilter],
   );
 
+  const likedAvailableCount = useMemo(() => likedListings.filter((l) => !l.is_sold).length, [likedListings]);
+  const likedSoldCount = useMemo(() => likedListings.length - likedAvailableCount, [likedListings, likedAvailableCount]);
+  const visibleLikedListings = useMemo(
+    () =>
+      likedFilter === 'available'
+        ? likedListings.filter((l) => !l.is_sold)
+        : likedFilter === 'sold'
+          ? likedListings.filter((l) => l.is_sold)
+          : likedListings,
+    [likedListings, likedFilter],
+  );
+
   const gridRows = useMemo(() => {
     let list: Listing[] = [];
     if (activeTab === 'shop') list = visibleListings;
-    else if (activeTab === 'liked') list = likedListings;
+    else if (activeTab === 'liked') list = visibleLikedListings;
     else if (activeTab === 'collections') {
       list = isCollectionsPublic ? visibleSavedListings : [];
     }
@@ -226,7 +239,7 @@ export default function UserProfileScreen() {
       out.push(list.slice(i, i + columns));
     }
     return out;
-  }, [activeTab, visibleListings, likedListings, isCollectionsPublic, visibleSavedListings, columns]);
+  }, [activeTab, visibleListings, visibleLikedListings, isCollectionsPublic, visibleSavedListings, columns]);
 
   const renderRow = useCallback(
     ({ item }: { item: Listing[] }) => <GridRow row={item} columns={columns} cardW={cardW} />,
@@ -791,7 +804,7 @@ export default function UserProfileScreen() {
               </ScrollView>
             )}
 
-            {/* Available / Sold Filter Chips */}
+            {/* Available / Sold Filter Chips for Shop tab */}
             {activeTab === 'shop' && soldCount > 0 && availableCount > 0 ? (
               <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingVertical: 10 }}>
                 {(
@@ -837,8 +850,53 @@ export default function UserProfileScreen() {
                   );
                 })}
               </View>
+            ) : activeTab === 'liked' && likedSoldCount > 0 && likedAvailableCount > 0 ? (
+              <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingVertical: 10 }}>
+                {(
+                  [
+                    { id: 'all', label: `All (${likedListings.length})` },
+                    { id: 'available', label: `Available (${likedAvailableCount})` },
+                    { id: 'sold', label: `Sold (${likedSoldCount})` },
+                  ] as const
+                ).map((f) => {
+                  const active = likedFilter === f.id;
+                  return (
+                    <Pressable
+                      key={f.id}
+                      onPress={() => setLikedFilter(f.id)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                      style={({ pressed }) => ({
+                        height: 30,
+                        paddingHorizontal: 12,
+                        borderRadius: 15,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: active
+                          ? isDark ? theme.panel : '#111111'
+                          : isDark ? theme.surface : theme.panel,
+                        borderWidth: 1,
+                        borderColor: active
+                          ? isDark ? theme.border : '#111111'
+                          : theme.border,
+                        opacity: pressed ? 0.7 : 1,
+                      })}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: active ? '700' : '600',
+                          color: active ? '#FFFFFF' : theme.ink,
+                        }}
+                      >
+                        {f.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
             ) : (
-              activeTab === 'shop' && <View style={{ height: 12 }} />
+              <View style={{ height: 12 }} />
             )}
 
             {/* Empty States */}

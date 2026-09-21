@@ -14,7 +14,7 @@ import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
-import { FilterSlidersIcon, BellIcon } from '@/components/ui';
+import { BellIcon } from '@/components/ui';
 import { radii, shadow, type as typography } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 import {
@@ -37,8 +37,8 @@ type FeedSearchProps = {
   onBlur: () => void;
   onPressSearch?: () => void;
   resultCount: number | null;
-  filterCount: number;
-  onOpenFilter: () => void;
+  filterCount?: number;
+  onOpenFilter?: () => void;
   unreadNotificationsCount?: number;
   onPressNotifications?: () => void;
   onOpenShareProfile?: () => void;
@@ -61,7 +61,6 @@ export const FeedSearch = memo(function FeedSearch({
   const { theme, isDark } = useTheme();
   const inputRef = useRef<any>(null);
   const searching = value.trim().length > 0;
-  const hasFilters = filterCount > 0;
 
   return (
     <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
@@ -201,141 +200,54 @@ export const FeedSearch = memo(function FeedSearch({
             </Text>
           </Pressable>
         ) : (
-          <>
-            {/* Filter button with badge */}
-            <Pressable
-              onPress={() => {
-                haptic();
-                onOpenFilter();
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={hasFilters ? `Filters, ${filterCount} active` : 'Filters'}
-              style={({ pressed }) => ({
-                width: 44,
-                height: 44,
-                borderRadius: 22,
-                backgroundColor: pressed ? theme.surface : theme.panel,
-                borderWidth: 1,
-                borderColor: theme.border,
-                alignItems: 'center',
-                justifyContent: 'center',
-                transform: [{ scale: pressed ? 0.94 : 1 }],
-                position: 'relative',
-                outlineStyle: 'none',
-                ...shadow.sm,
-              } as any)}
-            >
-              <FilterSlidersIcon
-                size={26}
-                color={theme.ink}
-              />
-              {hasFilters && (
-                <View
-                  style={{
-                    position: 'absolute',
-                    top: -3,
-                    right: -3,
-                    minWidth: 18,
-                    height: 18,
-                    borderRadius: 9,
-                    backgroundColor: theme.purple,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    paddingHorizontal: 4,
-                    borderWidth: 2,
-                    borderColor: theme.background,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: '#FFFFFF',
-                      fontSize: 10,
-                      fontWeight: '800',
-                      lineHeight: 11,
-                    }}
-                  >
-                    {filterCount}
-                  </Text>
-                </View>
-              )}
-            </Pressable>
-
-            {/* Notifications button (Plick style) */}
-            <Pressable
-              onPress={() => {
-                haptic();
-                if (onPressNotifications) {
-                  onPressNotifications();
-                } else {
-                  router.push('/news' as any);
-                }
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={
-                unreadNotificationsCount && unreadNotificationsCount > 0
-                  ? `${unreadNotificationsCount} unread notifications`
-                  : 'Notifications'
+          /* Notifications button (Plick style) */
+          <Pressable
+            onPress={() => {
+              haptic();
+              if (onPressNotifications) {
+                onPressNotifications();
+              } else {
+                router.push('/news' as any);
               }
-              style={({ pressed }) => ({
-                width: 44,
-                height: 44,
-                borderRadius: 22,
-                backgroundColor: pressed ? theme.surface : theme.panel,
-                borderWidth: 1,
-                borderColor: theme.border,
-                alignItems: 'center',
-                justifyContent: 'center',
-                transform: [{ scale: pressed ? 0.94 : 1 }],
-                position: 'relative',
-                outlineStyle: 'none',
-                ...shadow.sm,
-              } as any)}
-            >
-              <BellIcon size={20} color={theme.ink} />
-              {!!unreadNotificationsCount && unreadNotificationsCount > 0 && (
-                <View
-                  style={{
-                    position: 'absolute',
-                    top: 10,
-                    right: 10,
-                    width: 8,
-                    height: 8,
-                    borderRadius: 4,
-                    backgroundColor: '#EF4444',
-                    borderWidth: 1.5,
-                    borderColor: theme.panel,
-                  }}
-                />
-              )}
-            </Pressable>
-
-            {/* Share Profile button (QR Code) */}
-            {onOpenShareProfile && (
-              <Pressable
-                onPress={() => {
-                  haptic();
-                  onOpenShareProfile();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={
+              unreadNotificationsCount && unreadNotificationsCount > 0
+                ? `${unreadNotificationsCount} unread notifications`
+                : 'Notifications'
+            }
+            style={({ pressed }) => ({
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              backgroundColor: pressed ? theme.surface : theme.panel,
+              borderWidth: 1,
+              borderColor: theme.border,
+              alignItems: 'center',
+              justifyContent: 'center',
+              transform: [{ scale: pressed ? 0.94 : 1 }],
+              position: 'relative',
+              outlineStyle: 'none',
+              ...shadow.sm,
+            } as any)}
+          >
+            <BellIcon size={20} color={theme.ink} />
+            {!!unreadNotificationsCount && unreadNotificationsCount > 0 && (
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 10,
+                  right: 10,
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: '#EF4444',
+                  borderWidth: 1.5,
+                  borderColor: theme.panel,
                 }}
-                accessibilityRole="button"
-                accessibilityLabel="Share profile"
-                style={({ pressed }) => ({
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
-                  backgroundColor: pressed ? theme.surface : theme.panel,
-                  borderWidth: 1,
-                  borderColor: theme.border,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transform: [{ scale: pressed ? 0.94 : 1 }],
-                  outlineStyle: 'none',
-                  ...shadow.sm,
-                } as any)}
-              >
-                <Ionicons name="qr-code-outline" size={19} color={theme.ink} />
-              </Pressable>
+              />
             )}
-          </>
+          </Pressable>
         )}
       </View>
     </View>

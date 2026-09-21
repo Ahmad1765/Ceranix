@@ -613,42 +613,31 @@ export default function ProfileEditScreen() {
             <Pressable onPress={pickAvatar} hitSlop={4}>
               <View
                 style={{
-                  width: 128,
-                  height: 128,
-                  borderRadius: 64,
+                  width: 120,
+                  height: 120,
+                  borderRadius: 60,
                   backgroundColor: colors.surface,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  borderWidth: 2.5,
-                  borderColor: PURPLE,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  overflow: 'hidden',
                 }}
               >
-                <View
-                  style={{
-                    width: 118,
-                    height: 118,
-                    borderRadius: 59,
-                    backgroundColor: colors.surface,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {avatarUri ? (
-                    <Image
-                      source={{ uri: avatarUri }}
-                      style={{ width: 118, height: 118 }}
-                      contentFit="cover"
-                      transition={150}
-                    />
-                  ) : (
-                    <Text
-                      style={{ fontSize: 52, fontWeight: '900', color: colors.ink, letterSpacing: -2 }}
-                    >
-                      {initial}
-                    </Text>
-                  )}
-                </View>
+                {avatarUri ? (
+                  <Image
+                    source={{ uri: avatarUri }}
+                    style={{ width: 120, height: 120 }}
+                    contentFit="cover"
+                    transition={150}
+                  />
+                ) : (
+                  <Text
+                    style={{ fontSize: 52, fontWeight: '900', color: colors.ink, letterSpacing: -2 }}
+                  >
+                    {initial}
+                  </Text>
+                )}
               </View>
               <View
                 style={{
