@@ -75,6 +75,7 @@ import { BRAND, APP_URL } from '@/lib/brand';
 import { reportListing, REPORT_REASONS } from '@/lib/reports';
 import { useGuestGate } from '@/components/GuestGate';
 import { buyerProtectionFee, orderTotal, formatPrice, DEFAULT_SHIPPING_FEE } from '@/lib/fees';
+import { isBundlesEnabled } from '@/lib/bundle';
 import { useSellSheet } from '@/components/sell/SellSheet';
 import { BuyerProtectionSheet } from '@/components/product/BuyerProtectionSheet';
 import { errorMessage } from '@/lib/errors';
@@ -160,11 +161,13 @@ export default function ProductScreen() {
   });
 
   // ── Bundle Domain Hook (Multi-Item Math & Selections) ────────────────────
+  const sellerBundlesEnabled = isBundlesEnabled(listing?.seller?.bundle_discount_pct);
   const bundle = useProductBundle({
     listing,
     sellerItems,
     user,
     guestGate,
+    bundlesEnabled: sellerBundlesEnabled,
   });
 
   // ── Social & Follow State ────────────────────────────────────────────────
@@ -647,6 +650,7 @@ export default function ProductScreen() {
           sellerItems={sellerItems}
           similarItems={similarItems}
           selectedBundleIds={bundle.selectedBundleIds}
+          bundlesEnabled={sellerBundlesEnabled}
           onTabChange={bundle.setRelatedTab}
           onToggleBundleItem={bundle.handleToggleBundleItem}
           onSelectAllBundle={bundle.handleSelectAllBundle}

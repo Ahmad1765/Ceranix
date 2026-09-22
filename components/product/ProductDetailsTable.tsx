@@ -318,7 +318,10 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
             {listing.tags.map((tag) => (
               <Pressable
                 key={tag}
-                onPress={() => router.push(`/?q=${encodeURIComponent(tag)}` as any)}
+                onPress={() => {
+                  tap('selection');
+                  router.push(`/?searchOpen=1&searchQuery=${encodeURIComponent(tag)}` as any);
+                }}
                 style={({ pressed }) => ({
                   backgroundColor: theme.white,
                   borderWidth: 1,

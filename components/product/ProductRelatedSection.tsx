@@ -29,6 +29,8 @@ type ProductRelatedSectionProps = {
   sellerItems: Listing[];
   similarItems: Listing[];
   selectedBundleIds: Set<string>;
+  /** When false the bundle/seller's-items tab is hidden. */
+  bundlesEnabled?: boolean;
   onTabChange: (tab: 'members' | 'similar') => void;
   onToggleBundleItem: (id: string) => void;
   onSelectAllBundle: () => void;
@@ -44,6 +46,7 @@ export const ProductRelatedSection = memo(function ProductRelatedSection({
   sellerItems,
   similarItems,
   selectedBundleIds,
+  bundlesEnabled = false,
   onTabChange,
   onToggleBundleItem,
   onSelectAllBundle,
@@ -54,53 +57,63 @@ export const ProductRelatedSection = memo(function ProductRelatedSection({
 }: ProductRelatedSectionProps) {
   const { theme } = useTheme();
   const { cardWidth } = useProductDimensions();
+
+  // Determine which tabs are available
+  const showBundleTab = bundlesEnabled;
+  // The tabs to render — only include 'members' when bundles are enabled
+  const availableTabs = showBundleTab ? (['members', 'similar'] as const) : (['similar'] as const);
+  // Effective tab — force 'similar' when bundle tab is hidden
+  const effectiveTab = showBundleTab ? relatedTab : 'similar';
+
   return (
     <View style={{ marginTop: 22 }} onLayout={onLayout}>
-      {/* Tab Pills: Seller's Items vs Similar Items */}
-      <View style={{ flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 4 }}>
-        {(['members', 'similar'] as const).map((tab) => {
-          const active = relatedTab === tab;
-          return (
-            <Pressable
-              key={tab}
-              onPress={() => {
-                tap('selection');
-                onTabChange(tab);
-              }}
-              style={({ pressed }) => ({
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingHorizontal: 16,
-                paddingVertical: 9,
-                borderRadius: 999,
-                backgroundColor: active ? theme.selected : theme.white,
-                borderWidth: 1,
-                borderColor: theme.border,
-                transform: [{ scale: pressed ? 0.96 : 1 }],
-              })}
-            >
-              <Ionicons
-                name={tab === 'members' ? 'person' : 'sparkles'}
-                size={13}
-                color={theme.ink}
-                style={{ marginRight: 6 }}
-              />
-              <Text
-                style={{
-                  fontSize: 13,
-                  fontWeight: '700',
-                  color: theme.ink,
+      {/* Tab Pills: Only show when there are multiple tabs */}
+      {availableTabs.length > 1 && (
+        <View style={{ flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 4 }}>
+          {availableTabs.map((tab) => {
+            const active = effectiveTab === tab;
+            return (
+              <Pressable
+                key={tab}
+                onPress={() => {
+                  tap('selection');
+                  onTabChange(tab);
                 }}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingHorizontal: 16,
+                  paddingVertical: 9,
+                  borderRadius: 999,
+                  backgroundColor: active ? theme.selected : theme.white,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                  transform: [{ scale: pressed ? 0.96 : 1 }],
+                })}
               >
-                {tab === 'members' ? "Seller's items" : 'Similar items'}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+                <Ionicons
+                  name={tab === 'members' ? 'person' : 'sparkles'}
+                  size={13}
+                  color={theme.ink}
+                  style={{ marginRight: 6 }}
+                />
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: '700',
+                    color: theme.ink,
+                  }}
+                >
+                  {tab === 'members' ? "Seller's items" : 'Similar items'}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
 
       {/* Tab Contents */}
-      {relatedTab === 'members' ? (
+      {effectiveTab === 'members' ? (
         <BundleSection
           listing={listing}
           sellerItems={sellerItems}

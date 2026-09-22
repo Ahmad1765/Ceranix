@@ -147,7 +147,8 @@ export async function fetchPriceDrops(userId: string): Promise<MyFeedResult<Pric
 // the existing user_follows table (PostgREST can't join through it inline).
 export async function fetchNewFromFollowed(
   userId: string,
-  sinceDays = 14,
+  sinceDays = 30,
+  limit = 40,
 ): Promise<MyFeedResult<Listing>> {
   try {
     const followsRes = await withTimeout(
@@ -176,7 +177,7 @@ export async function fetchNewFromFollowed(
         .eq('seller.vacation_mode', false)
         .gt('created_at', sinceIso)
         .order('created_at', { ascending: false })
-        .limit(8),
+        .limit(limit),
       'followed:listings',
     );
     if ('__wedge' in listingsRes) return { ok: false };

@@ -1213,7 +1213,12 @@ export const HomeSearchView = memo(function HomeSearchView({
             placeholder={
               searchFilters.category
                 ? `Search in ${searchFilters.category.charAt(0).toUpperCase() + searchFilters.category.slice(1)}`
-                : "Search"
+                : "What are you looking for today?"
+            }
+            accessibilityLabel={
+              searchFilters.category
+                ? `Search in ${searchFilters.category.charAt(0).toUpperCase() + searchFilters.category.slice(1)}`
+                : "What are you looking for today?"
             }
             placeholderTextColor={isDark ? "#9CA3AF" : "#8E8E93"}
             autoFocus={Platform.OS === 'web'}

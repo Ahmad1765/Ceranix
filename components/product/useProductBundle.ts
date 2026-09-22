@@ -27,6 +27,8 @@ type UseProductBundleProps = {
   sellerItems: Listing[];
   user: AuthUser | null;
   guestGate: ReturnType<typeof useGuestGate>;
+  /** When false the bundle tab is hidden and relatedTab defaults to 'similar'. */
+  bundlesEnabled?: boolean;
 };
 
 export function serializeBundleIds(ids: string[] | Iterable<string>): string {
@@ -41,10 +43,18 @@ export function useProductBundle({
   sellerItems,
   user,
   guestGate,
+  bundlesEnabled = false,
 }: UseProductBundleProps) {
   const toast = useToast();
   const [selectedBundleIds, setSelectedBundleIds] = useState<Set<string>>(new Set());
-  const [relatedTab, setRelatedTab] = useState<'members' | 'similar'>('members');
+  const [relatedTab, setRelatedTab] = useState<'members' | 'similar'>(
+    bundlesEnabled ? 'members' : 'similar',
+  );
+
+  // Sync tab when bundlesEnabled changes (e.g. listing changes to a different seller)
+  useEffect(() => {
+    if (!bundlesEnabled) setRelatedTab('similar');
+  }, [bundlesEnabled]);
 
   // Reset bundle selection whenever the viewed listing changes
   useEffect(() => {

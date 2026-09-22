@@ -24,12 +24,12 @@ import { useInboxQuery } from '@/lib/queries';
 import { colors, radii, shadow, type as typography } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { EmptyState, BellIcon } from '@/components/ui';
-import { InboxRow, InboxSkeleton } from '@/components/chat';
+import { InboxRow, InboxSkeleton, OrdersInboxPage } from '@/components/chat';
 import { HIT_SLOP_8, useTabBarClearance } from '@/lib/responsive';
 import { PressableScale } from '@/components/PressableScale';
 
-type InboxTab = 'selling' | 'buying' | 'support';
-type ConversationTab = Exclude<InboxTab, 'support'>;
+type InboxTab = 'selling' | 'buying' | 'orders' | 'support';
+type ConversationTab = Exclude<InboxTab, 'support' | 'orders'>;
 
 const EMPTY_CONVERSATIONS: ConversationRow[] = [];
 const keyById = (item: ConversationRow) => item.id;
@@ -37,6 +37,7 @@ const keyById = (item: ConversationRow) => item.id;
 const INBOX_TABS: { value: InboxTab; label: string }[] = [
   { value: 'selling', label: 'Selling' },
   { value: 'buying', label: 'Buying' },
+  { value: 'orders', label: 'Orders' },
   { value: 'support', label: 'Support' },
 ];
 
@@ -824,6 +825,16 @@ export default function InboxScreen() {
             scrollEventThrottle={16}
             onMomentumScrollEnd={onMomentumScrollEnd}
             renderItem={({ item }) => {
+              if (item.value === 'orders') {
+                return (
+                  <OrdersInboxPage
+                    userId={user.id}
+                    pageWidth={pageWidth}
+                    pageHeight={pagerHeight}
+                    bottomInset={tabBarClearance}
+                  />
+                );
+              }
               if (item.value === 'support') {
                 return (
                   <SupportPage

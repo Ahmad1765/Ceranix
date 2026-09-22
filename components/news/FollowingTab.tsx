@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
 import { EmptyState } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { useNewFromFollowedQuery, useFeedListingsQuery } from '@/lib/queries';
+import { useNewFromFollowedQuery } from '@/lib/queries';
 import { useOpenedNewsIds } from '@/lib/newsStorage';
 import { NewsRowSkeleton, NewsSkeletonList } from './NewsRowSkeleton';
 import { NewsActivityRow, type ActivityItem } from './NewsActivityRow';
@@ -21,28 +21,20 @@ export function FollowingTab({ bottomInset = 24 }: { bottomInset?: number }) {
   const { openedIds } = useOpenedNewsIds();
   const userId = user?.id ?? null;
 
-  // Followed listings
+  // News notifications strictly from followed accounts only
   const followedQ = useNewFromFollowedQuery(userId);
-  // Community active listings as fallback/discover feed if followed is empty
-  const communityQ = useFeedListingsQuery({ tab: 'popular', limit: 16 });
 
-  const isLoading = (userId ? followedQ.isLoading : false) || (communityQ.isLoading && !followedQ.data);
-  const refreshing = followedQ.isRefetching || communityQ.isRefetching;
+  const isLoading = userId ? followedQ.isLoading : false;
+  const refreshing = followedQ.isRefetching;
 
   const onRefresh = useCallback(async () => {
-    await Promise.all([
-      followedQ.refetch(),
-      communityQ.refetch(),
-    ]);
-  }, [followedQ, communityQ]);
+    await followedQ.refetch();
+  }, [followedQ]);
 
   const activities = useMemo<ActivityItem[]>(() => {
     const followedListings = followedQ.data ?? [];
-    const communityListings = communityQ.data ?? [];
 
-    const source = followedListings.length > 0 ? followedListings : communityListings;
-
-    return source.map((listing: Listing) => {
+    return followedListings.map((listing: Listing) => {
       const seller = listing.seller;
       return {
         id: `listing-${listing.id}`,
@@ -57,7 +49,7 @@ export function FollowingTab({ bottomInset = 24 }: { bottomInset?: number }) {
         created_at: listing.created_at,
       };
     });
-  }, [followedQ.data, communityQ.data]);
+  }, [followedQ.data]);
 
   const renderItem = useCallback(
     ({ item }: { item: ActivityItem }) => (

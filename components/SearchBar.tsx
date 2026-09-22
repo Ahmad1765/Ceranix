@@ -15,7 +15,7 @@ interface Props {
 }
 
 export function SearchBar({
-  placeholder = 'Search Carrinex...',
+  placeholder = 'What are you looking for today?',
   onPress,
   editable = false,
   value = '',

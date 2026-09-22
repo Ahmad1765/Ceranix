@@ -42,6 +42,7 @@ type FeedSearchProps = {
   unreadNotificationsCount?: number;
   onPressNotifications?: () => void;
   onOpenShareProfile?: () => void;
+  placeholder?: string;
 };
 
 export const FeedSearch = memo(function FeedSearch({
@@ -57,6 +58,7 @@ export const FeedSearch = memo(function FeedSearch({
   unreadNotificationsCount,
   onPressNotifications,
   onOpenShareProfile,
+  placeholder = 'What are you looking for today?',
 }: FeedSearchProps) {
   const { theme, isDark } = useTheme();
   const inputRef = useRef<any>(null);
@@ -67,7 +69,7 @@ export const FeedSearch = memo(function FeedSearch({
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={value.trim() ? `Search: ${value}` : 'Search listings and sellers'}
+          accessibilityLabel={value.trim() ? `Search: ${value}` : placeholder}
           onPress={() => {
             haptic();
             if (onPressSearch) {
@@ -111,8 +113,9 @@ export const FeedSearch = memo(function FeedSearch({
               }
             }}
             onBlur={onBlur}
-            placeholder="Search"
+            placeholder={placeholder}
             placeholderTextColor={theme.muteSoft}
+            accessibilityLabel={placeholder}
             editable={!onPressSearch}
             pointerEvents={onPressSearch ? 'none' : 'auto'}
             style={{
