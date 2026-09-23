@@ -60,7 +60,7 @@ export const FeedSearch = memo(function FeedSearch({
   onOpenShareProfile,
   placeholder = 'What are you looking for today?',
 }: FeedSearchProps) {
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
   const inputRef = useRef<any>(null);
   const searching = value.trim().length > 0;

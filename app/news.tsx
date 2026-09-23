@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 import { View, Pressable, Platform } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -147,15 +147,13 @@ export default function NewsScreen() {
   const toast = useToast();
 
   const userId = user?.id ?? null;
-  const { openedIds, markAllOpened } = useOpenedNewsIds();
+  const { markAllOpened } = useOpenedNewsIds();
 
   // News notifications strictly from followed accounts only
   const followedQ = useNewFromFollowedQuery(userId);
 
-  const unreadCount = useMemo(() => {
-    if (!user || !followedQ.data) return 0;
-    return followedQ.data.filter((l) => !openedIds.has(`listing-${l.id}`)).length;
-  }, [user, followedQ.data, openedIds]);
+
+
 
   const handleMarkAllRead = useCallback(async () => {
     haptic();

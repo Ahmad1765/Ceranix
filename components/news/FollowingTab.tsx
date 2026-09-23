@@ -6,7 +6,7 @@ import { EmptyState } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useNewFromFollowedQuery } from '@/lib/queries';
 import { useOpenedNewsIds } from '@/lib/newsStorage';
-import { NewsRowSkeleton, NewsSkeletonList } from './NewsRowSkeleton';
+import { NewsSkeletonList } from './NewsRowSkeleton';
 import { NewsActivityRow, type ActivityItem } from './NewsActivityRow';
 import type { Listing } from '@/types';
 

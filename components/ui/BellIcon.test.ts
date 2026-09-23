@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
+import { BellIcon, BELL_OUTLINE_PATH, BELL_FILLED_PATH } from './BellIcon';
 
 vi.mock('react-native', () => ({
   Platform: { OS: 'web', select: (obj: any) => obj.web || obj.default },
@@ -23,8 +24,6 @@ vi.mock('@/context/ThemeContext', () => ({
     isDark: false,
   }),
 }));
-
-import { BellIcon, BELL_OUTLINE_PATH, BELL_FILLED_PATH } from './BellIcon';
 
 function render(element: React.ReactElement<any>) {
   const Component = element.type as any;

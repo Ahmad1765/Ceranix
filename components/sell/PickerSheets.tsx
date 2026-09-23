@@ -4,13 +4,13 @@ import { Text, TextInput } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import { radii, type } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
-import { CATEGORIES, hasSubcategories } from '@/lib/categories';
+
 import { ITEM_COLORS } from '@/lib/itemColors';
 import { ColorSwatch } from '@/components/ColorSwatch';
 import { CURRENCY_SYMBOL, CURRENCY_CODE } from '@/lib/currency';
 import { BUYER_PROTECTION_PERCENTAGE } from '@/lib/fees';
-import type { Category } from '@/types';
-import { UNBRANDED_LOCAL_TAILOR } from '@/lib/taxonomy';
+
+
 import { BottomSheet } from './BottomSheet';
 import * as Haptics from 'expo-haptics';
 

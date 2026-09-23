@@ -11,7 +11,7 @@ import { memo, useMemo } from 'react';
 import { View, Pressable } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { router } from 'expo-router';
-import Feather from '@expo/vector-icons/Feather';
+
 import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { useTheme } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
@@ -22,7 +22,7 @@ import {
   timeAgo,
 } from '@/components/product/shared';
 import type { Listing, ListingLiker } from '@/types';
-import { Platform } from 'react-native';
+
 
 
 type ProductOverviewHeaderProps = {
@@ -42,7 +42,7 @@ export const ProductOverviewHeader = memo(function ProductOverviewHeader({
   likers,
   onOpenLikersSheet,
 }: ProductOverviewHeaderProps) {
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
   const heartCount = Math.max(0, Number(listing.likes ?? 0), likers?.length ?? 0);
   const itemPrice = Number(listing.price ?? 0);
 

@@ -11,10 +11,10 @@ import {
 import { capture } from '@/lib/analytics';
 import {
   View, Pressable, ScrollView, Alert, ActivityIndicator,
-  KeyboardAvoidingView, Platform, useWindowDimensions, Modal,
+  KeyboardAvoidingView, Platform, useWindowDimensions,
 } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
-import { SafeAreaProvider, SafeAreaView, initialWindowMetrics, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import Feather from '@expo/vector-icons/Feather';
@@ -39,7 +39,7 @@ import { SafetyBanner } from '@/components/SafetyBanner';
 import { radii, type as typography } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 import {
-  SingleSelectSheet, TextFieldSheet, SizeSheet, PriceSheet, ColorSheet, CategorySheet, TagsSheet,
+  SingleSelectSheet, SizeSheet, PriceSheet, ColorSheet, CategorySheet, TagsSheet,
   type SelectOption,
 } from '@/components/sell/PickerSheets';
 import { useForm, Controller } from 'react-hook-form';
@@ -55,6 +55,7 @@ import {
   UNBRANDED_LOCAL_TAILOR,
   TAXONOMY_VERSION,
 } from '@/lib/taxonomy';
+import { useGuestGate } from '@/components/GuestGate';
 
 const DISPLAY_BOLD = typography.family.sansBold;
 
@@ -100,7 +101,7 @@ export function useSellSheet(): SellSheetApi {
   return ctx;
 }
 
-import { useGuestGate } from '@/components/GuestGate';
+
 
 export function SellSheetProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();

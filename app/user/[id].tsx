@@ -37,7 +37,6 @@ import { useFadeIn } from '@/lib/motion';
 import { APP_URL, BRAND } from '@/lib/brand';
 import * as Clipboard from 'expo-clipboard';
 import type { Listing } from '@/types';
-import type { SaveList } from '@/lib/saves';
 import { EmptyState } from '@/components/ui';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
 import { SafeContainer } from '@/components/ui/SafeContainer';
@@ -287,8 +286,6 @@ export default function UserProfileScreen() {
   const displayName = profile.full_name || profile.username;
   const initial = (displayName || 'U').trim().charAt(0).toUpperCase();
   const isSelf = authUser?.id === profile.id;
-  const rating = Number(profile.rating ?? 0);
-  const totalSales = Number(profile.total_sales ?? 0);
   const totalLikes = listings.reduce((sum, l) => sum + (l.likes ?? 0), 0);
 
 

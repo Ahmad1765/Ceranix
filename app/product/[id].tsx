@@ -336,15 +336,8 @@ export default function ProductScreen() {
     }
     if (!sellerId || sellerId === user.id || followBusy) return;
 
-    const sellerHandle = listing?.seller?.username ?? 'seller';
+
     const wasFollowing = followed;
-    const undoFollow = async () => {
-      try {
-        await toggleFollowM.mutateAsync({ currentlyFollowing: true });
-      } catch {
-        toast.show('Could not undo', { variant: 'default', icon: 'alert-triangle' });
-      }
-    };
 
     let next: any = null;
     let failure: unknown = null;

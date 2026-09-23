@@ -9,7 +9,6 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/lib/auth';
 import {
   subscribeToInbox,
-  isTransactionalConversation,
   isConversationUnread,
   type ConversationRow,
 } from '@/lib/chat';
@@ -649,7 +648,7 @@ export default function InboxScreen() {
   const conversations = inboxQ.data ?? EMPTY_CONVERSATIONS;
   const loading = inboxQ.isLoading;
   const refreshing = inboxQ.isRefetching;
-  const { refetch: inboxRefetch, isStale: inboxStale } = inboxQ;
+  const { refetch: inboxRefetch } = inboxQ;
 
   const pagerRef = useRef<FlatList<{ value: InboxTab; label: string }>>(null);
   const [scrollX] = useState(() => new Animated.Value(0));

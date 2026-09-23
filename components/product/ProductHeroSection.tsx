@@ -11,7 +11,7 @@
 
 import { memo } from 'react';
 import { View, Pressable } from 'react-native';
-import { Text } from '@/lib/rnText';
+
 import Animated from 'react-native-reanimated';
 import { useTheme } from '@/context/ThemeContext';
 import { ImageCarousel } from '@/components/product/ImageCarousel';
@@ -19,7 +19,7 @@ import { PopIcon, type PopIconHandle } from '@/components/product/PopIcon';
 import { AnimatedNumber } from '@/components/AnimatedNumber';
 import { BRAND_PURPLE, HAIRLINE } from '@/components/product/shared';
 import { SoldBadge } from '@/components/ui/SoldBadge';
-import { radii } from '@/lib/theme';
+
 
 type ProductHeroSectionProps = {
   images: string[];
