@@ -180,7 +180,7 @@ export function TextFieldSheet({
   const [draft, setDraft] = useState(value);
   useEffect(() => {
     if (visible) setDraft(value);
-  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [visible, value]);
 
   const save = () => {
     onChange(draft.trim());
@@ -242,7 +242,7 @@ export function SizeSheet({
 
   useEffect(() => {
     if (visible) setDraft(value);
-  }, [visible]);
+  }, [visible, value]);
 
   const save = (valToSave?: string) => {
     const finalVal = (valToSave ?? draft).trim();
@@ -392,7 +392,7 @@ export function PriceSheet({
   const [draft, setDraft] = useState(value);
   useEffect(() => {
     if (visible) setDraft(value);
-  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [visible, value]);
 
   const save = () => {
     onChange(draft);
@@ -655,7 +655,7 @@ export function TagsSheet({
       setTags(value);
       setDraft('');
     }
-  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [visible, value]);
 
   const addFromDraft = (candidate?: string) => {
     const textToUse = typeof candidate === 'string' ? candidate : draft;

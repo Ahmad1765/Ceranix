@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { View } from 'react-native';
 import { SellForm } from '@/components/sell/SellSheet';
@@ -16,13 +16,13 @@ export default function SellScreen() {
 
   const { data: listing } = useListingQuery(listingId);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     if (router.canGoBack()) {
       router.back();
     } else {
       router.replace('/(tabs)');
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -33,7 +33,8 @@ export default function SellScreen() {
       });
       handleClose();
     }
-  }, [user]);
+  }, [user, guestGate, handleClose]);
+
 
   if (!user) {
     return <View style={{ flex: 1, backgroundColor: theme.background }} />;

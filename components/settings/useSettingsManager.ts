@@ -212,7 +212,7 @@ export function useSettingsManager() {
       }
       await refreshProfile();
     },
-    [user?.id, refreshProfile],
+    [user?.id, refreshProfile, toast],
   );
 
   const setBundlePct = useCallback(
@@ -232,7 +232,7 @@ export function useSettingsManager() {
       }
       await refreshProfile();
     },
-    [user?.id, refreshProfile],
+    [user?.id, refreshProfile, toast],
   );
 
   const savedCollectionPrivacy: 'public' | 'private' = profile?.saved_collection_privacy ?? 'public';
@@ -253,7 +253,7 @@ export function useSettingsManager() {
       }
       await refreshProfile();
     },
-    [user?.id, refreshProfile],
+    [user?.id, refreshProfile, toast],
   );
 
   const openSystemSettings = useCallback(async () => {
