@@ -10,61 +10,111 @@ import {
   StyleSheet,
   ScrollView,
   KeyboardAvoidingView,
+  Linking,
+  useWindowDimensions,
 } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
-import { router, Redirect } from 'expo-router';
+import { Redirect } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import * as Clipboard from 'expo-clipboard';
 import { tap } from '@/lib/haptics';
 import { type as typography } from '@/lib/theme';
-import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { safeBack } from '@/lib/nav';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { formatPrice } from '@/lib/fees';
-import { paymentService } from '@/lib/paymentService';
 import { supabase } from '@/lib/supabase';
-import { getOptimizedImageUrl, cardImageUrl, IMAGE_TRANSITION } from '@/lib/images';
-import type { Order } from '@/types';
+import { cardImageUrl, IMAGE_TRANSITION } from '@/lib/images';
+import {
+  escrowService,
+  getEscrowStatusStyle,
+  canAdvanceEscrow,
+  type EscrowLogisticsItem,
+} from '@/lib/escrowService';
+import type { EscrowStatus, TransactionEventLog } from '@/types';
 
-type FilterTab = 'all' | 'packing' | 'shifting' | 'delivered' | 'disputed' | 'canceled';
+type FilterTab =
+  | 'active'
+  | 'ready_for_pickup'
+  | 'in_transit'
+  | 'delivered'
+  | 'completed'
+  | 'disputed'
+  | 'cancelled'
+  | 'all';
 
-const COURIER_PRESETS = ['TCS', 'Leopards', 'Trax', 'PostEx', 'M&P', 'Custom'];
+const COURIER_PRESETS = ['Internal Fleet', 'TCS', 'Leopards', 'Trax', 'PostEx', 'M&P', 'Custom'];
 
 function deriveRef(id: string): string {
   const hex = id.replace(/-/g, '').slice(0, 8);
   return hex.toUpperCase();
 }
 
+function formatDate(isoString?: string | null): string {
+  if (!isoString) return '—';
+  try {
+    const d = new Date(isoString);
+    return d.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+  } catch {
+    return isoString;
+  }
+}
+
 export default function AdminLogisticsScreen() {
-  const insets = useSafeAreaInsets();
-  const { theme, isDark } = useTheme();
+  const { width } = useWindowDimensions();
+  const isLargeScreen = width >= 1024;
   const { profile, loading: authLoading } = useAuth();
   const toast = useToast();
 
-  const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
+  const [activeFilter, setActiveFilter] = useState<FilterTab>('active');
   const [searchQuery, setSearchQuery] = useState('');
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [transactions, setTransactions] = useState<EscrowLogisticsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Dispatch Modal State
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  // Selected Transaction for Detail View
+  const [selectedTx, setSelectedTx] = useState<EscrowLogisticsItem | null>(null);
+  const [eventLogs, setEventLogs] = useState<TransactionEventLog[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+
+  // Action Modals
   const [showDispatchModal, setShowDispatchModal] = useState(false);
+  const [showDisputeModal, setShowDisputeModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+
+  // Form Fields
   const [courier, setCourier] = useState(COURIER_PRESETS[0]);
   const [customCourier, setCustomCourier] = useState('');
   const [trackingNumber, setTrackingNumber] = useState('');
-  const [dispatching, setDispatching] = useState(false);
+  const [actionNotes, setActionNotes] = useState('');
+  const [disputeReason, setDisputeReason] = useState('');
+  const [cancelReason, setCancelReason] = useState('');
+  const [submittingAction, setSubmittingAction] = useState(false);
 
-  const loadOrders = useCallback(async () => {
+  // Fetch Transactions
+  const loadTransactions = useCallback(async () => {
     try {
-      const data = await paymentService.fetchAdminLogisticsOrders(activeFilter, 60);
-      setOrders(data);
+      const data = await escrowService.fetchLogisticsTransactions(activeFilter, 100);
+      setTransactions(data);
+      // Auto-select first item on large screen if nothing selected
+      if (isLargeScreen && data.length > 0) {
+        setSelectedTx((curr) => {
+          if (!curr) return data[0];
+          const found = data.find((t) => t.id === curr.id);
+          return found || data[0];
+        });
+      }
     } catch (err: any) {
-      toast.show(err?.message || 'Failed to load logistics orders', {
+      toast.show(err?.message || 'Failed to load escrow transactions', {
         variant: 'default',
         icon: 'alert-triangle',
       });
@@ -72,34 +122,64 @@ export default function AdminLogisticsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [activeFilter, toast]);
+  }, [activeFilter, isLargeScreen, toast]);
 
-  const loadOrdersRef = useRef(loadOrders);
-  loadOrdersRef.current = loadOrders;
+  const loadTransactionsRef = useRef(loadTransactions);
+  loadTransactionsRef.current = loadTransactions;
 
-  // Initial load and filter change effect
   useEffect(() => {
     if (!profile?.is_admin) return;
     setLoading(true);
-    loadOrders();
-  }, [loadOrders, profile?.is_admin]);
+    loadTransactions();
+  }, [loadTransactions, profile?.is_admin]);
 
-  // Supabase Realtime for instant multi-admin & seller synchronization (created once, debounced)
+  // Load audit logs when selectedTx changes
+  useEffect(() => {
+    if (!selectedTx?.id) {
+      setEventLogs([]);
+      return;
+    }
+    let isCurrent = true;
+    setLoadingLogs(true);
+    escrowService
+      .fetchEventLogs(selectedTx.id)
+      .then((logs) => {
+        if (isCurrent) setEventLogs(logs);
+      })
+      .finally(() => {
+        if (isCurrent) setLoadingLogs(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [selectedTx?.id]);
+
+  // Supabase Real-time Subscriptions (Dual subscription on transactions and orders)
   useEffect(() => {
     if (!profile?.is_admin) return;
 
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const channelName = `admin_logistics_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const channelName = `admin_escrow_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const channel = supabase
       .channel(channelName)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'transactions' },
+        () => {
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            loadTransactionsRef.current();
+          }, 300);
+        },
+      )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders' },
         () => {
           if (debounceTimer) clearTimeout(debounceTimer);
           debounceTimer = setTimeout(() => {
-            loadOrdersRef.current();
+            loadTransactionsRef.current();
           }, 300);
         },
       )
@@ -113,893 +193,1936 @@ export default function AdminLogisticsScreen() {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    loadOrders();
-  }, [loadOrders]);
+    loadTransactions();
+  }, [loadTransactions]);
 
-  const closeDispatchModal = useCallback(() => {
-    if (dispatching) return;
-    setShowDispatchModal(false);
-    setSelectedOrder(null);
-  }, [dispatching]);
-
-  // Copy helper with feedback
+  // Copy helper
   const copyToClipboard = async (text: string, label: string) => {
     tap('light');
     await Clipboard.setStringAsync(text);
     toast.show(`${label} copied!`, { variant: 'default', icon: 'check' });
   };
 
-  // Dispatch Action Handler
-  const handleConfirmDispatch = async () => {
-    if (!selectedOrder?.id) return;
-    if (!trackingNumber.trim()) {
-      toast.show('Tracking number / consignment # is required', {
+  // Dial Phone
+  const handleCall = (phoneNumber?: string | null) => {
+    if (!phoneNumber) {
+      toast.show('No phone number provided', { variant: 'default', icon: 'alert-triangle' });
+      return;
+    }
+    tap('light');
+    Linking.openURL(`tel:${phoneNumber}`).catch(() => {
+      toast.show('Could not open phone dialer', { variant: 'default', icon: 'alert-triangle' });
+    });
+  };
+
+  // State Transition Handlers
+  const handleAdvanceStatus = async (
+    targetStatus: EscrowStatus,
+    extra: {
+      notes?: string;
+      courier?: string;
+      trackingNumber?: string;
+      disputeReason?: string;
+      cancelReason?: string;
+    } = {},
+  ) => {
+    if (!selectedTx?.order_id) return;
+
+    if (!canAdvanceEscrow(selectedTx.status, targetStatus)) {
+      toast.show(`Cannot transition directly from ${selectedTx.status} to ${targetStatus}`, {
         variant: 'default',
         icon: 'alert-triangle',
       });
       return;
     }
 
-    if (courier === 'Custom' && !customCourier.trim()) {
-      toast.show('Custom courier name is required', {
-        variant: 'default',
-        icon: 'alert-triangle',
-      });
-      return;
-    }
-
-    const finalCourier = courier === 'Custom' ? customCourier.trim() : courier;
     tap('medium');
-    setDispatching(true);
+    setSubmittingAction(true);
 
     try {
-      const updated = await paymentService.advanceOrderFulfillment({
-        orderId: selectedOrder.id,
-        targetStatus: 'shifting',
-        courier: finalCourier,
-        trackingNumber: trackingNumber.trim(),
+      const updated = await escrowService.advanceStatus({
+        orderId: selectedTx.order_id,
+        targetStatus,
+        notes: extra.notes || actionNotes || null,
+        courier: extra.courier || null,
+        trackingNumber: extra.trackingNumber || null,
+        disputeReason: extra.disputeReason || null,
+        cancelReason: extra.cancelReason || null,
       });
 
-      setOrders((prev) =>
-        prev.map((o) => (o.id === updated.id ? { ...o, ...updated } : o)),
+      const updatedItem: EscrowLogisticsItem = {
+        ...selectedTx,
+        ...updated,
+        order: selectedTx.order,
+      };
+
+      setTransactions((prev) =>
+        prev.map((t) => (t.id === updated.id ? updatedItem : t)),
       );
-      toast.show('Shipment dispatched! Buyer & seller notified.', {
+      setSelectedTx(updatedItem);
+
+      // Re-fetch event logs
+      escrowService.fetchEventLogs(updated.id).then(setEventLogs);
+
+      toast.show(`Status updated to ${getEscrowStatusStyle(targetStatus).label}`, {
         variant: 'default',
         icon: 'check',
       });
+
       setShowDispatchModal(false);
-      setSelectedOrder(null);
+      setShowDisputeModal(false);
+      setShowCancelModal(false);
+      setActionNotes('');
+      setTrackingNumber('');
+      setDisputeReason('');
+      setCancelReason('');
     } catch (err: any) {
-      toast.show(err?.message || 'Failed to dispatch shipment', {
+      toast.show(err?.message || 'Failed to update transaction state', {
         variant: 'default',
         icon: 'alert-triangle',
       });
     } finally {
-      setDispatching(false);
+      setSubmittingAction(false);
     }
   };
 
-  const openDispatch = (order: Order) => {
-    tap('light');
-    setSelectedOrder(order);
-    setCourier(COURIER_PRESETS[0]);
-    setCustomCourier('');
-    setTrackingNumber('');
-    setShowDispatchModal(true);
+  const handleConfirmDispatch = async () => {
+    const finalCourier = courier === 'Custom' ? customCourier.trim() : courier;
+    await handleAdvanceStatus('IN_TRANSIT', {
+      courier: finalCourier || 'Internal Logistics',
+      trackingNumber: trackingNumber.trim() || undefined,
+      notes: actionNotes.trim() || undefined,
+    });
   };
 
-  // Filtered orders list by search query and active tab
-  const filteredOrders = useMemo(() => {
-    let list = orders;
-
-    // Filter out canceled orders in 'all' view; show canceled specifically in 'canceled' view
-    if (activeFilter === 'all') {
-      list = list.filter((o) => {
-        const isCanceled =
-          o.status === 'canceled' ||
-          o.status === 'refunded' ||
-          o.status === 'failed' ||
-          o.status === 'refund_due' ||
-          (o as any).fulfillment_status === 'canceled';
-        return !isCanceled;
+  const handleConfirmDispute = async () => {
+    if (!disputeReason.trim()) {
+      toast.show('Please provide a reason for the dispute', {
+        variant: 'default',
+        icon: 'alert-triangle',
       });
-    } else if (activeFilter === 'canceled') {
-      list = list.filter((o) => {
-        const isCanceled =
-          o.status === 'canceled' ||
-          o.status === 'refunded' ||
-          o.status === 'failed' ||
-          o.status === 'refund_due' ||
-          (o as any).fulfillment_status === 'canceled';
-        return isCanceled;
-      });
+      return;
     }
+    await handleAdvanceStatus('DISPUTED', {
+      disputeReason: disputeReason.trim(),
+      notes: actionNotes.trim() || undefined,
+    });
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!cancelReason.trim()) {
+      toast.show('Please provide a cancellation reason', {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
+      return;
+    }
+    await handleAdvanceStatus('CANCELLED', {
+      cancelReason: cancelReason.trim(),
+      notes: actionNotes.trim() || undefined,
+    });
+  };
+
+  // Filtered List
+  const filteredTransactions = useMemo(() => {
+    let list = transactions;
 
     if (!searchQuery.trim()) return list;
     const q = searchQuery.toLowerCase().trim();
-    return list.filter((o) => {
-      const title = (o as any).listing?.title?.toLowerCase() || '';
-      const ref = o.id.toLowerCase();
-      const buyerName = ((o as any).buyer?.full_name || (o as any).buyer?.username || '').toLowerCase();
-      const sellerName = ((o as any).seller?.full_name || (o as any).seller?.username || '').toLowerCase();
-      const city = ((o as any).shipping_address?.city || '').toLowerCase();
+    return list.filter((t) => {
+      const ref = deriveRef(t.id).toLowerCase();
+      const orderRef = deriveRef(t.order_id).toLowerCase();
+      const title = t.listing?.title?.toLowerCase() || '';
+      const buyerName = (t.buyer?.full_name || t.buyer?.username || '').toLowerCase();
+      const sellerName = (t.seller?.full_name || t.seller?.username || '').toLowerCase();
+      const tracking = (t.tracking_number || '').toLowerCase();
+      const courierName = (t.courier_name || '').toLowerCase();
       return (
-        title.includes(q) ||
         ref.includes(q) ||
+        orderRef.includes(q) ||
+        title.includes(q) ||
         buyerName.includes(q) ||
         sellerName.includes(q) ||
-        city.includes(q)
+        tracking.includes(q) ||
+        courierName.includes(q)
       );
     });
-  }, [orders, searchQuery, activeFilter]);
+  }, [transactions, searchQuery]);
 
+  // Auth Protection
   if (authLoading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={theme.primary} />
+      <SafeAreaView style={styles.authContainer} edges={['top']}>
+        <ActivityIndicator color="#6C47FF" />
       </SafeAreaView>
     );
   }
 
-  // Admin Access Guard: Non-admins are completely locked out and silently redirected
   if (!profile?.is_admin) {
     return <Redirect href="/" />;
   }
 
-  const filterTabs: { id: FilterTab; label: string }[] = [
-    { id: 'all', label: 'All Active' },
-    { id: 'packing', label: 'Needs Pickup' },
-    { id: 'shifting', label: 'In Transit' },
+  const filterTabs: { id: FilterTab; label: string; count?: number }[] = [
+    { id: 'active', label: 'Active Escrow' },
+    { id: 'ready_for_pickup', label: 'Needs Pickup' },
+    { id: 'in_transit', label: 'In Transit' },
     { id: 'delivered', label: 'Delivered' },
+    { id: 'completed', label: 'Completed' },
     { id: 'disputed', label: 'Disputed' },
-    { id: 'canceled', label: 'Canceled' },
+    { id: 'cancelled', label: 'Cancelled' },
+    { id: 'all', label: 'All' },
   ];
 
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top']}>
-      {/* ── Top App Bar ── */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingHorizontal: 16,
-          paddingTop: 8,
-          paddingBottom: 12,
-          backgroundColor: theme.surface,
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: theme.border,
-        }}
-      >
-        <Pressable
-          onPress={() => safeBack()}
-          hitSlop={HIT_SLOP_8}
-          style={({ pressed }) => [
-            {
-              width: 38,
-              height: 38,
-              borderRadius: 19,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: theme.panel,
-            },
-            pressed && { opacity: 0.6 },
-          ]}
-        >
-          <Feather name="arrow-left" size={20} color={theme.ink} />
-        </Pressable>
+  // Helper to extract seller pickup address
+  const getPickupAddress = (item: EscrowLogisticsItem) => {
+    const raw = item.order?.order_seller_pickups;
+    if (Array.isArray(raw) && raw.length > 0) return raw[0]?.pickup_address;
+    if (raw && typeof raw === 'object' && 'pickup_address' in raw) {
+      return (raw as any).pickup_address;
+    }
+    return null;
+  };
 
-        <View style={{ alignItems: 'center' }}>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
-            Admin Logistics Hub
-          </Text>
-          <Text style={{ fontSize: 11.5, color: theme.primary, fontFamily: typography.family.sansSemibold, marginTop: 1 }}>
-            Operations & Dispatch Control
-          </Text>
+  const currentPickupAddress = selectedTx ? getPickupAddress(selectedTx) : null;
+  const currentDropoffAddress = selectedTx?.order?.shipping_address;
+
+  return (
+    <SafeAreaView style={styles.root} edges={['top']}>
+      {/* ── Top Header Bar ── */}
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <Pressable
+            onPress={() => safeBack()}
+            hitSlop={HIT_SLOP_8}
+            style={({ pressed }) => [styles.iconButton, pressed && styles.pressedOpacity]}
+          >
+            <Feather name="arrow-left" size={18} color="#FFFFFF" />
+          </Pressable>
+          <View>
+            <View style={styles.headerTitleRow}>
+              <Text style={styles.headerTitle}>Internal Logistics</Text>
+              <View style={styles.liveIndicator}>
+                <View style={styles.liveDot} />
+                <Text style={styles.liveText}>Realtime</Text>
+              </View>
+            </View>
+            <Text style={styles.headerSubtitle}>
+              Escrow State Machine & In-House Fulfillment Operations
+            </Text>
+          </View>
         </View>
 
         <Pressable
           onPress={onRefresh}
-          hitSlop={HIT_SLOP_8}
-          style={({ pressed }) => [
-            {
-              width: 38,
-              height: 38,
-              borderRadius: 19,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: theme.panel,
-            },
-            pressed && { opacity: 0.6 },
-          ]}
+          style={({ pressed }) => [styles.refreshButton, pressed && styles.pressedOpacity]}
         >
-          <Feather name="refresh-cw" size={17} color={theme.ink} />
+          <Feather name="rotate-cw" size={14} color="#A78BFA" />
+          <Text style={styles.refreshButtonText}>Sync</Text>
         </Pressable>
       </View>
 
-      {/* ── Search Input ── */}
-      <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 }}>
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            backgroundColor: theme.surface,
-            borderWidth: 1,
-            borderColor: theme.border,
-            borderRadius: 12,
-            paddingHorizontal: 12,
-            height: 42,
-          }}
-        >
-          <Feather name="search" size={16} color={theme.mute} style={{ marginRight: 8 }} />
-          <TextInput
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search order ref, item, buyer, seller..."
-            placeholderTextColor={theme.muteSoft}
-            style={{
-              flex: 1,
-              fontSize: 13.5,
-              color: theme.ink,
-              fontFamily: typography.family.sans,
-            }}
-          />
-          {searchQuery.length > 0 && (
-            <Pressable onPress={() => setSearchQuery('')} hitSlop={HIT_SLOP_8}>
-              <Feather name="x" size={16} color={theme.mute} />
-            </Pressable>
-          )}
-        </View>
-      </View>
-
-      {/* ── Status Filter Chips (Strict 30px Standard) ── */}
-      <View style={{ paddingVertical: 10 }}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
-        >
-          {filterTabs.map((tab) => {
-            const isActive = activeFilter === tab.id;
-            return (
-              <Pressable
-                key={tab.id}
-                onPress={() => {
-                  tap('light');
-                  setActiveFilter(tab.id);
-                }}
-                style={({ pressed }) => [
-                  {
-                    height: 30,
-                    borderRadius: 15,
-                    paddingHorizontal: 14,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: isActive ? theme.ink : theme.surface,
-                    borderWidth: 1,
-                    borderColor: isActive ? theme.ink : theme.border,
-                  },
-                  pressed && { opacity: 0.75 },
-                ]}
-              >
-                <Text
-                  style={{
-                    fontSize: 12.5,
-                    fontWeight: isActive ? '700' : '500',
-                    color: isActive ? theme.background : theme.ink,
-                    fontFamily: isActive ? typography.family.sansBold : typography.family.sansMedium,
-                  }}
-                >
-                  {tab.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      </View>
-
-      {/* ── Order Cards List ── */}
-      {loading ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={theme.primary} size="large" />
-          <Text style={{ fontSize: 13, color: theme.mute, marginTop: 10, fontFamily: typography.family.sans }}>
-            Loading platform orders...
-          </Text>
-        </View>
-      ) : filteredOrders.length === 0 ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
-          <Feather name="package" size={40} color={theme.muteSoft} />
-          <Text style={{ fontSize: 16, fontWeight: '700', color: theme.ink, marginTop: 12, fontFamily: typography.family.sansBold }}>
-            No orders found
-          </Text>
-          <Text style={{ fontSize: 13, color: theme.mute, textAlign: 'center', marginTop: 4, fontFamily: typography.family.sans }}>
-            {searchQuery
-              ? 'Try searching with a different term'
-              : activeFilter === 'canceled'
-              ? 'No canceled orders found.'
-              : 'No orders currently in this fulfillment stage.'}
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={filteredOrders}
-          keyExtractor={(item) => item.id}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />
-          }
-          contentContainerStyle={{
-            paddingHorizontal: 16,
-            paddingTop: 6,
-            paddingBottom: Math.max(insets.bottom, 16) + 30,
-            gap: 14,
-          }}
-          renderItem={({ item }) => {
-            const isCanceled =
-              item.status === 'canceled' ||
-              item.status === 'refunded' ||
-              item.status === 'failed' ||
-              item.status === 'refund_due' ||
-              (item as any).fulfillment_status === 'canceled';
-            const isManaged = (item as any).shipping_method === 'managed' || !(item as any).shipping_method;
-            const isNeedsPickup = !isCanceled && item.fulfillment_status === 'packing';
-            const isInTransit = !isCanceled && item.fulfillment_status === 'shifting';
-            const isDelivered = !isCanceled && item.fulfillment_status === 'delivered';
-            const isDisputed = !isCanceled && (item.fulfillment_status === 'disputed' || item.status === 'disputed');
-            const isCompleted = !isCanceled && (item.fulfillment_status === 'completed' || item.status === 'completed');
-
-            const listing = (item as any).listing;
-            const heroImage = listing ? cardImageUrl(listing, 0) : '';
-            const buyer = (item as any).buyer;
-            const seller = (item as any).seller;
-            const sAddr = item.seller_pickup_address as any;
-            const dAddr = item.shipping_address as any;
-
-            return (
-              <View
-                style={{
-                  backgroundColor: theme.white,
-                  borderRadius: 16,
-                  borderWidth: 1,
-                  borderColor: isCanceled ? 'rgba(239, 68, 68, 0.35)' : isNeedsPickup ? theme.primary : theme.border,
-                  padding: 16,
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.04,
-                  shadowRadius: 8,
-                  elevation: 2,
-                }}
-              >
-                {/* Card Header: Ref #, Tag, and Status */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
-                      #{deriveRef(item.id)}
-                    </Text>
-
-                    {/* Shipping Method Tag */}
-                    <View
-                      style={{
-                        paddingHorizontal: 7,
-                        paddingVertical: 2.5,
-                        borderRadius: 6,
-                        backgroundColor: isManaged ? (isDark ? 'rgba(108, 71, 255, 0.15)' : '#F2F3FE') : theme.panel,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 10.5,
-                          fontWeight: '700',
-                          color: isManaged ? theme.primary : theme.mute,
-                          fontFamily: typography.family.sansBold,
-                        }}
-                      >
-                        {isManaged ? 'Managed Delivery' : 'Self-Ship'}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Operational Status Pill */}
-                  <View
-                    style={{
-                      paddingHorizontal: 9,
-                      paddingVertical: 3,
-                      borderRadius: 12,
-                      backgroundColor: isCanceled
-                        ? 'rgba(239, 68, 68, 0.12)'
-                        : isDisputed
-                        ? 'rgba(239, 68, 68, 0.12)'
-                        : isNeedsPickup
-                        ? 'rgba(108, 71, 255, 0.15)'
-                        : isInTransit
-                        ? '#EFF6FF'
-                        : isDelivered || isCompleted
-                        ? '#ECFDF5'
-                        : theme.panel,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 11,
-                        fontWeight: '700',
-                        color: isCanceled
-                          ? '#EF4444'
-                          : isDisputed
-                          ? '#EF4444'
-                          : isNeedsPickup
-                          ? theme.primary
-                          : isInTransit
-                          ? '#2563EB'
-                          : isDelivered || isCompleted
-                          ? '#10B981'
-                          : theme.mute,
-                        fontFamily: typography.family.sansBold,
-                        textTransform: 'capitalize',
-                      }}
-                    >
-                      {isCanceled
-                        ? (item.status === 'refunded' ? 'Refunded' : 'Canceled')
-                        : (item.fulfillment_status || item.status)}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Item Summary Strip */}
-                <Pressable
-                  onPress={() => {
-                    tap('light');
-                    if (item.listing_id) {
-                      router.push(`/invoice/${item.listing_id}` as any);
-                    }
-                  }}
-                  style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}
-                >
-                  <View
-                    style={{
-                      width: 52,
-                      height: 52,
-                      borderRadius: 10,
-                      backgroundColor: theme.panel,
-                      borderWidth: 1,
-                      borderColor: theme.border,
-                      overflow: 'hidden',
-                      marginRight: 12,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    {heroImage ? (
-                      <Image
-                        source={{ uri: getOptimizedImageUrl(heroImage, { width: 120 }) }}
-                        style={{ width: '100%', height: '100%' }}
-                        contentFit="cover"
-                        cachePolicy="memory-disk"
-                        transition={IMAGE_TRANSITION}
-                      />
-                    ) : (
-                      <Feather name="package" size={20} color={theme.muteSoft} />
-                    )}
-                  </View>
-
-                  <View style={{ flex: 1 }}>
-                    <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
-                      {listing?.title || 'Marketplace Item'}
-                    </Text>
-                    <Text style={{ fontSize: 12, color: theme.mute, marginTop: 2, fontFamily: typography.family.sans }}>
-                      Amount: {formatPrice((item.amount_cents + (item.shipping_fee_cents ?? 0)) / 100)} · {item.payment_method === 'cod' ? '💵 Cash on Delivery' : '💳 Paid Online'}
-                    </Text>
-                  </View>
-
-                  <Feather name="chevron-right" size={16} color={theme.muteSoft} />
+      {/* ── Main Container (Split-View or Full-Width) ── */}
+      <View style={[styles.mainLayout, isLargeScreen && styles.mainLayoutSplit]}>
+        {/* ── Left Column: Table & Filters ── */}
+        <View style={[styles.leftColumn, isLargeScreen && styles.leftColumnSplit]}>
+          {/* ── Search & Filter Tabs ── */}
+          <View style={styles.toolbar}>
+            <View style={styles.searchBar}>
+              <Feather name="search" size={15} color="#9CA3AF" />
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Search by ID, buyer, seller, title, tracking..."
+                placeholderTextColor="#6B7280"
+                style={styles.searchInput}
+              />
+              {searchQuery.length > 0 && (
+                <Pressable onPress={() => setSearchQuery('')} hitSlop={HIT_SLOP_8}>
+                  <Feather name="x" size={15} color="#9CA3AF" />
                 </Pressable>
-
-                {/* ── Addresses Section ── */}
-                <View style={{ gap: 10, marginBottom: 14 }}>
-                  {/* Seller Pickup Block */}
-                  <View
-                    style={{
-                      backgroundColor: theme.surface,
-                      borderRadius: 12,
-                      padding: 12,
-                      borderWidth: 1,
-                      borderColor: theme.border,
-                    }}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Feather name="arrow-up-circle" size={14} color={theme.primary} />
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
-                          Pickup From (Seller)
-                        </Text>
-                      </View>
-                      <Pressable
-                        onPress={() => {
-                          const copyStr = `${sAddr?.recipientName || seller?.full_name || seller?.username || 'Seller'}, Ph: ${sAddr?.phone || 'N/A'}, Addr: ${[sAddr?.line1, sAddr?.line2, sAddr?.city].filter(Boolean).join(', ')}`;
-                          copyToClipboard(copyStr, 'Pickup address');
-                        }}
-                        hitSlop={HIT_SLOP_8}
-                        style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
-                      >
-                        <Feather name="copy" size={12} color={theme.primary} />
-                        <Text style={{ fontSize: 11.5, fontWeight: '600', color: theme.primary, fontFamily: typography.family.sansSemibold }}>
-                          Copy
-                        </Text>
-                      </Pressable>
-                    </View>
-
-                    <Text style={{ fontSize: 12.5, fontWeight: '600', color: theme.ink, fontFamily: typography.family.sansSemibold }}>
-                      {sAddr?.recipientName || seller?.full_name || seller?.username || 'Seller'} · {sAddr?.phone ? `📞 ${sAddr.phone}` : 'No phone'}
-                    </Text>
-                    <Text style={{ fontSize: 12, color: theme.mute, fontFamily: typography.family.sans, marginTop: 2 }}>
-                      {sAddr?.line1 ? [sAddr.line1, sAddr.line2, sAddr.city].filter(Boolean).join(', ') : 'Waiting for seller to confirm pickup address'}
-                    </Text>
-                  </View>
-
-                  {/* Buyer Delivery Block */}
-                  <View
-                    style={{
-                      backgroundColor: theme.surface,
-                      borderRadius: 12,
-                      padding: 12,
-                      borderWidth: 1,
-                      borderColor: theme.border,
-                    }}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Feather name="arrow-down-circle" size={14} color="#10B981" />
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
-                          Deliver To (Buyer)
-                        </Text>
-                      </View>
-                      <Pressable
-                        onPress={() => {
-                          const copyStr = `${dAddr?.recipientName || dAddr?.recipient_name || buyer?.full_name || buyer?.username || 'Buyer'}, Ph: ${dAddr?.phone || 'N/A'}, Addr: ${[dAddr?.line1, dAddr?.line2, dAddr?.city].filter(Boolean).join(', ')}`;
-                          copyToClipboard(copyStr, 'Delivery address');
-                        }}
-                        hitSlop={HIT_SLOP_8}
-                        style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
-                      >
-                        <Feather name="copy" size={12} color={theme.primary} />
-                        <Text style={{ fontSize: 11.5, fontWeight: '600', color: theme.primary, fontFamily: typography.family.sansSemibold }}>
-                          Copy
-                        </Text>
-                      </Pressable>
-                    </View>
-
-                    <Text style={{ fontSize: 12.5, fontWeight: '600', color: theme.ink, fontFamily: typography.family.sansSemibold }}>
-                      {dAddr?.recipientName || dAddr?.recipient_name || buyer?.full_name || buyer?.username || 'Buyer'} · {dAddr?.phone ? `📞 ${dAddr.phone}` : 'No phone'}
-                    </Text>
-                    <Text style={{ fontSize: 12, color: theme.mute, fontFamily: typography.family.sans, marginTop: 2 }}>
-                      {dAddr?.line1 ? [dAddr.line1, dAddr.line2, dAddr.city].filter(Boolean).join(', ') : 'No delivery address provided'}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Tracking Details Strip if Dispatched */}
-                {item.tracking_number && (
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      backgroundColor: theme.panel,
-                      padding: 10,
-                      borderRadius: 10,
-                      marginBottom: 12,
-                    }}
-                  >
-                    <View>
-                      <Text style={{ fontSize: 11, color: theme.mute, fontFamily: typography.family.sans }}>
-                        Courier: {item.courier_name || 'Standard'}
-                      </Text>
-                      <Text style={{ fontSize: 12.5, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
-                        Tracking #: {item.tracking_number}
-                      </Text>
-                    </View>
-                    <Pressable
-                      onPress={() => copyToClipboard(item.tracking_number!, 'Tracking number')}
-                      hitSlop={HIT_SLOP_8}
-                    >
-                      <Feather name="copy" size={14} color={theme.primary} />
-                    </Pressable>
-                  </View>
-                )}
-
-                {/* Cancellation Notice Banner */}
-                {isCanceled && (
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      backgroundColor: 'rgba(239, 68, 68, 0.08)',
-                      borderRadius: 10,
-                      padding: 10,
-                      marginBottom: 12,
-                      borderWidth: 1,
-                      borderColor: 'rgba(239, 68, 68, 0.2)',
-                      gap: 8,
-                    }}
-                  >
-                    <Feather name="x-circle" size={15} color="#EF4444" />
-                    <Text
-                      style={{
-                        flex: 1,
-                        fontSize: 12,
-                        color: '#EF4444',
-                        fontFamily: typography.family.sansMedium,
-                      }}
-                      numberOfLines={2}
-                    >
-                      {(item as any).cancel_reason ? `Canceled: ${(item as any).cancel_reason}` : 'Order was canceled. No shipping required.'}
-                    </Text>
-                  </View>
-                )}
-
-                {/* Primary Action */}
-                {isNeedsPickup && !isCanceled ? (
-                  <Pressable
-                    onPress={() => openDispatch(item)}
-                    style={({ pressed }) => [
-                      {
-                        height: 44,
-                        borderRadius: 12,
-                        backgroundColor: theme.primary,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      },
-                      pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
-                    ]}
-                  >
-                    <Feather name="truck" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#FFFFFF', fontFamily: typography.family.sansBold }}>
-                      Dispatch Shipment & Assign Tracking
-                    </Text>
-                  </Pressable>
-                ) : (
-                  <Pressable
-                    onPress={() => {
-                      tap('light');
-                      if (item.listing_id) {
-                        router.push(`/invoice/${item.listing_id}` as any);
-                      }
-                    }}
-                    style={({ pressed }) => [
-                      {
-                        height: 40,
-                        borderRadius: 12,
-                        backgroundColor: theme.surface,
-                        borderWidth: 1,
-                        borderColor: theme.border,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      },
-                      pressed && { opacity: 0.75 },
-                    ]}
-                  >
-                    <Feather name="file-text" size={14} color={theme.ink} style={{ marginRight: 6 }} />
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: theme.ink, fontFamily: typography.family.sansSemibold }}>
-                      View Order Invoice
-                    </Text>
-                  </Pressable>
-                )}
-              </View>
-            );
-          }}
-        />
-      )}
-
-      {/* ── Admin Dispatch Modal ── */}
-      <Modal
-        visible={showDispatchModal}
-        transparent
-        animationType="slide"
-        onRequestClose={closeDispatchModal}
-        statusBarTranslucent
-      >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: theme.overlay,
-            justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end',
-            alignItems: 'center',
-            paddingHorizontal: Platform.OS === 'web' ? 16 : 0,
-          }}
-        >
-          <Pressable
-            style={StyleSheet.absoluteFill}
-            onPress={closeDispatchModal}
-          />
-
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={{ width: '100%', maxWidth: 480 }}
-          >
-          <View
-            style={[
-              {
-                width: '100%',
-                maxWidth: 480,
-                maxHeight: '85%',
-                backgroundColor: theme.white,
-                borderTopLeftRadius: 24,
-                borderTopRightRadius: 24,
-                borderRadius: Platform.OS === 'web' ? 24 : 0,
-                borderWidth: 1,
-                borderColor: theme.border,
-                paddingTop: 18,
-                paddingHorizontal: 20,
-              },
-              { paddingBottom: Math.max(insets.bottom, 16) + 16 },
-            ]}
-          >
-            {/* Grabber */}
-            <View style={{ alignItems: 'center', marginBottom: 12 }}>
-              <View style={{ width: 38, height: 4, borderRadius: 2, backgroundColor: theme.border }} />
-            </View>
-
-            {/* Header */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <View>
-                <Text style={{ fontSize: 18, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
-                  Dispatch Shipment
-                </Text>
-                <Text style={{ fontSize: 12.5, color: theme.mute, fontFamily: typography.family.sans, marginTop: 2 }}>
-                  Order #{selectedOrder ? deriveRef(selectedOrder.id) : ''}
-                </Text>
-              </View>
-
-              <Pressable
-                onPress={closeDispatchModal}
-                disabled={dispatching}
-                hitSlop={HIT_SLOP_8}
-                style={({ pressed }) => [
-                  {
-                    width: 32,
-                    height: 32,
-                    borderRadius: 16,
-                    backgroundColor: theme.panel,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  },
-                  dispatching && { opacity: 0.4 },
-                  pressed && { opacity: 0.7 },
-                ]}
-              >
-                <Feather name="x" size={18} color={theme.mute} />
-              </Pressable>
+              )}
             </View>
 
             <ScrollView
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              keyboardDismissMode="on-drag"
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.tabsScroll}
             >
-              {/* Courier Selection Chips */}
-              <Text style={{ fontSize: 12.5, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold, marginBottom: 8 }}>
-                Select Courier Partner
-              </Text>
-
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
-                {COURIER_PRESETS.map((c) => {
-                  const isSelected = courier === c;
-                  return (
-                    <Pressable
-                      key={c}
-                      onPress={() => {
-                        tap('light');
-                        setCourier(c);
-                      }}
-                      style={({ pressed }) => [
-                        {
-                          height: 32,
-                          borderRadius: 16,
-                          paddingHorizontal: 14,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          backgroundColor: isSelected ? theme.primary : theme.surface,
-                          borderWidth: 1,
-                          borderColor: isSelected ? theme.primary : theme.border,
-                        },
-                        pressed && { opacity: 0.75 },
-                      ]}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 13,
-                          fontWeight: isSelected ? '700' : '500',
-                          color: isSelected ? '#FFFFFF' : theme.ink,
-                          fontFamily: isSelected ? typography.family.sansBold : typography.family.sansMedium,
-                        }}
-                      >
-                        {c}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-
-              {courier === 'Custom' && (
-                <View style={{ marginBottom: 14 }}>
-                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold, marginBottom: 6 }}>
-                    Custom Courier Name *
-                  </Text>
-                  <TextInput
-                    value={customCourier}
-                    onChangeText={setCustomCourier}
-                    placeholder="e.g. Rider Express / Self Dispatch"
-                    placeholderTextColor={theme.muteSoft}
-                    style={{
-                      height: 46,
-                      borderWidth: 1,
-                      borderColor: theme.border,
-                      borderRadius: 12,
-                      paddingHorizontal: 14,
-                      fontSize: 14,
-                      color: theme.ink,
-                      backgroundColor: theme.surface,
+              {filterTabs.map((tab) => {
+                const isActive = activeFilter === tab.id;
+                return (
+                  <Pressable
+                    key={tab.id}
+                    onPress={() => {
+                      tap('light');
+                      setActiveFilter(tab.id);
                     }}
-                  />
-                </View>
-              )}
-
-              {/* Consignment / Tracking Number Input */}
-              <Text style={{ fontSize: 12.5, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold, marginBottom: 6 }}>
-                Consignment / Tracking Number *
-              </Text>
-              <TextInput
-                value={trackingNumber}
-                onChangeText={setTrackingNumber}
-                placeholder="e.g. 77391823901 or TRK-981"
-                placeholderTextColor={theme.muteSoft}
-                style={{
-                  height: 46,
-                  borderWidth: 1,
-                  borderColor: theme.border,
-                  borderRadius: 12,
-                  paddingHorizontal: 14,
-                  fontSize: 14,
-                  color: theme.ink,
-                  backgroundColor: theme.surface,
-                  marginBottom: 18,
-                }}
-              />
-
-              {/* Submit Button */}
-              <Pressable
-                onPress={handleConfirmDispatch}
-                disabled={dispatching}
-                style={({ pressed }) => [
-                  {
-                    height: 50,
-                    borderRadius: 14,
-                    backgroundColor: theme.primary,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexDirection: 'row',
-                  },
-                  dispatching && { opacity: 0.7 },
-                  pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
-                ]}
-              >
-                {dispatching ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <>
-                    <Feather name="send" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
-                    <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF', fontFamily: typography.family.sansBold }}>
-                      Mark In-Transit & Notify Buyer
+                    style={[styles.tabPill, isActive && styles.tabPillActive]}
+                  >
+                    <Text style={[styles.tabPillText, isActive && styles.tabPillTextActive]}>
+                      {tab.label}
                     </Text>
-                  </>
-                )}
-              </Pressable>
+                  </Pressable>
+                );
+              })}
             </ScrollView>
           </View>
-        </KeyboardAvoidingView>
+
+          {/* ── Orders Table Header ── */}
+          <View style={styles.tableHeaderRow}>
+            <Text style={[styles.tableHeaderCell, { width: 90 }]}>REF ID</Text>
+            <Text style={[styles.tableHeaderCell, { flex: 1.6 }]}>ITEM / LISTING</Text>
+            <Text style={[styles.tableHeaderCell, { flex: 1.2 }]}>PICKUP (SELLER)</Text>
+            <Text style={[styles.tableHeaderCell, { flex: 1.2 }]}>DROPOFF (BUYER)</Text>
+            <Text style={[styles.tableHeaderCell, { width: 105, textAlign: 'right' }]}>ESCROW</Text>
+            <Text style={[styles.tableHeaderCell, { width: 135, textAlign: 'center' }]}>STATUS</Text>
+          </View>
+
+          {/* ── Orders Table List ── */}
+          {loading ? (
+            <View style={styles.centerContainer}>
+              <ActivityIndicator color="#6C47FF" size="large" />
+              <Text style={styles.loadingText}>Syncing escrow ledger...</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={filteredTransactions}
+              keyExtractor={(item) => item.id}
+              refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6C47FF" />
+              }
+              contentContainerStyle={
+                filteredTransactions.length === 0 ? styles.emptyContainer : styles.listContent
+              }
+              ListEmptyComponent={
+                <View style={styles.emptyCard}>
+                  <Feather name="inbox" size={32} color="#4B5563" />
+                  <Text style={styles.emptyTitle}>No matching transactions found</Text>
+                  <Text style={styles.emptySubtitle}>
+                    {searchQuery
+                      ? 'Try adjusting your search criteria'
+                      : 'Orders in this status will automatically appear here via realtime stream.'}
+                  </Text>
+                </View>
+              }
+              renderItem={({ item }) => {
+                const isSelected = selectedTx?.id === item.id;
+                const statusStyle = getEscrowStatusStyle(item.status);
+                const sellerPickup = getPickupAddress(item);
+                const sellerCity = sellerPickup?.city || '—';
+                const buyerCity = item.order?.shipping_address?.city || '—';
+                const sellerName = item.seller?.full_name || item.seller?.username || 'Seller';
+                const buyerName = item.buyer?.full_name || item.buyer?.username || 'Buyer';
+                const img = item.listing ? cardImageUrl(item.listing, 0) : null;
+
+                return (
+                  <Pressable
+                    onPress={() => {
+                      tap('light');
+                      setSelectedTx(item);
+                    }}
+                    style={({ pressed }) => [
+                      styles.tableRow,
+                      isSelected && styles.tableRowSelected,
+                      pressed && styles.tableRowPressed,
+                    ]}
+                  >
+                    {/* Ref ID */}
+                    <View style={{ width: 90 }}>
+                      <Text style={styles.refIdText}>{deriveRef(item.id)}</Text>
+                      <Text style={styles.timeText}>{formatDate(item.created_at)}</Text>
+                    </View>
+
+                    {/* Listing & Thumbnail */}
+                    <View style={[styles.listingCell, { flex: 1.6 }]}>
+                      {img ? (
+                        <Image
+                          source={{ uri: img }}
+                          style={styles.thumbnail}
+                          transition={IMAGE_TRANSITION}
+                        />
+                      ) : (
+                        <View style={[styles.thumbnail, styles.thumbnailPlaceholder]}>
+                          <Feather name="image" size={14} color="#6B7280" />
+                        </View>
+                      )}
+                      <View style={{ flex: 1, marginLeft: 10 }}>
+                        <Text style={styles.listingTitleText} numberOfLines={1}>
+                          {item.listing?.title || 'Marketplace Item'}
+                        </Text>
+                        <Text style={styles.listingPriceText}>
+                          {formatPrice(item.amount_cents / 100)}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Seller Pickup */}
+                    <View style={{ flex: 1.2 }}>
+                      <Text style={styles.personNameText} numberOfLines={1}>
+                        {sellerName}
+                      </Text>
+                      <Text style={styles.cityText} numberOfLines={1}>
+                        📍 {sellerCity}
+                      </Text>
+                    </View>
+
+                    {/* Buyer Dropoff */}
+                    <View style={{ flex: 1.2 }}>
+                      <Text style={styles.personNameText} numberOfLines={1}>
+                        {buyerName}
+                      </Text>
+                      <Text style={styles.cityText} numberOfLines={1}>
+                        🎯 {buyerCity}
+                      </Text>
+                    </View>
+
+                    {/* Escrow Gross Amount */}
+                    <View style={{ width: 105, alignItems: 'flex-end' }}>
+                      <Text style={styles.escrowAmountText}>
+                        {formatPrice(item.amount_cents / 100)}
+                      </Text>
+                      <Text style={styles.escrowSubText}>
+                        {item.payment_method?.toUpperCase()}
+                      </Text>
+                    </View>
+
+                    {/* Status Badge */}
+                    <View style={{ width: 135, alignItems: 'center' }}>
+                      <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
+                        <View
+                          style={[styles.statusBadgeDot, { backgroundColor: statusStyle.dotColor }]}
+                        />
+                        <Text
+                          style={[styles.statusBadgeText, { color: statusStyle.color }]}
+                          numberOfLines={1}
+                        >
+                          {statusStyle.label}
+                        </Text>
+                      </View>
+                    </View>
+                  </Pressable>
+                );
+              }}
+            />
+          )}
         </View>
+
+        {/* ── Right Column: Detail View (Split-Screen on Desktop, Modal on Mobile) ── */}
+        {isLargeScreen ? (
+          <View style={styles.rightColumnSplit}>
+            {selectedTx ? (
+              <ScrollView
+                style={styles.detailScroll}
+                contentContainerStyle={styles.detailScrollContent}
+              >
+                <DetailContent
+                  tx={selectedTx}
+                  pickupAddress={currentPickupAddress}
+                  dropoffAddress={currentDropoffAddress}
+                  eventLogs={eventLogs}
+                  loadingLogs={loadingLogs}
+                  onOpenDispatch={() => setShowDispatchModal(true)}
+                  onOpenDispute={() => setShowDisputeModal(true)}
+                  onOpenCancel={() => setShowCancelModal(true)}
+                  onAdvance={handleAdvanceStatus}
+                  onCopy={copyToClipboard}
+                  onCall={handleCall}
+                  submitting={submittingAction}
+                />
+              </ScrollView>
+            ) : (
+              <View style={styles.noSelectionCard}>
+                <Feather name="mouse-pointer" size={32} color="#4B5563" />
+                <Text style={styles.noSelectionTitle}>Select an order to inspect logistics</Text>
+                <Text style={styles.noSelectionSubtitle}>
+                  View pickup, drop-off, accounting ledger, and advance the escrow state machine.
+                </Text>
+              </View>
+            )}
+          </View>
+        ) : (
+          /* Mobile Drawer / Modal */
+          <Modal
+            visible={Boolean(selectedTx && !isLargeScreen)}
+            animationType="slide"
+            presentationStyle="pageSheet"
+            onRequestClose={() => setSelectedTx(null)}
+          >
+            <View style={styles.mobileModalRoot}>
+              <View style={styles.mobileModalHeader}>
+                <Text style={styles.mobileModalTitle}>Logistics Detail</Text>
+                <Pressable onPress={() => setSelectedTx(null)} hitSlop={HIT_SLOP_8}>
+                  <Feather name="x" size={20} color="#FFFFFF" />
+                </Pressable>
+              </View>
+              {selectedTx && (
+                <ScrollView
+                  style={styles.detailScroll}
+                  contentContainerStyle={styles.detailScrollContent}
+                >
+                  <DetailContent
+                    tx={selectedTx}
+                    pickupAddress={currentPickupAddress}
+                    dropoffAddress={currentDropoffAddress}
+                    eventLogs={eventLogs}
+                    loadingLogs={loadingLogs}
+                    onOpenDispatch={() => setShowDispatchModal(true)}
+                    onOpenDispute={() => setShowDisputeModal(true)}
+                    onOpenCancel={() => setShowCancelModal(true)}
+                    onAdvance={handleAdvanceStatus}
+                    onCopy={copyToClipboard}
+                    onCall={handleCall}
+                    submitting={submittingAction}
+                  />
+                </ScrollView>
+              )}
+            </View>
+          </Modal>
+        )}
+      </View>
+
+      {/* ── Modal: Mark Picked Up & In Transit ── */}
+      <Modal
+        visible={showDispatchModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDispatchModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalDialog}>
+            <View style={styles.modalDialogHeader}>
+              <View>
+                <Text style={styles.modalDialogTitle}>Dispatch Shipment</Text>
+                <Text style={styles.modalDialogSubtitle}>
+                  Advance order from Ready for Pickup to In Transit
+                </Text>
+              </View>
+              <Pressable onPress={() => setShowDispatchModal(false)} hitSlop={HIT_SLOP_8}>
+                <Feather name="x" size={18} color="#9CA3AF" />
+              </Pressable>
+            </View>
+
+            {/* Courier Selection */}
+            <Text style={styles.fieldLabel}>ASSIGNED COURIER / FLEET</Text>
+            <View style={styles.courierRow}>
+              {COURIER_PRESETS.map((c) => (
+                <Pressable
+                  key={c}
+                  onPress={() => setCourier(c)}
+                  style={[styles.courierChip, courier === c && styles.courierChipActive]}
+                >
+                  <Text
+                    style={[
+                      styles.courierChipText,
+                      courier === c && styles.courierChipTextActive,
+                    ]}
+                  >
+                    {c}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {courier === 'Custom' && (
+              <TextInput
+                value={customCourier}
+                onChangeText={setCustomCourier}
+                placeholder="Enter custom courier name"
+                placeholderTextColor="#6B7280"
+                style={styles.dialogInput}
+              />
+            )}
+
+            {/* Consignment Tracking # */}
+            <Text style={styles.fieldLabel}>CONSIGNMENT / TRACKING # (OPTIONAL)</Text>
+            <TextInput
+              value={trackingNumber}
+              onChangeText={setTrackingNumber}
+              placeholder="e.g. TRK-88329104"
+              placeholderTextColor="#6B7280"
+              style={styles.dialogInput}
+            />
+
+            {/* Operational Notes */}
+            <Text style={styles.fieldLabel}>LOGISTICS HANDOFF NOTES</Text>
+            <TextInput
+              value={actionNotes}
+              onChangeText={setActionNotes}
+              placeholder="e.g. Picked up from seller, package sealed with tamper tape."
+              placeholderTextColor="#6B7280"
+              style={[styles.dialogInput, { height: 60 }]}
+              multiline
+            />
+
+            <View style={styles.modalActionsRow}>
+              <Pressable
+                onPress={() => setShowDispatchModal(false)}
+                style={styles.modalCancelButton}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={handleConfirmDispatch}
+                disabled={submittingAction}
+                style={[styles.modalSubmitButton, submittingAction && styles.disabledButton]}
+              >
+                {submittingAction ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.modalSubmitText}>Confirm In Transit</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── Modal: Flag Dispute ── */}
+      <Modal
+        visible={showDisputeModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDisputeModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalDialog}>
+            <View style={styles.modalDialogHeader}>
+              <View>
+                <Text style={[styles.modalDialogTitle, { color: '#EF4444' }]}>
+                  Flag Order Dispute
+                </Text>
+                <Text style={styles.modalDialogSubtitle}>
+                  Freezes escrow release pending administrative review.
+                </Text>
+              </View>
+              <Pressable onPress={() => setShowDisputeModal(false)} hitSlop={HIT_SLOP_8}>
+                <Feather name="x" size={18} color="#9CA3AF" />
+              </Pressable>
+            </View>
+
+            <Text style={styles.fieldLabel}>REASON FOR DISPUTE (REQUIRED)</Text>
+            <TextInput
+              value={disputeReason}
+              onChangeText={setDisputeReason}
+              placeholder="e.g. Package damaged in transit, item condition mismatched."
+              placeholderTextColor="#6B7280"
+              style={[styles.dialogInput, { height: 80 }]}
+              multiline
+            />
+
+            <View style={styles.modalActionsRow}>
+              <Pressable
+                onPress={() => setShowDisputeModal(false)}
+                style={styles.modalCancelButton}
+              >
+                <Text style={styles.modalCancelText}>Dismiss</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={handleConfirmDispute}
+                disabled={submittingAction}
+                style={[
+                  styles.modalSubmitButton,
+                  { backgroundColor: '#EF4444' },
+                  submittingAction && styles.disabledButton,
+                ]}
+              >
+                {submittingAction ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.modalSubmitText}>Freeze Escrow & Flag</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── Modal: Cancel & Refund ── */}
+      <Modal
+        visible={showCancelModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCancelModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalDialog}>
+            <View style={styles.modalDialogHeader}>
+              <View>
+                <Text style={[styles.modalDialogTitle, { color: '#9CA3AF' }]}>
+                  Cancel Transaction
+                </Text>
+                <Text style={styles.modalDialogSubtitle}>
+                  Refunds escrow payment to buyer and terminates order.
+                </Text>
+              </View>
+              <Pressable onPress={() => setShowCancelModal(false)} hitSlop={HIT_SLOP_8}>
+                <Feather name="x" size={18} color="#9CA3AF" />
+              </Pressable>
+            </View>
+
+            <Text style={styles.fieldLabel}>CANCELLATION REASON (REQUIRED)</Text>
+            <TextInput
+              value={cancelReason}
+              onChangeText={setCancelReason}
+              placeholder="e.g. Seller unresponsive, buyer requested cancellation before pickup."
+              placeholderTextColor="#6B7280"
+              style={[styles.dialogInput, { height: 80 }]}
+              multiline
+            />
+
+            <View style={styles.modalActionsRow}>
+              <Pressable
+                onPress={() => setShowCancelModal(false)}
+                style={styles.modalCancelButton}
+              >
+                <Text style={styles.modalCancelText}>Dismiss</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={handleConfirmCancel}
+                disabled={submittingAction}
+                style={[
+                  styles.modalSubmitButton,
+                  { backgroundColor: '#374151' },
+                  submittingAction && styles.disabledButton,
+                ]}
+              >
+                {submittingAction ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.modalSubmitText}>Confirm Cancellation</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
 }
+
+// ── Detail View Component ──────────────────────────────────────────────────
+function DetailContent({
+  tx,
+  pickupAddress,
+  dropoffAddress,
+  eventLogs,
+  loadingLogs,
+  onOpenDispatch,
+  onOpenDispute,
+  onOpenCancel,
+  onAdvance,
+  onCopy,
+  onCall,
+  submitting,
+}: {
+  tx: EscrowLogisticsItem;
+  pickupAddress: any;
+  dropoffAddress: any;
+  eventLogs: TransactionEventLog[];
+  loadingLogs: boolean;
+  onOpenDispatch: () => void;
+  onOpenDispute: () => void;
+  onOpenCancel: () => void;
+  onAdvance: (target: EscrowStatus) => void;
+  onCopy: (text: string, label: string) => void;
+  onCall: (phone?: string | null) => void;
+  submitting: boolean;
+}) {
+  const statusStyle = getEscrowStatusStyle(tx.status);
+  const sellerPhone = pickupAddress?.phone || (tx.seller as any)?.phone || null;
+  const buyerPhone = dropoffAddress?.phone || (tx.buyer as any)?.phone || null;
+  const itemImg = tx.listing ? cardImageUrl(tx.listing, 0) : null;
+
+  return (
+    <View style={styles.detailContainer}>
+      {/* ── Top Header ── */}
+      <View style={styles.detailHeader}>
+        <View>
+          <View style={styles.refRow}>
+            <Text style={styles.detailRefId}>REF: {deriveRef(tx.id)}</Text>
+            <Pressable
+              onPress={() => onCopy(deriveRef(tx.id), 'Reference ID')}
+              style={styles.copySmallBtn}
+            >
+              <Feather name="copy" size={12} color="#9CA3AF" />
+            </Pressable>
+          </View>
+          <Text style={styles.detailOrderIdText}>ORDER: {tx.order_id}</Text>
+        </View>
+
+        <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
+          <View style={[styles.statusBadgeDot, { backgroundColor: statusStyle.dotColor }]} />
+          <Text style={[styles.statusBadgeText, { color: statusStyle.color }]}>
+            {statusStyle.label}
+          </Text>
+        </View>
+      </View>
+
+      {/* ── Action Controls Bar ── */}
+      <View style={styles.actionSection}>
+        <Text style={styles.sectionHeaderTitle}>STATE ADVANCE CONTROLS</Text>
+        <View style={styles.actionButtonsContainer}>
+          {tx.status === 'READY_FOR_PICKUP' && (
+            <Pressable
+              onPress={onOpenDispatch}
+              disabled={submitting}
+              style={[styles.primaryActionButton, submitting && styles.disabledButton]}
+            >
+              <Feather name="truck" size={15} color="#FFFFFF" style={{ marginRight: 8 }} />
+              <Text style={styles.primaryActionText}>Mark Picked Up & In Transit</Text>
+            </Pressable>
+          )}
+
+          {tx.status === 'IN_TRANSIT' && (
+            <Pressable
+              onPress={() => onAdvance('DELIVERED')}
+              disabled={submitting}
+              style={[
+                styles.primaryActionButton,
+                { backgroundColor: '#059669' },
+                submitting && styles.disabledButton,
+              ]}
+            >
+              <Feather name="check-circle" size={15} color="#FFFFFF" style={{ marginRight: 8 }} />
+              <Text style={styles.primaryActionText}>Mark Delivered to Buyer</Text>
+            </Pressable>
+          )}
+
+          {tx.status === 'DELIVERED' && (
+            <Pressable
+              onPress={() => onAdvance('COMPLETED_FUNDS_RELEASED')}
+              disabled={submitting}
+              style={[
+                styles.primaryActionButton,
+                { backgroundColor: '#6C47FF' },
+                submitting && styles.disabledButton,
+              ]}
+            >
+              <Feather name="unlock" size={15} color="#FFFFFF" style={{ marginRight: 8 }} />
+              <Text style={styles.primaryActionText}>Release Escrow Funds to Seller</Text>
+            </Pressable>
+          )}
+
+          {/* Secondary Actions */}
+          <View style={styles.secondaryActionsRow}>
+            {tx.status !== 'COMPLETED_FUNDS_RELEASED' && tx.status !== 'CANCELLED' && (
+              <>
+                <Pressable
+                  onPress={onOpenDispute}
+                  style={({ pressed }) => [styles.dangerActionBtn, pressed && styles.pressedOpacity]}
+                >
+                  <Feather name="alert-triangle" size={13} color="#EF4444" style={{ marginRight: 6 }} />
+                  <Text style={styles.dangerActionText}>Flag Dispute</Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={onOpenCancel}
+                  style={({ pressed }) => [styles.neutralActionBtn, pressed && styles.pressedOpacity]}
+                >
+                  <Feather name="x" size={13} color="#9CA3AF" style={{ marginRight: 6 }} />
+                  <Text style={styles.neutralActionText}>Cancel & Refund</Text>
+                </Pressable>
+              </>
+            )}
+          </View>
+        </View>
+      </View>
+
+      {/* ── Two-Column Card: Pickup & Dropoff ── */}
+      <View style={styles.cardsRow}>
+        {/* Pickup Details (Seller) */}
+        <View style={styles.infoCard}>
+          <View style={styles.infoCardHeader}>
+            <View style={styles.infoBadgePickup}>
+              <Feather name="arrow-up-right" size={12} color="#FBBF24" />
+              <Text style={styles.infoBadgePickupText}>PICKUP (SELLER)</Text>
+            </View>
+            {sellerPhone && (
+              <View style={styles.contactActions}>
+                <Pressable onPress={() => onCall(sellerPhone)} style={styles.contactIconBtn}>
+                  <Feather name="phone" size={13} color="#A78BFA" />
+                </Pressable>
+                <Pressable
+                  onPress={() => onCopy(sellerPhone, 'Seller phone')}
+                  style={styles.contactIconBtn}
+                >
+                  <Feather name="copy" size={13} color="#9CA3AF" />
+                </Pressable>
+              </View>
+            )}
+          </View>
+
+          <Text style={styles.cardPersonName}>
+            {tx.seller?.full_name || tx.seller?.username || 'Seller'}
+          </Text>
+          <Text style={styles.cardPhoneText}>{sellerPhone || 'No phone registered'}</Text>
+
+          <View style={styles.addressBlock}>
+            <Text style={styles.addressLabel}>PICKUP LOCATION</Text>
+            {pickupAddress ? (
+              <>
+                <Text style={styles.addressLine}>{pickupAddress.line1}</Text>
+                {pickupAddress.line2 ? (
+                  <Text style={styles.addressLine}>{pickupAddress.line2}</Text>
+                ) : null}
+                <Text style={styles.addressCity}>
+                  {pickupAddress.city}
+                  {pickupAddress.postalCode ? `, ${pickupAddress.postalCode}` : ''}
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.addressLineMuted}>Seller has not submitted pickup address yet.</Text>
+            )}
+          </View>
+        </View>
+
+        {/* Drop-off Details (Buyer) */}
+        <View style={styles.infoCard}>
+          <View style={styles.infoCardHeader}>
+            <View style={styles.infoBadgeDropoff}>
+              <Feather name="arrow-down-left" size={12} color="#34D399" />
+              <Text style={styles.infoBadgeDropoffText}>DROP-OFF (BUYER)</Text>
+            </View>
+            {buyerPhone && (
+              <View style={styles.contactActions}>
+                <Pressable onPress={() => onCall(buyerPhone)} style={styles.contactIconBtn}>
+                  <Feather name="phone" size={13} color="#34D399" />
+                </Pressable>
+                <Pressable
+                  onPress={() => onCopy(buyerPhone, 'Buyer phone')}
+                  style={styles.contactIconBtn}
+                >
+                  <Feather name="copy" size={13} color="#9CA3AF" />
+                </Pressable>
+              </View>
+            )}
+          </View>
+
+          <Text style={styles.cardPersonName}>
+            {tx.buyer?.full_name || tx.buyer?.username || 'Buyer'}
+          </Text>
+          <Text style={styles.cardPhoneText}>{buyerPhone || 'No phone registered'}</Text>
+
+          <View style={styles.addressBlock}>
+            <Text style={styles.addressLabel}>DELIVERY ADDRESS</Text>
+            {dropoffAddress ? (
+              <>
+                <Text style={styles.addressLine}>{dropoffAddress.line1}</Text>
+                {dropoffAddress.line2 ? (
+                  <Text style={styles.addressLine}>{dropoffAddress.line2}</Text>
+                ) : null}
+                <Text style={styles.addressCity}>
+                  {dropoffAddress.city}
+                  {dropoffAddress.postalCode ? `, ${dropoffAddress.postalCode}` : ''}
+                </Text>
+                {dropoffAddress.deliveryInstructions ? (
+                  <View style={styles.instructionsCallout}>
+                    <Text style={styles.instructionsText}>
+                      💬 Note: {dropoffAddress.deliveryInstructions}
+                    </Text>
+                  </View>
+                ) : null}
+              </>
+            ) : (
+              <Text style={styles.addressLineMuted}>No delivery address recorded.</Text>
+            )}
+          </View>
+        </View>
+      </View>
+
+      {/* ── Listing & Package Specs ── */}
+      <View style={styles.itemCard}>
+        <View style={styles.itemCardContent}>
+          {itemImg ? (
+            <Image source={{ uri: itemImg }} style={styles.itemImage} transition={IMAGE_TRANSITION} />
+          ) : (
+            <View style={[styles.itemImage, styles.thumbnailPlaceholder]}>
+              <Feather name="image" size={18} color="#6B7280" />
+            </View>
+          )}
+          <View style={{ flex: 1, marginLeft: 14 }}>
+            <Text style={styles.itemTitle} numberOfLines={2}>
+              {tx.listing?.title || 'Marketplace Item'}
+            </Text>
+            <View style={styles.itemMetaRow}>
+              {tx.listing?.brand ? (
+                <Text style={styles.itemMetaTag}>🏷️ {tx.listing.brand}</Text>
+              ) : null}
+              {tx.listing?.category ? (
+                <Text style={styles.itemMetaTag}>📁 {tx.listing.category}</Text>
+              ) : null}
+            </View>
+            <Text style={styles.itemPrice}>{formatPrice(tx.amount_cents / 100)}</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* ── Financial Escrow Ledger Card (Invariant Check) ── */}
+      <View style={styles.ledgerCard}>
+        <Text style={styles.sectionHeaderTitle}>ESCROW FINANCIAL LEDGER</Text>
+        <View style={styles.ledgerRow}>
+          <Text style={styles.ledgerLabel}>Gross Escrow Captured (Buyer Paid)</Text>
+          <Text style={styles.ledgerValue}>{formatPrice(tx.amount_cents / 100)}</Text>
+        </View>
+        <View style={styles.ledgerRow}>
+          <Text style={styles.ledgerLabel}>Courier / Shipping Allocation</Text>
+          <Text style={styles.ledgerValueSub}>- {formatPrice(tx.shipping_fee_cents / 100)}</Text>
+        </View>
+        <View style={styles.ledgerRow}>
+          <Text style={styles.ledgerLabel}>Platform / Buyer Protection Fee</Text>
+          <Text style={styles.ledgerValueSub}>- {formatPrice(tx.platform_fee_cents / 100)}</Text>
+        </View>
+        <View style={styles.ledgerDivider} />
+        <View style={styles.ledgerRow}>
+          <Text style={styles.ledgerPayoutLabel}>Net Seller Payout (Held in Escrow)</Text>
+          <Text style={styles.ledgerPayoutValue}>
+            {formatPrice(tx.payout_amount_cents / 100)}
+          </Text>
+        </View>
+        <View style={styles.balanceCheckTag}>
+          <Feather name="check" size={11} color="#10B981" />
+          <Text style={styles.balanceCheckText}>
+            Accounting Invariant Balanced (Rs.{tx.amount_cents / 100} = Rs.
+            {tx.payout_amount_cents / 100} + Rs.{tx.shipping_fee_cents / 100} + Rs.
+            {tx.platform_fee_cents / 100})
+          </Text>
+        </View>
+      </View>
+
+      {/* ── Audit Trail & Timestamps ── */}
+      <View style={styles.auditSection}>
+        <Text style={styles.sectionHeaderTitle}>IMMUTABLE AUDIT TRAIL</Text>
+        {loadingLogs ? (
+          <ActivityIndicator color="#6C47FF" size="small" style={{ marginVertical: 12 }} />
+        ) : eventLogs.length === 0 ? (
+          <Text style={styles.noLogsText}>No audit event logs recorded yet.</Text>
+        ) : (
+          <View style={styles.logsList}>
+            {eventLogs.map((log, index) => (
+              <View key={log.id} style={styles.logItem}>
+                <View style={styles.logDot} />
+                {index < eventLogs.length - 1 && <View style={styles.logLine} />}
+                <View style={styles.logContent}>
+                  <View style={styles.logHeaderRow}>
+                    <Text style={styles.logAction}>{log.action}</Text>
+                    <Text style={styles.logTime}>{formatDate(log.created_at)}</Text>
+                  </View>
+                  <Text style={styles.logTransition}>
+                    {log.from_status ? `${log.from_status} ➔ ` : ''}
+                    <Text style={{ color: '#A78BFA' }}>{log.to_status}</Text>
+                  </Text>
+                  {log.notes ? (
+                    <Text style={styles.logNotes}>{`\u201C${log.notes}\u201D`}</Text>
+                  ) : null}
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    </View>
+  );
+}
+
+// ── Styles (High-end Apple/Linear/Stripe Dark Aesthetic) ──────────────────────
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: '#090A0D',
+  },
+  authContainer: {
+    flex: 1,
+    backgroundColor: '#090A0D',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 14,
+    backgroundColor: '#0E1015',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  iconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#161922',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    fontFamily: typography.family.sansBold,
+    letterSpacing: -0.3,
+  },
+  liveIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+  },
+  liveText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#34D399',
+    fontFamily: typography.family.sansSemibold,
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontFamily: typography.family.sans,
+    marginTop: 2,
+  },
+  refreshButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: '#181B23',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  refreshButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#A78BFA',
+    fontFamily: typography.family.sansSemibold,
+  },
+  mainLayout: {
+    flex: 1,
+  },
+  mainLayoutSplit: {
+    flexDirection: 'row',
+  },
+  leftColumn: {
+    flex: 1,
+  },
+  leftColumnSplit: {
+    flex: 0.58,
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  rightColumnSplit: {
+    flex: 0.42,
+    backgroundColor: '#0D0E13',
+  },
+  toolbar: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#12141B',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 12,
+    height: 38,
+    marginBottom: 10,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: '#FFFFFF',
+    fontFamily: typography.family.sans,
+    marginLeft: 8,
+  },
+  tabsScroll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingBottom: 4,
+  },
+  tabPill: {
+    paddingHorizontal: 14,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#141720',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabPillActive: {
+    backgroundColor: '#6C47FF',
+    borderColor: '#6C47FF',
+  },
+  tabPillText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#9CA3AF',
+    fontFamily: typography.family.sansMedium,
+  },
+  tabPillTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  tableHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#0E1016',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  tableHeaderCell: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#6B7280',
+    fontFamily: typography.family.sansBold,
+    letterSpacing: 0.5,
+  },
+  listContent: {
+    paddingBottom: 40,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: '#090A0D',
+  },
+  tableRowSelected: {
+    backgroundColor: '#141722',
+  },
+  tableRowPressed: {
+    backgroundColor: '#181C28',
+  },
+  refIdText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#E5E7EB',
+    fontFamily: typography.family.sansBold,
+    fontVariant: ['tabular-nums'],
+    letterSpacing: 0.5,
+  },
+  timeText: {
+    fontSize: 10.5,
+    color: '#6B7280',
+    fontFamily: typography.family.sans,
+    fontVariant: ['tabular-nums'],
+    marginTop: 2,
+  },
+  listingCell: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  thumbnail: {
+    width: 36,
+    height: 36,
+    borderRadius: 6,
+    backgroundColor: '#1F2430',
+  },
+  thumbnailPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  listingTitleText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    fontFamily: typography.family.sansSemibold,
+  },
+  listingPriceText: {
+    fontSize: 11.5,
+    color: '#9CA3AF',
+    fontFamily: typography.family.sans,
+    fontVariant: ['tabular-nums'],
+    marginTop: 2,
+  },
+  personNameText: {
+    fontSize: 12.5,
+    fontWeight: '500',
+    color: '#E5E7EB',
+    fontFamily: typography.family.sansMedium,
+  },
+  cityText: {
+    fontSize: 11,
+    color: '#6B7280',
+    fontFamily: typography.family.sans,
+    marginTop: 2,
+  },
+  escrowAmountText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    fontFamily: typography.family.sansBold,
+    fontVariant: ['tabular-nums'],
+  },
+  escrowSubText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#6B7280',
+    fontFamily: typography.family.sansSemibold,
+    letterSpacing: 0.5,
+    marginTop: 2,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  statusBadgeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    fontFamily: typography.family.sansSemibold,
+  },
+  centerContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  loadingText: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    marginTop: 12,
+    fontFamily: typography.family.sans,
+  },
+  emptyContainer: {
+    flexGrow: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  emptyCard: {
+    alignItems: 'center',
+    padding: 30,
+  },
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#E5E7EB',
+    marginTop: 12,
+    fontFamily: typography.family.sansSemibold,
+  },
+  emptySubtitle: {
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginTop: 6,
+    maxWidth: 280,
+    fontFamily: typography.family.sans,
+  },
+  noSelectionCard: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+  },
+  noSelectionTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#E5E7EB',
+    marginTop: 14,
+    fontFamily: typography.family.sansSemibold,
+  },
+  noSelectionSubtitle: {
+    fontSize: 12.5,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginTop: 6,
+    maxWidth: 300,
+    fontFamily: typography.family.sans,
+  },
+  detailScroll: {
+    flex: 1,
+  },
+  detailScrollContent: {
+    padding: 20,
+    paddingBottom: 60,
+  },
+  detailContainer: {
+    gap: 16,
+  },
+  detailHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  refRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  detailRefId: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    fontFamily: typography.family.sansBold,
+    fontVariant: ['tabular-nums'],
+    letterSpacing: 0.5,
+  },
+  copySmallBtn: {
+    padding: 4,
+  },
+  detailOrderIdText: {
+    fontSize: 11,
+    color: '#6B7280',
+    fontFamily: typography.family.sans,
+    fontVariant: ['tabular-nums'],
+    marginTop: 3,
+  },
+  actionSection: {
+    backgroundColor: '#12141B',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    padding: 14,
+  },
+  sectionHeaderTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6B7280',
+    fontFamily: typography.family.sansBold,
+    letterSpacing: 0.6,
+    marginBottom: 10,
+  },
+  actionButtonsContainer: {
+    gap: 10,
+  },
+  primaryActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: '#6C47FF',
+    paddingHorizontal: 16,
+  },
+  primaryActionText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    fontFamily: typography.family.sansSemibold,
+  },
+  secondaryActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  dangerActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.25)',
+  },
+  dangerActionText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#EF4444',
+    fontFamily: typography.family.sansSemibold,
+  },
+  neutralActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: '#181B23',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  neutralActionText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#9CA3AF',
+    fontFamily: typography.family.sansSemibold,
+  },
+  cardsRow: {
+    gap: 12,
+  },
+  infoCard: {
+    backgroundColor: '#12141B',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    padding: 14,
+  },
+  infoCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  infoBadgePickup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+  },
+  infoBadgePickupText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#FBBF24',
+    letterSpacing: 0.5,
+  },
+  infoBadgeDropoff: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+  },
+  infoBadgeDropoffText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#34D399',
+    letterSpacing: 0.5,
+  },
+  contactActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  contactIconBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#1A1D27',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  cardPersonName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    fontFamily: typography.family.sansSemibold,
+  },
+  cardPhoneText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontFamily: typography.family.sans,
+    fontVariant: ['tabular-nums'],
+    marginTop: 2,
+  },
+  addressBlock: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  addressLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#6B7280',
+    fontFamily: typography.family.sansBold,
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  addressLine: {
+    fontSize: 12.5,
+    color: '#E5E7EB',
+    fontFamily: typography.family.sans,
+    lineHeight: 18,
+  },
+  addressLineMuted: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontStyle: 'italic',
+  },
+  addressCity: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#A78BFA',
+    marginTop: 2,
+    fontFamily: typography.family.sansSemibold,
+  },
+  instructionsCallout: {
+    marginTop: 8,
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: '#191C27',
+    borderLeftWidth: 2,
+    borderLeftColor: '#34D399',
+  },
+  instructionsText: {
+    fontSize: 11.5,
+    color: '#D1D5DB',
+    fontFamily: typography.family.sans,
+  },
+  itemCard: {
+    backgroundColor: '#12141B',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    padding: 12,
+  },
+  itemCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  itemImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: '#1F2430',
+  },
+  itemTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    fontFamily: typography.family.sansSemibold,
+  },
+  itemMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  itemMetaTag: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    fontFamily: typography.family.sans,
+  },
+  itemPrice: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    fontFamily: typography.family.sansBold,
+    fontVariant: ['tabular-nums'],
+    marginTop: 4,
+  },
+  ledgerCard: {
+    backgroundColor: '#12141B',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    padding: 14,
+  },
+  ledgerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  ledgerLabel: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontFamily: typography.family.sans,
+  },
+  ledgerValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    fontFamily: typography.family.sansSemibold,
+    fontVariant: ['tabular-nums'],
+  },
+  ledgerValueSub: {
+    fontSize: 12.5,
+    color: '#F87171',
+    fontFamily: typography.family.sans,
+    fontVariant: ['tabular-nums'],
+  },
+  ledgerDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    marginVertical: 8,
+  },
+  ledgerPayoutLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    fontFamily: typography.family.sansBold,
+  },
+  ledgerPayoutValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#34D399',
+    fontFamily: typography.family.sansBold,
+    fontVariant: ['tabular-nums'],
+  },
+  balanceCheckTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  balanceCheckText: {
+    fontSize: 10.5,
+    color: '#10B981',
+    fontFamily: typography.family.sans,
+    fontVariant: ['tabular-nums'],
+  },
+  auditSection: {
+    backgroundColor: '#12141B',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    padding: 14,
+  },
+  noLogsText: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontStyle: 'italic',
+    paddingVertical: 6,
+  },
+  logsList: {
+    paddingLeft: 6,
+    paddingTop: 6,
+  },
+  logItem: {
+    flexDirection: 'row',
+    marginBottom: 14,
+    position: 'relative',
+  },
+  logDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#6C47FF',
+    marginTop: 4,
+    marginRight: 10,
+  },
+  logLine: {
+    position: 'absolute',
+    top: 14,
+    left: 3.5,
+    width: 1,
+    height: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  logContent: {
+    flex: 1,
+  },
+  logHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  logAction: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#E5E7EB',
+    fontFamily: typography.family.sansSemibold,
+  },
+  logTime: {
+    fontSize: 10.5,
+    color: '#6B7280',
+    fontFamily: typography.family.sans,
+    fontVariant: ['tabular-nums'],
+  },
+  logTransition: {
+    fontSize: 11.5,
+    color: '#9CA3AF',
+    marginTop: 2,
+    fontFamily: typography.family.sans,
+  },
+  logNotes: {
+    fontSize: 11,
+    color: '#D1D5DB',
+    fontStyle: 'italic',
+    marginTop: 2,
+  },
+  mobileModalRoot: {
+    flex: 1,
+    backgroundColor: '#090A0D',
+  },
+  mobileModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  mobileModalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    fontFamily: typography.family.sansBold,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalDialog: {
+    width: '100%',
+    maxWidth: 480,
+    backgroundColor: '#12141C',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    padding: 20,
+  },
+  modalDialogHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  modalDialogTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    fontFamily: typography.family.sansBold,
+  },
+  modalDialogSubtitle: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+  fieldLabel: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#9CA3AF',
+    fontFamily: typography.family.sansBold,
+    letterSpacing: 0.5,
+    marginBottom: 6,
+    marginTop: 10,
+  },
+  courierRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 10,
+  },
+  courierChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: '#1A1D27',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  courierChipActive: {
+    backgroundColor: '#6C47FF',
+    borderColor: '#6C47FF',
+  },
+  courierChipText: {
+    fontSize: 11.5,
+    fontWeight: '500',
+    color: '#9CA3AF',
+  },
+  courierChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  dialogInput: {
+    backgroundColor: '#181C26',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 13,
+    color: '#FFFFFF',
+    fontFamily: typography.family.sans,
+    marginBottom: 8,
+  },
+  modalActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: 18,
+  },
+  modalCancelButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 8,
+    backgroundColor: '#1C202C',
+  },
+  modalCancelText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#9CA3AF',
+  },
+  modalSubmitButton: {
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 8,
+    backgroundColor: '#6C47FF',
+  },
+  modalSubmitText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  pressedOpacity: {
+    opacity: 0.7,
+  },
+});

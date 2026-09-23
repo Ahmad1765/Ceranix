@@ -148,6 +148,68 @@ export interface Order {
   shipped_at?: string | null;
   delivered_at?: string | null;
   completed_at?: string | null;
+  escrow_status?: EscrowStatus | null;
+  payout_amount_cents?: number | null;
+  created_at: string;
+}
+
+export type EscrowStatus =
+  | 'PENDING_PAYMENT'
+  | 'PAYMENT_SECURED_ESCROW'
+  | 'READY_FOR_PICKUP'
+  | 'IN_TRANSIT'
+  | 'DELIVERED'
+  | 'COMPLETED_FUNDS_RELEASED'
+  | 'DISPUTED'
+  | 'CANCELLED';
+
+// A row of public.transactions — formal Escrow ledger with strict state machine and accounting balance.
+export interface Transaction {
+  id: string;
+  order_id: string;
+  listing_id: string;
+  buyer_id: string;
+  seller_id: string;
+  amount_cents: number;
+  platform_fee_cents: number;
+  shipping_fee_cents: number;
+  payout_amount_cents: number;
+  currency: string;
+  payment_method: 'card' | 'cod';
+  status: EscrowStatus;
+  escrow_secured_at?: string | null;
+  ready_for_pickup_at?: string | null;
+  picked_up_at?: string | null;
+  delivered_at?: string | null;
+  funds_released_at?: string | null;
+  disputed_at?: string | null;
+  cancelled_at?: string | null;
+  dispute_reason?: string | null;
+  dispute_evidence_urls?: string[] | null;
+  cancel_reason?: string | null;
+  cancelled_by?: string | null;
+  courier_name?: string | null;
+  tracking_number?: string | null;
+  logistics_notes?: string | null;
+  logistics_agent_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  order?: Order | null;
+  listing?: Listing | null;
+  buyer?: Profile | null;
+  seller?: Profile | null;
+}
+
+export interface TransactionEventLog {
+  id: string;
+  transaction_id: string;
+  order_id: string;
+  from_status?: string | null;
+  to_status: string;
+  actor_id?: string | null;
+  action: string;
+  notes?: string | null;
+  metadata?: Record<string, any>;
   created_at: string;
 }
 
