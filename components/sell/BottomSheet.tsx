@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { View, Pressable, Modal, ScrollView, Platform, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/lib/rnText';
@@ -34,12 +34,12 @@ export function FullPagePicker({
   const Content = scroll ? ScrollView : View;
   const closedByPopStateRef = useRef(false);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     }
     onClose();
-  };
+  }, [onClose]);
 
   // Hardware back button integration on Android
   useEffect(() => {
@@ -49,7 +49,7 @@ export function FullPagePicker({
       return true;
     });
     return () => sub.remove();
-  }, [visible]);
+  }, [visible, handleClose]);
 
   // Escape key & history sync on Web
   useEffect(() => {
@@ -83,7 +83,7 @@ export function FullPagePicker({
         window.history.back();
       }
     };
-  }, [visible]);
+  }, [visible, handleClose, onClose]);
 
   if (!visible) return null;
 

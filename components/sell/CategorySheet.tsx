@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   View,
   ScrollView,
@@ -13,7 +13,7 @@ import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/context/ThemeContext';
 import { colors, radii, type as typography } from '@/lib/theme';
-import { CATEGORIES, hasSubcategories, categoryLabel } from '@/lib/categories';
+import { CATEGORIES, hasSubcategories } from '@/lib/categories';
 import type { Category } from '@/types';
 import { UNBRANDED_LOCAL_TAILOR } from '@/lib/taxonomy';
 
@@ -96,7 +96,7 @@ export function CategorySheet({
     }
   };
 
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     haptic();
     if (queryRef.current.trim().length > 0) {
       setQuery('');
@@ -107,7 +107,7 @@ export function CategorySheet({
       return;
     }
     onClose();
-  };
+  }, [onClose]);
 
   // Hardware back button on Android
   useEffect(() => {
@@ -117,7 +117,7 @@ export function CategorySheet({
       return true;
     });
     return () => sub.remove();
-  }, [visible]);
+  }, [visible, handleBack]);
 
   // Escape key & history sync on Web
   useEffect(() => {
@@ -154,7 +154,7 @@ export function CategorySheet({
         window.history.back();
       }
     };
-  }, [visible]);
+  }, [visible, handleBack, onClose]);
 
   // Search Results across all categories & subcategories
   const searchResults = useMemo(() => {

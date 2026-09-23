@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   ScrollView,
@@ -16,7 +16,6 @@ import { colors, radii, type as typography } from '@/lib/theme';
 import {
   TAXONOMY_BRANDS,
   UNBRANDED_LOCAL_TAILOR,
-  type BrandTier,
   getBrandsForCategory,
   getRecommendedBrandsForCategory,
 } from '@/lib/taxonomy';
@@ -137,10 +136,10 @@ export function BrandSheet({
     }
   };
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     haptic();
     onClose();
-  };
+  }, [onClose]);
 
   // Hardware back button on Android
   useEffect(() => {
@@ -150,7 +149,7 @@ export function BrandSheet({
       return true;
     });
     return () => sub.remove();
-  }, [visible]);
+  }, [visible, handleClose]);
 
   // Escape key & history sync on Web
   useEffect(() => {
@@ -183,7 +182,7 @@ export function BrandSheet({
         window.history.back();
       }
     };
-  }, [visible]);
+  }, [visible, handleClose, onClose]);
 
   // Category context display name
   const categoryContextName = useMemo(() => {
