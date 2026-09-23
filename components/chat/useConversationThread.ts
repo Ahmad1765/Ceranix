@@ -197,9 +197,13 @@ export function useConversationThread(
   // ── Read Receipts Synchronization ────────────────────────────────────────
   useEffect(() => {
     if (!conversationId || !user?.id) return;
-    markConversationRead(conversationId, user.id).then(() => {
-      queryClient.invalidateQueries({ queryKey: qk.inbox(user.id) });
-    });
+    markConversationRead(conversationId, user.id)
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: qk.inbox(user.id) });
+      })
+      .catch((error) => {
+        console.warn('[chat] markConversationRead error', error);
+      });
   }, [conversationId, user?.id, messages.length, queryClient]);
 
   // ── Realtime Reactions Subscription ──────────────────────────────────────

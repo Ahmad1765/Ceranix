@@ -387,25 +387,33 @@ export function SellForm({
   }, [width]);
 
   const pickImages = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: true,
-      quality: 0.8,
-      selectionLimit: MAX_IMAGES,
-      base64: true,
-    });
-    if (!result.canceled) {
-      const room = MAX_IMAGES - slots.length;
-      const picked = result.assets.slice(0, room);
-      const newSlots = picked.map((a) => ({
-        ...makeSlot(
-          { uri: a.uri, base64: a.base64 ?? null },
-          (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`),
-        ),
-        status: 'done' as const,
-      }));
-      const updatedSlots = [...slots, ...newSlots].slice(0, MAX_IMAGES);
-      setValue('slots', updatedSlots, { shouldValidate: true });
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: true,
+        quality: 0.8,
+        selectionLimit: MAX_IMAGES,
+        base64: true,
+      });
+      if (!result.canceled) {
+        const room = MAX_IMAGES - slots.length;
+        const picked = result.assets.slice(0, room);
+        const newSlots = picked.map((a) => ({
+          ...makeSlot(
+            { uri: a.uri, base64: a.base64 ?? null },
+            (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`),
+          ),
+          status: 'done' as const,
+        }));
+        const updatedSlots = [...slots, ...newSlots].slice(0, MAX_IMAGES);
+        setValue('slots', updatedSlots, { shouldValidate: true });
+      }
+    } catch (err: any) {
+      console.warn('[SellSheet] pickImages error', err);
+      toast.show('Could not access photo library. Please check app permissions.', {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
     }
   };
 
