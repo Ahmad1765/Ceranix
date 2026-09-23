@@ -13,7 +13,11 @@ export const BUNDLE_TIERS = [
   { count: 5, pct: 20, label: '5+ items' },
 ] as const;
 
-export type BundleTier = (typeof BUNDLE_TIERS)[number];
+export interface BundleTier {
+  readonly count: number;
+  readonly pct: number;
+  readonly label: string;
+}
 
 /** A discount only applies from this many items up. */
 export const BUNDLE_MIN_ITEMS = 2;
@@ -61,24 +65,29 @@ export function computeBundlePricing(
   const subtotal =
     money(basePrice) + addOnPrices.reduce((acc, p) => acc + money(p), 0);
 
+  const hasSellerDiscount =
+    sellerDiscountPct != null && Number.isFinite(sellerDiscountPct) && sellerDiscountPct > 0;
+  const customPct = hasSellerDiscount
+    ? Math.min(30, Math.max(0, sellerDiscountPct))
+    : 0;
+
   // Walk tiers high→low so the first match is the largest qualifying discount.
   const tier = [...BUNDLE_TIERS].reverse().find((t) => itemCount >= t.count) ?? BUNDLE_TIERS[0];
 
-  const customPct =
-    sellerDiscountPct != null && Number.isFinite(sellerDiscountPct) && sellerDiscountPct > 0
-      ? Math.min(30, Math.max(0, sellerDiscountPct))
-      : 0;
-
   const pct =
-    itemCount >= BUNDLE_MIN_ITEMS && customPct > 0
-      ? Math.max(tier.pct, customPct)
-      : tier.pct;
+    itemCount >= BUNDLE_MIN_ITEMS
+      ? (hasSellerDiscount ? customPct : tier.pct)
+      : 0;
   const qualifies = itemCount >= BUNDLE_MIN_ITEMS && pct > 0;
   // Round to cents so the buyer is never charged a fraction of a cent.
   const savings = qualifies ? Math.round(((subtotal * pct) / 100) * 100) / 100 : 0;
   const total = Math.max(0, subtotal - savings);
-  const progress = Math.max(0, Math.min(1, (itemCount - 1) / (BUNDLE_TIERS.length - 1)));
-  const nextTier = BUNDLE_TIERS.find((t) => t.count > itemCount);
+  const progress = hasSellerDiscount
+    ? Math.max(0, Math.min(1, (itemCount - 1) / (BUNDLE_MIN_ITEMS - 1)))
+    : Math.max(0, Math.min(1, (itemCount - 1) / (BUNDLE_TIERS.length - 1)));
+  const nextTier = hasSellerDiscount
+    ? (itemCount < BUNDLE_MIN_ITEMS ? { count: 2, pct: customPct, label: '2+ items' } : undefined)
+    : BUNDLE_TIERS.find((t) => t.count > itemCount);
 
   return { itemCount, subtotal, tier, pct, qualifies, savings, total, progress, nextTier };
 }

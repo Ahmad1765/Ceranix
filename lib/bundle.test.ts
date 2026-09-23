@@ -63,12 +63,18 @@ describe('bundle discount policy', () => {
     expect(p.total).toBe(170);
   });
 
-  it('uses highest between standard tier and custom seller discount', () => {
-    // 5 items: standard tier is 20%, seller configured 10% -> should be 20%
-    const p = computeBundlePricing(100, [100, 100, 100, 100], 10);
-    expect(p.itemCount).toBe(5);
-    expect(p.pct).toBe(20);
-    expect(p.savings).toBe(100);
+  it('strictly respects seller custom bundle discount rate without inflating to 20%', () => {
+    // 5 items: seller configured 10% -> strictly 10% discount
+    const p10 = computeBundlePricing(100, [100, 100, 100, 100], 10);
+    expect(p10.itemCount).toBe(5);
+    expect(p10.pct).toBe(10);
+    expect(p10.savings).toBe(50); // 10% of 500
+
+    // 5 items: seller configured 5% -> strictly 5% discount
+    const p5 = computeBundlePricing(100, [100, 100, 100, 100], 5);
+    expect(p5.itemCount).toBe(5);
+    expect(p5.pct).toBe(5);
+    expect(p5.savings).toBe(25); // 5% of 500
   });
 });
 

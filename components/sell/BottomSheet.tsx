@@ -112,7 +112,7 @@ export function FullPagePicker({
             paddingHorizontal: 16,
             borderBottomWidth: 1,
             borderBottomColor: theme.border,
-            backgroundColor: theme.surface,
+            backgroundColor: theme.background,
           }}
         >
           {/* Back button (< arrow) */}

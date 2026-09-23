@@ -5,13 +5,13 @@ import {
   FlatList,
   RefreshControl,
   ActivityIndicator,
-  TextInput,
   Modal,
   Platform,
   StyleSheet,
   ScrollView,
+  KeyboardAvoidingView,
 } from 'react-native';
-import { Text } from '@/lib/rnText';
+import { Text, TextInput } from '@/lib/rnText';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { router, Redirect } from 'expo-router';
@@ -813,6 +813,10 @@ export default function AdminLogisticsScreen() {
             onPress={closeDispatchModal}
           />
 
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ width: '100%', maxWidth: 480 }}
+          >
           <View
             style={[
               {
@@ -868,7 +872,11 @@ export default function AdminLogisticsScreen() {
               </Pressable>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+            >
               {/* Courier Selection Chips */}
               <Text style={{ fontSize: 12.5, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold, marginBottom: 8 }}>
                 Select Courier Partner
@@ -989,6 +997,7 @@ export default function AdminLogisticsScreen() {
               </Pressable>
             </ScrollView>
           </View>
+        </KeyboardAvoidingView>
         </View>
       </Modal>
     </SafeAreaView>

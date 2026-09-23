@@ -4,11 +4,11 @@ import {
   View,
   Pressable,
   ScrollView,
-  TextInput,
+  KeyboardAvoidingView,
   Platform,
   StyleSheet,
 } from 'react-native';
-import { Text } from '@/lib/rnText';
+import { Text, TextInput } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -157,12 +157,14 @@ export function PaymentOptionsModal({
           <View style={{ width: 36 }} />
         </View>
 
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 30 }}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 30 }}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            showsVerticalScrollIndicator={false}
+          >
           {/* Option 1: Bank Card */}
           <Pressable
             onPress={() => handleSelect('card')}
@@ -564,6 +566,7 @@ export function PaymentOptionsModal({
             </Text>
           </Pressable>
         </View>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </Modal>
   );

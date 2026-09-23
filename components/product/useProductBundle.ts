@@ -48,13 +48,13 @@ export function useProductBundle({
   const toast = useToast();
   const [selectedBundleIds, setSelectedBundleIds] = useState<Set<string>>(new Set());
   const [relatedTab, setRelatedTab] = useState<'members' | 'similar'>(
-    bundlesEnabled ? 'members' : 'similar',
+    sellerItems.length > 0 ? 'members' : 'similar',
   );
 
-  // Sync tab when bundlesEnabled changes (e.g. listing changes to a different seller)
+  // Sync tab when sellerItems change (e.g. if current seller has no items, default to similar)
   useEffect(() => {
-    if (!bundlesEnabled) setRelatedTab('similar');
-  }, [bundlesEnabled]);
+    if (sellerItems.length === 0) setRelatedTab('similar');
+  }, [sellerItems.length]);
 
   // Reset bundle selection whenever the viewed listing changes
   useEffect(() => {

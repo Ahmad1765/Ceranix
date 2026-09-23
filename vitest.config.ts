@@ -19,6 +19,7 @@ export default defineConfig({
       'lib/**/*.test.ts',
       'components/**/*.test.ts',
       'supabase/functions/**/*.test.ts',
+      'hooks/**/*.test.ts',
     ],
   },
   resolve: {

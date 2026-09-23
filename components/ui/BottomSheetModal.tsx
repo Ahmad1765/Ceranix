@@ -256,6 +256,7 @@ export function BottomSheetModal({
                   style: { flex: 1 },
                   showsVerticalScrollIndicator: false,
                   keyboardShouldPersistTaps: 'handled' as const,
+                  keyboardDismissMode: 'on-drag' as const,
                   contentContainerStyle: [
                     styles.scrollContent,
                     contentPaddingHorizontal !== undefined && { paddingHorizontal: contentPaddingHorizontal },

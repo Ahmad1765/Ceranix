@@ -44,12 +44,21 @@ export function BundleProgressBar({
     selectedItems.map((s) => Number(s.price ?? 0)),
     listing.seller.bundle_discount_pct,
   );
-  const maxPct = BUNDLE_TIERS[BUNDLE_TIERS.length - 1].pct;
+  const hasSellerDiscount =
+    listing.seller?.bundle_discount_pct != null &&
+    Number(listing.seller.bundle_discount_pct) > 0;
+  const sellerDiscount = hasSellerDiscount
+    ? Number(listing.seller.bundle_discount_pct)
+    : null;
+
+  const maxPct = sellerDiscount ?? BUNDLE_TIERS[BUNDLE_TIERS.length - 1].pct;
   const remaining = nextTier ? nextTier.count - itemCount : 0;
 
   const headline = qualifies
     ? `${pct}% bundle discount unlocked!`
-    : `Bundle & save up to ${maxPct}%`;
+    : sellerDiscount
+      ? `Bundle & save ${sellerDiscount}%`
+      : `Bundle & save up to ${maxPct}%`;
 
   const guidance = nextTier
     ? `Add ${remaining} more ${remaining === 1 ? 'item' : 'items'} to save ${nextTier.pct}%`
@@ -165,29 +174,46 @@ export function BundleProgressBar({
           />
 
           {/* Milestone Step Dots across the track */}
-          {BUNDLE_TIERS.filter((t) => t.pct > 0).map((tier, index, arr) => {
-            const reached = itemCount >= tier.count;
-            // Position evenly across the progress bar track: 25%, 50%, 75%, 100%
-            const positionPct = ((index + 1) / arr.length) * 100;
+          {hasSellerDiscount ? (
+            <View
+              style={{
+                position: 'absolute',
+                left: '100%',
+                width: 8,
+                height: 8,
+                marginLeft: -4,
+                borderRadius: 4,
+                backgroundColor: qualifies ? purple : unreachedDotColor,
+                borderWidth: 1.5,
+                borderColor: qualifies ? purple : (isDark ? theme.panel : '#FFFFFF'),
+                zIndex: 2,
+              }}
+            />
+          ) : (
+            BUNDLE_TIERS.filter((t) => t.pct > 0).map((tier, index, arr) => {
+              const reached = itemCount >= tier.count;
+              // Position evenly across the progress bar track: 25%, 50%, 75%, 100%
+              const positionPct = ((index + 1) / arr.length) * 100;
 
-            return (
-              <View
-                key={tier.count}
-                style={{
-                  position: 'absolute',
-                  left: `${positionPct}%`,
-                  width: 8,
-                  height: 8,
-                  marginLeft: -4,
-                  borderRadius: 4,
-                  backgroundColor: reached ? purple : unreachedDotColor,
-                  borderWidth: 1.5,
-                  borderColor: reached ? purple : (isDark ? theme.panel : '#FFFFFF'),
-                  zIndex: 2,
-                }}
-              />
-            );
-          })}
+              return (
+                <View
+                  key={tier.count}
+                  style={{
+                    position: 'absolute',
+                    left: `${positionPct}%`,
+                    width: 8,
+                    height: 8,
+                    marginLeft: -4,
+                    borderRadius: 4,
+                    backgroundColor: reached ? purple : unreachedDotColor,
+                    borderWidth: 1.5,
+                    borderColor: reached ? purple : (isDark ? theme.panel : '#FFFFFF'),
+                    zIndex: 2,
+                  }}
+                />
+              );
+            })
+          )}
         </View>
       </Pressable>
 
@@ -196,7 +222,11 @@ export function BundleProgressBar({
         visible={infoModalVisible}
         onClose={() => setInfoModalVisible(false)}
         title="Bundle & Save"
-        subtitle={`Buy multiple items from @${listing.seller.username} to unlock exclusive discounts.`}
+        subtitle={
+          sellerDiscount
+            ? `Buy 2 or more items from @${listing.seller.username} to get ${sellerDiscount}% off your bundle.`
+            : `Buy multiple items from @${listing.seller.username} to unlock exclusive discounts.`
+        }
         autoHeight={true}
       >
         <View style={{ paddingHorizontal: 16, paddingBottom: 20 }}>
@@ -211,77 +241,143 @@ export function BundleProgressBar({
               marginBottom: 16,
             }}
           >
-            {BUNDLE_TIERS.filter((t) => t.pct > 0).map((t, idx, arr) => {
-              const isTopTier = idx === arr.length - 1;
-              const active = itemCount >= t.count;
-              const isCurrent = (isTopTier && itemCount >= t.count) || itemCount === t.count;
-              return (
-                <React.Fragment key={t.count}>
+            {hasSellerDiscount ? (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingVertical: 14,
+                  paddingHorizontal: 16,
+                  backgroundColor: qualifies
+                    ? isDark
+                      ? 'rgba(83, 86, 238, 0.15)'
+                      : '#F2F3FE'
+                    : 'transparent',
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                   <View
                     style={{
-                      flexDirection: 'row',
+                      width: 28,
+                      height: 28,
+                      borderRadius: 14,
+                      backgroundColor: qualifies ? purple : (isDark ? '#374151' : '#E5E7EB'),
                       alignItems: 'center',
-                      justifyContent: 'space-between',
-                      paddingVertical: 14,
-                      paddingHorizontal: 16,
-                      backgroundColor: isCurrent ? (isDark ? 'rgba(83, 86, 238, 0.15)' : '#F2F3FE') : 'transparent',
+                      justifyContent: 'center',
                     }}
                   >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                      <View
-                        style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: 14,
-                          backgroundColor: active ? purple : (isDark ? '#374151' : '#E5E7EB'),
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        {active ? (
-                          <Feather name="check" size={14} color="#FFFFFF" />
-                        ) : (
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: theme.mute }}>
-                            {t.count}
-                          </Text>
-                        )}
-                      </View>
-                      <Text
-                        style={{
-                          fontSize: 14.5,
-                          fontFamily: active ? typography.family.sansBold : typography.family.sansMedium,
-                          color: active ? theme.ink : theme.mute,
-                        }}
-                      >
-                        {isTopTier ? `${t.count} or more items` : `${t.count} items`}
+                    {qualifies ? (
+                      <Feather name="check" size={14} color="#FFFFFF" />
+                    ) : (
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: theme.mute }}>
+                        2
                       </Text>
-                    </View>
+                    )}
+                  </View>
+                  <Text
+                    style={{
+                      fontSize: 14.5,
+                      fontFamily: qualifies ? typography.family.sansBold : typography.family.sansMedium,
+                      color: qualifies ? theme.ink : theme.mute,
+                    }}
+                  >
+                    2 or more items
+                  </Text>
+                </View>
 
+                <View
+                  style={{
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                    borderRadius: 12,
+                    backgroundColor: qualifies ? (isDark ? '#312E81' : '#EEF2FF') : 'transparent',
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 13.5,
+                      fontFamily: typography.family.sansBold,
+                      color: qualifies ? purple : theme.mute,
+                    }}
+                  >
+                    {sellerDiscount}% OFF
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              BUNDLE_TIERS.filter((t) => t.pct > 0).map((t, idx, arr) => {
+                const isTopTier = idx === arr.length - 1;
+                const active = itemCount >= t.count;
+                const isCurrent = (isTopTier && itemCount >= t.count) || itemCount === t.count;
+                return (
+                  <React.Fragment key={t.count}>
                     <View
                       style={{
-                        paddingHorizontal: 10,
-                        paddingVertical: 4,
-                        borderRadius: 12,
-                        backgroundColor: active ? (isDark ? '#312E81' : '#EEF2FF') : 'transparent',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        paddingVertical: 14,
+                        paddingHorizontal: 16,
+                        backgroundColor: isCurrent ? (isDark ? 'rgba(83, 86, 238, 0.15)' : '#F2F3FE') : 'transparent',
                       }}
                     >
-                      <Text
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                        <View
+                          style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: 14,
+                            backgroundColor: active ? purple : (isDark ? '#374151' : '#E5E7EB'),
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          {active ? (
+                            <Feather name="check" size={14} color="#FFFFFF" />
+                          ) : (
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: theme.mute }}>
+                              {t.count}
+                            </Text>
+                          )}
+                        </View>
+                        <Text
+                          style={{
+                            fontSize: 14.5,
+                            fontFamily: active ? typography.family.sansBold : typography.family.sansMedium,
+                            color: active ? theme.ink : theme.mute,
+                          }}
+                        >
+                          {isTopTier ? `${t.count} or more items` : `${t.count} items`}
+                        </Text>
+                      </View>
+
+                      <View
                         style={{
-                          fontSize: 13.5,
-                          fontFamily: typography.family.sansBold,
-                          color: active ? purple : theme.mute,
+                          paddingHorizontal: 10,
+                          paddingVertical: 4,
+                          borderRadius: 12,
+                          backgroundColor: active ? (isDark ? '#312E81' : '#EEF2FF') : 'transparent',
                         }}
                       >
-                        {t.pct}% OFF
-                      </Text>
+                        <Text
+                          style={{
+                            fontSize: 13.5,
+                            fontFamily: typography.family.sansBold,
+                            color: active ? purple : theme.mute,
+                          }}
+                        >
+                          {t.pct}% OFF
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                  {idx < arr.length - 1 && (
-                    <View style={{ height: 1, backgroundColor: theme.hairline }} />
-                  )}
-                </React.Fragment>
-              );
-            })}
+                    {idx < arr.length - 1 && (
+                      <View style={{ height: 1, backgroundColor: theme.hairline }} />
+                    )}
+                  </React.Fragment>
+                );
+              })
+            )}
           </View>
 
           {/* Got it action button */}

@@ -24,6 +24,7 @@ export function BundleSection({
   listing,
   sellerItems,
   selectedIds,
+  bundlesEnabled = false,
   onToggle,
   onSelectAll,
   onClearAll,
@@ -33,6 +34,7 @@ export function BundleSection({
   listing: Listing;
   sellerItems: Listing[];
   selectedIds: Set<string>;
+  bundlesEnabled?: boolean;
   onToggle: (id: string) => void;
   onSelectAll?: () => void;
   onClearAll?: () => void;
@@ -106,14 +108,16 @@ export function BundleSection({
 
   return (
     <View style={{ paddingTop: 18 }}>
-      {/* Bundle Progress Banner */}
-      <View style={{ marginBottom: 18 }}>
-        <BundleProgressBar
-          listing={listing}
-          sellerItems={activeSellerItems}
-          selectedIds={selectedIds}
-        />
-      </View>
+      {/* Bundle Progress Banner (only when bundle discounts are enabled) */}
+      {bundlesEnabled && (
+        <View style={{ marginBottom: 18 }}>
+          <BundleProgressBar
+            listing={listing}
+            sellerItems={activeSellerItems}
+            selectedIds={selectedIds}
+          />
+        </View>
+      )}
 
       {/* Selectable seller items grid */}
       {activeSellerItems.length === 0 ? (

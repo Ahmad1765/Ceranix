@@ -7,11 +7,12 @@ import {
   StyleSheet,
   Alert,
   KeyboardAvoidingView,
+  ScrollView,
 } from 'react-native';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, TextInput } from '@/lib/rnText';
 import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { radii, shadow, type } from '@/lib/theme';
@@ -33,8 +34,9 @@ export interface OfferSheetProps {
 }
 
 /**
- * Quiet Atelier "Make an offer" bottom sheet modal.
- * Features 10% / 20% / Custom price cards, numeric input,
+ * Full-page Vinted-style "Make an offer" modal.
+ * Features full-page presentation, 10% / 20% / Custom price cards,
+ * large prominent numeric input with glitch-free native keypad handling,
  * dynamic buyer protection fee calculation, and Signal Purple action CTA.
  */
 export function OfferSheet({
@@ -48,8 +50,7 @@ export function OfferSheet({
   loading = false,
   offersLeftToday = 25,
 }: OfferSheetProps) {
-  const { theme } = useTheme();
-  const insets = useSafeAreaInsets();
+  const { theme, isDark } = useTheme();
   const inputRef = useRef<any>(null);
 
   // Normalize asking price
@@ -89,7 +90,9 @@ export function OfferSheet({
       setCustomAmount(String(preset20));
       inputRef.current?.blur?.();
     } else if (card === 'custom') {
-      inputRef.current?.focus?.();
+      setTimeout(() => {
+        inputRef.current?.focus?.();
+      }, 50);
     }
   };
 
@@ -131,7 +134,7 @@ export function OfferSheet({
     Alert.alert(
       'Daily Offer Limit',
       'To prevent spam and keep negotiations active and meaningful for sellers, buyers are limited to 25 offers per day.',
-      [{ text: 'Got it' }]
+      [{ text: 'Got it' }],
     );
   };
 
@@ -140,348 +143,372 @@ export function OfferSheet({
   return (
     <Modal
       visible={visible}
-      transparent
       animationType="slide"
+      presentationStyle="fullScreen"
       statusBarTranslucent
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
-        <Pressable
-          style={styles.backdrop}
-          onPress={onClose}
-          accessibilityRole="button"
-          accessibilityLabel="Close offer modal"
-        />
-
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={{ width: '100%', maxWidth: 540, alignSelf: 'center' }}
+      <SafeAreaView
+        edges={['top', 'bottom']}
+        style={[
+          styles.fullPageContainer,
+          { backgroundColor: isDark ? theme.background : '#F9FAFB' },
+        ]}
+      >
+        {/* Top Navigation Header */}
+        <View
+          style={[
+            styles.headerBar,
+            {
+              borderBottomColor: theme.hairline,
+              backgroundColor: isDark ? theme.background : '#FFFFFF',
+            },
+          ]}
         >
-          <View
+          <Pressable
+            onPress={onClose}
+            hitSlop={{ top: 12, bottom: 12, left: 16, right: 16 }}
+            style={({ pressed }) => [
+              styles.closeButton,
+              pressed && { opacity: 0.6 },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+          >
+            <Feather name="arrow-left" size={24} color={theme.ink} />
+          </Pressable>
+
+          <Text
             style={[
-              styles.sheetContainer,
-              {
-                backgroundColor: theme.surface,
-                borderColor: theme.border,
-                paddingBottom: Math.max(insets.bottom, 24),
-              },
+              styles.headerTitle,
+              { color: theme.ink, fontFamily: type.family.sansBold },
             ]}
           >
-            {/* Grab Handle */}
-            <View style={[styles.grabHandle, { backgroundColor: theme.border }]} />
+            Make an offer
+          </Text>
 
-            {/* Header Bar */}
-            <View style={[styles.headerBar, { borderBottomColor: theme.hairline }]}>
-              <Pressable
-                onPress={onClose}
-                hitSlop={{ top: 12, bottom: 12, left: 16, right: 16 }}
-                style={styles.closeButton}
-                accessibilityRole="button"
-                accessibilityLabel="Close"
-              >
-                <Text style={[styles.closeText, { color: theme.muteSoft }]}>Cancel</Text>
-              </Pressable>
+          <View style={styles.headerSpacer} />
+        </View>
 
-              <Text
-                style={[
-                  styles.headerTitle,
-                  { color: theme.ink, fontFamily: type.family.sansBold },
-                ]}
-              >
-                Make an Offer
-              </Text>
+        {/* Full-Page Content with Keypad Stability */}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1 }}
+        >
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.scrollContent}
+          >
+            {/* Item Card Row */}
+            <View
+              style={[
+                styles.itemRow,
+                {
+                  backgroundColor: isDark ? theme.surface : '#FFFFFF',
+                  borderColor: isDark ? theme.border : '#E5E7EB',
+                },
+              ]}
+            >
+              {optimizedThumb ? (
+                <Image
+                  source={{ uri: optimizedThumb }}
+                  style={styles.itemImage}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  transition={IMAGE_TRANSITION}
+                />
+              ) : (
+                <View style={[styles.itemImagePlaceholder, { backgroundColor: isDark ? theme.panel : '#F4F4F5' }]}>
+                  <Feather name="tag" size={20} color={theme.mute} />
+                </View>
+              )}
 
-              <View style={styles.headerSpacer} />
+              <View style={styles.itemDetails}>
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.itemTitle,
+                    { color: theme.ink, fontFamily: type.family.sansBold },
+                  ]}
+                >
+                  {title || 'Selected Item'}
+                </Text>
+                <Text style={[styles.itemPrice, { color: theme.mute }]}>
+                  Listing price: {formatPrice(askingPrice)}
+                </Text>
+              </View>
             </View>
 
-            {/* Main Content Area */}
-            <View style={styles.mainContent}>
-              {/* Item Card Row */}
-              <View
-                style={[
-                  styles.itemRow,
-                  { backgroundColor: theme.panel, borderColor: theme.hairline },
-                ]}
-              >
-                {optimizedThumb ? (
-                  <Image
-                    source={{ uri: optimizedThumb }}
-                    style={styles.itemImage}
-                    contentFit="cover"
-                    cachePolicy="memory-disk"
-                    transition={IMAGE_TRANSITION}
-                  />
-                ) : (
-                  <View style={[styles.itemImagePlaceholder, { backgroundColor: theme.surface }]}>
-                    <Feather name="tag" size={20} color={theme.mute} />
-                  </View>
-                )}
-
-                <View style={styles.itemDetails}>
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      styles.itemTitle,
-                      { color: theme.ink, fontFamily: type.family.sansBold },
-                    ]}
-                  >
-                    {title || 'Selected Item'}
-                  </Text>
-                  <Text style={[styles.itemPrice, { color: theme.mute }]}>
-                    Listing price: {formatPrice(askingPrice)}
-                  </Text>
-                </View>
-              </View>
-
-              {/* 3 Preset Tier Cards */}
-              <View style={styles.cardsRow}>
-                {/* 10% off card */}
-                <Pressable
-                  onPress={() => handleSelectCard('tier10')}
-                  style={({ pressed }) => [
-                    styles.presetCard,
-                    {
-                      backgroundColor:
-                        selectedCard === 'tier10' ? theme.purpleSoft : theme.panel,
-                      borderColor:
-                        selectedCard === 'tier10' ? theme.purple : theme.hairline,
-                      borderWidth: selectedCard === 'tier10' ? 1.5 : 1,
-                      transform: [{ scale: pressed ? 0.96 : 1 }],
-                    },
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel={`10% off: ${formatPrice(preset10)}`}
-                >
-                  <Text
-                    style={[
-                      styles.cardTopText,
-                      {
-                        color: selectedCard === 'tier10' ? theme.purple : theme.ink,
-                        fontFamily: type.family.sansBold,
-                      },
-                    ]}
-                  >
-                    {formatPrice(preset10)}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.cardBottomText,
-                      {
-                        color: selectedCard === 'tier10' ? theme.purple : theme.muteSoft,
-                        fontFamily: type.family.sansMedium,
-                      },
-                    ]}
-                  >
-                    10% off
-                  </Text>
-                </Pressable>
-
-                {/* 20% off card */}
-                <Pressable
-                  onPress={() => handleSelectCard('tier20')}
-                  style={({ pressed }) => [
-                    styles.presetCard,
-                    {
-                      backgroundColor:
-                        selectedCard === 'tier20' ? theme.purpleSoft : theme.panel,
-                      borderColor:
-                        selectedCard === 'tier20' ? theme.purple : theme.hairline,
-                      borderWidth: selectedCard === 'tier20' ? 1.5 : 1,
-                      transform: [{ scale: pressed ? 0.96 : 1 }],
-                    },
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel={`20% off: ${formatPrice(preset20)}`}
-                >
-                  <Text
-                    style={[
-                      styles.cardTopText,
-                      {
-                        color: selectedCard === 'tier20' ? theme.purple : theme.ink,
-                        fontFamily: type.family.sansBold,
-                      },
-                    ]}
-                  >
-                    {formatPrice(preset20)}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.cardBottomText,
-                      {
-                        color: selectedCard === 'tier20' ? theme.purple : theme.muteSoft,
-                        fontFamily: type.family.sansMedium,
-                      },
-                    ]}
-                  >
-                    20% off
-                  </Text>
-                </Pressable>
-
-                {/* Custom card */}
-                <Pressable
-                  onPress={() => handleSelectCard('custom')}
-                  style={({ pressed }) => [
-                    styles.presetCard,
-                    {
-                      backgroundColor:
-                        selectedCard === 'custom' ? theme.purpleSoft : theme.panel,
-                      borderColor:
-                        selectedCard === 'custom' ? theme.purple : theme.hairline,
-                      borderWidth: selectedCard === 'custom' ? 1.5 : 1,
-                      transform: [{ scale: pressed ? 0.96 : 1 }],
-                    },
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Custom set a price"
-                >
-                  <Text
-                    style={[
-                      styles.cardTopText,
-                      {
-                        color: selectedCard === 'custom' ? theme.purple : theme.ink,
-                        fontFamily: type.family.sansBold,
-                      },
-                    ]}
-                  >
-                    Custom
-                  </Text>
-                  <Text
-                    style={[
-                      styles.cardBottomText,
-                      {
-                        color: selectedCard === 'custom' ? theme.purple : theme.muteSoft,
-                        fontFamily: type.family.sansMedium,
-                      },
-                    ]}
-                  >
-                    Set a price
-                  </Text>
-                </Pressable>
-              </View>
-
-              {/* Input Section */}
+            {/* 3 Preset Tier Cards */}
+            <View style={styles.cardsRow}>
+              {/* 10% off card */}
               <Pressable
-                onPress={() => {
-                  setSelectedCard('custom');
-                  inputRef.current?.focus?.();
-                }}
-                style={[
-                  styles.inputSection,
+                onPress={() => handleSelectCard('tier10')}
+                style={({ pressed }) => [
+                  styles.presetCard,
                   {
-                    backgroundColor: theme.panel,
-                    borderColor: selectedCard === 'custom' ? theme.purple : theme.hairline,
+                    backgroundColor:
+                      selectedCard === 'tier10'
+                        ? theme.purpleSoft
+                        : isDark
+                        ? theme.surface
+                        : '#FFFFFF',
+                    borderColor:
+                      selectedCard === 'tier10'
+                        ? theme.purple
+                        : isDark
+                        ? theme.border
+                        : '#E5E7EB',
+                    borderWidth: selectedCard === 'tier10' ? 1.5 : 1,
+                    transform: [{ scale: pressed ? 0.97 : 1 }],
                   },
                 ]}
+                accessibilityRole="button"
+                accessibilityLabel={`10% off: ${formatPrice(preset10)}`}
               >
-                <Text style={[styles.inputEyebrow, { color: theme.muteSoft }]}>YOUR OFFER AMOUNT</Text>
-                <View style={styles.displayRow}>
-                  <Text style={[styles.currencyPrefix, { color: theme.ink }]}>
-                    {CURRENCY_SYMBOL}
-                  </Text>
-                  <TextInput
-                    ref={inputRef}
-                    value={customAmount}
-                    onChangeText={handleCustomChange}
-                    placeholder="0"
-                    placeholderTextColor={theme.muteSoft}
-                    keyboardType="decimal-pad"
-                    returnKeyType="done"
-                    style={[
-                      styles.amountInput,
-                      {
-                        color: theme.ink,
-                        fontFamily: type.family.sansBold,
-                      },
-                    ]}
-                  />
-                </View>
-
-                {/* Fee breakdown helper text */}
-                <View style={[styles.feeBreakdownRow, { borderTopColor: theme.hairline }]}>
-                  <ShieldCheckIcon size={14} />
-                  <Text style={[styles.feeHelperText, { color: theme.mute }]}>
-                    {parsedAmount > 0
-                      ? `${formatPrice(totalWithProtection)} incl. Buyer Protection`
-                      : `Includes Buyer Protection guarantee`}
-                  </Text>
-                </View>
-
-              </Pressable>
-
-              {/* Action Button: "Offer $15.00" */}
-              <View style={styles.actionButtonContainer}>
-                <Pressable
-                  onPress={handleSubmit}
-                  disabled={!isValidOffer || submitting || loading}
-                  style={({ pressed }) => [
-                    styles.actionButton,
+                <Text
+                  style={[
+                    styles.cardTopText,
                     {
-                      backgroundColor: theme.purple,
-                      opacity: !isValidOffer || submitting || loading ? 0.45 : pressed ? 0.88 : 1,
-                      transform: [{ scale: pressed ? 0.98 : 1 }],
-                      ...shadow.sm,
+                      color: selectedCard === 'tier10' ? theme.purple : theme.ink,
+                      fontFamily: type.family.sansBold,
                     },
                   ]}
-                  accessibilityRole="button"
-                  accessibilityLabel={
-                    parsedAmount > 0 ? `Offer ${formatPrice(parsedAmount)}` : 'Make an offer'
-                  }
                 >
-                  <Text
-                    style={[
-                      styles.actionButtonText,
-                      { fontFamily: type.family.sansBold },
-                    ]}
-                  >
-                    {submitting || loading
-                      ? 'Sending offer…'
-                      : parsedAmount > 0
-                      ? `Send Offer · ${formatPrice(parsedAmount)}`
-                      : 'Make an offer'}
-                  </Text>
-                </Pressable>
+                  {formatPrice(preset10)}
+                </Text>
+                <Text
+                  style={[
+                    styles.cardBottomText,
+                    {
+                      color: selectedCard === 'tier10' ? theme.purple : theme.mute,
+                      fontFamily: type.family.sansMedium,
+                    },
+                  ]}
+                >
+                  10% off
+                </Text>
+              </Pressable>
+
+              {/* 20% off card */}
+              <Pressable
+                onPress={() => handleSelectCard('tier20')}
+                style={({ pressed }) => [
+                  styles.presetCard,
+                  {
+                    backgroundColor:
+                      selectedCard === 'tier20'
+                        ? theme.purpleSoft
+                        : isDark
+                        ? theme.surface
+                        : '#FFFFFF',
+                    borderColor:
+                      selectedCard === 'tier20'
+                        ? theme.purple
+                        : isDark
+                        ? theme.border
+                        : '#E5E7EB',
+                    borderWidth: selectedCard === 'tier20' ? 1.5 : 1,
+                    transform: [{ scale: pressed ? 0.97 : 1 }],
+                  },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`20% off: ${formatPrice(preset20)}`}
+              >
+                <Text
+                  style={[
+                    styles.cardTopText,
+                    {
+                      color: selectedCard === 'tier20' ? theme.purple : theme.ink,
+                      fontFamily: type.family.sansBold,
+                    },
+                  ]}
+                >
+                  {formatPrice(preset20)}
+                </Text>
+                <Text
+                  style={[
+                    styles.cardBottomText,
+                    {
+                      color: selectedCard === 'tier20' ? theme.purple : theme.mute,
+                      fontFamily: type.family.sansMedium,
+                    },
+                  ]}
+                >
+                  20% off
+                </Text>
+              </Pressable>
+
+              {/* Custom card */}
+              <Pressable
+                onPress={() => handleSelectCard('custom')}
+                style={({ pressed }) => [
+                  styles.presetCard,
+                  {
+                    backgroundColor:
+                      selectedCard === 'custom'
+                        ? theme.purpleSoft
+                        : isDark
+                        ? theme.surface
+                        : '#FFFFFF',
+                    borderColor:
+                      selectedCard === 'custom'
+                        ? theme.purple
+                        : isDark
+                        ? theme.border
+                        : '#E5E7EB',
+                    borderWidth: selectedCard === 'custom' ? 1.5 : 1,
+                    transform: [{ scale: pressed ? 0.97 : 1 }],
+                  },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Custom set a price"
+              >
+                <Text
+                  style={[
+                    styles.cardTopText,
+                    {
+                      color: selectedCard === 'custom' ? theme.purple : theme.ink,
+                      fontFamily: type.family.sansBold,
+                    },
+                  ]}
+                >
+                  Custom
+                </Text>
+                <Text
+                  style={[
+                    styles.cardBottomText,
+                    {
+                      color: selectedCard === 'custom' ? theme.purple : theme.mute,
+                      fontFamily: type.family.sansMedium,
+                    },
+                  ]}
+                >
+                  Set a price
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Input Section */}
+            <Pressable
+              onPress={() => {
+                setSelectedCard('custom');
+                inputRef.current?.focus?.();
+              }}
+              style={[
+                styles.inputSection,
+                {
+                  backgroundColor: isDark ? theme.surface : '#FFFFFF',
+                  borderColor:
+                    selectedCard === 'custom'
+                      ? theme.purple
+                      : isDark
+                      ? theme.border
+                      : '#E5E7EB',
+                  borderWidth: selectedCard === 'custom' ? 1.5 : 1,
+                },
+              ]}
+            >
+              <Text style={[styles.inputEyebrow, { color: theme.mute }]}>
+                YOUR OFFER AMOUNT
+              </Text>
+
+              <View style={styles.displayRow}>
+                <Text
+                  style={[
+                    styles.currencyPrefix,
+                    {
+                      color: theme.ink,
+                      fontFamily: type.family.sansBold,
+                    },
+                  ]}
+                >
+                  {CURRENCY_SYMBOL}
+                </Text>
+                <TextInput
+                  ref={inputRef}
+                  value={customAmount}
+                  onChangeText={handleCustomChange}
+                  placeholder="0"
+                  placeholderTextColor={theme.muteSoft}
+                  keyboardType="decimal-pad"
+                  returnKeyType="done"
+                  selectTextOnFocus
+                  style={[
+                    styles.amountInput,
+                    {
+                      color: theme.ink,
+                      fontFamily: type.family.sansBold,
+                    },
+                  ]}
+                />
               </View>
 
-              {/* Subtext: "25 offers left for today. Learn why." */}
-              <View style={styles.limitRow}>
-                <Text style={[styles.limitText, { color: theme.muteSoft }]}>
-                  {offersLeftToday} offers remaining today.{' '}
+              {/* Fee breakdown helper text */}
+              <View style={[styles.feeBreakdownRow, { borderTopColor: isDark ? theme.hairline : '#E5E7EB' }]}>
+                <ShieldCheckIcon size={16} />
+                <Text style={[styles.feeHelperText, { color: theme.mute }]}>
+                  {parsedAmount > 0
+                    ? `${formatPrice(totalWithProtection)} incl. Buyer Protection`
+                    : `Includes Buyer Protection guarantee`}
                 </Text>
-                <Pressable onPress={handleLearnWhy} hitSlop={6}>
-                  <Text style={[styles.learnWhyText, { color: theme.purple }]}>Learn why.</Text>
-                </Pressable>
               </View>
+            </Pressable>
+
+            {/* Action Button: "Send Offer · Rs 16" */}
+            <View style={styles.actionButtonContainer}>
+              <Pressable
+                onPress={handleSubmit}
+                disabled={!isValidOffer || submitting || loading}
+                style={({ pressed }) => [
+                  styles.actionButton,
+                  {
+                    backgroundColor: theme.purple,
+                    opacity: !isValidOffer || submitting || loading ? 0.45 : pressed ? 0.88 : 1,
+                    transform: [{ scale: pressed ? 0.98 : 1 }],
+                    ...shadow.sm,
+                  },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  parsedAmount > 0 ? `Offer ${formatPrice(parsedAmount)}` : 'Make an offer'
+                }
+              >
+                <Text
+                  style={[
+                    styles.actionButtonText,
+                    { fontFamily: type.family.sansBold },
+                  ]}
+                >
+                  {submitting || loading
+                    ? 'Sending offer…'
+                    : parsedAmount > 0
+                    ? `Send Offer · ${formatPrice(parsedAmount)}`
+                    : 'Make an offer'}
+                </Text>
+              </Pressable>
             </View>
-          </View>
+
+            {/* Subtext: "25 offers remaining today. Learn why." */}
+            <View style={styles.limitRow}>
+              <Text style={[styles.limitText, { color: theme.mute }]}>
+                {offersLeftToday} offers remaining today.{' '}
+              </Text>
+              <Pressable onPress={handleLearnWhy} hitSlop={6}>
+                <Text style={[styles.learnWhyText, { color: theme.purple }]}>Learn why.</Text>
+              </Pressable>
+            </View>
+          </ScrollView>
         </KeyboardAvoidingView>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  modalOverlay: {
+  fullPageContainer: {
     flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.50)',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  sheetContainer: {
-    width: '100%',
-    borderTopLeftRadius: radii['3xl'],
-    borderTopRightRadius: radii['3xl'],
-    overflow: 'hidden',
-    borderTopWidth: 1,
-    ...shadow.lg,
-  },
-  grabHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginTop: 10,
   },
   headerBar: {
     flexDirection: 'row',
@@ -492,13 +519,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   closeButton: {
-    paddingVertical: 4,
-    paddingHorizontal: 4,
-    minWidth: 56,
-  },
-  closeText: {
-    fontSize: 14.5,
-    fontFamily: type.family.sansMedium,
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 16,
@@ -506,30 +530,30 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   headerSpacer: {
-    minWidth: 56,
+    width: 36,
   },
-  mainContent: {
+  scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 16,
-    paddingBottom: 8,
+    paddingBottom: 32,
   },
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
-    padding: 10,
-    borderRadius: radii.xl,
+    padding: 12,
+    borderRadius: 14,
     borderWidth: 1,
   },
   itemImage: {
     width: 48,
     height: 48,
-    borderRadius: radii.md,
+    borderRadius: 10,
   },
   itemImagePlaceholder: {
     width: 48,
     height: 48,
-    borderRadius: radii.md,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -539,7 +563,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   itemTitle: {
-    fontSize: 14,
+    fontSize: 15,
     marginBottom: 2,
     letterSpacing: -0.1,
   },
@@ -554,48 +578,48 @@ const styles = StyleSheet.create({
   },
   presetCard: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 6,
-    borderRadius: radii.xl,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cardTopText: {
-    fontSize: 15,
+    fontSize: 16,
     marginBottom: 2,
     textAlign: 'center',
     letterSpacing: -0.2,
   },
   cardBottomText: {
-    fontSize: 12,
+    fontSize: 12.5,
     textAlign: 'center',
   },
   inputSection: {
-    marginBottom: 18,
-    padding: 14,
-    borderRadius: radii.xl,
-    borderWidth: 1,
+    marginBottom: 20,
+    padding: 16,
+    borderRadius: 16,
   },
   inputEyebrow: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontFamily: type.family.sansBold,
     fontWeight: '700',
-    letterSpacing: 0.8,
-    marginBottom: 6,
+    letterSpacing: 0.6,
+    marginBottom: 8,
   },
   displayRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    marginBottom: 14,
   },
   currencyPrefix: {
-    fontSize: 26,
-    fontFamily: type.family.sansBold,
-    fontWeight: '700',
+    fontSize: 28,
+    fontWeight: '800',
+    marginRight: 6,
   },
   amountInput: {
     flex: 1,
-    fontSize: 26,
+    fontSize: 28,
+    fontWeight: '800',
     padding: 0,
     margin: 0,
     height: 38,
@@ -606,26 +630,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginTop: 10,
-    paddingTop: 8,
-    borderTopWidth: 1,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   feeHelperText: {
-    fontSize: 12.5,
+    fontSize: 13,
     fontFamily: type.family.sansMedium,
   },
   actionButtonContainer: {
-    marginBottom: 12,
+    marginBottom: 14,
   },
   actionButton: {
-    height: 48,
+    height: 52,
     borderRadius: radii.pill,
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
   },
   actionButtonText: {
-    fontSize: 15,
+    fontSize: 16,
     color: '#FFFFFF',
     fontWeight: '700',
     letterSpacing: 0.1,
@@ -637,11 +660,11 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   limitText: {
-    fontSize: 12.5,
+    fontSize: 13,
     fontFamily: type.family.sans,
   },
   learnWhyText: {
-    fontSize: 12.5,
+    fontSize: 13,
     fontFamily: type.family.sansBold,
     textDecorationLine: 'underline',
   },

@@ -58,19 +58,24 @@ export const ProductRelatedSection = memo(function ProductRelatedSection({
   const { theme } = useTheme();
   const { cardWidth } = useProductDimensions();
 
-  // Determine which tabs are available
-  const showBundleTab = bundlesEnabled;
-  // The tabs to render — only include 'members' when bundles are enabled
-  const availableTabs = showBundleTab ? (['members', 'similar'] as const) : (['similar'] as const);
-  // Effective tab — force 'similar' when bundle tab is hidden
-  const effectiveTab = showBundleTab ? relatedTab : 'similar';
+  // Check item availability
+  const hasSellerItems = sellerItems.length > 0;
+  const hasSimilarItems = similarItems.length > 0;
+
+  if (!hasSellerItems && !hasSimilarItems) {
+    return null;
+  }
+
+  // When both exist, show the switchable tabs
+  const showTabs = hasSellerItems && hasSimilarItems;
+  const effectiveTab = showTabs ? relatedTab : hasSellerItems ? 'members' : 'similar';
 
   return (
     <View style={{ marginTop: 22 }} onLayout={onLayout}>
-      {/* Tab Pills: Only show when there are multiple tabs */}
-      {availableTabs.length > 1 && (
+      {/* Tab Pills: When both seller items and similar items exist */}
+      {showTabs ? (
         <View style={{ flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 4 }}>
-          {availableTabs.map((tab) => {
+          {(['members', 'similar'] as const).map((tab) => {
             const active = effectiveTab === tab;
             return (
               <Pressable
@@ -110,6 +115,13 @@ export const ProductRelatedSection = memo(function ProductRelatedSection({
             );
           })}
         </View>
+      ) : (
+        /* Single Section Title */
+        <View style={{ paddingHorizontal: 16, marginBottom: 4 }}>
+          <Text style={{ fontSize: 17, fontWeight: '800', color: theme.ink, letterSpacing: -0.3 }}>
+            {hasSellerItems ? "Seller's items" : 'Similar items'}
+          </Text>
+        </View>
       )}
 
       {/* Tab Contents */}
@@ -118,6 +130,7 @@ export const ProductRelatedSection = memo(function ProductRelatedSection({
           listing={listing}
           sellerItems={sellerItems}
           selectedIds={selectedBundleIds}
+          bundlesEnabled={bundlesEnabled}
           onToggle={onToggleBundleItem}
           onSelectAll={onSelectAllBundle}
           onClearAll={onClearAllBundle}

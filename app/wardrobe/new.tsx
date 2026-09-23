@@ -1,7 +1,7 @@
 // app/wardrobe/new.tsx — post an outfit to your wardrobe, optionally hiding
 // your face and/or the background (web: real processing; native: no-op today).
 import { useState, useRef } from 'react';
-import { View, Pressable, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { View, Pressable, ScrollView, ActivityIndicator, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -106,8 +106,13 @@ function NewWardrobeInner() {
         <Text style={{ fontSize: 16, fontWeight: '800' }}>New outfit</Text>
         <View style={{ width: 24 }} />
       </View>
-
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 120 }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          contentContainerStyle={{ padding: 20, paddingBottom: 120 }}
+        >
         {!preview ? (
           <Pressable
             onPress={pick}
@@ -145,17 +150,18 @@ function NewWardrobeInner() {
         )}
       </ScrollView>
 
-      <View className="bg-white border-t border-ink-hair" style={{ padding: 20 }}>
-        <Pressable
-          onPress={post}
-          disabled={!preview || processing || posting}
-          style={{ height: 54, borderRadius: 14, backgroundColor: !preview || processing || posting ? 'rgba(15,15,15,0.12)' : '#0F0F0F', alignItems: 'center', justifyContent: 'center' }}
-        >
-          {posting ? <ActivityIndicator color="#fff" /> : (
-            <Text style={{ color: !preview || processing ? 'rgba(15,15,15,0.55)' : '#fff', fontWeight: '800', fontSize: 16 }}>Post outfit</Text>
-          )}
-        </Pressable>
-      </View>
+        <View className="bg-white border-t border-ink-hair" style={{ padding: 20 }}>
+          <Pressable
+            onPress={post}
+            disabled={!preview || processing || posting}
+            style={{ height: 54, borderRadius: 14, backgroundColor: !preview || processing || posting ? 'rgba(15,15,15,0.12)' : '#0F0F0F', alignItems: 'center', justifyContent: 'center' }}
+          >
+            {posting ? <ActivityIndicator color="#fff" /> : (
+              <Text style={{ color: !preview || processing ? 'rgba(15,15,15,0.55)' : '#fff', fontWeight: '800', fontSize: 16 }}>Post outfit</Text>
+            )}
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

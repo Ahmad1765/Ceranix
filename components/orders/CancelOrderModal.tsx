@@ -4,13 +4,13 @@ import {
   View,
   Pressable,
   ScrollView,
-  TextInput,
+  KeyboardAvoidingView,
   ActivityIndicator,
   Platform,
   StyleSheet,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Text } from '@/lib/rnText';
+import { Text, TextInput } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import { tap } from '@/lib/haptics';
 import { useTheme } from '@/context/ThemeContext';
@@ -104,32 +104,35 @@ export function CancelOrderModal({
           accessibilityLabel="Dismiss"
         />
 
-        <View
-          style={[
-            {
-              width: '100%',
-              maxWidth: 480,
-              maxHeight: '88%',
-              backgroundColor: theme.white,
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
-              borderRadius: Platform.OS === 'web' ? 24 : 0,
-              borderWidth: 1,
-              borderColor: theme.border,
-              paddingTop: 18,
-              paddingHorizontal: 20,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: -4 },
-              shadowOpacity: 0.12,
-              shadowRadius: 16,
-              elevation: 10,
-              overflow: 'hidden',
-            },
-            {
-              paddingBottom: Math.max(insets.bottom, 20),
-            },
-          ]}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ width: '100%', maxWidth: 480 }}
         >
+          <View
+            style={[
+              {
+                width: '100%',
+                maxHeight: '88%',
+                backgroundColor: theme.white,
+                borderTopLeftRadius: 24,
+                borderTopRightRadius: 24,
+                borderRadius: Platform.OS === 'web' ? 24 : 0,
+                borderWidth: 1,
+                borderColor: theme.border,
+                paddingTop: 18,
+                paddingHorizontal: 20,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: -4 },
+                shadowOpacity: 0.12,
+                shadowRadius: 16,
+                elevation: 10,
+                overflow: 'hidden',
+              },
+              {
+                paddingBottom: Math.max(insets.bottom, 20),
+              },
+            ]}
+          >
           {/* Header */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
             <View style={{ flex: 1 }}>
@@ -180,7 +183,12 @@ export function CancelOrderModal({
           </View>
 
           {/* Reason Selection List */}
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 10 }}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            contentContainerStyle={{ paddingBottom: 10 }}
+          >
             {reasons.map((r) => {
               const active = selectedReason === r;
               return (
@@ -325,7 +333,8 @@ export function CancelOrderModal({
             </Pressable>
           </View>
         </View>
-      </View>
-    </Modal>
+      </KeyboardAvoidingView>
+    </View>
+  </Modal>
   );
 }

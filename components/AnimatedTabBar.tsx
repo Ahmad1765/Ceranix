@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { View, Platform, LayoutChangeEvent, StyleSheet } from 'react-native';
+import { View, Platform, LayoutChangeEvent, StyleSheet, type ViewStyle } from 'react-native';
 import Animated, {
   useSharedValue,
   useDerivedValue,
@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useTheme } from '@/context/ThemeContext';
+import { useIsKeyboardShown } from '@/hooks/useIsKeyboardShown';
 import { Text } from '@/lib/rnText';
 import {
   HomeTabIcon,
@@ -111,6 +112,13 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
   const count = routes.length;
   const activeKey = state.routes[state.index].key;
   const activePos = routes.findIndex((r) => r.key === activeKey);
+
+  const isKeyboardShown = useIsKeyboardShown();
+  const activeOptions = descriptors[activeKey]?.options;
+  const hideOnKeyboard = activeOptions?.tabBarHideOnKeyboard ?? true;
+  const resolvedTabBarStyle = StyleSheet.flatten(activeOptions?.tabBarStyle as any) as ViewStyle | undefined;
+  const isHiddenByStyle = resolvedTabBarStyle?.display === 'none';
+  const shouldHideTabBar = (hideOnKeyboard && isKeyboardShown) || isHiddenByStyle;
 
   // ---- shared values (UI thread) ----
   const layouts = useSharedValue<ItemLayout[]>([]);
@@ -244,7 +252,7 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
   return (
     <Animated.View
       ref={containerRef}
-      pointerEvents="box-none"
+      pointerEvents={shouldHideTabBar ? 'none' : 'box-none'}
       style={[
         {
           position: 'absolute',
@@ -257,6 +265,7 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
           borderTopColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
         },
         barStyle,
+        shouldHideTabBar && { display: 'none' },
       ]}
     >
       <GestureDetector gesture={gesture}>

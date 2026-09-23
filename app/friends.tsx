@@ -365,6 +365,8 @@ export default function FriendsScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         contentContainerStyle={{
           paddingHorizontal: 16,
           paddingTop: 16,

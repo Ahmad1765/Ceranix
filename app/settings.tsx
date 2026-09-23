@@ -62,7 +62,7 @@ export default function SettingsScreen() {
         style={{
           borderBottomWidth: 1,
           borderBottomColor: theme.border,
-          backgroundColor: theme.surface,
+          backgroundColor: theme.background,
         }}
       >
         <View

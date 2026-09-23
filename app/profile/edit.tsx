@@ -523,23 +523,24 @@ export default function ProfileEditScreen() {
             paddingHorizontal: 20,
             paddingTop: 8,
             paddingBottom: 14,
+            backgroundColor: colors.background,
           }}
         >
           <Pressable
             onPress={handleBack}
             disabled={isOnboarding || saving}
             hitSlop={12}
-            style={{
+            style={({ pressed }) => ({
               width: 38,
               height: 38,
               borderRadius: 19,
-              backgroundColor: colors.surface,
+              backgroundColor: pressed ? colors.surface : colors.panel,
               alignItems: 'center',
               justifyContent: 'center',
               borderWidth: 1,
               borderColor: colors.border,
               opacity: isOnboarding ? 0 : 1,
-            }}
+            })}
           >
             <Feather name="arrow-left" size={18} color={colors.ink} />
           </Pressable>

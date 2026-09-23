@@ -7,8 +7,8 @@
 // Saved, and custom alerts), and zero-layout-shift cold start guidance banners.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { memo, useRef } from 'react';
-import { View, Pressable, ScrollView, Platform } from 'react-native';
+import { memo, useRef, useMemo } from 'react';
+import { View, Pressable, ScrollView, Platform, useWindowDimensions } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
@@ -61,15 +61,29 @@ export const FeedSearch = memo(function FeedSearch({
   placeholder = 'What are you looking for today?',
 }: FeedSearchProps) {
   const { theme, isDark } = useTheme();
+  const { width: screenWidth } = useWindowDimensions();
   const inputRef = useRef<any>(null);
   const searching = value.trim().length > 0;
+
+  const resolvedPlaceholder = useMemo(() => {
+    if (placeholder !== 'What are you looking for today?') {
+      return placeholder;
+    }
+    if (screenWidth < 380) {
+      return 'Search items, brands…';
+    }
+    if (screenWidth < 420) {
+      return 'What are you looking for?';
+    }
+    return placeholder;
+  }, [placeholder, screenWidth]);
 
   return (
     <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={value.trim() ? `Search: ${value}` : placeholder}
+          accessibilityLabel={value.trim() ? `Search: ${value}` : resolvedPlaceholder}
           onPress={() => {
             haptic();
             if (onPressSearch) {
@@ -84,8 +98,8 @@ export const FeedSearch = memo(function FeedSearch({
             alignItems: 'center',
             backgroundColor: pressed ? theme.surface : theme.panel,
             borderRadius: radii.pill,
-            paddingLeft: 14,
-            paddingRight: 10,
+            paddingLeft: 12,
+            paddingRight: searching ? 8 : 12,
             height: 44,
             borderWidth: 1,
             borderColor: theme.border,
@@ -113,17 +127,17 @@ export const FeedSearch = memo(function FeedSearch({
               }
             }}
             onBlur={onBlur}
-            placeholder={placeholder}
+            placeholder={resolvedPlaceholder}
             placeholderTextColor={theme.muteSoft}
-            accessibilityLabel={placeholder}
+            accessibilityLabel={resolvedPlaceholder}
             editable={!onPressSearch}
             pointerEvents={onPressSearch ? 'none' : 'auto'}
             style={{
               flex: 1,
               minWidth: 0,
               flexShrink: 1,
-              marginLeft: 9,
-              marginRight: 6,
+              marginLeft: 8,
+              marginRight: searching ? 6 : 0,
               fontFamily: typography.family.sansMedium,
               fontSize: 16,
               letterSpacing: -0.15,

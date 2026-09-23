@@ -143,6 +143,23 @@ export const HomeSearchView = memo(function HomeSearchView({
   }));
   const [loading, setLoading] = useState(false);
 
+  const searchPlaceholder = useMemo(() => {
+    if (searchFilters.category) {
+      const cat = searchFilters.category;
+      return `Search in ${cat.charAt(0).toUpperCase() + cat.slice(1)}`;
+    }
+    if (activeTab === 'seller') {
+      return 'Search members…';
+    }
+    if (screenWidth < 375) {
+      return 'Search items…';
+    }
+    if (screenWidth < 415) {
+      return 'What are you looking for?';
+    }
+    return 'What are you looking for today?';
+  }, [searchFilters.category, activeTab, screenWidth]);
+
   const scrollX = useRef(new RNAnimated.Value(initialTab === 'listings' ? 0 : screenWidth)).current;
   const searchRequestIdRef = useRef(0);
 
@@ -571,6 +588,7 @@ export const HomeSearchView = memo(function HomeSearchView({
   const handleTabPress = useCallback(
     (tab: SearchTab) => {
       haptic();
+      Keyboard.dismiss();
       setActiveTab(tab);
       const targetX = tab === 'listings' ? 0 : screenWidth;
       pagerRef.current?.scrollTo({ x: targetX, animated: true });
@@ -604,6 +622,7 @@ export const HomeSearchView = memo(function HomeSearchView({
       const pageIndex = Math.round(offsetX / screenWidth);
       const newTab: SearchTab = pageIndex === 0 ? 'listings' : 'seller';
       if (newTab !== activeTab) {
+        Keyboard.dismiss();
         setActiveTab(newTab);
       }
     },
@@ -790,6 +809,7 @@ export const HomeSearchView = memo(function HomeSearchView({
     <ScrollView
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
       contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40 }}
     >
       {/* Previous searches Section */}
@@ -938,6 +958,7 @@ export const HomeSearchView = memo(function HomeSearchView({
     <ScrollView
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
       contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40 }}
     >
       {/* Search Members Banner Card */}
@@ -1183,8 +1204,8 @@ export const HomeSearchView = memo(function HomeSearchView({
               alignItems: 'center',
               backgroundColor: isDark ? theme.surface : '#F4F4F5',
               borderRadius: radii.pill,
-              paddingLeft: 14,
-              paddingRight: 10,
+              paddingLeft: 12,
+              paddingRight: query.length > 0 ? 8 : 12,
               height: 46,
               borderWidth: 0,
             },
@@ -1210,16 +1231,8 @@ export const HomeSearchView = memo(function HomeSearchView({
               }
             }}
             onSubmitEditing={handleSubmitSearch}
-            placeholder={
-              searchFilters.category
-                ? `Search in ${searchFilters.category.charAt(0).toUpperCase() + searchFilters.category.slice(1)}`
-                : "What are you looking for today?"
-            }
-            accessibilityLabel={
-              searchFilters.category
-                ? `Search in ${searchFilters.category.charAt(0).toUpperCase() + searchFilters.category.slice(1)}`
-                : "What are you looking for today?"
-            }
+            placeholder={searchPlaceholder}
+            accessibilityLabel={searchPlaceholder}
             placeholderTextColor={isDark ? "#9CA3AF" : "#8E8E93"}
             autoFocus={Platform.OS === 'web'}
             returnKeyType="search"
@@ -1230,8 +1243,8 @@ export const HomeSearchView = memo(function HomeSearchView({
                 flex: 1,
                 minWidth: 0,
                 flexShrink: 1,
-                marginLeft: 10,
-                marginRight: 6,
+                marginLeft: 8,
+                marginRight: query.length > 0 ? 4 : 0,
                 fontFamily: typography.family.sans,
                 fontSize: 16,
                 letterSpacing: -0.15,
@@ -1243,33 +1256,34 @@ export const HomeSearchView = memo(function HomeSearchView({
             }
           />
 
-          {/* Clear "✕" icon inside search pill */}
-          <Pressable
-            onPress={() => {
-              haptic();
-              setQuery('');
-              if (!searchFilters.category) {
-                setHasSubmitted(false);
-                ++searchRequestIdRef.current;
-                setSellerResults([]);
-                setListingResults([]);
-                setLoading(false);
-              }
-              inputRef.current?.focus?.();
-            }}
-            hitSlop={8}
-            accessibilityLabel="Clear search"
-            style={{
-              width: 24,
-              height: 24,
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginRight: 2,
-              opacity: query.length > 0 ? 1 : 0.45,
-            }}
-          >
-            <Feather name="x" size={16} color={isDark ? "#9CA3AF" : "#6B7280"} />
-          </Pressable>
+          {/* Clear "✕" icon inside search pill (only rendered when query text exists) */}
+          {query.length > 0 && (
+            <Pressable
+              onPress={() => {
+                haptic();
+                setQuery('');
+                if (!searchFilters.category) {
+                  setHasSubmitted(false);
+                  ++searchRequestIdRef.current;
+                  setSellerResults([]);
+                  setListingResults([]);
+                  setLoading(false);
+                }
+                inputRef.current?.focus?.();
+              }}
+              hitSlop={8}
+              accessibilityLabel="Clear search"
+              style={{
+                width: 24,
+                height: 24,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginRight: 2,
+              }}
+            >
+              <Feather name="x" size={16} color={isDark ? "#9CA3AF" : "#6B7280"} />
+            </Pressable>
+          )}
         </Animated.View>
 
         {/* Before Searching: Underlined 'Close' button matching Plick reference */}
@@ -1483,6 +1497,7 @@ export const HomeSearchView = memo(function HomeSearchView({
               <ScrollView
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
                 contentContainerStyle={{
                   paddingBottom: 40,
                 }}
@@ -1548,6 +1563,7 @@ export const HomeSearchView = memo(function HomeSearchView({
                 keyExtractor={(item) => item.id}
                 renderItem={renderSellerItem}
                 keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
                 contentContainerStyle={{ paddingBottom: 40 }}
                 ListHeaderComponent={
                   <View

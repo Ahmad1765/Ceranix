@@ -257,7 +257,7 @@ export function CategorySheet({
             paddingHorizontal: 16,
             borderBottomWidth: 1,
             borderBottomColor: theme.border,
-            backgroundColor: theme.surface,
+            backgroundColor: theme.background,
           }}
         >
           {/* Back Button */}
@@ -327,7 +327,7 @@ export function CategorySheet({
               gap: 8,
               paddingHorizontal: 16,
               paddingVertical: 10,
-              backgroundColor: theme.surface,
+              backgroundColor: theme.background,
               borderBottomWidth: 1,
               borderBottomColor: theme.border,
             }}
@@ -362,7 +362,7 @@ export function CategorySheet({
               placeholder={
                 activeCategory !== null
                   ? `Search in ${activeCategoryMeta?.title}…`
-                  : 'Search category or subcategory…'
+                  : 'Search category…'
               }
               placeholderTextColor={theme.muteSoft ?? theme.mute}
               style={
@@ -499,28 +499,6 @@ export function CategorySheet({
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
           >
-            <View
-              style={{
-                paddingVertical: 12,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <Text
-                style={{
-                  fontFamily: DISPLAY_BOLD,
-                  fontSize: 12.5,
-                  color: theme.muteSoft,
-                  textTransform: 'uppercase',
-                  letterSpacing: 0.5,
-                }}
-              >
-                Subcategories in {activeCategoryMeta?.title} (
-                {activeCategoryDef.subs.length})
-              </Text>
-            </View>
-
             {activeCategoryDef.subs.map((s) => {
               const isSelected = category === activeCategory && subcategory === s.id;
               return (
@@ -574,20 +552,6 @@ export function CategorySheet({
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
           >
-            <View style={{ paddingVertical: 10 }}>
-              <Text
-                style={{
-                  fontFamily: DISPLAY_BOLD,
-                  fontSize: 12.5,
-                  color: theme.muteSoft,
-                  textTransform: 'uppercase',
-                  letterSpacing: 0.5,
-                }}
-              >
-                All Categories
-              </Text>
-            </View>
-
             {CATEGORIES.map((c) => {
               const meta = CATEGORY_META[c.id] || {
                 title: c.label,

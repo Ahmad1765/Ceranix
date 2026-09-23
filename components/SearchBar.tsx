@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { View, Pressable, Platform } from 'react-native';
+import { useState, useMemo } from 'react';
+import { View, Pressable, Platform, useWindowDimensions } from 'react-native';
 import { TextInput } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
@@ -21,8 +21,22 @@ export function SearchBar({
   value = '',
   onChangeText,
 }: Props) {
+  const { width: screenWidth } = useWindowDimensions();
   const [focused, setFocused] = useState(false);
   const searching = (value ?? '').trim().length > 0;
+
+  const resolvedPlaceholder = useMemo(() => {
+    if (placeholder !== 'What are you looking for today?') {
+      return placeholder;
+    }
+    if (screenWidth < 380) {
+      return 'Search items, brands…';
+    }
+    if (screenWidth < 420) {
+      return 'What are you looking for?';
+    }
+    return placeholder;
+  }, [placeholder, screenWidth]);
 
   const content = (
     <View
@@ -31,8 +45,8 @@ export function SearchBar({
         alignItems: 'center',
         backgroundColor: colors.panel,
         borderRadius: radii.pill,
-        paddingLeft: 14,
-        paddingRight: 10,
+        paddingLeft: 12,
+        paddingRight: searching ? 8 : 12,
         height: 44,
         borderWidth: 1,
         borderColor: focused ? colors.purple : colors.border,
@@ -50,7 +64,7 @@ export function SearchBar({
         onChangeText={onChangeText}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        placeholder={placeholder}
+        placeholder={resolvedPlaceholder}
         placeholderTextColor={colors.muteSoft}
         editable={editable && !onPress}
         pointerEvents={onPress ? 'none' : 'auto'}
@@ -59,8 +73,8 @@ export function SearchBar({
             flex: 1,
             minWidth: 0,
             flexShrink: 1,
-            marginLeft: 9,
-            marginRight: 6,
+            marginLeft: 8,
+            marginRight: searching ? 6 : 0,
             fontFamily: typography.family.sansMedium,
             fontSize: 16,
             letterSpacing: -0.15,
@@ -73,7 +87,7 @@ export function SearchBar({
         returnKeyType="search"
         autoCorrect={false}
         autoCapitalize="none"
-        accessibilityLabel={placeholder}
+        accessibilityLabel={resolvedPlaceholder}
       />
       {searching && onChangeText && !onPress ? (
         <Pressable

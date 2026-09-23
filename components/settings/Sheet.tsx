@@ -50,7 +50,7 @@ export function SheetModal({
         >
           <View
             style={{
-              backgroundColor: theme.surface,
+              backgroundColor: theme.panel,
               borderRadius: Platform.OS === 'web' ? 24 : 0,
               ...(Platform.OS !== 'web' && {
                 borderTopLeftRadius: 28,

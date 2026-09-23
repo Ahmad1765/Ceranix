@@ -7,7 +7,7 @@
 // settings), verification status, bio text, and external store links.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { View, Pressable, Linking } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { router } from 'expo-router';
@@ -15,18 +15,21 @@ import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { colors } from '@/lib/theme';
+import { tap } from '@/lib/haptics';
 import { ProfileBanner } from './ProfileBanner';
+import { ProfileQrSheet } from './ProfileQrSheet';
 import type { User as Profile } from '@/types';
 
 type ProfileHeaderProps = {
   profile: Profile;
-  onShare: () => void;
+  onShare?: () => void;
 };
 
 export const ProfileHeader = memo(function ProfileHeader({
   profile,
   onShare,
 }: ProfileHeaderProps) {
+  const [showQrSheet, setShowQrSheet] = useState(false);
   const displayName = profile.full_name || profile.username;
   const initial = (displayName || 'U').trim().charAt(0).toUpperCase();
   const websiteLink = profile.website?.trim() || null;
@@ -42,10 +45,13 @@ export const ProfileHeader = memo(function ProfileHeader({
         onPress={() => router.push('/profile/edit')}
         actions={[
           {
-            icon: 'user-plus',
+            icon: 'share-2',
             family: 'feather',
-            label: 'Find friends',
-            onPress: () => router.push('/friends' as any),
+            label: 'Share profile',
+            onPress: () => {
+              tap('light');
+              setShowQrSheet(true);
+            },
           },
           {
             icon: 'edit-2',
@@ -171,6 +177,13 @@ export const ProfileHeader = memo(function ProfileHeader({
           </Pressable>
         )}
       </View>
+
+      <ProfileQrSheet
+        visible={showQrSheet}
+        onClose={() => setShowQrSheet(false)}
+        username={profile.username}
+        fullName={displayName}
+      />
     </>
   );
 });

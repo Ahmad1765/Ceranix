@@ -5,7 +5,7 @@
 // Mounting is cheap — the heavy fetch only runs when `visible` flips on.
 
 import { useEffect, useMemo, useState } from 'react';
-import { View, Pressable, Modal, StyleSheet, ActivityIndicator, Platform, Dimensions } from 'react-native';
+import { View, Pressable, Modal, StyleSheet, ActivityIndicator, Platform, Dimensions, KeyboardAvoidingView } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
 import { BlurView } from 'expo-blur';
 import Feather from '@expo/vector-icons/Feather';
@@ -166,24 +166,27 @@ export function SaveListSheet({
         ) : (
           <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.55)' }]} />
         )}
-        <Pressable
-          onPress={() => {}}
-          style={{
-            width: width - 56,
-            maxWidth: 360,
-            maxHeight: '80%',
-            backgroundColor: isDark ? theme.panel : '#FFFFFF',
-            borderRadius: 18,
-            paddingVertical: 6,
-            borderWidth: isDark ? 1 : 0,
-            borderColor: theme.border,
-            shadowColor: '#000',
-            shadowOpacity: isDark ? 0.4 : 0.15,
-            shadowRadius: 24,
-            shadowOffset: { width: 0, height: 16 },
-            elevation: 12,
-          }}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ width: width - 56, maxWidth: 360, alignItems: 'center', justifyContent: 'center' }}
         >
+          <Pressable
+            onPress={() => {}}
+            style={{
+              width: '100%',
+              maxHeight: '80%',
+              backgroundColor: isDark ? theme.panel : '#FFFFFF',
+              borderRadius: 18,
+              paddingVertical: 6,
+              borderWidth: isDark ? 1 : 0,
+              borderColor: theme.border,
+              shadowColor: '#000',
+              shadowOpacity: isDark ? 0.4 : 0.15,
+              shadowRadius: 24,
+              shadowOffset: { width: 0, height: 16 },
+              elevation: 12,
+            }}
+          >
           <Text
             style={{
               fontSize: 13,
@@ -321,7 +324,8 @@ export function SaveListSheet({
               </Text>
             </Pressable>
           )}
-        </Pressable>
+          </Pressable>
+        </KeyboardAvoidingView>
       </Pressable>
     </Modal>
   );

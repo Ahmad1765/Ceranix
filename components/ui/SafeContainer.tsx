@@ -199,6 +199,7 @@ export const SafeContainer = React.forwardRef<View, SafeContainerProps>(
         <ScrollView
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           contentContainerStyle={[
             {
               paddingBottom: edges.includes('bottom')
@@ -246,6 +247,7 @@ export const SafeContainer = React.forwardRef<View, SafeContainerProps>(
         <ScrollView
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           contentContainerStyle={[
             styles.grow,
             {

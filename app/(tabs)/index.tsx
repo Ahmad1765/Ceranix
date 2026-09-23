@@ -18,7 +18,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect, router, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect, router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/context/ThemeContext';
 import { useToast } from '@/lib/toast';
@@ -71,6 +71,14 @@ export default function HomeScreen() {
     searchQuery?: string;
     category?: string;
   }>();
+
+  const navigation = useNavigation();
+
+  useEffect(() => {
+    navigation.setOptions({
+      tabBarStyle: searchModeOpen ? { display: 'none' } : undefined,
+    });
+  }, [navigation, searchModeOpen]);
 
   useEffect(() => {
     const cat = params.searchCategory || (params.searchOpen === '1' ? params.category : undefined);

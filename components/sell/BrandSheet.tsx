@@ -25,20 +25,86 @@ import type { Category } from '@/types';
 
 const DISPLAY_BOLD = typography.family.sansBold;
 
-const TIERS: (BrandTier | 'All')[] = [
-  'All',
-  'Local Premium',
-  'Local Contemporary',
-  'Local Modern Menswear',
-  'Local Luxury / Couture',
-  'Local Mass',
-  'Gen Z / Streetwear',
-  'Premium / Luxury',
-  'Moderate / Mass',
-  'Footwear',
-  'Kids & Girls',
-  'Eyewear',
-];
+function BrandRow({
+  name,
+  subtitle,
+  isSelected,
+  onSelect,
+  theme,
+  isDark,
+}: {
+  name: string;
+  subtitle?: string;
+  isSelected: boolean;
+  onSelect: () => void;
+  theme: any;
+  isDark: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onSelect}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 13,
+        borderBottomWidth: 1,
+        borderBottomColor: theme.border,
+        backgroundColor: pressed ? theme.surface : 'transparent',
+        gap: 12,
+      })}
+    >
+      {/* Brand Initial Badge */}
+      <View
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 18,
+          backgroundColor: isDark ? theme.surface : '#F2F3FE',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Text
+          style={{
+            fontFamily: DISPLAY_BOLD,
+            fontSize: 14,
+            color: colors.primary,
+          }}
+        >
+          {name.charAt(0).toUpperCase()}
+        </Text>
+      </View>
+
+      {/* Brand Information */}
+      <View style={{ flex: 1, paddingRight: 8 }}>
+        <Text
+          style={{
+            fontSize: 15,
+            fontFamily: isSelected ? DISPLAY_BOLD : typography.family.sansMedium,
+            color: isSelected ? colors.primary : theme.ink,
+          }}
+        >
+          {name}
+        </Text>
+        {Boolean(subtitle) && (
+          <Text
+            numberOfLines={1}
+            style={{ fontSize: 12, color: theme.muteSoft, marginTop: 1 }}
+          >
+            {subtitle}
+          </Text>
+        )}
+      </View>
+
+      {isSelected ? (
+        <Feather name="check" size={18} color={colors.primary} />
+      ) : (
+        <Feather name="chevron-right" size={16} color={theme.muteSoft} />
+      )}
+    </Pressable>
+  );
+}
 
 export function BrandSheet({
   visible,
@@ -57,13 +123,11 @@ export function BrandSheet({
 }) {
   const { theme, isDark } = useTheme();
   const [query, setQuery] = useState('');
-  const [selectedTier, setSelectedTier] = useState<BrandTier | 'All'>('All');
   const closedByPopStateRef = useRef(false);
 
   useEffect(() => {
     if (visible) {
       setQuery('');
-      setSelectedTier('All');
     }
   }, [visible]);
 
@@ -141,13 +205,6 @@ export function BrandSheet({
     return getRecommendedBrandsForCategory(categoryCode, subcategoryId);
   }, [categoryCode, subcategoryId]);
 
-  // Available tiers that actually exist within the active category
-  const availableTiers = useMemo(() => {
-    const set = new Set<string>();
-    categoryBrands.forEach((b) => set.add(b.tier));
-    return TIERS.filter((t) => t === 'All' || set.has(t));
-  }, [categoryBrands]);
-
   const filteredBrands = useMemo(() => {
     const q = query.trim().toLowerCase();
     const hasCategoryFilter = Boolean(categoryCode || subcategoryId);
@@ -155,14 +212,13 @@ export function BrandSheet({
     const pool = hasCategoryFilter ? categoryBrands : TAXONOMY_BRANDS;
 
     return pool.filter((b) => {
-      const matchTier = selectedTier === 'All' || b.tier === selectedTier;
       const matchQuery =
         !q ||
         b.name.toLowerCase().includes(q) ||
         b.categoryRelevance.toLowerCase().includes(q);
-      return matchTier && matchQuery;
+      return matchQuery;
     });
-  }, [categoryBrands, categoryCode, subcategoryId, query, selectedTier]);
+  }, [categoryBrands, categoryCode, subcategoryId, query]);
 
   const trimmedQuery = query.trim();
   const exactMatchExists = filteredBrands.some(
@@ -203,7 +259,7 @@ export function BrandSheet({
             paddingHorizontal: 16,
             borderBottomWidth: 1,
             borderBottomColor: theme.border,
-            backgroundColor: theme.surface,
+            backgroundColor: theme.background,
           }}
         >
           {/* Back button */}
@@ -280,7 +336,7 @@ export function BrandSheet({
               placeholder={
                 categoryContextName
                   ? `Search ${categoryContextName.toLowerCase()} brands…`
-                  : 'Search brands or enter custom…'
+                  : 'Search brands…'
               }
               placeholderTextColor={theme.muteSoft ?? theme.mute}
               autoCapitalize="words"
@@ -303,56 +359,6 @@ export function BrandSheet({
             )}
           </View>
         </View>
-
-        {/* Tier Filter Chips (Universal 30px Standard) */}
-        {availableTiers.length > 2 && !query && (
-          <View style={{ borderBottomWidth: 1, borderBottomColor: theme.border }}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{
-                paddingHorizontal: 16,
-                paddingVertical: 10,
-                gap: 8,
-              }}
-            >
-              {availableTiers.map((tier) => {
-                const active = selectedTier === tier;
-                return (
-                  <Pressable
-                    key={tier}
-                    onPress={() => {
-                      haptic();
-                      setSelectedTier(tier);
-                    }}
-                    style={({ pressed }) => ({
-                      height: 30,
-                      paddingHorizontal: 14,
-                      borderRadius: 15,
-                      borderWidth: 1,
-                      borderColor: active ? theme.ink : theme.border,
-                      backgroundColor: active ? theme.ink : theme.panel,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      opacity: pressed ? 0.8 : 1,
-                      transform: [{ scale: pressed ? 0.97 : 1 }],
-                    })}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 12,
-                        fontFamily: active ? DISPLAY_BOLD : typography.family.sansMedium,
-                        color: active ? theme.background : theme.ink,
-                      }}
-                    >
-                      {tier}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </View>
-        )}
 
         {/* Scrollable Brands Directory */}
         <ScrollView
@@ -409,7 +415,7 @@ export function BrandSheet({
           )}
 
           {/* ── ONLY POPULAR BRANDS RELEVANT TO THE SELECTED CATEGORY ── */}
-          {!query && recommendedBrands.length > 0 && selectedTier === 'All' && (
+          {!query && recommendedBrands.length > 0 && (
             <View style={{ marginBottom: 18 }}>
               <View style={{ paddingVertical: 8 }}>
                 <Text
@@ -427,41 +433,18 @@ export function BrandSheet({
                 </Text>
               </View>
 
-              {/* Universal 30px standard pill chips for quick popular selection */}
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
-                {recommendedBrands.map((b) => {
-                  const isSelected = value?.toLowerCase() === b.name.toLowerCase();
-                  return (
-                    <Pressable
-                      key={b.name}
-                      onPress={() => handleSelect(b.name)}
-                      style={({ pressed }) => ({
-                        height: 30,
-                        paddingHorizontal: 14,
-                        borderRadius: 15,
-                        borderWidth: 1,
-                        borderColor: isSelected ? theme.ink : theme.border,
-                        backgroundColor: isSelected ? theme.ink : theme.panel,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transform: [{ scale: pressed ? 0.97 : 1 }],
-                      })}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 12.5,
-                          fontFamily: isSelected
-                            ? DISPLAY_BOLD
-                            : typography.family.sansMedium,
-                          color: isSelected ? theme.background : theme.ink,
-                        }}
-                      >
-                        {b.name}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
+              {/* Listed in row design like all brands are listed */}
+              {recommendedBrands.map((b) => (
+                <BrandRow
+                  key={`popular-${b.name}`}
+                  name={b.name}
+                  subtitle={[b.tier, b.categoryRelevance].filter(Boolean).join(' • ')}
+                  isSelected={value?.toLowerCase() === b.name.toLowerCase()}
+                  onSelect={() => handleSelect(b.name)}
+                  theme={theme}
+                  isDark={isDark}
+                />
+              ))}
             </View>
           )}
 
@@ -522,74 +505,17 @@ export function BrandSheet({
               </Text>
             </View>
 
-            {filteredBrands.map((brand) => {
-              const isSelected = value?.toLowerCase() === brand.name.toLowerCase();
-              return (
-                <Pressable
-                  key={brand.name}
-                  onPress={() => handleSelect(brand.name)}
-                  style={({ pressed }) => ({
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    paddingVertical: 13,
-                    borderBottomWidth: 1,
-                    borderBottomColor: theme.border,
-                    backgroundColor: pressed ? theme.surface : 'transparent',
-                    gap: 12,
-                  })}
-                >
-                  {/* Brand Initial Badge */}
-                  <View
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 18,
-                      backgroundColor: isDark ? theme.surface : '#F2F3FE',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontFamily: DISPLAY_BOLD,
-                        fontSize: 14,
-                        color: colors.primary,
-                      }}
-                    >
-                      {brand.name.charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
-
-                  {/* Brand Information */}
-                  <View style={{ flex: 1, paddingRight: 8 }}>
-                    <Text
-                      style={{
-                        fontSize: 15,
-                        fontFamily: isSelected
-                          ? DISPLAY_BOLD
-                          : typography.family.sansMedium,
-                        color: isSelected ? colors.primary : theme.ink,
-                      }}
-                    >
-                      {brand.name}
-                    </Text>
-                    <Text
-                      numberOfLines={1}
-                      style={{ fontSize: 12, color: theme.muteSoft, marginTop: 1 }}
-                    >
-                      {brand.tier} • {brand.categoryRelevance}
-                    </Text>
-                  </View>
-
-                  {isSelected ? (
-                    <Feather name="check" size={18} color={colors.primary} />
-                  ) : (
-                    <Feather name="chevron-right" size={16} color={theme.muteSoft} />
-                  )}
-                </Pressable>
-              );
-            })}
+            {filteredBrands.map((brand) => (
+              <BrandRow
+                key={brand.name}
+                name={brand.name}
+                subtitle={[brand.tier, brand.categoryRelevance].filter(Boolean).join(' • ')}
+                isSelected={value?.toLowerCase() === brand.name.toLowerCase()}
+                onSelect={() => handleSelect(brand.name)}
+                theme={theme}
+                isDark={isDark}
+              />
+            ))}
 
             {filteredBrands.length === 0 && (
               <View style={{ paddingVertical: 40, alignItems: 'center' }}>

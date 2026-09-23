@@ -10,7 +10,11 @@ export default function TabsLayout() {
   return (
     <Tabs
       tabBar={(props) => <AnimatedTabBar {...props} />}
-      screenOptions={{ headerShown: false, freezeOnBlur: true }}
+      screenOptions={{
+        headerShown: false,
+        freezeOnBlur: true,
+        tabBarHideOnKeyboard: true,
+      }}
     >
       <Tabs.Screen name="index" options={{ title: 'Home' }} />
       <Tabs.Screen
