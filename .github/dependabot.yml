@@ -22,8 +22,15 @@ updates:
       - dependency-name: 'expo-*'
       - dependency-name: react-native
       - dependency-name: 'react-native-*'
+      - dependency-name: '@react-native/*'
+      - dependency-name: '@react-native-async-storage/*'
+      - dependency-name: '@react-native-community/*'
+      - dependency-name: '@shopify/*'
       - dependency-name: react
       - dependency-name: react-dom
+      - dependency-name: metro
+      - dependency-name: 'metro-*'
+      - dependency-name: '@types/node'
 
   - package-ecosystem: github-actions
     directory: '/'
