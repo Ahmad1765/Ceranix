@@ -243,7 +243,7 @@ export default function AdminLogisticsScreen() {
       const updated = await escrowService.advanceStatus({
         orderId: selectedTx.order_id,
         targetStatus,
-        notes: extra.notes || actionNotes || null,
+        notes: extra.notes || null,
         courier: extra.courier || null,
         trackingNumber: extra.trackingNumber || null,
         disputeReason: extra.disputeReason || null,
@@ -1000,7 +1000,7 @@ function DetailContent({
             </Pressable>
           )}
 
-          {tx.status === 'DELIVERED' && (
+          {(tx.status === 'DELIVERED' || tx.status === 'DISPUTED') && (
             <Pressable
               onPress={() => onAdvance('COMPLETED_FUNDS_RELEASED')}
               disabled={submitting}
@@ -1017,24 +1017,24 @@ function DetailContent({
 
           {/* Secondary Actions */}
           <View style={styles.secondaryActionsRow}>
-            {tx.status !== 'COMPLETED_FUNDS_RELEASED' && tx.status !== 'CANCELLED' && (
-              <>
-                <Pressable
-                  onPress={onOpenDispute}
-                  style={({ pressed }) => [styles.dangerActionBtn, pressed && styles.pressedOpacity]}
-                >
-                  <Feather name="alert-triangle" size={13} color="#EF4444" style={{ marginRight: 6 }} />
-                  <Text style={styles.dangerActionText}>Flag Dispute</Text>
-                </Pressable>
+            {canAdvanceEscrow(tx.status, 'DISPUTED') && (
+              <Pressable
+                onPress={onOpenDispute}
+                style={({ pressed }) => [styles.dangerActionBtn, pressed && styles.pressedOpacity]}
+              >
+                <Feather name="alert-triangle" size={13} color="#EF4444" style={{ marginRight: 6 }} />
+                <Text style={styles.dangerActionText}>Flag Dispute</Text>
+              </Pressable>
+            )}
 
-                <Pressable
-                  onPress={onOpenCancel}
-                  style={({ pressed }) => [styles.neutralActionBtn, pressed && styles.pressedOpacity]}
-                >
-                  <Feather name="x" size={13} color="#9CA3AF" style={{ marginRight: 6 }} />
-                  <Text style={styles.neutralActionText}>Cancel & Refund</Text>
-                </Pressable>
-              </>
+            {canAdvanceEscrow(tx.status, 'CANCELLED') && (
+              <Pressable
+                onPress={onOpenCancel}
+                style={({ pressed }) => [styles.neutralActionBtn, pressed && styles.pressedOpacity]}
+              >
+                <Feather name="x" size={13} color="#9CA3AF" style={{ marginRight: 6 }} />
+                <Text style={styles.neutralActionText}>Cancel & Refund</Text>
+              </Pressable>
             )}
           </View>
         </View>

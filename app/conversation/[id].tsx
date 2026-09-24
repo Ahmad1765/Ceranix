@@ -25,6 +25,7 @@ import {
   Pressable,
   ActivityIndicator,
   Animated,
+  Easing,
   StyleSheet,
 } from 'react-native';
 import { Text } from '@/lib/rnText';
@@ -74,6 +75,7 @@ function useChatKeyboardLayout(containerRef?: React.RefObject<any>) {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [webViewportHeight, setWebViewportHeight] = useState<number | null>(null);
   const [webViewportOffsetTop, setWebViewportOffsetTop] = useState(0);
+  const keyboardAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // 1. Native Keyboard Events (iOS & Android)
@@ -84,11 +86,23 @@ function useChatKeyboardLayout(containerRef?: React.RefObject<any>) {
       setKeyboardUp(true);
       const h = e?.endCoordinates?.height ?? 0;
       setKeyboardHeight(h);
+      Animated.timing(keyboardAnim, {
+        toValue: 1,
+        duration: Platform.OS === 'ios' ? (e?.duration || 250) : 150,
+        easing: Platform.OS === 'ios' ? Easing.bezier(0.17, 0.59, 0.4, 0.77) : Easing.out(Easing.ease),
+        useNativeDriver: false,
+      }).start();
     });
 
-    const hideSub = Keyboard.addListener(hideEvt, () => {
+    const hideSub = Keyboard.addListener(hideEvt, (e) => {
       setKeyboardUp(false);
       setKeyboardHeight(0);
+      Animated.timing(keyboardAnim, {
+        toValue: 0,
+        duration: Platform.OS === 'ios' ? (e?.duration || 250) : 150,
+        easing: Platform.OS === 'ios' ? Easing.bezier(0.17, 0.59, 0.4, 0.77) : Easing.out(Easing.ease),
+        useNativeDriver: false,
+      }).start();
     });
 
     // 2. Web VisualViewport Events (Mobile Safari / iOS WebKit / Chrome Mobile)
@@ -135,6 +149,12 @@ function useChatKeyboardLayout(containerRef?: React.RefObject<any>) {
         setWebViewportHeight(isUp ? currentHeight : null);
         setWebViewportOffsetTop(isUp ? offsetTop : 0);
 
+        Animated.timing(keyboardAnim, {
+          toValue: isUp ? 1 : 0,
+          duration: 150,
+          useNativeDriver: false,
+        }).start();
+
         applyDirectStyles(isUp, currentHeight, offsetTop);
 
         // Keep page/document scroll pinned to top on iOS Safari
@@ -165,9 +185,9 @@ function useChatKeyboardLayout(containerRef?: React.RefObject<any>) {
       hideSub.remove();
       cleanupWeb?.();
     };
-  }, [containerRef]);
+  }, [containerRef, keyboardAnim]);
 
-  return { keyboardUp, keyboardHeight, webViewportHeight, webViewportOffsetTop };
+  return { keyboardUp, keyboardHeight, keyboardAnim, webViewportHeight, webViewportOffsetTop };
 }
 
 export default function ConversationScreen() {
@@ -179,7 +199,19 @@ export default function ConversationScreen() {
   const toast = useToast();
   const insets = useSafeAreaInsets();
   const containerRef = useRef<any>(null);
-  const { keyboardUp, webViewportHeight, webViewportOffsetTop } = useChatKeyboardLayout(containerRef);
+  const { keyboardUp, keyboardAnim, webViewportHeight, webViewportOffsetTop } = useChatKeyboardLayout(containerRef);
+
+  const restingBottomPadding = Math.max(insets.bottom, 12);
+  const animatedDockPaddingBottom = keyboardAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [restingBottomPadding, DOCK_GAP_KEYBOARD],
+  });
+
+  const keyboardVerticalOffset = Platform.select({
+    ios: 0,
+    android: 0,
+    default: 0,
+  });
 
   // Prevent document body scrolling on mobile web when in a conversation
   useEffect(() => {
@@ -203,6 +235,7 @@ export default function ConversationScreen() {
 
   // ── Custom Domain Hooks ──────────────────────────────────────────────────
   const thread = useConversationThread(conversationId, user, prefillParam);
+  const { scrollToBottom } = thread;
   const block = useConversationBlock(user, thread.other);
 
   // ── Sheet & Context Menu Visibility States ───────────────────────────────
@@ -249,12 +282,13 @@ export default function ConversationScreen() {
   // Ensure message list follows bottom when keyboard opens
   useEffect(() => {
     if (keyboardUp) {
+      scrollToBottom(true);
       const timer = setTimeout(() => {
-        thread.followEnd();
-      }, 100);
+        scrollToBottom(false);
+      }, Platform.OS === 'ios' ? 260 : 160);
       return () => clearTimeout(timer);
     }
-  }, [keyboardUp, thread]);
+  }, [keyboardUp, scrollToBottom]);
 
   // ── Navigation & Clipboard Helpers ───────────────────────────────────────
   const openListing = useCallback(() => {
@@ -576,6 +610,7 @@ export default function ConversationScreen() {
       noScroll
       edges={['top', 'left', 'right']}
       backgroundColor={theme.background}
+      keyboardVerticalOffset={keyboardVerticalOffset}
       style={[
         { flex: 1 },
         Platform.OS === 'web' && webViewportHeight != null
@@ -617,13 +652,20 @@ export default function ConversationScreen() {
         keyExtractor={(row) => row.key}
         renderItem={renderRow}
         style={{ flex: 1 }}
-        contentContainerStyle={{
-          flexGrow: 1,
-          justifyContent: 'flex-end',
-          paddingTop: 8,
-          paddingBottom: 8,
+        contentContainerStyle={[
+          {
+            flexGrow: 1,
+            paddingTop: 8,
+            paddingBottom: 8,
+          },
+          thread.rows.length < 8 ? { justifyContent: 'flex-end' } : null,
+        ]}
+        onContentSizeChange={() => thread.followEnd(false, false)}
+        onLayout={() => {
+          if (thread.pinnedRef.current || keyboardUp) {
+            thread.scrollToBottom(false);
+          }
         }}
-        onContentSizeChange={thread.followEnd}
         onScroll={thread.onScroll}
         onScrollBeginDrag={() => {
           if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -655,12 +697,12 @@ export default function ConversationScreen() {
       />
 
       {/* Bottom Composer / Order Overview Dock */}
-      <View
+      <Animated.View
         style={{
           backgroundColor: theme.background,
           zIndex: 10,
           paddingTop: thread.convListingId ? 6 : 0,
-          paddingBottom: keyboardUp ? DOCK_GAP_KEYBOARD : Math.max(insets.bottom, 12),
+          paddingBottom: animatedDockPaddingBottom,
         }}
       >
         {/* Animated Order Overview (slides down when writing, slides up when leaving field) */}
@@ -713,6 +755,7 @@ export default function ConversationScreen() {
             onPlus={() => setPlusOpen(true)}
             onFocus={() => {
               setIsWriting(true);
+              thread.scrollToBottom(true);
               if (Platform.OS === 'web' && typeof window !== 'undefined') {
                 window.scrollTo({ left: 0, top: 0, behavior: 'instant' as any });
                 if (document.body) document.body.scrollTop = 0;
@@ -724,11 +767,11 @@ export default function ConversationScreen() {
                 setTimeout(() => {
                   window.scrollTo({ left: 0, top: 0, behavior: 'instant' as any });
                   if (document.body) document.body.scrollTop = 0;
-                  thread.followEnd();
+                  thread.scrollToBottom(false);
                 }, 100);
               } else {
                 setTimeout(() => {
-                  thread.followEnd();
+                  thread.scrollToBottom(false);
                 }, 150);
               }
             }}
@@ -747,7 +790,7 @@ export default function ConversationScreen() {
             onUnblock={block.handleToggleBlock}
           />
         )}
-      </View>
+      </Animated.View>
 
       {/* Pop-up Reaction Picker */}
       <ReactionPicker

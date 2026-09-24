@@ -226,11 +226,18 @@ export function useConversationThread(
   // ── Scroll & Pin to Bottom Handlers ──────────────────────────────────────
   const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
-    pinnedRef.current = contentSize.height - (contentOffset.y + layoutMeasurement.height) < 60;
+    if (layoutMeasurement.height <= 0) return;
+    const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
+    pinnedRef.current = distanceFromBottom < 80;
   }, []);
 
-  const followEnd = useCallback(() => {
-    if (pinnedRef.current) listRef.current?.scrollToEnd({ animated: false });
+  const followEnd = useCallback((force: boolean = false, animated: boolean = false) => {
+    if (force || pinnedRef.current) listRef.current?.scrollToEnd({ animated });
+  }, []);
+
+  const scrollToBottom = useCallback((animated: boolean = false) => {
+    pinnedRef.current = true;
+    listRef.current?.scrollToEnd({ animated });
   }, []);
 
   // ── Derived Participant & Listing State ──────────────────────────────────
@@ -720,6 +727,7 @@ export function useConversationThread(
     pinnedRef,
     onScroll,
     followEnd,
+    scrollToBottom,
     other,
     isSeller,
     rows,

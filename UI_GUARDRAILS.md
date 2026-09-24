@@ -117,12 +117,17 @@ These rules protect the runtime from silent crashes, style collapse, and mobile/
 
 ---
 
-### Rule 2.6: Mobile Safari Viewport & Keyboard Docking (`components/ui/SafeContainer.tsx`)
-- **The Invariant:** On mobile web (iOS Safari), virtual keyboard appearances trigger WebKit's two-viewport model (`visualViewport.offsetTop` and `visualViewport.height`). Pinned full-screen or bottom-docked containers (like chat composers or sticky action bars) must sync with `visualViewport.offsetTop` and must never use uncompensated `position: fixed; top: 0` without offset tracking.
-- **The Risk:** In Mobile Safari, focusing an input causes WebKit to pan the visual viewport upward (~180–250px). A naive `position: fixed; top: 0` element remains relative to the layout viewport, which pushes the top header off the screen and leaves a massive empty gap above the keyboard.
+### Rule 2.6: Cross-Platform Keyboard Docking & Mobile Safari Viewport (`components/ui/SafeContainer.tsx`)
+- **The Invariant:** Across iOS, Android, and mobile web, virtual keyboard appearances and composer docking must remain fluid, flush, and platform-aware without layout jitter, double-padding, or message list detachment.
+  1. **iOS Native Docking & Smooth Animation:** Always use `<SafeContainer mode="keyboard-avoiding">` with `behavior="padding"` and platform-appropriate `keyboardVerticalOffset`. The bottom composer dock must animate bottom padding smoothly via `Animated.Value` (`keyboardAnim`) synced with `keyboardWillShow` and `keyboardWillHide` event durations (`e.duration`) and native bezier curves (`Easing.bezier(0.17, 0.59, 0.4, 0.77)`). Never toggle dock padding using discrete binary states (`paddingBottom: keyboardUp ? 6 : insets.bottom`), as this causes severe ~28px visual jumping and snapping before or after the keyboard animates.
+  2. **Android Native Resizing:** In Android, `windowSoftInputMode="adjustResize"` automatically shrinks the window. `KeyboardAvoidingView` behavior must remain `undefined` on Android to prevent double-offsetting bugs (which push inputs to the middle of the screen). Dock padding transitions smoothly (150ms) to sit flush above the keyboard.
+  3. **Message List Anchor & Insets:** In chat message lists (`FlatList`), always use `onLayout` to keep the list anchored to the bottom when the viewport contracts, and depend on stable `scrollToBottom` callbacks instead of entire `thread` object references in effects. Avoid unconditional `justifyContent: 'flex-end'` on `contentContainerStyle` for long threads (`>= 8` messages) to prevent breaking native scroll virtualization.
+  4. **Mobile Safari Viewport Sync:** On mobile web (iOS Safari), virtual keyboard appearances trigger WebKit's two-viewport model (`visualViewport.offsetTop` and `visualViewport.height`). Pinned full-screen or bottom-docked containers must sync with `visualViewport.offsetTop` and must never use uncompensated `position: fixed; top: 0` without offset tracking. When in full-screen pinned modes (like chat), lock `html` and `body` `overflow: hidden; height: 100%` on web to prevent iOS Safari from rubber-banding or scrolling the root canvas.
+- **The Risk:** Binary padding toggles cause jarring layout jumps; un-shimmed Android KeyboardAvoidingView doubles keyboard height; naive FlatList `flex-end` corrupts scroll boundaries and hides recent messages; naive `position: fixed` pushes headers off-screen on Safari.
 - **Enforced Pattern:**
-  - Always use `<SafeContainer mode="keyboard-avoiding">` or bind container styles to `window.visualViewport`'s `offsetTop` and `height`.
-  - When in full-screen pinned modes (like chat), lock `html` and `body` `overflow: hidden; height: 100%` on web to prevent iOS Safari from rubber-banding or scrolling the root canvas.
+  - Always use `<SafeContainer mode="keyboard-avoiding" keyboardVerticalOffset={...}>`.
+  - Use `keyboardAnim.interpolate({ inputRange: [0, 1], outputRange: [Math.max(insets.bottom, 12), DOCK_GAP_KEYBOARD] })` in an `<Animated.View>` dock.
+  - In effects, depend on stable `scrollToBottom` callback references instead of volatile hook objects.
 
 ### Rule 2.7: Strict Mercari Buyer Protection Shield Geometry (`components/ui/ShieldCheckIcon.tsx`)
 - **The Invariant:** All buyer protection and seller verification marks across the entire application **MUST** strictly use the canonical Mercari shield and checkmark design implemented in `<ShieldCheckIcon>` (`@/components/ui/ShieldCheckIcon`). The icon renders inside a `0 0 24 24` viewBox with a scaled Mercari group transform:
@@ -195,7 +200,7 @@ The following files represent high-risk architectural hubs. Any AI asked to modi
 | `components/ListingCard.tsx` | Feed Performance | Renders in `FlashList`. Uses raw `expo-image`, cached like states, unified `<ShieldCheckIcon>`, and strict 4:5 aspect ratio. |
 | `components/chat/ListingBar.tsx` | Transaction Flow | Pinned to bottom above chat composer deliberately to keep negotiation item in context. |
 | `components/GuestGate.tsx` | Auth Guard | Guards authenticated actions; prevents unauthenticated RPC errors. |
-| `components/ui/SafeContainer.tsx` | Layout / Viewport Engine | Mobile-native safe area and keyboard avoiding container with iOS Safari visualViewport synchronization. |
+| `components/ui/SafeContainer.tsx` | Layout / Viewport Engine | Mobile-native safe area and keyboard avoiding container with platform-specific behavior/offsets and iOS Safari visualViewport synchronization. |
 | `components/ui/SoldBadge.tsx` | Visual Identity / Listings | Canonical sharp Sold badge across all listing cards and detail overlays. Strictly enforces 90° sharp corners (`borderRadius: 0`) and Signal Purple palette. AI must NEVER round corners or replace with inline pills. |
 | `app/_layout.tsx` | Root Providers | Controls font preloading, Sentry, Alert shim, and React Query offline persistence. |
 
@@ -223,6 +228,7 @@ Before proceeding with a user request, match it against this matrix:
 | *"Add an unauthenticated quick checkout / chat"* | 🔴 **YES** | Bypasses `GuestGate` security, crashing Supabase RPC queries. | Wrap the action in `guestGate.gate(() => proceed())`. |
 | *"Make unselected buttons, search bars, or chips grey (#F6F6F6)"* | 🔴 **YES** | Violates Paper White Resting State; makes active controls look disabled/greyed out. | Use Paper White (`theme.panel` / `#FFFFFF` in light mode) with hairline border (`theme.border`) for resting controls. |
 | *"Use naive 'position: fixed; top: 0' on mobile web chat or forms"* | 🔴 **YES** | Violates Mobile Safari Viewport Sync Rule (Rule 2.6). Pushes headers off-screen and leaves blank space above keyboard. | Use `<SafeContainer mode="keyboard-avoiding">` with `top: visualViewport.offsetTop` and `height: visualViewport.height`. |
+| *"Use discrete binary toggles (keyboardUp ? 6 : insets.bottom) for keyboard dock padding"* | 🔴 **YES** | Violates Cross-Platform Keyboard Docking Invariant (Rule 2.6). Causes severe visual snapping and layout jitter during keyboard transitions. | Animate dock padding via `Animated.Value` (`keyboardAnim`) synced with keyboard event durations. |
 | *"Make the Sold badge rounded, pill-shaped, or change its border radius"* | 🔴 **YES** | Violates Strict Sharp Sold Badge Geometry (Rule 2.8). Breaks editorial brand aesthetic. | Maintain strict rectangular geometry (`borderRadius: 0`) in `<SoldBadge>` (`@/components/ui/SoldBadge`). |
 | *"Use an inline pill or ad-hoc container for 'Sold' status on cards"* | 🔴 **YES** | Violates Single Component Invariant for Sold badges. | Import and render canonical `<SoldBadge size="sm" />` from `@/components/ui/SoldBadge`. |
 | *"Add dark mode styling for this new component"* | 🟢 **NO** | Safe, provided `useTheme()` tokens are used. | Use `const { theme, isDark } = useTheme();` and bind to `theme.surface`, `theme.panel`, etc. |
