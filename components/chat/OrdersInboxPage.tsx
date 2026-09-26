@@ -120,7 +120,7 @@ function getOrderStatusInfo(order: MyOrder, side: OrderSide, isDark: boolean) {
     return {
       label: 'Completed',
       color: '#6C47FF',
-      bg: isDark ? 'rgba(108, 71, 255, 0.16)' : '#F2F3FE',
+      bg: isDark ? 'rgba(108, 71, 255, 0.16)' : 'rgba(108, 71, 255, 0.10)',
       icon: <Feather name="check-circle" size={12} color="#6C47FF" style={{ marginRight: 4 }} />,
       description: side === 'bought' ? 'Transaction complete · Item received' : 'Sale completed · Payout processed',
     };
@@ -130,7 +130,7 @@ function getOrderStatusInfo(order: MyOrder, side: OrderSide, isDark: boolean) {
     return {
       label: side === 'bought' ? 'Delivered · Inspect' : 'Delivered',
       color: '#6C47FF',
-      bg: isDark ? 'rgba(108, 71, 255, 0.16)' : '#F2F3FE',
+      bg: isDark ? 'rgba(108, 71, 255, 0.16)' : 'rgba(108, 71, 255, 0.10)',
       icon: <Feather name="package" size={12} color="#6C47FF" style={{ marginRight: 4 }} />,
       description: side === 'bought' ? 'Delivered to your address · Please inspect' : 'Buyer has received package',
     };
@@ -141,7 +141,7 @@ function getOrderStatusInfo(order: MyOrder, side: OrderSide, isDark: boolean) {
     return {
       label: 'In Transit',
       color: '#6C47FF',
-      bg: isDark ? 'rgba(108, 71, 255, 0.16)' : '#F2F3FE',
+      bg: isDark ? 'rgba(108, 71, 255, 0.16)' : 'rgba(108, 71, 255, 0.10)',
       icon: <Feather name="truck" size={12} color="#6C47FF" style={{ marginRight: 4 }} />,
       description: tracking ? `Dispatched · Tracking: ${tracking}` : 'Package is on the way',
     };
@@ -195,7 +195,7 @@ function getOrderStatusInfo(order: MyOrder, side: OrderSide, isDark: boolean) {
   return {
     label: side === 'bought' ? 'Order Confirmed' : 'New Order',
     color: '#6C47FF',
-    bg: isDark ? 'rgba(108, 71, 255, 0.16)' : '#F2F3FE',
+    bg: isDark ? 'rgba(108, 71, 255, 0.16)' : 'rgba(108, 71, 255, 0.10)',
     icon: <Feather name="check" size={12} color="#6C47FF" style={{ marginRight: 4 }} />,
     description: 'Order confirmed and placed successfully',
   };
@@ -554,7 +554,7 @@ export const OrdersInboxPage = memo(function OrdersInboxPage({
             marginBottom: 4,
             padding: 12,
             borderRadius: 12,
-            backgroundColor: isDark ? 'rgba(108, 71, 255, 0.14)' : '#F2F3FE',
+            backgroundColor: isDark ? 'rgba(108, 71, 255, 0.14)' : 'rgba(108, 71, 255, 0.08)',
             borderWidth: 1,
             borderColor: isDark ? 'rgba(108, 71, 255, 0.28)' : 'rgba(108, 71, 255, 0.20)',
             flexDirection: 'row',

@@ -373,32 +373,25 @@ export async function cancelBundleOffersForSoldItem(soldListingId: string): Prom
     // 2. Direct server query and update fallback
     const { data: offers, error: selectErr } = await supabase
       .from('messages')
-      .select('id, metadata, conversations(listing_id)')
+      .select('id')
       .eq('kind', 'offer')
-      .in('offer_status', ['pending', 'proposed']);
+      .in('offer_status', ['pending', 'proposed'])
+      .or(
+        `metadata->>base_listing_id.eq.${soldListingId},metadata->bundle_item_ids.cs.["${soldListingId}"]`,
+      );
 
-    if (selectErr || !offers) return [];
+    if (selectErr || !offers || offers.length === 0) return [];
 
-    const invalidOfferIds: string[] = [];
-    for (const offer of offers) {
-      const meta = offer.metadata;
-      const itemIds: string[] = meta?.bundle_item_ids || [];
-      const baseId = meta?.base_listing_id || (offer as any).conversations?.listing_id;
-      if (itemIds.includes(soldListingId) || baseId === soldListingId) {
-        invalidOfferIds.push(offer.id);
-      }
-    }
+    const invalidOfferIds = offers.map((o) => o.id);
 
-    if (invalidOfferIds.length > 0) {
-      const { error: updateError } = await supabase
-        .from('messages')
-        .update({ offer_status: 'canceled' })
-        .in('id', invalidOfferIds);
+    const { error: updateError } = await supabase
+      .from('messages')
+      .update({ offer_status: 'canceled' })
+      .in('id', invalidOfferIds);
 
-      if (updateError) {
-        console.warn('[chat] cancelBundleOffersForSoldItem update error', updateError);
-        return [];
-      }
+    if (updateError) {
+      console.warn('[chat] cancelBundleOffersForSoldItem update error', updateError);
+      return [];
     }
     return invalidOfferIds;
   } catch (err) {

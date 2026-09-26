@@ -55,7 +55,21 @@ vi.mock('@/lib/supabase', () => ({
           })),
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
-              in: vi.fn(() => Promise.resolve({ data: mockMessages, error: null })),
+              in: vi.fn(() => {
+                const promise = Promise.resolve({ data: mockMessages, error: null });
+                return Object.assign(promise, {
+                  or: vi.fn((orExpr: string) => {
+                    const matchId = orExpr.match(/base_listing_id\.eq\.([^,]+)/)?.[1];
+                    const filtered = mockMessages.filter((m) => {
+                      if (!matchId) return true;
+                      const baseMatch = m.metadata?.base_listing_id === matchId;
+                      const bundleMatch = m.metadata?.bundle_item_ids?.includes(matchId);
+                      return baseMatch || bundleMatch;
+                    });
+                    return Promise.resolve({ data: filtered, error: null });
+                  }),
+                });
+              }),
             })),
           })),
           update: vi.fn((updatePayload: any) => ({
