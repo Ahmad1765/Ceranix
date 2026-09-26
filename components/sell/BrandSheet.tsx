@@ -353,6 +353,12 @@ export function BrandSheet({
   }, [popularBrandsList, query]);
 
   const trimmedQuery = query.trim();
+  const hasMatchingBrand = useMemo(() => {
+    if (!trimmedQuery) return false;
+    const lower = trimmedQuery.toLowerCase();
+    return TAXONOMY_BRANDS.some((b) => b.name.toLowerCase() === lower);
+  }, [trimmedQuery]);
+
   const isNoBrandSelected =
     value?.toLowerCase() === 'no brand' || value === UNBRANDED_LOCAL_TAILOR;
 
@@ -516,7 +522,7 @@ export function BrandSheet({
           ))}
 
           {/* ── WHEN QUERY IS TYPED: BRAND NOT FOUND & CREATE BRAND (Reference Image 1) ── */}
-          {trimmedQuery.length > 0 && (
+          {trimmedQuery.length > 0 && !hasMatchingBrand && (
             <View style={{ marginTop: 8 }}>
               {/* Section Header */}
               <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 6 }}>

@@ -82,7 +82,7 @@ export function AuthenticitySheet({
     // Trademark policy guardrail: Apple Guideline 5.2.3 and Google Play Counterfeit Policy
     if (optValue === 'inspired' && isTrademark) {
       setLuxuryWarning(
-        `Registered international luxury items (${brandName}) cannot be listed as "Inspired" under the brand's trademark name. To comply with platform policies, please select "Unbranded / Local Tailor" for inspired designs or verify authenticity as "Original".`,
+        `Registered international luxury items (${brandName}) cannot be listed as "Inspired" under the brand's trademark name. To comply with platform policies, please select "No brand" for inspired designs or verify authenticity as "Original".`,
       );
       return;
     }

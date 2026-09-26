@@ -82,9 +82,16 @@ function getOrderStatusInfo(order: MyOrder, side: OrderSide, isDark: boolean) {
   if (isRefunded) {
     return {
       label: status === 'refund_due' ? 'Refund Pending' : 'Refunded',
-      color: '#D97706',
-      bg: isDark ? 'rgba(217, 119, 6, 0.16)' : '#FEF3C7',
-      icon: <Feather name="rotate-ccw" size={12} color="#D97706" style={{ marginRight: 4 }} />,
+      color: isDark ? 'rgba(255, 255, 255, 0.70)' : 'rgba(17, 17, 17, 0.70)',
+      bg: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(17, 17, 17, 0.06)',
+      icon: (
+        <Feather
+          name="rotate-ccw"
+          size={12}
+          color={isDark ? 'rgba(255, 255, 255, 0.70)' : 'rgba(17, 17, 17, 0.70)'}
+          style={{ marginRight: 4 }}
+        />
+      ),
       description: 'Refund issued to original payment method',
     };
   }
@@ -112,9 +119,9 @@ function getOrderStatusInfo(order: MyOrder, side: OrderSide, isDark: boolean) {
   if (isCompleted) {
     return {
       label: 'Completed',
-      color: '#10B981',
-      bg: isDark ? 'rgba(16, 185, 129, 0.16)' : '#ECFDF5',
-      icon: <Feather name="check-circle" size={12} color="#10B981" style={{ marginRight: 4 }} />,
+      color: '#6C47FF',
+      bg: isDark ? 'rgba(108, 71, 255, 0.16)' : '#F2F3FE',
+      icon: <Feather name="check-circle" size={12} color="#6C47FF" style={{ marginRight: 4 }} />,
       description: side === 'bought' ? 'Transaction complete · Item received' : 'Sale completed · Payout processed',
     };
   }
@@ -123,7 +130,7 @@ function getOrderStatusInfo(order: MyOrder, side: OrderSide, isDark: boolean) {
     return {
       label: side === 'bought' ? 'Delivered · Inspect' : 'Delivered',
       color: '#6C47FF',
-      bg: isDark ? 'rgba(108, 71, 255, 0.16)' : '#EEF2FF',
+      bg: isDark ? 'rgba(108, 71, 255, 0.16)' : '#F2F3FE',
       icon: <Feather name="package" size={12} color="#6C47FF" style={{ marginRight: 4 }} />,
       description: side === 'bought' ? 'Delivered to your address · Please inspect' : 'Buyer has received package',
     };
@@ -133,9 +140,9 @@ function getOrderStatusInfo(order: MyOrder, side: OrderSide, isDark: boolean) {
     const tracking = (order as any).tracking_number;
     return {
       label: 'In Transit',
-      color: '#4F46E5',
-      bg: isDark ? 'rgba(79, 70, 229, 0.16)' : '#EEF2FF',
-      icon: <Feather name="truck" size={12} color="#4F46E5" style={{ marginRight: 4 }} />,
+      color: '#6C47FF',
+      bg: isDark ? 'rgba(108, 71, 255, 0.16)' : '#F2F3FE',
+      icon: <Feather name="truck" size={12} color="#6C47FF" style={{ marginRight: 4 }} />,
       description: tracking ? `Dispatched · Tracking: ${tracking}` : 'Package is on the way',
     };
   }
@@ -144,9 +151,9 @@ function getOrderStatusInfo(order: MyOrder, side: OrderSide, isDark: boolean) {
     const isDropship = (order as any).fulfillment_type === 'dropship';
     return {
       label: side === 'bought' ? (isDropship ? 'Processing' : 'Packing Order') : 'Prepare Shipment',
-      color: '#2563EB',
-      bg: isDark ? 'rgba(37, 99, 235, 0.16)' : '#EFF6FF',
-      icon: <Feather name="box" size={12} color="#2563EB" style={{ marginRight: 4 }} />,
+      color: isDark ? '#F5F5F5' : '#111111',
+      bg: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(17, 17, 17, 0.06)',
+      icon: <Feather name="box" size={12} color={isDark ? '#F5F5F5' : '#111111'} style={{ marginRight: 4 }} />,
       description: side === 'bought' ? 'Seller is preparing your order' : 'Please package item for shipping',
     };
   }
@@ -154,9 +161,16 @@ function getOrderStatusInfo(order: MyOrder, side: OrderSide, isDark: boolean) {
   if (isAwaitingPayment) {
     return {
       label: 'Awaiting Payment',
-      color: '#D97706',
-      bg: isDark ? 'rgba(217, 119, 6, 0.16)' : '#FEF3C7',
-      icon: <Feather name="clock" size={12} color="#D97706" style={{ marginRight: 4 }} />,
+      color: isDark ? 'rgba(255, 255, 255, 0.70)' : 'rgba(17, 17, 17, 0.70)',
+      bg: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(17, 17, 17, 0.06)',
+      icon: (
+        <Feather
+          name="clock"
+          size={12}
+          color={isDark ? 'rgba(255, 255, 255, 0.70)' : 'rgba(17, 17, 17, 0.70)'}
+          style={{ marginRight: 4 }}
+        />
+      ),
       description: 'Awaiting payment confirmation',
     };
   }
@@ -164,18 +178,25 @@ function getOrderStatusInfo(order: MyOrder, side: OrderSide, isDark: boolean) {
   if (isCodPending) {
     return {
       label: side === 'bought' ? 'CoD · Pay on Delivery' : 'CoD Confirmed',
-      color: '#D97706',
-      bg: isDark ? 'rgba(217, 119, 6, 0.16)' : '#FEF3C7',
-      icon: <Feather name="clock" size={12} color="#D97706" style={{ marginRight: 4 }} />,
+      color: isDark ? 'rgba(255, 255, 255, 0.70)' : 'rgba(17, 17, 17, 0.70)',
+      bg: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(17, 17, 17, 0.06)',
+      icon: (
+        <Feather
+          name="clock"
+          size={12}
+          color={isDark ? 'rgba(255, 255, 255, 0.70)' : 'rgba(17, 17, 17, 0.70)'}
+          style={{ marginRight: 4 }}
+        />
+      ),
       description: side === 'bought' ? 'Pay cash upon delivery at your door' : 'Cash on delivery order confirmed',
     };
   }
 
   return {
     label: side === 'bought' ? 'Order Confirmed' : 'New Order',
-    color: '#10B981',
-    bg: isDark ? 'rgba(16, 185, 129, 0.16)' : '#ECFDF5',
-    icon: <Feather name="check" size={12} color="#10B981" style={{ marginRight: 4 }} />,
+    color: '#6C47FF',
+    bg: isDark ? 'rgba(108, 71, 255, 0.16)' : '#F2F3FE',
+    icon: <Feather name="check" size={12} color="#6C47FF" style={{ marginRight: 4 }} />,
     description: 'Order confirmed and placed successfully',
   };
 }
@@ -487,49 +508,24 @@ export const OrdersInboxPage = memo(function OrdersInboxPage({
     if (initialSide) setSubTab(initialSide);
   }, [initialSide]);
 
+  const q = useMyOrdersQuery(userId);
+  const { refetch, isPending, isRefetching } = q;
+
   useEffect(() => {
     if (justPaid === '1' || justPaid === '0') {
       setShowToast(true);
+      refetch();
       const timer = setTimeout(() => setShowToast(false), 7000);
       return () => clearTimeout(timer);
     }
-  }, [justPaid]);
-
-  const q = useMyOrdersQuery(userId);
-  const { refetch, isPending, isRefetching } = q;
+  }, [justPaid, refetch]);
 
   const { bought, sold } = useMemo(
     () => partitionOrders(q.data ?? [], userId),
     [q.data, userId],
   );
 
-  const allBoughtOrders = useMemo(() => {
-    if ((justPaid === '1' || justPaid === '0') && recentTitle && !bought.some((b) => b.listing?.title === recentTitle)) {
-      const parsedAmount = recentAmount ? Number(recentAmount) : 0;
-      const mockOrder: MyOrder = {
-        id: `recent_order_${Date.now()}`,
-        listing_id: `mock_listing_${Date.now()}`,
-        buyer_id: userId,
-        seller_id: 'seller',
-        amount_cents: Math.round(parsedAmount * 100),
-        fee_cents: 0,
-        currency: 'pkr',
-        payment_method: justPaid === '1' ? 'card' : 'cod',
-        status: justPaid === '1' ? 'paid' : 'pending',
-        shipping_address: null,
-        delivery_notes: null,
-        created_at: new Date().toISOString(),
-        listing: {
-          id: `mock_listing_${Date.now()}`,
-          title: recentTitle,
-          price: parsedAmount,
-          images: [],
-        },
-      };
-      return [mockOrder, ...bought];
-    }
-    return bought;
-  }, [bought, justPaid, recentTitle, recentAmount, userId]);
+  const allBoughtOrders = bought;
 
   const filterList = useCallback(
     (raw: MyOrder[]) => {
@@ -558,9 +554,9 @@ export const OrdersInboxPage = memo(function OrdersInboxPage({
             marginBottom: 4,
             padding: 12,
             borderRadius: 12,
-            backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5',
+            backgroundColor: isDark ? 'rgba(108, 71, 255, 0.14)' : '#F2F3FE',
             borderWidth: 1,
-            borderColor: isDark ? 'rgba(16, 185, 129, 0.3)' : '#A7F3D0',
+            borderColor: isDark ? 'rgba(108, 71, 255, 0.28)' : 'rgba(108, 71, 255, 0.20)',
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -568,15 +564,15 @@ export const OrdersInboxPage = memo(function OrdersInboxPage({
           }}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
-            <Feather name="check-circle" size={16} color="#10B981" />
-            <Text style={{ fontSize: 13, color: isDark ? '#6EE7B7' : '#065F46', fontFamily: typography.family.sansMedium, flex: 1 }}>
+            <Feather name="check-circle" size={16} color="#6C47FF" />
+            <Text style={{ fontSize: 13, color: theme.ink, fontFamily: typography.family.sansMedium, flex: 1 }}>
               {justPaid === '1'
                 ? `Payment successful! Your order${recentTitle ? ` for "${recentTitle}"` : ''} is confirmed.`
                 : `Order placed! Cash on delivery confirmed${recentTitle ? ` for "${recentTitle}"` : ''}.`}
             </Text>
           </View>
           <Pressable onPress={() => setShowToast(false)} hitSlop={8}>
-            <Feather name="x" size={15} color={isDark ? '#6EE7B7' : '#065F46'} />
+            <Feather name="x" size={15} color={theme.mute} />
           </Pressable>
         </View>
       )}
@@ -701,14 +697,14 @@ export const OrdersInboxPage = memo(function OrdersInboxPage({
               }}
               style={({ pressed }) => [
                 {
-                  paddingHorizontal: 16,
-                  paddingVertical: 8,
-                  borderRadius: 10,
+                  height: 30,
+                  borderRadius: 15,
+                  paddingHorizontal: 14,
                   alignItems: 'center',
                   justifyContent: 'center',
                   backgroundColor: active
-                    ? (isDark ? '#FFFFFF' : '#18181B')
-                    : (isDark ? theme.panel : '#F3F4F6'),
+                    ? theme.ink
+                    : theme.surface,
                 },
                 pressed && { opacity: 0.8 },
               ]}
@@ -718,8 +714,8 @@ export const OrdersInboxPage = memo(function OrdersInboxPage({
                   fontSize: 14,
                   fontWeight: active ? '700' : '600',
                   color: active
-                    ? (isDark ? '#111111' : '#FFFFFF')
-                    : (isDark ? '#E5E7EB' : '#1F1F1F'),
+                    ? theme.background
+                    : theme.ink,
                   fontFamily: active ? typography.family.sansBold : typography.family.sansSemibold,
                 }}
               >

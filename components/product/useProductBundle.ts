@@ -29,6 +29,7 @@ type UseProductBundleProps = {
   guestGate: ReturnType<typeof useGuestGate>;
   /** When false the bundle tab is hidden and relatedTab defaults to 'similar'. */
   bundlesEnabled?: boolean;
+  sellerItemsLoading?: boolean;
 };
 
 export function serializeBundleIds(ids: string[] | Iterable<string>): string {
@@ -44,6 +45,7 @@ export function useProductBundle({
   user,
   guestGate,
   bundlesEnabled = false,
+  sellerItemsLoading = false,
 }: UseProductBundleProps) {
   const toast = useToast();
   const [selectedBundleIds, setSelectedBundleIds] = useState<Set<string>>(new Set());
@@ -63,7 +65,7 @@ export function useProductBundle({
 
   // If any item in the bundle is bought by another buyer, automatically remove it and cancel bundle if only 1 item remains
   useEffect(() => {
-    if (selectedBundleIds.size === 0) return;
+    if (sellerItemsLoading || selectedBundleIds.size === 0) return;
     const soldOrMissingIds: string[] = [];
     selectedBundleIds.forEach((id) => {
       const found = sellerItems.find((s) => s.id === id);
@@ -83,7 +85,7 @@ export function useProductBundle({
         icon: 'info',
       });
     }
-  }, [sellerItems, selectedBundleIds, toast]);
+  }, [sellerItems, selectedBundleIds, sellerItemsLoading, toast]);
 
   useEffect(() => {
     if (listing?.is_sold && selectedBundleIds.size > 0) {

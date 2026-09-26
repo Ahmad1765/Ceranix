@@ -167,6 +167,7 @@ export default function ProductScreen() {
     user,
     guestGate,
     bundlesEnabled: sellerBundlesEnabled,
+    sellerItemsLoading: sellerItemsQ.isLoading,
   });
 
   const selectedSellerItems = useMemo(

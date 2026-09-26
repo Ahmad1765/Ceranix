@@ -416,6 +416,41 @@ describe('bundleFlow tests', () => {
       ]);
     });
 
+    it('Requirement 2: checkAndCancelInvalidBundleOffers excludes accepted and paid offers from cancellation', async () => {
+      mockListings = [
+        { id: 'base-listing', is_sold: true },
+        { id: 'item-addon-1', is_sold: true },
+      ];
+      updatedMessages = [];
+
+      const messages: any[] = [
+        {
+          id: 'msg-offer-accepted',
+          kind: 'offer',
+          metadata: {
+            is_bundle: true,
+            base_listing_id: 'base-listing',
+            bundle_item_ids: ['item-addon-1'],
+          },
+          offer_status: 'accepted',
+        },
+        {
+          id: 'msg-offer-paid',
+          kind: 'offer',
+          metadata: {
+            is_bundle: true,
+            base_listing_id: 'base-listing',
+            bundle_item_ids: ['item-addon-1'],
+          },
+          offer_status: 'paid',
+        },
+      ];
+
+      const canceled = await checkAndCancelInvalidBundleOffers(messages, 'base-listing');
+      expect(canceled).toEqual([]);
+      expect(updatedMessages).toEqual([]);
+    });
+
     it('Requirement 2 & 3: prunes sold items from active bundle selections on product page', () => {
       const sellerItems = [
         { id: 'item-2', is_sold: true },

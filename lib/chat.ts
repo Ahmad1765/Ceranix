@@ -11,7 +11,8 @@ export type OfferStatus =
   | 'countered'
   | 'expired'
   | 'withdrawn'
-  | 'canceled';
+  | 'canceled'
+  | 'paid';
 
 export interface ChatMessage {
   id: string;
@@ -354,35 +355,50 @@ export async function updateOfferStatus(
 
 /**
  * Automatically cancels any bundle offers across messages if a referenced item has been sold.
+ * Uses a server-side security-definer operation to cancel regardless of caller RLS visibility.
  */
 export async function cancelBundleOffersForSoldItem(soldListingId: string): Promise<string[]> {
   if (!soldListingId) return [];
   try {
-    const { data: offers, error } = await supabase
-      .from('messages')
-      .select('id, conversation_id, metadata, offer_status, conversations(listing_id)')
-      .eq('kind', 'offer')
-      .in('offer_status', ['pending', 'proposed', 'accepted']);
+    // 1. Server-side RPC operation (security definer cancels regardless of caller RLS visibility)
+    if (typeof (supabase as any).rpc === 'function') {
+      const { data, error } = await supabase.rpc('cancel_bundle_offers_for_sold_item', {
+        p_sold_listing_id: soldListingId,
+      });
+      if (!error && Array.isArray(data)) {
+        return data as string[];
+      }
+    }
 
-    if (error || !offers) return [];
+    // 2. Direct server query and update fallback
+    const { data: offers, error: selectErr } = await supabase
+      .from('messages')
+      .select('id, metadata, conversations(listing_id)')
+      .eq('kind', 'offer')
+      .in('offer_status', ['pending', 'proposed']);
+
+    if (selectErr || !offers) return [];
 
     const invalidOfferIds: string[] = [];
     for (const offer of offers) {
       const meta = offer.metadata;
-      if (meta?.is_bundle || (meta?.bundle_item_ids && Array.isArray(meta.bundle_item_ids))) {
-        const itemIds: string[] = meta.bundle_item_ids || [];
-        const baseId = meta.base_listing_id || (offer as any).conversations?.listing_id;
-        if (itemIds.includes(soldListingId) || baseId === soldListingId) {
-          invalidOfferIds.push(offer.id);
-        }
+      const itemIds: string[] = meta?.bundle_item_ids || [];
+      const baseId = meta?.base_listing_id || (offer as any).conversations?.listing_id;
+      if (itemIds.includes(soldListingId) || baseId === soldListingId) {
+        invalidOfferIds.push(offer.id);
       }
     }
 
     if (invalidOfferIds.length > 0) {
-      await supabase
+      const { error: updateError } = await supabase
         .from('messages')
         .update({ offer_status: 'canceled' })
         .in('id', invalidOfferIds);
+
+      if (updateError) {
+        console.warn('[chat] cancelBundleOffersForSoldItem update error', updateError);
+        return [];
+      }
     }
     return invalidOfferIds;
   } catch (err) {
@@ -434,6 +450,10 @@ export async function checkAndCancelInvalidBundleOffers(
 
     const invalidOfferIds: string[] = [];
     activeBundleOffers.forEach((m) => {
+      // Exclude accepted and paid offers so their own sold listing does not trigger cancellation
+      if (m.offer_status === 'accepted' || m.offer_status === 'paid') {
+        return;
+      }
       const itemIds = [
         convListingId,
         m.metadata?.base_listing_id,
@@ -445,10 +465,15 @@ export async function checkAndCancelInvalidBundleOffers(
     });
 
     if (invalidOfferIds.length > 0) {
-      await supabase
+      const { error: updateError } = await supabase
         .from('messages')
         .update({ offer_status: 'canceled' })
         .in('id', invalidOfferIds);
+
+      if (updateError) {
+        console.warn('[chat] checkAndCancelInvalidBundleOffers update error', updateError);
+        return [];
+      }
     }
 
     return invalidOfferIds;

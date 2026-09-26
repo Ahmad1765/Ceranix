@@ -171,12 +171,16 @@ export function CategorySheet({
     } catch {}
 
     const handlePopState = () => {
-      closedByPopStateRef.current = true;
       if (activeCategoryRef.current !== null) {
+        closedByPopStateRef.current = false;
+        try {
+          window.history.pushState({ sellCategory: stateId }, '', window.location.href);
+        } catch {}
         setCooldown(350);
         setActiveCategory(null);
         setQuery('');
       } else {
+        closedByPopStateRef.current = true;
         onCloseRef.current();
       }
     };

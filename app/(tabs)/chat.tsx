@@ -270,7 +270,7 @@ function MessagesPage({
   onRefresh: () => void;
   bottomInset: number;
 }) {
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
   const currentData = allData[activeChip] ?? allData.all;
   const empty = emptyStateFor(activeChip);
 
@@ -281,7 +281,7 @@ function MessagesPage({
 
   return (
     <View style={{ width: pageWidth, height: pageHeight, flex: 1 }}>
-      {/* 4 Filter Chips (Image 4 design: squircle, bold labels) */}
+      {/* 4 Filter Chips (Universal 30px pill geometry & theme tokens) */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -312,14 +312,14 @@ function MessagesPage({
               accessibilityLabel={chip.label}
               style={({ pressed }) => [
                 {
-                  paddingHorizontal: 16,
-                  paddingVertical: 8,
-                  borderRadius: 10,
+                  height: 30,
+                  borderRadius: 15,
+                  paddingHorizontal: 14,
                   alignItems: 'center',
                   justifyContent: 'center',
                   backgroundColor: active
-                    ? (isDark ? '#FFFFFF' : '#18181B')
-                    : (isDark ? theme.panel : '#F3F4F6'),
+                    ? theme.ink
+                    : theme.surface,
                 },
                 pressed && { opacity: 0.8 },
               ]}
@@ -329,8 +329,8 @@ function MessagesPage({
                   fontSize: 14,
                   fontWeight: active ? '700' : '600',
                   color: active
-                    ? (isDark ? '#111111' : '#FFFFFF')
-                    : (isDark ? '#E5E7EB' : '#1F1F1F'),
+                    ? theme.background
+                    : theme.ink,
                   fontFamily: active ? typography.family.sansBold : typography.family.sansSemibold,
                 }}
               >

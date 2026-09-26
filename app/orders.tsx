@@ -15,8 +15,8 @@ export default function OrdersRedirect() {
     router.replace({
       pathname: '/(tabs)/chat',
       params: {
-        tab: 'orders',
         ...params,
+        tab: 'orders',
       },
     } as any);
   }, [params]);
