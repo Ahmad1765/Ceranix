@@ -105,3 +105,42 @@ export function orderBadge(
     }
   }
 }
+
+export type OrderCategory = 'in_progress' | 'completed' | 'refunds' | 'canceled';
+
+/**
+ * Categorize an order into one of the 4 mutually exclusive states
+ * for the Orders Dashboard filter tabs: All, In Progress, Completed, Refunds, Canceled.
+ *
+ * Precedence:
+ * 1. Refunds: status or fulfillment_status is refunded/refund_due/partially_refunded.
+ * 2. Canceled / Failed: status or fulfillment_status is canceled/failed.
+ * 3. Completed: fulfillment_status or status is completed.
+ * 4. In Progress: any active order (pending, paid, awaiting_payment, packing, shifting, delivered, disputed).
+ */
+export function getOrderCategory(order: {
+  status?: string | null;
+  fulfillment_status?: string | null;
+}): OrderCategory {
+  const status = (order.status ?? '').toLowerCase();
+  const fulfillment = ((order.fulfillment_status ?? '') as string).toLowerCase();
+
+  if (
+    status === 'refunded' ||
+    status === 'refund_due' ||
+    status === 'partially_refunded' ||
+    fulfillment === 'refunded'
+  ) {
+    return 'refunds';
+  }
+
+  if (status === 'canceled' || status === 'failed' || fulfillment === 'canceled') {
+    return 'canceled';
+  }
+
+  if (fulfillment === 'completed' || status === 'completed') {
+    return 'completed';
+  }
+
+  return 'in_progress';
+}

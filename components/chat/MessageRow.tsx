@@ -223,7 +223,7 @@ function OfferStatusPill({ status, isPaid }: { status: string; isPaid: boolean }
     );
   }
 
-  if (status === 'declined') {
+  if (status === 'declined' || status === 'canceled') {
     return (
       <View
         style={{
@@ -236,7 +236,7 @@ function OfferStatusPill({ status, isPaid }: { status: string; isPaid: boolean }
           backgroundColor: 'rgba(239, 68, 68, 0.10)',
         }}
       >
-        <Feather name="x" size={10} color="#EF4444" />
+        <Feather name={status === 'canceled' ? 'slash' : 'x'} size={10} color="#EF4444" />
         <Text
           style={{
             fontFamily: typography.family.sansBold,
@@ -245,7 +245,7 @@ function OfferStatusPill({ status, isPaid }: { status: string; isPaid: boolean }
             letterSpacing: 0.2,
           }}
         >
-          Declined
+          {status === 'canceled' ? 'Cancelled' : 'Declined'}
         </Text>
       </View>
     );
@@ -468,6 +468,37 @@ function OutgoingOfferBubble({
         </View>
       ) : null}
 
+      {/* Cancellation Notice if item in bundle was sold */}
+      {isBundle && (status === 'canceled' || msg.metadata?.bundle_invalid) && (
+        <View
+          style={{
+            marginTop: 8,
+            paddingHorizontal: 10,
+            paddingVertical: 7,
+            borderRadius: radii.md,
+            backgroundColor: 'rgba(239, 68, 68, 0.08)',
+            borderLeftWidth: 2,
+            borderLeftColor: '#EF4444',
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          <Feather name="alert-circle" size={13} color="#EF4444" />
+          <Text
+            style={{
+              fontFamily: typography.family.sans,
+              fontSize: 11.5,
+              color: '#EF4444',
+              flex: 1,
+              lineHeight: 15,
+            }}
+          >
+            This bundle offer is no longer valid because an item was purchased by another buyer.
+          </Text>
+        </View>
+      )}
+
       {/* Pay Now Button (if Accepted) */}
       {canPay && (
         <PressableScale
@@ -533,6 +564,7 @@ function IncomingOfferCard({
   isSeller,
   canRespond,
   canPay,
+  canMakeCounter: canMakeCounterProp,
   awaitingPayment,
   isPaid,
   onAccept,
@@ -547,6 +579,7 @@ function IncomingOfferCard({
   isSeller: boolean;
   canRespond: boolean;
   canPay: boolean;
+  canMakeCounter?: boolean;
   awaitingPayment: boolean;
   isPaid: boolean;
   onAccept: () => void;
@@ -564,7 +597,10 @@ function IncomingOfferCard({
   const isDeclined = status === 'declined';
   const isExpired = status === 'expired';
   const isCountered = status === 'countered';
-  const canMakeCounter = (isDeclined || isExpired || isCountered) && !listingSold && !!onCounterOffer;
+  const isBundleInvalid = isBundle && (Boolean(msg.metadata?.bundle_invalid) || status === 'canceled');
+  const canMakeCounter = canMakeCounterProp !== undefined
+    ? canMakeCounterProp
+    : (isDeclined || isExpired || isCountered) && !listingSold && !!onCounterOffer && !isBundleInvalid;
 
   return (
     <View
@@ -791,6 +827,37 @@ function IncomingOfferCard({
         </View>
       )}
 
+      {/* Cancellation Notice if item in bundle was sold */}
+      {isBundle && (status === 'canceled' || msg.metadata?.bundle_invalid) && (
+        <View
+          style={{
+            marginTop: 8,
+            paddingHorizontal: 10,
+            paddingVertical: 7,
+            borderRadius: radii.md,
+            backgroundColor: 'rgba(239, 68, 68, 0.08)',
+            borderLeftWidth: 2,
+            borderLeftColor: '#EF4444',
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          <Feather name="alert-circle" size={13} color="#EF4444" />
+          <Text
+            style={{
+              fontFamily: typography.family.sans,
+              fontSize: 11.5,
+              color: '#EF4444',
+              flex: 1,
+              lineHeight: 15,
+            }}
+          >
+            This bundle offer is no longer valid because an item was purchased by another buyer.
+          </Text>
+        </View>
+      )}
+
       {/* Counter offer button when declined or expired */}
       {canMakeCounter && (
         <PressableScale
@@ -926,10 +993,13 @@ function OfferBubble(
     msg.metadata?.order_status === 'paid' ||
     msg.metadata?.payment_status === 'paid'
   );
-  const isPending = status === 'pending' || status === 'proposed';
-  const canRespond = !mine && isPending && !listingSold;
-  const canPay = !isSeller && status === 'accepted' && !!listingId && !listingSold && !isPaid;
-  const awaitingPayment = isSeller && status === 'accepted' && !listingSold && !isPaid;
+  const isBundle = Boolean(msg.metadata?.is_bundle || (msg.metadata?.bundle_item_ids && msg.metadata.bundle_item_ids.length > 0));
+  const isBundleInvalid = isBundle && (Boolean(msg.metadata?.bundle_invalid) || status === 'canceled');
+  const isPending = (status === 'pending' || status === 'proposed') && !isBundleInvalid;
+  const canRespond = !mine && isPending && !listingSold && !isBundleInvalid;
+  const canPay = !isSeller && status === 'accepted' && !!listingId && !listingSold && !isPaid && !isBundleInvalid;
+  const awaitingPayment = isSeller && status === 'accepted' && !listingSold && !isPaid && !isBundleInvalid;
+  const canMakeCounter = !isBundleInvalid && (status === 'declined' || status === 'expired') && !!onCounterOffer && !listingSold;
 
   if (mine) {
     return (
@@ -951,6 +1021,7 @@ function OfferBubble(
       isSeller={isSeller}
       canRespond={canRespond}
       canPay={canPay}
+      canMakeCounter={canMakeCounter}
       awaitingPayment={awaitingPayment}
       isPaid={isPaid}
       onAccept={onAccept}

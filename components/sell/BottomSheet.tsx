@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Pressable, Modal, ScrollView, Platform, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/lib/rnText';
@@ -33,13 +33,27 @@ export function FullPagePicker({
   const { theme } = useTheme();
   const Content = scroll ? ScrollView : View;
   const closedByPopStateRef = useRef(false);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // Prevent immediate double-tap or ghost click-through on sheet mount
+  const [touchReady, setTouchReady] = useState(false);
+  useEffect(() => {
+    if (visible) {
+      setTouchReady(false);
+      const timer = setTimeout(() => setTouchReady(true), 250);
+      return () => clearTimeout(timer);
+    } else {
+      setTouchReady(false);
+    }
+  }, [visible]);
 
   const handleClose = useCallback(() => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     }
-    onClose();
-  }, [onClose]);
+    onCloseRef.current();
+  }, []);
 
   // Hardware back button integration on Android
   useEffect(() => {
@@ -51,7 +65,7 @@ export function FullPagePicker({
     return () => sub.remove();
   }, [visible, handleClose]);
 
-  // Escape key & history sync on Web
+  // Escape key & history sync on Web (strictly depends on `visible` only)
   useEffect(() => {
     if (Platform.OS !== 'web' || !visible) return;
 
@@ -72,7 +86,7 @@ export function FullPagePicker({
 
     const handlePopState = () => {
       closedByPopStateRef.current = true;
-      onClose();
+      onCloseRef.current();
     };
     window.addEventListener('popstate', handlePopState);
 
@@ -83,7 +97,7 @@ export function FullPagePicker({
         window.history.back();
       }
     };
-  }, [visible, handleClose, onClose]);
+  }, [visible]);
 
   if (!visible) return null;
 
@@ -97,6 +111,7 @@ export function FullPagePicker({
     >
       <SafeAreaView
         edges={['top', 'bottom']}
+        pointerEvents={touchReady ? 'auto' : 'none'}
         style={{
           flex: 1,
           backgroundColor: theme.background,

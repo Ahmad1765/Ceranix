@@ -19,7 +19,7 @@
 //    smooth 60fps gesture handling.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Pressable, Alert, Share, type LayoutChangeEvent } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -52,14 +52,13 @@ import { useAuth } from '@/lib/auth';
 import { fetchOrderForListing, type Order } from '@/lib/payments';
 import { useToast } from '@/lib/toast';
 import { captureError } from '@/lib/sentry';
-import { getOrCreateConversation, sendOffer } from '@/lib/chat';
+import { getOrCreateConversation, sendOffer, cancelBundleOffersForSoldItem } from '@/lib/chat';
 import { cardImageUrl, prefetchImages, getImagePlaceholder } from '@/lib/images';
 import { SaveListSheet } from '@/components/SaveListSheet';
 import { colors } from '@/lib/theme';
 import { FullscreenImageViewer } from '@/components/product/FullscreenImageViewer';
 import { ProductActionBar } from '@/components/product/ProductActionBar';
 import { SellerOptionsSheet } from '@/components/product/SellerOptionsSheet';
-import { CheckoutSheet } from '@/components/product/CheckoutSheet';
 import { OfferSheet } from '@/components/product/OfferSheet';
 import type { PopIconHandle } from '@/components/product/PopIcon';
 import { ProductSkeleton } from '@/components/product/ProductSkeleton';
@@ -74,8 +73,8 @@ import { useTheme } from '@/context/ThemeContext';
 import { BRAND, APP_URL } from '@/lib/brand';
 import { reportListing, REPORT_REASONS } from '@/lib/reports';
 import { useGuestGate } from '@/components/GuestGate';
-import { buyerProtectionFee, orderTotal, formatPrice, DEFAULT_SHIPPING_FEE } from '@/lib/fees';
-import { isBundlesEnabled } from '@/lib/bundle';
+import { buyerProtectionFee, orderTotal, formatPrice } from '@/lib/fees';
+import { isBundlesEnabled, computeBundlePricing } from '@/lib/bundle';
 import { useSellSheet } from '@/components/sell/SellSheet';
 import { BuyerProtectionSheet } from '@/components/product/BuyerProtectionSheet';
 import { errorMessage } from '@/lib/errors';
@@ -169,6 +168,23 @@ export default function ProductScreen() {
     guestGate,
     bundlesEnabled: sellerBundlesEnabled,
   });
+
+  const selectedSellerItems = useMemo(
+    () => sellerItems.filter((s: Listing) => bundle.selectedBundleIds.has(s.id)),
+    [sellerItems, bundle.selectedBundleIds],
+  );
+
+  const isBundleActive = bundle.selectedBundleIds.size > 0;
+  const bundleCount = 1 + bundle.selectedBundleIds.size;
+
+  const bundlePricing = useMemo(() => {
+    if (!isBundleActive || !listing) return null;
+    return computeBundlePricing(
+      listing.price,
+      selectedSellerItems.map((s: Listing) => Number(s.price ?? 0)),
+      listing.seller?.bundle_discount_pct,
+    );
+  }, [isBundleActive, listing, selectedSellerItems]);
 
   // ── Social & Follow State ────────────────────────────────────────────────
   const sellerId = listing?.seller?.id ?? '';
@@ -286,6 +302,9 @@ export default function ProductScreen() {
     }
 
     if (committed === next) {
+      if (next && listing.id) {
+        cancelBundleOffersForSoldItem(listing.id).catch(() => {});
+      }
       toast.show(successMessage, { variant: 'success', icon: 'check' });
     } else {
       toast.show("Couldn't update the listing", {
@@ -546,6 +565,8 @@ export default function ProductScreen() {
   const itemPrice = Number(listing.price ?? 0);
   const bpFee = buyerProtectionFee(itemPrice);
   const buyTotal = orderTotal(itemPrice);
+
+  const activeBuyTotal = bundlePricing ? bundlePricing.total : buyTotal;
   const images = listing.images ?? [];
   const heroPlaceholder = placeholderImage || cardImageUrl(listing, 0) || undefined;
 
@@ -657,18 +678,28 @@ export default function ProductScreen() {
       {/* 7. Fixed Bottom Thumb Zone Action Bar (Z: 50) */}
       <ProductActionBar
         price={itemPrice}
-        buyTotal={buyTotal}
+        buyTotal={activeBuyTotal}
         bottomInset={insets.bottom}
         isOwner={isOwnListing}
         isSold={listing.is_sold || Boolean(buyerOrder)}
         hasPurchased={Boolean(buyerOrder)}
+        isBundle={isBundleActive}
+        bundleCount={bundleCount}
         onViewOrderPress={() => {
           tap('selection');
           router.push(`/invoice/${listing.id}` as any);
         }}
         onChatPress={() => openChat('message')}
         onOfferPress={() => {
-          if (canOffer()) engagement.setOfferVisible(true);
+          if (!canOffer()) return;
+          if (isBundleActive) {
+            bundle.handleSendBundleOffer(
+              bundlePricing?.total ?? itemPrice,
+              Array.from(bundle.selectedBundleIds),
+            );
+            return;
+          }
+          engagement.setOfferVisible(true);
         }}
         onBuyPress={() => {
           tap('medium');
@@ -678,43 +709,32 @@ export default function ProductScreen() {
           }
           if (!user) {
             guestGate.prompt({
-              title: 'Almost yours',
-              message: 'Create a free account to check out securely with buyer protection included.',
-              icon: 'shopping-bag',
+              title: isBundleActive ? 'Sign in to bundle' : 'Almost yours',
+              message: isBundleActive
+                ? 'Create a free account to buy bundled items with a discount.'
+                : 'Create a free account to check out securely with buyer protection included.',
+              icon: isBundleActive ? 'package' : 'shopping-bag',
               cta: 'Create account & continue',
             });
             return;
           }
           if (!listing?.id) return;
-          engagement.setCheckoutVisible(true);
-        }}
-      />
 
-      {/* 8. Modal & Sheet Overlays */}
-      <CheckoutSheet
-        visible={engagement.checkoutVisible}
-        product={{
-          id: listing.id,
-          title: listing.title,
-          price: itemPrice,
-          imageUrl: images[0],
-          sellerName: listing.seller?.username || 'Seller',
-          shippingFee: DEFAULT_SHIPPING_FEE,
-          buyerProtectionFee: bpFee,
-        }}
-        onClose={() => engagement.setCheckoutVisible(false)}
-        onConfirmPay={({ fulfillment, paymentMethod }) => {
-          engagement.setCheckoutVisible(false);
+          if (isBundleActive) {
+            bundle.handleBuyBundle(
+              bundlePricing?.total ?? itemPrice,
+              Array.from(bundle.selectedBundleIds),
+            );
+            return;
+          }
+
           router.push({
             pathname: `/payment/${listing.id}`,
-            params: {
-              fulfillment,
-              paymentMethod,
-            },
           } as any);
         }}
       />
 
+      {/* 8. Modal & Sheet Overlays */}
       {user?.id ? (
         <SaveListSheet
           visible={engagement.saveListVisible}

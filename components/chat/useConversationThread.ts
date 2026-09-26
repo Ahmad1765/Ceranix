@@ -57,6 +57,7 @@ import {
   subscribeToMessages,
   subscribeToReactions,
   updateOfferStatus,
+  checkAndCancelInvalidBundleOffers,
   otherParticipant,
   isImageMessage,
   getMessageImageUrl,
@@ -161,6 +162,28 @@ export function useConversationThread(
         }
         setMessages(initialMsgs);
         setReactions(loaded[2]);
+
+        // Auto-cancel bundle offers if any item in the bundle was purchased by another buyer
+        checkAndCancelInvalidBundleOffers(initialMsgs, loaded[0]?.listing_id)
+          .then((canceledIds) => {
+            if (!cancelled && canceledIds.length > 0) {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  canceledIds.includes(m.id)
+                    ? {
+                        ...m,
+                        offer_status: 'canceled',
+                        metadata: {
+                          ...m.metadata,
+                          bundle_invalid: true,
+                        },
+                      }
+                    : m,
+                ),
+              );
+            }
+          })
+          .catch(() => {});
       }
       setLoading(false);
     })();

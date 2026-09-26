@@ -61,6 +61,40 @@ export function useProductBundle({
     setSelectedBundleIds(new Set());
   }, [listing?.id]);
 
+  // If any item in the bundle is bought by another buyer, automatically remove it and cancel bundle if only 1 item remains
+  useEffect(() => {
+    if (selectedBundleIds.size === 0) return;
+    const soldOrMissingIds: string[] = [];
+    selectedBundleIds.forEach((id) => {
+      const found = sellerItems.find((s) => s.id === id);
+      if (!found || found.is_sold) {
+        soldOrMissingIds.push(id);
+      }
+    });
+
+    if (soldOrMissingIds.length > 0) {
+      setSelectedBundleIds((prev) => {
+        const next = new Set(prev);
+        soldOrMissingIds.forEach((id) => next.delete(id));
+        return next;
+      });
+      toast.show('An item in your bundle was purchased by someone else and removed', {
+        variant: 'default',
+        icon: 'info',
+      });
+    }
+  }, [sellerItems, selectedBundleIds, toast]);
+
+  useEffect(() => {
+    if (listing?.is_sold && selectedBundleIds.size > 0) {
+      setSelectedBundleIds(new Set());
+      toast.show('This item was purchased by someone else', {
+        variant: 'default',
+        icon: 'info',
+      });
+    }
+  }, [listing?.is_sold, selectedBundleIds.size, toast]);
+
   const handleToggleBundleItem = useCallback((id: string) => {
     tap('selection');
     setSelectedBundleIds((prev) => {

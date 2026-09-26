@@ -26,7 +26,8 @@ import { useToast } from '@/lib/toast';
 import { safeBack } from '@/lib/nav';
 import { HIT_SLOP_8, CONTENT_MAX_WIDTH } from '@/lib/responsive';
 import { supabase } from '@/lib/supabase';
-import { buyerProtectionFee, formatPrice, getShippingFee } from '@/lib/fees';
+import { buyerProtectionFee, formatPrice, getParcelDeliveryFee } from '@/lib/fees';
+import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import {
   computeBundlePricing,
   sanitizeBundleItemIds,
@@ -41,7 +42,7 @@ import {
 } from '@/components/payment/PaymentOptionsModal';
 import { paymentService, normalizeAddressInput } from '@/lib/paymentService';
 import { ShippingAddressSchema } from '@/lib/schemas/order';
-import { getOrCreateConversation } from '@/lib/chat';
+import { getOrCreateConversation, cancelBundleOffersForSoldItem } from '@/lib/chat';
 import { SELECT_LISTING_WITH_SELLER } from '@/lib/listings';
 import type { ShippingAddress, Listing, ShippingMethod } from '@/types';
 
@@ -160,12 +161,17 @@ export default function PaymentScreen() {
 
   // Checkout states
   const initialMethod: PaymentMethodOption =
-    paymentMethodParam === 'cod' || paymentMethodParam === 'apple_pay' || paymentMethodParam === 'card'
-      ? paymentMethodParam
+    paymentMethodParam === 'cod' ||
+    paymentMethodParam === 'apple_pay' ||
+    paymentMethodParam === 'card' ||
+    paymentMethodParam === 'jazzcash' ||
+    paymentMethodParam === 'easypaisa'
+      ? (paymentMethodParam as PaymentMethodOption)
       : 'card';
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethodOption>(initialMethod);
   const [cardLast4, setCardLast4] = useState<string | null>(null);
   const [cardBrand, setCardBrand] = useState<string | null>(null);
+  const [walletNumber, setWalletNumber] = useState<string | null>(null);
   const [saveCard, setSaveCard] = useState(true);
   const [hasChosenMethod, setHasChosenMethod] = useState(
     Boolean(paymentMethodParam && paymentMethodParam !== 'card'),
@@ -174,8 +180,13 @@ export default function PaymentScreen() {
   const [shippingMethod, setShippingMethod] = useState<ShippingMethod>('managed');
 
   useEffect(() => {
-    if (paymentMethodParam === 'cod' || paymentMethodParam === 'apple_pay') {
-      setSelectedMethod(paymentMethodParam);
+    if (
+      paymentMethodParam === 'cod' ||
+      paymentMethodParam === 'apple_pay' ||
+      paymentMethodParam === 'jazzcash' ||
+      paymentMethodParam === 'easypaisa'
+    ) {
+      setSelectedMethod(paymentMethodParam as PaymentMethodOption);
       setHasChosenMethod(true);
     } else if (paymentMethodParam === 'card') {
       setSelectedMethod('card');
@@ -302,8 +313,9 @@ export default function PaymentScreen() {
     listingPrice: Number(listing.price ?? 0),
   });
 
+  const parcelSize = listing?.parcel_size || 'medium';
   const bpFee = buyerProtectionFee(itemPrice);
-  const deliveryFee = fulfillment === 'handshake' ? 0 : getShippingFee(shippingMethod);
+  const deliveryFee = fulfillment === 'handshake' ? 0 : getParcelDeliveryFee(parcelSize);
   const salesTax = 0;
   const totalAmount = Math.round((itemPrice + bpFee + deliveryFee + salesTax) * 100) / 100;
 
@@ -411,6 +423,7 @@ export default function PaymentScreen() {
     setSelectedMethod(selected.method);
     if (selected.cardBrand) setCardBrand(selected.cardBrand);
     if (selected.cardLast4) setCardLast4(selected.cardLast4);
+    if (selected.walletNumber) setWalletNumber(selected.walletNumber);
     if (selected.saveCard !== undefined) setSaveCard(selected.saveCard);
     if (selected.method !== 'card' || selected.cardLast4) {
       setHasChosenMethod(true);
@@ -434,13 +447,25 @@ export default function PaymentScreen() {
       return;
     }
 
-    if (!shippingAddress) {
-      toast.show('Please confirm your delivery address', {
-        variant: 'default',
-        icon: 'map-pin',
-      });
-      setAddressSheetOpen(true);
-      return;
+    if (fulfillment !== 'handshake') {
+      if (!shippingAddress?.line1 || !shippingAddress?.city || !shippingAddress?.phone) {
+        toast.show('Please provide a complete delivery address with phone number', {
+          variant: 'default',
+          icon: 'map-pin',
+        });
+        setAddressSheetOpen(true);
+        return;
+      }
+
+      const cleanPhone = (shippingAddress.phone || '').replace(/[\s\-\(\)]/g, '');
+      if (cleanPhone.length < 10 || cleanPhone.length > 15) {
+        toast.show('Please enter a valid contact phone number (10 to 15 digits)', {
+          variant: 'default',
+          icon: 'phone',
+        });
+        setAddressSheetOpen(true);
+        return;
+      }
     }
 
     const isMethodReady = hasChosenMethod && (selectedMethod !== 'card' || Boolean(cardLast4));
@@ -456,8 +481,6 @@ export default function PaymentScreen() {
     tap('medium');
     setPaying(true);
     try {
-      const effectiveShippingMethod = fulfillment === 'handshake' ? 'self_ship' : shippingMethod;
-
       const result = await paymentService.checkout({
         listingId: String(listing.id),
         bundleItemIds: isBundle ? bundleItemIds : undefined,
@@ -467,7 +490,7 @@ export default function PaymentScreen() {
         listingPrice: Number(listing.price),
         offerAmount: itemPrice,
         shippingAddress,
-        shippingMethod: effectiveShippingMethod,
+        shippingMethod: 'managed',
       });
 
       if (!result.success) {
@@ -481,6 +504,7 @@ export default function PaymentScreen() {
           old ? { ...old, is_sold: true } : old,
         );
         queryClient.invalidateQueries({ queryKey: qk.listing(itemId) });
+        cancelBundleOffersForSoldItem(itemId).catch(() => {});
       });
       queryClient.invalidateQueries({ queryKey: ['myOrders'] });
       queryClient.invalidateQueries({ queryKey: ['feedListings'] });
@@ -522,8 +546,9 @@ export default function PaymentScreen() {
       }
 
       router.replace({
-        pathname: '/orders',
+        pathname: '/(tabs)/chat',
         params: {
+          tab: 'orders',
           side: 'bought',
           justPaid: isPaid ? '1' : '0',
           title: isBundle && allTitles.length > 1 ? `Bundle (${allTitles.length} items)` : listing.title,
@@ -546,6 +571,7 @@ export default function PaymentScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top', 'bottom']}>
+      {/* ── Top Header ── */}
       <View
         style={{
           borderBottomWidth: StyleSheet.hairlineWidth,
@@ -584,29 +610,41 @@ export default function PaymentScreen() {
             <Feather name="x" size={22} color={theme.ink} />
           </Pressable>
           <Text style={{ fontSize: 16, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
-            {isBundle ? 'Bundle Checkout' : 'Payment'}
+            {isBundle ? 'Bundle Checkout' : 'Checkout'}
           </Text>
-          <View style={{ width: 36 }} />
+          <View style={{ width: 36, alignItems: 'center', justifyContent: 'center' }}>
+            <ShieldCheckIcon size={20} />
+          </View>
         </View>
       </View>
 
       <ScrollView
-        style={{ flex: 1 }}
+        style={{ flex: 1, backgroundColor: theme.background }}
         contentContainerStyle={{
-          paddingHorizontal: 20,
-          paddingTop: 18,
-          paddingBottom: 30,
+          paddingHorizontal: 16,
+          paddingTop: 16,
+          paddingBottom: 36,
           width: '100%',
           maxWidth: CONTENT_MAX_WIDTH,
           alignSelf: 'center',
         }}
         showsVerticalScrollIndicator={false}
       >
+        {/* ── Card 1: Item / Bundle Summary ── */}
         {isBundle ? (
-          <View style={{ marginBottom: 22 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+          <View
+            style={{
+              backgroundColor: theme.surface,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: theme.border,
+              padding: 14,
+              marginBottom: 14,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
               <Feather name="package" size={16} color={theme.purple} />
-              <Text style={{ fontSize: 15, fontWeight: '800', color: theme.ink, fontFamily: typography.family.sansBold }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
                 Bundle ({1 + bundleItemIds.length} items)
               </Text>
             </View>
@@ -635,23 +673,23 @@ export default function PaymentScreen() {
                   <View
                     key={item.id}
                     style={{
-                      width: 130,
+                      width: 120,
                       padding: 8,
                       borderRadius: 12,
-                      backgroundColor: theme.panel,
+                      backgroundColor: theme.surface,
                       borderWidth: 1,
                       borderColor: theme.border,
                     }}
                   >
                     <Image
-                      source={{ uri: getOptimizedImageUrl(cardImageUrl(item, 0), { width: 260 }) }}
-                      style={{ width: '100%', height: 100, borderRadius: 8, backgroundColor: theme.panel }}
+                      source={{ uri: getOptimizedImageUrl(cardImageUrl(item, 0), { width: 240 }) }}
+                      style={{ width: '100%', height: 90, borderRadius: 8, backgroundColor: theme.surface }}
                       contentFit="cover"
                     />
-                    <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '700', color: theme.ink, marginTop: 6 }}>
+                    <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '700', color: theme.ink, marginTop: 6, fontFamily: typography.family.sansBold }}>
                       {item.brand || item.title}
                     </Text>
-                    <Text style={{ fontSize: 11, color: theme.mute, marginTop: 2 }}>
+                    <Text style={{ fontSize: 11.5, color: theme.mute, marginTop: 2, fontFamily: typography.family.sansMedium }}>
                       {formatPrice(Number(item.price ?? 0))}
                     </Text>
                   </View>
@@ -660,15 +698,27 @@ export default function PaymentScreen() {
             )}
           </View>
         ) : (
-          <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 22 }}>
+          <View
+            style={{
+              backgroundColor: theme.surface,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: theme.border,
+              padding: 14,
+              marginBottom: 14,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 12,
+            }}
+          >
             {imageUrl ? (
               <Image
                 source={{ uri: imageUrl }}
                 style={{
-                  width: 76,
-                  height: 76,
-                  borderRadius: 8,
-                  backgroundColor: theme.panel,
+                  width: 68,
+                  height: 68,
+                  borderRadius: 10,
+                  backgroundColor: theme.surface,
                   borderWidth: 1,
                   borderColor: theme.border,
                 }}
@@ -679,453 +729,751 @@ export default function PaymentScreen() {
             ) : (
               <View
                 style={{
-                  width: 76,
-                  height: 76,
-                  borderRadius: 8,
-                  backgroundColor: theme.panel,
+                  width: 68,
+                  height: 68,
+                  borderRadius: 10,
+                  backgroundColor: theme.surface,
                   borderWidth: 1,
                   borderColor: theme.border,
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <Feather name="image" size={24} color={theme.mute} />
+                <Feather name="image" size={22} color={theme.mute} />
               </View>
             )}
-          </View>
-        )}
 
-        <View style={{ marginBottom: 20 }}>
-          {isBundle && !offerAmount ? (
-            <>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4.5 }}>
-                <Text style={{ fontSize: 14, color: theme.mute, fontFamily: typography.family.sans }}>
-                  Subtotal ({allOrderItems.length} items)
-                </Text>
-                <Text style={{ fontSize: 14, color: theme.ink, fontFamily: typography.family.sansMedium }}>
-                  {formatPrice(bundleSubtotal)}
-                </Text>
-              </View>
-              {bundleSavings > 0 && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4.5 }}>
-                  <Text style={{ fontSize: 14, color: theme.purple, fontFamily: typography.family.sansBold }}>
-                    Bundle discount ({bundleDiscountPct}%)
-                  </Text>
-                  <Text style={{ fontSize: 14, color: theme.purple, fontFamily: typography.family.sansBold }}>
-                    − {formatPrice(bundleSavings)}
-                  </Text>
-                </View>
-              )}
-            </>
-          ) : (
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4.5 }}>
-              <Text style={{ fontSize: 14, color: theme.mute, fontFamily: typography.family.sans }}>
-                {offerAmount ? (isBundle ? 'Bundle offer' : 'Offer price') : 'Order'}
+            <View style={{ flex: 1, justifyContent: 'center' }}>
+              <Text
+                numberOfLines={1}
+                style={{
+                  fontSize: 15,
+                  fontWeight: '700',
+                  color: theme.ink,
+                  fontFamily: typography.family.sansBold,
+                  marginBottom: 3,
+                }}
+              >
+                {listing.title}
               </Text>
-              <Text style={{ fontSize: 14, color: theme.ink, fontFamily: typography.family.sansMedium }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                {listing.brand ? (
+                  <Text style={{ fontSize: 13, color: theme.mute, fontFamily: typography.family.sans }}>
+                    {listing.brand}
+                  </Text>
+                ) : null}
+                {listing.brand && listing.size ? (
+                  <Text style={{ fontSize: 13, color: theme.muteSoft }}>·</Text>
+                ) : null}
+                {listing.size ? (
+                  <Text style={{ fontSize: 13, color: theme.mute, fontFamily: typography.family.sans }}>
+                    {listing.size}
+                  </Text>
+                ) : null}
+              </View>
+              <Text
+                style={{
+                  fontSize: 15,
+                  fontWeight: '700',
+                  color: theme.ink,
+                  fontFamily: typography.family.sansBold,
+                  marginTop: 4,
+                }}
+              >
                 {formatPrice(itemPrice)}
               </Text>
             </View>
-          )}
-
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4.5 }}>
-            <Pressable
-              onPress={() => setBpSheetOpen(true)}
-              style={{ flexDirection: 'row', alignItems: 'center' }}
-              hitSlop={6}
-            >
-              <Text style={{ fontSize: 14, color: theme.mute, fontFamily: typography.family.sans }}>Buyer protection fee</Text>
-              <Feather name="info" size={13} color={theme.muteSoft} style={{ marginLeft: 4 }} />
-            </Pressable>
-            <Text style={[{ fontSize: 14, color: theme.ink, fontFamily: typography.family.sansMedium }, bpFee === 0 && { color: '#10B981', fontWeight: '600' }]}>
-              {bpFee > 0 ? formatPrice(bpFee) : 'Free'}
-            </Text>
-          </View>
-
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4.5 }}>
-            <Text style={{ fontSize: 14, color: theme.mute, fontFamily: typography.family.sans }}>
-              {fulfillment === 'handshake'
-                ? 'Delivery'
-                : shippingMethod === 'managed'
-                  ? 'Ceranix Delivery'
-                  : 'Shipping (Self-Ship)'}
-            </Text>
-            <Text style={[{ fontSize: 14, color: theme.ink, fontFamily: typography.family.sansMedium }, deliveryFee === 0 && { color: '#10B981', fontWeight: '600' }]}>
-              {deliveryFee > 0 ? formatPrice(deliveryFee) : 'Free'}
-            </Text>
-          </View>
-
-          {salesTax > 0 ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4.5 }}>
-              <Pressable
-                onPress={() =>
-                  Alert.alert(
-                    'Sales Tax',
-                    'Standard state and local sales tax calculated based on your shipping address.',
-                  )
-                }
-                style={{ flexDirection: 'row', alignItems: 'center' }}
-                hitSlop={6}
-              >
-                <Text style={{ fontSize: 14, color: theme.mute, fontFamily: typography.family.sans }}>Sales tax</Text>
-                <Feather name="info" size={13} color={theme.muteSoft} style={{ marginLeft: 4 }} />
-              </Pressable>
-              <Text style={{ fontSize: 14, color: theme.ink, fontFamily: typography.family.sansMedium }}>{formatPrice(salesTax)}</Text>
-            </View>
-          ) : null}
-
-          <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.border, marginVertical: 10 }} />
-
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 2 }}>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>Total to pay</Text>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>{formatPrice(totalAmount)}</Text>
-          </View>
-        </View>
-
-        {/* ── Section: Delivery Option ── */}
-        {fulfillment !== 'handshake' && (
-          <View style={{ marginTop: 6, marginBottom: 16 }}>
-            <Text style={{ fontSize: 12.5, fontWeight: '600', color: theme.muteSoft, fontFamily: typography.family.sansSemibold, marginBottom: 10 }}>
-              Delivery Option
-            </Text>
-
-            <View style={{ gap: 10 }}>
-              {/* Option 1: Ceranix Managed Delivery */}
-              <Pressable
-                onPress={() => {
-                  tap('light');
-                  setShippingMethod('managed');
-                }}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: shippingMethod === 'managed' }}
-                style={({ pressed }) => [
-                  {
-                    padding: 14,
-                    borderRadius: 14,
-                    borderWidth: 1.5,
-                    borderColor: shippingMethod === 'managed' ? theme.primary : theme.border,
-                    backgroundColor: shippingMethod === 'managed' ? (isDark ? 'rgba(108, 71, 255, 0.12)' : '#F2F3FE') : theme.white,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                  },
-                  pressed && { opacity: 0.8 },
-                ]}
-              >
-                <View
-                  style={{
-                    width: 20,
-                    height: 20,
-                    borderRadius: 10,
-                    borderWidth: 2,
-                    borderColor: shippingMethod === 'managed' ? theme.primary : theme.border,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginRight: 12,
-                  }}
-                >
-                  {shippingMethod === 'managed' && (
-                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: theme.primary }} />
-                  )}
-                </View>
-
-                <View style={{ flex: 1, marginRight: 8 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Feather name="shield" size={14} color={theme.primary} />
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
-                      Ceranix Managed Delivery
-                    </Text>
-                  </View>
-                  <Text style={{ fontSize: 12.5, color: theme.mute, fontFamily: typography.family.sans, marginTop: 2 }}>
-                    Doorstep pickup from seller & tracked courier delivery
-                  </Text>
-                </View>
-
-                <Text style={{ fontSize: 13.5, fontWeight: '700', color: theme.primary, fontFamily: typography.family.sansBold }}>
-                  +{formatPrice(getShippingFee('managed'))}
-                </Text>
-              </Pressable>
-
-              {/* Option 2: Direct / Seller Transfer */}
-              <Pressable
-                onPress={() => {
-                  tap('light');
-                  setShippingMethod('self_ship');
-                }}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: shippingMethod === 'self_ship' }}
-                style={({ pressed }) => [
-                  {
-                    padding: 14,
-                    borderRadius: 14,
-                    borderWidth: 1.5,
-                    borderColor: shippingMethod === 'self_ship' ? theme.primary : theme.border,
-                    backgroundColor: shippingMethod === 'self_ship' ? (isDark ? 'rgba(108, 71, 255, 0.12)' : '#F2F3FE') : theme.white,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                  },
-                  pressed && { opacity: 0.8 },
-                ]}
-              >
-                <View
-                  style={{
-                    width: 20,
-                    height: 20,
-                    borderRadius: 10,
-                    borderWidth: 2,
-                    borderColor: shippingMethod === 'self_ship' ? theme.primary : theme.border,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginRight: 12,
-                  }}
-                >
-                  {shippingMethod === 'self_ship' && (
-                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: theme.primary }} />
-                  )}
-                </View>
-
-                <View style={{ flex: 1, marginRight: 8 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Feather name="truck" size={14} color={theme.ink} />
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
-                      Direct / Seller Transfer
-                    </Text>
-                  </View>
-                  <Text style={{ fontSize: 12.5, color: theme.mute, fontFamily: typography.family.sans, marginTop: 2 }}>
-                    Seller ships directly or coordinates transfer
-                  </Text>
-                </View>
-
-                <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#10B981', fontFamily: typography.family.sansBold }}>
-                  Free
-                </Text>
-              </Pressable>
-            </View>
           </View>
         )}
 
-        {/* ── Section: Address ── */}
-        <View style={{ marginTop: 18 }}>
-          <Text style={{ fontSize: 12.5, fontWeight: '600', color: theme.muteSoft, fontFamily: typography.family.sansSemibold, marginBottom: 8 }}>
-            Address
-          </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}>
-            <View style={{ flex: 1, paddingRight: 10 }}>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold, marginBottom: 2 }}>
-                {shippingAddress?.recipient_name || profile?.full_name || ''}
-              </Text>
-              <Text style={{ fontSize: 13.5, color: theme.mute, fontFamily: typography.family.sans, lineHeight: 18 }}>
-                {shippingAddress?.line1 || ''}
-              </Text>
-              <Text style={{ fontSize: 13.5, color: theme.mute, fontFamily: typography.family.sans }}>
-                {shippingAddress
-                  ? `${shippingAddress.postal_code || ''} ${shippingAddress.city || ''}${
-                      shippingAddress.state ? `, ${shippingAddress.state}` : ''
-                    }`.trim()
-                  : ''}
+        {/* ── Card 2: Delivery Address (Working Field) ── */}
+        <View
+          style={{
+            backgroundColor: theme.surface,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: theme.border,
+            overflow: 'hidden',
+            marginBottom: 14,
+          }}
+        >
+          {/* Header Row */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: 16,
+              paddingTop: 14,
+              paddingBottom: 10,
+              borderBottomWidth: StyleSheet.hairlineWidth,
+              borderBottomColor: theme.border,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Feather name="map-pin" size={16} color={theme.purple} />
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: '700',
+                  color: theme.ink,
+                  fontFamily: typography.family.sansBold,
+                }}
+              >
+                Delivery address
               </Text>
             </View>
             <Pressable
               onPress={() => setAddressSheetOpen(true)}
               hitSlop={HIT_SLOP_8}
               accessibilityRole="button"
-              accessibilityLabel="Edit shipping address"
-              style={({ pressed }) => [
-                {
-                  width: 32,
-                  height: 32,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                },
-                pressed && { opacity: 0.6 },
-              ]}
+              accessibilityLabel="Change delivery address"
+              style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
             >
-              <Feather name="edit-2" size={18} color={theme.mute} />
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: '700',
+                  color: theme.purple,
+                  fontFamily: typography.family.sansBold,
+                }}
+              >
+                {shippingAddress?.line1 ? 'Edit' : 'Add'}
+              </Text>
             </Pressable>
           </View>
-        </View>
 
-        {/* ── Section: Delivery details ── */}
-        <View style={{ marginTop: 18 }}>
-          <Text style={{ fontSize: 12.5, fontWeight: '600', color: theme.muteSoft, fontFamily: typography.family.sansSemibold, marginBottom: 8 }}>
-            Delivery details
-          </Text>
-          <View style={{ paddingVertical: 6 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View
+          {/* Interactive Card Body */}
+          <Pressable
+            onPress={() => setAddressSheetOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Edit address"
+            style={({ pressed }) => [
+              {
+                paddingHorizontal: 16,
+                paddingVertical: 14,
+              },
+              pressed && { opacity: 0.75 },
+            ]}
+          >
+            {shippingAddress?.line1 && shippingAddress?.city ? (
+              <View>
+                <Text
                   style={{
-                    width: 22,
-                    height: 22,
-                    borderRadius: 4,
-                    backgroundColor: theme.purple,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginRight: 8,
+                    fontSize: 14,
+                    fontWeight: '700',
+                    color: theme.ink,
+                    fontFamily: typography.family.sansBold,
+                    marginBottom: 4,
                   }}
                 >
-                  <Feather name={fulfillment === 'handshake' ? 'map-pin' : 'package'} size={14} color="#FFFFFF" />
-                </View>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
-                  {fulfillment === 'handshake' ? 'In-Person Meetup (Handshake)' : 'Standard Delivery'}
+                  {shippingAddress.recipient_name || profile?.full_name || 'Delivery Recipient'}
                 </Text>
-              </View>
-              <Text style={[{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }, deliveryFee === 0 && { color: '#10B981', fontWeight: '600' }]}>
-                {deliveryFee > 0 ? formatPrice(deliveryFee) : 'Free'}
-              </Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
-              <Feather name="clock" size={13} color={theme.muteSoft} style={{ marginRight: 6 }} />
-              <Text style={{ fontSize: 13, color: theme.mute, fontFamily: typography.family.sans }}>
-                {fulfillment === 'handshake' ? 'Meet seller directly in public safe zone' : 'Home delivery, 1 - 3 business days'}
-              </Text>
-            </View>
-          </View>
-        </View>
+                <Text
+                  style={{
+                    fontSize: 13.5,
+                    color: theme.ink,
+                    fontFamily: typography.family.sans,
+                    lineHeight: 19,
+                  }}
+                >
+                  {shippingAddress.line1}
+                  {shippingAddress.line2 ? `, ${shippingAddress.line2}` : ''}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 13.5,
+                    color: theme.mute,
+                    fontFamily: typography.family.sans,
+                    marginTop: 2,
+                  }}
+                >
+                  {shippingAddress.city}
+                  {shippingAddress.state ? `, ${shippingAddress.state}` : ''}
+                  {shippingAddress.postal_code ? ` ${shippingAddress.postal_code}` : ''}
+                </Text>
 
-        {/* ── Section: Payment ── */}
-        <View style={{ marginTop: 18 }}>
-          <Text style={{ fontSize: 12.5, fontWeight: '600', color: theme.muteSoft, fontFamily: typography.family.sansSemibold, marginBottom: 8 }}>
-            Payment
-          </Text>
-
-          {!hasChosenMethod || (selectedMethod === 'card' && !cardLast4) ? (
-            /* Choose Payment Method Row */
-            <Pressable
-              onPress={() => setPaymentOptionsOpen(true)}
-              style={({ pressed }) => [
-                {
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  paddingVertical: 10,
-                },
-                pressed && { opacity: 0.7 },
-              ]}
-            >
-              <Text style={{ fontSize: 14, fontWeight: '600', color: theme.ink, fontFamily: typography.family.sansSemibold }}>
-                Choose payment method
-              </Text>
-              <Feather name="plus" size={20} color={theme.ink} />
-            </Pressable>
-          ) : (
-            /* Selected Payment Method Card */
-            <View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  {selectedMethod === 'card' ? (
-                    <>
-                      <View
-                        style={{
-                          paddingHorizontal: 5,
-                          paddingVertical: 2,
-                          borderRadius: 3,
-                          backgroundColor: '#FFFFFF',
-                          borderWidth: 1,
-                          borderColor: '#E0E0E0',
-                          marginRight: 10,
-                        }}
-                      >
-                        <Text style={{ fontSize: 10, fontWeight: '900', color: '#1A1F71', fontStyle: 'italic' }}>
-                          {(cardBrand ?? 'VISA').toUpperCase()}
-                        </Text>
-                      </View>
-                      <Text style={{ fontSize: 14, fontWeight: '600', color: theme.ink, fontFamily: typography.family.sansSemibold }}>
-                        {cardBrand || 'Card'} ending with {cardLast4}
-                      </Text>
-                    </>
-                  ) : selectedMethod === 'apple_pay' ? (
-                    <>
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          paddingHorizontal: 5,
-                          paddingVertical: 2,
-                          borderRadius: 3,
-                          backgroundColor: isDark ? '#000000' : '#FFFFFF',
-                          borderWidth: 1,
-                          borderColor: isDark ? theme.border : '#111111',
-                          marginRight: 10,
-                        }}
-                      >
-                        <Ionicons name="logo-apple" size={13} color={isDark ? '#FFFFFF' : '#000000'} />
-                        <Text style={{ fontSize: 10, fontWeight: '700', color: isDark ? '#FFFFFF' : '#000000', marginLeft: 2 }}>Pay</Text>
-                      </View>
-                      <Text style={{ fontSize: 14, fontWeight: '600', color: theme.ink, fontFamily: typography.family.sansSemibold }}>Apple Pay</Text>
-                    </>
+                {/* Phone number display */}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    marginTop: 10,
+                    paddingTop: 8,
+                    borderTopWidth: StyleSheet.hairlineWidth,
+                    borderTopColor: theme.border,
+                  }}
+                >
+                  <Feather name="phone" size={13} color={shippingAddress.phone ? theme.purple : '#EF4444'} />
+                  {shippingAddress.phone ? (
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: '600',
+                        color: theme.ink,
+                        fontFamily: typography.family.sansSemibold,
+                      }}
+                    >
+                      {shippingAddress.phone}
+                    </Text>
                   ) : (
-                    <>
-                      <Feather name="package" size={16} color={theme.ink} style={{ marginRight: 8 }} />
-                      <Text style={{ fontSize: 14, fontWeight: '600', color: theme.ink, fontFamily: typography.family.sansSemibold }}>Cash on Delivery</Text>
-                    </>
+                    <Text
+                      style={{
+                        fontSize: 12.5,
+                        fontWeight: '600',
+                        color: '#EF4444',
+                        fontFamily: typography.family.sansSemibold,
+                      }}
+                    >
+                      Phone number required — tap to add
+                    </Text>
                   )}
                 </View>
-                <Pressable
-                  onPress={() => setPaymentOptionsOpen(true)}
-                  hitSlop={HIT_SLOP_8}
-                  style={({ pressed }) => [
-                    {
-                      width: 32,
-                      height: 32,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    },
-                    pressed && { opacity: 0.6 },
-                  ]}
-                >
-                  <Feather name="edit-2" size={18} color={theme.mute} />
-                </Pressable>
               </View>
-
-              {/* Save Card Checkbox Container */}
-              {selectedMethod === 'card' && (
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4 }}>
                 <View
                   style={{
-                    backgroundColor: theme.purpleSoft,
-                    borderRadius: 8,
-                    padding: 12,
-                    marginTop: 10,
+                    width: 40,
+                    height: 40,
+                    borderRadius: 20,
+                    backgroundColor: isDark ? 'rgba(108, 71, 255, 0.15)' : '#F2F3FE',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}
                 >
-                  <Pressable
-                    onPress={() => {
-                      tap('light');
-                      setSaveCard(!saveCard);
-                    }}
-                    style={{ flexDirection: 'row', alignItems: 'flex-start' }}
-                  >
-                    <View
-                      style={[
-                        {
-                          width: 18,
-                          height: 18,
-                          borderRadius: 4,
-                          borderWidth: 1.5,
-                          borderColor: theme.border,
-                          backgroundColor: theme.surface,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          marginTop: 1,
-                        },
-                        saveCard && { backgroundColor: theme.purple, borderColor: theme.purple },
-                      ]}
-                    >
-                      {saveCard && <Feather name="check" size={12} color="#FFFFFF" />}
-                    </View>
-                    <View style={{ flex: 1, marginLeft: 10 }}>
-                      <Text style={{ fontSize: 13, fontWeight: '600', color: theme.ink, fontFamily: typography.family.sansSemibold }}>
-                        Save card details for future payments
-                      </Text>
-                      <Text style={{ fontSize: 11.5, color: theme.mute, fontFamily: typography.family.sans, marginTop: 2, lineHeight: 15 }}>
-                        You can remove the card anytime in Settings, under Payments.
-                      </Text>
-                    </View>
-                  </Pressable>
+                  <Feather name="plus" size={20} color={theme.purple} />
                 </View>
-              )}
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: '700',
+                      color: theme.ink,
+                      fontFamily: typography.family.sansBold,
+                    }}
+                  >
+                    Add delivery address
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 12.5,
+                      color: theme.mute,
+                      fontFamily: typography.family.sans,
+                      marginTop: 2,
+                    }}
+                  >
+                    Street address, city & contact phone number
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={18} color={theme.mute} />
+              </View>
+            )}
+          </Pressable>
+        </View>
+
+        {/* ── Card 3: Delivery Option (Direct Seller Transfer completely removed) ── */}
+        <View
+          style={{
+            backgroundColor: theme.surface,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: theme.border,
+            overflow: 'hidden',
+            marginBottom: 14,
+          }}
+        >
+          {/* Header Row */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: 16,
+              paddingTop: 14,
+              paddingBottom: 10,
+              borderBottomWidth: StyleSheet.hairlineWidth,
+              borderBottomColor: theme.border,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Feather name="truck" size={16} color={theme.purple} />
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: '700',
+                  color: theme.ink,
+                  fontFamily: typography.family.sansBold,
+                }}
+              >
+                Delivery option
+              </Text>
+            </View>
+          </View>
+
+          {/* Delivery Option Details */}
+          <View style={{ padding: 16 }}>
+            {fulfillment === 'handshake' ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flex: 1, paddingRight: 10 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+                    In-Person Meetup (Handshake)
+                  </Text>
+                  <Text style={{ fontSize: 12.5, color: theme.mute, fontFamily: typography.family.sans, marginTop: 2 }}>
+                    Coordinate meetup in a public safe spot
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#10B981', fontFamily: typography.family.sansBold }}>
+                  Free
+                </Text>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+                      Ceranix Tracked Courier
+                    </Text>
+                    <View
+                      style={{
+                        paddingHorizontal: 7,
+                        paddingVertical: 2,
+                        borderRadius: radii.pill,
+                        backgroundColor: isDark ? 'rgba(108, 71, 255, 0.18)' : '#F2F3FE',
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: theme.purple, fontFamily: typography.family.sansBold }}>
+                        {parcelSize === 'large' ? 'Large parcel' : 'Small / Medium'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 12.5, color: theme.mute, fontFamily: typography.family.sans, marginTop: 4 }}>
+                    Doorstep pickup & tracked courier delivery (1 - 3 business days)
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+                  {formatPrice(deliveryFee)}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* ── Card 4: Payment Method (Including JazzCash & Easypaisa) ── */}
+        <View
+          style={{
+            backgroundColor: theme.surface,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: theme.border,
+            overflow: 'hidden',
+            marginBottom: 14,
+          }}
+        >
+          {/* Header Row */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: 16,
+              paddingTop: 14,
+              paddingBottom: 10,
+              borderBottomWidth: StyleSheet.hairlineWidth,
+              borderBottomColor: theme.border,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Feather name="credit-card" size={16} color={theme.purple} />
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: '700',
+                  color: theme.ink,
+                  fontFamily: typography.family.sansBold,
+                }}
+              >
+                Payment method
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => setPaymentOptionsOpen(true)}
+              hitSlop={HIT_SLOP_8}
+              accessibilityRole="button"
+              accessibilityLabel="Change payment method"
+              style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
+            >
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: '700',
+                  color: theme.purple,
+                  fontFamily: typography.family.sansBold,
+                }}
+              >
+                {hasChosenMethod ? 'Change' : 'Choose'}
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* Payment Method Content */}
+          <Pressable
+            onPress={() => setPaymentOptionsOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Select payment method"
+            style={({ pressed }) => [
+              {
+                paddingHorizontal: 16,
+                paddingVertical: 14,
+              },
+              pressed && { opacity: 0.75 },
+            ]}
+          >
+            {!hasChosenMethod || (selectedMethod === 'card' && !cardLast4) ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <View
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 18,
+                      backgroundColor: isDark ? 'rgba(108, 71, 255, 0.15)' : '#F2F3FE',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Feather name="plus" size={18} color={theme.purple} />
+                  </View>
+                  <View>
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        fontWeight: '700',
+                        color: theme.ink,
+                        fontFamily: typography.family.sansBold,
+                      }}
+                    >
+                      Choose payment method
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        color: theme.mute,
+                        fontFamily: typography.family.sans,
+                        marginTop: 1,
+                      }}
+                    >
+                      Card, JazzCash, Easypaisa, or Cash on Delivery
+                    </Text>
+                  </View>
+                </View>
+                <Feather name="chevron-right" size={18} color={theme.mute} />
+              </View>
+            ) : selectedMethod === 'jazzcash' ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <View
+                    style={{
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      borderRadius: 6,
+                      backgroundColor: '#ED1B24',
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '900', color: '#FFFFFF', letterSpacing: 0.3 }}>
+                      JazzCash
+                    </Text>
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+                      JazzCash Mobile Account
+                    </Text>
+                    <Text style={{ fontSize: 12.5, color: theme.mute, fontFamily: typography.family.sans, marginTop: 2 }}>
+                      {walletNumber || 'Mobile Account Linked'}
+                    </Text>
+                  </View>
+                </View>
+                <Feather name="chevron-right" size={18} color={theme.mute} />
+              </View>
+            ) : selectedMethod === 'easypaisa' ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <View
+                    style={{
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      borderRadius: 6,
+                      backgroundColor: '#00A859',
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '900', color: '#FFFFFF', letterSpacing: 0.3 }}>
+                      easypaisa
+                    </Text>
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+                      Easypaisa Mobile Account
+                    </Text>
+                    <Text style={{ fontSize: 12.5, color: theme.mute, fontFamily: typography.family.sans, marginTop: 2 }}>
+                      {walletNumber || 'Mobile Account Linked'}
+                    </Text>
+                  </View>
+                </View>
+                <Feather name="chevron-right" size={18} color={theme.mute} />
+              </View>
+            ) : selectedMethod === 'apple_pay' ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      borderRadius: 6,
+                      backgroundColor: isDark ? '#000000' : '#111111',
+                    }}
+                  >
+                    <Ionicons name="logo-apple" size={13} color="#FFFFFF" />
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFFFFF', marginLeft: 3 }}>Pay</Text>
+                  </View>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+                    Apple Pay
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={18} color={theme.mute} />
+              </View>
+            ) : selectedMethod === 'cod' ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <View
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 16,
+                      backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Feather name="package" size={16} color="#10B981" />
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+                      Cash on Delivery
+                    </Text>
+                    <Text style={{ fontSize: 12, color: theme.mute, fontFamily: typography.family.sans, marginTop: 1 }}>
+                      Pay cash to courier when delivered
+                    </Text>
+                  </View>
+                </View>
+                <Feather name="chevron-right" size={18} color={theme.mute} />
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <View
+                    style={{
+                      paddingHorizontal: 6,
+                      paddingVertical: 3,
+                      borderRadius: 4,
+                      backgroundColor: '#FFFFFF',
+                      borderWidth: 1,
+                      borderColor: '#E0E0E0',
+                    }}
+                  >
+                    <Text style={{ fontSize: 10, fontWeight: '900', color: '#1A1F71', fontStyle: 'italic' }}>
+                      {(cardBrand ?? 'VISA').toUpperCase()}
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+                    {cardBrand || 'Card'} ending with {cardLast4}
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={18} color={theme.mute} />
+              </View>
+            )}
+          </Pressable>
+
+          {/* Save Card Checkbox Container */}
+          {selectedMethod === 'card' && cardLast4 && (
+            <View
+              style={{
+                borderTopWidth: StyleSheet.hairlineWidth,
+                borderTopColor: theme.border,
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+              }}
+            >
+              <Pressable
+                onPress={() => {
+                  tap('light');
+                  setSaveCard(!saveCard);
+                }}
+                style={{ flexDirection: 'row', alignItems: 'flex-start' }}
+              >
+                <View
+                  style={[
+                    {
+                      width: 18,
+                      height: 18,
+                      borderRadius: 4,
+                      borderWidth: 1.5,
+                      borderColor: theme.border,
+                      backgroundColor: theme.surface,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginTop: 1,
+                    },
+                    saveCard && { backgroundColor: theme.purple, borderColor: theme.purple },
+                  ]}
+                >
+                  {saveCard && <Feather name="check" size={12} color="#FFFFFF" />}
+                </View>
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: theme.ink, fontFamily: typography.family.sansSemibold }}>
+                    Save card details for future payments
+                  </Text>
+                  <Text style={{ fontSize: 11.5, color: theme.mute, fontFamily: typography.family.sans, marginTop: 2, lineHeight: 15 }}>
+                    You can remove the card anytime in Settings, under Payments.
+                  </Text>
+                </View>
+              </Pressable>
             </View>
           )}
         </View>
+
+        {/* ── Card 5: Order Summary Breakdown ── */}
+        <View
+          style={{
+            backgroundColor: theme.surface,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: theme.border,
+            padding: 16,
+            marginBottom: 14,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 14,
+              fontWeight: '700',
+              color: theme.ink,
+              fontFamily: typography.family.sansBold,
+              marginBottom: 12,
+            }}
+          >
+            Order summary
+          </Text>
+
+          {/* Subtotal */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 5 }}>
+            <Text style={{ fontSize: 14, color: theme.mute, fontFamily: typography.family.sans }}>
+              {isBundle ? `Subtotal (${allOrderItems.length} items)` : offerAmount ? 'Offer price' : 'Order'}
+            </Text>
+            <Text style={{ fontSize: 14, color: theme.ink, fontFamily: typography.family.sansMedium }}>
+              {formatPrice(isBundle && !offerAmount ? bundleSubtotal : itemPrice)}
+            </Text>
+          </View>
+
+          {/* Bundle Savings */}
+          {isBundle && !offerAmount && bundleSavings > 0 ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 5 }}>
+              <Text style={{ fontSize: 14, color: theme.purple, fontFamily: typography.family.sansBold }}>
+                Bundle discount ({bundleDiscountPct}%)
+              </Text>
+              <Text style={{ fontSize: 14, color: theme.purple, fontFamily: typography.family.sansBold }}>
+                − {formatPrice(bundleSavings)}
+              </Text>
+            </View>
+          ) : null}
+
+          {/* Buyer Protection Fee */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 5 }}>
+            <Pressable
+              onPress={() => setBpSheetOpen(true)}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+              hitSlop={6}
+            >
+              <ShieldCheckIcon size={14} />
+              <Text style={{ fontSize: 14, color: theme.mute, fontFamily: typography.family.sans }}>
+                Buyer protection fee
+              </Text>
+              <Feather name="info" size={13} color={theme.muteSoft} />
+            </Pressable>
+            <Text style={[{ fontSize: 14, color: theme.ink, fontFamily: typography.family.sansMedium }, bpFee === 0 && { color: '#10B981', fontWeight: '600' }]}>
+              {bpFee > 0 ? formatPrice(bpFee) : 'Free'}
+            </Text>
+          </View>
+
+          {/* Delivery Fee */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 5 }}>
+            <Text style={{ fontSize: 14, color: theme.mute, fontFamily: typography.family.sans }}>
+              Ceranix Delivery
+            </Text>
+            <Text style={[{ fontSize: 14, color: theme.ink, fontFamily: typography.family.sansMedium }, deliveryFee === 0 && { color: '#10B981', fontWeight: '600' }]}>
+              {deliveryFee > 0 ? formatPrice(deliveryFee) : 'Free'}
+            </Text>
+          </View>
+
+          <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.border, marginVertical: 12 }} />
+
+          {/* Total */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+              Total to pay
+            </Text>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: theme.purple, fontFamily: typography.family.sansBold }}>
+              {formatPrice(totalAmount)}
+            </Text>
+          </View>
+        </View>
+
+        {/* ── Card 6: Buyer Protection Trust Guarantee ── */}
+        <Pressable
+          onPress={() => setBpSheetOpen(true)}
+          style={({ pressed }) => [
+            {
+              backgroundColor: theme.surface,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: theme.border,
+              padding: 16,
+              flexDirection: 'row',
+              alignItems: 'flex-start',
+              gap: 12,
+              marginBottom: 16,
+            },
+            pressed && { opacity: 0.8 },
+          ]}
+        >
+          <ShieldCheckIcon size={22} />
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                fontSize: 13.5,
+                fontWeight: '700',
+                color: theme.ink,
+                fontFamily: typography.family.sansBold,
+                marginBottom: 3,
+              }}
+            >
+              Buyer Protection included
+            </Text>
+            <Text
+              style={{
+                fontSize: 12,
+                color: theme.mute,
+                fontFamily: typography.family.sans,
+                lineHeight: 16,
+              }}
+            >
+              Our Buyer Protection is added for a fee to every purchase. It includes our refund policy, secure payment processing, and 24/7 dedicated support.
+            </Text>
+          </View>
+          <Feather name="chevron-right" size={16} color={theme.mute} style={{ marginTop: 2 }} />
+        </Pressable>
       </ScrollView>
 
       {/* ── Fixed Footer: Trust Note + Pay Button ── */}
@@ -1134,8 +1482,8 @@ export default function PaymentScreen() {
           borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: theme.border,
           backgroundColor: theme.surface,
-          paddingTop: 10,
-          paddingBottom: Platform.OS === 'ios' ? 12 : 18,
+          paddingTop: 12,
+          paddingBottom: Platform.OS === 'ios' ? 14 : 20,
         }}
       >
         <View
@@ -1143,13 +1491,13 @@ export default function PaymentScreen() {
             width: '100%',
             maxWidth: CONTENT_MAX_WIDTH,
             alignSelf: 'center',
-            paddingHorizontal: 20,
+            paddingHorizontal: 16,
           }}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
-            <Feather name="lock" size={11} color={theme.muteSoft} style={{ marginRight: 5 }} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 10, gap: 5 }}>
+            <Feather name="lock" size={12} color={theme.muteSoft} />
             <Text style={{ fontSize: 11.5, color: theme.muteSoft, fontFamily: typography.family.sans }}>
-              This is a secure encrypted payment
+              Secure 256-bit encrypted checkout
             </Text>
           </View>
 
@@ -1174,7 +1522,11 @@ export default function PaymentScreen() {
               <ActivityIndicator color="#FFFFFF" size="small" />
             ) : (
               <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF', fontFamily: typography.family.sansBold, letterSpacing: 0.2 }}>
-                {isBundle && bundleFetchStatus === 'loading' ? 'Loading bundle...' : 'Pay'}
+                {isBundle && bundleFetchStatus === 'loading'
+                  ? 'Loading bundle...'
+                  : selectedMethod === 'cod'
+                    ? `Confirm Order · ${formatPrice(totalAmount)}`
+                    : `Pay · ${formatPrice(totalAmount)}`}
               </Text>
             )}
           </Pressable>

@@ -32,16 +32,42 @@ export const BUYER_PROTECTION_PERCENTAGE = 6;
 /** Platform-managed delivery fee in PKR (doorstep pickup from seller + delivery by Ceranix). */
 export const MANAGED_SHIPPING_FEE = 250;
 
+/** Parcel delivery rates in PKR based on parcel size. */
+export const PARCEL_DELIVERY_RATES = {
+  small: 130,
+  medium: 130,
+  large: 180,
+} as const;
+
+/** Default delivery fee for standard small/medium parcel in PKR. */
+export const DEFAULT_PARCEL_DELIVERY_FEE = 130;
+
+/**
+ * Returns the courier delivery fee in PKR based on parcel size.
+ * Small & Medium: 130 PKR.
+ * Large: 180 PKR.
+ */
+export function getParcelDeliveryFee(parcelSize?: string | null): number {
+  if (parcelSize === 'large') return PARCEL_DELIVERY_RATES.large;
+  return PARCEL_DELIVERY_RATES.medium; // 130 PKR for small, medium, or unspecified
+}
+
 /** Default shipping fee in PKR (free / zero-fee platform basis for self-ship). */
 export const DEFAULT_SHIPPING_FEE = 0;
 
 /**
- * Calculates shipping fee depending on chosen shipping method.
- * 'managed'   -> PKR 250 flat platform courier fee.
+ * Calculates shipping fee depending on chosen shipping method and optional parcel size.
+ * 'managed' with parcel size -> PKR 130 (small/medium) or PKR 180 (large).
  * 'self_ship' -> PKR 0 platform fee (seller transfers/ships directly).
  */
-export function getShippingFee(method?: ShippingMethod | string | null): number {
+export function getShippingFee(
+  method?: ShippingMethod | string | null,
+  parcelSize?: string | null,
+): number {
   if (method === 'managed') {
+    if (parcelSize !== undefined) {
+      return getParcelDeliveryFee(parcelSize);
+    }
     return MANAGED_SHIPPING_FEE;
   }
   return DEFAULT_SHIPPING_FEE;

@@ -11,7 +11,7 @@ import * as Haptics from 'expo-haptics';
 import { Text } from '@/lib/rnText';
 import { formatPrice } from '@/lib/currency';
 import { useTheme } from '@/context/ThemeContext';
-import { tabularNumberStyle } from '@/lib/theme';
+import { radii, tabularNumberStyle } from '@/lib/theme';
 
 export interface ProductActionBarProps {
   price?: number;
@@ -28,6 +28,8 @@ export interface ProductActionBarProps {
   isSold?: boolean;
   hasPurchased?: boolean;
   disabled?: boolean;
+  isBundle?: boolean;
+  bundleCount?: number;
   className?: string;
   style?: ViewStyle;
 }
@@ -47,6 +49,8 @@ export function ProductActionBar({
   isSold = false,
   hasPurchased = false,
   disabled = false,
+  isBundle = false,
+  bundleCount,
   className = '',
   style,
 }: ProductActionBarProps) {
@@ -178,21 +182,23 @@ export function ProductActionBar({
           accessibilityLabel={
             isOwner
               ? 'Edit listing'
-              : `Buy now for ${buyTotal ? formatPrice(buyTotal) : price ? formatPrice(price) : ''}`
+              : isBundle
+                ? `Buy bundle for ${buyTotal ? formatPrice(buyTotal) : price ? formatPrice(price) : ''}`
+                : `Buy now for ${buyTotal ? formatPrice(buyTotal) : price ? formatPrice(price) : ''}`
           }
-          accessibilityHint="Proceeds to secure checkout"
+          accessibilityHint={isBundle ? 'Proceeds to secure bundle checkout' : 'Proceeds to secure checkout'}
           style={({ pressed }) => [
             styles.buyButton,
             {
-              backgroundColor: theme.ink,
-              borderColor: theme.ink,
+              backgroundColor: isBundle ? theme.purple : theme.ink,
+              borderColor: isBundle ? theme.purple : theme.ink,
               opacity: pressed ? 0.88 : 1,
               transform: [{ scale: pressed ? 0.98 : 1 }],
             },
           ]}
         >
-          <Text style={[styles.buyButtonText, { color: theme.background }]}>
-            {isOwner ? 'Edit listing' : 'Buy now'}
+          <Text style={[styles.buyButtonText, { color: isBundle ? '#FFFFFF' : theme.background }]}>
+            {isOwner ? 'Edit listing' : isBundle ? 'Buy bundle' : 'Buy now'}
           </Text>
         </Pressable>
       </View>
@@ -235,7 +241,7 @@ const styles = StyleSheet.create({
   offerButton: {
     flex: 1,
     height: 48,
-    borderRadius: 10,
+    borderRadius: radii.pill,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -249,7 +255,7 @@ const styles = StyleSheet.create({
   buyButton: {
     flex: 1,
     height: 48,
-    borderRadius: 10,
+    borderRadius: radii.pill,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -264,7 +270,7 @@ const styles = StyleSheet.create({
   },
   soldContainer: {
     height: 48,
-    borderRadius: 10,
+    borderRadius: radii.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },

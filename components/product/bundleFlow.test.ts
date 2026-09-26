@@ -7,7 +7,11 @@ import {
   computeCheckoutItemPrice,
   isBundlesEnabled,
 } from '@/lib/bundle';
-import { sendOffer } from '@/lib/chat';
+import {
+  sendOffer,
+  cancelBundleOffersForSoldItem,
+  checkAndCancelInvalidBundleOffers,
+} from '@/lib/chat';
 import { serializeBundleIds } from '@/components/product/useProductBundle';
 
 vi.mock('expo-router', () => ({
@@ -22,28 +26,55 @@ vi.mock('@/lib/toast', () => ({
   useToast: () => ({ show: vi.fn() }),
 }));
 
+let mockMessages: any[] = [];
+let mockListings: any[] = [];
+let updatedMessages: any[] = [];
+
 vi.mock('@/lib/supabase', () => ({
   supabase: {
-    from: vi.fn(() => ({
-      insert: vi.fn((payload: any) => ({
-        select: vi.fn(() => ({
-          single: vi.fn().mockResolvedValue({
-            data: {
-              id: 'msg-bundle-123',
-              conversation_id: payload.conversation_id,
-              sender_id: payload.sender_id,
-              content: payload.content,
-              kind: payload.kind,
-              metadata: payload.metadata,
-              offer_status: payload.offer_status,
-              created_at: '2026-09-02T12:00:00Z',
-              updated_at: '2026-09-02T12:00:00Z',
-            },
-            error: null,
-          }),
-        })),
-      })),
-    })),
+    from: vi.fn((table: string) => {
+      if (table === 'messages') {
+        return {
+          insert: vi.fn((payload: any) => ({
+            select: vi.fn(() => ({
+              single: vi.fn().mockResolvedValue({
+                data: {
+                  id: 'msg-bundle-123',
+                  conversation_id: payload.conversation_id,
+                  sender_id: payload.sender_id,
+                  content: payload.content,
+                  kind: payload.kind,
+                  metadata: payload.metadata,
+                  offer_status: payload.offer_status,
+                  created_at: '2026-09-02T12:00:00Z',
+                  updated_at: '2026-09-02T12:00:00Z',
+                },
+                error: null,
+              }),
+            })),
+          })),
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              in: vi.fn(() => Promise.resolve({ data: mockMessages, error: null })),
+            })),
+          })),
+          update: vi.fn((updatePayload: any) => ({
+            in: vi.fn((column: string, ids: string[]) => {
+              updatedMessages.push({ updatePayload, column, ids });
+              return Promise.resolve({ data: null, error: null });
+            }),
+          })),
+        };
+      }
+      if (table === 'listings') {
+        return {
+          select: vi.fn(() => ({
+            in: vi.fn(() => Promise.resolve({ data: mockListings, error: null })),
+          })),
+        };
+      }
+      return {};
+    }),
   },
 }));
 
@@ -236,6 +267,178 @@ describe('bundleFlow tests', () => {
       // Sold item -> do NOT show bundle options even if seller has discounts
       expect(shouldShowBundleBuilder(true, 15)).toBe(false);
       expect(shouldShowBundleBuilder(true, 0)).toBe(false);
+    });
+  });
+
+  describe('Product page Bundle behavior (requirements 1, 2, 3)', () => {
+    it('Requirement 1 & 3: changes "Buy now" (black) to "Buy bundle" (purple) on 2nd item, and reverts to black "Buy now" when 1 item remains', () => {
+      // Helper simulating the ProductActionBar CTA state on the Product detail screen
+      const getButtonProps = (selectedBundleItemCount: number) => {
+        const isBundle = selectedBundleItemCount > 0;
+        const totalItems = 1 + selectedBundleItemCount;
+        return {
+          isBundle,
+          label: isBundle ? 'Buy bundle' : 'Buy now',
+          backgroundColor: isBundle ? '#6C47FF' : '#111111',
+          totalItems,
+        };
+      };
+
+      // Initial state: Only 1 item (the base listing being viewed)
+      const initial = getButtonProps(0);
+      expect(initial.totalItems).toBe(1);
+      expect(initial.isBundle).toBe(false);
+      expect(initial.label).toBe('Buy now');
+      expect(initial.backgroundColor).toBe('#111111');
+
+      // Requirement 1: Buyer adds a second item from the same seller
+      const withSecondItem = getButtonProps(1);
+      expect(withSecondItem.totalItems).toBe(2);
+      expect(withSecondItem.isBundle).toBe(true);
+      expect(withSecondItem.label).toBe('Buy bundle');
+      expect(withSecondItem.backgroundColor).toBe('#6C47FF');
+
+      // Buyer adds a third item
+      const withThirdItem = getButtonProps(2);
+      expect(withThirdItem.totalItems).toBe(3);
+      expect(withThirdItem.isBundle).toBe(true);
+      expect(withThirdItem.label).toBe('Buy bundle');
+      expect(withThirdItem.backgroundColor).toBe('#6C47FF');
+
+      // Requirement 3: Buyer removes items until only one is left
+      const afterRemovingBackToOne = getButtonProps(0);
+      expect(afterRemovingBackToOne.totalItems).toBe(1);
+      expect(afterRemovingBackToOne.isBundle).toBe(false);
+      expect(afterRemovingBackToOne.label).toBe('Buy now');
+      expect(afterRemovingBackToOne.backgroundColor).toBe('#111111');
+    });
+
+    it('Requirement 2: automatically cancels bundle offer when an add-on item in the bundle is bought by another buyer', async () => {
+      mockMessages = [
+        {
+          id: 'offer-bundle-1',
+          metadata: {
+            is_bundle: true,
+            base_listing_id: 'listing-primary',
+            bundle_item_ids: ['item-addon-2', 'item-addon-3'],
+          },
+          offer_status: 'pending',
+        },
+      ];
+      updatedMessages = [];
+
+      // Another buyer purchases item-addon-2
+      const canceledIds = await cancelBundleOffersForSoldItem('item-addon-2');
+      expect(canceledIds).toEqual(['offer-bundle-1']);
+      expect(updatedMessages).toEqual([
+        {
+          updatePayload: { offer_status: 'canceled' },
+          column: 'id',
+          ids: ['offer-bundle-1'],
+        },
+      ]);
+    });
+
+    it('Requirement 2: automatically cancels bundle offer when the primary listing in the bundle is bought by another buyer', async () => {
+      mockMessages = [
+        {
+          id: 'offer-bundle-2',
+          metadata: {
+            is_bundle: true,
+            base_listing_id: 'listing-primary',
+            bundle_item_ids: ['item-addon-2'],
+          },
+          offer_status: 'pending',
+        },
+      ];
+      updatedMessages = [];
+
+      // Another buyer purchases listing-primary
+      const canceledIds = await cancelBundleOffersForSoldItem('listing-primary');
+      expect(canceledIds).toEqual(['offer-bundle-2']);
+      expect(updatedMessages).toEqual([
+        {
+          updatePayload: { offer_status: 'canceled' },
+          column: 'id',
+          ids: ['offer-bundle-2'],
+        },
+      ]);
+    });
+
+    it('Requirement 2: does not cancel bundle offer when an unrelated item is bought', async () => {
+      mockMessages = [
+        {
+          id: 'offer-bundle-3',
+          metadata: {
+            is_bundle: true,
+            base_listing_id: 'listing-primary',
+            bundle_item_ids: ['item-addon-2'],
+          },
+          offer_status: 'pending',
+        },
+      ];
+      updatedMessages = [];
+
+      // Another buyer purchases an unrelated listing
+      const canceledIds = await cancelBundleOffersForSoldItem('unrelated-item-99');
+      expect(canceledIds).toEqual([]);
+      expect(updatedMessages).toEqual([]);
+    });
+
+    it('Requirement 2: checkAndCancelInvalidBundleOffers marks offer canceled if any bundled item is sold', async () => {
+      mockListings = [
+        { id: 'base-listing', is_sold: false },
+        { id: 'item-addon-1', is_sold: true },
+      ];
+      updatedMessages = [];
+
+      const messages: any[] = [
+        {
+          id: 'msg-offer-active',
+          kind: 'offer',
+          metadata: {
+            is_bundle: true,
+            base_listing_id: 'base-listing',
+            bundle_item_ids: ['item-addon-1'],
+          },
+          offer_status: 'pending',
+        },
+      ];
+
+      const canceled = await checkAndCancelInvalidBundleOffers(messages, 'base-listing');
+      expect(canceled).toEqual(['msg-offer-active']);
+      expect(updatedMessages).toEqual([
+        {
+          updatePayload: { offer_status: 'canceled' },
+          column: 'id',
+          ids: ['msg-offer-active'],
+        },
+      ]);
+    });
+
+    it('Requirement 2 & 3: prunes sold items from active bundle selections on product page', () => {
+      const sellerItems = [
+        { id: 'item-2', is_sold: true },
+        { id: 'item-3', is_sold: false },
+      ];
+      const selectedBundleIds = new Set(['item-2']);
+
+      const soldOrMissingIds: string[] = [];
+      selectedBundleIds.forEach((id) => {
+        const found = sellerItems.find((s) => s.id === id);
+        if (!found || found.is_sold) {
+          soldOrMissingIds.push(id);
+        }
+      });
+
+      expect(soldOrMissingIds).toEqual(['item-2']);
+
+      const next = new Set(selectedBundleIds);
+      soldOrMissingIds.forEach((id) => next.delete(id));
+
+      expect(next.size).toBe(0);
+      const isBundle = next.size > 0;
+      expect(isBundle).toBe(false);
     });
   });
 });

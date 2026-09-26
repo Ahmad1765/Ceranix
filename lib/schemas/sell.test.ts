@@ -47,6 +47,15 @@ describe('SellFormSchema', () => {
     expect(result.success).toBe(true);
   });
 
+  it('accepts the "No brand" sentinel with null authenticity', () => {
+    const result = SellFormSchema.safeParse({
+      ...validPayload,
+      brand: 'No brand',
+      authenticity: null,
+    });
+    expect(result.success).toBe(true);
+  });
+
   it('fails if no photo slots are provided', () => {
     const result = SellFormSchema.safeParse({ ...validPayload, slots: [] });
     expect(result.success).toBe(false);

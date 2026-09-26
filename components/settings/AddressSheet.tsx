@@ -112,6 +112,16 @@ export function AddressSheet({
     if (!form.recipient_name.trim()) e.recipient_name = 'Full name is required';
     if (!form.line1.trim()) e.line1 = 'Street address is required';
     if (!form.city.trim()) e.city = 'City is required';
+    const cleanPhone = form.phone.replace(/[\s\-()]/g, '');
+    if (!cleanPhone) {
+      e.phone = 'Phone number is required for courier delivery';
+    } else if (cleanPhone.length < 10) {
+      e.phone = 'Phone number must be at least 10 digits';
+    } else if (cleanPhone.length > 15) {
+      e.phone = 'Phone number must not exceed 15 digits';
+    } else if (!/^(\+?92|0)?[3-9][0-9]{8,11}$/.test(cleanPhone)) {
+      e.phone = 'Please enter a valid phone number (e.g. 0300 1234567)';
+    }
     return e;
   }, [form]);
 
@@ -446,6 +456,7 @@ export function AddressSheet({
                   placeholder="e.g. 0300 1234567"
                   placeholderTextColor={theme.textMuted}
                   keyboardType="phone-pad"
+                  maxLength={15}
                   style={[
                     styles.input,
                     {
@@ -454,8 +465,12 @@ export function AddressSheet({
                       color: theme.text,
                     },
                     focusedField === 'phone' && [styles.inputFocused, { borderColor: theme.accent, backgroundColor: theme.panel, color: theme.text }],
+                    attemptedSubmit && Boolean(errors.phone) && styles.inputError,
                   ]}
                 />
+                {attemptedSubmit && Boolean(errors.phone) && (
+                  <Text style={styles.errorText}>{errors.phone}</Text>
+                )}
               </View>
             </ScrollView>
 

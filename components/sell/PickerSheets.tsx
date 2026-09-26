@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { View, Pressable, Platform } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
@@ -8,7 +8,6 @@ import { useTheme } from '@/context/ThemeContext';
 import { ITEM_COLORS } from '@/lib/itemColors';
 import { ColorSwatch } from '@/components/ColorSwatch';
 import { CURRENCY_SYMBOL, CURRENCY_CODE } from '@/lib/currency';
-import { BUYER_PROTECTION_PERCENTAGE } from '@/lib/fees';
 
 
 import { BottomSheet } from './BottomSheet';
@@ -78,6 +77,21 @@ export function SingleSelectSheet<T extends string>({
   onClose: () => void;
 }) {
   const { theme } = useTheme();
+  const selectingRef = useRef(false);
+
+  useEffect(() => {
+    if (visible) selectingRef.current = false;
+  }, [visible]);
+
+  const handleSelect = (val: T) => {
+    if (selectingRef.current) return;
+    selectingRef.current = true;
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
+    onChange(val);
+    onClose();
+  };
 
   return (
     <BottomSheet visible={visible} title={title} onClose={onClose}>
@@ -87,13 +101,7 @@ export function SingleSelectSheet<T extends string>({
           return (
             <Pressable
               key={o.value}
-              onPress={() => {
-                if (Platform.OS !== 'web') {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                }
-                onChange(o.value);
-                onClose();
-              }}
+              onPress={() => handleSelect(o.value)}
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
               style={({ pressed }) => ({
@@ -239,12 +247,18 @@ export function SizeSheet({
 }) {
   const { theme } = useTheme();
   const [draft, setDraft] = useState(value);
+  const savingRef = useRef(false);
 
   useEffect(() => {
-    if (visible) setDraft(value);
+    if (visible) {
+      setDraft(value);
+      savingRef.current = false;
+    }
   }, [visible, value]);
 
   const save = (valToSave?: string) => {
+    if (savingRef.current) return;
+    savingRef.current = true;
     const finalVal = (valToSave ?? draft).trim();
     onChange(finalVal);
     onClose();
@@ -390,11 +404,18 @@ export function PriceSheet({
 }) {
   const { theme } = useTheme();
   const [draft, setDraft] = useState(value);
+  const savingRef = useRef(false);
+
   useEffect(() => {
-    if (visible) setDraft(value);
+    if (visible) {
+      setDraft(value);
+      savingRef.current = false;
+    }
   }, [visible, value]);
 
   const save = () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
     onChange(draft);
     onClose();
   };
@@ -511,30 +532,6 @@ export function PriceSheet({
           })}
         </View>
       </View>
-
-      {/* Transparent Fee Explanation */}
-      <View
-        style={{
-          padding: 16,
-          borderRadius: radii.xl,
-          backgroundColor: theme.panel,
-          borderWidth: 1,
-          borderColor: theme.border,
-          gap: 8,
-        }}
-      >
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={{ fontSize: 13, color: theme.mute }}>Buyer Protection (covered by buyer)</Text>
-          <Text style={{ fontSize: 13, fontFamily: DISPLAY_BOLD, color: theme.ink }}>{BUYER_PROTECTION_PERCENTAGE}%</Text>
-        </View>
-        <View style={{ height: 1, backgroundColor: theme.border }} />
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={{ fontSize: 13, fontFamily: DISPLAY_BOLD, color: theme.ink }}>Your estimated earnings</Text>
-          <Text style={{ fontSize: 16, fontFamily: DISPLAY_BOLD, color: theme.ink }}>
-            {CURRENCY_SYMBOL} {draft && !isNaN(parseFloat(draft)) ? parseFloat(draft).toLocaleString() : '0'}
-          </Text>
-        </View>
-      </View>
     </BottomSheet>
   );
 }
@@ -552,6 +549,21 @@ export function ColorSheet({
   onClose: () => void;
 }) {
   const { theme } = useTheme();
+  const selectingRef = useRef(false);
+
+  useEffect(() => {
+    if (visible) selectingRef.current = false;
+  }, [visible]);
+
+  const handleSelect = (val: string | null) => {
+    if (selectingRef.current) return;
+    selectingRef.current = true;
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
+    onChange(val);
+    onClose();
+  };
 
   return (
     <BottomSheet visible={visible} title="Color" onClose={onClose}>
@@ -561,13 +573,7 @@ export function ColorSheet({
           return (
             <Pressable
               key={c.id}
-              onPress={() => {
-                if (Platform.OS !== 'web') {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                }
-                onChange(active ? null : c.id);
-                onClose();
-              }}
+              onPress={() => handleSelect(active ? null : c.id)}
               accessibilityRole="button"
               accessibilityLabel={c.label}
               accessibilityState={{ selected: active }}

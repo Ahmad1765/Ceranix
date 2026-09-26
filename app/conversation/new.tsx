@@ -348,6 +348,7 @@ export default function NewConversationScreen() {
           isBundle: isBundle,
           bundleItemIds: isBundle ? bundleItemIds : undefined,
           bundleCount: isBundle ? bundleCount : undefined,
+          baseListingId: listing.id,
         });
         ok = !!saved;
       } else {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { orderSide, partitionOrders, orderBadge, normalizeMyOrder } from '@/lib/orders';
+import { orderSide, partitionOrders, orderBadge, normalizeMyOrder, getOrderCategory } from '@/lib/orders';
 import type { MyOrder } from '@/lib/payments';
 
 const ME = 'me-uuid';
@@ -99,5 +99,34 @@ describe('orderBadge', () => {
       label: 'Payment failed',
       tone: 'warn',
     });
+  });
+});
+
+describe('getOrderCategory', () => {
+  it('categorizes completed orders even if status is paid (solves orders glitch)', () => {
+    expect(getOrderCategory({ status: 'paid', fulfillment_status: 'completed' })).toBe('completed');
+    expect(getOrderCategory({ status: 'completed' })).toBe('completed');
+  });
+
+  it('categorizes canceled and failed orders into canceled', () => {
+    expect(getOrderCategory({ status: 'canceled' })).toBe('canceled');
+    expect(getOrderCategory({ status: 'failed' })).toBe('canceled');
+    expect(getOrderCategory({ status: 'paid', fulfillment_status: 'canceled' })).toBe('canceled');
+  });
+
+  it('categorizes refunded and refund_due orders into refunds', () => {
+    expect(getOrderCategory({ status: 'refunded' })).toBe('refunds');
+    expect(getOrderCategory({ status: 'refund_due' })).toBe('refunds');
+    expect(getOrderCategory({ status: 'partially_refunded' })).toBe('refunds');
+    expect(getOrderCategory({ status: 'paid', fulfillment_status: 'refunded' })).toBe('refunds');
+  });
+
+  it('categorizes active orders into in_progress', () => {
+    expect(getOrderCategory({ status: 'pending' })).toBe('in_progress');
+    expect(getOrderCategory({ status: 'paid' })).toBe('in_progress');
+    expect(getOrderCategory({ status: 'paid', fulfillment_status: 'packing' })).toBe('in_progress');
+    expect(getOrderCategory({ status: 'paid', fulfillment_status: 'shifting' })).toBe('in_progress');
+    expect(getOrderCategory({ status: 'paid', fulfillment_status: 'delivered' })).toBe('in_progress');
+    expect(getOrderCategory({ status: 'paid', fulfillment_status: 'disputed' })).toBe('in_progress');
   });
 });

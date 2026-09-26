@@ -17,12 +17,13 @@ import { useTheme } from '@/context/ThemeContext';
 import { type as typography } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 
-export type PaymentMethodOption = 'card' | 'apple_pay' | 'cod';
+export type PaymentMethodOption = 'card' | 'apple_pay' | 'cod' | 'jazzcash' | 'easypaisa';
 
 export interface SelectedPaymentMethod {
   method: PaymentMethodOption;
   cardBrand?: string;
   cardLast4?: string;
+  walletNumber?: string;
   saveCard?: boolean;
 }
 
@@ -48,6 +49,8 @@ export function PaymentOptionsModal({
   const [showCardForm, setShowCardForm] = useState(false);
   const [saveCard, setSaveCard] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
+  const [walletPhone, setWalletPhone] = useState('');
+  const [walletError, setWalletError] = useState<string | null>(null);
 
   useEffect(() => {
     if (visible) {
@@ -55,6 +58,7 @@ export function PaymentOptionsModal({
       setSelected(active);
       setShowCardForm(active === 'card');
       setCardError(null);
+      setWalletError(null);
     }
   }, [visible, initialSelected]);
 
@@ -63,11 +67,9 @@ export function PaymentOptionsModal({
       Haptics.selectionAsync().catch(() => {});
     }
     setSelected(method);
-    if (method === 'card') {
-      setShowCardForm(true);
-    } else {
-      setShowCardForm(false);
-    }
+    setShowCardForm(method === 'card');
+    setWalletError(null);
+    setCardError(null);
   };
 
   const handleProceed = () => {
@@ -96,10 +98,23 @@ export function PaymentOptionsModal({
       }
     }
 
+    if (selected === 'jazzcash' || selected === 'easypaisa') {
+      const clean = walletPhone.replace(/\D/g, '');
+      if (!clean) {
+        setWalletError(`Please enter your ${selected === 'jazzcash' ? 'JazzCash' : 'Easypaisa'} mobile number`);
+        return;
+      }
+      if (clean.length < 10) {
+        setWalletError('Please enter a valid 11-digit mobile number');
+        return;
+      }
+    }
+
     onSelect({
       method: selected,
       cardBrand: selected === 'card' ? brand : undefined,
       cardLast4: selected === 'card' ? last4 : undefined,
+      walletNumber: selected === 'jazzcash' || selected === 'easypaisa' ? walletPhone : undefined,
       saveCard: selected === 'card' ? saveCard : undefined,
     });
     onClose();
@@ -416,6 +431,249 @@ export function PaymentOptionsModal({
                     Save card for future purchases
                   </Text>
                 </Pressable>
+              </View>
+            )}
+          </Pressable>
+
+          <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.border, marginVertical: 6 }} />
+
+          {/* Section: Mobile Wallets */}
+          <View style={{ paddingTop: 6, paddingBottom: 2 }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: theme.muteSoft, fontFamily: typography.family.sansBold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>
+              Mobile Wallets (Pakistan)
+            </Text>
+          </View>
+
+          {/* Option: JazzCash */}
+          <Pressable
+            onPress={() => handleSelect('jazzcash')}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: selected === 'jazzcash' }}
+            style={({ pressed }) => [
+              { paddingVertical: 14 },
+              pressed && { opacity: 0.8 },
+            ]}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+              <View
+                style={{
+                  width: 38,
+                  height: 28,
+                  borderRadius: 6,
+                  backgroundColor: '#ED1B24',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: 12,
+                }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '900', color: '#FFFFFF', letterSpacing: 0.5 }}>
+                  JC
+                </Text>
+              </View>
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+                    JazzCash
+                  </Text>
+                  <View style={{ paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4, backgroundColor: isDark ? 'rgba(237, 27, 36, 0.15)' : '#FEE2E2' }}>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#DC2626', fontFamily: typography.family.sansBold }}>
+                      Preview
+                    </Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 12.5, color: theme.mute, fontFamily: typography.family.sans, lineHeight: 17, marginTop: 2 }}>
+                  Pay using your JazzCash mobile account or voucher.
+                </Text>
+              </View>
+
+              {/* Radio Indicator */}
+              <View
+                style={[
+                  {
+                    width: 22,
+                    height: 22,
+                    borderRadius: 11,
+                    borderWidth: 2,
+                    borderColor: theme.border,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginTop: 2,
+                  },
+                  selected === 'jazzcash' && { borderColor: theme.purple },
+                ]}
+              >
+                {selected === 'jazzcash' && <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: theme.purple }} />}
+              </View>
+            </View>
+
+            {/* Expandable JazzCash Form */}
+            {selected === 'jazzcash' && (
+              <View
+                style={{
+                  marginTop: 14,
+                  marginLeft: 38,
+                  padding: 12,
+                  backgroundColor: theme.panel,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '600', color: theme.ink, marginBottom: 4, fontFamily: typography.family.sansSemibold }}>
+                  JazzCash Account Number
+                </Text>
+                <TextInput
+                  value={walletPhone}
+                  onChangeText={(val) => {
+                    if (walletError) setWalletError(null);
+                    setWalletPhone(val.replace(/\D/g, '').slice(0, 11));
+                  }}
+                  keyboardType="phone-pad"
+                  maxLength={11}
+                  placeholder="0300 1234567"
+                  placeholderTextColor={theme.muteSoft}
+                  style={[
+                    {
+                      height: 40,
+                      backgroundColor: theme.surface,
+                      borderWidth: 1,
+                      borderColor: theme.border,
+                      borderRadius: 6,
+                      paddingHorizontal: 10,
+                      fontSize: 13.5,
+                      color: theme.ink,
+                      fontFamily: typography.family.sansMedium,
+                    },
+                    walletError ? { borderColor: '#EF4444' } : null,
+                  ]}
+                />
+                {walletError ? (
+                  <Text style={{ fontSize: 11.5, color: '#EF4444', marginTop: 4, fontFamily: typography.family.sansMedium }}>
+                    {walletError}
+                  </Text>
+                ) : (
+                  <Text style={{ fontSize: 11, color: theme.mute, marginTop: 4, fontFamily: typography.family.sans }}>
+                    You will receive an authorization prompt on your phone (UI Preview).
+                  </Text>
+                )}
+              </View>
+            )}
+          </Pressable>
+
+          <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.border, marginVertical: 6 }} />
+
+          {/* Option: Easypaisa */}
+          <Pressable
+            onPress={() => handleSelect('easypaisa')}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: selected === 'easypaisa' }}
+            style={({ pressed }) => [
+              { paddingVertical: 14 },
+              pressed && { opacity: 0.8 },
+            ]}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+              <View
+                style={{
+                  width: 38,
+                  height: 28,
+                  borderRadius: 6,
+                  backgroundColor: '#00A859',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: 12,
+                }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '900', color: '#FFFFFF', letterSpacing: 0.5 }}>
+                  EP
+                </Text>
+              </View>
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+                    Easypaisa
+                  </Text>
+                  <View style={{ paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4, backgroundColor: isDark ? 'rgba(0, 168, 89, 0.15)' : '#DCFCE7' }}>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#16A34A', fontFamily: typography.family.sansBold }}>
+                      Preview
+                    </Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 12.5, color: theme.mute, fontFamily: typography.family.sans, lineHeight: 17, marginTop: 2 }}>
+                  Pay using your Easypaisa mobile account or in-app approval.
+                </Text>
+              </View>
+
+              {/* Radio Indicator */}
+              <View
+                style={[
+                  {
+                    width: 22,
+                    height: 22,
+                    borderRadius: 11,
+                    borderWidth: 2,
+                    borderColor: theme.border,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginTop: 2,
+                  },
+                  selected === 'easypaisa' && { borderColor: theme.purple },
+                ]}
+              >
+                {selected === 'easypaisa' && <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: theme.purple }} />}
+              </View>
+            </View>
+
+            {/* Expandable Easypaisa Form */}
+            {selected === 'easypaisa' && (
+              <View
+                style={{
+                  marginTop: 14,
+                  marginLeft: 38,
+                  padding: 12,
+                  backgroundColor: theme.panel,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '600', color: theme.ink, marginBottom: 4, fontFamily: typography.family.sansSemibold }}>
+                  Easypaisa Account Number
+                </Text>
+                <TextInput
+                  value={walletPhone}
+                  onChangeText={(val) => {
+                    if (walletError) setWalletError(null);
+                    setWalletPhone(val.replace(/\D/g, '').slice(0, 11));
+                  }}
+                  keyboardType="phone-pad"
+                  maxLength={11}
+                  placeholder="0300 1234567"
+                  placeholderTextColor={theme.muteSoft}
+                  style={[
+                    {
+                      height: 40,
+                      backgroundColor: theme.surface,
+                      borderWidth: 1,
+                      borderColor: theme.border,
+                      borderRadius: 6,
+                      paddingHorizontal: 10,
+                      fontSize: 13.5,
+                      color: theme.ink,
+                      fontFamily: typography.family.sansMedium,
+                    },
+                    walletError ? { borderColor: '#EF4444' } : null,
+                  ]}
+                />
+                {walletError ? (
+                  <Text style={{ fontSize: 11.5, color: '#EF4444', marginTop: 4, fontFamily: typography.family.sansMedium }}>
+                    {walletError}
+                  </Text>
+                ) : (
+                  <Text style={{ fontSize: 11, color: theme.mute, marginTop: 4, fontFamily: typography.family.sans }}>
+                    Approve the payment request in your Easypaisa app (UI Preview).
+                  </Text>
+                )}
               </View>
             )}
           </Pressable>

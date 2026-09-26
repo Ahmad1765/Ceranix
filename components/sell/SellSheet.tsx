@@ -6,7 +6,7 @@
 // screen is currently showing and leaves the tab bar's active tab untouched
 // underneath — exactly like the Offer button's sheet on the product page.
 import {
-  createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode,
+  createContext, useCallback, useContext, useEffect, useMemo, useState, useRef, type ReactNode,
 } from 'react';
 import { capture } from '@/lib/analytics';
 import {
@@ -222,8 +222,12 @@ function RowField({
   disabled?: boolean;
 }) {
   const { theme } = useTheme();
+  const lastPressRef = useRef(0);
   const handlePress = () => {
     if (disabled) return;
+    const now = Date.now();
+    if (now - lastPressRef.current < 450) return;
+    lastPressRef.current = now;
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     }
@@ -320,6 +324,25 @@ export function SellForm({
   const { width } = useWindowDimensions();
   const [publishing, setPublishing] = useState(false);
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
+  const isNavigatingSheetRef = useRef(false);
+
+  const openSheet = useCallback((sheet: ActiveSheet) => {
+    if (isNavigatingSheetRef.current || activeSheet !== null) return;
+    isNavigatingSheetRef.current = true;
+    setActiveSheet(sheet);
+    setTimeout(() => {
+      isNavigatingSheetRef.current = false;
+    }, 400);
+  }, [activeSheet]);
+
+  const closeSheet = useCallback(() => {
+    if (isNavigatingSheetRef.current) return;
+    isNavigatingSheetRef.current = true;
+    setActiveSheet(null);
+    setTimeout(() => {
+      isNavigatingSheetRef.current = false;
+    }, 400);
+  }, []);
 
   const isEditing = !!editingListing;
   const initialValues = useMemo(
@@ -424,7 +447,10 @@ export function SellForm({
   };
 
   const isBrandEntered = Boolean(brand && brand.trim().length > 0);
-  const isBrandedItem = isBrandEntered && brand !== UNBRANDED_LOCAL_TAILOR;
+  const isBrandedItem =
+    isBrandEntered &&
+    brand !== UNBRANDED_LOCAL_TAILOR &&
+    brand.toLowerCase() !== 'no brand';
   const isAuthenticityValid = !isBrandedItem || Boolean(authenticity);
 
   const canPublish =
@@ -1168,7 +1194,10 @@ export function SellForm({
                                 }
                                 setValue('brand', bName, { shouldValidate: true });
                                 setIsCustomBrand(false);
-                                if (bName === UNBRANDED_LOCAL_TAILOR) {
+                                if (
+                                  bName.toLowerCase() === 'no brand' ||
+                                  bName === UNBRANDED_LOCAL_TAILOR
+                                ) {
                                   setValue('authenticity', null, { shouldValidate: true });
                                 } else if (!authenticity) {
                                   setTimeout(() => setActiveSheet('authenticity'), 200);
@@ -1294,7 +1323,7 @@ export function SellForm({
               label="Category"
               value={categoryValue}
               placeholder="Select category"
-              onPress={() => setActiveSheet('category')}
+              onPress={() => openSheet('category')}
             />
 
             {!compatibility.compatible && compatibility.advisory ? (
@@ -1319,7 +1348,7 @@ export function SellForm({
                 </View>
                 <Pressable
                   onPress={() => {
-                    setValue('brand', UNBRANDED_LOCAL_TAILOR, { shouldValidate: true });
+                    setValue('brand', 'No brand', { shouldValidate: true });
                     setValue('authenticity', null, { shouldValidate: true });
                   }}
                   style={({ pressed }) => ({
@@ -1344,7 +1373,7 @@ export function SellForm({
               label="Brand"
               value={brand}
               placeholder="Add brand"
-              onPress={() => setActiveSheet('brand')}
+              onPress={() => openSheet('brand')}
             />
 
             {isBrandedItem ? (
@@ -1367,7 +1396,7 @@ export function SellForm({
                   disabled={isCustomBrand}
                   onPress={() => {
                     if (!isCustomBrand) {
-                      setActiveSheet('authenticity');
+                      openSheet('authenticity');
                     }
                   }}
                 />
@@ -1394,7 +1423,7 @@ export function SellForm({
               label="Size"
               value={size}
               placeholder="Add size"
-              onPress={() => setActiveSheet('size')}
+              onPress={() => openSheet('size')}
             />
 
             <RowField
@@ -1402,7 +1431,7 @@ export function SellForm({
               label="Condition"
               value={CONDITIONS.find((c) => c.value === condition)?.label ?? ''}
               placeholder="Add condition"
-              onPress={() => setActiveSheet('condition')}
+              onPress={() => openSheet('condition')}
             />
 
             <RowField
@@ -1410,7 +1439,7 @@ export function SellForm({
               label="Color"
               value={color ? itemColorLabel(color) : ''}
               placeholder="Add color"
-              onPress={() => setActiveSheet('colors')}
+              onPress={() => openSheet('colors')}
             />
 
             <RowField
@@ -1418,7 +1447,7 @@ export function SellForm({
               label="Gender"
               value={GENDERS.find((g) => g.value === gender)?.label ?? ''}
               placeholder="Add gender"
-              onPress={() => setActiveSheet('gender')}
+              onPress={() => openSheet('gender')}
             />
 
             <RowField
@@ -1426,7 +1455,7 @@ export function SellForm({
               label="Tags"
               value={tags.length ? `${tags.length} tag${tags.length === 1 ? '' : 's'}` : ''}
               placeholder="Add discovery tags"
-              onPress={() => setActiveSheet('tags')}
+              onPress={() => openSheet('tags')}
               isLast
             />
           </View>
@@ -1478,7 +1507,7 @@ export function SellForm({
               label="Price"
               value={price && Number.isFinite(parseFloat(price)) ? formatPrice(parseFloat(price), { whole: true }) : ''}
               placeholder={`Set price (${CURRENCY_SYMBOL})`}
-              onPress={() => setActiveSheet('price')}
+              onPress={() => openSheet('price')}
             />
 
             <RowField
@@ -1486,7 +1515,7 @@ export function SellForm({
               label="Parcel size"
               value={PARCEL_SIZES.find((p) => p.value === parcelSize)?.label ?? ''}
               placeholder="Select parcel size"
-              onPress={() => setActiveSheet('parcel')}
+              onPress={() => openSheet('parcel')}
               isLast
             />
           </View>
@@ -1568,7 +1597,7 @@ export function SellForm({
           setValue('category', c, { shouldValidate: true });
           setValue('subcategory', s, { shouldValidate: true });
         }}
-        onClose={() => setActiveSheet(null)}
+        onClose={closeSheet}
       />
       <BrandSheet
         visible={activeSheet === 'brand'}
@@ -1578,31 +1607,37 @@ export function SellForm({
         onSelectBrand={(bName, isCustom) => {
           setValue('brand', bName, { shouldValidate: true });
           setIsCustomBrand(!!isCustom);
-          if (bName === UNBRANDED_LOCAL_TAILOR) {
+          if (
+            bName.toLowerCase() === 'no brand' ||
+            bName === UNBRANDED_LOCAL_TAILOR
+          ) {
             setValue('authenticity', null, { shouldValidate: true });
           } else if (isCustom) {
             setValue('authenticity', 'not_sure', { shouldValidate: true });
           } else {
             if (!authenticity) {
-              setTimeout(() => setActiveSheet('authenticity'), 200);
+              setTimeout(() => {
+                isNavigatingSheetRef.current = false;
+                setActiveSheet('authenticity');
+              }, 250);
             }
           }
         }}
-        onClose={() => setActiveSheet(null)}
+        onClose={closeSheet}
       />
       <AuthenticitySheet
         visible={activeSheet === 'authenticity'}
         brandName={brand}
         value={authenticity}
         onChange={(auth) => setValue('authenticity', auth, { shouldValidate: true })}
-        onClose={() => setActiveSheet(null)}
+        onClose={closeSheet}
       />
       <SizeSheet
         visible={activeSheet === 'size'}
         categoryCode={category}
         value={size}
         onChange={(s) => setValue('size', s, { shouldValidate: true })}
-        onClose={() => setActiveSheet(null)}
+        onClose={closeSheet}
       />
       <SingleSelectSheet
         visible={activeSheet === 'condition'}
@@ -1610,13 +1645,13 @@ export function SellForm({
         options={CONDITIONS}
         value={condition}
         onChange={(c) => setValue('condition', c, { shouldValidate: true })}
-        onClose={() => setActiveSheet(null)}
+        onClose={closeSheet}
       />
       <ColorSheet
         visible={activeSheet === 'colors'}
         value={color ?? null}
         onChange={(cl) => setValue('color', cl, { shouldValidate: true })}
-        onClose={() => setActiveSheet(null)}
+        onClose={closeSheet}
       />
       <SingleSelectSheet
         visible={activeSheet === 'gender'}
@@ -1624,19 +1659,19 @@ export function SellForm({
         options={GENDERS}
         value={gender}
         onChange={(g) => setValue('gender', g, { shouldValidate: true })}
-        onClose={() => setActiveSheet(null)}
+        onClose={closeSheet}
       />
       <TagsSheet
         visible={activeSheet === 'tags'}
         value={tags}
         onChange={(t) => setValue('tags', t, { shouldValidate: true })}
-        onClose={() => setActiveSheet(null)}
+        onClose={closeSheet}
       />
       <PriceSheet
         visible={activeSheet === 'price'}
         value={price}
         onChange={(p) => setValue('price', p, { shouldValidate: true })}
-        onClose={() => setActiveSheet(null)}
+        onClose={closeSheet}
       />
       <SingleSelectSheet<ParcelSize>
         visible={activeSheet === 'parcel'}
@@ -1644,7 +1679,7 @@ export function SellForm({
         options={PARCEL_SIZES}
         value={parcelSize ?? null}
         onChange={(ps) => setValue('parcelSize', ps, { shouldValidate: true })}
-        onClose={() => setActiveSheet(null)}
+        onClose={closeSheet}
       />
     </SafeAreaView>
   );

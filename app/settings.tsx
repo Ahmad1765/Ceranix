@@ -166,7 +166,7 @@ export default function SettingsScreen() {
           <Row
             label="Order history"
             desc="Your orders, invoices & payouts"
-            onPress={() => router.push('/orders' as any)}
+            onPress={() => router.push({ pathname: '/(tabs)/chat', params: { tab: 'orders' } } as any)}
             chevron
           />
           <Divider />

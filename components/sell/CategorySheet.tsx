@@ -77,18 +77,50 @@ export function CategorySheet({
   const [query, setQuery] = useState('');
   const closedByPopStateRef = useRef(false);
 
+  // Prevent immediate double-tap or ghost clicks on sheet mount & transitions
+  const [touchReady, setTouchReady] = useState(false);
+  const [interactive, setInteractive] = useState(true);
+  const cooldownTimerRef = useRef<any>(null);
+
+  const setCooldown = (ms = 350) => {
+    setInteractive(false);
+    if (cooldownTimerRef.current) clearTimeout(cooldownTimerRef.current);
+    cooldownTimerRef.current = setTimeout(() => {
+      setInteractive(true);
+    }, ms);
+  };
+
   const activeCategoryRef = useRef<Category | null>(null);
   activeCategoryRef.current = activeCategory;
   const queryRef = useRef('');
   queryRef.current = query;
+
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   // Reset drill-down state on open
   useEffect(() => {
     if (visible) {
       setActiveCategory(null);
       setQuery('');
+      setTouchReady(false);
+      setInteractive(false);
+      const timer = setTimeout(() => {
+        setTouchReady(true);
+        setInteractive(true);
+      }, 250);
+      return () => clearTimeout(timer);
+    } else {
+      setTouchReady(false);
+      setInteractive(true);
     }
   }, [visible]);
+
+  useEffect(() => {
+    return () => {
+      if (cooldownTimerRef.current) clearTimeout(cooldownTimerRef.current);
+    };
+  }, []);
 
   const haptic = () => {
     if (Platform.OS !== 'web') {
@@ -98,28 +130,29 @@ export function CategorySheet({
 
   const handleBack = useCallback(() => {
     haptic();
-    if (queryRef.current.trim().length > 0) {
+    if (activeCategoryRef.current !== null) {
+      setCooldown(350);
+      setActiveCategory(null);
       setQuery('');
       return;
     }
-    if (activeCategoryRef.current !== null) {
-      setActiveCategory(null);
-      return;
-    }
-    onClose();
-  }, [onClose]);
+    onCloseRef.current();
+  }, []);
+
+  const handleBackRef = useRef(handleBack);
+  handleBackRef.current = handleBack;
 
   // Hardware back button on Android
   useEffect(() => {
     if (Platform.OS !== 'android' || !visible) return;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      handleBack();
+      handleBackRef.current();
       return true;
     });
     return () => sub.remove();
-  }, [visible, handleBack]);
+  }, [visible]);
 
-  // Escape key & history sync on Web
+  // Escape key & history sync on Web (strictly depends on `visible` only)
   useEffect(() => {
     if (Platform.OS !== 'web' || !visible) return;
 
@@ -127,7 +160,7 @@ export function CategorySheet({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        handleBack();
+        handleBackRef.current();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -140,9 +173,11 @@ export function CategorySheet({
     const handlePopState = () => {
       closedByPopStateRef.current = true;
       if (activeCategoryRef.current !== null) {
+        setCooldown(350);
         setActiveCategory(null);
+        setQuery('');
       } else {
-        onClose();
+        onCloseRef.current();
       }
     };
     window.addEventListener('popstate', handlePopState);
@@ -154,57 +189,7 @@ export function CategorySheet({
         window.history.back();
       }
     };
-  }, [visible, handleBack, onClose]);
-
-  // Search Results across all categories & subcategories
-  const searchResults = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return null;
-
-    const results: {
-      category: Category;
-      categoryTitle: string;
-      categoryIcon: keyof typeof Feather.glyphMap;
-      subId: string | null;
-      subLabel: string;
-    }[] = [];
-
-    for (const catDef of CATEGORIES) {
-      const catMeta = CATEGORY_META[catDef.id] || {
-        title: catDef.label,
-        subtitle: '',
-        icon: catDef.icon,
-      };
-
-      // Check subcategories
-      for (const sub of catDef.subs) {
-        const matchesLabel = sub.label.toLowerCase().includes(q);
-        const matchesKw = sub.kw?.some((k) => k.toLowerCase().includes(q));
-        if (matchesLabel || matchesKw) {
-          results.push({
-            category: catDef.id,
-            categoryTitle: catMeta.title,
-            categoryIcon: catMeta.icon,
-            subId: sub.id,
-            subLabel: sub.label,
-          });
-        }
-      }
-
-      // If category title itself matches and has no subcategories
-      if (catDef.label.toLowerCase().includes(q) && catDef.subs.length === 0) {
-        results.push({
-          category: catDef.id,
-          categoryTitle: catMeta.title,
-          categoryIcon: catMeta.icon,
-          subId: null,
-          subLabel: catMeta.title,
-        });
-      }
-    }
-
-    return results;
-  }, [query]);
+  }, [visible]);
 
   const activeCategoryDef = useMemo(() => {
     if (!activeCategory) return null;
@@ -213,21 +198,36 @@ export function CategorySheet({
 
   const activeCategoryMeta = activeCategory ? CATEGORY_META[activeCategory] : null;
 
+  // Filter subcategories of the active category by search query
+  const filteredSubs = useMemo(() => {
+    if (!activeCategoryDef) return [];
+    const q = query.trim().toLowerCase();
+    if (!q) return activeCategoryDef.subs;
+    return activeCategoryDef.subs.filter((s) => {
+      const matchLabel = s.label.toLowerCase().includes(q);
+      const matchKw = s.kw?.some((k) => k.toLowerCase().includes(q));
+      return matchLabel || matchKw;
+    });
+  }, [activeCategoryDef, query]);
+
   const handleSelectLevel1 = (catId: Category) => {
+    if (!interactive) return;
     haptic();
     if (!hasSubcategories(catId)) {
       onChange(catId, null);
-      onClose();
+      onCloseRef.current();
       return;
     }
+    setCooldown(350);
     setActiveCategory(catId);
     setQuery('');
   };
 
   const handleSelectLevel2 = (catId: Category, subId: string) => {
+    if (!interactive) return;
     haptic();
     onChange(catId, subId);
-    onClose();
+    onCloseRef.current();
   };
 
   if (!visible) return null;
@@ -242,6 +242,7 @@ export function CategorySheet({
     >
       <SafeAreaView
         edges={['top', 'bottom']}
+        pointerEvents={touchReady && interactive ? 'auto' : 'none'}
         style={{
           flex: 1,
           backgroundColor: theme.background,
@@ -319,232 +320,146 @@ export function CategorySheet({
         </View>
 
         {/* Selected Brand Context Advisory (if user already chose a brand) */}
-        {selectedBrand && selectedBrand !== UNBRANDED_LOCAL_TAILOR && (
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 8,
-              paddingHorizontal: 16,
-              paddingVertical: 10,
-              backgroundColor: theme.background,
-              borderBottomWidth: 1,
-              borderBottomColor: theme.border,
-            }}
-          >
-            <Feather name="info" size={14} color={theme.ink} />
-            <Text style={{ fontSize: 13, color: theme.ink, flex: 1 }}>
-              Selecting category for{' '}
-              <Text style={{ fontFamily: DISPLAY_BOLD }}>{selectedBrand}</Text>
-            </Text>
-          </View>
-        )}
-
-        {/* Search Input Bar */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 }}>
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 10,
-              borderWidth: 1,
-              borderColor: theme.border,
-              borderRadius: radii.xl,
-              backgroundColor: theme.panel,
-              paddingHorizontal: 14,
-              height: 44,
-            }}
-          >
-            <Feather name="search" size={16} color={theme.mute} />
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder={
-                activeCategory !== null
-                  ? `Search in ${activeCategoryMeta?.title}…`
-                  : 'Search category…'
-              }
-              placeholderTextColor={theme.muteSoft ?? theme.mute}
-              style={
-                {
-                  flex: 1,
-                  minWidth: 0,
-                  fontSize: 14.5,
-                  color: theme.ink,
-                  padding: 0,
-                  outlineStyle: 'none',
-                } as any
-              }
-            />
-            {query.length > 0 && (
-              <Pressable onPress={() => setQuery('')} hitSlop={8}>
-                <Feather name="x" size={16} color={theme.mute} />
-              </Pressable>
-            )}
-          </View>
-        </View>
-
-        {/* Content Views: Search Results OR Level 2 OR Level 1 */}
-        {searchResults !== null ? (
-          // ── SEARCH RESULTS ──
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
-          >
-            <View style={{ paddingVertical: 10 }}>
-              <Text
-                style={{
-                  fontFamily: DISPLAY_BOLD,
-                  fontSize: 12,
-                  color: theme.muteSoft,
-                  textTransform: 'uppercase',
-                  letterSpacing: 0.5,
-                }}
-              >
-                Results ({searchResults.length})
+        {selectedBrand &&
+          selectedBrand.toLowerCase() !== 'no brand' &&
+          selectedBrand !== UNBRANDED_LOCAL_TAILOR && (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8,
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                backgroundColor: theme.background,
+                borderBottomWidth: 1,
+                borderBottomColor: theme.border,
+              }}
+            >
+              <Feather name="info" size={14} color={theme.ink} />
+              <Text style={{ fontSize: 13, color: theme.ink, flex: 1 }}>
+                Selecting category for{' '}
+                <Text style={{ fontFamily: DISPLAY_BOLD }}>{selectedBrand}</Text>
               </Text>
             </View>
+          )}
 
-            {searchResults.map((res, index) => {
-              const isSelected =
-                category === res.category &&
-                (res.subId === null ? subcategory === null : subcategory === res.subId);
-              return (
-                <Pressable
-                  key={`${res.category}-${res.subId ?? 'root'}-${index}`}
-                  onPress={() => {
-                    if (res.subId) {
-                      handleSelectLevel2(res.category, res.subId);
-                    } else {
-                      handleSelectLevel1(res.category);
-                    }
-                  }}
-                  style={({ pressed }) => ({
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    paddingVertical: 14,
-                    borderBottomWidth: 1,
-                    borderBottomColor: theme.border,
-                    backgroundColor: pressed ? theme.surface : 'transparent',
-                    gap: 12,
-                  })}
-                >
-                  <View
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 18,
-                      backgroundColor: isDark ? theme.surface : '#F2F3FE',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Feather name={res.categoryIcon} size={17} color={colors.primary} />
-                  </View>
-
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={{
-                        fontFamily: DISPLAY_BOLD,
-                        fontSize: 15,
-                        color: theme.ink,
-                      }}
-                    >
-                      {res.subLabel}
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: 12.5,
-                        color: theme.mute,
-                        marginTop: 1,
-                      }}
-                    >
-                      {res.categoryTitle}
-                    </Text>
-                  </View>
-
-                  {isSelected ? (
-                    <Feather name="check" size={18} color={colors.primary} />
-                  ) : (
-                    <Feather name="chevron-right" size={18} color={theme.muteSoft} />
-                  )}
-                </Pressable>
-              );
-            })}
-
-            {searchResults.length === 0 && (
-              <View style={{ paddingVertical: 40, alignItems: 'center' }}>
-                <Feather name="search" size={32} color={theme.muteSoft} />
-                <Text
-                  style={{
-                    fontFamily: DISPLAY_BOLD,
-                    fontSize: 15,
-                    color: theme.ink,
-                    marginTop: 12,
-                  }}
-                >
-                  No categories found
-                </Text>
-                <Text style={{ fontSize: 13, color: theme.mute, marginTop: 4 }}>
-                  No match for &quot;{query}&quot;. Try another search term.
-                </Text>
+        {/* Content Views: Level 2 (Subcategories with Search) OR Level 1 (Main Categories) */}
+        {activeCategoryDef !== null ? (
+          // ── LEVEL 2: SUBCATEGORIES OF SELECTED CATEGORY (With Search) ──
+          <View style={{ flex: 1 }}>
+            {/* Search Input Bar (Strictly in Subcategories only) */}
+            <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 10,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                  borderRadius: radii.xl,
+                  backgroundColor: theme.panel,
+                  paddingHorizontal: 14,
+                  height: 44,
+                }}
+              >
+                <Feather name="search" size={16} color={theme.mute} />
+                <TextInput
+                  value={query}
+                  onChangeText={setQuery}
+                  placeholder={`Search in ${activeCategoryMeta?.title ?? 'subcategories'}…`}
+                  placeholderTextColor={theme.muteSoft ?? theme.mute}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  style={
+                    {
+                      flex: 1,
+                      minWidth: 0,
+                      fontSize: 14.5,
+                      color: theme.ink,
+                      padding: 0,
+                      outlineStyle: 'none',
+                    } as any
+                  }
+                />
+                {query.length > 0 && (
+                  <Pressable onPress={() => setQuery('')} hitSlop={8}>
+                    <Feather name="x" size={16} color={theme.mute} />
+                  </Pressable>
+                )}
               </View>
-            )}
-          </ScrollView>
-        ) : activeCategoryDef !== null ? (
-          // ── LEVEL 2: SUBCATEGORIES OF SELECTED CATEGORY (Vinted Style) ──
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
-          >
-            {activeCategoryDef.subs.map((s) => {
-              const isSelected = category === activeCategory && subcategory === s.id;
-              return (
-                <Pressable
-                  key={s.id}
-                  onPress={() => handleSelectLevel2(activeCategoryDef.id, s.id)}
-                  style={({ pressed }) => ({
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    paddingVertical: 15,
-                    paddingHorizontal: 4,
-                    borderBottomWidth: 1,
-                    borderBottomColor: theme.border,
-                    backgroundColor: pressed ? theme.surface : 'transparent',
-                    transform: [{ scale: pressed ? 0.98 : 1 }],
-                  })}
-                >
+            </View>
+
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
+            >
+              {filteredSubs.map((s) => {
+                const isSelected = category === activeCategory && subcategory === s.id;
+                return (
+                  <Pressable
+                    key={s.id}
+                    onPress={() => handleSelectLevel2(activeCategoryDef.id, s.id)}
+                    style={({ pressed }) => ({
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingVertical: 15,
+                      paddingHorizontal: 4,
+                      borderBottomWidth: 1,
+                      borderBottomColor: theme.border,
+                      backgroundColor: pressed ? theme.surface : 'transparent',
+                      transform: [{ scale: pressed ? 0.98 : 1 }],
+                    })}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 15.5,
+                        fontFamily: isSelected ? DISPLAY_BOLD : typography.family.sansMedium,
+                        color: isSelected ? colors.primary : theme.ink,
+                      }}
+                    >
+                      {s.label}
+                    </Text>
+
+                    {isSelected && (
+                      <View
+                        style={{
+                          width: 26,
+                          height: 26,
+                          borderRadius: 13,
+                          backgroundColor: isDark ? theme.surface : '#F2F3FE',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <Feather name="check" size={15} color={colors.primary} />
+                      </View>
+                    )}
+                  </Pressable>
+                );
+              })}
+
+              {filteredSubs.length === 0 && (
+                <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                  <Feather name="search" size={32} color={theme.muteSoft} />
                   <Text
                     style={{
-                      fontSize: 15.5,
-                      fontFamily: isSelected ? DISPLAY_BOLD : typography.family.sansMedium,
-                      color: isSelected ? colors.primary : theme.ink,
+                      fontFamily: DISPLAY_BOLD,
+                      fontSize: 15,
+                      color: theme.ink,
+                      marginTop: 12,
                     }}
                   >
-                    {s.label}
+                    No subcategories found
                   </Text>
-
-                  {isSelected && (
-                    <View
-                      style={{
-                        width: 26,
-                        height: 26,
-                        borderRadius: 13,
-                        backgroundColor: isDark ? theme.surface : '#F2F3FE',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <Feather name="check" size={15} color={colors.primary} />
-                    </View>
-                  )}
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+                  <Text style={{ fontSize: 13, color: theme.mute, marginTop: 4 }}>
+                    No match for &quot;{query}&quot; in {activeCategoryMeta?.title}.
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
         ) : (
           // ── LEVEL 1: MAIN CATEGORIES (Dedicated Page, Vinted Style) ──
           <ScrollView

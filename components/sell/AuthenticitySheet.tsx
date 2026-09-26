@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { View, Pressable, Platform } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
@@ -60,11 +60,13 @@ export function AuthenticitySheet({
   const { theme } = useTheme();
   const [selected, setSelected] = useState<Authenticity | null | undefined>(value);
   const [luxuryWarning, setLuxuryWarning] = useState<string | null>(null);
+  const selectingRef = useRef(false);
 
   useEffect(() => {
     if (visible) {
       setSelected(value);
       setLuxuryWarning(null);
+      selectingRef.current = false;
     }
   }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -72,6 +74,7 @@ export function AuthenticitySheet({
   const isDesigner = isHighValueDesigner(brandName);
 
   const handleSelectOption = (optValue: Authenticity) => {
+    if (selectingRef.current) return;
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     }
@@ -84,6 +87,7 @@ export function AuthenticitySheet({
       return;
     }
 
+    selectingRef.current = true;
     setLuxuryWarning(null);
     setSelected(optValue);
     onChange(optValue);

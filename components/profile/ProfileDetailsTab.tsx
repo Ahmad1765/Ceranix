@@ -190,7 +190,7 @@ export const ProfileDetailsTab = memo(function ProfileDetailsTab({
                   badgeTone="mute"
                   onPress={() => {
                     if (item.action === 'shop') {
-                      router.push('/orders' as any);
+                      router.push({ pathname: '/(tabs)/chat', params: { tab: 'orders' } } as any);
                     } else if (item.action === 'ratings') {
                       router.push('/ratings' as any);
                     } else if (item.action === 'bundle') {

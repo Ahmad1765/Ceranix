@@ -124,10 +124,11 @@ export const SellFormSchema = z
       }
     }
 
-    // Authenticity required for branded listings (except Unbranded / Local Tailor)
+    // Authenticity required for branded listings (except No brand / Unbranded)
     const brandTrimmed = (data.brand || '').trim();
     if (
       brandTrimmed.length > 0 &&
+      brandTrimmed.toLowerCase() !== 'no brand' &&
       brandTrimmed !== UNBRANDED_LOCAL_TAILOR &&
       !data.authenticity
     ) {
