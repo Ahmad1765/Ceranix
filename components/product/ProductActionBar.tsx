@@ -182,29 +182,21 @@ export function ProductActionBar({
           accessibilityLabel={
             isOwner
               ? 'Edit listing'
-              : isBundle
-                ? `Buy bundle for ${buyTotal ? formatPrice(buyTotal) : price ? formatPrice(price) : ''}`
-                : `Buy now for ${buyTotal ? formatPrice(buyTotal) : price ? formatPrice(price) : ''}`
+              : `Buy now for ${buyTotal ? formatPrice(buyTotal) : price ? formatPrice(price) : ''}`
           }
-          accessibilityHint={isBundle ? 'Proceeds to secure bundle checkout' : 'Proceeds to secure checkout'}
+          accessibilityHint="Proceeds to secure checkout"
           style={({ pressed }) => [
             styles.buyButton,
             {
-              backgroundColor: theme.purple,
-              borderColor: theme.purple,
+              backgroundColor: theme.ink,
+              borderColor: theme.ink,
               opacity: pressed ? 0.88 : 1,
               transform: [{ scale: pressed ? 0.98 : 1 }],
             },
           ]}
         >
-          <Text style={[styles.buyButtonText, { color: '#FFFFFF' }]}>
-            {isOwner
-              ? 'Edit listing'
-              : isBundle
-                ? buyTotal
-                  ? `Buy bundle · ${formatPrice(buyTotal, { whole: true })}`
-                  : 'Buy bundle'
-                : 'Buy now'}
+          <Text style={[styles.buyButtonText, { color: theme.background }]}>
+            {isOwner ? 'Edit listing' : 'Buy now'}
           </Text>
         </Pressable>
       </View>
@@ -247,7 +239,7 @@ const styles = StyleSheet.create({
   offerButton: {
     flex: 1,
     height: 48,
-    borderRadius: radii.pill,
+    borderRadius: 10,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -261,7 +253,7 @@ const styles = StyleSheet.create({
   buyButton: {
     flex: 1,
     height: 48,
-    borderRadius: radii.pill,
+    borderRadius: 10,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
