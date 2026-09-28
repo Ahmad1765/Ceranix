@@ -57,14 +57,22 @@ Thumbs.db
 # Supabase
 supabase/.temp/
 
-#Reference for web design and animations
-References
+# Cloudflare & Vercel
+.vercel/
+.wrangler/
 
-Testing for wardrobe
-brag-output
-.vercel
-.env*
+# Binary & media documents
+*.pdf
 
-icons
-apple
-scratch
+# Local reference, scratch, and test media
+References/
+Testing\ for\ wardrobe/
+Testing for wardrobe/
+brag-output/
+Icons/
+icons/
+Sreenshots/
+Screenshots/
+apple/
+scratch/
+
