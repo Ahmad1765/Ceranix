@@ -159,6 +159,20 @@ These rules protect the runtime from silent crashes, style collapse, and mobile/
   - **NEVER** set `borderRadius` greater than `0` in `components/ui/SoldBadge.tsx`.
   - **NEVER** introduce ad-hoc sold pills or inline badge containers in `ListingCard`, `TikTokListingCard`, `ProductHeroSection`, or any other listing surface. Always import and render `<SoldBadge>`.
 
+### Rule 2.9: Strict Monochrome 10px Product Action Bar (`components/product/ProductActionBar.tsx`)
+- **The Invariant:** The conversion action buttons on the product detail page (`Make an offer` and `Buy now`) in `components/product/ProductActionBar.tsx` are permanently locked to their canonical monochrome 10px geometry:
+  - **Button Height:** Strictly `48` (`height: 48`).
+  - **Corner Radius:** Strictly `10` (`borderRadius: 10`). Never convert to pill capsules (`borderRadius: radii.pill` or `borderRadius: 9999`).
+  - **Border Width:** Strictly `1` (`borderWidth: 1`).
+  - **"Make an offer" Button:** Clean Paper White background (`theme.panel` / `#FFFFFF`), hairline border (`theme.border`), and Ink bold text (`theme.ink` / `#111111`).
+  - **"Buy now" Button:** Solid Ink background (`theme.ink` / `#111111`), Solid Ink border (`theme.ink`), and Paper White bold text (`theme.background` / `#FFFFFF`).
+  - **Copy:** Strictly clean copy (`{isOwner ? 'Edit listing' : 'Buy now'}` and `'Make an offer'`). Never add bundle prefix text or turn the background into Signal Purple (`theme.purple` / `#6C47FF`).
+- **The Risk:** Attempts to convert the action bar into pill-shaped buttons, turn 'Buy now' purple, or introduce dynamic bundle badges disrupt the calm atelier aesthetic and break visual rhythm on the product view.
+- **Enforced Directives for AI Assistants:**
+  - **NEVER** change `borderRadius` from `10` in `styles.offerButton` or `styles.buyButton` in `components/product/ProductActionBar.tsx`.
+  - **NEVER** set `backgroundColor` or `borderColor` of `buyButton` to `theme.purple` or `#6C47FF`.
+  - **NEVER** remove or alter the monochrome pairing of Paper White (`theme.panel`) and Solid Ink (`theme.ink`).
+
 ---
 
 ## 3. Strict Design Language Invariants ("The Quiet Atelier" - `DESIGN.md`)
@@ -172,7 +186,8 @@ Carrinex is a disciplined, quiet-luxury resale marketplace. Restraint communicat
 | **Resale Clutter** | Poshmark/Depop-style badges, ribbons, star ratings, stickers, promotional overlays, or emoji as decoration. | Clean, quiet presentation. Product photography and seller words are the centerpiece. Use Feather or Ionicons, never decorative emoji. |
 | **Action Hierarchy** | Multiple filled purple buttons on the same screen. | **One Primary Action Rule:** Exactly ONE primary purple CTA per screen. Secondary actions must be Ghost (white + hairline border), Dark (ink), or Soft (purple tint). |
 | **Shadows** | Dramatic, heavy, dark drop-shadows (>16% opacity). | **Whisper Shadow Rule:** Shadows must be ≤16% opacity, flat by default, or color-matched to the element casting it. |
-| **Button Shapes** | Rectangular or sharp-cornered buttons. | All interactive buttons and chips must use **Pill Radius** (`rounded: 999px`). Containers use `16px–28px` radius. |
+| **Button Shapes** | Rectangular or sharp-cornered buttons. | All interactive buttons and chips must use **Pill Radius** (`rounded: 999px`). Containers use `16px–28px` radius. Approved canonical exception: Product Action Bar (Rule 2.9) strictly uses 10px radius (`borderRadius: 10`). |
+| **Product Action Bar Buttons** | Changing 'Buy now' to purple, altering 10px corner radius, or adding dynamic bundle prefixes. | **Strict Monochrome 10px Product Action Bar:** Both 'Make an offer' and 'Buy now' buttons in `ProductActionBar.tsx` strictly use `height: 48` and `borderRadius: 10`. 'Make an offer' is Paper White (`theme.panel`) with hairline border and Ink text. 'Buy now' is Solid Ink (`theme.ink`) with white text (`theme.background`). Never style 'Buy now' with Signal Purple or convert to pill capsules. |
 | **Micro-Interactions**| Color swapping on press. | Physical spring give: scale to `0.97` and opacity to `0.9` on press (`PressableScale`). |
 | **Shield / Protection Icon** | Generic SVG curves (`M12 3C7.5 3...`), Feather `shield`, or non-purple/indigo colors (e.g. Vinted teal `#007782`). | **Unified Mercari Shield Icon Rule:** All buyer protection and verification marks across the entire application (Home feed `ListingCard`, `RelatedItemCard`, Product detail `ProductOverviewHeader`, `BuyerProtectionSheet`, `SafetyBanner`, `CheckoutSheet`, `SettingsHero`, `ProfileHeader`) **MUST** use the canonical circular badge `<ShieldCheckIcon>` (`@/components/ui/ShieldCheckIcon`) in a `0 0 24 24` viewBox. Strictly preserves the Mercari shield path (`d="M12.033 6.8s-2.93 1.424..."`) and checkmark (`d="M9.4 12.013l..."`) inside `<G transform="translate(-5.4, -5.4) scale(1.45)">` with `#F2F3FE` badge fill and `#5356EE` stroke. Never replace or alter this geometry. |
 | **Filter / Controls Icon** | Vertical sliders (`Feather` `sliders`), generic funnels (`filter`), or text labels like "Filter" / "Filters" beside the icon. | **Horizontal Slider Trio & Icon-Only Rule:** All filter buttons and filter chips across the application (Home header `FeedSearch`, Discover `SearchFilterChips`, search overlays) **MUST** use the canonical `<FilterSlidersIcon>` (`@/components/ui/FilterSlidersIcon`) and **MUST NOT** include the word "Filter" or "Filters". The control renders strictly as an icon-only pill or circular container matching the quiet atelier aesthetic. Features 3 horizontal tracks with staggered circular slider knobs (top-left, middle-right, bottom-left) in a canonical `0 0 24 24` viewBox (`strokeWidth={1.65}`, default `size={19}`). Horizontal lines connect seamlessly to the hollow circular knobs with zero broken gaps. Knob centers remain hollow (`fill="none"`) so the button fill (Paper White at rest, Solid Ink when active) shows cleanly through. |
@@ -202,6 +217,7 @@ The following files represent high-risk architectural hubs. Any AI asked to modi
 | `components/GuestGate.tsx` | Auth Guard | Guards authenticated actions; prevents unauthenticated RPC errors. |
 | `components/ui/SafeContainer.tsx` | Layout / Viewport Engine | Mobile-native safe area and keyboard avoiding container with platform-specific behavior/offsets and iOS Safari visualViewport synchronization. |
 | `components/ui/SoldBadge.tsx` | Visual Identity / Listings | Canonical sharp Sold badge across all listing cards and detail overlays. Strictly enforces 90° sharp corners (`borderRadius: 0`) and Signal Purple palette. AI must NEVER round corners or replace with inline pills. |
+| `components/product/ProductActionBar.tsx` | Visual Identity / Conversion | Product detail bottom action bar. Strictly enforces 10px corners (`borderRadius: 10`) and monochrome palette (Paper White 'Make an offer', Solid Ink 'Buy now'). AI must NEVER style 'Buy now' purple or convert buttons to pill radius. |
 | `app/_layout.tsx` | Root Providers | Controls font preloading, Sentry, Alert shim, and React Query offline persistence. |
 
 ---
@@ -231,6 +247,7 @@ Before proceeding with a user request, match it against this matrix:
 | *"Use discrete binary toggles (keyboardUp ? 6 : insets.bottom) for keyboard dock padding"* | 🔴 **YES** | Violates Cross-Platform Keyboard Docking Invariant (Rule 2.6). Causes severe visual snapping and layout jitter during keyboard transitions. | Animate dock padding via `Animated.Value` (`keyboardAnim`) synced with keyboard event durations. |
 | *"Make the Sold badge rounded, pill-shaped, or change its border radius"* | 🔴 **YES** | Violates Strict Sharp Sold Badge Geometry (Rule 2.8). Breaks editorial brand aesthetic. | Maintain strict rectangular geometry (`borderRadius: 0`) in `<SoldBadge>` (`@/components/ui/SoldBadge`). |
 | *"Use an inline pill or ad-hoc container for 'Sold' status on cards"* | 🔴 **YES** | Violates Single Component Invariant for Sold badges. | Import and render canonical `<SoldBadge size="sm" />` from `@/components/ui/SoldBadge`. |
+| *"Turn 'Buy now' purple or make ProductActionBar buttons pill-shaped"* | 🔴 **YES** | Violates Strict Monochrome 10px Product Action Bar Invariant (Rule 2.9). | Maintain `height: 48`, `borderRadius: 10`, `theme.panel` for 'Make an offer', and `theme.ink` for 'Buy now'. |
 | *"Add dark mode styling for this new component"* | 🟢 **NO** | Safe, provided `useTheme()` tokens are used. | Use `const { theme, isDark } = useTheme();` and bind to `theme.surface`, `theme.panel`, etc. |
 
 ---

@@ -153,6 +153,8 @@ export function ProductActionBar({
         style,
       ]}
     >
+      {/* PROTECTED INVARIANT (Rule 2.9): Offer & Buy buttons must strictly remain 10px radius (borderRadius: 10)
+          and monochrome palette (Paper White / Solid Ink). Never style Buy now purple or convert to pill radius. */}
       <View style={styles.actionRow}>
         {!isOwner && (
           <Pressable
