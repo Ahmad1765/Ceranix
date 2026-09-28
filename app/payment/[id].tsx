@@ -255,7 +255,7 @@ export default function PaymentScreen() {
   const bundleCalculation = useMemo(() => {
     if (!listing) return null;
     const addOnPrices = bundledListings.map((b) => Number(b.price ?? 0));
-    return computeBundlePricing(listing.price, addOnPrices, listing.seller?.bundle_discount_pct);
+    return computeBundlePricing(listing.price, addOnPrices, listing.seller?.bundle_discount_pct ?? 0);
   }, [listing, bundledListings]);
 
   const bundleSavings = bundleCalculation?.savings ?? 0;

@@ -56,19 +56,35 @@ export function BundleSection({
     return (
       <View style={{ paddingTop: 18 }}>
         {activeSellerItems.length === 0 ? (
-          <View style={{ paddingHorizontal: 20, paddingVertical: 20, alignItems: 'center' }}>
-            <Feather name="package" size={22} color={theme.mute} />
-            <Text
+          <View>
+            <View
               style={{
-                fontSize: 13,
-                color: theme.mute,
-                marginTop: 8,
-                textAlign: 'center',
-                lineHeight: 19,
+                width: '100%',
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                paddingHorizontal: CARD_OUTER_PAD,
+                columnGap: CARD_GAP,
+                rowGap: 16,
               }}
             >
-              @{username} has no other available items right now.
-            </Text>
+              <View style={{ width: cardWidth }}>
+                <ListingCard listing={listing} width={cardWidth} />
+              </View>
+            </View>
+            <View style={{ paddingHorizontal: 20, paddingVertical: 18, alignItems: 'center' }}>
+              <Feather name="package" size={20} color={theme.mute} />
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: theme.mute,
+                  marginTop: 6,
+                  textAlign: 'center',
+                  lineHeight: 19,
+                }}
+              >
+                @{username} has no other available items right now.
+              </Text>
+            </View>
           </View>
         ) : (
           <View
@@ -103,7 +119,7 @@ export function BundleSection({
   } = computeBundlePricing(
     listing.price,
     selectedItems.map((s) => Number(s.price ?? 0)),
-    listing.seller.bundle_discount_pct,
+    listing.seller?.bundle_discount_pct ?? 0,
   );
 
   return (
@@ -121,19 +137,34 @@ export function BundleSection({
 
       {/* Selectable seller items grid */}
       {activeSellerItems.length === 0 ? (
-        <View style={{ paddingHorizontal: 20, paddingVertical: 20, alignItems: 'center' }}>
-          <Feather name="package" size={22} color={theme.mute} />
-          <Text
+        <View>
+          <View
             style={{
-              fontSize: 13,
-              color: theme.mute,
-              marginTop: 8,
-              textAlign: 'center',
-              lineHeight: 19,
+              width: '100%',
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              paddingHorizontal: CARD_OUTER_PAD,
+              columnGap: CARD_GAP,
+              rowGap: 16,
             }}
           >
-            @{username} has nothing else available to bundle right now.{'\n'}Follow them to catch their next drop.
-          </Text>
+            {/* The item being viewed is the seller's available listing */}
+            <BaseItemCard item={listing} />
+          </View>
+          <View style={{ paddingHorizontal: 20, paddingVertical: 18, alignItems: 'center' }}>
+            <Feather name="package" size={20} color={theme.mute} />
+            <Text
+              style={{
+                fontSize: 13,
+                color: theme.mute,
+                marginTop: 6,
+                textAlign: 'center',
+                lineHeight: 19,
+              }}
+            >
+              @{username} has no other available items right now.{'\n'}Follow them to catch their next drop.
+            </Text>
+          </View>
         </View>
       ) : (
         <View
@@ -162,122 +193,6 @@ export function BundleSection({
           })}
         </View>
       )}
-
-      {/* Summary + CTA — only once the buyer has added something. */}
-      {selectedItems.length > 0 ? (
-        <View
-          style={{
-            marginHorizontal: 16,
-            marginTop: 18,
-            backgroundColor: theme.surface,
-            borderWidth: 1,
-            borderColor: theme.border,
-            borderRadius: 18,
-            padding: 16,
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <Text style={{ fontSize: 14, fontWeight: '800', color: theme.ink, letterSpacing: -0.2 }}>
-              Your bundle
-            </Text>
-            <Text style={{ fontSize: 12.5, fontWeight: '600', color: theme.mute }}>
-              {bundleItemCount} items
-            </Text>
-          </View>
-
-          <SummaryRow label="Subtotal" value={formatPrice(subtotal)} />
-          {qualifies ? (
-            <SummaryRow
-              label={`Bundle discount · ${bundlePct}%`}
-              value={`− ${formatPrice(savings)}`}
-              accent
-            />
-          ) : null}
-          <View style={{ height: HAIRLINE_COLOR_H, backgroundColor: theme.border, marginVertical: 10 }} />
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
-            <Text style={{ fontSize: 14, fontWeight: '800', color: theme.ink }}>Total</Text>
-            <Text style={{ fontSize: 22, fontWeight: '900', color: theme.ink, letterSpacing: -0.5 }}>
-              {formatPrice(total)}
-            </Text>
-          </View>
-
-          {/* Action Buttons: Buy Bundle + Make an Offer */}
-          <View style={{ marginTop: 14, gap: 8 }}>
-            <Pressable
-              onPress={() => onBuyBundle(total, selectedItemIds)}
-              accessibilityRole="button"
-              accessibilityLabel={`Buy bundle for ${formatPrice(total)}`}
-              style={({ pressed }) => ({
-                backgroundColor: BRAND_PURPLE,
-                borderRadius: 14,
-                paddingVertical: 14,
-                alignItems: 'center',
-                flexDirection: 'row',
-                justifyContent: 'center',
-                gap: 7,
-                opacity: pressed ? 0.85 : 1,
-                transform: [{ scale: pressed ? 0.98 : 1 }],
-              })}
-            >
-              <Feather name="shopping-bag" size={15} color="white" />
-              <Text style={{ fontSize: 14, fontWeight: '800', color: 'white' }}>
-                Buy bundle · {formatPrice(total)}
-              </Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => onSendBundleOffer(total, selectedItemIds)}
-              accessibilityRole="button"
-              accessibilityLabel={`Make a bundle offer on ${bundleItemCount} items`}
-              style={({ pressed }) => ({
-                borderRadius: 14,
-                borderWidth: 1.5,
-                borderColor: theme.border,
-                backgroundColor: theme.panel,
-                paddingVertical: 12,
-                alignItems: 'center',
-                flexDirection: 'row',
-                justifyContent: 'center',
-                gap: 7,
-                opacity: pressed ? 0.85 : 1,
-                transform: [{ scale: pressed ? 0.98 : 1 }],
-              })}
-            >
-              <Feather name="tag" size={14} color={theme.ink} />
-              <Text style={{ fontSize: 13.5, fontWeight: '700', color: theme.ink }}>
-                Make an offer
-              </Text>
-            </Pressable>
-          </View>
-
-          <Text
-            style={{
-              fontSize: 11.5,
-              color: theme.mute,
-              textAlign: 'center',
-              marginTop: 10,
-            }}
-          >
-            Buyer Protection covers all items in your bundle.
-          </Text>
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
-const HAIRLINE_COLOR_H = 1;
-
-function SummaryRow({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
-  const { theme } = useTheme();
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 3 }}>
-      <Text style={{ fontSize: 13, color: accent ? BRAND_PURPLE : theme.mute, fontWeight: accent ? '700' : '500' }}>
-        {label}
-      </Text>
-      <Text style={{ fontSize: 13, color: accent ? BRAND_PURPLE : theme.ink, fontWeight: '700' }}>
-        {value}
-      </Text>
     </View>
   );
 }

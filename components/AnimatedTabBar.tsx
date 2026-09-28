@@ -150,21 +150,32 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
       previewIdx.value = NO_PREVIEW;
       return;
     }
-    const focused = route.key === activeKey;
-    const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-    if (!focused && !event.defaultPrevented) {
-      if (HAPTICS) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      const t0 = __DEV__ ? Date.now() : 0;
-      navigation.navigate(route.name);
-      if (__DEV__) {
-        requestAnimationFrame(() =>
+
+    const proceed = () => {
+      const focused = route.key === activeKey;
+      const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+      if (!focused && !event.defaultPrevented) {
+        if (HAPTICS) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        const t0 = __DEV__ ? Date.now() : 0;
+        navigation.navigate(route.name);
+        if (__DEV__) {
           requestAnimationFrame(() =>
-            console.log(`[tab] ${route.name} ${Date.now() - t0}ms`),
-          ),
-        );
+            requestAnimationFrame(() =>
+              console.log(`[tab] ${route.name} ${Date.now() - t0}ms`),
+            ),
+          );
+        }
       }
+      previewIdx.value = NO_PREVIEW;
+    };
+
+    if (Platform.OS === 'web') {
+      // Defer navigation slightly on web to let the browser's synthetic click
+      // finish on the tab dock instead of hitting underlying buttons in the new view/modal.
+      setTimeout(proceed, 60);
+    } else {
+      proceed();
     }
-    previewIdx.value = NO_PREVIEW;
   };
 
   // Mount the tab under the finger BEFORE the finger lifts.

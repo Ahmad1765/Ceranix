@@ -70,6 +70,7 @@ export default function HomeScreen() {
     searchCategory?: string;
     searchQuery?: string;
     category?: string;
+    q?: string;
   }>();
 
   const navigation = useNavigation();
@@ -82,14 +83,14 @@ export default function HomeScreen() {
 
   useEffect(() => {
     const cat = params.searchCategory || (params.searchOpen === '1' ? params.category : undefined);
-    const query = params.searchQuery;
+    const query = params.searchQuery || (params.searchOpen === '1' ? params.q : undefined);
 
     if (params.searchOpen === '1' || cat || query) {
       if (cat !== undefined) setInitialSearchCategory(cat);
       if (query !== undefined) setInitialSearchQuery(query);
       setSearchModeOpen(true);
     }
-  }, [params.searchOpen, params.searchCategory, params.searchQuery, params.category]);
+  }, [params.searchOpen, params.searchCategory, params.searchQuery, params.category, params.q]);
 
   const listRef = useRef<FlashListRef<Listing[]>>(null);
   const scrollToTop = useCallback(() => {
@@ -279,12 +280,13 @@ export default function HomeScreen() {
               setSearchModeOpen(false);
               setInitialSearchCategory(null);
               setInitialSearchQuery('');
-              if (params.searchOpen || params.searchCategory || params.searchQuery || params.category) {
+              if (params.searchOpen || params.searchCategory || params.searchQuery || params.category || params.q) {
                 router.setParams({
                   searchOpen: undefined,
                   searchCategory: undefined,
                   searchQuery: undefined,
                   category: undefined,
+                  q: undefined,
                 });
               }
             }}

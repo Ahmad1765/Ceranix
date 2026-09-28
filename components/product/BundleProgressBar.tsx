@@ -42,7 +42,7 @@ export function BundleProgressBar({
   const { itemCount, pct, qualifies, progress, nextTier } = computeBundlePricing(
     listing.price,
     selectedItems.map((s) => Number(s.price ?? 0)),
-    listing.seller.bundle_discount_pct,
+    listing.seller?.bundle_discount_pct ?? 0,
   );
   const hasSellerDiscount =
     listing.seller?.bundle_discount_pct != null &&
@@ -51,21 +51,23 @@ export function BundleProgressBar({
     ? Number(listing.seller.bundle_discount_pct)
     : null;
 
-  const maxPct = sellerDiscount ?? BUNDLE_TIERS[BUNDLE_TIERS.length - 1].pct;
+  const maxPct = sellerDiscount ?? 0;
   const remaining = nextTier ? nextTier.count - itemCount : 0;
 
   const headline = qualifies
     ? `${pct}% bundle discount unlocked!`
     : sellerDiscount
       ? `Bundle & save ${sellerDiscount}%`
-      : `Bundle & save up to ${maxPct}%`;
+      : `Bundle items from @${listing.seller.username}`;
 
   const guidance = nextTier
     ? `Add ${remaining} more ${remaining === 1 ? 'item' : 'items'} to save ${nextTier.pct}%`
     : qualifies
       ? 'Maximum discount reached for this order'
       : sellerItems.length > 0
-        ? 'Select items below to unlock discounts'
+        ? sellerDiscount
+          ? 'Select items below to unlock discounts'
+          : 'Select items below to bundle together'
         : `@${listing.seller.username} has 1 item listed`;
 
   const handleOpenInfo = () => {
@@ -225,7 +227,7 @@ export function BundleProgressBar({
         subtitle={
           sellerDiscount
             ? `Buy 2 or more items from @${listing.seller.username} to get ${sellerDiscount}% off your bundle.`
-            : `Buy multiple items from @${listing.seller.username} to unlock exclusive discounts.`
+            : `Bundle items from @${listing.seller.username} to purchase together.`
         }
         autoHeight={true}
       >

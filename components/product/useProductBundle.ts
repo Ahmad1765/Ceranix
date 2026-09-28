@@ -53,11 +53,6 @@ export function useProductBundle({
     sellerItems.length > 0 ? 'members' : 'similar',
   );
 
-  // Sync tab when sellerItems change (e.g. if current seller has no items, default to similar)
-  useEffect(() => {
-    if (sellerItems.length === 0) setRelatedTab('similar');
-  }, [sellerItems.length]);
-
   // Reset bundle selection whenever the viewed listing changes
   useEffect(() => {
     setSelectedBundleIds(new Set());

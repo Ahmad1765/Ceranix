@@ -198,7 +198,13 @@ export function ProductActionBar({
           ]}
         >
           <Text style={[styles.buyButtonText, { color: isBundle ? '#FFFFFF' : theme.background }]}>
-            {isOwner ? 'Edit listing' : isBundle ? 'Buy bundle' : 'Buy now'}
+            {isOwner
+              ? 'Edit listing'
+              : isBundle
+                ? buyTotal
+                  ? `Buy bundle · ${formatPrice(buyTotal, { whole: true })}`
+                  : 'Buy bundle'
+                : 'Buy now'}
           </Text>
         </Pressable>
       </View>

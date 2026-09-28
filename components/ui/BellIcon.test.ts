@@ -42,7 +42,9 @@ describe('BellIcon Component', () => {
     expect(svg.props.viewBox).toBe('0 0 24 24');
 
     expect(path.props.d).toBe(BELL_OUTLINE_PATH);
-    expect(path.props.fill).toBe('#0F0F0F');
+    expect(path.props.fill).toBe('none');
+    expect(path.props.stroke).toBe('#0F0F0F');
+    expect(path.props.strokeWidth).toBe(2.4);
     expect(path.props.fillRule).toBe('evenodd');
     expect(path.props.clipRule).toBe('evenodd');
   });
@@ -63,13 +65,14 @@ describe('BellIcon Component', () => {
 
     expect(path.props.d).toBe(BELL_FILLED_PATH);
     expect(path.props.fill).toBe('#6C47FF');
+    expect(path.props.stroke).toBe('#6C47FF');
     expect(path.props.fillRule).toBe('nonzero');
     expect(path.props.clipRule).toBe('nonzero');
   });
 
   it('exports valid SVG path constants matching the design', () => {
-    expect(BELL_OUTLINE_PATH).toContain('M12 1');
-    expect(BELL_OUTLINE_PATH).toContain('14 19h-4a2 2 0 104 0z');
-    expect(BELL_FILLED_PATH).toContain('M12 1');
+    expect(BELL_OUTLINE_PATH).toContain('M18 8A6 6 0 0 0 6 8');
+    expect(BELL_OUTLINE_PATH).toContain('M13.73 21a2 2 0 0 1-3.46 0');
+    expect(BELL_FILLED_PATH).toContain('M18 8A6 6 0 0 0 6 8');
   });
 });

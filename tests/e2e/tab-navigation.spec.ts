@@ -20,11 +20,11 @@ test.describe('Tab navigation', () => {
     await expect(page.getByPlaceholder('Search your feed')).toBeVisible();
   });
 
-  test('Inbox tab routes to the inbox', async ({ page }) => {
-    await page.getByRole('button', { name: 'Inbox' }).click();
+  test('Activity tab routes to the activity inbox', async ({ page }) => {
+    await page.getByRole('button', { name: /Activity|Inbox/i }).click();
     await page.waitForURL(/\/chat/);
     await expect(
-      page.getByText(/Inbox|Sign in to chat|It's quiet here/).first(),
+      page.getByText(/Activity|Inbox|Sign in to chat|It's quiet here/).first(),
     ).toBeVisible();
   });
 

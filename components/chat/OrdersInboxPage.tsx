@@ -1,4 +1,4 @@
-import { memo, useState, useCallback, useMemo, useEffect } from 'react';
+import { memo, useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   FlatList,
@@ -21,203 +21,50 @@ import { useMyOrdersQuery } from '@/lib/queries';
 import { getOptimizedImageUrl, cardImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 import { buyerProtectionFee, formatPrice } from '@/lib/fees';
 import { deriveInvoiceAmounts } from '@/lib/invoiceStatus';
-import { partitionOrders, getOrderCategory, type OrderSide, type OrderCategory } from '@/lib/orders';
+import { partitionOrders, type OrderSide } from '@/lib/orders';
 import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import type { MyOrder } from '@/lib/payments';
 
-type FilterStatus = 'all' | OrderCategory;
+type FilterStatus = 'all' | 'in_progress' | 'canceled' | 'completed';
 
 const FILTER_CHIPS: { key: FilterStatus; label: string }[] = [
   { key: 'all', label: 'All' },
-  { key: 'in_progress', label: 'In Progress' },
-  { key: 'completed', label: 'Completed' },
-  { key: 'refunds', label: 'Refunds' },
+  { key: 'in_progress', label: 'In progress' },
   { key: 'canceled', label: 'Canceled' },
+  { key: 'completed', label: 'Completed' },
 ];
 
-function formatDate(dateStr?: string | null): string {
-  if (!dateStr) return '';
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return '';
-    return d.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  } catch {
-    return '';
-  }
-}
-
-function deriveOrderCode(id: string): string {
-  const hex = id.replace(/-/g, '').slice(0, 8).toUpperCase();
-  return `#${hex}`;
-}
-
-function getOrderStatusInfo(order: MyOrder, side: OrderSide, isDark: boolean) {
-  const fulfillment = (((order as any).fulfillment_status ?? '') as string).toLowerCase();
-  const status = (order.status ?? '').toLowerCase();
-
-  const isDisputed = fulfillment === 'disputed' || status === 'disputed';
-  const isCanceled = status === 'canceled' || status === 'failed' || fulfillment === 'canceled';
-  const isRefunded =
-    status === 'refunded' ||
-    status === 'refund_due' ||
-    status === 'partially_refunded' ||
-    fulfillment === 'refunded';
-  const isCompleted = fulfillment === 'completed' || status === 'completed';
-  const isDelivered = fulfillment === 'delivered' || status === 'delivered';
+function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
+  const { theme } = useTheme();
+  const { total } = deriveInvoiceAmounts(order, order.listing?.price, buyerProtectionFee);
+  const image = order.listing ? cardImageUrl(order.listing, 0) : '';
   const isShipped = Boolean(
     (order as any).shipped_at ||
       (order as any).shifted_at ||
       (order as any).tracking_number ||
-      status === 'shifting' ||
-      fulfillment === 'shifting',
+      order.status === 'shifting' ||
+      (order as any).fulfillment_status === 'shifting',
   );
-  const isPacking = fulfillment === 'packing' || status === 'packing';
-  const isAwaitingPayment = fulfillment === 'awaiting_payment' || status === 'awaiting_payment';
-  const isCodPending = order.payment_method === 'cod' && (status === 'pending' || fulfillment === 'pending');
-
-  if (isRefunded) {
-    return {
-      label: status === 'refund_due' ? 'Refund Pending' : 'Refunded',
-      color: isDark ? 'rgba(255, 255, 255, 0.70)' : 'rgba(17, 17, 17, 0.70)',
-      bg: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(17, 17, 17, 0.06)',
-      icon: (
-        <Feather
-          name="rotate-ccw"
-          size={12}
-          color={isDark ? 'rgba(255, 255, 255, 0.70)' : 'rgba(17, 17, 17, 0.70)'}
-          style={{ marginRight: 4 }}
-        />
-      ),
-      description: 'Refund issued to original payment method',
-    };
-  }
-
-  if (isCanceled) {
-    return {
-      label: status === 'failed' ? 'Payment Failed' : 'Order Canceled',
-      color: '#EF4444',
-      bg: isDark ? 'rgba(239, 68, 68, 0.16)' : '#FEF2F2',
-      icon: <Feather name="x-circle" size={12} color="#EF4444" style={{ marginRight: 4 }} />,
-      description: status === 'failed' ? 'Payment could not be processed' : 'Order was canceled',
-    };
-  }
-
-  if (isDisputed) {
-    return {
-      label: 'Dispute in Review',
-      color: '#5356EE',
-      bg: isDark ? 'rgba(83, 86, 238, 0.16)' : '#F2F3FE',
-      icon: <ShieldCheckIcon size={13} style={{ marginRight: 4 }} />,
-      description: 'Ceranix Protection is reviewing this order',
-    };
-  }
-
-  if (isCompleted) {
-    return {
-      label: 'Completed',
-      color: '#6C47FF',
-      bg: isDark ? 'rgba(108, 71, 255, 0.16)' : 'rgba(108, 71, 255, 0.10)',
-      icon: <Feather name="check-circle" size={12} color="#6C47FF" style={{ marginRight: 4 }} />,
-      description: side === 'bought' ? 'Transaction complete · Item received' : 'Sale completed · Payout processed',
-    };
-  }
-
-  if (isDelivered) {
-    return {
-      label: side === 'bought' ? 'Delivered · Inspect' : 'Delivered',
-      color: '#6C47FF',
-      bg: isDark ? 'rgba(108, 71, 255, 0.16)' : 'rgba(108, 71, 255, 0.10)',
-      icon: <Feather name="package" size={12} color="#6C47FF" style={{ marginRight: 4 }} />,
-      description: side === 'bought' ? 'Delivered to your address · Please inspect' : 'Buyer has received package',
-    };
-  }
-
-  if (isShipped) {
-    const tracking = (order as any).tracking_number;
-    return {
-      label: 'In Transit',
-      color: '#6C47FF',
-      bg: isDark ? 'rgba(108, 71, 255, 0.16)' : 'rgba(108, 71, 255, 0.10)',
-      icon: <Feather name="truck" size={12} color="#6C47FF" style={{ marginRight: 4 }} />,
-      description: tracking ? `Dispatched · Tracking: ${tracking}` : 'Package is on the way',
-    };
-  }
-
-  if (isPacking) {
-    const isDropship = (order as any).fulfillment_type === 'dropship';
-    return {
-      label: side === 'bought' ? (isDropship ? 'Processing' : 'Packing Order') : 'Prepare Shipment',
-      color: isDark ? '#F5F5F5' : '#111111',
-      bg: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(17, 17, 17, 0.06)',
-      icon: <Feather name="box" size={12} color={isDark ? '#F5F5F5' : '#111111'} style={{ marginRight: 4 }} />,
-      description: side === 'bought' ? 'Seller is preparing your order' : 'Please package item for shipping',
-    };
-  }
-
-  if (isAwaitingPayment) {
-    return {
-      label: 'Awaiting Payment',
-      color: isDark ? 'rgba(255, 255, 255, 0.70)' : 'rgba(17, 17, 17, 0.70)',
-      bg: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(17, 17, 17, 0.06)',
-      icon: (
-        <Feather
-          name="clock"
-          size={12}
-          color={isDark ? 'rgba(255, 255, 255, 0.70)' : 'rgba(17, 17, 17, 0.70)'}
-          style={{ marginRight: 4 }}
-        />
-      ),
-      description: 'Awaiting payment confirmation',
-    };
-  }
-
-  if (isCodPending) {
-    return {
-      label: side === 'bought' ? 'CoD · Pay on Delivery' : 'CoD Confirmed',
-      color: isDark ? 'rgba(255, 255, 255, 0.70)' : 'rgba(17, 17, 17, 0.70)',
-      bg: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(17, 17, 17, 0.06)',
-      icon: (
-        <Feather
-          name="clock"
-          size={12}
-          color={isDark ? 'rgba(255, 255, 255, 0.70)' : 'rgba(17, 17, 17, 0.70)'}
-          style={{ marginRight: 4 }}
-        />
-      ),
-      description: side === 'bought' ? 'Pay cash upon delivery at your door' : 'Cash on delivery order confirmed',
-    };
-  }
-
-  return {
-    label: side === 'bought' ? 'Order Confirmed' : 'New Order',
-    color: '#6C47FF',
-    bg: isDark ? 'rgba(108, 71, 255, 0.16)' : 'rgba(108, 71, 255, 0.10)',
-    icon: <Feather name="check" size={12} color="#6C47FF" style={{ marginRight: 4 }} />,
-    description: 'Order confirmed and placed successfully',
-  };
-}
-
-function OrderCard({ order, side }: { order: MyOrder; side: OrderSide }) {
-  const { theme, isDark } = useTheme();
-  const { total } = deriveInvoiceAmounts(order, order.listing?.price, buyerProtectionFee);
-  const image = order.listing ? cardImageUrl(order.listing, 0) : '';
 
   const handlePress = () => {
     tap();
-    const targetId = order.listing_id || order.id;
-    if (targetId) {
-      router.push(`/invoice/${targetId}` as any);
+    if (order.listing_id) {
+      router.push(`/invoice/${order.listing_id}` as any);
     }
   };
 
-  const statusInfo = getOrderStatusInfo(order, side, isDark);
-  const dateFormatted = formatDate(order.created_at);
-  const orderCode = deriveOrderCode(order.id);
-  const isCod = order.payment_method === 'cod';
+  const fulfillment = (order as any).fulfillment_status;
+  const isDisputed = fulfillment === 'disputed' || order.status === 'disputed';
+  const isDelivered = fulfillment === 'delivered' || order.status === 'delivered';
+  const isPacking = fulfillment === 'packing' || order.status === 'packing';
+  const isCompleted = fulfillment === 'completed' || order.status === 'completed';
+  const isAwaitingPayment = fulfillment === 'awaiting_payment' || order.status === 'awaiting_payment';
+  const isCanceled =
+    order.status === 'canceled' ||
+    order.status === 'refunded' ||
+    order.status === 'failed' ||
+    fulfillment === 'canceled' ||
+    fulfillment === 'refunded';
 
   return (
     <Pressable
@@ -226,252 +73,181 @@ function OrderCard({ order, side }: { order: MyOrder; side: OrderSide }) {
       accessibilityRole="button"
       style={({ pressed }) => [
         {
-          marginHorizontal: 16,
-          marginBottom: 12,
-          backgroundColor: theme.surface,
-          borderRadius: 14,
-          borderWidth: 1,
-          borderColor: isDark ? theme.border : '#E5E7EB',
-          overflow: 'hidden',
-          ...(Platform.OS !== 'web'
-            ? {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 1.5 },
-                shadowOpacity: isDark ? 0.25 : 0.04,
-                shadowRadius: 5,
-                elevation: 2,
-              }
-            : {
-                boxShadow: isDark
-                  ? '0 2px 8px rgba(0,0,0,0.3)'
-                  : '0 2px 8px rgba(0,0,0,0.04)',
-              }),
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 16,
+          paddingVertical: 12,
         },
-        pressed && { opacity: 0.88, transform: [{ scale: 0.995 }] },
+        pressed && { opacity: 0.75 },
       ]}
     >
-      {/* Card Header: Date & Order Code + Status Badge */}
+      {/* Thumbnail */}
       <View
         style={{
-          flexDirection: 'row',
+          width: 58,
+          height: 58,
+          borderRadius: 8,
+          backgroundColor: theme.panel,
+          borderWidth: 1,
+          borderColor: theme.border,
+          overflow: 'hidden',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingHorizontal: 14,
-          paddingTop: 12,
-          paddingBottom: 10,
+          justifyContent: 'center',
+          marginRight: 14,
         }}
       >
-        <View style={{ flex: 1, marginRight: 8 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            {dateFormatted ? (
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontFamily: typography.family.sansMedium,
-                  color: theme.mute,
-                }}
-              >
-                {dateFormatted}
-              </Text>
-            ) : null}
-            {dateFormatted && orderCode ? (
-              <Text style={{ fontSize: 11, color: theme.muteSoft }}>·</Text>
-            ) : null}
-            <Text
-              style={{
-                fontSize: 12,
-                fontFamily: typography.family.sansMedium,
-                color: theme.mute,
-              }}
-            >
-              {orderCode}
-            </Text>
-          </View>
-        </View>
-
-        {/* Status Badge */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            paddingHorizontal: 9,
-            paddingVertical: 4.5,
-            borderRadius: 7,
-            backgroundColor: statusInfo.bg,
-          }}
-        >
-          {statusInfo.icon}
-          <Text
-            style={{
-              fontSize: 11.5,
-              fontWeight: '700',
-              fontFamily: typography.family.sansBold,
-              color: statusInfo.color,
-            }}
-          >
-            {statusInfo.label}
-          </Text>
-        </View>
+        {image ? (
+          <Image
+            source={{ uri: getOptimizedImageUrl(image, { width: 160 }) }}
+            style={{ width: '100%', height: '100%' }}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={IMAGE_TRANSITION}
+          />
+        ) : (
+          <Feather name="package" size={20} color={theme.muteSoft} />
+        )}
       </View>
 
-      {/* Card Divider */}
-      <View
-        style={{
-          height: StyleSheet.hairlineWidth,
-          backgroundColor: isDark ? theme.border : '#F3F4F6',
-          marginHorizontal: 14,
-        }}
-      />
-
-      {/* Card Body: Thumbnail + Details */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingHorizontal: 14,
-          paddingVertical: 12,
-        }}
-      >
-        {/* Thumbnail */}
-        <View
-          style={{
-            width: 66,
-            height: 66,
-            borderRadius: 10,
-            backgroundColor: theme.panel,
-            borderWidth: 1,
-            borderColor: theme.border,
-            overflow: 'hidden',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginRight: 12,
-          }}
-        >
-          {image ? (
-            <Image
-              source={{ uri: getOptimizedImageUrl(image, { width: 180 }) }}
-              style={{ width: '100%', height: '100%' }}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-              transition={IMAGE_TRANSITION}
-            />
-          ) : (
-            <Feather name="package" size={24} color={theme.muteSoft} />
-          )}
-        </View>
-
-        {/* Info */}
-        <View style={{ flex: 1, justifyContent: 'center' }}>
-          <Text
-            style={{
-              fontSize: 14.5,
-              fontWeight: '700',
-              color: theme.ink,
-              fontFamily: typography.family.sansBold,
-              lineHeight: 19,
-              marginBottom: 4,
-            }}
-            numberOfLines={2}
-          >
-            {order.listing?.title ?? 'Item purchased'}
-          </Text>
-
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-            <Text
-              style={{
-                fontSize: 14,
-                fontWeight: '700',
-                color: theme.ink,
-                fontFamily: typography.family.sansBold,
-              }}
-            >
-              {formatPrice(total)}
-            </Text>
-            <Text
-              style={{
-                fontSize: 11.5,
-                color: theme.mute,
-                fontFamily: typography.family.sansMedium,
-              }}
-            >
-              {isCod ? '· Cash on Delivery' : '· Paid Online'}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Card Footer: Contextual message + View Details link */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingHorizontal: 14,
-          paddingVertical: 10,
-          backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : '#F9FAFB',
-          borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: isDark ? theme.border : '#F3F4F6',
-        }}
-      >
+      {/* Item info */}
+      <View style={{ flex: 1, marginRight: 10 }}>
         <Text
           style={{
-            fontSize: 12,
-            fontFamily: typography.family.sansMedium,
-            color: theme.mute,
-            flex: 1,
-            marginRight: 10,
+            fontSize: 14.5,
+            fontWeight: '700',
+            color: theme.ink,
+            fontFamily: typography.family.sansBold,
+            marginBottom: 2,
           }}
           numberOfLines={1}
         >
-          {statusInfo.description}
+          {order.listing?.title ?? 'Order'}
         </Text>
-
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+        <Text
+          style={{
+            fontSize: 13,
+            color: theme.mute,
+            fontFamily: typography.family.sansMedium,
+            marginBottom: 3,
+          }}
+        >
+          {formatPrice(total)}
+        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {isDisputed ? (
+            <ShieldCheckIcon size={13} style={{ marginRight: 4 }} />
+          ) : (
+            <Feather
+              name={
+                isCanceled
+                  ? 'x-circle'
+                  : isCompleted
+                  ? 'check-circle'
+                  : isDelivered
+                  ? 'package'
+                  : isShipped
+                  ? 'truck'
+                  : isPacking
+                  ? 'package'
+                  : isAwaitingPayment
+                  ? 'clock'
+                  : 'check-circle'
+              }
+              size={12}
+              color={
+                isCanceled
+                  ? '#EF4444'
+                  : isCompleted
+                  ? '#10B981'
+                  : isDelivered
+                  ? theme.primary
+                  : isShipped
+                  ? theme.primary
+                  : isPacking
+                  ? theme.primary
+                  : isAwaitingPayment
+                  ? '#D97706'
+                  : '#10B981'
+              }
+              style={{ marginRight: 4 }}
+            />
+          )}
           <Text
-            style={{
-              fontSize: 12,
-              fontWeight: '600',
-              fontFamily: typography.family.sansSemibold,
-              color: theme.purple,
-            }}
+            style={[
+              {
+                fontSize: 12,
+                fontWeight: '600',
+                color: '#10B981',
+                fontFamily: typography.family.sansSemibold,
+              },
+              isCanceled && { color: '#EF4444' },
+              (isShipped || isPacking || isDelivered) && { color: theme.primary },
+              isAwaitingPayment && { color: '#D97706' },
+              isDisputed && { color: theme.ink },
+            ]}
           >
-            View Details
+            {isCanceled
+              ? order.status === 'refunded' || fulfillment === 'refunded'
+                ? 'Refunded'
+                : 'Order Canceled'
+              : isDisputed
+              ? 'Dispute under review'
+              : isCompleted
+              ? 'Completed'
+              : isDelivered
+              ? side === 'bought'
+                ? 'Delivered · Please inspect'
+                : 'Delivered · Awaiting completion'
+              : isShipped
+              ? 'Dispatched · In transit'
+              : isPacking
+              ? (order as any).fulfillment_type === 'dropship'
+                ? 'Supplier Processing'
+                : 'Packing order'
+              : isAwaitingPayment
+              ? 'Awaiting Payment'
+              : order.payment_method === 'cod' && (order.status === 'pending' || fulfillment === 'pending')
+              ? side === 'bought'
+                ? 'CoD · Pay on delivery'
+                : 'CoD · Awaiting delivery'
+              : 'Order Confirmed'}
           </Text>
-          <Feather name="chevron-right" size={14} color={theme.purple} />
         </View>
       </View>
+
+      {/* Chevron */}
+      <Feather name="chevron-right" size={18} color={theme.muteSoft} />
     </Pressable>
   );
 }
 
 function OrdersSkeleton() {
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
   return (
-    <View style={{ paddingVertical: 10 }}>
+    <View style={{ paddingVertical: 6 }}>
       {[0, 1, 2].map((i) => (
         <View
           key={i}
           style={{
-            marginHorizontal: 16,
-            marginBottom: 12,
-            backgroundColor: theme.surface,
-            borderRadius: 14,
-            borderWidth: 1,
-            borderColor: isDark ? theme.border : '#E5E7EB',
-            padding: 14,
-            gap: 12,
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 16,
+            paddingVertical: 14,
           }}
         >
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <View style={{ width: 120, height: 12, borderRadius: 4, backgroundColor: theme.panel }} />
-            <View style={{ width: 80, height: 22, borderRadius: 6, backgroundColor: theme.panel }} />
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <View style={{ width: 66, height: 66, borderRadius: 10, backgroundColor: theme.panel }} />
-            <View style={{ flex: 1, gap: 8 }}>
-              <View style={{ width: '80%', height: 14, borderRadius: 4, backgroundColor: theme.panel }} />
-              <View style={{ width: '40%', height: 13, borderRadius: 4, backgroundColor: theme.panel }} />
-            </View>
+          <View
+            style={{
+              width: 58,
+              height: 58,
+              borderRadius: 8,
+              backgroundColor: theme.panel,
+              marginRight: 14,
+            }}
+          />
+          <View style={{ flex: 1, gap: 6 }}>
+            <View style={{ width: '60%', height: 14, borderRadius: 4, backgroundColor: theme.panel }} />
+            <View style={{ width: '30%', height: 13, borderRadius: 4, backgroundColor: theme.panel }} />
+            <View style={{ width: '45%', height: 12, borderRadius: 4, backgroundColor: theme.panel }} />
           </View>
         </View>
       ))}
@@ -503,6 +279,7 @@ export const OrdersInboxPage = memo(function OrdersInboxPage({
   const [subTab, setSubTab] = useState<OrderSide>(initialSide);
   const [filter, setFilter] = useState<FilterStatus>('in_progress');
   const [showToast, setShowToast] = useState(justPaid === '1' || justPaid === '0');
+  const listRef = useRef<FlatList>(null);
 
   useEffect(() => {
     if (initialSide) setSubTab(initialSide);
@@ -520,31 +297,68 @@ export const OrdersInboxPage = memo(function OrdersInboxPage({
     }
   }, [justPaid, refetch]);
 
+  // When switching filter or subTab, cleanly reset scroll position on iOS
+  useEffect(() => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, [filter, subTab]);
+
   const { bought, sold } = useMemo(
     () => partitionOrders(q.data ?? [], userId),
     [q.data, userId],
   );
 
-  const allBoughtOrders = bought;
-
   const filterList = useCallback(
     (raw: MyOrder[]) => {
       if (filter === 'all') return raw;
-      return raw.filter((o) => getOrderCategory(o) === filter);
+      if (filter === 'in_progress') {
+        return raw.filter(
+          (o) =>
+            o.status === 'pending' ||
+            o.status === 'shifting' ||
+            (o as any).fulfillment_status === 'pending' ||
+            (o as any).fulfillment_status === 'awaiting_payment' ||
+            (o as any).fulfillment_status === 'packing' ||
+            (o as any).fulfillment_status === 'shifting' ||
+            (o as any).fulfillment_status === 'delivered' ||
+            (o as any).fulfillment_status === 'disputed',
+        );
+      }
+      if (filter === 'canceled') {
+        return raw.filter(
+          (o) =>
+            o.status === 'canceled' ||
+            o.status === 'refunded' ||
+            o.status === 'failed' ||
+            (o as any).fulfillment_status === 'canceled' ||
+            (o as any).fulfillment_status === 'refunded',
+        );
+      }
+      if (filter === 'completed') {
+        return raw.filter((o) => o.status === 'completed' || (o as any).fulfillment_status === 'completed');
+      }
+      return raw;
     },
     [filter],
   );
 
   const orders = useMemo(() => {
-    return filterList(subTab === 'bought' ? allBoughtOrders : sold);
-  }, [subTab, allBoughtOrders, sold, filterList]);
+    return filterList(subTab === 'bought' ? bought : sold);
+  }, [subTab, bought, sold, filterList]);
 
   const onRefresh = useCallback(async () => {
     await refetch();
   }, [refetch]);
 
   return (
-    <View style={{ width: pageWidth, height: pageHeight > 0 ? pageHeight : undefined, flex: 1, backgroundColor: theme.background }}>
+    <View
+      style={{
+        width: pageWidth,
+        height: pageHeight > 0 ? pageHeight : undefined,
+        flex: 1,
+        backgroundColor: theme.background,
+        overflow: 'hidden',
+      }}
+    >
       {/* Toast banner after checkout */}
       {showToast && (
         <View
@@ -561,6 +375,7 @@ export const OrdersInboxPage = memo(function OrdersInboxPage({
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: 10,
+            flexShrink: 0,
           }}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
@@ -587,6 +402,7 @@ export const OrdersInboxPage = memo(function OrdersInboxPage({
           paddingTop: 10,
           paddingBottom: 8,
           backgroundColor: theme.background,
+          flexShrink: 0,
         }}
       >
         <View
@@ -669,13 +485,13 @@ export const OrdersInboxPage = memo(function OrdersInboxPage({
         </View>
       </View>
 
-      {/* Filter Status Chips (Image 3 design: squircle, bold labels) */}
+      {/* Filter Status Chips (Universal 30px pill standard) */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{
           paddingHorizontal: 16,
-          paddingVertical: 10,
+          paddingVertical: 8,
           gap: 8,
           alignItems: 'center',
         }}
@@ -684,6 +500,7 @@ export const OrdersInboxPage = memo(function OrdersInboxPage({
           borderBottomColor: theme.border,
           backgroundColor: theme.background,
           flexGrow: 0,
+          flexShrink: 0,
         }}
       >
         {FILTER_CHIPS.map((item) => {
@@ -698,25 +515,27 @@ export const OrdersInboxPage = memo(function OrdersInboxPage({
               style={({ pressed }) => [
                 {
                   height: 30,
-                  borderRadius: 15,
                   paddingHorizontal: 14,
+                  borderRadius: 15,
                   alignItems: 'center',
                   justifyContent: 'center',
+                  borderWidth: 1,
                   backgroundColor: active
-                    ? theme.ink
-                    : theme.surface,
+                    ? isDark ? theme.panel : '#111111'
+                    : isDark ? theme.surface : theme.panel,
+                  borderColor: active
+                    ? isDark ? theme.border : '#111111'
+                    : theme.border,
                 },
-                pressed && { opacity: 0.8 },
+                pressed && { opacity: 0.75 },
               ]}
             >
               <Text
                 style={{
-                  fontSize: 14,
-                  fontWeight: active ? '700' : '600',
-                  color: active
-                    ? theme.background
-                    : theme.ink,
-                  fontFamily: active ? typography.family.sansBold : typography.family.sansSemibold,
+                  fontSize: 12,
+                  fontWeight: active ? '700' : '500',
+                  color: active ? '#FFFFFF' : theme.mute,
+                  fontFamily: active ? typography.family.sansBold : typography.family.sansMedium,
                 }}
               >
                 {item.label}
@@ -726,16 +545,21 @@ export const OrdersInboxPage = memo(function OrdersInboxPage({
         })}
       </ScrollView>
 
-      {/* Orders List (Modern Card UI) */}
+      {/* Orders List */}
       {isPending && orders.length === 0 ? (
         <OrdersSkeleton />
       ) : (
         <FlatList
+          ref={listRef}
+          style={{ flex: 1 }}
           data={orders}
           keyExtractor={(o) => o.id}
-          renderItem={({ item }) => <OrderCard order={item} side={subTab} />}
+          renderItem={({ item }) => <OrderRow order={item} side={subTab} />}
+          ItemSeparatorComponent={() => (
+            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.border, marginLeft: 88 }} />
+          )}
           contentContainerStyle={[
-            { paddingTop: 12, paddingBottom: bottomInset + 20 },
+            { paddingVertical: 4, paddingBottom: bottomInset + 20 },
             orders.length === 0 && { flexGrow: 1, justifyContent: 'center' },
           ]}
           showsVerticalScrollIndicator={false}
@@ -759,17 +583,13 @@ export const OrdersInboxPage = memo(function OrdersInboxPage({
                     ? subTab === 'bought'
                       ? 'No canceled orders'
                       : 'No canceled sales'
-                    : filter === 'refunds'
-                    ? subTab === 'bought'
-                      ? 'No refunds'
-                      : 'No refunded sales'
                     : filter === 'completed'
                     ? subTab === 'bought'
                       ? 'No completed orders'
                       : 'No completed sales'
                     : subTab === 'bought'
-                    ? 'No purchases yet'
-                    : 'No sales yet'
+                    ? 'No orders'
+                    : 'No sales'
                 }
                 description="When you buy or sell items, they will show up here."
                 cta={{
@@ -785,4 +605,3 @@ export const OrdersInboxPage = memo(function OrdersInboxPage({
     </View>
   );
 });
-

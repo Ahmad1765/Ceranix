@@ -76,6 +76,26 @@ describe('bundle discount policy', () => {
     expect(p5.pct).toBe(5);
     expect(p5.savings).toBe(25); // 5% of 500
   });
+
+  it('strictly respects seller authority when bundle discount is disabled (0% or null)', () => {
+    // 4 items: seller disabled bundle discount (0%)
+    const p0 = computeBundlePricing(100, [100, 100, 100], 0);
+    expect(p0.itemCount).toBe(4);
+    expect(p0.subtotal).toBe(400);
+    expect(p0.pct).toBe(0);
+    expect(p0.qualifies).toBe(false);
+    expect(p0.savings).toBe(0);
+    expect(p0.total).toBe(400);
+
+    // 5 items: seller has null discount
+    const pNull = computeBundlePricing(100, [100, 100, 100, 100], null);
+    expect(pNull.itemCount).toBe(5);
+    expect(pNull.subtotal).toBe(500);
+    expect(pNull.pct).toBe(0);
+    expect(pNull.qualifies).toBe(false);
+    expect(pNull.savings).toBe(0);
+    expect(pNull.total).toBe(500);
+  });
 });
 
 describe('bundle money math', () => {

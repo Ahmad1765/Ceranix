@@ -15,7 +15,13 @@ function RowSeparator() {
   return <View style={{ height: 1, backgroundColor: theme.border, width: '100%' }} />;
 }
 
-export function FollowingTab({ bottomInset = 24 }: { bottomInset?: number }) {
+export function FollowingTab({
+  bottomInset = 24,
+  filter = 'all',
+}: {
+  bottomInset?: number;
+  filter?: 'all' | 'buyer' | 'important';
+}) {
   const { theme } = useTheme();
   const { user } = useAuth();
   const { openedIds } = useOpenedNewsIds();
@@ -51,6 +57,24 @@ export function FollowingTab({ bottomInset = 24 }: { bottomInset?: number }) {
     });
   }, [followedQ.data]);
 
+  const filteredActivities = useMemo(() => {
+    if (filter === 'all') return activities;
+    if (filter === 'buyer') {
+      return activities.filter(
+        (a) =>
+          a.kind === 'listing_created' ||
+          a.kind === 'price_drop' ||
+          a.kind === 'search_alert',
+      );
+    }
+    if (filter === 'important') {
+      return activities.filter(
+        (a) => a.kind === 'price_drop' || a.kind === 'search_alert',
+      );
+    }
+    return activities;
+  }, [activities, filter]);
+
   const renderItem = useCallback(
     ({ item }: { item: ActivityItem }) => (
       <NewsActivityRow item={item} isRead={openedIds.has(item.id)} />
@@ -58,7 +82,7 @@ export function FollowingTab({ bottomInset = 24 }: { bottomInset?: number }) {
     [openedIds],
   );
 
-  if (isLoading && activities.length === 0) {
+  if (isLoading && filteredActivities.length === 0) {
     return (
       <View style={{ flex: 1, backgroundColor: theme.background }}>
         <NewsSkeletonList count={5} />
@@ -69,21 +93,33 @@ export function FollowingTab({ bottomInset = 24 }: { bottomInset?: number }) {
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
       <FlatList
-        data={activities}
+        data={filteredActivities}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         ItemSeparatorComponent={RowSeparator}
         contentContainerStyle={
-          activities.length === 0 ? { flex: 1 } : { paddingBottom: bottomInset }
+          filteredActivities.length === 0 ? { flex: 1 } : { paddingBottom: bottomInset }
         }
         removeClippedSubviews={Platform.OS === 'android'}
         ListEmptyComponent={
           <EmptyState
-            icon="users"
-            title="No activity from followed accounts"
-            description="Follow creators, curators, and brands to see their new drops, likes, and follows here."
+            icon={filter === 'important' ? 'alert-circle' : filter === 'buyer' ? 'shopping-bag' : 'bell'}
+            title={
+              filter === 'buyer'
+                ? 'No buyer notifications'
+                : filter === 'important'
+                ? 'No important notifications'
+                : 'No notifications'
+            }
+            description={
+              filter === 'buyer'
+                ? 'Updates on price drops and new drops from sellers you follow will appear here.'
+                : filter === 'important'
+                ? 'Order updates and critical alerts will appear here.'
+                : 'Follow creators, curators, and brands to see their new drops, likes, and follows here.'
+            }
             cta={{
-              label: 'Explore creators',
+              label: 'Explore marketplace',
               icon: 'compass',
               onPress: () => router.push('/' as any),
             }}

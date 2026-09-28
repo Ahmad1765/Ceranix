@@ -1,8 +1,9 @@
-import { useCallback } from 'react';
-import { View, Pressable, Platform } from 'react-native';
+import { useCallback, useState } from 'react';
+import { View, Pressable, Platform, ScrollView } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useTheme } from '@/context/ThemeContext';
@@ -63,7 +64,7 @@ function SignedOutNewsState() {
           letterSpacing: -0.3,
         }}
       >
-        Create an account to see news
+        Create an account to see notifications
       </Text>
 
       <Text
@@ -140,11 +141,14 @@ function SignedOutNewsState() {
   );
 }
 
+type NotificationFilter = 'all' | 'buyer' | 'important';
+
 export default function NewsScreen() {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const toast = useToast();
+  const [filter, setFilter] = useState<NotificationFilter>('all');
 
   const userId = user?.id ?? null;
   const { markAllOpened } = useOpenedNewsIds();
@@ -152,13 +156,10 @@ export default function NewsScreen() {
   // News notifications strictly from followed accounts only
   const followedQ = useNewFromFollowedQuery(userId);
 
-
-
-
   const handleMarkAllRead = useCallback(async () => {
     haptic();
     if (!user) {
-      toast.show('Create an account or sign in to see news', { variant: 'info', icon: 'log-in' });
+      toast.show('Create an account or sign in to see notifications', { variant: 'info', icon: 'log-in' });
       router.push('/auth/login' as any);
       return;
     }
@@ -174,7 +175,7 @@ export default function NewsScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.background }}>
-      {/* Top Header Bar matching Reference Image 1 exactly */}
+      {/* Top Header Bar matching Reference Image 3 */}
       <View
         style={{
           position: 'relative',
@@ -186,7 +187,7 @@ export default function NewsScreen() {
           backgroundColor: theme.background,
         }}
       >
-        {/* Dead-center "News" Title */}
+        {/* Dead-center "Notifications" Title */}
         <View
           pointerEvents="none"
           style={{
@@ -208,7 +209,7 @@ export default function NewsScreen() {
               letterSpacing: -0.3,
             }}
           >
-            News
+            Notifications
           </Text>
         </View>
 
@@ -229,43 +230,108 @@ export default function NewsScreen() {
             opacity: pressed ? 0.6 : 1,
           })}
         >
-          <Feather name="arrow-left" size={22} color={theme.ink} />
+          <Feather name="chevron-left" size={26} color={theme.ink} />
         </Pressable>
 
-        {/* Right: "Mark read" with icon matching Reference Image 1 */}
+        {/* Right: Simple icon-only "Mark read" matching Reference Image 3 */}
         <Pressable
           onPress={handleMarkAllRead}
           hitSlop={HIT_SLOP_8}
           accessibilityRole="button"
           accessibilityLabel="Mark all as read"
           style={({ pressed }) => ({
+            width: 40,
             height: 40,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'flex-end',
-            gap: 5,
+            alignItems: 'flex-end',
+            justifyContent: 'center',
             opacity: pressed ? 0.6 : 1,
           })}
         >
-          <Feather name="check-circle" size={17} color={theme.purple} />
-          <Text
-            style={{
-              fontFamily: typography.family.sansSemibold,
-              fontSize: 14,
-              fontWeight: '600',
-              color: theme.purple,
-              letterSpacing: -0.1,
-            }}
-          >
-            Mark read
-          </Text>
+          <Ionicons name="checkmark-done-outline" size={22} color={theme.ink} />
         </Pressable>
+      </View>
+
+      {/* Filter Chips matching Reference Image 3: Always shown even if 0 notifications */}
+      <View
+        style={{
+          paddingHorizontal: 16,
+          paddingTop: 8,
+          paddingBottom: 10,
+          backgroundColor: theme.background,
+        }}
+      >
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{
+            gap: 8,
+            alignItems: 'center',
+          }}
+        >
+          {(
+            [
+              { key: 'all', label: 'All' },
+              { key: 'buyer', label: 'Buyer' },
+              { key: 'important', label: 'Important' },
+            ] as const
+          ).map((item) => {
+            const active = filter === item.key;
+            return (
+              <Pressable
+                key={item.key}
+                onPress={() => {
+                  haptic();
+                  setFilter(item.key);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`Filter ${item.label}`}
+                style={({ pressed }) => ({
+                  height: 36,
+                  paddingHorizontal: 18,
+                  borderRadius: 10,
+                  backgroundColor: active
+                    ? isDark
+                      ? '#FFFFFF'
+                      : '#1D1D1D'
+                    : isDark
+                    ? theme.surface
+                    : '#F3F3F3',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: pressed ? 0.9 : 1,
+                  transform: [{ scale: pressed ? 0.97 : 1 }],
+                })}
+              >
+                <Text
+                  style={{
+                    fontFamily: active
+                      ? typography.family.sansBold
+                      : typography.family.sansMedium,
+                    fontSize: 14,
+                    fontWeight: active ? '700' : '500',
+                    color: active
+                      ? isDark
+                        ? '#111111'
+                        : '#FFFFFF'
+                      : theme.ink,
+                    letterSpacing: -0.2,
+                  }}
+                >
+                  {item.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
       </View>
 
       {/* Main Content: Ask to create account if guest, otherwise show followed accounts news */}
       <View style={{ flex: 1 }}>
         {user ? (
-          <FollowingTab bottomInset={Math.max(insets.bottom, 16) + 16} />
+          <FollowingTab
+            bottomInset={Math.max(insets.bottom, 16) + 16}
+            filter={filter}
+          />
         ) : (
           <SignedOutNewsState />
         )}

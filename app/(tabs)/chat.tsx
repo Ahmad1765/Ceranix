@@ -943,7 +943,7 @@ export default function InboxScreen() {
             letterSpacing: -0.2,
           }}
         >
-          Inbox
+          Activity
         </Text>
       </View>
 

@@ -60,10 +60,11 @@ export const FeedSearch = memo(function FeedSearch({
   onOpenShareProfile,
   placeholder = 'What are you looking for today?',
 }: FeedSearchProps) {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
   const inputRef = useRef<any>(null);
   const searching = value.trim().length > 0;
+  const searchBg = isDark ? theme.surface : '#F0F1F5';
 
   const resolvedPlaceholder = useMemo(() => {
     if (placeholder !== 'What are you looking for today?') {
@@ -96,16 +97,14 @@ export const FeedSearch = memo(function FeedSearch({
             flex: 1,
             flexDirection: 'row',
             alignItems: 'center',
-            backgroundColor: pressed ? theme.surface : theme.panel,
+            backgroundColor: pressed ? (isDark ? theme.panel : '#E8EAED') : searchBg,
             borderRadius: radii.pill,
-            paddingLeft: 12,
-            paddingRight: searching ? 8 : 12,
+            paddingLeft: 14,
+            paddingRight: searching ? 8 : 14,
             height: 44,
-            borderWidth: 1,
-            borderColor: theme.border,
+            borderWidth: 0,
             opacity: pressed && onPressSearch ? 0.85 : 1,
             outlineStyle: 'none',
-            ...shadow.sm,
           } as any)}
         >
           <Feather
@@ -237,7 +236,7 @@ export const FeedSearch = memo(function FeedSearch({
               width: 44,
               height: 44,
               borderRadius: 22,
-              backgroundColor: pressed ? theme.surface : theme.panel,
+              backgroundColor: pressed ? theme.surface : (isDark ? theme.panel : '#FFFFFF'),
               borderWidth: 1,
               borderColor: theme.border,
               alignItems: 'center',
@@ -248,7 +247,7 @@ export const FeedSearch = memo(function FeedSearch({
               ...shadow.sm,
             } as any)}
           >
-            <BellIcon size={20} color={theme.ink} />
+            <BellIcon size={20} color={theme.ink} strokeWidth={2.4} />
             {!!unreadNotificationsCount && unreadNotificationsCount > 0 && (
               <View
                 style={{
@@ -260,7 +259,7 @@ export const FeedSearch = memo(function FeedSearch({
                   borderRadius: 4,
                   backgroundColor: '#EF4444',
                   borderWidth: 1.5,
-                  borderColor: theme.panel,
+                  borderColor: isDark ? theme.panel : '#FFFFFF',
                 }}
               />
             )}
@@ -290,12 +289,16 @@ export const ChipRow = memo(function ChipRow({
   onDeleteChip,
   onAdd,
 }: ChipRowProps) {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
 
   const isDynamicActive =
     activeChip === dynamicChip.id ||
     (dynamicChip.isDefaultTrending && activeChip === TRENDING);
   const isForYouActive = activeChip === FOR_YOU;
+
+  const activeChipBg = isDark ? theme.selected : '#F0F1F5';
+  const inactiveChipBg = isDark ? theme.panel : '#FFFFFF';
+  const chipBorder = isDark ? theme.border : '#E5E7EB';
 
   return (
     <ScrollView
@@ -320,9 +323,9 @@ export const ChipRow = memo(function ChipRow({
           height: 30,
           paddingHorizontal: 12,
           borderRadius: 15,
-          backgroundColor: isForYouActive ? theme.selected : theme.white,
+          backgroundColor: isForYouActive ? activeChipBg : inactiveChipBg,
           borderWidth: 1,
-          borderColor: isForYouActive ? 'transparent' : theme.border,
+          borderColor: isForYouActive ? 'transparent' : chipBorder,
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
@@ -356,9 +359,9 @@ export const ChipRow = memo(function ChipRow({
           height: 30,
           paddingHorizontal: 12,
           borderRadius: 15,
-          backgroundColor: isDynamicActive ? theme.selected : theme.white,
+          backgroundColor: isDynamicActive ? activeChipBg : inactiveChipBg,
           borderWidth: 1,
-          borderColor: isDynamicActive ? 'transparent' : theme.border,
+          borderColor: isDynamicActive ? 'transparent' : chipBorder,
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
@@ -395,9 +398,9 @@ export const ChipRow = memo(function ChipRow({
           width: 30,
           height: 30,
           borderRadius: 15,
-          backgroundColor: theme.white,
+          backgroundColor: inactiveChipBg,
           borderWidth: 1,
-          borderColor: theme.border,
+          borderColor: chipBorder,
           alignItems: 'center',
           justifyContent: 'center',
           transform: [{ scale: pressed ? 0.96 : 1 }],
@@ -424,9 +427,9 @@ export const ChipRow = memo(function ChipRow({
               height: 30,
               paddingHorizontal: 12,
               borderRadius: 15,
-              backgroundColor: active ? theme.selected : theme.white,
+              backgroundColor: active ? activeChipBg : inactiveChipBg,
               borderWidth: 1,
-              borderColor: active ? 'transparent' : theme.border,
+              borderColor: active ? 'transparent' : chipBorder,
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center',

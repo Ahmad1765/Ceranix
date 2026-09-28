@@ -47,7 +47,7 @@ export default function TabsLayout() {
           },
         }}
       />
-      <Tabs.Screen name="chat" options={{ title: 'Inbox' }} />
+      <Tabs.Screen name="chat" options={{ title: 'Activity' }} />
       <Tabs.Screen name="profile" options={{ title: 'Account' }} />
     </Tabs>
   );

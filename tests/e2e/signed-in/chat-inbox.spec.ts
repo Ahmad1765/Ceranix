@@ -11,7 +11,7 @@ test.describe('Inbox (signed in)', () => {
   });
 
   test('renders the Inbox header and the three tabs', async ({ page }) => {
-    await expect(page.getByText('Inbox', { exact: true })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/^(Activity|Inbox)$/).first()).toBeVisible({ timeout: 20_000 });
     for (const label of ['Messages', 'Orders', 'Support']) {
       await expect(page.getByText(label, { exact: true }).first()).toBeVisible();
     }

@@ -183,7 +183,7 @@ export default function ProductScreen() {
     return computeBundlePricing(
       listing.price,
       selectedSellerItems.map((s: Listing) => Number(s.price ?? 0)),
-      listing.seller?.bundle_discount_pct,
+      listing.seller?.bundle_discount_pct ?? 0,
     );
   }, [isBundleActive, listing, selectedSellerItems]);
 

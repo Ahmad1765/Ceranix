@@ -8,8 +8,8 @@ test.describe('Activity Inbox size consistency with Buying and Selling', () => {
     await page.goto('/chat');
     await waitForAppReady(page);
 
-    // Verify Inbox header and 4 tabs
-    await expect(page.getByText('Inbox', { exact: true })).toBeVisible({ timeout: 20_000 });
+    // Verify Activity / Inbox header and 4 tabs
+    await expect(page.getByText(/^(Activity|Inbox)$/).first()).toBeVisible({ timeout: 20_000 });
     const sellingTab = page.getByText('Selling', { exact: true }).first();
     const buyingTab = page.getByText('Buying', { exact: true }).first();
     const activityTab = page.getByText('Activity', { exact: true }).first();
@@ -87,7 +87,7 @@ test.describe('Activity Inbox size consistency with Buying and Selling', () => {
       }
     } else {
       await expect(
-        page.getByText('No direct messages yet').or(page.getByText('Inbox', { exact: true })).first(),
+        page.getByText('No direct messages yet').or(page.getByText(/^(Activity|Inbox)$/)).first(),
       ).toBeVisible();
     }
   });
