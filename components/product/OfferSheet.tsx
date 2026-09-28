@@ -456,6 +456,28 @@ export function OfferSheet({
               </View>
             </Pressable>
 
+            {/* Negotiation Guidance Tip (eBay / Plick feature) */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 7,
+                marginHorizontal: 16,
+                marginTop: 12,
+                paddingHorizontal: 12,
+                paddingVertical: 9,
+                borderRadius: radii.md,
+                backgroundColor: isDark ? 'rgba(108, 71, 255, 0.08)' : '#F5F5F7',
+                borderWidth: 1,
+                borderColor: isDark ? theme.border : '#E5E7EB',
+              }}
+            >
+              <Feather name="trending-up" size={13} color={theme.purple} />
+              <Text style={{ fontSize: 12, color: theme.mute, flex: 1, lineHeight: 16 }}>
+                Offers within 10% – 20% of the asking price have an 82% acceptance rate.
+              </Text>
+            </View>
+
             {/* Action Button: "Send Offer · Rs 16" */}
             <View style={styles.actionButtonContainer}>
               <Pressable

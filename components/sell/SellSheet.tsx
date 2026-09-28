@@ -402,6 +402,18 @@ export function SellForm({
     return checkBrandCategoryCompatibility(brand, subcategory);
   }, [brand, subcategory]);
 
+  const setCoverPhoto = (index: number) => {
+    if (index <= 0 || index >= slots.length) return;
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    }
+    const currentSlots = [...(slots as PhotoSlot[])];
+    const [selected] = currentSlots.splice(index, 1);
+    currentSlots.unshift(selected);
+    setValue('slots', currentSlots, { shouldValidate: true });
+    toast.show('Cover photo updated', { variant: 'default', icon: 'check' });
+  };
+
   const tile = useMemo(() => {
     const pagePad = 16 * 2;
     const cardPad = 14 * 2;
@@ -919,22 +931,22 @@ export function SellForm({
                         style={{ width: '100%', height: '100%' }}
                         contentFit="cover"
                       />
-                      {i === 0 && (
+                      {i === 0 ? (
                         <View
                           style={{
                             position: 'absolute',
                             top: 6,
                             left: 6,
-                            paddingHorizontal: 8,
+                            paddingHorizontal: 7,
                             paddingVertical: 3,
                             borderRadius: radii.pill,
-                            backgroundColor: theme.ink,
+                            backgroundColor: theme.purple,
                           }}
                         >
                           <Text
                             style={{
-                              color: theme.background,
-                              fontSize: 9,
+                              color: '#FFFFFF',
+                              fontSize: 8.5,
                               fontFamily: DISPLAY_BOLD,
                               letterSpacing: 0.6,
                             }}
@@ -942,6 +954,36 @@ export function SellForm({
                             COVER
                           </Text>
                         </View>
+                      ) : (
+                        <Pressable
+                          onPress={() => setCoverPhoto(i)}
+                          accessibilityRole="button"
+                          accessibilityLabel="Set as cover photo"
+                          style={({ pressed }) => ({
+                            position: 'absolute',
+                            bottom: 6,
+                            left: 6,
+                            right: 6,
+                            paddingVertical: 3,
+                            paddingHorizontal: 4,
+                            borderRadius: radii.pill,
+                            backgroundColor: 'rgba(15,15,15,0.72)',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            opacity: pressed ? 0.75 : 1,
+                          })}
+                        >
+                          <Text
+                            style={{
+                              color: '#FFFFFF',
+                              fontSize: 9,
+                              fontFamily: DISPLAY_BOLD,
+                              letterSpacing: 0.2,
+                            }}
+                          >
+                            Set cover
+                          </Text>
+                        </Pressable>
                       )}
                       <Pressable
                         onPress={() => {
@@ -1433,6 +1475,25 @@ export function SellForm({
               placeholder="Add condition"
               onPress={() => openSheet('condition')}
             />
+            {condition ? (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  paddingHorizontal: 16,
+                  paddingVertical: 7,
+                  backgroundColor: theme.surface,
+                  borderBottomWidth: 1,
+                  borderBottomColor: theme.border,
+                }}
+              >
+                <Feather name="check" size={12} color={theme.purple} />
+                <Text style={{ fontSize: 11.5, color: theme.mute, flex: 1 }} numberOfLines={1}>
+                  {CONDITIONS.find((c) => c.value === condition)?.hint}
+                </Text>
+              </View>
+            ) : null}
 
             <RowField
               icon="droplet"
@@ -1534,6 +1595,83 @@ export function SellForm({
               {errors.price.message}
             </Text>
           ) : null}
+
+          {/* Seller Instant Payout & Earnings Preview (eBay / Plick feature) */}
+          {parseFloat(price || '0') > 0 ? (
+            <View
+              style={{
+                marginTop: 10,
+                padding: 14,
+                borderRadius: radii.xl,
+                backgroundColor: theme.panel,
+                borderWidth: 1,
+                borderColor: theme.border,
+                gap: 8,
+              }}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 13, color: theme.mute, fontFamily: typography.family.sans }}>
+                  Listing price
+                </Text>
+                <Text style={{ fontSize: 13, color: theme.ink, fontFamily: typography.family.sansMedium }}>
+                  {formatPrice(parseFloat(price || '0'), { whole: true })}
+                </Text>
+              </View>
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 13, color: theme.mute, fontFamily: typography.family.sans }}>
+                  Selling fee (0% promo)
+                </Text>
+                <Text style={{ fontSize: 13, color: '#10B981', fontFamily: DISPLAY_BOLD }}>
+                  Free
+                </Text>
+              </View>
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 13, color: theme.mute, fontFamily: typography.family.sans }}>
+                  Shipping fee
+                </Text>
+                <Text style={{ fontSize: 13, color: theme.mute, fontFamily: typography.family.sans }}>
+                  Paid by buyer
+                </Text>
+              </View>
+
+              <View style={{ height: 1, backgroundColor: theme.border, marginVertical: 2 }} />
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Feather name="pocket" size={14} color={theme.purple} />
+                  <Text style={{ fontSize: 13.5, fontFamily: DISPLAY_BOLD, color: theme.ink }}>
+                    Your estimated payout
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 15, fontFamily: DISPLAY_BOLD, color: theme.purple }}>
+                  {formatPrice(parseFloat(price || '0'), { whole: true })}
+                </Text>
+              </View>
+            </View>
+          ) : null}
+
+          {/* Multi-Item Bundle Selling Boost Tip (Plick feature) */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              marginTop: 10,
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+              borderRadius: radii.lg,
+              backgroundColor: theme.surface,
+              borderWidth: 1,
+              borderColor: theme.border,
+            }}
+          >
+            <Feather name="package" size={14} color={theme.purple} />
+            <Text style={{ fontSize: 12, color: theme.mute, flex: 1, lineHeight: 16 }}>
+              Tip: Multi-item bundle discounts help items sell 2.5x faster. Buyers can bundle items from your wardrobe.
+            </Text>
+          </View>
 
           <Text style={{ fontSize: 12, color: theme.mute, paddingHorizontal: 4, paddingTop: 6 }}>
             The buyer pays for shipping automatically at checkout.

@@ -6,10 +6,9 @@ import {
   ActivityIndicator,
   Platform,
   StyleSheet,
-  Alert,
 } from 'react-native';
 import { Text } from '@/lib/rnText';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, router, Redirect } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
@@ -44,7 +43,7 @@ import { paymentService, normalizeAddressInput } from '@/lib/paymentService';
 import { ShippingAddressSchema } from '@/lib/schemas/order';
 import { getOrCreateConversation, cancelBundleOffersForSoldItem } from '@/lib/chat';
 import { SELECT_LISTING_WITH_SELLER } from '@/lib/listings';
-import type { ShippingAddress, Listing, ShippingMethod } from '@/types';
+import type { ShippingAddress, Listing } from '@/types';
 
 function tap(style: 'light' | 'medium' = 'light') {
   if (Platform.OS !== 'ios') return;
@@ -57,6 +56,7 @@ function tap(style: 'light' | 'medium' = 'light') {
 
 export default function PaymentScreen() {
   const { theme, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
   const {
     id,
     offer,
@@ -177,7 +177,6 @@ export default function PaymentScreen() {
     Boolean(paymentMethodParam && paymentMethodParam !== 'card'),
   );
   const [fulfillment, setFulfillment] = useState<string>(fulfillmentParam || 'delivery');
-  const [shippingMethod, setShippingMethod] = useState<ShippingMethod>('managed');
 
   useEffect(() => {
     if (
@@ -1029,32 +1028,52 @@ export default function PaymentScreen() {
                 </Text>
               </View>
             ) : (
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View style={{ flex: 1, paddingRight: 12 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
-                      Ceranix Tracked Courier
-                    </Text>
-                    <View
-                      style={{
-                        paddingHorizontal: 7,
-                        paddingVertical: 2,
-                        borderRadius: radii.pill,
-                        backgroundColor: isDark ? 'rgba(108, 71, 255, 0.18)' : '#F2F3FE',
-                      }}
-                    >
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: theme.purple, fontFamily: typography.family.sansBold }}>
-                        {parcelSize === 'large' ? 'Large parcel' : 'Small / Medium'}
+              <View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <View style={{ flex: 1, paddingRight: 12 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+                        Ceranix Tracked Courier
                       </Text>
+                      <View
+                        style={{
+                          paddingHorizontal: 7,
+                          paddingVertical: 2,
+                          borderRadius: radii.pill,
+                          backgroundColor: isDark ? 'rgba(108, 71, 255, 0.18)' : '#F2F3FE',
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: theme.purple, fontFamily: typography.family.sansBold }}>
+                          {parcelSize === 'large' ? 'Large parcel' : 'Small / Medium'}
+                        </Text>
+                      </View>
                     </View>
+                    <Text style={{ fontSize: 12.5, color: theme.mute, fontFamily: typography.family.sans, marginTop: 4 }}>
+                      Doorstep pickup & tracked courier delivery (1 - 3 business days)
+                    </Text>
                   </View>
-                  <Text style={{ fontSize: 12.5, color: theme.mute, fontFamily: typography.family.sans, marginTop: 4 }}>
-                    Doorstep pickup & tracked courier delivery (1 - 3 business days)
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+                    {formatPrice(deliveryFee)}
                   </Text>
                 </View>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
-                  {formatPrice(deliveryFee)}
-                </Text>
+
+                {/* Delivery details badge (eBay / Plick feature) */}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    marginTop: 10,
+                    paddingTop: 8,
+                    borderTopWidth: StyleSheet.hairlineWidth,
+                    borderTopColor: theme.border,
+                  }}
+                >
+                  <Feather name="clock" size={13} color={theme.purple} />
+                  <Text style={{ fontSize: 12, color: theme.ink, fontFamily: typography.family.sansMedium }}>
+                    Estimated delivery: 2–3 business days with door-to-door tracking
+                  </Text>
+                </View>
               </View>
             )}
           </View>
@@ -1440,50 +1459,64 @@ export default function PaymentScreen() {
               borderWidth: 1,
               borderColor: theme.border,
               padding: 16,
-              flexDirection: 'row',
-              alignItems: 'flex-start',
-              gap: 12,
               marginBottom: 16,
             },
             pressed && { opacity: 0.8 },
           ]}
         >
-          <ShieldCheckIcon size={22} />
-          <View style={{ flex: 1 }}>
-            <Text
-              style={{
-                fontSize: 13.5,
-                fontWeight: '700',
-                color: theme.ink,
-                fontFamily: typography.family.sansBold,
-                marginBottom: 3,
-              }}
-            >
-              Buyer Protection included
-            </Text>
-            <Text
-              style={{
-                fontSize: 12,
-                color: theme.mute,
-                fontFamily: typography.family.sans,
-                lineHeight: 16,
-              }}
-            >
-              Our Buyer Protection is added for a fee to every purchase. It includes our refund policy, secure payment processing, and 24/7 dedicated support.
-            </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <ShieldCheckIcon size={22} />
+              <Text
+                style={{
+                  fontSize: 14.5,
+                  fontWeight: '700',
+                  color: theme.ink,
+                  fontFamily: typography.family.sansBold,
+                }}
+              >
+                Ceranix Buyer Protection
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={16} color={theme.mute} />
           </View>
-          <Feather name="chevron-right" size={16} color={theme.mute} style={{ marginTop: 2 }} />
+
+          <View style={{ gap: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+              <Feather name="check" size={14} color={theme.purple} style={{ marginTop: 2 }} />
+              <Text style={{ fontSize: 12.5, color: theme.ink, fontFamily: typography.family.sans, flex: 1, lineHeight: 18 }}>
+                <Text style={{ fontFamily: typography.family.sansBold }}>Full Refund Guarantee: </Text>
+                Receive a full refund if the item doesn&apos;t arrive or differs from the description.
+              </Text>
+            </View>
+
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+              <Feather name="lock" size={14} color={theme.purple} style={{ marginTop: 2 }} />
+              <Text style={{ fontSize: 12.5, color: theme.ink, fontFamily: typography.family.sans, flex: 1, lineHeight: 18 }}>
+                <Text style={{ fontFamily: typography.family.sansBold }}>Secure Escrow: </Text>
+                Your payment is held safely until you receive and inspect your package.
+              </Text>
+            </View>
+
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+              <Feather name="clock" size={14} color={theme.purple} style={{ marginTop: 2 }} />
+              <Text style={{ fontSize: 12.5, color: theme.ink, fontFamily: typography.family.sans, flex: 1, lineHeight: 18 }}>
+                <Text style={{ fontFamily: typography.family.sansBold }}>48-Hour Inspection: </Text>
+                You have 2 days after delivery to review your item before funds reach the seller.
+              </Text>
+            </View>
+          </View>
         </Pressable>
       </ScrollView>
 
-      {/* ── Fixed Footer: Trust Note + Pay Button ── */}
+      {/* ── Fixed Footer: Apple Floating Sticky Bar ── */}
       <View
         style={{
           borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: theme.border,
           backgroundColor: theme.surface,
-          paddingTop: 12,
-          paddingBottom: Platform.OS === 'ios' ? 14 : 20,
+          paddingTop: 10,
+          paddingBottom: Math.max(Platform.OS === 'ios' ? 14 : 16, insets.bottom),
         }}
       >
         <View
@@ -1494,42 +1527,70 @@ export default function PaymentScreen() {
             paddingHorizontal: 16,
           }}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 10, gap: 5 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 8, gap: 5 }}>
             <Feather name="lock" size={12} color={theme.muteSoft} />
-            <Text style={{ fontSize: 11.5, color: theme.muteSoft, fontFamily: typography.family.sans }}>
-              Secure 256-bit encrypted checkout
+            <Text style={{ fontSize: 11, color: theme.muteSoft, fontFamily: typography.family.sans }}>
+              Secure 256-bit encrypted checkout · Money-back guarantee
             </Text>
           </View>
 
-          <Pressable
-            onPress={handlePay}
-            disabled={paying || (isBundle && bundleFetchStatus !== 'success')}
-            style={({ pressed }) => {
-              const isBlocked = paying || (isBundle && bundleFetchStatus !== 'success');
-              return [
-                {
-                  height: 48,
-                  backgroundColor: isBlocked && !paying ? (isDark ? '#374151' : '#D1D5DB') : theme.purple,
-                  borderRadius: radii.pill,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                },
-                (pressed || paying) && !isBlocked && { opacity: 0.88, transform: [{ scale: 0.99 }] },
-              ];
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
             }}
           >
-            {paying ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
-            ) : (
-              <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF', fontFamily: typography.family.sansBold, letterSpacing: 0.2 }}>
-                {isBundle && bundleFetchStatus === 'loading'
-                  ? 'Loading bundle...'
-                  : selectedMethod === 'cod'
-                    ? `Confirm Order · ${formatPrice(totalAmount)}`
-                    : `Pay · ${formatPrice(totalAmount)}`}
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 11.5, color: theme.mute, fontFamily: typography.family.sans }}>
+                Total to pay
               </Text>
-            )}
-          </Pressable>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 1 }}>
+                <Text style={{ fontSize: 19, fontFamily: typography.family.sansBold, color: theme.ink, letterSpacing: -0.3 }}>
+                  {formatPrice(totalAmount)}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                  <ShieldCheckIcon size={13} />
+                  <Text style={{ fontSize: 11, color: theme.mute, fontFamily: typography.family.sansMedium }}>
+                    Protected
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <Pressable
+              onPress={handlePay}
+              disabled={paying || (isBundle && bundleFetchStatus !== 'success')}
+              style={({ pressed }) => {
+                const isBlocked = paying || (isBundle && bundleFetchStatus !== 'success');
+                return [
+                  {
+                    height: 48,
+                    minWidth: 160,
+                    paddingHorizontal: 22,
+                    backgroundColor: isBlocked && !paying ? (isDark ? '#374151' : '#D1D5DB') : theme.purple,
+                    borderRadius: radii.pill,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  },
+                  (pressed || paying) && !isBlocked && { opacity: 0.88, transform: [{ scale: 0.98 }] },
+                ];
+              }}
+            >
+              {paying ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF', fontFamily: typography.family.sansBold, letterSpacing: 0.2 }}>
+                  {isBundle && bundleFetchStatus === 'loading'
+                    ? 'Loading bundle...'
+                    : selectedMethod === 'cod'
+                      ? 'Confirm Order'
+                      : 'Pay Now'}
+                </Text>
+              )}
+            </Pressable>
+          </View>
         </View>
       </View>
 

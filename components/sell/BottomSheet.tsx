@@ -97,7 +97,7 @@ export function FullPagePicker({
         window.history.back();
       }
     };
-  }, [visible]);
+  }, [visible, handleClose]);
 
   if (!visible) return null;
 

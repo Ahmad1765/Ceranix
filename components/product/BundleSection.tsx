@@ -12,7 +12,6 @@ import type { Listing } from '@/types';
 import { useTheme } from '@/context/ThemeContext';
 import { BundleProgressBar } from './BundleProgressBar';
 import {
-  computeBundlePricing,
   BRAND_PURPLE,
   CARD_OUTER_PAD,
   CARD_GAP,
@@ -48,8 +47,6 @@ export function BundleSection({
 
   // Ensure sold items never appear in the bundle offers
   const activeSellerItems = sellerItems.filter((s) => !s.is_sold);
-  const selectedItems = activeSellerItems.filter((s) => selectedIds.has(s.id));
-  const selectedItemIds = selectedItems.map((s) => s.id);
 
   // If the current listing is already sold, bundling is unavailable — show other available items to browse cleanly
   if (isSold) {
@@ -107,20 +104,6 @@ export function BundleSection({
       </View>
     );
   }
-
-  // All bundle money math lives in lib/bundle.ts (pure + unit-tested).
-  const {
-    itemCount: bundleItemCount,
-    subtotal,
-    pct: bundlePct,
-    qualifies,
-    savings,
-    total,
-  } = computeBundlePricing(
-    listing.price,
-    selectedItems.map((s) => Number(s.price ?? 0)),
-    listing.seller?.bundle_discount_pct ?? 0,
-  );
 
   return (
     <View style={{ paddingTop: 18 }}>

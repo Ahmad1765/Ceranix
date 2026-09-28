@@ -13,7 +13,6 @@ export { BottomSheetModal } from './BottomSheetModal';
 export { UserCommentHeader } from './UserCommentHeader';
 export { Input, type InputProps } from './Input';
 export { ShieldCheckIcon } from './ShieldCheckIcon';
-export { VintedShieldIcon } from './VintedShieldIcon';
 export { FilterSlidersIcon, type FilterSlidersIconProps } from './FilterSlidersIcon';
 export { BellIcon, type BellIconProps } from './BellIcon';
 export { UserPlusIcon, type UserPlusIconProps } from './UserPlusIcon';

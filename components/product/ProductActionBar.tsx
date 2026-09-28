@@ -190,14 +190,14 @@ export function ProductActionBar({
           style={({ pressed }) => [
             styles.buyButton,
             {
-              backgroundColor: isBundle ? theme.purple : theme.ink,
-              borderColor: isBundle ? theme.purple : theme.ink,
+              backgroundColor: theme.purple,
+              borderColor: theme.purple,
               opacity: pressed ? 0.88 : 1,
               transform: [{ scale: pressed ? 0.98 : 1 }],
             },
           ]}
         >
-          <Text style={[styles.buyButtonText, { color: isBundle ? '#FFFFFF' : theme.background }]}>
+          <Text style={[styles.buyButtonText, { color: '#FFFFFF' }]}>
             {isOwner
               ? 'Edit listing'
               : isBundle

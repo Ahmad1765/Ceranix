@@ -49,13 +49,12 @@ import { confirm } from '@/lib/confirm';
 import { logListingView } from '@/lib/recommendations';
 import { capture, buildListingViewedProps } from '@/lib/analytics';
 import { useAuth } from '@/lib/auth';
-import { fetchOrderForListing, type Order } from '@/lib/payments';
 import { useToast } from '@/lib/toast';
 import { captureError } from '@/lib/sentry';
+import { fetchOrderForListing, type Order } from '@/lib/payments';
 import { getOrCreateConversation, sendOffer, cancelBundleOffersForSoldItem } from '@/lib/chat';
 import { cardImageUrl, prefetchImages, getImagePlaceholder } from '@/lib/images';
 import { SaveListSheet } from '@/components/SaveListSheet';
-import { colors } from '@/lib/theme';
 import { FullscreenImageViewer } from '@/components/product/FullscreenImageViewer';
 import { ProductActionBar } from '@/components/product/ProductActionBar';
 import { SellerOptionsSheet } from '@/components/product/SellerOptionsSheet';
@@ -502,16 +501,16 @@ export default function ProductScreen() {
 
   if (notFound) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}>
+      <View style={{ flex: 1, backgroundColor: theme.background, paddingTop: insets.top }}>
         <Pressable onPress={() => safeBack()} hitSlop={10} style={{ padding: 16 }}>
-          <Feather name="arrow-left" size={22} color={colors.ink} />
+          <Feather name="arrow-left" size={22} color={theme.ink} />
         </Pressable>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
-          <Feather name="alert-circle" size={42} color={colors.mute} />
-          <Text style={{ fontSize: 17, fontWeight: '700', color: colors.ink, marginTop: 14 }}>
+          <Feather name="alert-circle" size={42} color={theme.mute} />
+          <Text style={{ fontSize: 17, fontWeight: '700', color: theme.ink, marginTop: 14 }}>
             Listing not available
           </Text>
-          <Text style={{ fontSize: 14, color: colors.mute, marginTop: 6, textAlign: 'center' }}>
+          <Text style={{ fontSize: 14, color: theme.mute, marginTop: 6, textAlign: 'center' }}>
             It may have been removed or never existed.
           </Text>
         </View>
@@ -521,16 +520,16 @@ export default function ProductScreen() {
 
   if (listingQ.isError && !listing) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}>
+      <View style={{ flex: 1, backgroundColor: theme.background, paddingTop: insets.top }}>
         <Pressable onPress={() => safeBack()} hitSlop={10} style={{ padding: 16 }}>
-          <Feather name="arrow-left" size={22} color={colors.ink} />
+          <Feather name="arrow-left" size={22} color={theme.ink} />
         </Pressable>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
-          <Feather name="wifi-off" size={36} color={colors.mute} />
-          <Text style={{ fontSize: 17, fontWeight: '800', color: colors.ink, marginTop: 14, letterSpacing: -0.3 }}>
+          <Feather name="wifi-off" size={36} color={theme.mute} />
+          <Text style={{ fontSize: 17, fontWeight: '800', color: theme.ink, marginTop: 14, letterSpacing: -0.3 }}>
             Couldn&apos;t load this listing
           </Text>
-          <Text style={{ fontSize: 13, color: colors.mute, marginTop: 6, textAlign: 'center', lineHeight: 19 }}>
+          <Text style={{ fontSize: 13, color: theme.mute, marginTop: 6, textAlign: 'center', lineHeight: 19 }}>
             {loadErrorText === 'Request timed out'
               ? 'The connection is slow right now. Try again in a moment.'
               : 'Something went wrong. Check your connection and try again.'}
@@ -542,15 +541,15 @@ export default function ProductScreen() {
               height: 48,
               borderRadius: 14,
               paddingHorizontal: 28,
-              backgroundColor: colors.ink,
+              backgroundColor: theme.ink,
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center',
               opacity: pressed ? 0.85 : 1,
             })}
           >
-            <Feather name="refresh-cw" size={14} color={colors.white} />
-            <Text style={{ color: colors.white, fontWeight: '800', fontSize: 14, marginLeft: 8 }}>
+            <Feather name="refresh-cw" size={14} color="#FFFFFF" />
+            <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 14, marginLeft: 8 }}>
               Retry
             </Text>
           </Pressable>

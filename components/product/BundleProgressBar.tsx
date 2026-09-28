@@ -51,7 +51,6 @@ export function BundleProgressBar({
     ? Number(listing.seller.bundle_discount_pct)
     : null;
 
-  const maxPct = sellerDiscount ?? 0;
   const remaining = nextTier ? nextTier.count - itemCount : 0;
 
   const headline = qualifies

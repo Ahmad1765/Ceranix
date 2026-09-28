@@ -158,7 +158,7 @@ function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
                 isCanceled
                   ? '#EF4444'
                   : isCompleted
-                  ? '#10B981'
+                  ? theme.primary
                   : isDelivered
                   ? theme.primary
                   : isShipped
@@ -166,8 +166,8 @@ function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
                   : isPacking
                   ? theme.primary
                   : isAwaitingPayment
-                  ? '#D97706'
-                  : '#10B981'
+                  ? theme.mute
+                  : theme.primary
               }
               style={{ marginRight: 4 }}
             />
@@ -177,12 +177,12 @@ function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
               {
                 fontSize: 12,
                 fontWeight: '600',
-                color: '#10B981',
+                color: theme.primary,
                 fontFamily: typography.family.sansSemibold,
               },
               isCanceled && { color: '#EF4444' },
               (isShipped || isPacking || isDelivered) && { color: theme.primary },
-              isAwaitingPayment && { color: '#D97706' },
+              isAwaitingPayment && { color: theme.mute },
               isDisputed && { color: theme.ink },
             ]}
           >

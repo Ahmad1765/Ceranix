@@ -482,7 +482,32 @@ export function PriceSheet({
           </Text>
         </View>
       </View>
-      <Text style={{ fontSize: 12.5, color: theme.mute, marginTop: 10, paddingHorizontal: 4 }}>
+      {Number(draft) > 0 ? (
+        <View
+          style={{
+            marginTop: 10,
+            padding: 12,
+            borderRadius: radii.lg,
+            backgroundColor: theme.surface,
+            borderWidth: 1,
+            borderColor: theme.border,
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Feather name="pocket" size={14} color={theme.purple} />
+            <Text style={{ fontSize: 13, fontFamily: type.family.sansSemibold, color: theme.ink }}>
+              Estimated payout (0% fee)
+            </Text>
+          </View>
+          <Text style={{ fontSize: 14, fontFamily: DISPLAY_BOLD, color: theme.purple }}>
+            {CURRENCY_SYMBOL} {Number(draft).toLocaleString()}
+          </Text>
+        </View>
+      ) : null}
+      <Text style={{ fontSize: 12.5, color: theme.mute, marginTop: 8, paddingHorizontal: 4 }}>
         Set a fair price based on condition and brand to sell quickly.
       </Text>
 
