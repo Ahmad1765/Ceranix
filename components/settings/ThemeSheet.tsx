@@ -12,22 +12,10 @@ const THEME_OPTIONS: {
   icon: keyof typeof Feather.glyphMap;
 }[] = [
   {
-    id: 'system',
-    title: 'System Default',
-    desc: 'Match your operating system appearance',
-    icon: 'monitor',
-  },
-  {
     id: 'light',
     title: 'Light Monotone',
     desc: 'Clean high-contrast white & slate palette',
     icon: 'sun',
-  },
-  {
-    id: 'dark',
-    title: 'Dark Monotone',
-    desc: 'Deep OLED black & crisp monochrome accents',
-    icon: 'moon',
   },
 ];
 

@@ -238,7 +238,6 @@ export default function HomeScreen() {
           setAlertSheetOpen(true);
         },
       }}
-      showColdStartBanner={showColdStartBanner}
     />
   );
 

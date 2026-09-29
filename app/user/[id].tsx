@@ -147,7 +147,7 @@ export default function UserProfileScreen() {
     setMoreOptionsOpen(true);
   };
 
-  const isCollectionsPublic = profile?.saved_collection_privacy !== 'private';
+  const isCollectionsPublic = profile?.saved_collection_privacy === 'public';
   const savedQ = useSavedListingsQuery(isCollectionsPublic ? userId : null);
   const savedListings = savedQ.data ?? EMPTY_LISTINGS;
   const saveListsQ = useSaveListsQuery(isCollectionsPublic ? userId : null);

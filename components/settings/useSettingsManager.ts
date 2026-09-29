@@ -235,7 +235,7 @@ export function useSettingsManager() {
     [user?.id, refreshProfile, toast],
   );
 
-  const savedCollectionPrivacy: 'public' | 'private' = profile?.saved_collection_privacy ?? 'public';
+  const savedCollectionPrivacy: 'public' | 'private' = profile?.saved_collection_privacy ?? 'private';
 
   const setSavedCollectionPrivacy = useCallback(
     async (privacy: 'public' | 'private') => {

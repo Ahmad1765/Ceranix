@@ -458,44 +458,17 @@ export const ChipRow = memo(function ChipRow({
 type HomeHeaderProps = {
   searchProps: FeedSearchProps;
   chipProps: ChipRowProps;
-  showColdStartBanner: boolean;
+  showColdStartBanner?: boolean;
 };
 
 export const HomeHeader = memo(function HomeHeader({
   searchProps,
   chipProps,
-  showColdStartBanner,
 }: HomeHeaderProps) {
-  const { theme } = useTheme();
-
   return (
     <>
       <FeedSearch {...searchProps} />
       <ChipRow {...chipProps} />
-
-      {showColdStartBanner && (
-        <Pressable
-          onPress={() => {
-            haptic();
-            router.push('/auth/login');
-          }}
-          style={{
-            marginTop: -8,
-            marginHorizontal: 14,
-            marginBottom: 10,
-            padding: 14,
-            borderRadius: radii.md,
-            backgroundColor: theme.purpleSoft,
-            flexDirection: 'row',
-            alignItems: 'center',
-          }}
-        >
-          <Feather name="user-plus" size={16} color={theme.purple} style={{ marginRight: 10 }} />
-          <Text style={{ flex: 1, color: theme.purple, fontSize: 13, fontWeight: '600' }}>
-            Sign in and like a few items to see this feed personalize itself.
-          </Text>
-        </Pressable>
-      )}
     </>
   );
 });

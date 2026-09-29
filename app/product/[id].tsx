@@ -305,7 +305,6 @@ export default function ProductScreen() {
       if (next && listing.id) {
         cancelBundleOffersForSoldItem(listing.id).catch(() => {});
       }
-      toast.show(successMessage, { variant: 'success', icon: 'check' });
     } else {
       toast.show("Couldn't update the listing", {
         variant: 'default',

@@ -4,22 +4,24 @@ import {
   Modal,
   Pressable,
   Platform,
-  StyleSheet,
-  Alert,
+  ActivityIndicator,
   KeyboardAvoidingView,
-  ScrollView,
+  TouchableWithoutFeedback,
 } from 'react-native';
-import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, TextInput } from '@/lib/rnText';
-import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { radii, shadow, type } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { formatPrice, CURRENCY_SYMBOL } from '@/lib/currency';
 import { orderTotal } from '@/lib/fees';
-import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
+import {
+  OFFER_PRESET_TIERS,
+  type OfferTierId,
+  calculateTierPrices,
+  isValidOfferAmount,
+} from './offerHelpers';
 
 export interface OfferSheetProps {
   visible: boolean;
@@ -34,10 +36,14 @@ export interface OfferSheetProps {
 }
 
 /**
- * Full-page Vinted-style "Make an offer" modal.
- * Features full-page presentation, 10% / 20% / Custom price cards,
- * large prominent numeric input with glitch-free native keypad handling,
- * dynamic buyer protection fee calculation, and Signal Purple action CTA.
+ * Make an Offer Bottom Sheet (Reference Image 7 adapted to Ceranix Atelier UI).
+ * Features:
+ * - Bottom sheet presentation with top pull bar
+ * - Title "Select offer amount" with close button
+ * - -20%, -15%, -10%, -5%, Custom discount chips
+ * - "Your offer:" summary row with strikethrough original price, discounted price, and + shipping
+ * - Signal Purple "Continue" CTA
+ * - Reassurance text: "You won't be charged unless the seller accepts the offer. Coupons do not apply to offers."
  */
 export function OfferSheet({
   visible,
@@ -51,65 +57,80 @@ export function OfferSheet({
   offersLeftToday = 25,
 }: OfferSheetProps) {
   const { theme, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
   const inputRef = useRef<any>(null);
 
   // Normalize asking price
   const askingPrice = Number(askingPriceProp ?? itemPriceProp ?? 0);
 
-  // 10% and 20% round numbers
-  const preset10 = useMemo(() => Math.round(askingPrice * 0.9), [askingPrice]);
-  const preset20 = useMemo(() => Math.round(askingPrice * 0.8), [askingPrice]);
-
-  const [selectedCard, setSelectedCard] = useState<'tier10' | 'tier20' | 'custom'>('tier20');
+  const [selectedTier, setSelectedTier] = useState<OfferTierId>('20');
   const [customAmount, setCustomAmount] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
 
-  const optimizedThumb = imageUrl
-    ? getOptimizedImageUrl(imageUrl, { width: 120 })
-    : null;
+  // Preset discount prices
+  const tierPrices = useMemo(() => {
+    return calculateTierPrices(askingPrice);
+  }, [askingPrice]);
 
-  // Initialize selected tier on open
+  // Reset state when opening
   useEffect(() => {
     if (visible) {
-      setSelectedCard('tier20');
-      setCustomAmount(preset20 > 0 ? String(preset20) : '');
+      setSelectedTier('20');
+      setCustomAmount('');
       setSubmitting(false);
     }
-  }, [visible, askingPrice, preset20]);
+  }, [visible, askingPrice]);
 
-  const handleSelectCard = (card: 'tier10' | 'tier20' | 'custom') => {
+  // Web Escape key listener
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !visible) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [visible, onClose]);
+
+  const handleSelectTier = (tierId: OfferTierId) => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     }
-    setSelectedCard(card);
-
-    if (card === 'tier10') {
-      setCustomAmount(String(preset10));
-      inputRef.current?.blur?.();
-    } else if (card === 'tier20') {
-      setCustomAmount(String(preset20));
-      inputRef.current?.blur?.();
-    } else if (card === 'custom') {
+    setSelectedTier(tierId);
+    if (tierId === 'custom') {
       setTimeout(() => {
         inputRef.current?.focus?.();
-      }, 50);
+      }, 60);
+    } else {
+      inputRef.current?.blur?.();
     }
   };
 
   const handleCustomChange = (text: string) => {
-    // Only allow digits and a single decimal point
     const clean = text.replace(/[^0-9.]/g, '');
-    setSelectedCard('custom');
     setCustomAmount(clean);
   };
 
-  const parsedAmount = parseFloat(customAmount) || 0;
-  const isValidOffer = parsedAmount > 0 && (askingPrice <= 0 || parsedAmount < askingPrice);
+  // Determine active offer amount
+  const activeOfferAmount = useMemo(() => {
+    if (selectedTier === 'custom') {
+      return parseFloat(customAmount) || 0;
+    }
+    return tierPrices[selectedTier] || 0;
+  }, [selectedTier, customAmount, tierPrices]);
+
+  const isValidOffer = isValidOfferAmount(activeOfferAmount, askingPrice);
+
+  const isCustomInvalid =
+    selectedTier === 'custom' &&
+    customAmount.trim().length > 0 &&
+    (!isValidOffer || (askingPrice > 0 && activeOfferAmount >= askingPrice));
 
   const totalWithProtection = useMemo(() => {
-    if (parsedAmount <= 0) return 0;
-    return orderTotal(parsedAmount);
-  }, [parsedAmount]);
+    if (activeOfferAmount <= 0) return 0;
+    return orderTotal(activeOfferAmount);
+  }, [activeOfferAmount]);
 
   const handleSubmit = async () => {
     if (!isValidOffer || submitting || loading) return;
@@ -119,7 +140,7 @@ export function OfferSheet({
 
     setSubmitting(true);
     try {
-      await onSubmit(parsedAmount);
+      await onSubmit(activeOfferAmount);
     } catch (e) {
       console.warn('[OfferSheet] submit failed', e);
     } finally {
@@ -127,567 +148,364 @@ export function OfferSheet({
     }
   };
 
-  const handleLearnWhy = () => {
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    }
-    Alert.alert(
-      'Daily Offer Limit',
-      'To prevent spam and keep negotiations active and meaningful for sellers, buyers are limited to 25 offers per day.',
-      [{ text: 'Got it' }],
-    );
-  };
-
   if (!visible) return null;
 
   return (
     <Modal
       visible={visible}
-      animationType="slide"
-      presentationStyle="fullScreen"
-      statusBarTranslucent
+      transparent
+      animationType="fade"
       onRequestClose={onClose}
+      statusBarTranslucent
     >
-      <SafeAreaView
-        edges={['top', 'bottom']}
-        style={[
-          styles.fullPageContainer,
-          { backgroundColor: isDark ? theme.background : '#F9FAFB' },
-        ]}
-      >
-        {/* Top Navigation Header */}
+      <TouchableWithoutFeedback onPress={onClose}>
         <View
-          style={[
-            styles.headerBar,
-            {
-              borderBottomColor: theme.hairline,
-              backgroundColor: isDark ? theme.background : '#FFFFFF',
-            },
-          ]}
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.55)',
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+          }}
         >
-          <Pressable
-            onPress={onClose}
-            hitSlop={{ top: 12, bottom: 12, left: 16, right: 16 }}
-            style={({ pressed }) => [
-              styles.closeButton,
-              pressed && { opacity: 0.6 },
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel="Close"
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={{ width: '100%', alignItems: 'center' }}
           >
-            <Feather name="arrow-left" size={24} color={theme.ink} />
-          </Pressable>
-
-          <Text
-            style={[
-              styles.headerTitle,
-              { color: theme.ink, fontFamily: type.family.sansBold },
-            ]}
-          >
-            Make an offer
-          </Text>
-
-          <View style={styles.headerSpacer} />
-        </View>
-
-        {/* Full-Page Content with Keypad Stability */}
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={{ flex: 1 }}
-        >
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={styles.scrollContent}
-          >
-            {/* Item Card Row */}
-            <View
-              style={[
-                styles.itemRow,
-                {
+            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+              <View
+                style={{
+                  width: '100%',
+                  maxWidth: 480,
                   backgroundColor: isDark ? theme.surface : '#FFFFFF',
-                  borderColor: isDark ? theme.border : '#E5E7EB',
-                },
-              ]}
-            >
-              {optimizedThumb ? (
-                <Image
-                  source={{ uri: optimizedThumb }}
-                  style={styles.itemImage}
-                  contentFit="cover"
-                  cachePolicy="memory-disk"
-                  transition={IMAGE_TRANSITION}
+                  borderTopLeftRadius: 24,
+                  borderTopRightRadius: 24,
+                  paddingHorizontal: 20,
+                  paddingTop: 10,
+                  paddingBottom: Math.max(insets.bottom + 8, 24),
+                  ...shadow.lg,
+                }}
+              >
+                {/* Drag Handle */}
+                <View
+                  style={{
+                    alignSelf: 'center',
+                    width: 38,
+                    height: 4.5,
+                    borderRadius: 2.5,
+                    backgroundColor: isDark ? theme.border : '#E5E7EB',
+                    marginBottom: 16,
+                  }}
                 />
-              ) : (
-                <View style={[styles.itemImagePlaceholder, { backgroundColor: isDark ? theme.panel : '#F4F4F5' }]}>
-                  <Feather name="tag" size={20} color={theme.mute} />
+
+                {/* Header: Title & Close Button */}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: 20,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 18,
+                      fontFamily: type.family.sansBold,
+                      color: theme.ink,
+                      letterSpacing: -0.2,
+                    }}
+                  >
+                    Select offer amount
+                  </Text>
+                  <Pressable
+                    onPress={onClose}
+                    accessibilityRole="button"
+                    accessibilityLabel="Close"
+                    hitSlop={8}
+                    style={({ pressed }) => ({
+                      width: 32,
+                      height: 32,
+                      borderRadius: 16,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: pressed
+                        ? isDark
+                          ? theme.panel
+                          : '#F4F4F5'
+                        : 'transparent',
+                    })}
+                  >
+                    <Feather name="x" size={20} color={theme.ink} />
+                  </Pressable>
                 </View>
-              )}
 
-              <View style={styles.itemDetails}>
-                <Text
-                  numberOfLines={1}
-                  style={[
-                    styles.itemTitle,
-                    { color: theme.ink, fontFamily: type.family.sansBold },
-                  ]}
-                >
-                  {title || 'Selected Item'}
-                </Text>
-                <Text style={[styles.itemPrice, { color: theme.mute }]}>
-                  Listing price: {formatPrice(askingPrice)}
-                </Text>
-              </View>
-            </View>
+                {/* Preset Chips Row: -20%, -15%, -10%, -5%, Custom */}
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
+                  {OFFER_PRESET_TIERS.map((tier) => {
+                    const isSelected = selectedTier === tier.id;
+                    return (
+                      <Pressable
+                        key={tier.id}
+                        onPress={() => handleSelectTier(tier.id)}
+                        style={({ pressed }) => ({
+                          flex: 1,
+                          height: 42,
+                          borderRadius: 10,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: isSelected
+                            ? isDark
+                              ? '#FFFFFF'
+                              : '#18181B'
+                            : isDark
+                            ? theme.panel
+                            : '#F3F4F6',
+                          transform: [{ scale: pressed ? 0.96 : 1 }],
+                        })}
+                        accessibilityRole="button"
+                        accessibilityLabel={tier.label}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 14.5,
+                            fontFamily: type.family.sansBold,
+                            color: isSelected
+                              ? isDark
+                                ? '#111111'
+                                : '#FFFFFF'
+                              : theme.ink,
+                            letterSpacing: -0.1,
+                          }}
+                        >
+                          {tier.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
 
-            {/* 3 Preset Tier Cards */}
-            <View style={styles.cardsRow}>
-              {/* 10% off card */}
-              <Pressable
-                onPress={() => handleSelectCard('tier10')}
-                style={({ pressed }) => [
-                  styles.presetCard,
-                  {
-                    backgroundColor:
-                      selectedCard === 'tier10'
-                        ? theme.purpleSoft
-                        : isDark
-                        ? theme.surface
-                        : '#FFFFFF',
-                    borderColor:
-                      selectedCard === 'tier10'
-                        ? theme.purple
-                        : isDark
-                        ? theme.border
-                        : '#E5E7EB',
-                    borderWidth: selectedCard === 'tier10' ? 1.5 : 1,
-                    transform: [{ scale: pressed ? 0.97 : 1 }],
-                  },
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel={`10% off: ${formatPrice(preset10)}`}
-              >
-                <Text
-                  style={[
-                    styles.cardTopText,
-                    {
-                      color: selectedCard === 'tier10' ? theme.purple : theme.ink,
-                      fontFamily: type.family.sansBold,
-                    },
-                  ]}
+                {/* Custom Amount Input Field (Expands when 'Custom' chip selected) */}
+                {selectedTier === 'custom' && (
+                  <View style={{ marginBottom: 18 }}>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        backgroundColor: isDark ? theme.panel : '#F9FAFB',
+                        borderWidth: 1.5,
+                        borderColor: isCustomInvalid
+                          ? '#EF4444'
+                          : isDark
+                          ? theme.border
+                          : '#E5E7EB',
+                        borderRadius: 12,
+                        paddingHorizontal: 14,
+                        height: 46,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 16,
+                          fontFamily: type.family.sansBold,
+                          color: theme.ink,
+                          marginRight: 6,
+                        }}
+                      >
+                        {CURRENCY_SYMBOL}
+                      </Text>
+                      <TextInput
+                        ref={inputRef}
+                        autoFocus
+                        value={customAmount}
+                        onChangeText={handleCustomChange}
+                        placeholder={`Enter amount lower than ${formatPrice(askingPrice)}`}
+                        placeholderTextColor={theme.muteSoft}
+                        keyboardType="decimal-pad"
+                        returnKeyType="done"
+                        selectTextOnFocus
+                        style={
+                          {
+                            flex: 1,
+                            fontSize: 16,
+                            fontFamily: type.family.sansBold,
+                            color: theme.ink,
+                            padding: 0,
+                            outlineStyle: 'none',
+                          } as any
+                        }
+                      />
+                      {customAmount.length > 0 && (
+                        <Pressable onPress={() => setCustomAmount('')} hitSlop={8}>
+                          <Feather name="x-circle" size={16} color={theme.mute} />
+                        </Pressable>
+                      )}
+                    </View>
+                    {isCustomInvalid && (
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: '#EF4444',
+                          marginTop: 5,
+                          paddingHorizontal: 2,
+                        }}
+                      >
+                        {activeOfferAmount >= askingPrice
+                          ? `Offer must be less than the asking price (${formatPrice(askingPrice)})`
+                          : 'Please enter a valid offer amount'}
+                      </Text>
+                    )}
+                  </View>
+                )}
+
+                {/* Summary Row: "Your offer:" with Strikethrough & Savings */}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'flex-start',
+                    justifyContent: 'space-between',
+                    marginBottom: 24,
+                    paddingHorizontal: 2,
+                  }}
                 >
-                  {formatPrice(preset10)}
-                </Text>
-                <Text
-                  style={[
-                    styles.cardBottomText,
-                    {
-                      color: selectedCard === 'tier10' ? theme.purple : theme.mute,
+                  <Text
+                    style={{
+                      fontSize: 15.5,
                       fontFamily: type.family.sansMedium,
-                    },
-                  ]}
-                >
-                  10% off
-                </Text>
-              </Pressable>
-
-              {/* 20% off card */}
-              <Pressable
-                onPress={() => handleSelectCard('tier20')}
-                style={({ pressed }) => [
-                  styles.presetCard,
-                  {
-                    backgroundColor:
-                      selectedCard === 'tier20'
-                        ? theme.purpleSoft
-                        : isDark
-                        ? theme.surface
-                        : '#FFFFFF',
-                    borderColor:
-                      selectedCard === 'tier20'
-                        ? theme.purple
-                        : isDark
-                        ? theme.border
-                        : '#E5E7EB',
-                    borderWidth: selectedCard === 'tier20' ? 1.5 : 1,
-                    transform: [{ scale: pressed ? 0.97 : 1 }],
-                  },
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel={`20% off: ${formatPrice(preset20)}`}
-              >
-                <Text
-                  style={[
-                    styles.cardTopText,
-                    {
-                      color: selectedCard === 'tier20' ? theme.purple : theme.ink,
-                      fontFamily: type.family.sansBold,
-                    },
-                  ]}
-                >
-                  {formatPrice(preset20)}
-                </Text>
-                <Text
-                  style={[
-                    styles.cardBottomText,
-                    {
-                      color: selectedCard === 'tier20' ? theme.purple : theme.mute,
-                      fontFamily: type.family.sansMedium,
-                    },
-                  ]}
-                >
-                  20% off
-                </Text>
-              </Pressable>
-
-              {/* Custom card */}
-              <Pressable
-                onPress={() => handleSelectCard('custom')}
-                style={({ pressed }) => [
-                  styles.presetCard,
-                  {
-                    backgroundColor:
-                      selectedCard === 'custom'
-                        ? theme.purpleSoft
-                        : isDark
-                        ? theme.surface
-                        : '#FFFFFF',
-                    borderColor:
-                      selectedCard === 'custom'
-                        ? theme.purple
-                        : isDark
-                        ? theme.border
-                        : '#E5E7EB',
-                    borderWidth: selectedCard === 'custom' ? 1.5 : 1,
-                    transform: [{ scale: pressed ? 0.97 : 1 }],
-                  },
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel="Custom set a price"
-              >
-                <Text
-                  style={[
-                    styles.cardTopText,
-                    {
-                      color: selectedCard === 'custom' ? theme.purple : theme.ink,
-                      fontFamily: type.family.sansBold,
-                    },
-                  ]}
-                >
-                  Custom
-                </Text>
-                <Text
-                  style={[
-                    styles.cardBottomText,
-                    {
-                      color: selectedCard === 'custom' ? theme.purple : theme.mute,
-                      fontFamily: type.family.sansMedium,
-                    },
-                  ]}
-                >
-                  Set a price
-                </Text>
-              </Pressable>
-            </View>
-
-            {/* Input Section */}
-            <Pressable
-              onPress={() => {
-                setSelectedCard('custom');
-                inputRef.current?.focus?.();
-              }}
-              style={[
-                styles.inputSection,
-                {
-                  backgroundColor: isDark ? theme.surface : '#FFFFFF',
-                  borderColor:
-                    selectedCard === 'custom'
-                      ? theme.purple
-                      : isDark
-                      ? theme.border
-                      : '#E5E7EB',
-                  borderWidth: selectedCard === 'custom' ? 1.5 : 1,
-                },
-              ]}
-            >
-              <Text style={[styles.inputEyebrow, { color: theme.mute }]}>
-                YOUR OFFER AMOUNT
-              </Text>
-
-              <View style={styles.displayRow}>
-                <Text
-                  style={[
-                    styles.currencyPrefix,
-                    {
                       color: theme.ink,
-                      fontFamily: type.family.sansBold,
-                    },
-                  ]}
-                >
-                  {CURRENCY_SYMBOL}
-                </Text>
-                <TextInput
-                  ref={inputRef}
-                  value={customAmount}
-                  onChangeText={handleCustomChange}
-                  placeholder="0"
-                  placeholderTextColor={theme.muteSoft}
-                  keyboardType="decimal-pad"
-                  returnKeyType="done"
-                  selectTextOnFocus
-                  style={[
-                    styles.amountInput,
-                    {
-                      color: theme.ink,
-                      fontFamily: type.family.sansBold,
-                    },
-                  ]}
-                />
-              </View>
+                      paddingTop: 2,
+                    }}
+                  >
+                    Your offer:
+                  </Text>
 
-              {/* Fee breakdown helper text */}
-              <View style={[styles.feeBreakdownRow, { borderTopColor: isDark ? theme.hairline : '#E5E7EB' }]}>
-                <ShieldCheckIcon size={16} />
-                <Text style={[styles.feeHelperText, { color: theme.mute }]}>
-                  {parsedAmount > 0
-                    ? `${formatPrice(totalWithProtection)} incl. Buyer Protection`
-                    : `Includes Buyer Protection guarantee`}
-                </Text>
-              </View>
-            </Pressable>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'baseline',
+                        gap: 6,
+                      }}
+                    >
+                      {askingPrice > 0 && (
+                        <Text
+                          style={{
+                            fontSize: 16,
+                            fontFamily: type.family.sansBold,
+                            color: '#9CA3AF',
+                            textDecorationLine: 'line-through',
+                          }}
+                        >
+                          {formatPrice(askingPrice)}
+                        </Text>
+                      )}
+                      <Text
+                        style={{
+                          fontSize: 20,
+                          fontFamily: type.family.sansBold,
+                          color: isValidOffer ? '#16A34A' : theme.ink,
+                        }}
+                      >
+                        {activeOfferAmount > 0
+                          ? formatPrice(activeOfferAmount)
+                          : '—'}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontFamily: type.family.sans,
+                          color: theme.mute,
+                        }}
+                      >
+                        + shipping
+                      </Text>
+                    </View>
 
-            {/* Negotiation Guidance Tip (eBay / Plick feature) */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 7,
-                marginHorizontal: 16,
-                marginTop: 12,
-                paddingHorizontal: 12,
-                paddingVertical: 9,
-                borderRadius: radii.md,
-                backgroundColor: isDark ? 'rgba(108, 71, 255, 0.08)' : '#F5F5F7',
-                borderWidth: 1,
-                borderColor: isDark ? theme.border : '#E5E7EB',
-              }}
-            >
-              <Feather name="trending-up" size={13} color={theme.purple} />
-              <Text style={{ fontSize: 12, color: theme.mute, flex: 1, lineHeight: 16 }}>
-                Offers within 10% – 20% of the asking price have an 82% acceptance rate.
-              </Text>
-            </View>
+                    {isValidOffer && totalWithProtection > 0 && (
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontFamily: type.family.sans,
+                          color: theme.mute,
+                          marginTop: 4,
+                        }}
+                      >
+                        (est. {formatPrice(totalWithProtection)} with Buyer Protection)
+                      </Text>
+                    )}
+                  </View>
+                </View>
 
-            {/* Action Button: "Send Offer · Rs 16" */}
-            <View style={styles.actionButtonContainer}>
-              <Pressable
-                onPress={handleSubmit}
-                disabled={!isValidOffer || submitting || loading}
-                style={({ pressed }) => [
-                  styles.actionButton,
-                  {
+                {/* Action CTA: Signal Purple "Continue" button */}
+                <Pressable
+                  onPress={handleSubmit}
+                  disabled={!isValidOffer || submitting || loading}
+                  style={({ pressed }) => ({
+                    height: 48,
+                    borderRadius: radii.pill,
                     backgroundColor: theme.purple,
-                    opacity: !isValidOffer || submitting || loading ? 0.45 : pressed ? 0.88 : 1,
-                    transform: [{ scale: pressed ? 0.98 : 1 }],
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '100%',
+                    marginBottom: 16,
+                    opacity:
+                      !isValidOffer || submitting || loading
+                        ? 0.45
+                        : pressed
+                        ? 0.88
+                        : 1,
+                    transform: [{ scale: pressed ? 0.985 : 1 }],
                     ...shadow.sm,
-                  },
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  parsedAmount > 0 ? `Offer ${formatPrice(parsedAmount)}` : 'Make an offer'
-                }
-              >
-                <Text
-                  style={[
-                    styles.actionButtonText,
-                    { fontFamily: type.family.sansBold },
-                  ]}
+                  })}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    activeOfferAmount > 0
+                      ? `Continue with offer of ${formatPrice(activeOfferAmount)}`
+                      : 'Continue'
+                  }
                 >
-                  {submitting || loading
-                    ? 'Sending offer…'
-                    : parsedAmount > 0
-                    ? `Send Offer · ${formatPrice(parsedAmount)}`
-                    : 'Make an offer'}
-                </Text>
-              </Pressable>
-            </View>
+                  {submitting || loading ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <Text
+                      style={{
+                        fontSize: 16,
+                        fontFamily: type.family.sansBold,
+                        color: '#FFFFFF',
+                        letterSpacing: 0.1,
+                      }}
+                    >
+                      Continue
+                    </Text>
+                  )}
+                </Pressable>
 
-            {/* Subtext: "25 offers remaining today. Learn why." */}
-            <View style={styles.limitRow}>
-              <Text style={[styles.limitText, { color: theme.mute }]}>
-                {offersLeftToday} offers remaining today.{' '}
-              </Text>
-              <Pressable onPress={handleLearnWhy} hitSlop={6}>
-                <Text style={[styles.learnWhyText, { color: theme.purple }]}>Learn why.</Text>
-              </Pressable>
-            </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
+                {/* Disclaimer / Reassurance text */}
+                <View style={{ gap: 4 }}>
+                  <Text
+                    style={{
+                      fontSize: 12.5,
+                      fontFamily: type.family.sans,
+                      color: theme.mute,
+                      lineHeight: 17,
+                    }}
+                  >
+                    You won&apos;t be charged unless the seller accepts the offer.
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 12.5,
+                      fontFamily: type.family.sans,
+                      color: theme.mute,
+                      lineHeight: 17,
+                    }}
+                  >
+                    Coupons do not apply to offers.
+                  </Text>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </KeyboardAvoidingView>
+        </View>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  fullPageContainer: {
-    flex: 1,
-  },
-  headerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  closeButton: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 16,
-    textAlign: 'center',
-    letterSpacing: -0.2,
-  },
-  headerSpacer: {
-    width: 36,
-  },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 32,
-  },
-  itemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    padding: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  itemImage: {
-    width: 48,
-    height: 48,
-    borderRadius: 10,
-  },
-  itemImagePlaceholder: {
-    width: 48,
-    height: 48,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  itemDetails: {
-    flex: 1,
-    marginLeft: 12,
-    justifyContent: 'center',
-  },
-  itemTitle: {
-    fontSize: 15,
-    marginBottom: 2,
-    letterSpacing: -0.1,
-  },
-  itemPrice: {
-    fontSize: 13,
-    fontFamily: type.family.sansMedium,
-  },
-  cardsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 16,
-  },
-  presetCard: {
-    flex: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 6,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardTopText: {
-    fontSize: 16,
-    marginBottom: 2,
-    textAlign: 'center',
-    letterSpacing: -0.2,
-  },
-  cardBottomText: {
-    fontSize: 12.5,
-    textAlign: 'center',
-  },
-  inputSection: {
-    marginBottom: 20,
-    padding: 16,
-    borderRadius: 16,
-  },
-  inputEyebrow: {
-    fontSize: 11,
-    fontFamily: type.family.sansBold,
-    fontWeight: '700',
-    letterSpacing: 0.6,
-    marginBottom: 8,
-  },
-  displayRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  currencyPrefix: {
-    fontSize: 28,
-    fontWeight: '800',
-    marginRight: 6,
-  },
-  amountInput: {
-    flex: 1,
-    fontSize: 28,
-    fontWeight: '800',
-    padding: 0,
-    margin: 0,
-    height: 38,
-    outlineStyle: 'none',
-    outlineWidth: 0,
-  } as any,
-  feeBreakdownRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingTop: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  feeHelperText: {
-    fontSize: 13,
-    fontFamily: type.family.sansMedium,
-  },
-  actionButtonContainer: {
-    marginBottom: 14,
-  },
-  actionButton: {
-    height: 52,
-    borderRadius: radii.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-  },
-  actionButtonText: {
-    fontSize: 16,
-    color: '#FFFFFF',
-    fontWeight: '700',
-    letterSpacing: 0.1,
-  },
-  limitRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 4,
-  },
-  limitText: {
-    fontSize: 13,
-    fontFamily: type.family.sans,
-  },
-  learnWhyText: {
-    fontSize: 13,
-    fontFamily: type.family.sansBold,
-    textDecorationLine: 'underline',
-  },
-});
