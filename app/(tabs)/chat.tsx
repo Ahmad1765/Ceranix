@@ -48,7 +48,7 @@ const EMPTY_CONVERSATIONS: ConversationRow[] = [];
 const keyById = (item: ConversationRow) => item.id;
 
 export const INBOX_TABS: { value: InboxTab; label: string }[] = [
-  { value: 'orders', label: 'Purchases & Selling' },
+  { value: 'orders', label: 'Orders' },
   { value: 'messages', label: 'Messages' },
   { value: 'support', label: 'Support' },
 ];

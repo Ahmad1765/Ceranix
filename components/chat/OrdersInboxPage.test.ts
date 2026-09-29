@@ -224,11 +224,11 @@ describe('OrdersInboxPage UI Invariants & Guardrails (Rule 2.10)', () => {
     expect(textNodes).toContain('View shop');
   });
 
-  it('strictly locks Activity screen top tabs to Purchases & Selling, Messages, and Support', () => {
+  it('strictly locks Activity screen top tabs to Orders, Messages, and Support', () => {
     const fs = require('fs');
     const path = require('path');
     const content = fs.readFileSync(path.resolve(__dirname, '../../app/(tabs)/chat.tsx'), 'utf-8');
-    expect(content).toContain("{ value: 'orders', label: 'Purchases & Selling' }");
+    expect(content).toContain("{ value: 'orders', label: 'Orders' }");
     expect(content).toContain("{ value: 'messages', label: 'Messages' }");
     expect(content).toContain("{ value: 'support', label: 'Support' }");
   });
