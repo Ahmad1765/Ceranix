@@ -62,6 +62,27 @@ describe('normalizeMyOrder', () => {
     expect(normalizeMyOrder({ listing: null }).listing).toBeNull();
     expect(normalizeMyOrder({ listing: [] }).listing).toBeNull();
   });
+
+  it('normalizes buyer and seller profile embeds when returned as array, object, or null', () => {
+    const buyer = { id: 'b1', username: 'buyer_one' };
+    const seller = { id: 's1', username: 'seller_one' };
+
+    expect(normalizeMyOrder({ listing, buyer: [buyer], seller: [seller] })).toMatchObject({
+      listing,
+      buyer,
+      seller,
+    });
+    expect(normalizeMyOrder({ listing, buyer, seller })).toMatchObject({
+      listing,
+      buyer,
+      seller,
+    });
+    expect(normalizeMyOrder({ listing, buyer: null, seller: [] })).toMatchObject({
+      listing,
+      buyer: null,
+      seller: null,
+    });
+  });
 });
 
 describe('orderBadge', () => {

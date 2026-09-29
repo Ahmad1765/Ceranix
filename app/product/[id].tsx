@@ -682,12 +682,20 @@ export default function ProductScreen() {
         bottomInset={insets.bottom}
         isOwner={isOwnListing}
         isSold={listing.is_sold || Boolean(buyerOrder)}
-        hasPurchased={Boolean(buyerOrder)}
-        isBundle={isBundleActive}
-        bundleCount={bundleCount}
+        hasPurchased={Boolean(buyerOrder && buyerOrder.status !== 'awaiting_payment')}
+        isAwaitingPayment={Boolean(buyerOrder && buyerOrder.status === 'awaiting_payment')}
+        awaitingAmount={buyerOrder?.amount_cents ? Math.round(buyerOrder.amount_cents / 100) : undefined}
+        onCompleteCheckoutPress={() => {
+          tap('medium');
+          const amount = buyerOrder?.amount_cents ? Math.round(buyerOrder.amount_cents / 100) : undefined;
+          router.push({
+            pathname: `/payment/${listing.id}`,
+            params: amount ? { offer: String(amount) } : undefined,
+          } as any);
+        }}
         onViewOrderPress={() => {
           tap('selection');
-          router.push(`/invoice/${listing.id}` as any);
+          router.push(`/invoice/${buyerOrder?.id || listing.id}` as any);
         }}
         onChatPress={() => openChat('message')}
         onOfferPress={() => {

@@ -464,18 +464,63 @@ export function useSettingsManager() {
         account_last4: form.account_last4.trim(),
         is_default: true,
       };
-      const { data, error } = await supabase.rpc('set_default_payout', {
-        p_payload: payout?.id ? { ...payload, id: payout.id } : payload,
-      });
 
-      if (error) {
-        toast.show(error.message ?? 'Could not save payout', {
+      let savedData: PayoutMethod | null = null;
+      let rpcError: Error | null = null;
+
+      try {
+        const { data, error } = await supabase.rpc('set_default_payout', {
+          p_payload: payout?.id ? { ...payload, id: payout.id } : payload,
+        });
+        if (!error && data) {
+          savedData = data as PayoutMethod;
+        } else if (error) {
+          rpcError = new Error(error.message);
+        }
+      } catch (err: any) {
+        rpcError = err instanceof Error ? err : new Error(String(err));
+      }
+
+      // Direct database fallback if RPC not yet deployed or failed
+      if (!savedData) {
+        try {
+          await supabase
+            .from('payout_methods')
+            .update({ is_default: false })
+            .eq('user_id', user.id)
+            .eq('is_default', true);
+
+          if (payout?.id) {
+            const { data, error } = await supabase
+              .from('payout_methods')
+              .update(payload)
+              .eq('id', payout.id)
+              .eq('user_id', user.id)
+              .select()
+              .single();
+            if (!error && data) savedData = data as PayoutMethod;
+          } else {
+            const { data, error } = await supabase
+              .from('payout_methods')
+              .insert(payload)
+              .select()
+              .single();
+            if (!error && data) savedData = data as PayoutMethod;
+          }
+        } catch {
+          // continue to check savedData
+        }
+      }
+
+      if (!savedData) {
+        toast.show(rpcError?.message ?? 'Could not save payout method', {
           variant: 'default',
           icon: 'alert-triangle',
         });
         return false;
       }
-      if (mounted.current) setPayout(data as PayoutMethod);
+
+      if (mounted.current) setPayout(savedData);
       toast.show('Payout method saved', { variant: 'success', icon: 'check' });
       return true;
     },

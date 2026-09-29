@@ -13,7 +13,7 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import { tap } from '@/lib/haptics';
-import { type as typography } from '@/lib/theme';
+import { type as typography, tabularNumberStyle } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useSellSheet } from '@/components/sell/SellSheet';
@@ -45,7 +45,7 @@ function formatOrderDate(dateStr?: string | null): string {
   return `${month}/${day}/${year < 10 ? '0' : ''}${year}`;
 }
 
-function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
+export function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
   const { theme, isDark } = useTheme();
   const { total } = deriveInvoiceAmounts(order, order.listing?.price, buyerProtectionFee);
   const image = order.listing ? cardImageUrl(order.listing, 0) : '';
@@ -59,8 +59,9 @@ function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
 
   const handlePress = () => {
     tap();
-    if (order.listing_id) {
-      router.push(`/invoice/${order.listing_id}` as any);
+    const targetId = order.id || order.listing_id;
+    if (targetId) {
+      router.push(`/invoice/${targetId}` as any);
     }
   };
 
@@ -79,10 +80,9 @@ function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
 
   const purchasedDate = formatOrderDate(order.created_at);
   const counterpartName =
-    (order.listing as any)?.seller?.username ||
-    (side === 'bought'
-      ? order.courier_name || 'Seller'
-      : 'Buyer');
+    side === 'bought'
+      ? (order.seller?.username || order.seller?.full_name || (order.listing as any)?.seller?.username || 'Seller')
+      : (order.buyer?.username || order.buyer?.full_name || (order.shipping_address as any)?.recipientName || (order.shipping_address as any)?.recipient_name || 'Buyer');
 
   let badgeLabel = 'In Progress';
   let badgeBg: string = isDark ? 'rgba(255, 255, 255, 0.10)' : '#E5E7EB';
@@ -201,7 +201,7 @@ function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
             color: theme.ink,
             fontFamily: typography.family.sansBold,
             fontWeight: '700',
-            letterSpacing: -0.2,
+            letterSpacing: -0.3,
             marginBottom: 2,
           }}
           numberOfLines={1}
@@ -218,7 +218,15 @@ function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
             marginBottom: 1,
           }}
         >
-          Price: <Text style={{ fontFamily: typography.family.sansBold, fontWeight: '700', color: theme.ink }}>{formatPrice(total)}</Text>
+          Price:{' '}
+          <Text
+            style={[
+              { fontFamily: typography.family.sansBold, fontWeight: '700', color: theme.ink },
+              tabularNumberStyle,
+            ]}
+          >
+            {formatPrice(total)}
+          </Text>
         </Text>
 
         {/* Purchased Date */}
@@ -249,7 +257,7 @@ function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
           </Text>
         ) : null}
 
-        {/* Counterparty / From */}
+        {/* Counterparty / From or Buyer */}
         <Text
           style={{
             fontSize: 13,
@@ -257,7 +265,8 @@ function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
             fontFamily: typography.family.sans,
           }}
         >
-          From: <Text style={{ fontFamily: typography.family.sansMedium, color: '#5B8DEF' }}>{counterpartName}</Text>
+          {side === 'bought' ? 'From: ' : 'Buyer: '}
+          <Text style={{ fontFamily: typography.family.sansMedium, color: theme.primary }}>{counterpartName}</Text>
         </Text>
       </View>
     </Pressable>

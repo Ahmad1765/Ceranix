@@ -346,7 +346,12 @@ function OutgoingOfferBubble({
 }) {
   const { theme } = useTheme();
   const amount = msg.metadata?.amount ?? 0;
-  const status = msg.offer_status ?? 'pending';
+  const isExpiredTtl = Boolean(
+    (msg.offer_status === 'pending' || msg.offer_status === 'proposed') &&
+    msg.created_at &&
+    Date.now() - new Date(msg.created_at).getTime() > 48 * 3600 * 1000
+  );
+  const status = isExpiredTtl ? 'expired' : (msg.offer_status ?? 'pending');
   const isBundle = Boolean(msg.metadata?.is_bundle);
   const bundleCount = msg.metadata?.bundle_count ?? (msg.metadata?.bundle_item_ids ? msg.metadata.bundle_item_ids.length + 1 : 1);
   const showStruck = !isBundle && !!listingPrice && listingPrice > amount;
@@ -589,7 +594,12 @@ function IncomingOfferCard({
 }) {
   const { theme } = useTheme();
   const amount = msg.metadata?.amount ?? 0;
-  const status = msg.offer_status ?? 'pending';
+  const isExpiredTtl = Boolean(
+    (msg.offer_status === 'pending' || msg.offer_status === 'proposed') &&
+    msg.created_at &&
+    Date.now() - new Date(msg.created_at).getTime() > 48 * 3600 * 1000
+  );
+  const status = isExpiredTtl ? 'expired' : (msg.offer_status ?? 'pending');
   const isBundle = Boolean(msg.metadata?.is_bundle);
   const bundleCount = msg.metadata?.bundle_count ?? (msg.metadata?.bundle_item_ids ? msg.metadata.bundle_item_ids.length + 1 : 1);
   const showStruck = !isBundle && !!listingPrice && listingPrice > amount;
@@ -987,7 +997,12 @@ function OfferBubble(
     onCounterOffer,
     onPay,
   } = props;
-  const status = msg.offer_status ?? 'pending';
+  const isExpiredTtl = Boolean(
+    (msg.offer_status === 'pending' || msg.offer_status === 'proposed') &&
+    msg.created_at &&
+    Date.now() - new Date(msg.created_at).getTime() > 48 * 3600 * 1000
+  );
+  const status = isExpiredTtl ? 'expired' : (msg.offer_status ?? 'pending');
   const isPaid = Boolean(
     msg.metadata?.paid ||
     msg.metadata?.order_status === 'paid' ||
@@ -997,8 +1012,10 @@ function OfferBubble(
   const isBundleInvalid = isBundle && (Boolean(msg.metadata?.bundle_invalid) || status === 'canceled');
   const isPending = (status === 'pending' || status === 'proposed') && !isBundleInvalid;
   const canRespond = !mine && isPending && !listingSold && !isBundleInvalid;
-  const canPay = !isSeller && status === 'accepted' && !!listingId && !listingSold && !isPaid && !isBundleInvalid;
-  const awaitingPayment = isSeller && status === 'accepted' && !listingSold && !isPaid && !isBundleInvalid;
+  // NOTE: When an offer is accepted, the listing is locked (is_sold: true) specifically for this order.
+  // Neither canPay (buyer) nor awaitingPayment (seller) should be blocked by listingSold.
+  const canPay = !isSeller && status === 'accepted' && !!listingId && !isPaid && !isBundleInvalid;
+  const awaitingPayment = isSeller && status === 'accepted' && !isPaid && !isBundleInvalid;
   const canMakeCounter = !isBundleInvalid && (status === 'declined' || status === 'expired') && !!onCounterOffer && !listingSold;
 
   if (mine) {

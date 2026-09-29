@@ -24,9 +24,12 @@ export interface ProductActionBarProps {
   onBuyPress?: () => void;
   onChatPress?: () => void;
   onViewOrderPress?: () => void;
+  onCompleteCheckoutPress?: () => void;
   isOwner?: boolean;
   isSold?: boolean;
   hasPurchased?: boolean;
+  isAwaitingPayment?: boolean;
+  awaitingAmount?: number;
   disabled?: boolean;
   isBundle?: boolean;
   bundleCount?: number;
@@ -45,9 +48,12 @@ export function ProductActionBar({
   onBuyPress,
   onChatPress,
   onViewOrderPress,
+  onCompleteCheckoutPress,
   isOwner = false,
   isSold = false,
   hasPurchased = false,
+  isAwaitingPayment = false,
+  awaitingAmount,
   disabled = false,
   isBundle = false,
   bundleCount,
@@ -76,6 +82,51 @@ export function ProductActionBar({
     }
     onBuyPress?.();
   };
+
+  if (isAwaitingPayment) {
+    return (
+      <View
+        className={className}
+        style={[
+          styles.container,
+          {
+            backgroundColor: theme.surface,
+            borderTopColor: theme.border,
+            paddingBottom: Math.max(safeBottom, 16),
+          },
+          style,
+        ]}
+      >
+        <View style={styles.actionRow}>
+          <View style={{ flex: 1, marginRight: 10, justifyContent: 'center' }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: theme.primary, fontFamily: 'Inter_700Bold' }}>
+              Offer accepted!
+            </Text>
+            <Text style={{ fontSize: 11.5, color: theme.mute, fontFamily: 'Inter_500Medium' }}>
+              Complete checkout to lock order
+            </Text>
+          </View>
+          <Pressable
+            onPress={onCompleteCheckoutPress}
+            style={({ pressed }) => [
+              styles.buyButton,
+              {
+                backgroundColor: theme.ink,
+                paddingHorizontal: 18,
+                height: 48,
+                borderRadius: 10,
+                opacity: pressed ? 0.85 : 1,
+              },
+            ]}
+          >
+            <Text style={[styles.buyButtonText, { color: theme.background, fontFamily: 'Inter_700Bold' }]}>
+              {awaitingAmount ? `Pay ${formatPrice(awaitingAmount)}` : 'Pay now'}
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
 
   if (hasPurchased) {
     return (

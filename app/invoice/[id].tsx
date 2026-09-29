@@ -7,7 +7,9 @@ import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/context/ThemeContext';
-import { type as typography, radii } from '@/lib/theme';
+import { type as typography, radii, tabularNumberStyle } from '@/lib/theme';
+import { useQueryClient } from '@tanstack/react-query';
+import { qk } from '@/lib/queries/keys';
 import { useListingQuery } from '@/lib/queries';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
@@ -74,10 +76,29 @@ export default function InvoiceScreen() {
   const toast = useToast();
   const { theme, isDark } = useTheme();
 
-  const listingQ = useListingQuery(id ? String(id) : null);
-  const listing = listingQ.data ?? null;
+  const queryClient = useQueryClient();
 
   const [order, setOrder] = useState<Order | null>(null);
+  const [orderLoading, setOrderLoading] = useState(true);
+
+  const effectiveListingId = order?.listing_id ?? (id ? String(id) : null);
+  const listingQ = useListingQuery(effectiveListingId);
+
+  const fallbackListing = order
+    ? {
+        id: order.listing_id || order.id,
+        title: 'Purchased Item',
+        price: order.amount_cents / 100,
+        photos: [],
+        images: [],
+        thumbnails: [],
+        category: 'Order',
+        seller_id: order.seller_id,
+        seller: null,
+        is_sold: true,
+      }
+    : null;
+  const listing = listingQ.data ?? (order as any)?.listing ?? fallbackListing;
   const [confirming, setConfirming] = useState(false);
   const [completingCod, setCompletingCod] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -122,13 +143,16 @@ export default function InvoiceScreen() {
   }, [user?.id]);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id) {
+      setOrderLoading(false);
+      return;
+    }
     let active = true;
-    const listingId = String(id);
+    const lookupId = String(id);
 
     const load = async () => {
       try {
-        return await fetchOrderForListing(listingId);
+        return await fetchOrderForListing(lookupId);
       } catch (e) {
         console.warn('[invoice] order load failed', e);
         return null;
@@ -136,6 +160,7 @@ export default function InvoiceScreen() {
     };
 
     (async () => {
+      setOrderLoading(true);
       const first = await load();
       if (!active) return;
       if (first) {
@@ -143,7 +168,7 @@ export default function InvoiceScreen() {
       } else if (__DEV__ && placed === '1') {
         setOrder({
           id: `order_demo_${Date.now()}`,
-          listing_id: String(listingId),
+          listing_id: String(lookupId),
           buyer_id: user?.id ?? 'buyer_demo',
           seller_id: listing?.seller_id ?? listing?.seller?.id ?? 'seller_demo',
           status: method === 'cod' ? 'pending' : 'paid',
@@ -154,6 +179,7 @@ export default function InvoiceScreen() {
           created_at: new Date().toISOString(),
         });
       }
+      setOrderLoading(false);
 
       if (paid !== '1' || first?.status === 'paid') return;
 
@@ -212,7 +238,9 @@ export default function InvoiceScreen() {
     };
   }, [order?.id]);
 
-  if (!listing && id && listingQ.isPending) {
+  const isInitialLoading = !listing && !order && (orderLoading || listingQ.isPending);
+
+  if (isInitialLoading) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -222,7 +250,7 @@ export default function InvoiceScreen() {
     );
   }
 
-  if (!listing) {
+  if (!listing && !order) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }}>
         <View
@@ -281,22 +309,24 @@ export default function InvoiceScreen() {
   const {
     item: itemPrice,
     total,
-  } = deriveInvoiceAmounts(order, listing.price, buyerProtectionFee);
-  const seller = listing.seller;
-  const isSeller = Boolean(user?.id && (user.id === listing.seller_id || user.id === seller?.id));
-  const isBuyer = Boolean(user?.id && order?.buyer_id && user.id === order.buyer_id);
+  } = deriveInvoiceAmounts(order, listing?.price, buyerProtectionFee);
+  const seller = listing?.seller ?? (order as any)?.seller ?? null;
+  const isSeller = Boolean(user?.id && (user.id === listing?.seller_id || user.id === seller?.id || user.id === order?.seller_id));
+  const isBuyer = Boolean(user?.id && (order?.buyer_id ? user.id === order.buyer_id : !isSeller));
   const isAdmin = Boolean(profile?.is_admin);
-  const invoiceNumber = deriveInvoiceNumber(listing.id);
-  const buyerName = isBuyer ? displayName(profile?.full_name, profile?.username) : 'Buyer';
+  const invoiceNumber = deriveInvoiceNumber(order?.id || listing?.id || String(id));
+  const buyerName = isBuyer
+    ? displayName(profile?.full_name, profile?.username)
+    : displayName((order as any)?.buyer?.full_name, (order as any)?.buyer?.username) || 'Buyer';
   const status = deriveInvoiceStatus(order, confirming);
-  const heroImage = cardImageUrl(listing, 0);
+  const heroImage = listing ? cardImageUrl(listing, 0) : '';
   const mapsUrl = generateMapsLink(order?.shipping_address);
 
   const onShare = async () => {
     tap('light');
     try {
       await Share.share({
-        message: `Order #${invoiceNumber}\n${listing.title} · ${formatPrice(total)}`,
+        message: `Order #${invoiceNumber}\n${listing?.title || 'Purchased Item'} · ${formatPrice(total)}`,
       });
     } catch {
       toast.show('Share failed', { variant: 'default', icon: 'alert-triangle' });
@@ -319,7 +349,7 @@ export default function InvoiceScreen() {
     const lines: string[] = [
       `📦 *${BRAND.toUpperCase()} DISPATCH SLIP*`,
       `Order: #${invoiceNumber}`,
-      `Item: ${listing.title}`,
+      `Item: ${listing?.title || 'Purchased Item'}`,
       '',
       `👤 Recipient: ${recipient}`,
       ...(street ? [`📍 Address: ${street}`] : []),
@@ -342,7 +372,10 @@ export default function InvoiceScreen() {
 
   const handleContactOtherUser = () => {
     tap('light');
-    router.push(`/conversation/new?listing=${listing.id}` as any);
+    const targetListingId = listing?.id || order?.listing_id;
+    if (targetListingId) {
+      router.push(`/conversation/new?listing=${targetListingId}` as any);
+    }
   };
 
   // Order Cancellation Handler
@@ -352,10 +385,16 @@ export default function InvoiceScreen() {
     try {
       const updated = await paymentService.cancelOrder({
         orderId: order.id,
-        listingId: listing.id,
+        listingId: listing?.id || order.listing_id || String(id),
         reason,
       });
       setOrder(updated);
+      if (user?.id) {
+        queryClient.invalidateQueries({ queryKey: qk.myOrders(user.id) });
+      }
+      if (effectiveListingId) {
+        queryClient.invalidateQueries({ queryKey: qk.listing(effectiveListingId) });
+      }
       toast.show('Order cancelled successfully', {
         variant: 'default',
         icon: 'check',
@@ -380,6 +419,9 @@ export default function InvoiceScreen() {
         sellerPickupAddress: address,
       });
       setOrder(updated);
+      if (user?.id) {
+        queryClient.invalidateQueries({ queryKey: qk.myOrders(user.id) });
+      }
       toast.show('Pickup address confirmed & order marked as Packing', {
         variant: 'default',
         icon: 'check',
@@ -411,6 +453,9 @@ export default function InvoiceScreen() {
         targetStatus: 'packing',
       });
       setOrder(updated);
+      if (user?.id) {
+        queryClient.invalidateQueries({ queryKey: qk.myOrders(user.id) });
+      }
       toast.show(
         order.fulfillment_type === 'dropship'
           ? 'Sent to supplier for processing'
@@ -439,6 +484,9 @@ export default function InvoiceScreen() {
         trackingNumber,
       });
       setOrder(updated);
+      if (user?.id) {
+        queryClient.invalidateQueries({ queryKey: qk.myOrders(user.id) });
+      }
       toast.show('Order marked as Shifting / Dispatched!', {
         variant: 'default',
         icon: 'check',
@@ -473,6 +521,9 @@ export default function InvoiceScreen() {
         reason: 'Item damaged / defective on arrival',
       });
       setOrder(updated);
+      if (user?.id) {
+        queryClient.invalidateQueries({ queryKey: qk.myOrders(user.id) });
+      }
       toast.show('Dispute opened. Funds placed on hold.', {
         variant: 'default',
         icon: 'shield',
@@ -504,6 +555,10 @@ export default function InvoiceScreen() {
     try {
       const updated = await paymentService.confirmOrderReceived({ orderId: order.id });
       setOrder((prev) => ({ ...(prev ?? {}), ...(updated ?? {}), status: 'completed' } as any));
+      if (user?.id) {
+        queryClient.invalidateQueries({ queryKey: qk.myOrders(user.id) });
+        queryClient.invalidateQueries({ queryKey: ['myOrders'] });
+      }
       toast.show('Order completed! Thank you for confirming.', {
         variant: 'default',
         icon: 'check',
@@ -535,6 +590,10 @@ export default function InvoiceScreen() {
     try {
       const updated = await paymentService.markCodOrderPaid(order.id);
       setOrder(updated);
+      if (user?.id) {
+        queryClient.invalidateQueries({ queryKey: qk.myOrders(user.id) });
+        queryClient.invalidateQueries({ queryKey: ['myOrders'] });
+      }
       toast.show('Order marked as paid & delivered', {
         variant: 'default',
         icon: 'check',
@@ -556,6 +615,9 @@ export default function InvoiceScreen() {
     order?.status === 'packing' ||
     order?.status === 'shifting' ||
     order?.status === 'delivered';
+  const isAwaitingPayment =
+    order?.status === 'awaiting_payment' ||
+    order?.fulfillment_status === 'awaiting_payment';
   const isShipped = Boolean(
     order?.shipped_at ||
     (order as any)?.shifted_at ||
@@ -602,7 +664,7 @@ export default function InvoiceScreen() {
             <Feather name="arrow-left" size={20} color={theme.ink} />
           </Pressable>
 
-          <Text style={{ fontSize: 17, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+          <Text style={{ fontSize: 17, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold, letterSpacing: -0.3 }}>
             Order Details
           </Text>
 
@@ -690,13 +752,13 @@ export default function InvoiceScreen() {
             </View>
 
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }} numberOfLines={1}>
-                {listing.title}
+              <Text style={{ fontSize: 16, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold, letterSpacing: -0.3 }} numberOfLines={1}>
+                {listing?.title || 'Purchased Item'}
               </Text>
               <Text style={{ fontSize: 13, color: theme.mute, marginTop: 2, textTransform: 'capitalize', fontFamily: typography.family.sans }}>
-                {listing.category} · Ref #{invoiceNumber}
+                {listing?.category || 'Order'} · Ref #{invoiceNumber}
               </Text>
-              <Text style={{ fontSize: 16, fontWeight: '800', color: theme.purple, marginTop: 4, fontFamily: typography.family.sansBold }}>
+              <Text style={[{ fontSize: 16, fontWeight: '800', color: theme.purple, marginTop: 4, fontFamily: typography.family.sansBold, letterSpacing: -0.3 }, tabularNumberStyle]}>
                 {formatPrice(itemPrice)}
               </Text>
 
@@ -857,13 +919,13 @@ export default function InvoiceScreen() {
           </Text>
 
           <MetaRow label="Item Price" theme={theme}>
-            <Text style={{ fontSize: 13.5, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>{formatPrice(itemPrice)}</Text>
+            <Text style={[{ fontSize: 13.5, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold, letterSpacing: -0.3 }, tabularNumberStyle]}>{formatPrice(itemPrice)}</Text>
           </MetaRow>
           <MetaRow label="Buyer Protection" theme={theme}>
             <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#10B981', fontFamily: typography.family.sansBold }}>Free</Text>
           </MetaRow>
           <MetaRow label="Delivery Method" theme={theme}>
-            <Text style={{ fontSize: 13.5, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+            <Text style={[{ fontSize: 13.5, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold, letterSpacing: -0.3 }, tabularNumberStyle]}>
               {order?.shipping_method === 'self_ship'
                 ? 'Self-Ship (Free)'
                 : `Ceranix Managed (+${formatPrice((order?.shipping_fee_cents && order.shipping_fee_cents > 0) ? order.shipping_fee_cents / 100 : MANAGED_SHIPPING_FEE)})`}
@@ -873,7 +935,7 @@ export default function InvoiceScreen() {
           <View style={{ height: 1, backgroundColor: theme.border, marginVertical: 10 }} />
 
           <MetaRow label="Total Amount" theme={theme}>
-            <Text style={{ fontSize: 16, fontWeight: '800', color: theme.ink, fontFamily: typography.family.sansBold }}>{formatPrice(total)}</Text>
+            <Text style={[{ fontSize: 16, fontWeight: '800', color: theme.ink, fontFamily: typography.family.sansBold, letterSpacing: -0.3 }, tabularNumberStyle]}>{formatPrice(total)}</Text>
           </MetaRow>
 
           <MetaRow label="Payment Method" theme={theme}>
@@ -947,11 +1009,11 @@ export default function InvoiceScreen() {
                   </Text>
                 </Pressable>
               )}
-              {(seller?.id || listing.seller_id) && (
+              {(seller?.id || listing?.seller_id || order?.seller_id) && (
                 <Pressable
                   onPress={() => {
                     tap('light');
-                    router.push(`/user/${seller?.id || listing.seller_id}` as any);
+                    router.push(`/user/${seller?.id || listing?.seller_id || order?.seller_id}` as any);
                   }}
                   style={({ pressed }) => [
                     {
@@ -1082,6 +1144,64 @@ export default function InvoiceScreen() {
               Dispute In Review by Support
             </Text>
           </View>
+        ) : isAwaitingPayment ? (
+          isBuyer ? (
+            <View style={{ width: '100%', gap: 8 }}>
+              <Pressable
+                onPress={() => {
+                  tap('medium');
+                  const offerAmt = order?.amount_cents ? Math.round(order.amount_cents / 100) : undefined;
+                  router.push({
+                    pathname: `/payment/${effectiveListingId || order?.listing_id}`,
+                    params: offerAmt ? { offer: String(offerAmt) } : undefined,
+                  } as any);
+                }}
+                style={({ pressed }) => [
+                  {
+                    height: 48,
+                    borderRadius: radii.pill,
+                    backgroundColor: theme.primary,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  },
+                  pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
+                ]}
+              >
+                <Feather name="credit-card" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
+                <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF', fontFamily: typography.family.sansBold }}>
+                  Complete Checkout · {formatPrice(total)}
+                </Text>
+              </Pressable>
+              <Text style={{ fontSize: 12, color: theme.mute, textAlign: 'center', fontFamily: typography.family.sans }}>
+                Offer accepted by seller. Complete checkout to finalize your purchase.
+              </Text>
+            </View>
+          ) : (
+            <View style={{ width: '100%', gap: 8 }}>
+              <View
+                style={{
+                  height: 48,
+                  borderRadius: radii.pill,
+                  backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : theme.panel,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                }}
+              >
+                <Feather name="clock" size={16} color={theme.mute} />
+                <Text style={{ fontSize: 14, fontWeight: '700', color: theme.mute, fontFamily: typography.family.sansBold }}>
+                  Waiting for Buyer to Complete Payment
+                </Text>
+              </View>
+              <Text style={{ fontSize: 12, color: theme.mute, textAlign: 'center', fontFamily: typography.family.sans }}>
+                You accepted this offer. The listing is reserved while the buyer finishes checkout.
+              </Text>
+            </View>
+          )
         ) : isSeller && (order?.fulfillment_status === 'pending' || (!order?.fulfillment_status && !isShipped && order?.status !== 'completed')) ? (
           <View style={{ width: '100%', gap: 8 }}>
             <Pressable

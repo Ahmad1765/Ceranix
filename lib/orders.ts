@@ -18,11 +18,14 @@ export type OrderSide = 'bought' | 'sold';
  * longer listed" with no image — a wrong answer on a screen about money, which
  * is why this is normalized rather than asserted.
  */
-export function normalizeMyOrder(row: {
-  listing: MyOrder['listing'] | MyOrder['listing'][];
-}): { listing: MyOrder['listing'] } {
-  const { listing } = row;
-  return { ...row, listing: Array.isArray(listing) ? (listing[0] ?? null) : listing };
+export function normalizeMyOrder(row: any): any {
+  const { listing, buyer, seller } = row;
+  return {
+    ...row,
+    listing: Array.isArray(listing) ? (listing[0] ?? null) : (listing ?? null),
+    buyer: Array.isArray(buyer) ? (buyer[0] ?? null) : (buyer ?? null),
+    seller: Array.isArray(seller) ? (seller[0] ?? null) : (seller ?? null),
+  };
 }
 
 /**

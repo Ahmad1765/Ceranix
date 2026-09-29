@@ -16,7 +16,7 @@ vi.mock('react', async () => {
   };
 });
 
-import { OrdersInboxPage } from './OrdersInboxPage';
+import { OrdersInboxPage, OrderRow } from './OrdersInboxPage';
 import { lightTheme } from '@/lib/theme';
 
 vi.mock('react-native', () => ({
@@ -43,6 +43,7 @@ vi.mock('react-native', () => ({
 vi.mock('expo-router', () => ({
   router: { push: vi.fn() },
 }));
+import { router } from 'expo-router';
 
 vi.mock('expo-image', () => ({
   Image: (props: any) => React.createElement('img', props),
@@ -76,7 +77,7 @@ vi.mock('@/lib/queries', () => ({
         buyer_id: 'user-123',
         seller_id: 'seller-abc',
         status: 'paid',
-        fulfillment_status: 'completed',
+        fulfillment_status: 'packing',
         amount_cents: 350000,
         fee_cents: 10000,
         currency: 'pkr',
@@ -231,5 +232,50 @@ describe('OrdersInboxPage UI Invariants & Guardrails (Rule 2.10)', () => {
     expect(content).toContain("{ value: 'orders', label: 'Orders' }");
     expect(content).toContain("{ value: 'messages', label: 'Messages' }");
     expect(content).toContain("{ value: 'support', label: 'Support' }");
+  });
+
+  it('routes to /invoice/${order.id} when tapping an order row and shows accurate counterpart', () => {
+    const mockOrder: any = {
+      id: 'ord-123',
+      listing_id: 'list-456',
+      amount_cents: 250000,
+      fee_cents: 15000,
+      created_at: '2026-07-01T12:00:00Z',
+      status: 'paid',
+      seller: { username: 'seller_super' },
+      buyer: { username: 'buyer_prime' },
+      listing: { title: 'Designer Shoes', price: 2500 },
+    };
+
+    // Test purchase side
+    const renderedBought = render(React.createElement(OrderRow, { order: mockOrder, side: 'bought' }));
+    expect(renderedBought.props.testID).toBe('order-row');
+    renderedBought.props.onPress();
+    expect(router.push).toHaveBeenCalledWith('/invoice/ord-123');
+
+    // Test counterparty text collection on purchases
+    const boughtText: string[] = [];
+    function collect(node: any) {
+      if (!node) return;
+      if (typeof node === 'string') boughtText.push(node);
+      if (Array.isArray(node)) node.forEach(collect);
+      else if (node.props?.children) collect(node.props.children);
+    }
+    collect(renderedBought);
+    expect(boughtText).toContain('From: ');
+    expect(boughtText).toContain('seller_super');
+
+    // Test counterparty text collection on sales
+    const renderedSold = render(React.createElement(OrderRow, { order: mockOrder, side: 'sold' }));
+    const soldText: string[] = [];
+    function collectSold(node: any) {
+      if (!node) return;
+      if (typeof node === 'string') soldText.push(node);
+      if (Array.isArray(node)) node.forEach(collectSold);
+      else if (node.props?.children) collectSold(node.props.children);
+    }
+    collectSold(renderedSold);
+    expect(soldText).toContain('Buyer: ');
+    expect(soldText).toContain('buyer_prime');
   });
 });

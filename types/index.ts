@@ -127,6 +127,7 @@ export interface Order {
   stripe_payment_intent?: string | null;
   offer_message_id?: string | null;
   payment_method?: PaymentMethod;
+  payment_status?: string | null;
   status: OrderStatus;
   fulfillment_status?: FulfillmentStatus | null;
   fulfillment_type?: FulfillmentType | null;
@@ -150,6 +151,9 @@ export interface Order {
   completed_at?: string | null;
   escrow_status?: EscrowStatus | null;
   payout_amount_cents?: number | null;
+  listing?: any;
+  buyer?: any;
+  seller?: any;
   created_at: string;
 }
 

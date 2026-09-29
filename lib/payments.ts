@@ -28,25 +28,54 @@ export type Order = CanonicalOrder;
  * null and gets the Pending state, which is the truth for them.
  */
 export async function fetchOrderForListing(
-  listingId: string,
+  idOrListingId: string,
 ): Promise<Order | null> {
+  const SELECT_ORDER_COLS =
+    "id, status, fulfillment_status, fulfillment_type, amount_cents, fee_cents, currency, payment_method, shipping_method, shipping_fee_cents, order_seller_pickups(pickup_address), shipping_address, delivery_notes, courier_name, tracking_number, cancel_reason, cancelled_by, dispute_reason, dispute_evidence_urls, disputed_at, dispute_resolved_at, payment_authorized_at, packed_at, shifted_at, shipped_at, delivered_at, completed_at, cod_paid_at, supplier_name, supplier_order_id, created_at, listing_id, buyer_id, seller_id, listing:listings(id, title, images, thumbnails, price, category, seller_id, is_sold), buyer:profiles!orders_buyer_id_fkey(id, username, full_name, avatar_url), seller:profiles!orders_seller_id_fkey(id, username, full_name, avatar_url)";
+
+  const formatOrderRow = (row: any): Order => {
+    const rawPickup = row.order_seller_pickups;
+    const pickupObj = Array.isArray(rawPickup) ? rawPickup[0] : rawPickup;
+    const rawListing = row.listing;
+    const listingObj = Array.isArray(rawListing) ? rawListing[0] : rawListing;
+    const rawBuyer = row.buyer;
+    const buyerObj = Array.isArray(rawBuyer) ? rawBuyer[0] : rawBuyer;
+    const rawSeller = row.seller;
+    const sellerObj = Array.isArray(rawSeller) ? rawSeller[0] : rawSeller;
+    return {
+      ...row,
+      listing: listingObj ?? null,
+      buyer: buyerObj ?? null,
+      seller: sellerObj ?? null,
+      seller_pickup_address: pickupObj?.pickup_address ?? null,
+    } as Order;
+  };
+
+  // First check if idOrListingId is a direct order ID match (e.g. from an order row click)
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrListingId);
+  if (isUuid) {
+    const { data: directOrder, error: directErr } = await supabase
+      .from("orders")
+      .select(SELECT_ORDER_COLS)
+      .eq("id", idOrListingId)
+      .maybeSingle();
+
+    if (!directErr && directOrder) {
+      return formatOrderRow(directOrder);
+    }
+  }
+
+  // Fallback to querying by listing_id
   const { data, error } = await supabase
     .from("orders")
-    .select(
-      "id, status, fulfillment_status, fulfillment_type, amount_cents, fee_cents, currency, payment_method, shipping_method, shipping_fee_cents, order_seller_pickups(pickup_address), shipping_address, delivery_notes, courier_name, tracking_number, cancel_reason, cancelled_by, dispute_reason, dispute_evidence_urls, disputed_at, dispute_resolved_at, payment_authorized_at, packed_at, shifted_at, shipped_at, delivered_at, completed_at, cod_paid_at, supplier_name, supplier_order_id, created_at, listing_id, buyer_id, seller_id",
-    )
-    .eq("listing_id", listingId)
+    .select(SELECT_ORDER_COLS)
+    .eq("listing_id", idOrListingId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) return null;
-  const rawPickup = (data as any).order_seller_pickups;
-  const pickupObj = Array.isArray(rawPickup) ? rawPickup[0] : rawPickup;
-  return {
-    ...(data as any),
-    seller_pickup_address: pickupObj?.pickup_address ?? null,
-  } as Order;
+  return formatOrderRow(data);
 }
 
 // An order joined to the item it paid for, as the order history needs it.
@@ -64,12 +93,26 @@ export type MyOrder = Order & {
     thumbnails?: string[] | null;
     price: number | string | null;
   } | null;
+  buyer?: {
+    id: string;
+    username: string | null;
+    full_name: string | null;
+    avatar_url: string | null;
+  } | null;
+  seller?: {
+    id: string;
+    username: string | null;
+    full_name: string | null;
+    avatar_url: string | null;
+  } | null;
 };
 
 // The embed as PostgREST may actually hand it back — see the normalization in
 // fetchMyOrders below.
 type MyOrderRow = Omit<MyOrder, "listing"> & {
   listing: MyOrder["listing"] | MyOrder["listing"][];
+  buyer?: any;
+  seller?: any;
 };
 
 /**
@@ -87,7 +130,7 @@ export async function fetchMyOrders(userId: string): Promise<MyOrder[]> {
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "id, status, fulfillment_status, fulfillment_type, amount_cents, fee_cents, currency, payment_method, shipping_address, delivery_notes, courier_name, tracking_number, cancel_reason, cancelled_by, dispute_reason, dispute_evidence_urls, disputed_at, dispute_resolved_at, payment_authorized_at, packed_at, shifted_at, shipped_at, delivered_at, completed_at, cod_paid_at, supplier_name, supplier_order_id, created_at, listing_id, buyer_id, seller_id, listing:listings(id, title, images, thumbnails, price)",
+      "id, status, fulfillment_status, fulfillment_type, amount_cents, fee_cents, currency, payment_method, shipping_address, delivery_notes, courier_name, tracking_number, cancel_reason, cancelled_by, dispute_reason, dispute_evidence_urls, disputed_at, dispute_resolved_at, payment_authorized_at, packed_at, shifted_at, shipped_at, delivered_at, completed_at, cod_paid_at, supplier_name, supplier_order_id, created_at, listing_id, buyer_id, seller_id, listing:listings(id, title, images, thumbnails, price), buyer:profiles!orders_buyer_id_fkey(id, username, full_name, avatar_url), seller:profiles!orders_seller_id_fkey(id, username, full_name, avatar_url)",
     )
     .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
     .order("created_at", { ascending: false });
