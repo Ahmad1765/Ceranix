@@ -64,13 +64,15 @@ export function CategorySheet({
   onClose,
 }: {
   visible: boolean;
-  category: Category;
+  category?: Category | null;
   subcategory: string | null;
   selectedBrand?: string | null;
   onChange: (category: Category, subcategory: string | null) => void;
   onClose: () => void;
 }) {
   const { theme, isDark } = useTheme();
+  const searchBg = isDark ? theme.surface : '#F0F1F5';
+  const searchInputRef = useRef<any>(null);
 
   // Active Category drill-down (null = Level 1 Main Categories, Category = Level 2 Sub-categories)
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
@@ -108,6 +110,7 @@ export function CategorySheet({
       const timer = setTimeout(() => {
         setTouchReady(true);
         setInteractive(true);
+        searchInputRef.current?.focus();
       }, 250);
       return () => clearTimeout(timer);
     } else {
@@ -212,6 +215,61 @@ export function CategorySheet({
       const matchKw = s.kw?.some((k) => k.toLowerCase().includes(q));
       return matchLabel || matchKw;
     });
+  }, [activeCategoryDef, query]);
+
+  // Level 1 cross-category search: searches all subcategories and categories with parent category links (Plick / Vinted)
+  const crossCategoryMatches = useMemo(() => {
+    if (activeCategoryDef !== null) return null;
+    const q = query.trim().toLowerCase();
+    if (!q) return null;
+
+    const subMatches: {
+      categoryId: Category;
+      categoryTitle: string;
+      categoryIcon: keyof typeof Feather.glyphMap;
+      subId: string;
+      subLabel: string;
+    }[] = [];
+
+    const catMatches: {
+      categoryId: Category;
+      title: string;
+      subtitle: string;
+      icon: keyof typeof Feather.glyphMap;
+    }[] = [];
+
+    for (const c of CATEGORIES) {
+      const meta = CATEGORY_META[c.id] || {
+        title: c.label,
+        subtitle: '',
+        icon: c.icon,
+      };
+
+      for (const s of c.subs) {
+        const matchLabel = s.label.toLowerCase().includes(q);
+        const matchKw = s.kw?.some((k) => k.toLowerCase().includes(q));
+        if (matchLabel || matchKw) {
+          subMatches.push({
+            categoryId: c.id,
+            categoryTitle: meta.title,
+            categoryIcon: meta.icon,
+            subId: s.id,
+            subLabel: s.label,
+          });
+        }
+      }
+
+      if (meta.title.toLowerCase().includes(q) || meta.subtitle.toLowerCase().includes(q)) {
+        catMatches.push({
+          categoryId: c.id,
+          title: meta.title,
+          subtitle: meta.subtitle,
+          icon: meta.icon,
+        });
+      }
+    }
+
+    return { subMatches, catMatches };
   }, [activeCategoryDef, query]);
 
   const handleSelectLevel1 = (catId: Category) => {
@@ -358,10 +416,8 @@ export function CategorySheet({
                   flexDirection: 'row',
                   alignItems: 'center',
                   gap: 10,
-                  borderWidth: 1,
-                  borderColor: theme.border,
-                  borderRadius: radii.xl,
-                  backgroundColor: theme.panel,
+                  borderRadius: radii.pill,
+                  backgroundColor: searchBg,
                   paddingHorizontal: 14,
                   height: 44,
                 }}
@@ -465,95 +521,338 @@ export function CategorySheet({
             </ScrollView>
           </View>
         ) : (
-          // ── LEVEL 1: MAIN CATEGORIES (Dedicated Page, Vinted Style) ──
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
-          >
-            {CATEGORIES.map((c) => {
-              const meta = CATEGORY_META[c.id] || {
-                title: c.label,
-                subtitle: '',
-                icon: c.icon,
-              };
-              const isCurrent = category === c.id;
+          // ── LEVEL 1: MAIN CATEGORIES (With Search Across Subcategories & Categories) ──
+          <View style={{ flex: 1 }}>
+            {/* Search Input Bar (Level 1: All categories & subcategories) */}
+            <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 10,
+                  borderRadius: radii.pill,
+                  backgroundColor: searchBg,
+                  paddingHorizontal: 14,
+                  height: 44,
+                }}
+              >
+                <Feather name="search" size={16} color={theme.mute} />
+                <TextInput
+                  ref={searchInputRef}
+                  value={query}
+                  onChangeText={setQuery}
+                  placeholder="Search category or subcategory…"
+                  placeholderTextColor={theme.muteSoft ?? theme.mute}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  style={
+                    {
+                      flex: 1,
+                      minWidth: 0,
+                      fontSize: 14.5,
+                      color: theme.ink,
+                      padding: 0,
+                      outlineStyle: 'none',
+                    } as any
+                  }
+                />
+                {query.length > 0 && (
+                  <Pressable onPress={() => setQuery('')} hitSlop={8}>
+                    <Feather name="x" size={16} color={theme.mute} />
+                  </Pressable>
+                )}
+              </View>
+            </View>
 
-              return (
-                <Pressable
-                  key={c.id}
-                  onPress={() => handleSelectLevel1(c.id)}
-                  style={({ pressed }) => ({
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    paddingVertical: 14,
-                    borderBottomWidth: 1,
-                    borderBottomColor: theme.border,
-                    backgroundColor: pressed ? theme.surface : 'transparent',
-                    gap: 14,
-                    transform: [{ scale: pressed ? 0.98 : 1 }],
-                  })}
-                >
-                  {/* Icon Circle */}
-                  <View
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 22,
-                      backgroundColor: isDark ? theme.surface : '#F2F3FE',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Feather
-                      name={meta.icon}
-                      size={20}
-                      color={isCurrent ? colors.primary : theme.ink}
-                    />
-                  </View>
-
-                  {/* Title & Subtitle Preview */}
-                  <View style={{ flex: 1 }}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
+            >
+              {crossCategoryMatches !== null ? (
+                // ── SEARCH RESULTS: SUBCATEGORIES WITH CATEGORY LINKS ──
+                crossCategoryMatches.subMatches.length === 0 && crossCategoryMatches.catMatches.length === 0 ? (
+                  <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                    <Feather name="search" size={32} color={theme.muteSoft} />
                     <Text
                       style={{
                         fontFamily: DISPLAY_BOLD,
-                        fontSize: 16,
+                        fontSize: 15,
                         color: theme.ink,
-                        letterSpacing: -0.1,
+                        marginTop: 12,
                       }}
                     >
-                      {meta.title}
+                      No categories found
                     </Text>
-                    <Text
-                      numberOfLines={1}
-                      style={{
-                        fontSize: 12.5,
-                        color: theme.muteSoft,
-                        marginTop: 2,
-                      }}
-                    >
-                      {meta.subtitle}
+                    <Text style={{ fontSize: 13, color: theme.mute, marginTop: 4 }}>
+                      No match for &quot;{query}&quot;.
                     </Text>
                   </View>
+                ) : (
+                  <>
+                    {crossCategoryMatches.subMatches.length > 0 && (
+                      <View style={{ marginBottom: 16 }}>
+                        <Text
+                          style={{
+                            fontSize: 11.5,
+                            fontFamily: DISPLAY_BOLD,
+                            color: theme.mute,
+                            textTransform: 'uppercase',
+                            letterSpacing: 0.6,
+                            marginTop: 6,
+                            marginBottom: 4,
+                            paddingHorizontal: 2,
+                          }}
+                        >
+                          Subcategories
+                        </Text>
+                        {crossCategoryMatches.subMatches.map((m) => {
+                          const isSelected = category === m.categoryId && subcategory === m.subId;
+                          return (
+                            <Pressable
+                              key={`${m.categoryId}-${m.subId}`}
+                              onPress={() => handleSelectLevel2(m.categoryId, m.subId)}
+                              style={({ pressed }) => ({
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                paddingVertical: 13,
+                                borderBottomWidth: 1,
+                                borderBottomColor: theme.border,
+                                backgroundColor: pressed ? theme.surface : 'transparent',
+                                gap: 12,
+                                transform: [{ scale: pressed ? 0.985 : 1 }],
+                              })}
+                            >
+                              <View
+                                style={{
+                                  width: 40,
+                                  height: 40,
+                                  borderRadius: 20,
+                                  backgroundColor: isDark ? theme.surface : '#F2F3FE',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }}
+                              >
+                                <Feather name={m.categoryIcon} size={18} color={theme.ink} />
+                              </View>
 
-                  {/* Chevron or Subcategory count */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    {isCurrent && (
+                              <View style={{ flex: 1 }}>
+                                <Text
+                                  style={{
+                                    fontSize: 15,
+                                    fontFamily: isSelected ? DISPLAY_BOLD : typography.family.sansMedium,
+                                    color: isSelected ? colors.primary : theme.ink,
+                                  }}
+                                >
+                                  {m.subLabel}
+                                </Text>
+
+                                <Pressable
+                                  hitSlop={6}
+                                  onPress={(e) => {
+                                    e.stopPropagation();
+                                    handleSelectLevel1(m.categoryId);
+                                  }}
+                                  style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}
+                                >
+                                  <Text style={{ fontSize: 12.5, color: theme.purple, fontFamily: DISPLAY_BOLD }}>
+                                    {m.categoryTitle}
+                                  </Text>
+                                  <Feather name="chevron-right" size={13} color={theme.purple} />
+                                </Pressable>
+                              </View>
+
+                              {isSelected ? (
+                                <View
+                                  style={{
+                                    width: 24,
+                                    height: 24,
+                                    borderRadius: 12,
+                                    backgroundColor: isDark ? theme.surface : '#F2F3FE',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                  }}
+                                >
+                                  <Feather name="check" size={14} color={colors.primary} />
+                                </View>
+                              ) : (
+                                <Feather name="arrow-up-right" size={16} color={theme.muteSoft} />
+                              )}
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    )}
+
+                    {crossCategoryMatches.catMatches.length > 0 && (
+                      <View>
+                        {crossCategoryMatches.subMatches.length > 0 && (
+                          <Text
+                            style={{
+                              fontSize: 11.5,
+                              fontFamily: DISPLAY_BOLD,
+                              color: theme.mute,
+                              textTransform: 'uppercase',
+                              letterSpacing: 0.6,
+                              marginBottom: 4,
+                              paddingHorizontal: 2,
+                            }}
+                          >
+                            Categories
+                          </Text>
+                        )}
+                        {crossCategoryMatches.catMatches.map((c) => {
+                          const isCurrent = category === c.categoryId;
+                          return (
+                            <Pressable
+                              key={c.categoryId}
+                              onPress={() => handleSelectLevel1(c.categoryId)}
+                              style={({ pressed }) => ({
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                paddingVertical: 14,
+                                borderBottomWidth: 1,
+                                borderBottomColor: theme.border,
+                                backgroundColor: pressed ? theme.surface : 'transparent',
+                                gap: 14,
+                                transform: [{ scale: pressed ? 0.98 : 1 }],
+                              })}
+                            >
+                              <View
+                                style={{
+                                  width: 44,
+                                  height: 44,
+                                  borderRadius: 22,
+                                  backgroundColor: isDark ? theme.surface : '#F2F3FE',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }}
+                              >
+                                <Feather
+                                  name={c.icon}
+                                  size={20}
+                                  color={isCurrent ? colors.primary : theme.ink}
+                                />
+                              </View>
+
+                              <View style={{ flex: 1 }}>
+                                <Text
+                                  style={{
+                                    fontFamily: DISPLAY_BOLD,
+                                    fontSize: 16,
+                                    color: theme.ink,
+                                    letterSpacing: -0.1,
+                                  }}
+                                >
+                                  {c.title}
+                                </Text>
+                                <Text
+                                  numberOfLines={1}
+                                  style={{
+                                    fontSize: 12.5,
+                                    color: theme.muteSoft,
+                                    marginTop: 2,
+                                  }}
+                                >
+                                  {c.subtitle}
+                                </Text>
+                              </View>
+
+                              <Feather name="chevron-right" size={18} color={theme.muteSoft} />
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    )}
+                  </>
+                )
+              ) : (
+                // ── DEFAULT LEVEL 1: MAIN CATEGORIES LIST ──
+                CATEGORIES.map((c) => {
+                  const meta = CATEGORY_META[c.id] || {
+                    title: c.label,
+                    subtitle: '',
+                    icon: c.icon,
+                  };
+                  const isCurrent = category === c.id;
+
+                  return (
+                    <Pressable
+                      key={c.id}
+                      onPress={() => handleSelectLevel1(c.id)}
+                      style={({ pressed }) => ({
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        paddingVertical: 14,
+                        borderBottomWidth: 1,
+                        borderBottomColor: theme.border,
+                        backgroundColor: pressed ? theme.surface : 'transparent',
+                        gap: 14,
+                        transform: [{ scale: pressed ? 0.98 : 1 }],
+                      })}
+                    >
+                      {/* Icon Circle */}
                       <View
                         style={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: 4,
-                          backgroundColor: colors.primary,
+                          width: 44,
+                          height: 44,
+                          borderRadius: 22,
+                          backgroundColor: isDark ? theme.surface : '#F2F3FE',
+                          alignItems: 'center',
+                          justifyContent: 'center',
                         }}
-                      />
-                    )}
-                    <Feather name="chevron-right" size={18} color={theme.muteSoft} />
-                  </View>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+                      >
+                        <Feather
+                          name={meta.icon}
+                          size={20}
+                          color={isCurrent ? colors.primary : theme.ink}
+                        />
+                      </View>
+
+                      {/* Title & Subtitle Preview */}
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={{
+                            fontFamily: DISPLAY_BOLD,
+                            fontSize: 16,
+                            color: theme.ink,
+                            letterSpacing: -0.1,
+                          }}
+                        >
+                          {meta.title}
+                        </Text>
+                        <Text
+                          numberOfLines={1}
+                          style={{
+                            fontSize: 12.5,
+                            color: theme.muteSoft,
+                            marginTop: 2,
+                          }}
+                        >
+                          {meta.subtitle}
+                        </Text>
+                      </View>
+
+                      {/* Chevron or Subcategory count */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        {isCurrent && (
+                          <View
+                            style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: 4,
+                              backgroundColor: colors.primary,
+                            }}
+                          />
+                        )}
+                        <Feather name="chevron-right" size={18} color={theme.muteSoft} />
+                      </View>
+                    </Pressable>
+                  );
+                })
+              )}
+            </ScrollView>
+          </View>
         )}
       </SafeAreaView>
     </Modal>

@@ -31,7 +31,7 @@ import { putCachedListing } from '@/lib/listingCache';
 import { emitListingCreated } from '@/lib/listingEvents';
 import { invalidateFresh } from '@/lib/freshness';
 import { router } from 'expo-router';
-import type { Condition, Gender, Listing } from '@/types';
+import type { Category, Condition, Gender, Listing } from '@/types';
 import { categoryLabel, hasSubcategories, subcategoryLabel } from '@/lib/categories';
 import { formatPrice, CURRENCY_SYMBOL } from '@/lib/currency';
 import { itemColorLabel } from '@/lib/itemColors';
@@ -469,12 +469,18 @@ export function SellForm({
     title?.trim().length > 0 &&
     parseFloat(price || '0') > 0 &&
     slots.length > 0 &&
-    (!hasSubcategories(category) || !!subcategory) &&
+    Boolean(category) &&
+    (!hasSubcategories(category as Category) || !!subcategory) &&
+    Boolean(condition) &&
+    Boolean(gender) &&
     isAuthenticityValid;
 
   const onValidSubmit = async (formData: SellFormValues) => {
     if (!user) {
       Alert.alert('Sign in required', 'Please sign in to publish a listing.');
+      return;
+    }
+    if (!formData.category || !formData.condition || !formData.gender) {
       return;
     }
 
@@ -1521,6 +1527,21 @@ export function SellForm({
             />
           </View>
 
+          {errors.category?.message ? (
+            <Text
+              accessibilityRole="alert"
+              style={{
+                fontSize: 12,
+                color: theme.danger ?? '#EF4444',
+                paddingHorizontal: 4,
+                paddingTop: 4,
+                fontFamily: typography.family.sansMedium,
+              }}
+            >
+              {errors.category.message}
+            </Text>
+          ) : null}
+
           {errors.subcategory?.message ? (
             <Text
               accessibilityRole="alert"
@@ -1533,6 +1554,36 @@ export function SellForm({
               }}
             >
               {errors.subcategory.message}
+            </Text>
+          ) : null}
+
+          {errors.condition?.message ? (
+            <Text
+              accessibilityRole="alert"
+              style={{
+                fontSize: 12,
+                color: theme.danger ?? '#EF4444',
+                paddingHorizontal: 4,
+                paddingTop: 4,
+                fontFamily: typography.family.sansMedium,
+              }}
+            >
+              {errors.condition.message}
+            </Text>
+          ) : null}
+
+          {errors.gender?.message ? (
+            <Text
+              accessibilityRole="alert"
+              style={{
+                fontSize: 12,
+                color: theme.danger ?? '#EF4444',
+                paddingHorizontal: 4,
+                paddingTop: 4,
+                fontFamily: typography.family.sansMedium,
+              }}
+            >
+              {errors.gender.message}
             </Text>
           ) : null}
 
@@ -1595,83 +1646,6 @@ export function SellForm({
               {errors.price.message}
             </Text>
           ) : null}
-
-          {/* Seller Instant Payout & Earnings Preview (eBay / Plick feature) */}
-          {parseFloat(price || '0') > 0 ? (
-            <View
-              style={{
-                marginTop: 10,
-                padding: 14,
-                borderRadius: radii.xl,
-                backgroundColor: theme.panel,
-                borderWidth: 1,
-                borderColor: theme.border,
-                gap: 8,
-              }}
-            >
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontSize: 13, color: theme.mute, fontFamily: typography.family.sans }}>
-                  Listing price
-                </Text>
-                <Text style={{ fontSize: 13, color: theme.ink, fontFamily: typography.family.sansMedium }}>
-                  {formatPrice(parseFloat(price || '0'), { whole: true })}
-                </Text>
-              </View>
-
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontSize: 13, color: theme.mute, fontFamily: typography.family.sans }}>
-                  Selling fee (0% promo)
-                </Text>
-                <Text style={{ fontSize: 13, color: '#10B981', fontFamily: DISPLAY_BOLD }}>
-                  Free
-                </Text>
-              </View>
-
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontSize: 13, color: theme.mute, fontFamily: typography.family.sans }}>
-                  Shipping fee
-                </Text>
-                <Text style={{ fontSize: 13, color: theme.mute, fontFamily: typography.family.sans }}>
-                  Paid by buyer
-                </Text>
-              </View>
-
-              <View style={{ height: 1, backgroundColor: theme.border, marginVertical: 2 }} />
-
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Feather name="pocket" size={14} color={theme.purple} />
-                  <Text style={{ fontSize: 13.5, fontFamily: DISPLAY_BOLD, color: theme.ink }}>
-                    Your estimated payout
-                  </Text>
-                </View>
-                <Text style={{ fontSize: 15, fontFamily: DISPLAY_BOLD, color: theme.purple }}>
-                  {formatPrice(parseFloat(price || '0'), { whole: true })}
-                </Text>
-              </View>
-            </View>
-          ) : null}
-
-          {/* Multi-Item Bundle Selling Boost Tip (Plick feature) */}
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 8,
-              marginTop: 10,
-              paddingHorizontal: 12,
-              paddingVertical: 10,
-              borderRadius: radii.lg,
-              backgroundColor: theme.surface,
-              borderWidth: 1,
-              borderColor: theme.border,
-            }}
-          >
-            <Feather name="package" size={14} color={theme.purple} />
-            <Text style={{ fontSize: 12, color: theme.mute, flex: 1, lineHeight: 16 }}>
-              Tip: Multi-item bundle discounts help items sell 2.5x faster. Buyers can bundle items from your wardrobe.
-            </Text>
-          </View>
 
           <Text style={{ fontSize: 12, color: theme.mute, paddingHorizontal: 4, paddingTop: 6 }}>
             The buyer pays for shipping automatically at checkout.
@@ -1740,7 +1714,7 @@ export function SellForm({
       <BrandSheet
         visible={activeSheet === 'brand'}
         value={brand}
-        categoryCode={category}
+        categoryCode={category || undefined}
         subcategoryId={subcategory}
         onSelectBrand={(bName, isCustom) => {
           setValue('brand', bName, { shouldValidate: true });
@@ -1772,7 +1746,7 @@ export function SellForm({
       />
       <SizeSheet
         visible={activeSheet === 'size'}
-        categoryCode={category}
+        categoryCode={category || undefined}
         value={size}
         onChange={(s) => setValue('size', s, { shouldValidate: true })}
         onClose={closeSheet}

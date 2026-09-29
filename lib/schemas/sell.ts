@@ -86,9 +86,7 @@ export const SellFormSchema = z
         },
         'Price can have at most 2 decimal places',
       ),
-    category: z.enum(CATEGORY_VALUES, {
-      required_error: 'Please choose a category',
-    }),
+    category: z.enum(CATEGORY_VALUES).nullable(),
     subcategory: z.string().nullable(),
     brand: z
       .string()
@@ -96,13 +94,9 @@ export const SellFormSchema = z
     size: z
       .string()
       .max(30, 'Size cannot exceed 30 characters'),
-    condition: z.enum(CONDITION_VALUES, {
-      required_error: 'Please select a condition',
-    }),
+    condition: z.enum(CONDITION_VALUES).nullable(),
     color: z.string().nullable(),
-    gender: z.enum(GENDER_VALUES, {
-      required_error: 'Please select a target gender',
-    }),
+    gender: z.enum(GENDER_VALUES).nullable(),
     tags: z
       .array(z.string())
       .max(10, 'Maximum 10 tags allowed'),
@@ -110,7 +104,13 @@ export const SellFormSchema = z
     authenticity: z.enum(['original', 'inspired', 'replica', 'not_sure']).nullable().optional(),
   })
   .superRefine((data, ctx) => {
-    if (hasSubcategories(data.category)) {
+    if (!data.category) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Please choose a category',
+        path: ['category'],
+      });
+    } else if (hasSubcategories(data.category)) {
       const cat = CATEGORIES.find((c) => c.id === data.category);
       const isSubcategoryValid = Boolean(
         data.subcategory && cat?.subs.some((s) => s.id === data.subcategory),
@@ -122,6 +122,22 @@ export const SellFormSchema = z
           path: ['subcategory'],
         });
       }
+    }
+
+    if (!data.condition) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Please select a condition',
+        path: ['condition'],
+      });
+    }
+
+    if (!data.gender) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Please select a target gender',
+        path: ['gender'],
+      });
     }
 
     // Authenticity required for branded listings (except No brand / Unbranded)

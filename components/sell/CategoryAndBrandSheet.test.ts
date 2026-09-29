@@ -171,4 +171,85 @@ describe('Category & Brand Selection in Sell flow', () => {
       }
     });
   });
+
+  describe('Unprefilled Form Fields Validation', () => {
+    const baseValid = {
+      slots: [{ id: '1', uri: 'file://test.jpg' }],
+      title: 'Summer Floral Dress',
+      description: 'Pretty summer dress',
+      price: '50.00',
+      category: 'clothing' as const,
+      subcategory: 'dresses',
+      brand: NO_BRAND,
+      size: 'M',
+      condition: 'good' as const,
+      color: 'red',
+      gender: 'women' as const,
+      tags: ['summer'],
+      parcelSize: 'small' as const,
+      authenticity: null,
+    };
+
+    it('rejects submission when category is null', () => {
+      const res = SellFormSchema.safeParse({ ...baseValid, category: null });
+      expect(res.success).toBe(false);
+      if (!res.success) {
+        expect(res.error.issues.some((i) => i.path.includes('category'))).toBe(true);
+      }
+    });
+
+    it('rejects submission when condition is null', () => {
+      const res = SellFormSchema.safeParse({ ...baseValid, condition: null });
+      expect(res.success).toBe(false);
+      if (!res.success) {
+        expect(res.error.issues.some((i) => i.path.includes('condition'))).toBe(true);
+      }
+    });
+
+    it('rejects submission when gender is null', () => {
+      const res = SellFormSchema.safeParse({ ...baseValid, gender: null });
+      expect(res.success).toBe(false);
+      if (!res.success) {
+        expect(res.error.issues.some((i) => i.path.includes('gender'))).toBe(true);
+      }
+    });
+  });
+
+  describe('Cross-Category Taxonomy Search (Plick / Vinted pattern)', () => {
+    it('searches subcategories across all categories and maps to parent category', () => {
+      const q = 'sneakers';
+      const results: { categoryId: string; subId: string; subLabel: string }[] = [];
+
+      for (const c of CATEGORIES) {
+        for (const s of c.subs) {
+          const matchLabel = s.label.toLowerCase().includes(q);
+          const matchKw = s.kw?.some((k) => k.toLowerCase().includes(q));
+          if (matchLabel || matchKw) {
+            results.push({ categoryId: c.id, subId: s.id, subLabel: s.label });
+          }
+        }
+      }
+
+      expect(results.length).toBeGreaterThan(0);
+      expect(results.some((r) => r.categoryId === 'shoes' && r.subId === 'sneakers')).toBe(true);
+    });
+
+    it('finds subcategories across categories by keyword (e.g. "wallet")', () => {
+      const q = 'wallet';
+      const results: { categoryId: string; subId: string }[] = [];
+
+      for (const c of CATEGORIES) {
+        for (const s of c.subs) {
+          const matchLabel = s.label.toLowerCase().includes(q);
+          const matchKw = s.kw?.some((k) => k.toLowerCase().includes(q));
+          if (matchLabel || matchKw) {
+            results.push({ categoryId: c.id, subId: s.id });
+          }
+        }
+      }
+
+      expect(results.some((r) => r.categoryId === 'bags' && r.subId === 'wallets_clutches')).toBe(true);
+    });
+  });
 });
+
