@@ -48,8 +48,8 @@ const EMPTY_CONVERSATIONS: ConversationRow[] = [];
 const keyById = (item: ConversationRow) => item.id;
 
 export const INBOX_TABS: { value: InboxTab; label: string }[] = [
-  { value: 'orders', label: 'Orders' },
   { value: 'messages', label: 'Messages' },
+  { value: 'orders', label: 'Orders' },
   { value: 'support', label: 'Support' },
 ];
 
@@ -723,11 +723,11 @@ export default function InboxScreen() {
   }>();
 
   const requestedTab: InboxTab =
-    params.tab === 'messages'
-      ? 'messages'
+    params.tab === 'orders' || params.side
+      ? 'orders'
       : params.tab === 'support'
       ? 'support'
-      : 'orders';
+      : 'messages';
 
   const initialChip: MessageChip =
     params.tab === 'buying' || params.tab === 'selling' || params.tab === 'socials'
@@ -984,7 +984,7 @@ export default function InboxScreen() {
             showsHorizontalScrollIndicator={false}
             bounces={false}
             style={{ flex: 1 }}
-            initialScrollIndex={initialScrollIndex >= 0 ? initialScrollIndex : 1}
+            initialScrollIndex={initialScrollIndex >= 0 ? initialScrollIndex : 0}
             getItemLayout={(_, index) => ({
               length: pageWidth,
               offset: pageWidth * index,
