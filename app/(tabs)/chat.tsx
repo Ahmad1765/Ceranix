@@ -41,15 +41,15 @@ import { InboxRow, InboxSkeleton, OrdersInboxPage } from '@/components/chat';
 import { HIT_SLOP_8, useTabBarClearance } from '@/lib/responsive';
 import { PressableScale } from '@/components/PressableScale';
 
-type InboxTab = 'messages' | 'orders' | 'support';
+type InboxTab = 'orders' | 'messages' | 'support';
 type MessageChip = 'all' | 'buying' | 'selling' | 'socials';
 
 const EMPTY_CONVERSATIONS: ConversationRow[] = [];
 const keyById = (item: ConversationRow) => item.id;
 
-const INBOX_TABS: { value: InboxTab; label: string }[] = [
+export const INBOX_TABS: { value: InboxTab; label: string }[] = [
+  { value: 'orders', label: 'Purchases & Selling' },
   { value: 'messages', label: 'Messages' },
-  { value: 'orders', label: 'Orders' },
   { value: 'support', label: 'Support' },
 ];
 
@@ -87,29 +87,14 @@ function TabBadge({ count }: { count: number }) {
       pointerEvents="none"
       style={{
         position: 'absolute',
-        left: '100%',
-        bottom: '58%',
-        marginLeft: 3,
-        minWidth: 16,
-        height: 16,
-        paddingHorizontal: 4,
-        borderRadius: 8,
-        backgroundColor: colors.primary,
-        alignItems: 'center',
-        justifyContent: 'center',
+        top: 2,
+        right: -8,
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#EF4444',
       }}
-    >
-      <Text
-        style={{
-          fontFamily: typography.family.sansBold,
-          fontSize: 10,
-          lineHeight: 12,
-          color: colors.white,
-        }}
-      >
-        {count > 9 ? '9+' : count}
-      </Text>
-    </View>
+    />
   );
 }
 
@@ -138,12 +123,7 @@ function UnderlineTabs({
   });
 
   return (
-    <View
-      style={{
-        borderBottomWidth: 1,
-        borderBottomColor: theme.hairline,
-      }}
-    >
+    <View style={{ position: 'relative' }}>
       <View style={{ flexDirection: 'row' }}>
         {INBOX_TABS.map((t) => {
           const active = t.value === value;
@@ -161,11 +141,12 @@ function UnderlineTabs({
                 paddingVertical: 14,
               }}
             >
-              <View>
+              <View style={{ position: 'relative' }}>
                 <Text
+                  numberOfLines={1}
                   style={{
                     fontFamily: active ? typography.family.sansBold : typography.family.sansMedium,
-                    fontSize: 15,
+                    fontSize: 14.5,
                     color: active ? theme.ink : theme.muteSoft,
                     letterSpacing: -0.1,
                   }}
@@ -183,7 +164,7 @@ function UnderlineTabs({
           pointerEvents="none"
           style={{
             position: 'absolute',
-            bottom: -1,
+            bottom: 0,
             left: 0,
             height: 2.5,
             width: underlineWidth,
@@ -292,8 +273,6 @@ function MessagesPage({
           alignItems: 'center',
         }}
         style={{
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: theme.hairline,
           backgroundColor: theme.background,
           flexGrow: 0,
         }}
@@ -347,7 +326,6 @@ function MessagesPage({
         data={currentData}
         keyExtractor={keyById}
         renderItem={renderItem}
-        ItemSeparatorComponent={InboxSeparator}
         windowSize={7}
         initialNumToRender={10}
         maxToRenderPerBatch={8}
@@ -605,11 +583,8 @@ function SupportPage({
                 overflow: 'hidden',
               }}
             >
-              {data.map((conv, idx) => (
-                <View key={conv.id}>
-                  <InboxListRow conv={conv} userId={userId} />
-                  {idx < data.length - 1 && <InboxSeparator />}
-                </View>
+              {data.map((conv) => (
+                <InboxListRow key={conv.id} conv={conv} userId={userId} />
               ))}
             </View>
           </View>
@@ -734,7 +709,7 @@ function PushNotificationBanner({ onDismiss }: { onDismiss: () => void }) {
 }
 
 export default function InboxScreen() {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const { user, loading: authLoading } = useAuth();
   const { width: pageWidth } = useWindowDimensions();
   const tabBarClearance = useTabBarClearance();
@@ -748,9 +723,11 @@ export default function InboxScreen() {
   }>();
 
   const requestedTab: InboxTab =
-    params.tab === 'orders' || params.tab === 'support'
-      ? (params.tab as InboxTab)
-      : 'messages';
+    params.tab === 'messages'
+      ? 'messages'
+      : params.tab === 'support'
+      ? 'support'
+      : 'orders';
 
   const initialChip: MessageChip =
     params.tab === 'buying' || params.tab === 'selling' || params.tab === 'socials'
@@ -891,10 +868,14 @@ export default function InboxScreen() {
   );
 
   useEffect(() => {
-    if (!params.tab) return;
-    if (params.tab === 'orders' || params.tab === 'support') {
-      if (params.tab !== activeTabRef.current) {
-        goToTab(params.tab as InboxTab);
+    if (!params.tab && !params.side) return;
+    if (params.tab === 'orders' || params.tab === 'purchases' || params.tab === 'sales' || params.tab === 'selling' || params.side) {
+      if (activeTabRef.current !== 'orders') {
+        goToTab('orders');
+      }
+    } else if (params.tab === 'support') {
+      if (activeTabRef.current !== 'support') {
+        goToTab('support');
       }
     } else if (params.tab === 'messages') {
       if (activeTabRef.current !== 'messages') {
@@ -906,7 +887,7 @@ export default function InboxScreen() {
       }
       setMessageFilter(params.tab as MessageChip);
     }
-  }, [params.tab, goToTab]);
+  }, [params.tab, params.side, goToTab]);
 
   useEffect(() => {
     const target = params.tab && INBOX_TABS.some((t) => t.value === params.tab)
@@ -929,22 +910,53 @@ export default function InboxScreen() {
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          justifyContent: 'center',
+          justifyContent: 'space-between',
           paddingHorizontal: 20,
           paddingTop: 8,
-          paddingBottom: 14,
+          paddingBottom: 12,
         }}
       >
         <Text
           style={{
             fontFamily: typography.family.sansBold,
-            fontSize: 18,
+            fontSize: 28,
             color: theme.ink,
-            letterSpacing: -0.2,
+            letterSpacing: -0.6,
           }}
         >
           Activity
         </Text>
+
+        <PressableScale
+          onPress={() => {
+            haptic();
+            router.push('/friends' as any);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Friends"
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            height: 32,
+            paddingHorizontal: 12,
+            borderRadius: 16,
+            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : theme.panel,
+            borderWidth: 1,
+            borderColor: theme.border,
+          }}
+        >
+          <Feather name="users" size={13} color={theme.ink} />
+          <Text
+            style={{
+              fontFamily: typography.family.sansBold,
+              fontSize: 12.5,
+              color: theme.ink,
+            }}
+          >
+            Friends
+          </Text>
+        </PressableScale>
       </View>
 
       {/* Underline tabs */}
@@ -992,7 +1004,7 @@ export default function InboxScreen() {
                     pageWidth={pageWidth}
                     pageHeight={pagerHeight}
                     bottomInset={tabBarClearance}
-                    initialSide={params.side === 'sold' ? 'sold' : 'bought'}
+                    initialSide={params.side === 'sold' || params.tab === 'sales' || params.tab === 'selling' ? 'sold' : 'bought'}
                     justPaid={params.justPaid}
                     recentTitle={params.title}
                     recentAmount={params.amount}
