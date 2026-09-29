@@ -151,10 +151,13 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
       return;
     }
 
-    const proceed = () => {
-      const focused = route.key === activeKey;
-      const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-      if (!focused && !event.defaultPrevented) {
+    const focused = route.key === activeKey;
+    // Emit tabPress synchronously during the user touch/click gesture so any listener
+    // that calls e.preventDefault() (like Categories opening DiscoverSheet or Sell opening SellSheet)
+    // runs synchronously with active user activation — allowing immediate soft keyboard / keypad focus.
+    const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+    if (!focused && !event.defaultPrevented) {
+      const doNavigate = () => {
         if (HAPTICS) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         const t0 = __DEV__ ? Date.now() : 0;
         navigation.navigate(route.name);
@@ -165,17 +168,17 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
             ),
           );
         }
-      }
-      previewIdx.value = NO_PREVIEW;
-    };
+      };
 
-    if (Platform.OS === 'web') {
-      // Defer navigation slightly on web to let the browser's synthetic click
-      // finish on the tab dock instead of hitting underlying buttons in the new view/modal.
-      setTimeout(proceed, 60);
-    } else {
-      proceed();
+      if (Platform.OS === 'web') {
+        // Defer navigation slightly on web to let the browser's synthetic click
+        // finish on the tab dock instead of hitting underlying buttons in the new view.
+        setTimeout(doNavigate, 60);
+      } else {
+        doNavigate();
+      }
     }
+    previewIdx.value = NO_PREVIEW;
   };
 
   // Mount the tab under the finger BEFORE the finger lifts.

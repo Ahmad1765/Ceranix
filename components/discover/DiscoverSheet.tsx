@@ -56,6 +56,7 @@ import { getSearchSuggestions } from '@/lib/searchSuggestions';
 import { PreSearchSuggestions } from '@/components/home/PreSearchSuggestions';
 import { SearchLanding, type BrowseAction, type TopicAction } from './SearchLanding';
 import { useSheetSearchFocus } from './useSheetSearchFocus';
+import { useTheme } from '@/context/ThemeContext';
 
 // Every navigation out of the sheet carries a monotonic `n`. Without it,
 // picking the same chip twice produces an identical URL, expo-router hands
@@ -160,6 +161,7 @@ export function DiscoverSheetProvider({ children }: { children: ReactNode }) {
   const [visible, setVisible] = useState(false);
   // See <KeyboardPrimer/> below for why this exists.
   const primerRef = useRef<TextInput>(null);
+  const searchInputRef = useRef<TextInput>(null);
   const open = useCallback(() => {
     // MUST stay synchronous, and MUST come before setVisible: it has to run
     // inside the tap's own task to count as user-activated. See KeyboardPrimer.
@@ -204,6 +206,10 @@ export function DiscoverSheetProvider({ children }: { children: ReactNode }) {
         animationType="slide"
         transparent
         onRequestClose={close}
+        onShow={() => {
+          // Native iOS & Android trigger onShow when slide presentation finishes.
+          searchInputRef.current?.focus?.();
+        }}
         statusBarTranslucent
         navigationBarTranslucent
       >
@@ -227,7 +233,7 @@ export function DiscoverSheetProvider({ children }: { children: ReactNode }) {
                     gets a visible response immediately instead of waiting on
                     the body's whole subtree and its listings query. */}
                 <DeferAfterPaint>
-                  <DiscoverSheetBody onClose={close} />
+                  <DiscoverSheetBody onClose={close} searchInputRef={searchInputRef} />
                 </DeferAfterPaint>
               </SheetShell>
             </GestureHandlerRootView>
@@ -402,13 +408,22 @@ function SheetShell({
   );
 }
 
-function DiscoverSheetBody({ onClose }: { onClose: () => void }) {
+function DiscoverSheetBody({
+  onClose,
+  searchInputRef,
+}: {
+  onClose: () => void;
+  searchInputRef?: RefObject<TextInput | null>;
+}) {
   const insets = useSafeAreaInsets();
+  const { theme, isDark } = useTheme();
+  const searchBg = isDark ? theme.surface : '#F0F1F5';
   const [query, setQuery] = useState('');
 
   // Opening the sheet is unambiguously an intent to search, so the keyboard
   // comes up with it rather than costing a second tap.
-  const searchRef = useRef<TextInput>(null);
+  const internalRef = useRef<TextInput>(null);
+  const searchRef = searchInputRef ?? internalRef;
   useSheetSearchFocus(searchRef);
 
   // Hold the covers fetch until the slide-up has finished. RN's performance
@@ -520,19 +535,19 @@ function DiscoverSheetBody({ onClose }: { onClose: () => void }) {
             borderRadius: radii.pill,
             paddingLeft: 14,
             paddingRight: 10,
-            borderWidth: 1,
-            borderColor: colors.hair,
-            backgroundColor: colors.panel,
+            borderWidth: 0,
+            backgroundColor: searchBg,
           }}
         >
-          <Feather name="search" size={18} color={colors.muteSoft} />
+          <Feather name="search" size={16} color={theme.mute} style={{ flexShrink: 0 }} />
           <TextInput
             ref={searchRef}
+            autoFocus
             value={query}
             onChangeText={setQuery}
             onSubmitEditing={submit}
             placeholder={`Search ${BRAND}...`}
-            placeholderTextColor={colors.muteSoft}
+            placeholderTextColor={theme.muteSoft}
             autoCorrect={false}
             autoCapitalize="none"
             returnKeyType="search"
@@ -547,11 +562,11 @@ function DiscoverSheetBody({ onClose }: { onClose: () => void }) {
             style={[
               {
                 flex: 1,
-                marginLeft: 10,
+                marginLeft: 8,
                 marginRight: 6,
-                fontSize: 14.5,
+                fontSize: 15,
                 fontFamily: type.family.sans,
-                color: colors.ink,
+                color: theme.ink,
                 padding: 0,
               },
               // Focus-ring removal is a DOM concern. Kept off native entirely
@@ -575,14 +590,14 @@ function DiscoverSheetBody({ onClose }: { onClose: () => void }) {
                 opacity: pressed ? 0.6 : 1,
               })}
             >
-              <Feather name="x" size={16} color={colors.muteSoft} />
+              <Feather name="x" size={16} color={theme.mute} />
             </Pressable>
           ) : null}
         </View>
         {/* Explicit way out, alongside the grabber, the gap above and Android's
             back button — the keyboard covers the other three while typing. */}
         <Pressable hitSlop={HIT_SLOP_8} onPress={onClose} accessibilityRole="button">
-          <Text style={{ fontSize: 14, fontFamily: type.family.sansBold, color: colors.purple }}>
+          <Text style={{ fontSize: 15, fontFamily: type.family.sansBold, color: theme.purple }}>
             Cancel
           </Text>
         </Pressable>
