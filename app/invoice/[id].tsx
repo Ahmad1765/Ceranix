@@ -793,7 +793,7 @@ export default function InvoiceScreen() {
                   >
                     <Feather name="shield" size={11} color={theme.primary} style={{ marginRight: 4 }} />
                     <Text style={{ fontSize: 11.5, fontWeight: '700', color: theme.primary, fontFamily: typography.family.sansBold }}>
-                      Ceranix Managed Delivery
+                      {BRAND} Managed Delivery
                     </Text>
                   </View>
                 )}
@@ -928,7 +928,7 @@ export default function InvoiceScreen() {
             <Text style={[{ fontSize: 13.5, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold, letterSpacing: -0.3 }, tabularNumberStyle]}>
               {order?.shipping_method === 'self_ship'
                 ? 'Self-Ship (Free)'
-                : `Ceranix Managed (+${formatPrice((order?.shipping_fee_cents && order.shipping_fee_cents > 0) ? order.shipping_fee_cents / 100 : MANAGED_SHIPPING_FEE)})`}
+                : `${BRAND} Managed (+${formatPrice((order?.shipping_fee_cents && order.shipping_fee_cents > 0) ? order.shipping_fee_cents / 100 : MANAGED_SHIPPING_FEE)})`}
             </Text>
           </MetaRow>
 
@@ -1265,7 +1265,7 @@ export default function InvoiceScreen() {
             >
               <Feather name="clock" size={16} color={theme.primary} />
               <Text style={{ fontSize: 14, fontWeight: '700', color: theme.primary, fontFamily: typography.family.sansBold }}>
-                Ceranix Arranging Courier Pickup
+                {BRAND} Arranging Courier Pickup
               </Text>
             </View>
             <Text style={{ fontSize: 12, color: theme.mute, textAlign: 'center', fontFamily: typography.family.sans }}>

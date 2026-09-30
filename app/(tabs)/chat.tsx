@@ -387,7 +387,7 @@ function SupportPage({
     } catch (e) {
       setStartingChat(false);
       console.warn('[support] failed to start', e);
-      Alert.alert('Support unavailable', 'Failed to connect to Ceranix Support. Please try again later.');
+      Alert.alert('Support unavailable', 'Failed to connect to Grabsty Support. Please try again later.');
     }
   };
 
@@ -404,7 +404,7 @@ function SupportPage({
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />
         }
       >
-        {/* Ceranix Support Assistant Hero Card */}
+        {/* Grabsty Support Assistant Hero Card */}
         <View
           style={{
             backgroundColor: theme.surface,
@@ -490,7 +490,7 @@ function SupportPage({
           >
             <Feather name="message-square" size={16} color="#FFFFFF" />
             <Text style={{ fontFamily: typography.family.sansBold, fontSize: 14, color: '#FFFFFF' }}>
-              {startingChat ? 'Connecting…' : 'Chat with Ceranix Support'}
+              {startingChat ? 'Connecting…' : 'Chat with Grabsty Support'}
             </Text>
           </PressableScale>
         </View>

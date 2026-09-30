@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/context/ThemeContext';
 import { type as typography } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
+import { BRAND } from '@/lib/brand';
 
 export type PaymentMethodOption = 'card' | 'apple_pay' | 'cod' | 'jazzcash' | 'easypaisa';
 
@@ -199,7 +200,7 @@ export function PaymentOptionsModal({
                   Bank card
                 </Text>
                 <Text style={{ fontSize: 12.5, color: theme.mute, fontFamily: typography.family.sans, lineHeight: 17 }}>
-                  Ceranix never shares your payment information with the seller.
+                  {BRAND} never shares your payment information with the seller.
                 </Text>
 
                 {/* Card Brand Badges */}

@@ -39,6 +39,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 import { bp } from '@/lib/responsive';
+import { BRAND } from '@/lib/brand';
 import {
   BundleDiscountSheet,
   AddressSheet,
@@ -130,7 +131,7 @@ export default function SettingsScreen() {
 
             <ChatGPTSwitchRow
               label="Share usage data"
-              desc="Help us improve Carrinex with anonymous diagnostic telemetry. No personal content is collected."
+              desc={`Help us improve ${BRAND} with anonymous diagnostic telemetry. No personal content is collected.`}
               value={mgr.shareUsage}
               onValueChange={mgr.setShareUsage}
             />
@@ -465,7 +466,7 @@ export default function SettingsScreen() {
           <>
             <ChatGPTRow
               label="Customer Support"
-              desc={session ? 'Chat live with 24/7 Ceranix Concierge' : SUPPORT_EMAIL}
+              desc={session ? `Chat live with 24/7 ${BRAND} Concierge` : SUPPORT_EMAIL}
             >
               <ChatGPTButton
                 label="Contact"
@@ -648,7 +649,7 @@ export default function SettingsScreen() {
                   })}
                 >
                   <Text style={{ fontSize: 13, fontWeight: '600', color: theme.text }}>
-                    Sign in to Carrinex
+                    Sign in to {BRAND}
                   </Text>
                 </Pressable>
               )}
@@ -948,7 +949,7 @@ export default function SettingsScreen() {
         >
           <View style={{ flex: 1, paddingRight: 12 }}>
             <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text }}>
-              {profile?.is_pro ? 'Carrinex Pro Active' : 'Do more with Carrinex Pro'}
+              {profile?.is_pro ? `${BRAND} Pro Active` : `Do more with ${BRAND} Pro`}
             </Text>
             <Text
               style={{

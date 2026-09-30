@@ -43,6 +43,7 @@ import { paymentService, normalizeAddressInput } from '@/lib/paymentService';
 import { ShippingAddressSchema } from '@/lib/schemas/order';
 import { getOrCreateConversation, cancelBundleOffersForSoldItem } from '@/lib/chat';
 import { SELECT_LISTING_WITH_SELLER } from '@/lib/listings';
+import { BRAND } from '@/lib/brand';
 import type { ShippingAddress, Listing } from '@/types';
 
 function tap(style: 'light' | 'medium' = 'light') {
@@ -1033,7 +1034,7 @@ export default function PaymentScreen() {
                   <View style={{ flex: 1, paddingRight: 12 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
-                        Ceranix Tracked Courier
+                        {BRAND} Tracked Courier
                       </Text>
                       <View
                         style={{
@@ -1429,7 +1430,7 @@ export default function PaymentScreen() {
           {/* Delivery Fee */}
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 5 }}>
             <Text style={{ fontSize: 14, color: theme.mute, fontFamily: typography.family.sans }}>
-              Ceranix Delivery
+              {BRAND} Delivery
             </Text>
             <Text style={[{ fontSize: 14, color: theme.ink, fontFamily: typography.family.sansMedium }, deliveryFee === 0 && { color: '#10B981', fontWeight: '600' }]}>
               {deliveryFee > 0 ? formatPrice(deliveryFee) : 'Free'}
@@ -1475,7 +1476,7 @@ export default function PaymentScreen() {
                   fontFamily: typography.family.sansBold,
                 }}
               >
-                Ceranix Buyer Protection
+                {BRAND} Buyer Protection
               </Text>
             </View>
             <Feather name="chevron-right" size={16} color={theme.mute} />

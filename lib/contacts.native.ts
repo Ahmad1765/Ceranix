@@ -23,6 +23,7 @@ import {
   normalizeEmail,
   type CountryCode,
 } from '@/lib/contactNormalization';
+import { BRAND } from '@/lib/brand';
 import type {
   MatchedFriend,
   UnmatchedContact,
@@ -245,7 +246,7 @@ export async function syncContacts(
 
   // 3. Chunked Supabase Queries
   const allHashes = Array.from(uniqueHashesSet);
-  report('matching', 0, allHashes.length, 'Matching friends on Ceranix…');
+  report('matching', 0, allHashes.length, `Matching friends on ${BRAND}…`);
 
   const matchedFriendsMap = new Map<string, MatchedFriend>();
   const matchedContactIds = new Set<string>();
@@ -292,7 +293,7 @@ export async function syncContacts(
   const filteredUnmatchedContacts = unmatchedList.filter(
     (contact) => !matchedContactIds.has(contact.id),
   );
-  report('completed', totalContacts, totalContacts, `Found ${matchedFriends.length} friends on Ceranix`);
+  report('completed', totalContacts, totalContacts, `Found ${matchedFriends.length} friends on ${BRAND}`);
 
   return {
     matchedFriends,

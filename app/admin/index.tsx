@@ -564,7 +564,7 @@ export default function AdminConsoleScreen() {
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <Text style={{ fontSize: 16, fontWeight: '800', color: theme.text, letterSpacing: -0.2 }}>
-            Carrinex Admin
+            Grabsty Admin
           </Text>
           <View
             style={{

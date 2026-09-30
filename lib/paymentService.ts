@@ -407,7 +407,7 @@ export class StripePaymentProvider implements PaymentProvider {
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       return `${window.location.origin}/invoice/${listingId}?paid=1`;
     }
-    return `carrinex://invoice/${listingId}?paid=1`;
+    return `grabsty://invoice/${listingId}?paid=1`;
   }
 }
 

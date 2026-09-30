@@ -17,6 +17,7 @@ import { fetchSuggestedFollows, toggleFollow } from '@/lib/follows';
 import { getOptimizedImageUrl } from '@/lib/images';
 import { CATEGORIES } from '@/lib/categories';
 import { colors } from '@/lib/theme';
+import { BRAND } from '@/lib/brand';
 import type { User } from '@/types';
 
 type Suggestion = Pick<
@@ -139,7 +140,7 @@ export default function OnboardingScreen() {
         {step === 0 && (
           <View>
             <Text style={{ fontSize: 34, fontWeight: '900', color: colors.ink, letterSpacing: -1, lineHeight: 38 }}>
-              Welcome to{'\n'}Carrinex.
+              Welcome to{'\n'}{BRAND}.
             </Text>
             <Text style={{ fontSize: 16, color: colors.mute, lineHeight: 23, marginTop: 12, marginBottom: 28 }}>
               The friendliest way to buy and sell preloved fashion. Here&apos;s what you get.

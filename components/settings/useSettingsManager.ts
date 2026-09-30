@@ -37,7 +37,7 @@ import type {
 } from '@/components/settings';
 import type { PayoutMethod, ShippingAddress, Verification } from '@/types';
 
-export const SUPPORT_EMAIL = 'support@carrinex.app';
+export const SUPPORT_EMAIL = 'support@grabsty.com';
 export const TERMS_URL = `${APP_URL}/terms`;
 export const PRIVACY_URL = `${APP_URL}/privacy`;
 

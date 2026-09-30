@@ -199,9 +199,9 @@ Deno.serve(async (req: Request) => {
     let cancelUrlObj: URL;
     try {
       successUrlObj = new URL(returnUrl);
-      // Validate protocol: http/https for web, carrinex:// for app deep links
+      // Validate protocol: http/https for web, grabsty:// or carrinex:// for app deep links
       const isWeb = successUrlObj.protocol === 'http:' || successUrlObj.protocol === 'https:';
-      const isApp = successUrlObj.protocol === 'carrinex:';
+      const isApp = successUrlObj.protocol === 'grabsty:' || successUrlObj.protocol === 'carrinex:';
       if (!isWeb && !isApp) {
         throw new Error('Invalid protocol');
       }

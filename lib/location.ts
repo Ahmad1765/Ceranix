@@ -39,11 +39,11 @@ export async function reverseGeocodeCoords(
       'Accept-Language': 'en',
     };
     if (Platform.OS !== 'web') {
-      headers['User-Agent'] = 'CeranixApp/1.0 (support@ceranix.com)';
+      headers['User-Agent'] = 'GrabstyApp/1.0 (support@grabsty.com)';
     }
 
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&addressdetails=1&email=support@ceranix.com`,
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&addressdetails=1&email=support@grabsty.com`,
       {
         signal: controller.signal,
         headers,

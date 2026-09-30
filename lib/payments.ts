@@ -188,6 +188,6 @@ function buildReturnUrl(listingId: string) {
   if (Platform.OS === "web" && typeof window !== "undefined") {
     return `${window.location.origin}/invoice/${listingId}?paid=1`;
   }
-  // Expo deep-link scheme. Update `scheme` in app.json if you change apps.
-  return `carrinex://invoice/${listingId}?paid=1`;
+  // Expo deep-link scheme.
+  return `grabsty://invoice/${listingId}?paid=1`;
 }

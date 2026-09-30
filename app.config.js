@@ -18,12 +18,12 @@ const easProjectId =
 // away wholesale. Adding a plugin or an `extra` key to an app.json here would look
 // right and do nothing; check the resolved result with `npx expo config --type public`.
 module.exports = () => ({
-    name: 'Carrinex',
-    slug: 'carrinex',
+    name: 'Grabsty',
+    slug: 'grabsty',
     version: '1.0.0',
     orientation: 'portrait',
     icon: './assets/images/icon.png',
-    scheme: 'carrinex',
+    scheme: 'grabsty',
     userInterfaceStyle: 'light',
     // Fingerprint policy derives runtimeVersion from the native module set, so an
     // OTA JS update only lands on a build whose native layer actually matches —
@@ -47,11 +47,11 @@ module.exports = () => ({
     },
     ios: {
       supportsTablet: false,
-      bundleIdentifier: 'com.carrinex.app',
+      bundleIdentifier: 'com.grabsty.app',
       infoPlist: {
-        NSContactsUsageDescription: 'Allow Carrinex to access your contacts to find friends on the app.',
-        NSCameraUsageDescription: 'Carrinex needs camera access to take photos of items to sell.',
-        NSPhotoLibraryUsageDescription: 'Carrinex needs access to your photos to upload listings.',
+        NSContactsUsageDescription: 'Allow Grabsty to access your contacts to find friends on the app.',
+        NSCameraUsageDescription: 'Grabsty needs camera access to take photos of items to sell.',
+        NSPhotoLibraryUsageDescription: 'Grabsty needs access to your photos to upload listings.',
         LSApplicationQueriesSchemes: ['whatsapp', 'sms'],
       },
     },
@@ -60,7 +60,7 @@ module.exports = () => ({
         foregroundImage: './assets/images/adaptive-icon.png',
         backgroundColor: '#ffffff',
       },
-      package: 'com.carrinex.app',
+      package: 'com.grabsty.app',
     },
     // Only the icon families this app actually renders. The previous `Fonts/*`
     // wildcard declared all 20 @expo/vector-icons families (~4.1 MB) when four
@@ -105,7 +105,7 @@ module.exports = () => ({
       [
         'expo-image-picker',
         {
-          photosPermission: 'Carrinex needs access to your photos to upload listings.',
+          photosPermission: 'Grabsty needs access to your photos to upload listings.',
         },
       ],
       'expo-asset',
@@ -132,7 +132,7 @@ module.exports = () => ({
       [
         'expo-contacts',
         {
-          contactsPermission: 'Allow Carrinex to access your contacts to find friends on the app.',
+          contactsPermission: 'Allow Grabsty to access your contacts to find friends on the app.',
         },
       ],
     ],

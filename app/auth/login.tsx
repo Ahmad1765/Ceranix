@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { signInWithGoogle } from '@/lib/oauth';
 import { useToast } from '@/lib/toast';
 import { colors } from '@/lib/theme';
+import { BRAND } from '@/lib/brand';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -264,7 +265,7 @@ export default function LoginScreen() {
                     letterSpacing: -0.6,
                   }}
                 >
-                  Carrinex
+                  {BRAND}
                 </Text>
                 <Text
                   style={{
@@ -369,7 +370,7 @@ export default function LoginScreen() {
                     textTransform: 'uppercase',
                   }}
                 >
-                  Carrinex
+                  {BRAND}
                 </Text>
               </View>
 

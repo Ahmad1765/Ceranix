@@ -150,8 +150,8 @@ export function useConversationThread(
               conversation_id: conversationId,
               sender_id: SUPPORT_BOT_USER_ID,
               content:
-                `👋 Welcome to Ceranix Support!\n\n` +
-                `How can we assist you today? Feel free to ask about your orders, Buyer Protection, payments, or selling on Ceranix.`,
+                `👋 Welcome to Grabsty Support!\n\n` +
+                `How can we assist you today? Feel free to ask about your orders, Buyer Protection, payments, or selling on Grabsty.`,
               kind: 'text',
               metadata: null,
               offer_status: null,

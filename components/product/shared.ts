@@ -86,7 +86,7 @@ export const CONDITION_LABELS: Record<string, string> = {
 // Category labels now live in the single-source taxonomy (lib/categories).
 export { CATEGORY_LABELS } from '@/lib/categories';
 
-export const ITEM_COLOR = { name: 'Carrinex purple', hex: '#6C47FF' };
+export const ITEM_COLOR = { name: 'Grabsty purple', hex: '#6C47FF' };
 
 // Unified brand palette (matches home tabs + PromoBanner + LiveActivityTicker)
 export const BRAND_PURPLE = '#6C47FF';

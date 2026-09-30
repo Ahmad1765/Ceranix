@@ -16,3 +16,4 @@ export { ShieldCheckIcon } from './ShieldCheckIcon';
 export { FilterSlidersIcon, type FilterSlidersIconProps } from './FilterSlidersIcon';
 export { BellIcon, type BellIconProps } from './BellIcon';
 export { UserPlusIcon, type UserPlusIconProps } from './UserPlusIcon';
+export { GrabstyLogo, type GrabstyLogoProps } from './GrabstyLogo';
