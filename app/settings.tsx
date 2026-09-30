@@ -24,6 +24,7 @@ import {
   Platform,
   Linking,
   useWindowDimensions,
+  Switch,
 } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -53,6 +54,8 @@ import {
   ChatGPTButton,
   ChatGPTSwitchRow,
   ChatGPTTabItem,
+  ChatGPTGroup,
+  ChatGPTItem,
   type Section,
 } from '@/components/settings';
 
@@ -350,20 +353,6 @@ export default function SettingsScreen() {
               onValueChange={mgr.setVacationMode}
               disabled={!user?.id}
             />
-
-            <ChatGPTRow
-              label="Public shop link"
-              desc={profile?.username ? `@${profile.username}` : 'Share a direct link to your shop'}
-            >
-              <ChatGPTButton
-                label="Share shop"
-                icon="share-2"
-                disabled={!profile?.id}
-                onPress={() => {
-                  if (profile?.id) router.push(`/user/${profile.id}` as any);
-                }}
-              />
-            </ChatGPTRow>
           </>
         );
 
@@ -790,128 +779,408 @@ export default function SettingsScreen() {
     );
   }
 
-  // ── 2. Mobile Responsive Layout ───────────────────────────────────────────
+  // ── 2. Mobile Responsive Layout (Faithful ChatGPT Mobile Settings) ────────
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.background }}>
-      {/* Top Header */}
+    <SafeAreaView
+      edges={['top']}
+      style={{
+        flex: 1,
+        backgroundColor: isDark ? '#141414' : '#F4F4F6',
+      }}
+    >
+      {/* Top Floating Close Button matching Video */}
       <View
         style={{
-          borderBottomWidth: 1,
-          borderBottomColor: theme.border,
-          backgroundColor: theme.background,
+          flexDirection: 'row',
+          justifyContent: 'flex-end',
+          alignItems: 'center',
+          paddingHorizontal: 16,
+          paddingTop: 8,
+          paddingBottom: 4,
         }}
       >
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingHorizontal: 16,
-            paddingTop: 8,
-            paddingBottom: 12,
+        <Pressable
+          onPress={() => {
+            tap('light');
+            safeBack();
           }}
-        >
-          <Pressable
-            onPress={() => safeBack()}
-            hitSlop={12}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-            style={({ pressed }) => ({
-              width: 36,
-              height: 36,
-              borderRadius: 18,
-              backgroundColor: theme.surface,
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderWidth: 1,
-              borderColor: theme.border,
-              opacity: pressed ? 0.7 : 1,
-            })}
-          >
-            <Feather name="arrow-left" size={17} color={theme.text} />
-          </Pressable>
-
-          <Text
-            style={{
-              fontSize: 14,
-              fontWeight: '700',
-              color: theme.text,
-              letterSpacing: 1.2,
-              textTransform: 'uppercase',
-            }}
-          >
-            Settings
-          </Text>
-
-          <View style={{ width: 36 }} />
-        </View>
-
-        {/* Universal 30px Category Pills Row */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{
-            paddingHorizontal: 16,
-            paddingVertical: 10,
-            gap: 8,
-            flexDirection: 'row',
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Close settings"
+          style={({ pressed }) => ({
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            backgroundColor: isDark ? '#212121' : '#FFFFFF',
             alignItems: 'center',
-          }}
-        >
-          {visibleTabs.map((tab) => {
-            const isActive = activeTab === tab.key;
-            return (
-              <Pressable
-                key={tab.key}
-                onPress={() => {
-                  tap('light');
-                  mgr.toggleSection(tab.key);
-                }}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: isActive }}
-                style={({ pressed }) => ({
-                  height: 30,
-                  borderRadius: 15,
-                  paddingHorizontal: 14,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 6,
-                  backgroundColor: isActive ? theme.ink : theme.panel,
-                  borderWidth: isActive ? 0 : 1,
-                  borderColor: theme.border,
-                  opacity: pressed ? 0.8 : 1,
-                })}
-              >
-                <Feather
-                  name={tab.icon}
-                  size={13}
-                  color={isActive ? theme.background : theme.text}
-                />
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontWeight: isActive ? '700' : '600',
-                    color: isActive ? theme.background : theme.text,
-                  }}
-                >
-                  {tab.label}
-                </Text>
-              </Pressable>
-            );
+            justifyContent: 'center',
+            borderWidth: 1,
+            borderColor: isDark ? '#2E2E2E' : 'rgba(0,0,0,0.08)',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: isDark ? 0.25 : 0.06,
+            shadowRadius: 3,
+            elevation: 2,
+            opacity: pressed ? 0.75 : 1,
           })}
-        </ScrollView>
+        >
+          <Feather name="x" size={18} color={theme.text} />
+        </Pressable>
       </View>
 
-      {/* Mobile Content ScrollView */}
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
           paddingHorizontal: 16,
-          paddingTop: 8,
-          paddingBottom: insets.bottom + 48,
+          paddingTop: 4,
+          paddingBottom: insets.bottom + 40,
         }}
       >
-        {renderTabContent()}
+        {/* Centered Profile Hero Section matching Video (Frame 0) */}
+        <View style={{ alignItems: 'center', marginBottom: 20 }}>
+          <Pressable
+            onPress={() => {
+              tap('light');
+              router.push('/profile/edit');
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Edit profile"
+            style={({ pressed }) => ({
+              opacity: pressed ? 0.85 : 1,
+              alignItems: 'center',
+            })}
+          >
+            <View
+              style={{
+                width: 76,
+                height: 76,
+                borderRadius: 38,
+                backgroundColor: isDark ? '#2C2C2E' : '#E8A5C8',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 10,
+                position: 'relative',
+              }}
+            >
+              {profile?.avatar_url ? (
+                <Image
+                  source={{ uri: getOptimizedImageUrl(profile.avatar_url, { width: 152 }) }}
+                  style={{ width: 76, height: 76, borderRadius: 38 }}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                />
+              ) : (
+                <Text style={{ fontSize: 24, fontWeight: '800', color: '#FFFFFF' }}>
+                  {initial}
+                </Text>
+              )}
+
+              {/* Edit Pencil Badge on bottom right of avatar */}
+              <View
+                style={{
+                  position: 'absolute',
+                  bottom: -2,
+                  right: -2,
+                  width: 26,
+                  height: 26,
+                  borderRadius: 13,
+                  backgroundColor: isDark ? '#2C2C2E' : '#FFFFFF',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 2,
+                  borderColor: isDark ? '#141414' : '#F4F4F6',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.15,
+                  shadowRadius: 2,
+                  elevation: 2,
+                }}
+              >
+                <Feather name="edit-2" size={12} color={theme.text} />
+              </View>
+            </View>
+
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: '700',
+                color: theme.text,
+                letterSpacing: -0.2,
+                textAlign: 'center',
+              }}
+            >
+              {profile?.full_name || profile?.username || 'Team Member'}
+            </Text>
+            {profile?.username && (
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: theme.textMuted,
+                  marginTop: 2,
+                  textAlign: 'center',
+                }}
+              >
+                @{profile.username}
+              </Text>
+            )}
+          </Pressable>
+        </View>
+
+        {/* Upgrade Card matching Video ("Do more with ChatGPT" -> "Do more with Carrinex Pro") */}
+        <View
+          style={{
+            backgroundColor: theme.panel,
+            borderRadius: 16,
+            padding: 16,
+            marginBottom: 20,
+            borderWidth: 1,
+            borderColor: isDark ? '#262626' : 'rgba(0,0,0,0.06)',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: isDark ? 0.2 : 0.04,
+            shadowRadius: 3,
+            elevation: 1,
+          }}
+        >
+          <View style={{ flex: 1, paddingRight: 12 }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text }}>
+              {profile?.is_pro ? 'Carrinex Pro Active' : 'Do more with Carrinex Pro'}
+            </Text>
+            <Text
+              style={{
+                fontSize: 12,
+                color: theme.textMuted,
+                marginTop: 3,
+                lineHeight: 16,
+              }}
+            >
+              {profile?.is_pro
+                ? 'Enjoy verified status, 0% escrow fees & priority dispatch.'
+                : 'Get higher limits, verified status, and access to advanced selling tools.'}
+            </Text>
+          </View>
+          <Pressable
+            onPress={() => {
+              tap('light');
+              mgr.setShowSubscription(true);
+            }}
+            style={({ pressed }) => ({
+              backgroundColor: theme.ink,
+              paddingHorizontal: 16,
+              paddingVertical: 9,
+              borderRadius: 20,
+              opacity: pressed ? 0.8 : 1,
+            })}
+          >
+            <Text style={{ fontSize: 13, fontWeight: '700', color: theme.background }}>
+              {profile?.is_pro ? 'Manage' : 'Upgrade'}
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* Group 1: Account matching Video (Frame 1) */}
+        <ChatGPTGroup title="Account">
+          <ChatGPTItem
+            icon="mail"
+            label="Email"
+            value={user?.email || 'Not configured'}
+          />
+          <ChatGPTItem
+            icon="plus-square"
+            label="Subscription"
+            value={profile?.is_pro ? 'Pro' : 'Free'}
+            chevron
+            onPress={() => mgr.setShowSubscription(true)}
+          />
+          <ChatGPTItem
+            icon="shield"
+            label="Identity verification"
+            value={
+              mgr.verification?.status === 'approved'
+                ? 'Verified'
+                : mgr.verification?.status === 'submitted'
+                  ? 'Pending'
+                  : 'Verify ID'
+            }
+            chevron
+            onPress={() => mgr.setShowVerify(true)}
+          />
+          <ChatGPTItem
+            icon="credit-card"
+            label="Payout method"
+            value={
+              mgr.payout
+                ? `${mgr.payout.kind === 'bank' ? 'Bank' : 'Wallet'} · ••${mgr.payout.account_last4}`
+                : 'Add'
+            }
+            chevron
+            onPress={() => mgr.setShowPayout(true)}
+          />
+          <ChatGPTItem
+            icon="map-pin"
+            label="Shipping address"
+            value={mgr.address ? `${mgr.address.city}` : 'Add'}
+            chevron
+            isLast
+            onPress={() => mgr.setShowAddress(true)}
+          />
+        </ChatGPTGroup>
+
+        {/* Group 2: Theme matching Video (Frame 1) */}
+        <ChatGPTGroup title="Theme">
+          <ChatGPTItem
+            icon="sun"
+            label="Appearance"
+            value={`${mode.charAt(0).toUpperCase() + mode.slice(1)} ↕`}
+            chevron
+            onPress={() => mgr.setShowTheme(true)}
+          />
+          <ChatGPTItem
+            icon="moon"
+            label="Dark mode"
+            isLast
+            rightElement={
+              <Switch
+                value={isDark}
+                onValueChange={(val: boolean) => {
+                  tap('light');
+                  setThemeMode(val ? 'dark' : 'light');
+                }}
+                trackColor={{ false: theme.border, true: theme.accent }}
+                thumbColor={theme.accent?.toUpperCase() === '#FFFFFF' ? '#000000' : '#FFFFFF'}
+                ios_backgroundColor={theme.border}
+              />
+            }
+          />
+        </ChatGPTGroup>
+
+        {/* Group 3: App settings matching Video (Frame 2 & 3) */}
+        <ChatGPTGroup title="App settings">
+          <ChatGPTItem
+            icon="shopping-bag"
+            label="Purchases & Orders"
+            chevron
+            onPress={() =>
+              router.push({ pathname: '/(tabs)/chat', params: { tab: 'orders' } } as any)
+            }
+          />
+          <ChatGPTItem
+            icon="percent"
+            label="Bundle discounts"
+            value={bundleOn ? `${bundlePct}% Off` : 'Configure'}
+            chevron
+            onPress={() => mgr.setShowBundle(true)}
+          />
+          <ChatGPTItem
+            icon="pause-circle"
+            label="Vacation mode"
+            rightElement={
+              <Switch
+                value={vacationOn}
+                onValueChange={(val: boolean) => {
+                  tap('light');
+                  mgr.setVacationMode(val);
+                }}
+                disabled={!user?.id}
+                trackColor={{ false: theme.border, true: theme.accent }}
+                thumbColor={theme.accent?.toUpperCase() === '#FFFFFF' ? '#000000' : '#FFFFFF'}
+                ios_backgroundColor={theme.border}
+              />
+            }
+          />
+          {Platform.OS !== 'web' && (
+            <ChatGPTItem
+              icon="bell"
+              label="Notifications"
+              rightElement={
+                <Switch
+                  value={mgr.pushOn}
+                  onValueChange={mgr.handlePushToggle}
+                  disabled={!session}
+                  trackColor={{ false: theme.border, true: theme.accent }}
+                  thumbColor={theme.accent?.toUpperCase() === '#FFFFFF' ? '#000000' : '#FFFFFF'}
+                  ios_backgroundColor={theme.border}
+                />
+              }
+            />
+          )}
+          <ChatGPTItem
+            icon="lock"
+            label="Security & login"
+            value="Reset password"
+            chevron
+            onPress={mgr.handleResetPassword}
+          />
+          <ChatGPTItem
+            icon="share-2"
+            label="Share usage data"
+            isLast
+            rightElement={
+              <Switch
+                value={mgr.shareUsage}
+                onValueChange={mgr.setShareUsage}
+                trackColor={{ false: theme.border, true: theme.accent }}
+                thumbColor={theme.accent?.toUpperCase() === '#FFFFFF' ? '#000000' : '#FFFFFF'}
+                ios_backgroundColor={theme.border}
+              />
+            }
+          />
+        </ChatGPTGroup>
+
+        {/* Group 4: Get help matching Video (Frame 4 & 5) */}
+        <ChatGPTGroup title="Get help">
+          <ChatGPTItem
+            icon="flag"
+            label="Report app issue"
+            chevron
+            onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=App Issue Report`).catch(() => {})}
+          />
+          <ChatGPTItem
+            icon="help-circle"
+            label="Help Center"
+            chevron
+            onPress={() => {
+              if (session) {
+                router.push('/conversation/new?support=true' as any);
+              } else {
+                Linking.openURL(`mailto:${SUPPORT_EMAIL}`).catch(() => {});
+              }
+            }}
+          />
+          <ChatGPTItem
+            icon="shield"
+            label="Privacy Center"
+            chevron
+            onPress={() => Linking.openURL(PRIVACY_URL).catch(() => {})}
+          />
+          <ChatGPTItem
+            icon="file-text"
+            label="Terms of service"
+            chevron
+            onPress={() => Linking.openURL(TERMS_URL).catch(() => {})}
+          />
+          <ChatGPTItem
+            icon="info"
+            label="About"
+            value={`v${Constants.expoConfig?.version ?? '1.0.0'}`}
+            isLast
+          />
+        </ChatGPTGroup>
+
+        {/* Standalone Log Out Button matching Video (Frame 5) */}
+        <ChatGPTGroup>
+          <ChatGPTItem
+            icon="log-out"
+            label={mgr.busy === 'logout' ? 'Logging out…' : 'Log out'}
+            destructive
+            isLast
+            disabled={mgr.busy === 'logout'}
+            onPress={mgr.handleLogout}
+          />
+        </ChatGPTGroup>
       </ScrollView>
 
       {/* Modal Sheets */}

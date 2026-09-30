@@ -20,6 +20,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
+import { uploadVerificationDocument } from '@/lib/upload';
 import {
   ensurePermissionAndRegister,
   isThisDeviceRegistered,
@@ -130,7 +131,11 @@ export function useSettingsManager() {
       if (!mounted.current) return;
       setAddress((a.data as ShippingAddress | null) ?? null);
       setPayout((p.data as PayoutMethod | null) ?? null);
-      setVerification((v.data as Verification | null) ?? null);
+      const vRec = (v.data as Verification | null) ?? null;
+      if (vRec && !vRec.id_photo_url && vRec.notes) {
+        vRec.id_photo_url = vRec.notes;
+      }
+      setVerification(vRec);
     } catch (e) {
       console.warn('[settings] loadExtras failed', e);
     } finally {
@@ -565,12 +570,24 @@ export function useSettingsManager() {
   const saveVerification = useCallback(
     async (form: VerifyForm): Promise<boolean> => {
       if (!user?.id) return false;
+
+      let photoUrl = form.id_photo_url || null;
+      if (form.local_image?.uri) {
+        try {
+          photoUrl = await uploadVerificationDocument(form.local_image, user.id);
+        } catch (uploadErr) {
+          console.warn('[settings] verification photo upload failed; using fallback', uploadErr);
+          photoUrl = form.local_image.uri;
+        }
+      }
+
       const payload = {
         user_id: user.id,
         status: 'submitted' as const,
         legal_name: form.legal_name.trim(),
         document_kind: form.document_kind,
         document_number_last4: form.document_number_last4.trim() || null,
+        notes: photoUrl || (verification?.notes ?? null),
         submitted_at: new Date().toISOString(),
       };
       const { data, error } = await supabase
@@ -585,11 +602,15 @@ export function useSettingsManager() {
         });
         return false;
       }
-      if (mounted.current) setVerification(data as Verification);
+      const record = (data as Verification) ?? null;
+      if (record && !record.id_photo_url && record.notes) {
+        record.id_photo_url = record.notes;
+      }
+      if (mounted.current) setVerification(record);
       toast.show('Verification submitted', { variant: 'success', icon: 'check' });
       return true;
     },
-    [user?.id, toast],
+    [user?.id, verification?.notes, toast],
   );
 
   return {

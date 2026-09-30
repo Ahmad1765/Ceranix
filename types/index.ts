@@ -239,6 +239,7 @@ export interface Verification {
   document_kind: DocumentKind;
   document_number_last4: string | null;
   notes: string | null;
+  id_photo_url?: string | null;
   submitted_at: string;
   reviewed_at: string | null;
 }

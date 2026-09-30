@@ -1,4 +1,4 @@
-import { View, Pressable, Switch, ActivityIndicator } from 'react-native';
+import { View, Pressable, Switch, ActivityIndicator, StyleSheet } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import { tap } from '@/lib/haptics';
@@ -453,5 +453,167 @@ export function ChatGPTTabItem({
         </View>
       )}
     </Pressable>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CHATGPT MOBILE GROUPED CARD & ROW PRIMITIVES (MATCHING CHATGPT APP)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function ChatGPTGroup({
+  title,
+  children,
+}: {
+  title?: string;
+  children: React.ReactNode;
+}) {
+  const { theme, isDark } = useTheme();
+
+  return (
+    <View style={{ marginBottom: 20 }}>
+      {title && (
+        <Text
+          style={{
+            fontSize: 12,
+            fontWeight: '600',
+            color: theme.textMuted,
+            letterSpacing: 0.2,
+            marginLeft: 12,
+            marginBottom: 8,
+            textTransform: 'uppercase',
+          }}
+        >
+          {title}
+        </Text>
+      )}
+      <View
+        style={{
+          backgroundColor: theme.panel,
+          borderRadius: 14,
+          overflow: 'hidden',
+          borderWidth: 1,
+          borderColor: isDark ? '#262626' : 'rgba(0,0,0,0.06)',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: isDark ? 0.2 : 0.04,
+          shadowRadius: 3,
+          elevation: 1,
+        }}
+      >
+        {children}
+      </View>
+    </View>
+  );
+}
+
+export function ChatGPTItem({
+  icon,
+  label,
+  value,
+  chevron = false,
+  onPress,
+  destructive = false,
+  disabled = false,
+  rightElement,
+  isLast = false,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  value?: string;
+  chevron?: boolean;
+  onPress?: () => void;
+  destructive?: boolean;
+  disabled?: boolean;
+  rightElement?: React.ReactNode;
+  isLast?: boolean;
+}) {
+  const { theme, isDark } = useTheme();
+  const tone = destructive ? theme.danger : theme.text;
+
+  const content = (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        minHeight: 50,
+      }}
+    >
+      <View style={{ width: 28, alignItems: 'flex-start', marginRight: 10 }}>
+        <Feather name={icon} size={18} color={tone} />
+      </View>
+      <Text
+        style={{
+          flex: 1,
+          fontSize: 15,
+          fontWeight: '500',
+          color: tone,
+          letterSpacing: -0.1,
+        }}
+      >
+        {label}
+      </Text>
+
+      {value && (
+        <Text
+          style={{
+            fontSize: 14,
+            color: theme.textMuted,
+            marginRight: chevron ? 6 : 0,
+            maxWidth: 160,
+          }}
+          numberOfLines={1}
+        >
+          {value}
+        </Text>
+      )}
+
+      {rightElement}
+
+      {chevron && (
+        <Feather
+          name="chevron-right"
+          size={16}
+          color={isDark ? '#555555' : '#C7C7CC'}
+          style={{ marginLeft: 2 }}
+        />
+      )}
+    </View>
+  );
+
+  return (
+    <View>
+      {onPress ? (
+        <Pressable
+          onPress={() => {
+            tap('light');
+            onPress();
+          }}
+          disabled={disabled}
+          accessibilityRole="button"
+          style={({ pressed }) => ({
+            opacity: disabled ? 0.45 : pressed ? 0.65 : 1,
+            backgroundColor: pressed
+              ? (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)')
+              : 'transparent',
+          })}
+        >
+          {content}
+        </Pressable>
+      ) : (
+        content
+      )}
+
+      {!isLast && (
+        <View
+          style={{
+            height: StyleSheet.hairlineWidth,
+            backgroundColor: isDark ? '#262626' : '#F0F0F0',
+            marginLeft: 54,
+          }}
+        />
+      )}
+    </View>
   );
 }

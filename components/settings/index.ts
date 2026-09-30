@@ -7,6 +7,8 @@ export {
   ChatGPTButton,
   ChatGPTSwitchRow,
   ChatGPTTabItem,
+  ChatGPTGroup,
+  ChatGPTItem,
 } from './SettingsRow';
 export { SettingsHero } from './SettingsHero';
 export { BundleDiscountSheet } from './BundleDiscountSheet';

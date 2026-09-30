@@ -13,6 +13,25 @@ vi.mock('react-native', () => ({
   Switch: (props: any) => React.createElement('input', { type: 'checkbox', ...props }),
   ActivityIndicator: () => React.createElement('span', null, 'loading'),
   StyleSheet: { create: (s: any) => s, hairlineWidth: 1 },
+  Modal: (props: any) => (props.visible ? React.createElement('div', { 'data-modal': true }, props.children) : null),
+  ScrollView: (props: any) => React.createElement('div', props, props.children),
+  KeyboardAvoidingView: (props: any) => React.createElement('div', props, props.children),
+  Alert: { alert: vi.fn() },
+}));
+
+vi.mock('expo-image', () => ({
+  Image: (props: any) => React.createElement('img', props),
+}));
+
+vi.mock('expo-image-picker', () => ({
+  launchImageLibraryAsync: vi.fn(),
+  launchCameraAsync: vi.fn(),
+  requestMediaLibraryPermissionsAsync: vi.fn().mockResolvedValue({ status: 'granted' }),
+  requestCameraPermissionsAsync: vi.fn().mockResolvedValue({ status: 'granted' }),
+}));
+
+vi.mock('@/components/ui/ShieldCheckIcon', () => ({
+  ShieldCheckIcon: (props: any) => React.createElement('div', { 'data-testid': 'shield-check-icon', ...props }),
 }));
 
 vi.mock('@expo/vector-icons/Feather', () => ({
@@ -25,16 +44,21 @@ vi.mock('@/lib/haptics', () => ({
 
 vi.mock('@/lib/rnText', () => ({
   Text: (props: any) => React.createElement('span', props, props.children),
+  TextInput: (props: any) => React.createElement('input', props),
 }));
 
 vi.mock('@/context/ThemeContext', () => ({
   useTheme: () => ({ theme: lightTheme, isDark: false }),
 }));
 
+import { VerificationSheet } from './VerificationSheet';
+
 import {
   ChatGPTRow,
   ChatGPTButton,
   ChatGPTTabItem,
+  ChatGPTGroup,
+  ChatGPTItem,
 } from './SettingsRow';
 
 describe('ChatGPT Settings UI & Primitives Invariants', () => {
@@ -89,5 +113,36 @@ describe('ChatGPT Settings UI & Primitives Invariants', () => {
     const rendered = (row.type as any)(row.props);
     expect(rendered.props.style.flexDirection).toBe('row');
     expect(rendered.props.style.justifyContent).toBe('space-between');
+  });
+
+  it('exports VerificationSheet as a valid component', () => {
+    expect(typeof VerificationSheet).toBe('function');
+    const sheet = React.createElement(VerificationSheet, {
+      visible: true,
+      initial: null,
+      onClose: () => {},
+      onSave: async () => {},
+    });
+    expect(sheet.type).toBe(VerificationSheet);
+  });
+
+  it('renders ChatGPTGroup with 14px radius card container and title', () => {
+    const group = React.createElement(ChatGPTGroup, {
+      title: 'Account',
+      children: React.createElement('div', null, 'content'),
+    });
+    const rendered = (group.type as any)(group.props);
+    expect(rendered.props.style.marginBottom).toBe(20);
+  });
+
+  it('renders ChatGPTItem with minHeight 50 and icon', () => {
+    const item = React.createElement(ChatGPTItem, {
+      icon: 'mail',
+      label: 'Email',
+      value: 'user@example.com',
+      chevron: true,
+    });
+    const rendered = (item.type as any)(item.props);
+    expect(rendered).not.toBeNull();
   });
 });

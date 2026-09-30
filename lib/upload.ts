@@ -416,6 +416,14 @@ export async function uploadAvatar(image: LocalImage, userId: string): Promise<s
 // keyed on the first path segment being the caller's own user id, so writing
 // here needs no new bucket and no new storage policy — see the banner_url
 // migration for the full reasoning.
+// Verification documents (CNIC / ID Card) also share the `avatars` bucket under
+// the user's folder (`avatars/${userId}/verification/...`), satisfying the existing
+// owner-only write policy without needing an extra storage bucket.
+export async function uploadVerificationDocument(image: LocalImage, userId: string): Promise<string> {
+  const compressed = await compressImage(image, BANNER_MAX_EDGE, BANNER_QUALITY);
+  return uploadOne('avatars', compressed, `${userId}/verification`, 0);
+}
+
 export async function uploadBanner(image: LocalImage, userId: string): Promise<string> {
   const compressed = await compressImage(image, BANNER_MAX_EDGE, BANNER_QUALITY);
   return uploadOne('avatars', compressed, userId, 0);

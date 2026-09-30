@@ -1410,9 +1410,29 @@ export default function AdminConsoleScreen() {
                         </Text>
                       </View>
 
-                      <Text style={{ fontSize: 13, color: theme.text, marginBottom: 12 }}>
+                      <Text style={{ fontSize: 13, color: theme.text, marginBottom: (item.notes || item.id_photo_url) ? 8 : 12 }}>
                         Document: <Text style={{ fontWeight: '700', textTransform: 'capitalize' }}>{item.document_kind.replace(/_/g, ' ')}</Text> · Number (Last 4): <Text style={{ fontWeight: '700' }}>{item.document_number_last4 || 'N/A'}</Text>
                       </Text>
+
+                      {Boolean(item.notes || item.id_photo_url) && (
+                        <View style={{ marginBottom: 12 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textMuted, marginBottom: 6 }}>
+                            Attached CNIC / ID Photo:
+                          </Text>
+                          <Image
+                            source={{ uri: (item.id_photo_url || item.notes)! }}
+                            style={{
+                              width: 200,
+                              height: 120,
+                              borderRadius: 8,
+                              backgroundColor: isDark ? '#111111' : '#EEEEEE',
+                              borderWidth: 1,
+                              borderColor: theme.border,
+                            }}
+                            contentFit="cover"
+                          />
+                        </View>
+                      )}
 
                       {isPending && (
                         <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end' }}>
