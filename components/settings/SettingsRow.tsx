@@ -212,3 +212,246 @@ export function Divider() {
   const { theme } = useTheme();
   return <View style={{ height: 1, backgroundColor: theme.border }} />;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CHATGPT-INSPIRED SETTINGS PRIMITIVES (CLEAN, LAPTOP-FRIENDLY, MINIMALIST)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function ChatGPTRow({
+  label,
+  desc,
+  children,
+  destructive,
+  disabled,
+}: {
+  label: string;
+  desc?: string;
+  children?: React.ReactNode;
+  destructive?: boolean;
+  disabled?: boolean;
+}) {
+  const { theme } = useTheme();
+
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 14,
+        borderBottomWidth: 1,
+        borderBottomColor: theme.border,
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      <View style={{ flex: 1, paddingRight: 16 }}>
+        <Text
+          style={{
+            fontSize: 14,
+            fontWeight: '600',
+            color: destructive ? theme.danger : theme.text,
+            letterSpacing: -0.1,
+          }}
+        >
+          {label}
+        </Text>
+        {desc && (
+          <Text
+            style={{
+              fontSize: 12,
+              color: theme.textMuted,
+              marginTop: 2,
+              lineHeight: 17,
+            }}
+          >
+            {desc}
+          </Text>
+        )}
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>{children}</View>
+    </View>
+  );
+}
+
+export function ChatGPTButton({
+  label,
+  onPress,
+  icon,
+  destructive,
+  disabled,
+  loading,
+  variant = 'default',
+}: {
+  label: string;
+  onPress?: () => void;
+  icon?: keyof typeof Feather.glyphMap;
+  destructive?: boolean;
+  disabled?: boolean;
+  loading?: boolean;
+  variant?: 'default' | 'ghost' | 'outline';
+}) {
+  const { theme, isDark } = useTheme();
+
+  const textColor = destructive
+    ? theme.danger
+    : theme.text;
+  const borderColor = destructive
+    ? 'rgba(239, 68, 68, 0.4)'
+    : theme.border;
+  const bg = destructive
+    ? (isDark ? 'rgba(239, 68, 68, 0.12)' : 'rgba(239, 68, 68, 0.05)')
+    : variant === 'ghost'
+      ? 'transparent'
+      : theme.panel;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled || loading}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => ({
+        height: 34,
+        paddingHorizontal: 14,
+        borderRadius: 8,
+        borderWidth: variant === 'ghost' ? 0 : 1,
+        borderColor,
+        backgroundColor: bg,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        opacity: disabled ? 0.5 : pressed ? 0.85 : 1,
+        transform: [{ scale: pressed && !disabled && !loading ? 0.96 : 1 }],
+      })}
+    >
+      {loading ? (
+        <ActivityIndicator size="small" color={textColor} />
+      ) : (
+        <>
+          {icon && <Feather name={icon} size={14} color={textColor} />}
+          <Text
+            style={{
+              fontSize: 13,
+              fontWeight: '600',
+              color: textColor,
+              letterSpacing: -0.1,
+            }}
+          >
+            {label}
+          </Text>
+        </>
+      )}
+    </Pressable>
+  );
+}
+
+export function ChatGPTSwitchRow({
+  label,
+  desc,
+  value,
+  onValueChange,
+  disabled,
+}: {
+  label: string;
+  desc?: string;
+  value: boolean;
+  onValueChange: (v: boolean) => void;
+  disabled?: boolean;
+}) {
+  const { theme } = useTheme();
+
+  return (
+    <ChatGPTRow label={label} desc={desc} disabled={disabled}>
+      <Switch
+        value={value}
+        onValueChange={(v) => {
+          tap('light');
+          onValueChange(v);
+        }}
+        disabled={disabled}
+        accessibilityLabel={label}
+        trackColor={{ false: theme.border, true: theme.accent }}
+        thumbColor={theme.accent?.toUpperCase() === '#FFFFFF' ? '#000000' : '#FFFFFF'}
+        ios_backgroundColor={theme.border}
+      />
+    </ChatGPTRow>
+  );
+}
+
+export function ChatGPTTabItem({
+  icon,
+  label,
+  active,
+  onPress,
+  badge,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  active: boolean;
+  onPress: () => void;
+  badge?: string;
+}) {
+  const { theme, isDark } = useTheme();
+
+  const activeBg = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
+  const activeColor = theme.text;
+  const inactiveColor = theme.textMuted;
+
+  return (
+    <Pressable
+      onPress={() => {
+        tap('light');
+        onPress();
+      }}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      style={({ pressed }) => ({
+        height: 38,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        backgroundColor: active ? activeBg : 'transparent',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        opacity: pressed ? 0.8 : 1,
+        marginBottom: 2,
+        transform: [{ scale: pressed ? 0.98 : 1 }],
+      })}
+    >
+      <Feather name={icon} size={16} color={active ? activeColor : inactiveColor} />
+      <Text
+        style={{
+          flex: 1,
+          fontSize: 14,
+          fontWeight: active ? '600' : '500',
+          color: active ? activeColor : inactiveColor,
+          letterSpacing: -0.1,
+        }}
+      >
+        {label}
+      </Text>
+      {badge && (
+        <View
+          style={{
+            paddingHorizontal: 6,
+            paddingVertical: 1,
+            borderRadius: 6,
+            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 10,
+              fontWeight: '700',
+              color: active ? activeColor : inactiveColor,
+              letterSpacing: 0.3,
+            }}
+          >
+            {badge}
+          </Text>
+        </View>
+      )}
+    </Pressable>
+  );
+}

@@ -40,8 +40,25 @@ export const SUPPORT_EMAIL = 'support@carrinex.app';
 export const TERMS_URL = `${APP_URL}/terms`;
 export const PRIVACY_URL = `${APP_URL}/privacy`;
 
-export type Section = 'admin' | 'shop' | 'verify' | 'enhance' | 'account' | 'help';
-export const SECTIONS: readonly Section[] = ['admin', 'shop', 'verify', 'enhance', 'account', 'help'];
+export type Section =
+  | 'general'
+  | 'account'
+  | 'shop'
+  | 'verify'
+  | 'security'
+  | 'help'
+  | 'admin'
+  | 'enhance';
+export const SECTIONS: readonly Section[] = [
+  'general',
+  'account',
+  'shop',
+  'verify',
+  'security',
+  'help',
+  'admin',
+  'enhance',
+];
 export type Busy = 'logout' | 'delete' | 'password' | null;
 
 export function useSettingsManager() {
@@ -49,7 +66,8 @@ export function useSettingsManager() {
   const toast = useToast();
   const params = useLocalSearchParams<{ open?: string }>();
 
-  const [openSection, setOpenSection] = useState<Section | null>(null);
+  // ponytail: default to 'general' for ChatGPT-style direct tab navigation
+  const [openSection, setOpenSection] = useState<Section>('general');
   const [busy, setBusy] = useState<Busy>(null);
   const [pushOn, setPushOn] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
@@ -162,17 +180,20 @@ export function useSettingsManager() {
         setShowVerify(true);
         break;
       case 'theme':
-        setOpenSection('enhance');
-        setShowTheme(true);
+      case 'notifications':
+      case 'enhance':
+      case 'general':
+        setOpenSection('general');
+        if (target === 'theme') setShowTheme(true);
         break;
       case 'subscription':
       case 'pro':
-        setOpenSection('enhance');
+        setOpenSection('account');
         setShowSubscription(true);
         break;
-      case 'notifications':
-      case 'enhance':
-        setOpenSection('enhance');
+      case 'security':
+      case 'password':
+        setOpenSection('security');
         break;
       case 'shop':
       case 'account':
@@ -191,7 +212,7 @@ export function useSettingsManager() {
   // ── 3. Section Toggling ───────────────────────────────────────────────────
   const toggleSection = useCallback((s: Section) => {
     tap('light');
-    setOpenSection((prev) => (prev === s ? null : s));
+    setOpenSection(s);
   }, []);
 
   // ── 4. DB Sync Actions (Vacation, Bundle, Push, Analytics) ────────────────

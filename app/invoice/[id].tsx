@@ -1415,7 +1415,7 @@ export default function InvoiceScreen() {
           <Pressable
             onPress={() => {
               tap('light');
-              router.push('/admin/logistics' as any);
+              router.push('/admin' as any);
             }}
             style={({ pressed }) => [
               {
