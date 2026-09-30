@@ -52,6 +52,7 @@ vi.mock('@/context/ThemeContext', () => ({
 }));
 
 import { VerificationSheet } from './VerificationSheet';
+import { PhoneSheet } from './PhoneSheet';
 
 import {
   ChatGPTRow,
@@ -107,8 +108,8 @@ describe('ChatGPT Settings UI & Primitives Invariants', () => {
 
   it('renders ChatGPTRow with label and description', () => {
     const row = React.createElement(ChatGPTRow, {
-      label: 'Dark mode',
-      desc: 'Light appearance active',
+      label: 'Push notifications',
+      desc: 'Receive alerts for offers, orders, and messages on this device',
     });
     const rendered = (row.type as any)(row.props);
     expect(rendered.props.style.flexDirection).toBe('row');
@@ -144,5 +145,16 @@ describe('ChatGPT Settings UI & Primitives Invariants', () => {
     });
     const rendered = (item.type as any)(item.props);
     expect(rendered).not.toBeNull();
+  });
+
+  it('exports PhoneSheet as a valid component', () => {
+    expect(typeof PhoneSheet).toBe('function');
+    const sheet = React.createElement(PhoneSheet, {
+      visible: true,
+      initialPhone: '+923001234567',
+      onClose: () => {},
+      onSave: async () => true,
+    });
+    expect(sheet.type).toBe(PhoneSheet);
   });
 });

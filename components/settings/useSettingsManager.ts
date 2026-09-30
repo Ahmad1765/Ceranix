@@ -75,10 +75,11 @@ export function useSettingsManager() {
   const [shareUsage, setShareUsage] = useState(!isOptedOut());
   const mounted = useRef(true);
 
-  // Address / Payout / Verification Data
+  // Address / Payout / Verification / Phone Data
   const [address, setAddress] = useState<ShippingAddress | null>(null);
   const [payout, setPayout] = useState<PayoutMethod | null>(null);
   const [verification, setVerification] = useState<Verification | null>(null);
+  const [phone, setPhone] = useState<string | null>(null);
   const [loadingExtras, setLoadingExtras] = useState(true);
 
   // Modal Visibility States
@@ -88,6 +89,7 @@ export function useSettingsManager() {
   const [showBundle, setShowBundle] = useState(false);
   const [showTheme, setShowTheme] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
+  const [showPhone, setShowPhone] = useState(false);
 
   useEffect(() => {
     mounted.current = true;
@@ -102,6 +104,7 @@ export function useSettingsManager() {
       setAddress(null);
       setPayout(null);
       setVerification(null);
+      setPhone(null);
       setLoadingExtras(false);
       return;
     }
@@ -136,6 +139,7 @@ export function useSettingsManager() {
         vRec.id_photo_url = vRec.notes;
       }
       setVerification(vRec);
+      setPhone(profile?.phone || user?.phone || (user?.user_metadata as any)?.phone || null);
     } catch (e) {
       console.warn('[settings] loadExtras failed', e);
     } finally {
@@ -195,6 +199,10 @@ export function useSettingsManager() {
       case 'pro':
         setOpenSection('account');
         setShowSubscription(true);
+        break;
+      case 'phone':
+        setOpenSection('account');
+        setShowPhone(true);
         break;
       case 'security':
       case 'password':
@@ -613,6 +621,52 @@ export function useSettingsManager() {
     [user?.id, verification?.notes, toast],
   );
 
+  const savePhone = useCallback(
+    async (phoneNum: string): Promise<boolean> => {
+      if (!user?.id) return false;
+      const clean = phoneNum.trim();
+      try {
+        await supabase
+          .from('profiles')
+          .update({ phone: clean })
+          .eq('id', user.id);
+
+        await supabase.auth.updateUser({
+          phone: clean.startsWith('+') ? clean : undefined,
+          data: { phone: clean },
+        }).catch(() => {});
+
+        await refreshProfile().catch(() => {});
+        if (mounted.current) setPhone(clean);
+        toast.show('Phone number saved', { variant: 'success', icon: 'check' });
+        return true;
+      } catch (e: any) {
+        toast.show(e?.message ?? 'Could not save phone number', {
+          variant: 'default',
+          icon: 'alert-triangle',
+        });
+        return false;
+      }
+    },
+    [user?.id, refreshProfile, toast],
+  );
+
+  const removePhone = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      await supabase.from('profiles').update({ phone: null }).eq('id', user.id);
+      await supabase.auth.updateUser({ data: { phone: null } }).catch(() => {});
+      await refreshProfile().catch(() => {});
+      if (mounted.current) setPhone(null);
+      toast.show('Phone number removed', { variant: 'default', icon: 'trash-2' });
+    } catch (e: any) {
+      toast.show(e?.message ?? 'Could not remove phone', {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
+    }
+  }, [user?.id, refreshProfile, toast]);
+
   return {
     open: openSection,
     setOpen: setOpenSection,
@@ -628,6 +682,8 @@ export function useSettingsManager() {
     address,
     payout,
     verification,
+    phone,
+    setPhone,
     loadingExtras,
     showAddress,
     setShowAddress,
@@ -641,6 +697,8 @@ export function useSettingsManager() {
     setShowTheme,
     showSubscription,
     setShowSubscription,
+    showPhone,
+    setShowPhone,
     setVacationMode,
     setBundlePct,
     savedCollectionPrivacy,
@@ -650,6 +708,8 @@ export function useSettingsManager() {
     savePayout,
     removePayout,
     saveVerification,
+    savePhone,
+    removePhone,
     handleLogout,
     handleResetPassword,
     handleDeleteAccount,

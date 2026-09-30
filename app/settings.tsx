@@ -44,7 +44,7 @@ import {
   AddressSheet,
   PayoutSheet,
   VerificationSheet,
-  ThemeSheet,
+  PhoneSheet,
   SubscriptionSheet,
   useSettingsManager,
   TERMS_URL,
@@ -77,7 +77,7 @@ const TABS: TabConfig[] = [
 
 export default function SettingsScreen() {
   const { profile, user, session } = useAuth();
-  const { theme, mode, isDark, setThemeMode } = useTheme();
+  const { theme, isDark } = useTheme();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const isLaptop = width >= bp.lg;
@@ -105,29 +105,6 @@ export default function SettingsScreen() {
       case 'general':
         return (
           <>
-            <ChatGPTRow
-              label="Theme"
-              desc={`Mode: ${mode.charAt(0).toUpperCase() + mode.slice(1)} (${isDark ? 'Dark' : 'Light'})`}
-            >
-              <ChatGPTButton
-                label="Change"
-                icon="chevron-down"
-                onPress={() => {
-                  tap('light');
-                  mgr.setShowTheme(true);
-                }}
-              />
-            </ChatGPTRow>
-
-            <ChatGPTSwitchRow
-              label="Dark mode"
-              desc={isDark ? 'Dark appearance active' : 'Light appearance active'}
-              value={isDark}
-              onValueChange={(val) => {
-                setThemeMode(val ? 'dark' : 'light');
-              }}
-            />
-
             {Platform.OS !== 'web' && (
               <ChatGPTSwitchRow
                 label="Push notifications"
@@ -251,6 +228,24 @@ export default function SettingsScreen() {
                 <ChatGPTButton label="Primary" variant="ghost" disabled />
               </ChatGPTRow>
             )}
+
+            <ChatGPTRow
+              label="Phone number"
+              desc={
+                mgr.phone
+                  ? mgr.phone
+                  : 'Add mobile number for courier dispatch and delivery updates'
+              }
+            >
+              <ChatGPTButton
+                label={mgr.phone ? 'Manage' : 'Add phone'}
+                icon="phone"
+                onPress={() => {
+                  tap('light');
+                  mgr.setShowPhone(true);
+                }}
+              />
+            </ChatGPTRow>
 
             <ChatGPTRow
               label="Seller Membership"
@@ -769,11 +764,17 @@ export default function SettingsScreen() {
           }}
         />
 
-        <ThemeSheet visible={mgr.showTheme} onClose={() => mgr.setShowTheme(false)} />
-
         <SubscriptionSheet
           visible={mgr.showSubscription}
           onClose={() => mgr.setShowSubscription(false)}
+        />
+
+        <PhoneSheet
+          visible={mgr.showPhone}
+          initialPhone={mgr.phone}
+          onClose={() => mgr.setShowPhone(false)}
+          onSave={mgr.savePhone}
+          onRemove={mgr.phone ? mgr.removePhone : undefined}
         />
       </View>
     );
@@ -989,6 +990,13 @@ export default function SettingsScreen() {
             value={user?.email || 'Not configured'}
           />
           <ChatGPTItem
+            icon="phone"
+            label="Phone number"
+            value={mgr.phone ? mgr.phone : 'Add'}
+            chevron
+            onPress={() => mgr.setShowPhone(true)}
+          />
+          <ChatGPTItem
             icon="plus-square"
             label="Subscription"
             value={profile?.is_pro ? 'Pro' : 'Free'}
@@ -1029,35 +1037,7 @@ export default function SettingsScreen() {
           />
         </ChatGPTGroup>
 
-        {/* Group 2: Theme matching Video (Frame 1) */}
-        <ChatGPTGroup title="Theme">
-          <ChatGPTItem
-            icon="sun"
-            label="Appearance"
-            value={`${mode.charAt(0).toUpperCase() + mode.slice(1)} ↕`}
-            chevron
-            onPress={() => mgr.setShowTheme(true)}
-          />
-          <ChatGPTItem
-            icon="moon"
-            label="Dark mode"
-            isLast
-            rightElement={
-              <Switch
-                value={isDark}
-                onValueChange={(val: boolean) => {
-                  tap('light');
-                  setThemeMode(val ? 'dark' : 'light');
-                }}
-                trackColor={{ false: theme.border, true: theme.accent }}
-                thumbColor={theme.accent?.toUpperCase() === '#FFFFFF' ? '#000000' : '#FFFFFF'}
-                ios_backgroundColor={theme.border}
-              />
-            }
-          />
-        </ChatGPTGroup>
-
-        {/* Group 3: App settings matching Video (Frame 2 & 3) */}
+        {/* Group 2: App settings matching Video */}
         <ChatGPTGroup title="App settings">
           <ChatGPTItem
             icon="shopping-bag"
@@ -1240,11 +1220,17 @@ export default function SettingsScreen() {
         }}
       />
 
-      <ThemeSheet visible={mgr.showTheme} onClose={() => mgr.setShowTheme(false)} />
-
       <SubscriptionSheet
         visible={mgr.showSubscription}
         onClose={() => mgr.setShowSubscription(false)}
+      />
+
+      <PhoneSheet
+        visible={mgr.showPhone}
+        initialPhone={mgr.phone}
+        onClose={() => mgr.setShowPhone(false)}
+        onSave={mgr.savePhone}
+        onRemove={mgr.phone ? mgr.removePhone : undefined}
       />
     </SafeAreaView>
   );

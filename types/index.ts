@@ -51,6 +51,7 @@ export interface User {
   // Category slugs captured at onboarding (feed personalization, future use).
   interests?: string[] | null;
   is_admin?: boolean;
+  phone?: string | null;
 }
 
 export type Profile = User;
