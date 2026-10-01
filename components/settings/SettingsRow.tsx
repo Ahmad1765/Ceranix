@@ -19,12 +19,12 @@ export function SectionCard({
   onToggle: () => void;
   children?: React.ReactNode;
 }) {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
 
   return (
     <View
       style={{
-        backgroundColor: theme.surface,
+        backgroundColor: theme.panel,
         borderRadius: 20,
         borderWidth: 1.5,
         borderColor: expanded ? theme.text : theme.border,
@@ -492,7 +492,7 @@ export function ChatGPTGroup({
           borderRadius: 14,
           overflow: 'hidden',
           borderWidth: 1,
-          borderColor: isDark ? '#262626' : 'rgba(0,0,0,0.06)',
+          borderColor: isDark ? '#262626' : 'rgba(0,0,0,0.08)',
           shadowColor: '#000',
           shadowOffset: { width: 0, height: 1 },
           shadowOpacity: isDark ? 0.2 : 0.04,

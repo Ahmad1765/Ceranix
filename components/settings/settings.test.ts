@@ -134,6 +134,8 @@ describe('ChatGPT Settings UI & Primitives Invariants', () => {
     });
     const rendered = (group.type as any)(group.props);
     expect(rendered.props.style.marginBottom).toBe(20);
+    const box = rendered.props.children[1];
+    expect(box.props.style.backgroundColor).toBe(lightTheme.panel);
   });
 
   it('renders ChatGPTItem with minHeight 50 and icon', () => {

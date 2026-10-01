@@ -37,124 +37,39 @@ function tap(style: 'light' | 'medium' = 'light') {
 }
 
 function FieldShell({
-  label,
-  helper,
   error,
   multiline,
   focused,
-  count,
-  max,
   children,
 }: {
-  label: string;
-  helper?: string | null;
   error?: string | null;
   multiline?: boolean;
   focused: boolean;
-  count?: number;
-  max?: number;
   children: React.ReactNode;
 }) {
   const borderColor = error ? RED : focused ? PURPLE : colors.border;
-  const labelColor = error ? RED : focused ? PURPLE : colors.mute;
-  const overTwoThirds = max !== undefined && count !== undefined && count > max * 0.85;
-  const counterColor = error
-    ? RED
-    : overTwoThirds
-      ? count! >= max!
-        ? RED
-        : colors.mute
-      : colors.mute;
 
   return (
-    <View style={{ marginBottom: 16 }}>
+    <View style={{ marginBottom: 14 }}>
       <View
         style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: 8,
-          marginLeft: 4,
-        }}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Text
-            style={{
-              fontSize: 11.5,
-              fontWeight: '800',
-              color: labelColor,
-              letterSpacing: 1.2,
-              textTransform: 'uppercase',
-            }}
-          >
-            {label}
-          </Text>
-          {focused && !error && (
-            <View
-              style={{
-                width: 14,
-                height: 2,
-                backgroundColor: PURPLE,
-                marginLeft: 8,
-                borderRadius: 2,
-              }}
-            />
-          )}
-        </View>
-        {max !== undefined && count !== undefined ? (
-          <Text style={{ fontSize: 11.5, color: counterColor, fontWeight: '600' }}>
-            {count}/{max}
-          </Text>
-        ) : helper && !error ? (
-          <Text style={{ fontSize: 11.5, color: colors.mute }}>{helper}</Text>
-        ) : null}
-      </View>
-      <View
-        style={{
-          backgroundColor: colors.surface,
-          borderRadius: 16,
-          borderWidth: 1.5,
+          backgroundColor: 'transparent',
+          borderRadius: 12,
+          borderWidth: 1,
           borderColor,
           paddingHorizontal: 16,
           paddingVertical: multiline ? 14 : 0,
-          minHeight: multiline ? 110 : 56,
+          minHeight: multiline ? 100 : 50,
           justifyContent: multiline ? 'flex-start' : 'center',
         }}
       >
         {children}
       </View>
       {error && (
-        <Text style={{ fontSize: 12, color: RED, marginTop: 6, marginLeft: 4, fontWeight: '600' }}>
+        <Text style={{ fontSize: 12, color: RED, marginTop: 5, marginLeft: 4, fontWeight: '600' }}>
           {error}
         </Text>
       )}
-    </View>
-  );
-}
-
-function SectionHeader({ label }: { label: string }) {
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 20,
-        marginBottom: 12,
-        marginLeft: 2,
-      }}
-    >
-      <View style={{ width: 18, height: 2, backgroundColor: PURPLE, marginRight: 10, borderRadius: 2 }} />
-      <Text
-        style={{
-          fontSize: 11.5,
-          fontWeight: '800',
-          color: colors.ink,
-          letterSpacing: 1.4,
-          textTransform: 'uppercase',
-        }}
-      >
-        {label}
-      </Text>
     </View>
   );
 }
@@ -207,7 +122,7 @@ export default function ProfileEditScreen() {
     setUsername(profile.username ?? '');
     setFullName(profile.full_name ?? '');
     setBio(profile.bio ?? '');
-    setLocation(profile.location ?? '');
+    setLocation('Lahore');
     setAvatarUri(profile.avatar_url ?? null);
     setAvatarBase64(null);
     setAvatarRemoved(false);
@@ -220,7 +135,7 @@ export default function ProfileEditScreen() {
       username: (profile?.username ?? '').trim().toLowerCase(),
       fullName: profile?.full_name ?? '',
       bio: profile?.bio ?? '',
-      location: profile?.location ?? '',
+      location: 'Lahore',
       avatarUrl: profile?.avatar_url ?? null,
     }),
     [profile],
@@ -239,7 +154,6 @@ export default function ProfileEditScreen() {
     username.trim().toLowerCase() !== initialSnapshot.username ||
     fullName.trim() !== initialSnapshot.fullName ||
     bio.trim() !== initialSnapshot.bio ||
-    location.trim() !== initialSnapshot.location ||
     avatarRemoved ||
     hasNewLocalAvatar;
 
@@ -420,7 +334,7 @@ export default function ProfileEditScreen() {
           username: username.trim().toLowerCase(),
           full_name: fullName.trim() || null,
           bio: bio.trim() || null,
-          location: location.trim() || null,
+          location: 'Lahore',
           avatar_url,
         })
         .eq('id', user.id);
@@ -497,16 +411,13 @@ export default function ProfileEditScreen() {
   const canSave =
     !validateUsername(username) &&
     usernameStatus !== 'taken' &&
-    usernameStatus !== 'checking' &&
-    (isOnboarding || isDirty);
+    usernameStatus !== 'checking';
 
   const ctaLabel = saving
     ? 'Saving…'
     : isOnboarding
       ? 'Get started'
-      : isDirty
-        ? 'Save changes'
-        : 'All saved';
+      : 'Save';
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.background }}>
@@ -575,48 +486,23 @@ export default function ProfileEditScreen() {
 
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 160 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: insets.bottom + 24 }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
         >
-          {/* Hero */}
-          <Text
-            style={{
-              fontSize: 40,
-              fontWeight: '900',
-              color: colors.ink,
-              lineHeight: 44,
-              letterSpacing: -1.5,
-              marginTop: 6,
-            }}
-          >
-            {isOnboarding ? 'Set up\nyour profile.' : 'Edit your\nprofile.'}
-          </Text>
-          <View style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center' }}>
-            <View
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: 3,
-                backgroundColor: PURPLE,
-                marginRight: 10,
-              }}
-            />
-            <Text style={{ fontSize: 14, color: colors.mute, lineHeight: 20, flex: 1 }}>
-              {isOnboarding
-                ? 'Pick a username and add a few details. You can change all of this later.'
-                : 'Update what people see when they visit your shop.'}
-            </Text>
-          </View>
-
-          {/* Avatar */}
-          <View style={{ alignItems: 'center', marginTop: 24, marginBottom: 8 }}>
-            <Pressable onPress={pickAvatar} hitSlop={4}>
+          {/* Avatar at the top */}
+          <View style={{ alignItems: 'center', marginTop: 12, marginBottom: 24 }}>
+            <Pressable
+              onPress={pickAvatar}
+              hitSlop={4}
+              accessibilityRole="button"
+              accessibilityLabel="Change profile picture"
+            >
               <View
                 style={{
-                  width: 120,
-                  height: 120,
-                  borderRadius: 60,
+                  width: 110,
+                  height: 110,
+                  borderRadius: 55,
                   backgroundColor: colors.surface,
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -628,13 +514,13 @@ export default function ProfileEditScreen() {
                 {avatarUri ? (
                   <Image
                     source={{ uri: avatarUri }}
-                    style={{ width: 120, height: 120 }}
+                    style={{ width: 110, height: 110 }}
                     contentFit="cover"
                     transition={150}
                   />
                 ) : (
                   <Text
-                    style={{ fontSize: 52, fontWeight: '900', color: colors.ink, letterSpacing: -2 }}
+                    style={{ fontSize: 46, fontWeight: '900', color: colors.ink, letterSpacing: -2 }}
                   >
                     {initial}
                   </Text>
@@ -645,74 +531,27 @@ export default function ProfileEditScreen() {
                   position: 'absolute',
                   right: 0,
                   bottom: 0,
-                  width: 36,
-                  height: 36,
-                  borderRadius: 18,
+                  width: 34,
+                  height: 34,
+                  borderRadius: 17,
                   backgroundColor: PURPLE,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  borderWidth: 3,
+                  borderWidth: 2.5,
                   borderColor: colors.background,
                 }}
               >
-                <Feather name="camera" size={15} color="#FFFFFF" />
+                <Feather name="camera" size={14} color="#FFFFFF" />
               </View>
             </Pressable>
-
-            <View style={{ flexDirection: 'row', marginTop: 14, gap: 8 }}>
-              <Pressable
-                onPress={pickAvatar}
-                style={({ pressed }) => ({
-                  paddingHorizontal: 16,
-                  paddingVertical: 9,
-                  borderRadius: 999,
-                  backgroundColor: colors.surface,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  opacity: pressed ? 0.7 : 1,
-                })}
-              >
-                <Feather name="image" size={13} color={colors.ink} style={{ marginRight: 6 }} />
-                <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.ink }}>Change</Text>
-              </Pressable>
-              {showRemove && (
-                <Pressable
-                  onPress={removeAvatar}
-                  style={({ pressed }) => ({
-                    paddingHorizontal: 16,
-                    paddingVertical: 9,
-                    borderRadius: 999,
-                    backgroundColor: colors.surface,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    opacity: pressed ? 0.7 : 1,
-                  })}
-                >
-                  <Feather name="trash-2" size={13} color={RED} style={{ marginRight: 6 }} />
-                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: RED }}>Remove</Text>
-                </Pressable>
-              )}
-            </View>
           </View>
 
-          {/* Identity */}
-          <SectionHeader label="Identity" />
-
-          <FieldShell
-            label="Username"
-            error={usernameError}
-            focused={focused === 'username'}
-            count={username.length}
-            max={LIMITS.username}
-          >
+          {/* Form Fields */}
+          <FieldShell error={usernameError} focused={focused === 'username'}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={{ fontSize: 16, color: colors.mute, marginRight: 2 }}>@</Text>
+              <Text style={{ fontSize: 15, color: colors.mute, marginRight: 2 }}>@</Text>
               <TextInput
-                placeholder="ahmad_saleem"
+                placeholder="Username"
                 placeholderTextColor={colors.mute}
                 value={username}
                 onChangeText={(t) => {
@@ -731,7 +570,7 @@ export default function ProfileEditScreen() {
                 returnKeyType="next"
                 onSubmitEditing={() => fullNameRef.current?.focus()}
                 maxLength={LIMITS.username}
-                style={{ flex: 1, fontSize: 16, color: colors.ink, padding: 0 }}
+                style={{ flex: 1, fontSize: 15, color: colors.ink, padding: 0 }}
               />
               {usernameStatus === 'checking' && (
                 <ActivityIndicator size="small" color={colors.mute} style={{ marginLeft: 8 }} />
@@ -739,45 +578,40 @@ export default function ProfileEditScreen() {
               {usernameStatus === 'ok' && (
                 <View
                   style={{
-                    width: 22,
-                    height: 22,
-                    borderRadius: 11,
+                    width: 20,
+                    height: 20,
+                    borderRadius: 10,
                     backgroundColor: PURPLE,
                     alignItems: 'center',
                     justifyContent: 'center',
                     marginLeft: 8,
                   }}
                 >
-                  <Feather name="check" size={13} color="#FFFFFF" />
+                  <Feather name="check" size={12} color="#FFFFFF" />
                 </View>
               )}
               {usernameStatus === 'taken' && (
                 <View
                   style={{
-                    width: 22,
-                    height: 22,
-                    borderRadius: 11,
+                    width: 20,
+                    height: 20,
+                    borderRadius: 10,
                     backgroundColor: RED,
                     alignItems: 'center',
                     justifyContent: 'center',
                     marginLeft: 8,
                   }}
                 >
-                  <Feather name="x" size={13} color="white" />
+                  <Feather name="x" size={12} color="white" />
                 </View>
               )}
             </View>
           </FieldShell>
 
-          <FieldShell
-            label="Full name"
-            focused={focused === 'fullName'}
-            count={fullName.length}
-            max={LIMITS.fullName}
-          >
+          <FieldShell focused={focused === 'fullName'}>
             <TextInput
               ref={fullNameRef}
-              placeholder="Ahmad Saleem"
+              placeholder="Full name"
               placeholderTextColor={colors.mute}
               value={fullName}
               onChangeText={(t) => setFullName(t.slice(0, LIMITS.fullName))}
@@ -786,23 +620,14 @@ export default function ProfileEditScreen() {
               maxLength={LIMITS.fullName}
               returnKeyType="next"
               onSubmitEditing={() => bioRef.current?.focus()}
-              style={{ fontSize: 16, color: colors.ink, padding: 0 }}
+              style={{ fontSize: 15, color: colors.ink, padding: 0 }}
             />
           </FieldShell>
 
-          {/* Story */}
-          <SectionHeader label="Story" />
-
-          <FieldShell
-            label="Bio"
-            multiline
-            focused={focused === 'bio'}
-            count={bio.length}
-            max={LIMITS.bio}
-          >
+          <FieldShell multiline focused={focused === 'bio'}>
             <TextInput
               ref={bioRef}
-              placeholder="A line about your shop"
+              placeholder="Bio"
               placeholderTextColor={colors.mute}
               value={bio}
               onChangeText={(t) => setBio(t.slice(0, LIMITS.bio))}
@@ -812,150 +637,132 @@ export default function ProfileEditScreen() {
               textAlignVertical="top"
               maxLength={LIMITS.bio}
               scrollEnabled={false}
-              style={{ fontSize: 16, color: colors.ink, padding: 0, minHeight: 80 }}
+              style={{ fontSize: 15, color: colors.ink, padding: 0, minHeight: 72 }}
             />
           </FieldShell>
 
-          <FieldShell
-            label="Location"
-            focused={focused === 'location'}
-            count={location.length}
-            max={LIMITS.location}
-          >
-            <TextInput
-              ref={locationRef}
-              placeholder="Karachi"
-              placeholderTextColor={colors.mute}
-              value={location}
-              onChangeText={(t) => setLocation(t.slice(0, LIMITS.location))}
-              onFocus={() => setFocused('location')}
-              onBlur={() => setFocused(null)}
-              maxLength={LIMITS.location}
-              returnKeyType="done"
-              style={{ fontSize: 16, color: colors.ink, padding: 0 }}
-            />
+          <FieldShell focused={false}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Feather name="map-pin" size={15} color={colors.mute} style={{ marginRight: 8 }} />
+              <TextInput
+                value="Lahore"
+                editable={false}
+                style={{ flex: 1, fontSize: 15, color: colors.ink, padding: 0 }}
+              />
+              <View
+                style={{
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                  borderRadius: 6,
+                  backgroundColor: 'rgba(0, 0, 0, 0.05)',
+                }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '700', color: colors.mute, letterSpacing: 0.5 }}>
+                  FIXED
+                </Text>
+              </View>
+            </View>
           </FieldShell>
 
           {/* Account context (read-only) */}
           {!isOnboarding && user?.email && (
-            <>
-              <SectionHeader label="Account" />
-              <View
-                style={{
-                  backgroundColor: colors.surface,
-                  borderRadius: 16,
-                  borderWidth: 1.5,
-                  borderColor: colors.border,
-                  paddingHorizontal: 16,
-                  paddingVertical: 14,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                }}
-              >
-                <View
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 10,
-                    backgroundColor: colors.panel,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginRight: 12,
-                  }}
-                >
-                  <Feather name="mail" size={16} color={colors.ink} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      fontWeight: '700',
-                      color: colors.mute,
-                      letterSpacing: 1.2,
-                      textTransform: 'uppercase',
-                    }}
-                  >
-                    Email
-                  </Text>
-                  <Text
-                    style={{ fontSize: 14, fontWeight: '600', color: colors.ink, marginTop: 2 }}
-                    numberOfLines={1}
-                  >
-                    {user.email}
-                  </Text>
-                </View>
-                <View
-                  style={{
-                    paddingHorizontal: 10,
-                    paddingVertical: 4,
-                    borderRadius: 999,
-                    backgroundColor: colors.panel,
-                  }}
-                >
-                  <Text
-                    style={{ fontSize: 10, fontWeight: '800', color: colors.mute, letterSpacing: 1 }}
-                  >
-                    LOCKED
-                  </Text>
-                </View>
-              </View>
-            </>
-          )}
-        </ScrollView>
-
-        {/* Sticky CTA */}
-        <View
-          style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            bottom: 0,
-            paddingHorizontal: 20,
-            paddingTop: 14,
-            paddingBottom: ctaBottomPad,
-            backgroundColor: colors.surface,
-            borderTopWidth: 1,
-            borderTopColor: colors.border,
-          }}
-        >
-          <Pressable
-            onPress={handleSave}
-            disabled={saving || !canSave}
-            style={({ pressed }) => ({
-              height: 52,
-              borderRadius: 14,
-              backgroundColor: canSave || saving ? PURPLE : colors.panel,
-              borderWidth: canSave || saving ? 0 : 1,
-              borderColor: colors.border,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-              opacity: saving ? 0.85 : !canSave ? 0.7 : 1,
-              transform: [{ scale: pressed && canSave ? 0.985 : 1 }],
-            })}
-          >
-            {saving ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
-            ) : (
-              <Feather
-                name={isOnboarding ? 'arrow-right' : 'check'}
-                size={18}
-                color={canSave ? '#FFFFFF' : colors.mute}
-              />
-            )}
-            <Text
+            <View
               style={{
-                fontSize: 15,
-                fontWeight: '700',
-                color: canSave || saving ? '#FFFFFF' : colors.mute,
-                letterSpacing: 0.2,
+                backgroundColor: 'transparent',
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: colors.border,
+                paddingHorizontal: 16,
+                paddingVertical: 14,
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginBottom: 14,
               }}
             >
-              {ctaLabel}
-            </Text>
-          </Pressable>
-        </View>
+              <View
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  backgroundColor: 'rgba(0, 0, 0, 0.05)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: 12,
+                }}
+              >
+                <Feather name="mail" size={15} color={colors.ink} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{ fontSize: 14, fontWeight: '500', color: colors.ink }}
+                  numberOfLines={1}
+                >
+                  {user.email}
+                </Text>
+              </View>
+              <View
+                style={{
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                  borderRadius: 6,
+                  backgroundColor: 'rgba(0, 0, 0, 0.05)',
+                }}
+              >
+                <Text
+                  style={{ fontSize: 11, fontWeight: '700', color: colors.mute, letterSpacing: 0.5 }}
+                >
+                  LOCKED
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Save Button (In-flow, non-sticky) */}
+          <View style={{ marginTop: 10, marginBottom: 8 }}>
+            <Pressable
+              onPress={handleSave}
+              disabled={saving}
+              style={({ pressed }) => ({
+                height: 50,
+                borderRadius: 12,
+                backgroundColor: PURPLE,
+                borderWidth: 1,
+                borderColor: '#5538D6',
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                opacity: saving ? 0.85 : 1,
+                transform: [{ scale: pressed ? 0.985 : 1 }],
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.08,
+                shadowRadius: 3,
+                elevation: 2,
+              })}
+            >
+              {saving ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Feather
+                  name={isOnboarding ? 'arrow-right' : 'check'}
+                  size={16}
+                  color="#FFFFFF"
+                />
+              )}
+              <Text
+                style={{
+                  fontSize: 15,
+                  fontWeight: '700',
+                  color: '#FFFFFF',
+                  letterSpacing: 0.2,
+                }}
+              >
+                {ctaLabel}
+              </Text>
+            </Pressable>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

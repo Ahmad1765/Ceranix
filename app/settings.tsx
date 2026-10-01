@@ -526,7 +526,7 @@ export default function SettingsScreen() {
       <View
         style={{
           flex: 1,
-          backgroundColor: isDark ? '#141414' : '#F5F5F7',
+          backgroundColor: isDark ? '#141414' : '#FFFFFF',
           alignItems: 'center',
           justifyContent: 'center',
           padding: 24,
@@ -787,7 +787,7 @@ export default function SettingsScreen() {
       edges={['top']}
       style={{
         flex: 1,
-        backgroundColor: isDark ? '#141414' : '#F4F4F6',
+        backgroundColor: isDark ? '#141414' : '#FFFFFF',
       }}
     >
       {/* Top Floating Close Button matching Video */}
@@ -890,7 +890,7 @@ export default function SettingsScreen() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   borderWidth: 2,
-                  borderColor: isDark ? '#141414' : '#F4F4F6',
+                  borderColor: isDark ? '#141414' : '#FFFFFF',
                   shadowColor: '#000',
                   shadowOffset: { width: 0, height: 1 },
                   shadowOpacity: 0.15,
@@ -936,7 +936,7 @@ export default function SettingsScreen() {
             padding: 16,
             marginBottom: 20,
             borderWidth: 1,
-            borderColor: isDark ? '#262626' : 'rgba(0,0,0,0.06)',
+            borderColor: isDark ? '#262626' : 'rgba(0,0,0,0.08)',
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',

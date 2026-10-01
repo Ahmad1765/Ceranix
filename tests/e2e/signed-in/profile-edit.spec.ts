@@ -11,27 +11,21 @@ test.describe('Profile edit (signed in)', () => {
     await waitForAppReady(page);
   });
 
-  test('renders the page hero, all sections, and a current email value', async ({ page }) => {
-    await expect(page.getByText(/Edit your[\s\S]*profile\./i)).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByText('Identity')).toBeVisible();
-    await expect(page.getByText('Story')).toBeVisible();
-    await expect(page.getByText('Account')).toBeVisible();
+  test('renders top title, profile avatar, and a current email value', async ({ page }) => {
+    await expect(page.getByText('Edit Profile')).toBeVisible({ timeout: 20_000 });
     // Some email is in the Account section (we don't pin to the literal so
     // the credential never leaks into a fail snapshot).
     await expect(page.getByText(/^[\w.+-]+@[\w-]+\.[\w.-]+$/).first()).toBeVisible();
   });
 
-  test('the four labelled fields (Username / Full name / Bio / Location) are present', async ({ page }) => {
-    await expect(page.getByText('Username', { exact: true })).toBeVisible();
-    await expect(page.getByText('Full name', { exact: true })).toBeVisible();
-    await expect(page.getByText('Bio', { exact: true })).toBeVisible();
-    await expect(page.getByText('Location', { exact: true })).toBeVisible();
+  test('the four fields (Username / Full name / Bio / fixed Lahore) are present', async ({ page }) => {
+    await expect(page.getByPlaceholder('Username')).toBeVisible();
+    await expect(page.getByPlaceholder('Full name')).toBeVisible();
+    await expect(page.getByPlaceholder('Bio')).toBeVisible();
+    await expect(page.getByDisplayValue('Lahore')).toBeVisible();
   });
 
-  test('All-saved CTA is rendered when no edits are made', async ({ page }) => {
-    // When the form is clean the CTA reads "All saved". The act of focusing
-    // a field without typing shouldn't flip the dirty flag, so we can rely
-    // on this on first render.
-    await expect(page.getByText(/All saved|Save changes/)).toBeVisible();
+  test('Save CTA is rendered in-flow', async ({ page }) => {
+    await expect(page.getByRole('button', { name: 'Save' })).toBeVisible();
   });
 });
