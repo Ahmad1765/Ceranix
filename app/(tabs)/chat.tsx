@@ -908,24 +908,40 @@ export default function InboxScreen() {
       {/* Header */}
       <View
         style={{
+          position: 'relative',
+          height: 48,
           flexDirection: 'row',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingHorizontal: 20,
-          paddingTop: 8,
-          paddingBottom: 12,
+          justifyContent: 'flex-end',
+          paddingHorizontal: 16,
         }}
       >
-        <Text
+        {/* Dead-center "Activity" Title */}
+        <View
+          pointerEvents="none"
           style={{
-            fontFamily: typography.family.sansBold,
-            fontSize: 28,
-            color: theme.ink,
-            letterSpacing: -0.6,
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: 0,
+            bottom: 0,
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
-          Activity
-        </Text>
+          <Text
+            style={{
+              fontFamily: typography.family.sansBold,
+              fontSize: 20,
+              fontWeight: '700',
+              color: theme.ink,
+              letterSpacing: -0.4,
+              textAlign: 'center',
+            }}
+          >
+            Activity
+          </Text>
+        </View>
 
         <PressableScale
           onPress={() => {
