@@ -107,7 +107,23 @@ export function SellSheetProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const guestGate = useGuestGate();
 
-  const open = useCallback((listingToEdit?: Listing | null) => {
+  const open = useCallback((listingToEdit?: Listing | null | any, e?: any) => {
+    // If an event was passed as first or second arg, stop propagation
+    const eventObj =
+      listingToEdit && typeof listingToEdit.stopPropagation === 'function'
+        ? listingToEdit
+        : e && typeof e.stopPropagation === 'function'
+          ? e
+          : null;
+    if (eventObj) {
+      eventObj.stopPropagation();
+      eventObj.preventDefault?.();
+    }
+    const realListing =
+      listingToEdit && typeof listingToEdit.stopPropagation === 'function'
+        ? null
+        : listingToEdit;
+
     if (!user?.id) {
       guestGate.prompt({
         title: 'Sign in to sell',
@@ -116,10 +132,20 @@ export function SellSheetProvider({ children }: { children: ReactNode }) {
       });
       return false;
     }
-    if (listingToEdit?.id) {
-      router.push(`/sell?id=${listingToEdit.id}` as any);
+
+    const doNavigate = () => {
+      if (realListing?.id) {
+        router.push(`/sell?id=${realListing.id}` as any);
+      } else {
+        router.push('/sell' as any);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      // ponytail: defer navigation on web so synthetic touch/click finishes on the Sell button instead of bleeding into the new view
+      setTimeout(doNavigate, 80);
     } else {
-      router.push('/sell' as any);
+      doNavigate();
     }
     return true;
   }, [user, guestGate]);
@@ -222,9 +248,15 @@ function RowField({
   disabled?: boolean;
 }) {
   const { theme } = useTheme();
-  const lastPressRef = useRef(0);
-  const handlePress = () => {
+  const lastPressRef = useRef(Platform.OS === 'web' ? Date.now() : 0);
+  const handlePress = (e?: any) => {
     if (disabled) return;
+    if (e && typeof e.stopPropagation === 'function') {
+      e.stopPropagation();
+      if (Platform.OS === 'web' && typeof e.preventDefault === 'function') {
+        e.preventDefault();
+      }
+    }
     const now = Date.now();
     if (now - lastPressRef.current < 450) return;
     lastPressRef.current = now;
@@ -324,7 +356,16 @@ export function SellForm({
   const { width } = useWindowDimensions();
   const [publishing, setPublishing] = useState(false);
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
-  const isNavigatingSheetRef = useRef(false);
+  const isNavigatingSheetRef = useRef(Platform.OS === 'web');
+
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const timer = setTimeout(() => {
+        isNavigatingSheetRef.current = false;
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   const openSheet = useCallback((sheet: ActiveSheet) => {
     if (isNavigatingSheetRef.current || activeSheet !== null) return;

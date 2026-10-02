@@ -173,7 +173,7 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
       if (Platform.OS === 'web') {
         // Defer navigation slightly on web to let the browser's synthetic click
         // finish on the tab dock instead of hitting underlying buttons in the new view.
-        setTimeout(doNavigate, 60);
+        setTimeout(doNavigate, 80);
       } else {
         doNavigate();
       }
@@ -266,7 +266,7 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
   return (
     <Animated.View
       ref={containerRef}
-      pointerEvents={shouldHideTabBar ? 'none' : 'box-none'}
+      pointerEvents={shouldHideTabBar ? 'none' : 'auto'}
       style={[
         {
           position: 'absolute',
@@ -289,6 +289,23 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
             flexDirection: 'row',
             height: BAR_HEIGHT,
           }}
+          {...(Platform.OS === 'web'
+            ? {
+                onClick: (e: any) => {
+                  e?.stopPropagation?.();
+                  e?.preventDefault?.();
+                },
+                onTouchEnd: (e: any) => {
+                  e?.stopPropagation?.();
+                },
+                onPointerDown: (e: any) => {
+                  e?.stopPropagation?.();
+                },
+                onPointerUp: (e: any) => {
+                  e?.stopPropagation?.();
+                },
+              }
+            : {})}
         >
           {routes.map((route, pos) => {
             const { options } = descriptors[route.key];
@@ -375,6 +392,23 @@ function TabItem({
         paddingTop: 6,
         paddingBottom: 2,
       }}
+      {...(Platform.OS === 'web'
+        ? {
+            onClick: (e: any) => {
+              e?.stopPropagation?.();
+              e?.preventDefault?.();
+            },
+            onTouchEnd: (e: any) => {
+              e?.stopPropagation?.();
+            },
+            onPointerDown: (e: any) => {
+              e?.stopPropagation?.();
+            },
+            onPointerUp: (e: any) => {
+              e?.stopPropagation?.();
+            },
+          }
+        : {})}
     >
       <Animated.View style={[{ width: ICON, height: ICON }, wrapStyle]}>
         <Animated.View style={[StyleSheet.absoluteFill, outlineStyle]}>

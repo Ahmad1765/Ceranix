@@ -162,7 +162,11 @@ export function DiscoverSheetProvider({ children }: { children: ReactNode }) {
   // See <KeyboardPrimer/> below for why this exists.
   const primerRef = useRef<TextInput>(null);
   const searchInputRef = useRef<TextInput>(null);
-  const open = useCallback(() => {
+  const open = useCallback((e?: any) => {
+    if (e && typeof e.stopPropagation === 'function') {
+      e.stopPropagation();
+      e.preventDefault?.();
+    }
     // MUST stay synchronous, and MUST come before setVisible: it has to run
     // inside the tap's own task to count as user-activated. See KeyboardPrimer.
     if (Platform.OS === 'web') primerRef.current?.focus();

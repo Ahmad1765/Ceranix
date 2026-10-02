@@ -23,7 +23,8 @@ export default function TabsLayout() {
         listeners={{
           tabPress: (e) => {
             e.preventDefault();
-            openDiscoverSheet();
+            (e as any)?.stopPropagation?.();
+            openDiscoverSheet(e);
           },
         }}
       />
@@ -43,7 +44,8 @@ export default function TabsLayout() {
         listeners={{
           tabPress: (e) => {
             e.preventDefault();
-            openSellSheet();
+            (e as any)?.stopPropagation?.();
+            openSellSheet(null, e);
           },
         }}
       />

@@ -998,13 +998,6 @@ export default function SettingsScreen() {
             onPress={() => mgr.setShowPhone(true)}
           />
           <ChatGPTItem
-            icon="plus-square"
-            label="Subscription"
-            value={profile?.is_pro ? 'Pro' : 'Free'}
-            chevron
-            onPress={() => mgr.setShowSubscription(true)}
-          />
-          <ChatGPTItem
             icon="shield"
             label="Identity verification"
             value={
