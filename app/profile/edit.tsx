@@ -37,11 +37,13 @@ function tap(style: 'light' | 'medium' = 'light') {
 }
 
 function FieldShell({
+  label,
   error,
   multiline,
   focused,
   children,
 }: {
+  label?: string;
   error?: string | null;
   multiline?: boolean;
   focused: boolean;
@@ -51,6 +53,20 @@ function FieldShell({
 
   return (
     <View style={{ marginBottom: 14 }}>
+      {label ? (
+        <Text
+          style={{
+            fontSize: 12,
+            fontWeight: '600',
+            color: focused ? PURPLE : colors.mute,
+            marginBottom: 6,
+            marginLeft: 4,
+            letterSpacing: 0.3,
+          }}
+        >
+          {label}
+        </Text>
+      ) : null}
       <View
         style={{
           backgroundColor: 'transparent',
@@ -547,7 +563,7 @@ export default function ProfileEditScreen() {
           </View>
 
           {/* Form Fields */}
-          <FieldShell error={usernameError} focused={focused === 'username'}>
+          <FieldShell label="Username" error={usernameError} focused={focused === 'username'}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Text style={{ fontSize: 15, color: colors.mute, marginRight: 2 }}>@</Text>
               <TextInput
@@ -608,7 +624,7 @@ export default function ProfileEditScreen() {
             </View>
           </FieldShell>
 
-          <FieldShell focused={focused === 'fullName'}>
+          <FieldShell label="Display Name" focused={focused === 'fullName'}>
             <TextInput
               ref={fullNameRef}
               placeholder="Full name"
@@ -624,7 +640,7 @@ export default function ProfileEditScreen() {
             />
           </FieldShell>
 
-          <FieldShell multiline focused={focused === 'bio'}>
+          <FieldShell label="Bio" multiline focused={focused === 'bio'}>
             <TextInput
               ref={bioRef}
               placeholder="Bio"
@@ -641,7 +657,7 @@ export default function ProfileEditScreen() {
             />
           </FieldShell>
 
-          <FieldShell focused={false}>
+          <FieldShell label="Location" focused={false}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Feather name="map-pin" size={15} color={colors.mute} style={{ marginRight: 8 }} />
               <TextInput
@@ -666,6 +682,19 @@ export default function ProfileEditScreen() {
 
           {/* Account context (read-only) */}
           {!isOnboarding && user?.email && (
+            <View style={{ marginBottom: 14 }}>
+            <Text
+              style={{
+                fontSize: 12,
+                fontWeight: '600',
+                color: colors.mute,
+                marginBottom: 6,
+                marginLeft: 4,
+                letterSpacing: 0.3,
+              }}
+            >
+              Email
+            </Text>
             <View
               style={{
                 backgroundColor: 'transparent',
@@ -714,6 +743,7 @@ export default function ProfileEditScreen() {
                   LOCKED
                 </Text>
               </View>
+            </View>
             </View>
           )}
 
