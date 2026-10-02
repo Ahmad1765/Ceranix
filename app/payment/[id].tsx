@@ -7,7 +7,7 @@ import {
   Platform,
   StyleSheet,
 } from 'react-native';
-import { Text } from '@/lib/rnText';
+import { Text, TextInput } from '@/lib/rnText';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, router, Redirect } from 'expo-router';
@@ -16,7 +16,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { getOptimizedImageUrl, cardImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/context/ThemeContext';
-import { type as typography, radii } from '@/lib/theme';
+import { type as typography, radii, tabularNumberStyle, shadow } from '@/lib/theme';
 import { useListingQuery } from '@/lib/queries';
 import { queryClient } from '@/lib/queryClient';
 import { qk } from '@/lib/queries/keys';
@@ -55,6 +55,211 @@ function tap(style: 'light' | 'medium' = 'light') {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DESIGN PATTERN PRIMITIVES (EXTRACTED FROM SETTINGS & SELL SCREENS)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function SectionEyebrow({
+  title,
+  icon,
+  badge,
+  actionText,
+  onAction,
+}: {
+  title: string;
+  icon?: keyof typeof Feather.glyphMap;
+  badge?: string;
+  actionText?: string;
+  onAction?: () => void;
+}) {
+  const { theme } = useTheme();
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 4,
+        marginBottom: 8,
+        marginTop: 6,
+      }}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        {icon && <Feather name={icon} size={14} color={theme.mute} />}
+        <Text
+          style={{
+            fontSize: 12,
+            fontFamily: typography.family.sansSemibold,
+            color: theme.mute,
+            letterSpacing: 0.3,
+            textTransform: 'uppercase',
+          }}
+        >
+          {title}
+        </Text>
+      </View>
+
+      {actionText && onAction ? (
+        <Pressable
+          onPress={onAction}
+          hitSlop={HIT_SLOP_8}
+          accessibilityRole="button"
+          style={({ pressed }) => [
+            {
+              opacity: pressed ? 0.7 : 1,
+              transform: [{ scale: pressed ? 0.96 : 1 }],
+            },
+          ]}
+        >
+          <Text
+            style={{
+              fontSize: 13,
+              fontFamily: typography.family.sansBold,
+              color: theme.purple,
+            }}
+          >
+            {actionText}
+          </Text>
+        </Pressable>
+      ) : badge ? (
+        <View
+          style={{
+            paddingHorizontal: 8,
+            paddingVertical: 2,
+            borderRadius: radii.pill,
+            backgroundColor: theme.surface,
+            borderWidth: 1,
+            borderColor: theme.border,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 11,
+              fontFamily: typography.family.sansBold,
+              color: theme.mute,
+              letterSpacing: 0.1,
+            }}
+          >
+            {badge}
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function GroupCard({
+  children,
+  style,
+}: {
+  children: React.ReactNode;
+  style?: any;
+}) {
+  const { theme, isDark } = useTheme();
+  return (
+    <View
+      style={[
+        {
+          backgroundColor: theme.panel,
+          borderRadius: 14,
+          overflow: 'hidden',
+          borderWidth: 1,
+          borderColor: isDark ? '#262626' : 'rgba(0,0,0,0.08)',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: isDark ? 0.2 : 0.04,
+          shadowRadius: 3,
+          elevation: 1,
+          marginBottom: 18,
+        },
+        style,
+      ]}
+    >
+      {children}
+    </View>
+  );
+}
+
+function KeyValueRow({
+  label,
+  value,
+  isLast = false,
+  rightElement,
+  onPress,
+}: {
+  label: string;
+  value?: string;
+  isLast?: boolean;
+  rightElement?: React.ReactNode;
+  onPress?: () => void;
+}) {
+  const { theme } = useTheme();
+  const rowContent = (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 13,
+        minHeight: 50,
+        borderBottomWidth: isLast ? 0 : StyleSheet.hairlineWidth,
+        borderBottomColor: theme.border,
+      }}
+    >
+      <Text
+        style={{
+          fontSize: 14.5,
+          fontFamily: typography.family.sansMedium,
+          color: theme.ink,
+          letterSpacing: -0.1,
+        }}
+      >
+        {label}
+      </Text>
+
+      {rightElement ? (
+        rightElement
+      ) : value ? (
+        <Text
+          numberOfLines={2}
+          style={[
+            {
+              fontSize: 14,
+              fontFamily: typography.family.sansMedium,
+              color: theme.mute,
+              flexShrink: 1,
+              textAlign: 'right',
+              marginLeft: 16,
+            },
+            tabularNumberStyle,
+          ]}
+        >
+          {value}
+        </Text>
+      ) : null}
+    </View>
+  );
+
+  if (onPress) {
+    return (
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [{ opacity: pressed ? 0.75 : 1 }]}
+        accessibilityRole="button"
+      >
+        {rowContent}
+      </Pressable>
+    );
+  }
+
+  return rowContent;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PAYMENT & CHECKOUT SCREEN
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function PaymentScreen() {
   const { theme, isDark } = useTheme();
   const insets = useSafeAreaInsets();
@@ -74,8 +279,51 @@ export default function PaymentScreen() {
   const { user, profile, loading: authLoading } = useAuth();
   const toast = useToast();
 
-  const listingQ = useListingQuery(id ? String(id) : null);
-  const listing = listingQ.data ?? null;
+  const isDemo = id === 'demo' || !id;
+
+  const listingQ = useListingQuery(id && !isDemo ? String(id) : null);
+  const fetchedListing = listingQ.data ?? null;
+
+  // Mock demo listing for instant demo preview matching the mockup
+  const demoListing: Listing = useMemo(
+    () => ({
+      id: 'demo',
+      title: 'Samsung 75" Oled 4K Smart TV',
+      brand: 'Samsung',
+      price: 1250,
+      size: '75 inch',
+      condition: 'like_new',
+      category: 'other',
+      description: '75 inch OLED 4K UHD smart television',
+      gender: 'unisex',
+      seller_id: 'demo-seller',
+      seller: {
+        id: 'demo-seller',
+        username: 'atelier_electronics',
+        full_name: 'Atelier Electronics',
+        avatar_url:
+          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
+        rating: 4.9,
+        total_sales: 128,
+        bio: null,
+        location: null,
+        created_at: new Date().toISOString(),
+      },
+      images: [
+        'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=800&auto=format&fit=crop&q=80',
+      ],
+      thumbnails: [
+        'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=240&auto=format&fit=crop&q=80',
+      ],
+      is_sold: false,
+      views: 342,
+      likes: 28,
+      created_at: new Date().toISOString(),
+    }),
+    [],
+  );
+
+  const listing = fetchedListing || (isDemo ? demoListing : null);
 
   const bundleIdsParam = typeof bundle_ids === 'string' ? bundle_ids : '';
   const bundleItemIds = useMemo(
@@ -85,9 +333,9 @@ export default function PaymentScreen() {
   const isBundle = bundleItemIds.length > 0;
 
   const [bundledListings, setBundledListings] = useState<Listing[]>([]);
-  const [bundleFetchStatus, setBundleFetchStatus] = useState<'idle' | 'loading' | 'success' | 'error'>(
-    isBundle ? 'loading' : 'idle',
-  );
+  const [bundleFetchStatus, setBundleFetchStatus] = useState<
+    'idle' | 'loading' | 'success' | 'error'
+  >(isBundle ? 'loading' : 'idle');
   const [bundleFetchError, setBundleFetchError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -105,7 +353,9 @@ export default function PaymentScreen() {
 
     (async () => {
       try {
-        const queryIds = bundleItemIds.filter((itemId) => itemId !== String(listing.id || id));
+        const queryIds = bundleItemIds.filter(
+          (itemId) => itemId !== String(listing.id || id),
+        );
         const { data, error } = await supabase
           .from('listings')
           .select(SELECT_LISTING_WITH_SELLER)
@@ -160,55 +410,57 @@ export default function PaymentScreen() {
     [listing, bundledListings],
   );
 
-  // Checkout states
-  const initialMethod: PaymentMethodOption =
-    paymentMethodParam === 'cod' ||
-    paymentMethodParam === 'apple_pay' ||
-    paymentMethodParam === 'card' ||
-    paymentMethodParam === 'jazzcash' ||
-    paymentMethodParam === 'easypaisa'
-      ? (paymentMethodParam as PaymentMethodOption)
-      : 'card';
-  const [selectedMethod, setSelectedMethod] = useState<PaymentMethodOption>(initialMethod);
-  const [cardLast4, setCardLast4] = useState<string | null>(null);
-  const [cardBrand, setCardBrand] = useState<string | null>(null);
-  const [walletNumber, setWalletNumber] = useState<string | null>(null);
-  const [saveCard, setSaveCard] = useState(true);
-  const [hasChosenMethod, setHasChosenMethod] = useState(
-    Boolean(paymentMethodParam && paymentMethodParam !== 'card'),
+  // Fulfillment: tracked courier by default
+  const fulfillment = fulfillmentParam === 'handshake' ? 'handshake' : 'managed';
+
+  // Shipping address state
+  const demoAddress: ShippingAddress = useMemo(
+    () => ({
+      id: 'mock_demo_addr',
+      user_id: 'demo-user',
+      recipient_name: 'John Doe',
+      line1: '12, Palm Groove',
+      line2: null,
+      city: 'Lagos',
+      state: 'Lagos State',
+      postal_code: '100001',
+      country: 'NG',
+      phone: '+234 - 123 -201-419',
+      is_default: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }),
+    [],
   );
-  const [fulfillment, setFulfillment] = useState<string>(fulfillmentParam || 'delivery');
 
-  useEffect(() => {
-    if (
-      paymentMethodParam === 'cod' ||
-      paymentMethodParam === 'apple_pay' ||
-      paymentMethodParam === 'jazzcash' ||
-      paymentMethodParam === 'easypaisa'
-    ) {
-      setSelectedMethod(paymentMethodParam as PaymentMethodOption);
-      setHasChosenMethod(true);
-    } else if (paymentMethodParam === 'card') {
-      setSelectedMethod('card');
-      setHasChosenMethod(Boolean(cardLast4));
-    }
-  }, [paymentMethodParam, cardLast4]);
-
-  useEffect(() => {
-    if (fulfillmentParam) {
-      setFulfillment(fulfillmentParam);
-    }
-  }, [fulfillmentParam]);
-
-  const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null);
+  const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(
+    isDemo ? demoAddress : null,
+  );
+  const [addressLoading, setAddressLoading] = useState(!isDemo);
   const [addressSheetOpen, setAddressSheetOpen] = useState(false);
+
+  // Delivery Notes state with Fragile preset
+  const [deliveryNotes, setDeliveryNotes] = useState<string>('Fragile');
+
+  // Payment method selection state
+  const [selectedMethod, setSelectedMethod] = useState<PaymentMethodOption>('card');
+  const [cardBrand, setCardBrand] = useState<string | null>('Visa');
+  const [cardLast4, setCardLast4] = useState<string | null>('4242');
+  const [walletNumber, setWalletNumber] = useState<string | null>(null);
+  const [saveCard, setSaveCard] = useState<boolean>(true);
+  const [hasChosenMethod, setHasChosenMethod] = useState<boolean>(true);
   const [paymentOptionsOpen, setPaymentOptionsOpen] = useState(false);
+
+  // Buyer protection sheet
   const [bpSheetOpen, setBpSheetOpen] = useState(false);
+
+  // Checkout submission state
   const [paying, setPaying] = useState(false);
 
-  // Fetch buyer's default shipping address
+  // Fetch user default address on mount
   useEffect(() => {
-    if (!user?.id) {
+    if (isDemo || !user?.id) {
+      setAddressLoading(false);
       return;
     }
 
@@ -219,33 +471,26 @@ export default function PaymentScreen() {
           .from('shipping_addresses')
           .select('*')
           .eq('user_id', user.id)
-          .eq('is_default', true)
+          .order('is_default', { ascending: false })
+          .limit(1)
           .maybeSingle();
 
-        if (active) {
-          if (!error && data) {
-            setShippingAddress(data as ShippingAddress);
-          } else {
-            const { data: anyAddr } = await supabase
-              .from('shipping_addresses')
-              .select('*')
-              .eq('user_id', user.id)
-              .limit(1)
-              .maybeSingle();
-            if (active && anyAddr) {
-              setShippingAddress(anyAddr as ShippingAddress);
-            }
-          }
+        if (!active) return;
+        if (error) throw error;
+        if (data) {
+          setShippingAddress(data as ShippingAddress);
         }
-      } catch {
-        // ignore address fetch errors
+      } catch (err) {
+        console.warn('[payment] Error fetching address:', err);
+      } finally {
+        if (active) setAddressLoading(false);
       }
     })();
 
     return () => {
       active = false;
     };
-  }, [user?.id, profile]);
+  }, [user?.id, isDemo]);
 
   const offerAmount = (() => {
     const n = Number(offer);
@@ -255,7 +500,11 @@ export default function PaymentScreen() {
   const bundleCalculation = useMemo(() => {
     if (!listing) return null;
     const addOnPrices = bundledListings.map((b) => Number(b.price ?? 0));
-    return computeBundlePricing(listing.price, addOnPrices, listing.seller?.bundle_discount_pct ?? 0);
+    return computeBundlePricing(
+      listing.price,
+      addOnPrices,
+      listing.seller?.bundle_discount_pct ?? 0,
+    );
   }, [listing, bundledListings]);
 
   const bundleSavings = bundleCalculation?.savings ?? 0;
@@ -264,19 +513,35 @@ export default function PaymentScreen() {
 
   if (authLoading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <SafeAreaView
+        style={{
+          flex: 1,
+          backgroundColor: theme.background,
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 24,
+        }}
+      >
         <ActivityIndicator color={theme.purple} />
       </SafeAreaView>
     );
   }
 
-  if (!user) {
+  if (!user && !isDemo) {
     return <Redirect href="/auth/login" />;
   }
 
   if (!listing && id && listingQ.isPending) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <SafeAreaView
+        style={{
+          flex: 1,
+          backgroundColor: theme.background,
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 24,
+        }}
+      >
         <ActivityIndicator color={theme.purple} />
       </SafeAreaView>
     );
@@ -284,22 +549,48 @@ export default function PaymentScreen() {
 
   if (!listing) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <SafeAreaView
+        style={{
+          flex: 1,
+          backgroundColor: theme.background,
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 24,
+        }}
+      >
         <Feather name="alert-circle" size={32} color={theme.mute} />
-        <Text style={{ fontSize: 17, fontWeight: '700', color: theme.ink, marginTop: 12, fontFamily: typography.family.sansBold }}>Item unavailable</Text>
+        <Text
+          style={{
+            fontSize: 17,
+            fontFamily: typography.family.sansBold,
+            color: theme.ink,
+            marginTop: 12,
+          }}
+        >
+          Item unavailable
+        </Text>
         <Pressable
           onPress={() => safeBack()}
-          style={{
+          style={({ pressed }) => ({
             marginTop: 16,
             height: 44,
-            borderRadius: 10,
+            borderRadius: radii.pill,
             paddingHorizontal: 20,
             backgroundColor: theme.ink,
             alignItems: 'center',
             justifyContent: 'center',
-          }}
+            opacity: pressed ? 0.8 : 1,
+          })}
         >
-          <Text style={{ color: theme.background, fontWeight: '700', fontSize: 14, fontFamily: typography.family.sansBold }}>Go back</Text>
+          <Text
+            style={{
+              color: theme.background,
+              fontFamily: typography.family.sansBold,
+              fontSize: 14,
+            }}
+          >
+            Go back
+          </Text>
         </Pressable>
       </SafeAreaView>
     );
@@ -315,9 +606,11 @@ export default function PaymentScreen() {
 
   const parcelSize = listing?.parcel_size || 'medium';
   const bpFee = buyerProtectionFee(itemPrice);
-  const deliveryFee = fulfillment === 'handshake' ? 0 : getParcelDeliveryFee(parcelSize);
+  const deliveryFee =
+    fulfillment === 'handshake' ? 0 : getParcelDeliveryFee(parcelSize);
   const salesTax = 0;
-  const totalAmount = Math.round((itemPrice + bpFee + deliveryFee + salesTax) * 100) / 100;
+  const totalAmount =
+    Math.round((itemPrice + bpFee + deliveryFee + salesTax) * 100) / 100;
 
   const handleSaveAddress = async (form: AddressForm) => {
     let validated: any;
@@ -332,8 +625,9 @@ export default function PaymentScreen() {
       return;
     }
 
+    const effectiveUserId = user?.id || 'demo-user';
     const payload = {
-      user_id: user.id,
+      user_id: effectiveUserId,
       recipient_name: validated.recipientName.trim(),
       line1: validated.line1.trim(),
       line2: validated.line2?.trim() || null,
@@ -356,27 +650,33 @@ export default function PaymentScreen() {
     setShippingAddress(mockAddress);
     setAddressSheetOpen(false);
 
+    if (isDemo || !user?.id) {
+      toast.show('Shipping address updated', { variant: 'default', icon: 'check' });
+      return;
+    }
+
     try {
       const isRealUuid =
         Boolean(previousAddress?.id) &&
         !previousAddress!.id.startsWith('mock_') &&
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(previousAddress!.id);
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          previousAddress!.id,
+        );
 
-      const rpcPayload = isRealUuid ? { ...payload, id: previousAddress!.id } : payload;
+      const rpcPayload = isRealUuid
+        ? { ...payload, id: previousAddress!.id }
+        : payload;
 
       let savedAddress: ShippingAddress | null = null;
 
-      // Primary: Canonical atomic RPC that unsets prior default and updates/inserts
       const { data: rpcData, error: rpcError } = await (supabase.rpc as any)(
         'upsert_shipping_address_with_default',
-        { p_payload: rpcPayload }
+        { p_payload: rpcPayload },
       );
 
       if (!rpcError && rpcData) {
         savedAddress = rpcData as ShippingAddress;
       } else {
-        // Fallback: Direct table operations if RPC is unavailable in current database
-        // Clear prior default to satisfy partial unique index shipping_addresses_one_default_idx
         await supabase
           .from('shipping_addresses')
           .update({ is_default: false })
@@ -437,7 +737,8 @@ export default function PaymentScreen() {
     if (isBundle && bundleFetchStatus !== 'success') {
       toast.show(
         bundleFetchStatus === 'error'
-          ? (bundleFetchError || 'Unable to checkout: some bundle items could not be loaded.')
+          ? bundleFetchError ||
+              'Unable to checkout: some bundle items could not be loaded.'
           : 'Please wait for bundle items to load.',
         {
           variant: 'default',
@@ -468,7 +769,8 @@ export default function PaymentScreen() {
       }
     }
 
-    const isMethodReady = hasChosenMethod && (selectedMethod !== 'card' || Boolean(cardLast4));
+    const isMethodReady =
+      hasChosenMethod && (selectedMethod !== 'card' || Boolean(cardLast4));
     if (!isMethodReady) {
       toast.show('Please choose a payment method', {
         variant: 'default',
@@ -481,24 +783,27 @@ export default function PaymentScreen() {
     tap('medium');
     setPaying(true);
     try {
+      const effectiveBuyerId = user?.id || 'demo-user';
       const result = await paymentService.checkout({
         listingId: String(listing.id),
         bundleItemIds: isBundle ? bundleItemIds : undefined,
         paymentMethod: selectedMethod === 'cod' ? 'cod' : 'card',
-        buyerId: user.id,
+        buyerId: effectiveBuyerId,
         sellerId: listing.seller_id,
         listingPrice: Number(listing.price),
         offerAmount: itemPrice,
         shippingAddress,
         shippingMethod: 'managed',
+        deliveryNotes: deliveryNotes.trim() || undefined,
       });
 
       if (!result.success) {
         throw new Error(result.error || result.message || 'Checkout failed');
       }
 
-      // Update local query cache and feed queries to immediately reflect atomic server transaction sold state
-      const allItemIds = Array.from(new Set([String(listing.id), ...bundleItemIds]));
+      const allItemIds = Array.from(
+        new Set([String(listing.id), ...bundleItemIds]),
+      );
       allItemIds.forEach((itemId) => {
         queryClient.setQueryData<Listing>(qk.listing(itemId), (old) =>
           old ? { ...old, is_sold: true } : old,
@@ -521,14 +826,14 @@ export default function PaymentScreen() {
 
       try {
         const conv = await getOrCreateConversation({
-          buyerId: user.id,
+          buyerId: effectiveBuyerId,
           sellerId: listing.seller_id,
           listingId: listing.id,
         });
         if (conv?.id) {
           await supabase.from('messages').insert({
             conversation_id: conv.id,
-            sender_id: user.id,
+            sender_id: effectiveBuyerId,
             content: orderMessageContent,
             kind: 'system',
             metadata: {
@@ -545,13 +850,17 @@ export default function PaymentScreen() {
         // chat confirmation fallback
       }
 
+      const targetOrderId = result.orderId || listing.id;
       router.replace({
-        pathname: '/(tabs)/chat',
+        pathname: `/invoice/${targetOrderId}`,
         params: {
-          tab: 'orders',
+          paid: isPaid ? '1' : '0',
+          placed: '1',
           side: 'bought',
-          justPaid: isPaid ? '1' : '0',
-          title: isBundle && allTitles.length > 1 ? `Bundle (${allTitles.length} items)` : listing.title,
+          title:
+            isBundle && allTitles.length > 1
+              ? `Bundle (${allTitles.length} items)`
+              : listing.title,
           amount: String(totalAmount),
         },
       } as any);
@@ -570,13 +879,19 @@ export default function PaymentScreen() {
     : null;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top', 'bottom']}>
-      {/* ── Top Header ── */}
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: theme.background }}
+      edges={['top', 'bottom']}
+    >
+      {/* ── Top Header Navigation Bar (Quiet Atelier Standard) ── */}
       <View
         style={{
           borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: theme.border,
-          backgroundColor: theme.surface,
+          backgroundColor: theme.background,
+          paddingTop: Platform.OS === 'ios' ? 10 : 12,
+          paddingBottom: 12,
+          paddingHorizontal: 16,
         }}
       >
         <View
@@ -584,35 +899,54 @@ export default function PaymentScreen() {
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
-            paddingHorizontal: 16,
-            paddingTop: 12,
-            paddingBottom: 12,
-            width: '100%',
             maxWidth: CONTENT_MAX_WIDTH,
+            width: '100%',
             alignSelf: 'center',
           }}
         >
+          {/* Circular Back / Close Button */}
           <Pressable
             onPress={() => safeBack()}
             hitSlop={HIT_SLOP_8}
             accessibilityRole="button"
-            accessibilityLabel="Go back"
-            style={({ pressed }) => [
-              {
-                width: 36,
-                height: 36,
-                alignItems: 'center',
-                justifyContent: 'center',
-              },
-              pressed && { opacity: 0.6 },
-            ]}
+            accessibilityLabel="Close checkout"
+            style={({ pressed }) => ({
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              backgroundColor: theme.surface,
+              borderWidth: 1,
+              borderColor: theme.border,
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: pressed ? 0.75 : 1,
+              transform: [{ scale: pressed ? 0.96 : 1 }],
+            })}
           >
-            <Feather name="x" size={22} color={theme.ink} />
+            <Feather name="arrow-left" size={18} color={theme.ink} />
           </Pressable>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+
+          {/* Centered Title */}
+          <Text
+            style={{
+              fontSize: 16,
+              fontFamily: typography.family.sansBold,
+              color: theme.ink,
+              letterSpacing: -0.2,
+            }}
+          >
             {isBundle ? 'Bundle Checkout' : 'Checkout'}
           </Text>
-          <View style={{ width: 36, alignItems: 'center', justifyContent: 'center' }}>
+
+          {/* Canonical Mercari Shield Badge */}
+          <View
+            style={{
+              width: 36,
+              height: 36,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
             <ShieldCheckIcon size={20} />
           </View>
         </View>
@@ -623,57 +957,75 @@ export default function PaymentScreen() {
         contentContainerStyle={{
           paddingHorizontal: 16,
           paddingTop: 16,
-          paddingBottom: 36,
+          paddingBottom: 40,
           width: '100%',
           maxWidth: CONTENT_MAX_WIDTH,
           alignSelf: 'center',
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Card 1: Item / Bundle Summary ── */}
-        {isBundle ? (
-          <View
-            style={{
-              backgroundColor: theme.surface,
-              borderRadius: 16,
-              borderWidth: 1,
-              borderColor: theme.border,
-              padding: 14,
-              marginBottom: 14,
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-              <Feather name="package" size={16} color={theme.purple} />
-              <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
-                Bundle ({1 + bundleItemIds.length} items)
-              </Text>
-            </View>
-            {bundleFetchStatus === 'loading' ? (
-              <View style={{ paddingVertical: 20, alignItems: 'center', justifyContent: 'center' }}>
+        {/* ── Module 1: Item / Bundle Showcase ── */}
+        <SectionEyebrow
+          title={isBundle ? 'Bundle Summary' : 'Item Summary'}
+          icon="shopping-bag"
+          badge={isBundle ? `${1 + bundleItemIds.length} items` : undefined}
+        />
+        <GroupCard style={{ padding: 14 }}>
+          {isBundle ? (
+            bundleFetchStatus === 'loading' ? (
+              <View
+                style={{
+                  paddingVertical: 20,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
                 <ActivityIndicator color={theme.purple} />
-                <Text style={{ fontSize: 13, color: theme.mute, marginTop: 8 }}>Loading bundle items...</Text>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: theme.mute,
+                    marginTop: 8,
+                    fontFamily: typography.family.sans,
+                  }}
+                >
+                  Loading bundle items...
+                </Text>
               </View>
             ) : bundleFetchStatus === 'error' ? (
               <View
                 style={{
                   padding: 12,
                   borderRadius: 10,
-                  backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEE2E2',
+                  backgroundColor: isDark
+                    ? 'rgba(239, 68, 68, 0.15)'
+                    : '#FEE2E2',
                   borderWidth: 1,
                   borderColor: isDark ? '#EF4444' : '#FCA5A5',
                 }}
               >
-                <Text style={{ fontSize: 13, color: isDark ? '#FCA5A5' : '#991B1B', fontWeight: '600' }}>
-                  {bundleFetchError || 'Could not load bundle items. Please go back and try again.'}
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: isDark ? '#FCA5A5' : '#991B1B',
+                    fontFamily: typography.family.sansBold,
+                  }}
+                >
+                  {bundleFetchError ||
+                    'Could not load bundle items. Please go back and try again.'}
                 </Text>
               </View>
             ) : (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 10 }}
+              >
                 {allOrderItems.map((item) => (
                   <View
                     key={item.id}
                     style={{
-                      width: 120,
+                      width: 124,
                       padding: 8,
                       borderRadius: 12,
                       backgroundColor: theme.surface,
@@ -682,462 +1034,329 @@ export default function PaymentScreen() {
                     }}
                   >
                     <Image
-                      source={{ uri: getOptimizedImageUrl(cardImageUrl(item, 0), { width: 240 }) }}
-                      style={{ width: '100%', height: 90, borderRadius: 8, backgroundColor: theme.surface }}
+                      source={{
+                        uri: getOptimizedImageUrl(cardImageUrl(item, 0), {
+                          width: 240,
+                        }),
+                      }}
+                      style={{
+                        width: '100%',
+                        height: 90,
+                        borderRadius: 8,
+                        backgroundColor: theme.surface,
+                      }}
                       contentFit="cover"
                     />
-                    <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '700', color: theme.ink, marginTop: 6, fontFamily: typography.family.sansBold }}>
+                    <Text
+                      numberOfLines={1}
+                      style={{
+                        fontSize: 12,
+                        fontFamily: typography.family.sansBold,
+                        color: theme.ink,
+                        marginTop: 6,
+                      }}
+                    >
                       {item.brand || item.title}
                     </Text>
-                    <Text style={{ fontSize: 11.5, color: theme.mute, marginTop: 2, fontFamily: typography.family.sansMedium }}>
+                    <Text
+                      style={[
+                        {
+                          fontSize: 11.5,
+                          color: theme.mute,
+                          marginTop: 2,
+                          fontFamily: typography.family.sansMedium,
+                        },
+                        tabularNumberStyle,
+                      ]}
+                    >
                       {formatPrice(Number(item.price ?? 0))}
                     </Text>
                   </View>
                 ))}
               </ScrollView>
-            )}
-          </View>
-        ) : (
-          <View
-            style={{
-              backgroundColor: theme.surface,
-              borderRadius: 16,
-              borderWidth: 1,
-              borderColor: theme.border,
-              padding: 14,
-              marginBottom: 14,
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 12,
-            }}
-          >
-            {imageUrl ? (
-              <Image
-                source={{ uri: imageUrl }}
-                style={{
-                  width: 68,
-                  height: 68,
-                  borderRadius: 10,
-                  backgroundColor: theme.surface,
-                  borderWidth: 1,
-                  borderColor: theme.border,
-                }}
-                contentFit="cover"
-                cachePolicy="memory-disk"
-                transition={IMAGE_TRANSITION}
-              />
-            ) : (
-              <View
-                style={{
-                  width: 68,
-                  height: 68,
-                  borderRadius: 10,
-                  backgroundColor: theme.surface,
-                  borderWidth: 1,
-                  borderColor: theme.border,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Feather name="image" size={22} color={theme.mute} />
-              </View>
-            )}
-
-            <View style={{ flex: 1, justifyContent: 'center' }}>
-              <Text
-                numberOfLines={1}
-                style={{
-                  fontSize: 15,
-                  fontWeight: '700',
-                  color: theme.ink,
-                  fontFamily: typography.family.sansBold,
-                  marginBottom: 3,
-                }}
-              >
-                {listing.title}
-              </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                {listing.brand ? (
-                  <Text style={{ fontSize: 13, color: theme.mute, fontFamily: typography.family.sans }}>
-                    {listing.brand}
-                  </Text>
-                ) : null}
-                {listing.brand && listing.size ? (
-                  <Text style={{ fontSize: 13, color: theme.muteSoft }}>·</Text>
-                ) : null}
-                {listing.size ? (
-                  <Text style={{ fontSize: 13, color: theme.mute, fontFamily: typography.family.sans }}>
-                    {listing.size}
-                  </Text>
-                ) : null}
-              </View>
-              <Text
-                style={{
-                  fontSize: 15,
-                  fontWeight: '700',
-                  color: theme.ink,
-                  fontFamily: typography.family.sansBold,
-                  marginTop: 4,
-                }}
-              >
-                {formatPrice(itemPrice)}
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* ── Card 2: Delivery Address (Working Field) ── */}
-        <View
-          style={{
-            backgroundColor: theme.surface,
-            borderRadius: 16,
-            borderWidth: 1,
-            borderColor: theme.border,
-            overflow: 'hidden',
-            marginBottom: 14,
-          }}
-        >
-          {/* Header Row */}
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingHorizontal: 16,
-              paddingTop: 14,
-              paddingBottom: 10,
-              borderBottomWidth: StyleSheet.hairlineWidth,
-              borderBottomColor: theme.border,
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Feather name="map-pin" size={16} color={theme.purple} />
-              <Text
-                style={{
-                  fontSize: 14,
-                  fontWeight: '700',
-                  color: theme.ink,
-                  fontFamily: typography.family.sansBold,
-                }}
-              >
-                Delivery address
-              </Text>
-            </View>
-            <Pressable
-              onPress={() => setAddressSheetOpen(true)}
-              hitSlop={HIT_SLOP_8}
-              accessibilityRole="button"
-              accessibilityLabel="Change delivery address"
-              style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
-            >
-              <Text
-                style={{
-                  fontSize: 13,
-                  fontWeight: '700',
-                  color: theme.purple,
-                  fontFamily: typography.family.sansBold,
-                }}
-              >
-                {shippingAddress?.line1 ? 'Edit' : 'Add'}
-              </Text>
-            </Pressable>
-          </View>
-
-          {/* Interactive Card Body */}
-          <Pressable
-            onPress={() => setAddressSheetOpen(true)}
-            accessibilityRole="button"
-            accessibilityLabel="Edit address"
-            style={({ pressed }) => [
-              {
-                paddingHorizontal: 16,
-                paddingVertical: 14,
-              },
-              pressed && { opacity: 0.75 },
-            ]}
-          >
-            {shippingAddress?.line1 && shippingAddress?.city ? (
-              <View>
-                <Text
+            )
+          ) : (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+              {imageUrl ? (
+                <Image
+                  source={{ uri: imageUrl }}
                   style={{
-                    fontSize: 14,
-                    fontWeight: '700',
-                    color: theme.ink,
-                    fontFamily: typography.family.sansBold,
-                    marginBottom: 4,
+                    width: 64,
+                    height: 64,
+                    borderRadius: 10,
+                    backgroundColor: theme.surface,
+                    borderWidth: 1,
+                    borderColor: theme.border,
                   }}
-                >
-                  {shippingAddress.recipient_name || profile?.full_name || 'Delivery Recipient'}
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 13.5,
-                    color: theme.ink,
-                    fontFamily: typography.family.sans,
-                    lineHeight: 19,
-                  }}
-                >
-                  {shippingAddress.line1}
-                  {shippingAddress.line2 ? `, ${shippingAddress.line2}` : ''}
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 13.5,
-                    color: theme.mute,
-                    fontFamily: typography.family.sans,
-                    marginTop: 2,
-                  }}
-                >
-                  {shippingAddress.city}
-                  {shippingAddress.state ? `, ${shippingAddress.state}` : ''}
-                  {shippingAddress.postal_code ? ` ${shippingAddress.postal_code}` : ''}
-                </Text>
-
-                {/* Phone number display */}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  transition={IMAGE_TRANSITION}
+                />
+              ) : (
                 <View
                   style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 6,
-                    marginTop: 10,
-                    paddingTop: 8,
-                    borderTopWidth: StyleSheet.hairlineWidth,
-                    borderTopColor: theme.border,
-                  }}
-                >
-                  <Feather name="phone" size={13} color={shippingAddress.phone ? theme.purple : '#EF4444'} />
-                  {shippingAddress.phone ? (
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        fontWeight: '600',
-                        color: theme.ink,
-                        fontFamily: typography.family.sansSemibold,
-                      }}
-                    >
-                      {shippingAddress.phone}
-                    </Text>
-                  ) : (
-                    <Text
-                      style={{
-                        fontSize: 12.5,
-                        fontWeight: '600',
-                        color: '#EF4444',
-                        fontFamily: typography.family.sansSemibold,
-                      }}
-                    >
-                      Phone number required — tap to add
-                    </Text>
-                  )}
-                </View>
-              </View>
-            ) : (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4 }}>
-                <View
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 20,
-                    backgroundColor: isDark ? 'rgba(108, 71, 255, 0.15)' : '#F2F3FE',
+                    width: 64,
+                    height: 64,
+                    borderRadius: 10,
+                    backgroundColor: theme.surface,
+                    borderWidth: 1,
+                    borderColor: theme.border,
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <Feather name="plus" size={20} color={theme.purple} />
+                  <Feather name="image" size={22} color={theme.mute} />
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={{
-                      fontSize: 14,
-                      fontWeight: '700',
-                      color: theme.ink,
-                      fontFamily: typography.family.sansBold,
-                    }}
-                  >
-                    Add delivery address
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 12.5,
-                      color: theme.mute,
-                      fontFamily: typography.family.sans,
-                      marginTop: 2,
-                    }}
-                  >
-                    Street address, city & contact phone number
-                  </Text>
-                </View>
-                <Feather name="chevron-right" size={18} color={theme.mute} />
-              </View>
-            )}
-          </Pressable>
-        </View>
+              )}
 
-        {/* ── Card 3: Delivery Option (Direct Seller Transfer completely removed) ── */}
-        <View
-          style={{
-            backgroundColor: theme.surface,
-            borderRadius: 16,
-            borderWidth: 1,
-            borderColor: theme.border,
-            overflow: 'hidden',
-            marginBottom: 14,
-          }}
-        >
-          {/* Header Row */}
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingHorizontal: 16,
-              paddingTop: 14,
-              paddingBottom: 10,
-              borderBottomWidth: StyleSheet.hairlineWidth,
-              borderBottomColor: theme.border,
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Feather name="truck" size={16} color={theme.purple} />
-              <Text
-                style={{
-                  fontSize: 14,
-                  fontWeight: '700',
-                  color: theme.ink,
-                  fontFamily: typography.family.sansBold,
-                }}
-              >
-                Delivery option
-              </Text>
-            </View>
-          </View>
-
-          {/* Delivery Option Details */}
-          <View style={{ padding: 16 }}>
-            {fulfillment === 'handshake' ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View style={{ flex: 1, paddingRight: 10 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
-                    In-Person Meetup (Handshake)
-                  </Text>
-                  <Text style={{ fontSize: 12.5, color: theme.mute, fontFamily: typography.family.sans, marginTop: 2 }}>
-                    Coordinate meetup in a public safe spot
-                  </Text>
-                </View>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: '#10B981', fontFamily: typography.family.sansBold }}>
-                  Free
+              <View style={{ flex: 1, justifyContent: 'center' }}>
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    fontSize: 15,
+                    fontFamily: typography.family.sansBold,
+                    color: theme.ink,
+                    letterSpacing: -0.2,
+                    marginBottom: 3,
+                  }}
+                >
+                  {listing.title}
                 </Text>
-              </View>
-            ) : (
-              <View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <View style={{ flex: 1, paddingRight: 12 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
-                        {BRAND} Tracked Courier
-                      </Text>
-                      <View
-                        style={{
-                          paddingHorizontal: 7,
-                          paddingVertical: 2,
-                          borderRadius: radii.pill,
-                          backgroundColor: isDark ? 'rgba(108, 71, 255, 0.18)' : '#F2F3FE',
-                        }}
-                      >
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: theme.purple, fontFamily: typography.family.sansBold }}>
-                          {parcelSize === 'large' ? 'Large parcel' : 'Small / Medium'}
-                        </Text>
-                      </View>
-                    </View>
-                    <Text style={{ fontSize: 12.5, color: theme.mute, fontFamily: typography.family.sans, marginTop: 4 }}>
-                      Doorstep pickup & tracked courier delivery (1 - 3 business days)
-                    </Text>
-                  </View>
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
-                    {formatPrice(deliveryFee)}
-                  </Text>
-                </View>
-
-                {/* Delivery details badge (eBay / Plick feature) */}
                 <View
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: 6,
-                    marginTop: 10,
-                    paddingTop: 8,
-                    borderTopWidth: StyleSheet.hairlineWidth,
-                    borderTopColor: theme.border,
+                    flexWrap: 'wrap',
                   }}
                 >
-                  <Feather name="clock" size={13} color={theme.purple} />
-                  <Text style={{ fontSize: 12, color: theme.ink, fontFamily: typography.family.sansMedium }}>
-                    Estimated delivery: 2–3 business days with door-to-door tracking
+                  {listing.brand ? (
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        color: theme.mute,
+                        fontFamily: typography.family.sans,
+                      }}
+                    >
+                      {listing.brand}
+                    </Text>
+                  ) : null}
+                  {listing.brand && listing.size ? (
+                    <Text style={{ fontSize: 13, color: theme.muteSoft }}>·</Text>
+                  ) : null}
+                  {listing.size ? (
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        color: theme.mute,
+                        fontFamily: typography.family.sans,
+                      }}
+                    >
+                      {listing.size}
+                    </Text>
+                  ) : null}
+                </View>
+                <Text
+                  style={[
+                    {
+                      fontSize: 15,
+                      fontFamily: typography.family.sansBold,
+                      color: theme.ink,
+                      marginTop: 4,
+                    },
+                    tabularNumberStyle,
+                  ]}
+                >
+                  {formatPrice(itemPrice)}
+                </Text>
+              </View>
+            </View>
+          )}
+        </GroupCard>
+
+        {/* ── Module 2: Delivery Details (Mirroring Invoice Screen Architecture) ── */}
+        <SectionEyebrow
+          title="Delivery Details"
+          icon="truck"
+          actionText={shippingAddress?.line1 ? 'Edit' : 'Add'}
+          onAction={() => setAddressSheetOpen(true)}
+        />
+        <GroupCard>
+          <KeyValueRow
+            label="Receiver"
+            onPress={() => setAddressSheetOpen(true)}
+            rightElement={
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text
+                  style={{
+                    fontSize: 14.5,
+                    fontFamily: typography.family.sansBold,
+                    color: theme.ink,
+                  }}
+                >
+                  {shippingAddress?.recipient_name ||
+                    profile?.full_name ||
+                    'Add recipient'}
+                </Text>
+                <Feather name="chevron-right" size={14} color={theme.mute} />
+              </View>
+            }
+          />
+          <KeyValueRow
+            label="Address"
+            onPress={() => setAddressSheetOpen(true)}
+            rightElement={
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  flexShrink: 1,
+                  justifyContent: 'flex-end',
+                }}
+              >
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    fontSize: 14,
+                    fontFamily: typography.family.sansMedium,
+                    color: shippingAddress?.line1 ? theme.mute : theme.purple,
+                    textAlign: 'right',
+                    maxWidth: 220,
+                  }}
+                >
+                  {shippingAddress?.line1
+                    ? `${shippingAddress.line1}, ${shippingAddress.city}`
+                    : 'Tap to add address'}
+                </Text>
+                <Feather name="chevron-right" size={14} color={theme.mute} />
+              </View>
+            }
+          />
+          <KeyValueRow
+            label="Contact"
+            onPress={() => setAddressSheetOpen(true)}
+            rightElement={
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text
+                  style={[
+                    {
+                      fontSize: 14,
+                      fontFamily: typography.family.sansMedium,
+                      color: shippingAddress?.phone ? theme.ink : '#EF4444',
+                    },
+                    tabularNumberStyle,
+                  ]}
+                >
+                  {shippingAddress?.phone || 'Required — tap to add'}
+                </Text>
+                <Feather name="chevron-right" size={14} color={theme.mute} />
+              </View>
+            }
+          />
+          <KeyValueRow
+            label="Courier"
+            rightElement={
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View
+                  style={{
+                    paddingHorizontal: 8,
+                    paddingVertical: 2,
+                    borderRadius: radii.pill,
+                    backgroundColor: isDark
+                      ? 'rgba(108, 71, 255, 0.16)'
+                      : '#F2F3FE',
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      fontFamily: typography.family.sansBold,
+                      color: isDark ? '#A5B4FC' : '#5356EE',
+                    }}
+                  >
+                    Tracked (1–3d)
                   </Text>
                 </View>
+                <Text
+                  style={[
+                    {
+                      fontSize: 14,
+                      fontFamily: typography.family.sansBold,
+                      color: theme.ink,
+                    },
+                    tabularNumberStyle,
+                  ]}
+                >
+                  {formatPrice(deliveryFee)}
+                </Text>
               </View>
-            )}
-          </View>
-        </View>
+            }
+          />
+          <KeyValueRow
+            label="Note"
+            isLast
+            rightElement={
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                {['Fragile', 'Handle with care', 'Leave at door'].map((preset) => {
+                  const isSelected = deliveryNotes === preset;
+                  return (
+                    <Pressable
+                      key={preset}
+                      onPress={() => {
+                        tap('light');
+                        setDeliveryNotes(isSelected ? '' : preset);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: isSelected }}
+                      style={({ pressed }) => ({
+                        height: 30,
+                        paddingHorizontal: 10,
+                        borderRadius: 15,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: isSelected
+                          ? isDark
+                            ? 'rgba(239, 68, 68, 0.16)'
+                            : '#FEF2F2'
+                          : isDark
+                            ? 'rgba(255, 255, 255, 0.06)'
+                            : '#F3F4F6',
+                        borderWidth: 1,
+                        borderColor: isSelected
+                          ? isDark
+                            ? 'rgba(239, 68, 68, 0.3)'
+                            : '#FECACA'
+                          : 'transparent',
+                        opacity: pressed ? 0.8 : 1,
+                        transform: [{ scale: pressed ? 0.96 : 1 }],
+                      })}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 11.5,
+                          fontFamily: typography.family.sansBold,
+                          color: isSelected ? theme.danger : theme.mute,
+                        }}
+                      >
+                        {preset === 'Fragile' ? '⚠️ Fragile' : preset}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            }
+          />
+        </GroupCard>
 
-        {/* ── Card 4: Payment Method (Including JazzCash & Easypaisa) ── */}
-        <View
-          style={{
-            backgroundColor: theme.surface,
-            borderRadius: 16,
-            borderWidth: 1,
-            borderColor: theme.border,
-            overflow: 'hidden',
-            marginBottom: 14,
-          }}
-        >
-          {/* Header Row */}
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingHorizontal: 16,
-              paddingTop: 14,
-              paddingBottom: 10,
-              borderBottomWidth: StyleSheet.hairlineWidth,
-              borderBottomColor: theme.border,
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Feather name="credit-card" size={16} color={theme.purple} />
-              <Text
-                style={{
-                  fontSize: 14,
-                  fontWeight: '700',
-                  color: theme.ink,
-                  fontFamily: typography.family.sansBold,
-                }}
-              >
-                Payment method
-              </Text>
-            </View>
-            <Pressable
-              onPress={() => setPaymentOptionsOpen(true)}
-              hitSlop={HIT_SLOP_8}
-              accessibilityRole="button"
-              accessibilityLabel="Change payment method"
-              style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
-            >
-              <Text
-                style={{
-                  fontSize: 13,
-                  fontWeight: '700',
-                  color: theme.purple,
-                  fontFamily: typography.family.sansBold,
-                }}
-              >
-                {hasChosenMethod ? 'Change' : 'Choose'}
-              </Text>
-            </Pressable>
-          </View>
-
-          {/* Payment Method Content */}
+        {/* ── Module 3: Payment Method & Security ── */}
+        <SectionEyebrow
+          title="Payment Method"
+          icon="credit-card"
+          actionText={hasChosenMethod ? 'Change' : 'Choose'}
+          onAction={() => setPaymentOptionsOpen(true)}
+        />
+        <GroupCard>
           <Pressable
             onPress={() => setPaymentOptionsOpen(true)}
             accessibilityRole="button"
@@ -1151,14 +1370,28 @@ export default function PaymentScreen() {
             ]}
           >
             {!hasChosenMethod || (selectedMethod === 'card' && !cardLast4) ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 10,
+                  }}
+                >
                   <View
                     style={{
                       width: 36,
                       height: 36,
                       borderRadius: 18,
-                      backgroundColor: isDark ? 'rgba(108, 71, 255, 0.15)' : '#F2F3FE',
+                      backgroundColor: isDark
+                        ? 'rgba(108, 71, 255, 0.15)'
+                        : '#F2F3FE',
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
@@ -1168,10 +1401,9 @@ export default function PaymentScreen() {
                   <View>
                     <Text
                       style={{
-                        fontSize: 14,
-                        fontWeight: '700',
-                        color: theme.ink,
+                        fontSize: 14.5,
                         fontFamily: typography.family.sansBold,
+                        color: theme.ink,
                       }}
                     >
                       Choose payment method
@@ -1188,11 +1420,23 @@ export default function PaymentScreen() {
                     </Text>
                   </View>
                 </View>
-                <Feather name="chevron-right" size={18} color={theme.mute} />
+                <Feather name="chevron-right" size={16} color={theme.mute} />
               </View>
             ) : selectedMethod === 'jazzcash' ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 12,
+                  }}
+                >
                   <View
                     style={{
                       paddingHorizontal: 8,
@@ -1201,24 +1445,56 @@ export default function PaymentScreen() {
                       backgroundColor: '#ED1B24',
                     }}
                   >
-                    <Text style={{ fontSize: 11, fontWeight: '900', color: '#FFFFFF', letterSpacing: 0.3 }}>
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: '900',
+                        color: '#FFFFFF',
+                        letterSpacing: 0.3,
+                      }}
+                    >
                       JazzCash
                     </Text>
                   </View>
                   <View>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+                    <Text
+                      style={{
+                        fontSize: 14.5,
+                        fontFamily: typography.family.sansBold,
+                        color: theme.ink,
+                      }}
+                    >
                       JazzCash Mobile Account
                     </Text>
-                    <Text style={{ fontSize: 12.5, color: theme.mute, fontFamily: typography.family.sans, marginTop: 2 }}>
+                    <Text
+                      style={{
+                        fontSize: 12.5,
+                        color: theme.mute,
+                        fontFamily: typography.family.sans,
+                        marginTop: 2,
+                      }}
+                    >
                       {walletNumber || 'Mobile Account Linked'}
                     </Text>
                   </View>
                 </View>
-                <Feather name="chevron-right" size={18} color={theme.mute} />
+                <Feather name="chevron-right" size={16} color={theme.mute} />
               </View>
             ) : selectedMethod === 'easypaisa' ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 12,
+                  }}
+                >
                   <View
                     style={{
                       paddingHorizontal: 8,
@@ -1227,24 +1503,56 @@ export default function PaymentScreen() {
                       backgroundColor: '#00A859',
                     }}
                   >
-                    <Text style={{ fontSize: 11, fontWeight: '900', color: '#FFFFFF', letterSpacing: 0.3 }}>
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: '900',
+                        color: '#FFFFFF',
+                        letterSpacing: 0.3,
+                      }}
+                    >
                       easypaisa
                     </Text>
                   </View>
                   <View>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+                    <Text
+                      style={{
+                        fontSize: 14.5,
+                        fontFamily: typography.family.sansBold,
+                        color: theme.ink,
+                      }}
+                    >
                       Easypaisa Mobile Account
                     </Text>
-                    <Text style={{ fontSize: 12.5, color: theme.mute, fontFamily: typography.family.sans, marginTop: 2 }}>
+                    <Text
+                      style={{
+                        fontSize: 12.5,
+                        color: theme.mute,
+                        fontFamily: typography.family.sans,
+                        marginTop: 2,
+                      }}
+                    >
                       {walletNumber || 'Mobile Account Linked'}
                     </Text>
                   </View>
                 </View>
-                <Feather name="chevron-right" size={18} color={theme.mute} />
+                <Feather name="chevron-right" size={16} color={theme.mute} />
               </View>
             ) : selectedMethod === 'apple_pay' ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 10,
+                  }}
+                >
                   <View
                     style={{
                       flexDirection: 'row',
@@ -1256,23 +1564,52 @@ export default function PaymentScreen() {
                     }}
                   >
                     <Ionicons name="logo-apple" size={13} color="#FFFFFF" />
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFFFFF', marginLeft: 3 }}>Pay</Text>
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: '700',
+                        color: '#FFFFFF',
+                        marginLeft: 3,
+                      }}
+                    >
+                      Pay
+                    </Text>
                   </View>
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+                  <Text
+                    style={{
+                      fontSize: 14.5,
+                      fontFamily: typography.family.sansBold,
+                      color: theme.ink,
+                    }}
+                  >
                     Apple Pay
                   </Text>
                 </View>
-                <Feather name="chevron-right" size={18} color={theme.mute} />
+                <Feather name="chevron-right" size={16} color={theme.mute} />
               </View>
             ) : selectedMethod === 'cod' ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 12,
+                  }}
+                >
                   <View
                     style={{
                       width: 32,
                       height: 32,
                       borderRadius: 16,
-                      backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5',
+                      backgroundColor: isDark
+                        ? 'rgba(16, 185, 129, 0.15)'
+                        : '#ECFDF5',
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
@@ -1280,19 +1617,44 @@ export default function PaymentScreen() {
                     <Feather name="package" size={16} color="#10B981" />
                   </View>
                   <View>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+                    <Text
+                      style={{
+                        fontSize: 14.5,
+                        fontFamily: typography.family.sansBold,
+                        color: theme.ink,
+                      }}
+                    >
                       Cash on Delivery
                     </Text>
-                    <Text style={{ fontSize: 12, color: theme.mute, fontFamily: typography.family.sans, marginTop: 1 }}>
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        color: theme.mute,
+                        fontFamily: typography.family.sans,
+                        marginTop: 1,
+                      }}
+                    >
                       Pay cash to courier when delivered
                     </Text>
                   </View>
                 </View>
-                <Feather name="chevron-right" size={18} color={theme.mute} />
+                <Feather name="chevron-right" size={16} color={theme.mute} />
               </View>
             ) : (
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 10,
+                  }}
+                >
                   <View
                     style={{
                       paddingHorizontal: 6,
@@ -1303,15 +1665,28 @@ export default function PaymentScreen() {
                       borderColor: '#E0E0E0',
                     }}
                   >
-                    <Text style={{ fontSize: 10, fontWeight: '900', color: '#1A1F71', fontStyle: 'italic' }}>
+                    <Text
+                      style={{
+                        fontSize: 10,
+                        fontWeight: '900',
+                        color: '#1A1F71',
+                        fontStyle: 'italic',
+                      }}
+                    >
                       {(cardBrand ?? 'VISA').toUpperCase()}
                     </Text>
                   </View>
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
+                  <Text
+                    style={{
+                      fontSize: 14.5,
+                      fontFamily: typography.family.sansBold,
+                      color: theme.ink,
+                    }}
+                  >
                     {cardBrand || 'Card'} ending with {cardLast4}
                   </Text>
                 </View>
-                <Feather name="chevron-right" size={18} color={theme.mute} />
+                <Feather name="chevron-right" size={16} color={theme.mute} />
               </View>
             )}
           </Pressable>
@@ -1346,177 +1721,183 @@ export default function PaymentScreen() {
                       justifyContent: 'center',
                       marginTop: 1,
                     },
-                    saveCard && { backgroundColor: theme.purple, borderColor: theme.purple },
+                    saveCard && {
+                      backgroundColor: theme.purple,
+                      borderColor: theme.purple,
+                    },
                   ]}
                 >
-                  {saveCard && <Feather name="check" size={12} color="#FFFFFF" />}
+                  {saveCard && (
+                    <Feather name="check" size={12} color="#FFFFFF" />
+                  )}
                 </View>
                 <View style={{ flex: 1, marginLeft: 10 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: theme.ink, fontFamily: typography.family.sansSemibold }}>
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontFamily: typography.family.sansSemibold,
+                      color: theme.ink,
+                    }}
+                  >
                     Save card details for future payments
                   </Text>
-                  <Text style={{ fontSize: 11.5, color: theme.mute, fontFamily: typography.family.sans, marginTop: 2, lineHeight: 15 }}>
-                    You can remove the card anytime in Settings, under Payments.
+                  <Text
+                    style={{
+                      fontSize: 11.5,
+                      color: theme.mute,
+                      fontFamily: typography.family.sans,
+                      marginTop: 2,
+                      lineHeight: 15,
+                    }}
+                  >
+                    You can remove the card anytime in Settings.
                   </Text>
                 </View>
               </Pressable>
             </View>
           )}
-        </View>
+        </GroupCard>
 
-        {/* ── Card 5: Order Summary Breakdown ── */}
-        <View
-          style={{
-            backgroundColor: theme.surface,
-            borderRadius: 16,
-            borderWidth: 1,
-            borderColor: theme.border,
-            padding: 16,
-            marginBottom: 14,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 14,
-              fontWeight: '700',
-              color: theme.ink,
-              fontFamily: typography.family.sansBold,
-              marginBottom: 12,
-            }}
-          >
-            Order summary
-          </Text>
+        {/* ── Module 4: Order Summary (Mirroring Invoice Screen Architecture) ── */}
+        <SectionEyebrow title="Order Summary" icon="list" />
+        <GroupCard>
+          <KeyValueRow
+            label={
+              isBundle
+                ? `Subtotal (${allOrderItems.length} items)`
+                : offerAmount
+                  ? 'Offer price'
+                  : 'Order price'
+            }
+            value={formatPrice(
+              isBundle && !offerAmount ? bundleSubtotal : itemPrice,
+            )}
+          />
 
-          {/* Subtotal */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 5 }}>
-            <Text style={{ fontSize: 14, color: theme.mute, fontFamily: typography.family.sans }}>
-              {isBundle ? `Subtotal (${allOrderItems.length} items)` : offerAmount ? 'Offer price' : 'Order'}
-            </Text>
-            <Text style={{ fontSize: 14, color: theme.ink, fontFamily: typography.family.sansMedium }}>
-              {formatPrice(isBundle && !offerAmount ? bundleSubtotal : itemPrice)}
-            </Text>
-          </View>
+          {isBundle && !offerAmount && bundleSavings > 0 && (
+            <KeyValueRow
+              label={`Bundle discount (${bundleDiscountPct}%)`}
+              rightElement={
+                <Text
+                  style={[
+                    {
+                      fontSize: 14,
+                      color: theme.purple,
+                      fontFamily: typography.family.sansBold,
+                    },
+                    tabularNumberStyle,
+                  ]}
+                >
+                  − {formatPrice(bundleSavings)}
+                </Text>
+              }
+            />
+          )}
 
-          {/* Bundle Savings */}
-          {isBundle && !offerAmount && bundleSavings > 0 ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 5 }}>
-              <Text style={{ fontSize: 14, color: theme.purple, fontFamily: typography.family.sansBold }}>
-                Bundle discount ({bundleDiscountPct}%)
-              </Text>
-              <Text style={{ fontSize: 14, color: theme.purple, fontFamily: typography.family.sansBold }}>
-                − {formatPrice(bundleSavings)}
-              </Text>
-            </View>
-          ) : null}
+          <KeyValueRow
+            label="Buyer protection fee"
+            onPress={() => setBpSheetOpen(true)}
+            rightElement={
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <ShieldCheckIcon size={14} />
+                <Text
+                  style={[
+                    {
+                      fontSize: 14,
+                      color: theme.ink,
+                      fontFamily: typography.family.sansMedium,
+                    },
+                    tabularNumberStyle,
+                  ]}
+                >
+                  {bpFee > 0 ? formatPrice(bpFee) : 'Free'}
+                </Text>
+                <Feather name="info" size={13} color={theme.muteSoft} />
+              </View>
+            }
+          />
 
-          {/* Buyer Protection Fee */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 5 }}>
-            <Pressable
-              onPress={() => setBpSheetOpen(true)}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
-              hitSlop={6}
-            >
-              <ShieldCheckIcon size={14} />
-              <Text style={{ fontSize: 14, color: theme.mute, fontFamily: typography.family.sans }}>
-                Buyer protection fee
-              </Text>
-              <Feather name="info" size={13} color={theme.muteSoft} />
-            </Pressable>
-            <Text style={[{ fontSize: 14, color: theme.ink, fontFamily: typography.family.sansMedium }, bpFee === 0 && { color: '#10B981', fontWeight: '600' }]}>
-              {bpFee > 0 ? formatPrice(bpFee) : 'Free'}
-            </Text>
-          </View>
+          <KeyValueRow
+            label={`${BRAND} Delivery`}
+            value={deliveryFee > 0 ? formatPrice(deliveryFee) : 'Free'}
+          />
 
-          {/* Delivery Fee */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 5 }}>
-            <Text style={{ fontSize: 14, color: theme.mute, fontFamily: typography.family.sans }}>
-              {BRAND} Delivery
-            </Text>
-            <Text style={[{ fontSize: 14, color: theme.ink, fontFamily: typography.family.sansMedium }, deliveryFee === 0 && { color: '#10B981', fontWeight: '600' }]}>
-              {deliveryFee > 0 ? formatPrice(deliveryFee) : 'Free'}
-            </Text>
-          </View>
-
-          <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.border, marginVertical: 12 }} />
-
-          {/* Total */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: theme.ink, fontFamily: typography.family.sansBold }}>
-              Total to pay
-            </Text>
-            <Text style={{ fontSize: 18, fontWeight: '700', color: theme.purple, fontFamily: typography.family.sansBold }}>
-              {formatPrice(totalAmount)}
-            </Text>
-          </View>
-        </View>
-
-        {/* ── Card 6: Buyer Protection Trust Guarantee ── */}
-        <Pressable
-          onPress={() => setBpSheetOpen(true)}
-          style={({ pressed }) => [
-            {
-              backgroundColor: theme.surface,
-              borderRadius: 16,
-              borderWidth: 1,
-              borderColor: theme.border,
-              padding: 16,
-              marginBottom: 16,
-            },
-            pressed && { opacity: 0.8 },
-          ]}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <ShieldCheckIcon size={22} />
+          <KeyValueRow
+            label="Total to pay"
+            isLast
+            rightElement={
               <Text
-                style={{
-                  fontSize: 14.5,
-                  fontWeight: '700',
-                  color: theme.ink,
-                  fontFamily: typography.family.sansBold,
-                }}
+                style={[
+                  {
+                    fontSize: 16.5,
+                    fontFamily: typography.family.sansBold,
+                    color: theme.ink,
+                    letterSpacing: -0.3,
+                  },
+                  tabularNumberStyle,
+                ]}
               >
-                {BRAND} Buyer Protection
+                {formatPrice(totalAmount)}
               </Text>
+            }
+          />
+        </GroupCard>
+
+        {/* ── Module 5: Buyer Protection (Mirroring Invoice Screen Architecture) ── */}
+        <SectionEyebrow title="Buyer Protection" icon="shield" />
+        <GroupCard>
+          <Pressable
+            onPress={() => setBpSheetOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="View Buyer Protection details"
+            style={({ pressed }) => [
+              {
+                paddingHorizontal: 16,
+                paddingVertical: 14,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              },
+              pressed && { opacity: 0.8 },
+            ]}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, paddingRight: 8 }}>
+              <ShieldCheckIcon size={24} />
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    fontSize: 14.5,
+                    fontFamily: typography.family.sansBold,
+                    color: theme.ink,
+                  }}
+                >
+                  {BRAND} Buyer Protection
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: theme.mute,
+                    fontFamily: typography.family.sans,
+                    marginTop: 2,
+                    lineHeight: 16,
+                  }}
+                >
+                  48-hour inspection period · Full refund if item differs or doesn&apos;t arrive
+                </Text>
+              </View>
             </View>
             <Feather name="chevron-right" size={16} color={theme.mute} />
-          </View>
-
-          <View style={{ gap: 8 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
-              <Feather name="check" size={14} color={theme.purple} style={{ marginTop: 2 }} />
-              <Text style={{ fontSize: 12.5, color: theme.ink, fontFamily: typography.family.sans, flex: 1, lineHeight: 18 }}>
-                <Text style={{ fontFamily: typography.family.sansBold }}>Full Refund Guarantee: </Text>
-                Receive a full refund if the item doesn&apos;t arrive or differs from the description.
-              </Text>
-            </View>
-
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
-              <Feather name="lock" size={14} color={theme.purple} style={{ marginTop: 2 }} />
-              <Text style={{ fontSize: 12.5, color: theme.ink, fontFamily: typography.family.sans, flex: 1, lineHeight: 18 }}>
-                <Text style={{ fontFamily: typography.family.sansBold }}>Secure Escrow: </Text>
-                Your payment is held safely until you receive and inspect your package.
-              </Text>
-            </View>
-
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
-              <Feather name="clock" size={14} color={theme.purple} style={{ marginTop: 2 }} />
-              <Text style={{ fontSize: 12.5, color: theme.ink, fontFamily: typography.family.sans, flex: 1, lineHeight: 18 }}>
-                <Text style={{ fontFamily: typography.family.sansBold }}>48-Hour Inspection: </Text>
-                You have 2 days after delivery to review your item before funds reach the seller.
-              </Text>
-            </View>
-          </View>
-        </Pressable>
+          </Pressable>
+        </GroupCard>
       </ScrollView>
 
-      {/* ── Fixed Footer: Apple Floating Sticky Bar ── */}
+      {/* ── Fixed Footer Dock: Sticky Checkout Bar (One Primary CTA) ── */}
       <View
         style={{
           borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: theme.border,
-          backgroundColor: theme.surface,
-          paddingTop: 10,
+          backgroundColor: theme.panel,
+          paddingTop: 12,
           paddingBottom: Math.max(Platform.OS === 'ios' ? 14 : 16, insets.bottom),
         }}
       >
@@ -1528,13 +1909,6 @@ export default function PaymentScreen() {
             paddingHorizontal: 16,
           }}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 8, gap: 5 }}>
-            <Feather name="lock" size={12} color={theme.muteSoft} />
-            <Text style={{ fontSize: 11, color: theme.muteSoft, fontFamily: typography.family.sans }}>
-              Secure 256-bit encrypted checkout · Money-back guarantee
-            </Text>
-          </View>
-
           <View
             style={{
               flexDirection: 'row',
@@ -1544,50 +1918,121 @@ export default function PaymentScreen() {
             }}
           >
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 11.5, color: theme.mute, fontFamily: typography.family.sans }}>
+              <Text
+                style={{
+                  fontSize: 11.5,
+                  color: theme.mute,
+                  fontFamily: typography.family.sansMedium,
+                }}
+              >
                 Total to pay
               </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 1 }}>
-                <Text style={{ fontSize: 19, fontFamily: typography.family.sansBold, color: theme.ink, letterSpacing: -0.3 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  marginTop: 1,
+                }}
+              >
+                <Text
+                  style={[
+                    {
+                      fontSize: 19,
+                      fontFamily: typography.family.sansBold,
+                      color: theme.ink,
+                      letterSpacing: -0.3,
+                    },
+                    tabularNumberStyle,
+                  ]}
+                >
                   {formatPrice(totalAmount)}
                 </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                  <ShieldCheckIcon size={13} />
-                  <Text style={{ fontSize: 11, color: theme.mute, fontFamily: typography.family.sansMedium }}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 3,
+                    paddingHorizontal: 6,
+                    paddingVertical: 2,
+                    borderRadius: radii.pill,
+                    backgroundColor: isDark
+                      ? 'rgba(108, 71, 255, 0.16)'
+                      : '#F2F3FE',
+                  }}
+                >
+                  <ShieldCheckIcon size={12} />
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      color: isDark ? '#A5B4FC' : '#5356EE',
+                      fontFamily: typography.family.sansBold,
+                    }}
+                  >
                     Protected
                   </Text>
                 </View>
               </View>
             </View>
 
+            {/* Primary Checkout Button: 10px Solid Ink matching ProductActionBar */}
             <Pressable
               onPress={handlePay}
               disabled={paying || (isBundle && bundleFetchStatus !== 'success')}
+              accessibilityRole="button"
+              accessibilityLabel={`Buy now for ${formatPrice(totalAmount)}`}
               style={({ pressed }) => {
-                const isBlocked = paying || (isBundle && bundleFetchStatus !== 'success');
+                const isBlocked =
+                  paying || (isBundle && bundleFetchStatus !== 'success');
                 return [
                   {
                     height: 48,
                     minWidth: 160,
-                    paddingHorizontal: 22,
-                    backgroundColor: isBlocked && !paying ? (isDark ? '#374151' : '#D1D5DB') : theme.purple,
-                    borderRadius: radii.pill,
+                    paddingHorizontal: 24,
+                    backgroundColor:
+                      isBlocked && !paying
+                        ? isDark
+                          ? '#374151'
+                          : '#D1D5DB'
+                        : theme.ink,
+                    borderColor:
+                      isBlocked && !paying
+                        ? isDark
+                          ? '#374151'
+                          : '#D1D5DB'
+                        : theme.ink,
+                    borderWidth: 1,
+                    borderRadius: 10,
                     alignItems: 'center',
                     justifyContent: 'center',
                   },
-                  (pressed || paying) && !isBlocked && { opacity: 0.88, transform: [{ scale: 0.98 }] },
+                  (pressed || paying) &&
+                    !isBlocked && {
+                      opacity: 0.88,
+                      transform: [{ scale: 0.98 }],
+                    },
                 ];
               }}
             >
               {paying ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
-                <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF', fontFamily: typography.family.sansBold, letterSpacing: 0.2 }}>
+                <Text
+                  style={[
+                    {
+                      fontSize: 15,
+                      fontFamily: typography.family.sansBold,
+                      color: '#FFFFFF',
+                      letterSpacing: 0.2,
+                    },
+                    tabularNumberStyle,
+                  ]}
+                >
                   {isBundle && bundleFetchStatus === 'loading'
                     ? 'Loading bundle...'
                     : selectedMethod === 'cod'
                       ? 'Confirm Order'
-                      : 'Pay Now'}
+                      : 'Buy now'}
                 </Text>
               )}
             </Pressable>

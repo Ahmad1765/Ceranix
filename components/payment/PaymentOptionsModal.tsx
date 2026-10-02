@@ -152,13 +152,18 @@ export function PaymentOptionsModal({
               {
                 width: 36,
                 height: 36,
+                borderRadius: 18,
+                backgroundColor: theme.surface,
+                borderWidth: 1,
+                borderColor: theme.border,
                 alignItems: 'center',
                 justifyContent: 'center',
+                opacity: pressed ? 0.75 : 1,
+                transform: [{ scale: pressed ? 0.96 : 1 }],
               },
-              pressed && { opacity: 0.5 },
             ]}
           >
-            <Feather name="x" size={22} color={theme.ink} />
+            <Feather name="x" size={18} color={theme.ink} />
           </Pressable>
           <Text
             style={{
@@ -173,7 +178,7 @@ export function PaymentOptionsModal({
           <View style={{ width: 36 }} />
         </View>
 
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView
             style={{ flex: 1 }}
             contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 30 }}
@@ -307,7 +312,7 @@ export function PaymentOptionsModal({
                     borderColor: theme.border,
                     borderRadius: 6,
                     paddingHorizontal: 10,
-                    fontSize: 13.5,
+                    fontSize: Platform.OS === 'web' ? 16 : 14,
                     color: theme.ink,
                     fontFamily: typography.family.sansMedium,
                   }}
@@ -335,7 +340,7 @@ export function PaymentOptionsModal({
                       borderColor: theme.border,
                       borderRadius: 6,
                       paddingHorizontal: 10,
-                      fontSize: 13.5,
+                      fontSize: Platform.OS === 'web' ? 16 : 14,
                       color: theme.ink,
                       fontFamily: typography.family.sansMedium,
                     },
@@ -373,7 +378,7 @@ export function PaymentOptionsModal({
                         borderColor: theme.border,
                         borderRadius: 6,
                         paddingHorizontal: 10,
-                        fontSize: 13.5,
+                        fontSize: Platform.OS === 'web' ? 16 : 14,
                         color: theme.ink,
                         fontFamily: typography.family.sansMedium,
                       }}
@@ -398,7 +403,7 @@ export function PaymentOptionsModal({
                         borderColor: theme.border,
                         borderRadius: 6,
                         paddingHorizontal: 10,
-                        fontSize: 13.5,
+                        fontSize: Platform.OS === 'web' ? 16 : 14,
                         color: theme.ink,
                         fontFamily: typography.family.sansMedium,
                       }}
@@ -541,7 +546,7 @@ export function PaymentOptionsModal({
                       borderColor: theme.border,
                       borderRadius: 6,
                       paddingHorizontal: 10,
-                      fontSize: 13.5,
+                      fontSize: Platform.OS === 'web' ? 16 : 14,
                       color: theme.ink,
                       fontFamily: typography.family.sansMedium,
                     },
@@ -659,7 +664,7 @@ export function PaymentOptionsModal({
                       borderColor: theme.border,
                       borderRadius: 6,
                       paddingHorizontal: 10,
-                      fontSize: 13.5,
+                      fontSize: Platform.OS === 'web' ? 16 : 14,
                       color: theme.ink,
                       fontFamily: typography.family.sansMedium,
                     },
