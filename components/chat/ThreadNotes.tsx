@@ -10,13 +10,13 @@ import { dayLabel } from './format';
 export function DateDivider({ iso }: { iso: string }) {
   const { theme } = useTheme();
   return (
-    <View style={{ alignItems: 'center', marginTop: 18, marginBottom: 6 }}>
+    <View style={{ alignItems: 'center', marginTop: 20, marginBottom: 10 }}>
       <Text
         style={{
-          fontFamily: typography.family.sansBold,
-          fontSize: 11,
-          letterSpacing: 0.4,
-          color: theme.muteSoft,
+          fontFamily: typography.family.sansMedium,
+          fontSize: 13.5,
+          color: theme.ink,
+          opacity: 0.85,
         }}
       >
         {dayLabel(iso)}

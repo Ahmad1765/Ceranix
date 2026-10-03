@@ -41,13 +41,17 @@ let upTo2Fmt: Formatter | null = null;
 // fractional asking price has to add up against the total shown beneath it.
 export function formatPrice(
   amount: number | string | null | undefined,
-  opts?: { whole?: boolean },
+  opts?: { whole?: boolean; forceDecimals?: boolean },
 ): string {
   const n = typeof amount === 'string' ? parseFloat(amount) : Number(amount);
   if (!Number.isFinite(n)) return `${CURRENCY_SYMBOL} 0`;
   if (opts?.whole) {
     plainFmt ??= makeFormatter();
     return `${CURRENCY_SYMBOL} ${plainFmt.format(Math.round(n))}`;
+  }
+  if (opts?.forceDecimals) {
+    fixed2Fmt ??= makeFormatter({ minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return `${CURRENCY_SYMBOL} ${fixed2Fmt.format(n)}`;
   }
   const hasFraction = Math.round(n * 100) % 100 !== 0;
   let fmt: Formatter;

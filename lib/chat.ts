@@ -28,6 +28,8 @@ export interface ChatMessage {
     payment_status?: string;
     paid?: boolean;
     is_bundle?: boolean;
+    is_special_offer?: boolean;
+    actionable?: boolean;
     base_listing_id?: string;
     bundle_item_ids?: string[];
     bundle_count?: number;

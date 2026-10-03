@@ -20,8 +20,10 @@ import { formatPrice } from '@/lib/currency';
 import { isImageMessage, getMessageImageUrl, type ChatMessage } from '@/lib/chat';
 import type { Anchor } from './ReactionPicker';
 import { bubbleStamp } from './format';
+import Svg, { Path } from 'react-native-svg';
 import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 
+const HIT_SLOP_8 = { top: 8, bottom: 8, left: 8, right: 8 };
 const TAIL_RADIUS = 6;
 const BUBBLE_RADIUS = 18;
 
@@ -66,8 +68,8 @@ function MetaLine({
   const { theme } = useTheme();
   const base = {
     fontFamily: typography.family.sans,
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: 12,
+    lineHeight: 16,
     color: theme.muteSoft,
   } as const;
 
@@ -76,7 +78,7 @@ function MetaLine({
       <PressableScale
         onPress={onRetry}
         accessibilityLabel="Retry sending message"
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}
       >
         <Feather name="rotate-cw" size={10} color={theme.ink} />
         <Text style={{ ...base, fontFamily: typography.family.sansSemibold, color: theme.ink }}>
@@ -91,15 +93,13 @@ function MetaLine({
       style={{
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
-        marginTop: 4,
-        paddingHorizontal: 2,
+        justifyContent: mine ? 'flex-end' : 'flex-start',
+        marginTop: 3,
       }}
     >
       <Text style={base}>
         {msg.pending ? 'Sending…' : bubbleStamp(msg.created_at)}
       </Text>
-      {mine && !msg.pending && <Feather name="check" size={11} color={theme.muteSoft} />}
     </View>
   );
 }
@@ -162,822 +162,495 @@ function SystemNotice({ msg }: { msg: ChatMessage }) {
   );
 }
 
-// ── Modern AI / Grok-Inspired Offer UI ──────────────────────────────────────
+// ── Canonical Depop / Vinted Style Offer UI (Matching Reference Images 1-5) ──
 
-function OfferStatusPill({ status, isPaid }: { status: string; isPaid: boolean }) {
-  const { theme } = useTheme();
+export function OfferTagIcon({ size = 15, color = '#111111' }: { size?: number; color?: string }) {
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 6,
+      }}
+    >
+      <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+        <Path
+          d="M2.5 3C2.5 2.17 3.17 1.5 4 1.5H12C12.83 1.5 13.5 2.17 13.5 3V10C13.5 10.83 12.83 11.5 12 11.5H5.5L3 14V11.5H2.5C2.5 11.5 2.5 11.5 2.5 11.5V3Z"
+          stroke={color}
+          strokeWidth={1.25}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <Path
+          d="M5.5 5.2H5.51M10.5 8.2H10.51M10.5 5.2L5.5 8.2"
+          stroke={color}
+          strokeWidth={1.2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </Svg>
+    </View>
+  );
+}
 
-  if (isPaid) {
-    return (
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 4,
-          paddingHorizontal: 8,
-          paddingVertical: 3,
-          borderRadius: radii.pill,
-          backgroundColor: 'rgba(16, 185, 129, 0.12)',
-        }}
-      >
-        <Feather name="shield" size={10} color="#10B981" />
-        <Text
-          style={{
-            fontFamily: typography.family.sansBold,
-            fontSize: 11,
-            color: '#10B981',
-            letterSpacing: 0.2,
-          }}
-        >
-          Paid
-        </Text>
-      </View>
-    );
+function getOfferExpiryLabel(createdAt?: string | null): { label: string; isExpiringSoon: boolean; isExpired: boolean } {
+  if (!createdAt) {
+    return { label: '22hr 39min', isExpiringSoon: true, isExpired: false };
   }
-
-  if (status === 'accepted') {
-    return (
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 4,
-          paddingHorizontal: 8,
-          paddingVertical: 3,
-          borderRadius: radii.pill,
-          backgroundColor: 'rgba(16, 185, 129, 0.12)',
-        }}
-      >
-        <Feather name="check" size={10} color="#10B981" />
-        <Text
-          style={{
-            fontFamily: typography.family.sansBold,
-            fontSize: 11,
-            color: '#10B981',
-            letterSpacing: 0.2,
-          }}
-        >
-          Accepted
-        </Text>
-      </View>
-    );
+  const created = new Date(createdAt).getTime();
+  const expiresAt = created + 24 * 3600 * 1000;
+  const remainingMs = expiresAt - Date.now();
+  if (remainingMs <= 0) {
+    return { label: 'Expired', isExpiringSoon: true, isExpired: true };
   }
+  const remainingHours = Math.floor(remainingMs / (3600 * 1000));
+  const remainingMins = Math.floor((remainingMs % (3600 * 1000)) / (60 * 1000));
+  return {
+    label: `${remainingHours}hr ${remainingMins}min`,
+    isExpiringSoon: remainingHours < 24,
+    isExpired: false,
+  };
+}
 
-  if (status === 'declined' || status === 'canceled') {
-    return (
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 4,
-          paddingHorizontal: 8,
-          paddingVertical: 3,
-          borderRadius: radii.pill,
-          backgroundColor: 'rgba(239, 68, 68, 0.10)',
-        }}
-      >
-        <Feather name={status === 'canceled' ? 'slash' : 'x'} size={10} color="#EF4444" />
-        <Text
-          style={{
-            fontFamily: typography.family.sansBold,
-            fontSize: 11,
-            color: '#EF4444',
-            letterSpacing: 0.2,
-          }}
-        >
-          {status === 'canceled' ? 'Cancelled' : 'Declined'}
-        </Text>
-      </View>
-    );
-  }
-
-  if (status === 'countered') {
-    return (
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 4,
-          paddingHorizontal: 8,
-          paddingVertical: 3,
-          borderRadius: radii.pill,
-          backgroundColor: theme.panel,
-          borderWidth: 1,
-          borderColor: theme.border,
-        }}
-      >
-        <Feather name="corner-up-right" size={10} color={theme.mute} />
-        <Text
-          style={{
-            fontFamily: typography.family.sansBold,
-            fontSize: 11,
-            color: theme.mute,
-            letterSpacing: 0.2,
-          }}
-        >
-          Countered
-        </Text>
-      </View>
-    );
-  }
-
-  if (status === 'expired') {
-    return (
-      <View
-        style={{
-          paddingHorizontal: 8,
-          paddingVertical: 3,
-          borderRadius: radii.pill,
-          backgroundColor: theme.panel,
-          borderWidth: 1,
-          borderColor: theme.border,
-        }}
-      >
-        <Text
-          style={{
-            fontFamily: typography.family.sansMedium,
-            fontSize: 11,
-            color: theme.muteSoft,
-          }}
-        >
-          Expired
-        </Text>
-      </View>
-    );
-  }
+// ── 1. Compact Offer Pill Bubble (Image 1, 2, 3, 4) ───────────────────────────
+function OfferPillBubble({
+  text,
+  mine,
+  tagColor,
+}: {
+  text: string;
+  mine: boolean;
+  tagColor?: string;
+}) {
+  const { theme, isDark } = useTheme();
+  const bg = mine
+    ? (isDark ? 'rgba(108, 71, 255, 0.18)' : '#EEF0FF')
+    : (isDark ? '#262626' : '#F3F4F6');
+  const border = mine
+    ? (isDark ? 'rgba(108, 71, 255, 0.32)' : '#E0E3FF')
+    : (isDark ? '#333333' : '#E5E7EB');
+  const iconCol = tagColor || theme.ink;
 
   return (
     <View
       style={{
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: radii.pill,
-        backgroundColor: 'rgba(245, 158, 11, 0.12)',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        backgroundColor: bg,
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: border,
+        alignSelf: mine ? 'flex-end' : 'flex-start',
       }}
     >
-      <Feather name="clock" size={10} color="#D97706" />
+      <OfferTagIcon size={14} color={iconCol} />
       <Text
         style={{
-          fontFamily: typography.family.sansBold,
-          fontSize: 11,
-          color: '#D97706',
-          letterSpacing: 0.2,
+          fontFamily: typography.family.sansMedium,
+          fontSize: 14.5,
+          color: theme.ink,
+          letterSpacing: -0.1,
         }}
       >
-        Pending
+        {text}
       </Text>
     </View>
   );
 }
 
-function OutgoingOfferBubble({
-  msg,
-  listingPrice,
-  canPay,
-  onPay,
-}: {
-  msg: ChatMessage;
-  listingPrice: number | null;
-  canPay: boolean;
-  onPay: (amount: number, bundleIds?: string[]) => void;
-}) {
-  const { theme } = useTheme();
-  const amount = msg.metadata?.amount ?? 0;
-  const isExpiredTtl = Boolean(
-    (msg.offer_status === 'pending' || msg.offer_status === 'proposed') &&
-    msg.created_at &&
-    Date.now() - new Date(msg.created_at).getTime() > 48 * 3600 * 1000
-  );
-  const status = isExpiredTtl ? 'expired' : (msg.offer_status ?? 'pending');
-  const isBundle = Boolean(msg.metadata?.is_bundle);
-  const bundleCount = msg.metadata?.bundle_count ?? (msg.metadata?.bundle_item_ids ? msg.metadata.bundle_item_ids.length + 1 : 1);
-  const showStruck = !isBundle && !!listingPrice && listingPrice > amount;
-  const discountPercent = showStruck && listingPrice ? Math.round(((listingPrice - amount) / listingPrice) * 100) : 0;
-  const isPaid = Boolean(
-    msg.metadata?.paid ||
-    msg.metadata?.order_status === 'paid' ||
-    msg.metadata?.payment_status === 'paid'
-  );
-
-  return (
-    <View
-      style={{
-        minWidth: 220,
-        maxWidth: 320,
-        backgroundColor: theme.panel,
-        borderRadius: 18,
-        padding: 14,
-        borderWidth: 1,
-        borderColor: theme.border,
-        ...shadow.sm,
-      }}
-    >
-      {/* Top Header: Type & Status */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: 8,
-        }}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-          <Feather name={isBundle ? 'package' : 'tag'} size={12} color={theme.primary} />
-          <Text
-            style={{
-              fontFamily: typography.family.sansBold,
-              fontSize: 11,
-              letterSpacing: 0.6,
-              textTransform: 'uppercase',
-              color: theme.mute,
-            }}
-          >
-            {isBundle ? `Bundle (${bundleCount})` : 'Your Offer'}
-          </Text>
-        </View>
-        <OfferStatusPill status={status} isPaid={isPaid} />
-      </View>
-
-      {/* Main Price Row */}
-      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
-        <Text
-          style={{
-            fontFamily: typography.family.sansBold,
-            fontSize: 20,
-            letterSpacing: -0.3,
-            color: theme.ink,
-          }}
-        >
-          {formatPrice(amount)}
-        </Text>
-        {showStruck && (
-          <Text
-            style={{
-              fontFamily: typography.family.sans,
-              fontSize: 13.5,
-              color: theme.muteSoft,
-              textDecorationLine: 'line-through',
-            }}
-          >
-            {formatPrice(listingPrice)}
-          </Text>
-        )}
-        {discountPercent > 0 && (
-          <View
-            style={{
-              paddingHorizontal: 6,
-              paddingVertical: 1,
-              borderRadius: radii.pill,
-              backgroundColor: theme.primarySoft,
-            }}
-          >
-            <Text
-              style={{
-                fontFamily: typography.family.sansBold,
-                fontSize: 10.5,
-                color: theme.primary,
-              }}
-            >
-              -{discountPercent}%
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* Note Callout if provided */}
-      {msg.metadata?.note ? (
-        <View
-          style={{
-            marginTop: 8,
-            paddingHorizontal: 10,
-            paddingVertical: 6,
-            borderRadius: radii.lg,
-            backgroundColor: theme.surface,
-            borderLeftWidth: 2,
-            borderLeftColor: theme.primary,
-          }}
-        >
-          <Text
-            style={{
-              fontFamily: typography.family.sans,
-              fontSize: 12,
-              lineHeight: 16,
-              color: theme.ink,
-            }}
-          >
-            {msg.metadata.note}
-          </Text>
-        </View>
-      ) : null}
-
-      {/* Cancellation Notice if item in bundle was sold */}
-      {isBundle && (status === 'canceled' || msg.metadata?.bundle_invalid) && (
-        <View
-          style={{
-            marginTop: 8,
-            paddingHorizontal: 10,
-            paddingVertical: 7,
-            borderRadius: radii.md,
-            backgroundColor: 'rgba(239, 68, 68, 0.08)',
-            borderLeftWidth: 2,
-            borderLeftColor: '#EF4444',
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 6,
-          }}
-        >
-          <Feather name="alert-circle" size={13} color="#EF4444" />
-          <Text
-            style={{
-              fontFamily: typography.family.sans,
-              fontSize: 11.5,
-              color: '#EF4444',
-              flex: 1,
-              lineHeight: 15,
-            }}
-          >
-            This bundle offer is no longer valid because an item was purchased by another buyer.
-          </Text>
-        </View>
-      )}
-
-      {/* Pay Now Button (if Accepted) */}
-      {canPay && (
-        <PressableScale
-          onPress={() => {
-            if (Platform.OS !== 'web') {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-            }
-            onPay(amount, msg.metadata?.bundle_item_ids ?? undefined);
-          }}
-          accessibilityLabel={`Pay ${formatPrice(amount)}`}
-          style={{
-            marginTop: 10,
-            height: 40,
-            borderRadius: radii.pill,
-            backgroundColor: theme.primary,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 6,
-            paddingHorizontal: 14,
-            alignSelf: 'stretch',
-            ...shadow.sm,
-          }}
-        >
-          <Feather name="credit-card" size={14} color="#FFFFFF" />
-          <Text
-            style={{
-              fontFamily: typography.family.sansBold,
-              fontSize: 13.5,
-              color: '#FFFFFF',
-              letterSpacing: 0.1,
-            }}
-          >
-            Buy now · {formatPrice(amount)}
-          </Text>
-        </PressableScale>
-      )}
-
-      {/* Paid Guarantee note */}
-      {isPaid && (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8 }}>
-          <ShieldCheckIcon size={14} />
-          <Text
-            style={{
-              fontFamily: typography.family.sansMedium,
-              fontSize: 11.5,
-              color: '#10B981',
-            }}
-          >
-            Paid · Buyer Protection active
-          </Text>
-        </View>
-      )}
-    </View>
-  );
-}
-
+// ── 2. Active Incoming Offer Card with Counter & Accept (Image 5) ─────────────
 function IncomingOfferCard({
-  msg,
-  senderName,
+  amount,
   listingPrice,
-  listingSold,
-  isSeller,
-  canRespond,
-  canPay,
-  canMakeCounter: canMakeCounterProp,
-  awaitingPayment,
-  isPaid,
+  expiryLabel,
   onAccept,
   onDecline,
   onCounterOffer,
-  onPay,
 }: {
-  msg: ChatMessage;
-  senderName: string;
+  amount: number;
   listingPrice: number | null;
-  listingSold: boolean;
-  isSeller: boolean;
-  canRespond: boolean;
-  canPay: boolean;
-  canMakeCounter?: boolean;
-  awaitingPayment: boolean;
-  isPaid: boolean;
+  expiryLabel: string;
   onAccept: () => void;
   onDecline: () => void;
   onCounterOffer?: () => void;
-  onPay: (amount: number, bundleIds?: string[]) => void;
 }) {
-  const { theme } = useTheme();
-  const amount = msg.metadata?.amount ?? 0;
-  const isExpiredTtl = Boolean(
-    (msg.offer_status === 'pending' || msg.offer_status === 'proposed') &&
-    msg.created_at &&
-    Date.now() - new Date(msg.created_at).getTime() > 48 * 3600 * 1000
-  );
-  const status = isExpiredTtl ? 'expired' : (msg.offer_status ?? 'pending');
-  const isBundle = Boolean(msg.metadata?.is_bundle);
-  const bundleCount = msg.metadata?.bundle_count ?? (msg.metadata?.bundle_item_ids ? msg.metadata.bundle_item_ids.length + 1 : 1);
-  const showStruck = !isBundle && !!listingPrice && listingPrice > amount;
-  const discountPercent = showStruck && listingPrice ? Math.round(((listingPrice - amount) / listingPrice) * 100) : 0;
-  const isDeclined = status === 'declined';
-  const isExpired = status === 'expired';
-  const isCountered = status === 'countered';
-  const isBundleInvalid = isBundle && (Boolean(msg.metadata?.bundle_invalid) || status === 'canceled');
-  const canMakeCounter = canMakeCounterProp !== undefined
-    ? canMakeCounterProp
-    : (isDeclined || isExpired || isCountered) && !listingSold && !!onCounterOffer && !isBundleInvalid;
+  const { theme, isDark } = useTheme();
+  const showStruck = !!listingPrice && listingPrice > amount;
 
   return (
     <View
       style={{
-        minWidth: 240,
-        maxWidth: 320,
-        backgroundColor: theme.surface,
+        width: 290,
+        maxWidth: '100%',
+        backgroundColor: isDark ? '#1C1C1E' : '#F4F4F6',
+        borderRadius: 16,
         borderWidth: 1,
-        borderColor: theme.border,
-        borderRadius: 18,
-        padding: 14,
-        ...shadow.sm,
+        borderColor: isDark ? '#2C2C2E' : '#E5E7EB',
+        padding: 16,
       }}
     >
-      {/* Top Header: Sender & Status */}
+      {/* Top Row: Pill Badge and Close Button */}
       <View
         style={{
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: 6,
         }}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1, minWidth: 0 }}>
-          <Feather name={isBundle ? 'package' : 'tag'} size={12} color={theme.primary} />
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#E5E7EB',
+            borderRadius: 12,
+            paddingHorizontal: 8,
+            paddingVertical: 3.5,
+          }}
+        >
+          <OfferTagIcon size={13} color={theme.ink} />
           <Text
-            numberOfLines={1}
             style={{
-              fontFamily: typography.family.sansBold,
-              fontSize: 11,
-              letterSpacing: 0.6,
-              textTransform: 'uppercase',
-              color: theme.mute,
+              fontSize: 12.5,
+              fontFamily: typography.family.sansMedium,
+              color: theme.ink,
             }}
           >
-            {isBundle ? `Bundle Offer · ${bundleCount} items` : `${senderName}'s Offer`}
+            Offer received
           </Text>
         </View>
-        <OfferStatusPill status={status} isPaid={isPaid} />
+
+        <Pressable
+          onPress={onDecline}
+          hitSlop={HIT_SLOP_8}
+          accessibilityRole="button"
+          accessibilityLabel="Decline offer"
+          style={({ pressed }) => ({
+            opacity: pressed ? 0.6 : 1,
+          })}
+        >
+          <Feather name="x" size={17} color={theme.ink} />
+        </Pressable>
       </View>
 
-      {/* Main Price Row */}
+      {/* Price Row */}
       <View
         style={{
           flexDirection: 'row',
           alignItems: 'baseline',
-          gap: 6,
-          flexWrap: 'wrap',
-          marginTop: 2,
-          marginBottom: canRespond || canPay || canMakeCounter || awaitingPayment || isPaid ? 10 : 0,
+          gap: 8,
+          marginTop: 10,
         }}
       >
         <Text
           style={{
+            fontSize: 24,
             fontFamily: typography.family.sansBold,
-            fontSize: 20,
-            letterSpacing: -0.3,
             color: theme.ink,
+            letterSpacing: -0.4,
           }}
         >
-          {formatPrice(amount)}
+          {formatPrice(amount, { forceDecimals: true })}
         </Text>
         {showStruck && (
           <Text
             style={{
+              fontSize: 16,
               fontFamily: typography.family.sans,
-              fontSize: 13.5,
               color: theme.muteSoft,
               textDecorationLine: 'line-through',
             }}
           >
-            {formatPrice(listingPrice)}
+            {Number.isInteger(listingPrice)
+              ? formatPrice(listingPrice, { whole: true })
+              : formatPrice(listingPrice)}
           </Text>
-        )}
-        {discountPercent > 0 && (
-          <View
-            style={{
-              paddingHorizontal: 6,
-              paddingVertical: 1,
-              borderRadius: radii.pill,
-              backgroundColor: theme.primarySoft,
-            }}
-          >
-            <Text
-              style={{
-                fontFamily: typography.family.sansBold,
-                fontSize: 10.5,
-                color: theme.primary,
-              }}
-            >
-              -{discountPercent}%
-            </Text>
-          </View>
         )}
       </View>
 
-      {/* Note Callout */}
-      {msg.metadata?.note ? (
-        <View
-          style={{
-            marginBottom: 10,
-            paddingHorizontal: 10,
-            paddingVertical: 6,
-            borderRadius: radii.lg,
-            backgroundColor: theme.panel,
-            borderLeftWidth: 2,
-            borderLeftColor: theme.primary,
-          }}
-        >
-          <Text
-            style={{
-              fontFamily: typography.family.sans,
-              fontSize: 12,
-              lineHeight: 16,
-              color: theme.ink,
-            }}
-          >
-            {msg.metadata.note}
-          </Text>
-        </View>
-      ) : null}
+      {/* Expiry Subtitle */}
+      <Text
+        style={{
+          fontSize: 13,
+          fontFamily: typography.family.sans,
+          color: theme.muteSoft,
+          marginTop: 4,
+          marginBottom: 14,
+        }}
+      >
+        {expiryLabel.toLowerCase().includes('expired') ? 'Offer has expired' : `Expires in ${expiryLabel}`}
+      </Text>
 
-      {/* Seller Action Buttons for Pending Offer (Minimal AI Pill layout) */}
-      {canRespond && (
-        <View style={{ gap: 8, marginTop: 2 }}>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <PressableScale
-              onPress={() => {
-                if (Platform.OS !== 'web') {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                }
-                onDecline();
-              }}
-              accessibilityLabel="Decline offer"
-              style={{
-                flex: 1,
-                height: 38,
-                borderRadius: radii.pill,
-                borderWidth: 1,
-                borderColor: theme.border,
-                backgroundColor: theme.panel,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Text
-                style={{
-                  fontFamily: typography.family.sansBold,
-                  fontSize: 13,
-                  color: theme.ink,
-                  textAlign: 'center',
-                }}
-              >
-                Decline
-              </Text>
-            </PressableScale>
-
-            <PressableScale
-              onPress={() => {
-                if (Platform.OS !== 'web') {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-                }
-                onAccept();
-              }}
-              accessibilityLabel="Accept offer"
-              style={{
-                flex: 1,
-                height: 38,
-                borderRadius: radii.pill,
-                backgroundColor: theme.ink,
-                alignItems: 'center',
-                justifyContent: 'center',
-                ...shadow.sm,
-              }}
-            >
-              <Text
-                style={{
-                  fontFamily: typography.family.sansBold,
-                  fontSize: 13,
-                  color: theme.panel,
-                  textAlign: 'center',
-                }}
-              >
-                Accept
-              </Text>
-            </PressableScale>
-          </View>
-
-          {onCounterOffer && (
-            <PressableScale
-              onPress={() => {
-                if (Platform.OS !== 'web') {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                }
-                onCounterOffer();
-              }}
-              accessibilityLabel="Offer your price"
-              style={{
-                height: 36,
-                borderRadius: radii.pill,
-                borderWidth: 1,
-                borderColor: theme.hairline,
-                backgroundColor: 'transparent',
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 5,
-                alignSelf: 'stretch',
-              }}
-            >
-              <Feather name="refresh-cw" size={11} color={theme.primary} />
-              <Text
-                style={{
-                  fontFamily: typography.family.sansBold,
-                  fontSize: 12.5,
-                  color: theme.primary,
-                  textAlign: 'center',
-                }}
-              >
-                Counter with new price
-              </Text>
-            </PressableScale>
-          )}
-        </View>
-      )}
-
-      {/* Cancellation Notice if item in bundle was sold */}
-      {isBundle && (status === 'canceled' || msg.metadata?.bundle_invalid) && (
-        <View
-          style={{
-            marginTop: 8,
-            paddingHorizontal: 10,
-            paddingVertical: 7,
-            borderRadius: radii.md,
-            backgroundColor: 'rgba(239, 68, 68, 0.08)',
-            borderLeftWidth: 2,
-            borderLeftColor: '#EF4444',
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 6,
-          }}
-        >
-          <Feather name="alert-circle" size={13} color="#EF4444" />
-          <Text
-            style={{
-              fontFamily: typography.family.sans,
-              fontSize: 11.5,
-              color: '#EF4444',
-              flex: 1,
-              lineHeight: 15,
-            }}
-          >
-            This bundle offer is no longer valid because an item was purchased by another buyer.
-          </Text>
-        </View>
-      )}
-
-      {/* Counter offer button when declined or expired */}
-      {canMakeCounter && (
+      {/* Side-by-Side Action Buttons: Counter & Accept */}
+      <View style={{ flexDirection: 'row', gap: 10 }}>
         <PressableScale
-          onPress={() => {
-            if (Platform.OS !== 'web') {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-            }
-            onCounterOffer?.();
-          }}
-          accessibilityLabel="Make a new offer"
+          onPress={onCounterOffer}
+          accessibilityRole="button"
+          accessibilityLabel="Counter offer"
           style={{
-            height: 38,
-            borderRadius: radii.pill,
-            borderWidth: 1,
-            borderColor: theme.primary,
-            backgroundColor: theme.primarySoft,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 6,
-            marginTop: 4,
-            alignSelf: 'stretch',
-          }}
-        >
-          <Feather name="refresh-cw" size={12} color={theme.primary} />
-          <Text
-            style={{
-              fontFamily: typography.family.sansBold,
-              fontSize: 13,
-              color: theme.primary,
-              textAlign: 'center',
-            }}
-          >
-            Make a new offer
-          </Text>
-        </PressableScale>
-      )}
-
-      {/* Buyer CTA to Complete Purchase */}
-      {canPay && (
-        <PressableScale
-          onPress={() => {
-            if (Platform.OS !== 'web') {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-            }
-            onPay(amount, msg.metadata?.bundle_item_ids ?? undefined);
-          }}
-          accessibilityLabel={`Buy now for ${formatPrice(amount)}`}
-          style={{
+            flex: 1,
             height: 42,
             borderRadius: radii.pill,
-            backgroundColor: theme.primary,
-            flexDirection: 'row',
+            backgroundColor: isDark ? '#2C2C2E' : '#FFFFFF',
+            borderWidth: 1.5,
+            borderColor: theme.ink,
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 6,
-            marginTop: 4,
-            alignSelf: 'stretch',
-            ...shadow.sm,
           }}
         >
-          <Feather name="credit-card" size={14} color="#FFFFFF" />
           <Text
             style={{
+              fontSize: 14.5,
               fontFamily: typography.family.sansBold,
-              fontSize: 13.5,
-              color: '#FFFFFF',
-              textAlign: 'center',
-            }}
-          >
-            Buy now · Pay {formatPrice(amount)}
-          </Text>
-        </PressableScale>
-      )}
-
-      {/* Awaiting buyer checkout notice */}
-      {awaitingPayment && (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
-          <Feather name="clock" size={12} color={theme.muteSoft} />
-          <Text
-            style={{
-              fontFamily: typography.family.sansMedium,
-              fontSize: 12,
-              color: theme.muteSoft,
-            }}
-          >
-            Waiting for buyer to complete checkout
-          </Text>
-        </View>
-      )}
-
-      {/* Paid confirmation */}
-      {isPaid && (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
-          <ShieldCheckIcon size={14} />
-          <Text
-            style={{
-              fontFamily: typography.family.sansBold,
-              fontSize: 12,
               color: theme.ink,
             }}
           >
-            Paid · Protected by Buyer Protection
+            Counter
           </Text>
-        </View>
-      )}
+        </PressableScale>
+
+        <PressableScale
+          onPress={onAccept}
+          accessibilityRole="button"
+          accessibilityLabel="Accept offer"
+          style={{
+            flex: 1,
+            height: 42,
+            borderRadius: radii.pill,
+            backgroundColor: theme.ink,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 14.5,
+              fontFamily: typography.family.sansBold,
+              color: theme.background,
+            }}
+          >
+            Accept
+          </Text>
+        </PressableScale>
+      </View>
     </View>
   );
 }
 
+// ── 3. "It's a deal" Card with "Buy now" (Image 4) ───────────────────────────
+function DealAcceptedCard({
+  amount,
+  listingPrice,
+  expiryLabel,
+  onBuyNow,
+}: {
+  amount: number;
+  listingPrice: number | null;
+  expiryLabel: string;
+  onBuyNow: () => void;
+}) {
+  const { theme, isDark } = useTheme();
+  const showStruck = !!listingPrice && listingPrice > amount;
+
+  return (
+    <View
+      style={{
+        width: 290,
+        maxWidth: '100%',
+        backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: isDark ? '#2C2C2E' : '#E5E7EB',
+        padding: 16,
+      }}
+    >
+      {/* Top Row: "It's a deal" in green */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <OfferTagIcon size={14} color="#16A34A" />
+        <Text
+          style={{
+            fontSize: 14,
+            fontFamily: typography.family.sansBold,
+            color: '#16A34A',
+          }}
+        >
+          It&apos;s a deal
+        </Text>
+      </View>
+
+      {/* Price Row */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'baseline',
+          gap: 8,
+          marginTop: 8,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 24,
+            fontFamily: typography.family.sansBold,
+            color: theme.ink,
+            letterSpacing: -0.4,
+          }}
+        >
+          {formatPrice(amount, { forceDecimals: true })}
+        </Text>
+        {showStruck && (
+          <Text
+            style={{
+              fontSize: 16,
+              fontFamily: typography.family.sans,
+              color: theme.muteSoft,
+              textDecorationLine: 'line-through',
+            }}
+          >
+            {Number.isInteger(listingPrice)
+              ? formatPrice(listingPrice, { whole: true })
+              : formatPrice(listingPrice)}
+          </Text>
+        )}
+      </View>
+
+      {/* Expiration line in red/burgundy */}
+      <Text
+        style={{
+          fontSize: 13,
+          fontFamily: typography.family.sansMedium,
+          color: '#991B1B',
+          marginTop: 4,
+          marginBottom: 14,
+        }}
+      >
+        {expiryLabel.toLowerCase().includes('expired') ? 'Offer has expired' : `Expires in ${expiryLabel}`}
+      </Text>
+
+      {/* Full width "Buy now" pill */}
+      <PressableScale
+        onPress={onBuyNow}
+        accessibilityRole="button"
+        accessibilityLabel="Buy now"
+        style={{
+          height: 44,
+          borderRadius: radii.pill,
+          backgroundColor: theme.ink,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 15,
+            fontFamily: typography.family.sansBold,
+            color: theme.background,
+          }}
+        >
+          Buy now
+        </Text>
+      </PressableScale>
+    </View>
+  );
+}
+
+// ── 4. Outgoing Special Offer Card (Image 2 & Image 3) ────────────────────────
+function SpecialOfferCard({
+  amount,
+  listingPrice,
+  expiryLabel,
+  isExpiringSoon,
+  isMine,
+}: {
+  amount: number;
+  listingPrice: number | null;
+  expiryLabel: string;
+  isExpiringSoon: boolean;
+  isMine: boolean;
+}) {
+  const { theme, isDark } = useTheme();
+  const showStruck = !!listingPrice && listingPrice > amount;
+
+  return (
+    <View
+      style={{
+        width: 270,
+        maxWidth: '100%',
+        backgroundColor: isDark ? 'rgba(108, 71, 255, 0.16)' : '#EEF0FF',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: isDark ? 'rgba(108, 71, 255, 0.28)' : '#E0E3FF',
+        padding: 16,
+        alignSelf: isMine ? 'flex-end' : 'flex-start',
+      }}
+    >
+      {/* Top Row: "You sent a special offer" */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <OfferTagIcon size={14} color={theme.ink} />
+        <Text
+          style={{
+            fontSize: 13.5,
+            fontFamily: typography.family.sansMedium,
+            color: theme.ink,
+          }}
+        >
+          {isMine ? 'You sent a special offer' : 'Special offer'}
+        </Text>
+      </View>
+
+      {/* Price Row */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'baseline',
+          gap: 8,
+          marginTop: 8,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 24,
+            fontFamily: typography.family.sansBold,
+            color: theme.ink,
+            letterSpacing: -0.4,
+          }}
+        >
+          {formatPrice(amount, { forceDecimals: true })}
+        </Text>
+        {showStruck && (
+          <Text
+            style={{
+              fontSize: 16,
+              fontFamily: typography.family.sans,
+              color: theme.muteSoft,
+              textDecorationLine: 'line-through',
+            }}
+          >
+            {Number.isInteger(listingPrice)
+              ? formatPrice(listingPrice, { whole: true })
+              : formatPrice(listingPrice)}
+          </Text>
+        )}
+      </View>
+
+      {/* Expiry line */}
+      <Text
+        style={{
+          fontSize: 13,
+          fontFamily: typography.family.sansMedium,
+          color: isExpiringSoon ? '#991B1B' : theme.muteSoft,
+          marginTop: 4,
+        }}
+      >
+        {expiryLabel.toLowerCase().includes('expired') ? 'Offer has expired' : `Expires in ${expiryLabel}`}
+      </Text>
+    </View>
+  );
+}
+
+// ── OfferBubble Coordinator (Selecting Exact Format Based on State) ───────────
 function OfferBubble(
   props: Omit<
     MessageRowProps,
@@ -988,7 +661,6 @@ function OfferBubble(
     msg,
     mine,
     isSeller,
-    senderName,
     listingId,
     listingPrice,
     listingSold,
@@ -997,8 +669,11 @@ function OfferBubble(
     onCounterOffer,
     onPay,
   } = props;
+
+  const amount = msg.metadata?.amount ?? 0;
   const isExpiredTtl = Boolean(
     (msg.offer_status === 'pending' || msg.offer_status === 'proposed') &&
+    msg.metadata?.actionable !== false &&
     msg.created_at &&
     Date.now() - new Date(msg.created_at).getTime() > 48 * 3600 * 1000
   );
@@ -1010,43 +685,102 @@ function OfferBubble(
   );
   const isBundle = Boolean(msg.metadata?.is_bundle || (msg.metadata?.bundle_item_ids && msg.metadata.bundle_item_ids.length > 0));
   const isBundleInvalid = isBundle && (Boolean(msg.metadata?.bundle_invalid) || status === 'canceled');
-  const isPending = (status === 'pending' || status === 'proposed') && !isBundleInvalid;
-  const canRespond = !mine && isPending && !listingSold && !isBundleInvalid;
-  // NOTE: When an offer is accepted, the listing is locked (is_sold: true) specifically for this order.
-  // Neither canPay (buyer) nor awaitingPayment (seller) should be blocked by listingSold.
   const canPay = !isSeller && status === 'accepted' && !!listingId && !isPaid && !isBundleInvalid;
-  const awaitingPayment = isSeller && status === 'accepted' && !isPaid && !isBundleInvalid;
-  const canMakeCounter = !isBundleInvalid && (status === 'declined' || status === 'expired') && !!onCounterOffer && !listingSold;
+  const { label: expiryLabel, isExpiringSoon } = getOfferExpiryLabel(msg.created_at);
 
-  if (mine) {
+  // 1. Paid Offer Confirmation
+  if (isPaid) {
     return (
-      <OutgoingOfferBubble
-        msg={msg}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          paddingHorizontal: 14,
+          paddingVertical: 9,
+          borderRadius: 18,
+          backgroundColor: 'rgba(16, 185, 129, 0.12)',
+          borderWidth: 1,
+          borderColor: 'rgba(16, 185, 129, 0.24)',
+        }}
+      >
+        <ShieldCheckIcon size={15} />
+        <Text style={{ fontSize: 14, fontFamily: typography.family.sansBold, color: '#10B981' }}>
+          Paid · {formatPrice(amount)}
+        </Text>
+      </View>
+    );
+  }
+
+  // 2. Image 4: "It's a deal" Card with "Buy now" for Buyer
+  if (status === 'accepted' && canPay) {
+    return (
+      <DealAcceptedCard
+        amount={amount}
         listingPrice={listingPrice}
-        canPay={canPay}
-        onPay={onPay}
+        expiryLabel={expiryLabel}
+        onBuyNow={() => onPay(amount, msg.metadata?.bundle_item_ids)}
       />
     );
   }
 
-  return (
-    <IncomingOfferCard
-      msg={msg}
-      senderName={senderName}
-      listingPrice={listingPrice}
-      listingSold={listingSold}
-      isSeller={isSeller}
-      canRespond={canRespond}
-      canPay={canPay}
-      canMakeCounter={canMakeCounter}
-      awaitingPayment={awaitingPayment}
-      isPaid={isPaid}
-      onAccept={onAccept}
-      onDecline={onDecline}
-      onCounterOffer={onCounterOffer}
-      onPay={onPay}
-    />
-  );
+  // 3. Image 5: Incoming Active Offer Card with "Counter" & "Accept" for Seller
+  const isActionable = msg.metadata?.actionable !== false;
+  if (!mine && isSeller && (status === 'pending' || status === 'proposed') && !listingSold && !isBundleInvalid && isActionable) {
+    return (
+      <IncomingOfferCard
+        amount={amount}
+        listingPrice={listingPrice}
+        expiryLabel={expiryLabel}
+        onAccept={onAccept}
+        onDecline={onDecline}
+        onCounterOffer={onCounterOffer}
+      />
+    );
+  }
+
+  // 4. Image 2 & 3: Outgoing Special Offer Card
+  if (mine && (msg.metadata?.is_special_offer || (isSeller && (status === 'pending' || status === 'proposed')))) {
+    return (
+      <SpecialOfferCard
+        amount={amount}
+        listingPrice={listingPrice}
+        expiryLabel={expiryLabel}
+        isExpiringSoon={isExpiringSoon}
+        isMine={mine}
+      />
+    );
+  }
+
+  // 5. Image 1, 2, 3, 4: Clean Offer Pill Bubbles
+  let pillText = '';
+  const formattedAmt = formatPrice(amount, { forceDecimals: true });
+  if (status === 'declined') {
+    pillText = mine
+      ? `You declined their offer: ${formattedAmt}`
+      : `They declined your offer: ${formattedAmt}`;
+  } else if (status === 'countered') {
+    pillText = mine
+      ? `You countered with: ${formattedAmt}`
+      : `Countered with: ${formattedAmt}`;
+  } else if (status === 'expired') {
+    pillText = mine ? 'Your offer has expired' : 'Offer has expired';
+  } else if (status === 'canceled' || isBundleInvalid) {
+    pillText = 'Offer is no longer available';
+  } else if (status === 'accepted') {
+    pillText = mine
+      ? `You accepted their offer: ${formattedAmt}`
+      : `Offer accepted: ${formattedAmt}`;
+  } else {
+    // Pending
+    if (mine) {
+      pillText = 'You made an offer';
+    } else {
+      pillText = `Made you an offer: ${formattedAmt}`;
+    }
+  }
+
+  return <OfferPillBubble text={pillText} mine={mine} />;
 }
 
 // ── Image ─────────────────────────────────────────────────────────────────
@@ -1203,7 +937,7 @@ function ReactionChip({ reactions, mine }: { reactions: string[]; mine: boolean 
 // ── Row ───────────────────────────────────────────────────────────────────
 
 function MessageRowImpl(props: MessageRowProps) {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const { msg, mine, grouped, lastOfGroup, senderName, senderAvatar, reactions, onRetry, onLongPress } = props;
   const bubbleRef = useRef<View>(null);
 
@@ -1257,14 +991,33 @@ function MessageRowImpl(props: MessageRowProps) {
                     width: 28,
                     height: 28,
                     borderRadius: 14,
-                    backgroundColor: theme.panel,
-                    borderWidth: 1,
-                    borderColor: theme.border,
+                    backgroundColor: isDark ? '#3A3A3C' : '#5A5A5E',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <Feather name="user" size={15} color={theme.mute} />
+                  {senderName ? (
+                    <Text
+                      style={{
+                        fontFamily: typography.family.sansBold,
+                        fontSize: 13,
+                        fontWeight: '700',
+                        color: '#FFFFFF',
+                        lineHeight: 16,
+                      }}
+                    >
+                      {senderName.trim().charAt(0).toUpperCase()}
+                    </Text>
+                  ) : (
+                    <View
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 14,
+                        backgroundColor: isDark ? '#3A3A3C' : '#8E8E93',
+                      }}
+                    />
+                  )}
                 </View>
               )
             ) : null}
@@ -1318,7 +1071,7 @@ function MessageRowImpl(props: MessageRowProps) {
       </View>
 
       {lastOfGroup && (
-        <View style={{ marginLeft: mine ? 0 : 36 }}>
+        <View style={{ width: '100%', alignItems: mine ? 'flex-end' : 'flex-start' }}>
           <MetaLine msg={msg} mine={mine} senderName={senderName} onRetry={onRetry} />
         </View>
       )}
