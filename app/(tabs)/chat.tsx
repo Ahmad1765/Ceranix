@@ -709,7 +709,7 @@ function PushNotificationBanner({ onDismiss }: { onDismiss: () => void }) {
 }
 
 export default function InboxScreen() {
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
   const { user, loading: authLoading } = useAuth();
   const { width: pageWidth } = useWindowDimensions();
   const tabBarClearance = useTabBarClearance();
@@ -908,71 +908,24 @@ export default function InboxScreen() {
       {/* Header */}
       <View
         style={{
-          position: 'relative',
           height: 48,
-          flexDirection: 'row',
           alignItems: 'center',
-          justifyContent: 'flex-end',
+          justifyContent: 'center',
           paddingHorizontal: 16,
         }}
       >
-        {/* Dead-center "Activity" Title */}
-        <View
-          pointerEvents="none"
+        <Text
           style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            top: 0,
-            bottom: 0,
-            alignItems: 'center',
-            justifyContent: 'center',
+            fontFamily: typography.family.sansBold,
+            fontSize: 20,
+            fontWeight: '700',
+            color: theme.ink,
+            letterSpacing: -0.4,
+            textAlign: 'center',
           }}
         >
-          <Text
-            style={{
-              fontFamily: typography.family.sansBold,
-              fontSize: 20,
-              fontWeight: '700',
-              color: theme.ink,
-              letterSpacing: -0.4,
-              textAlign: 'center',
-            }}
-          >
-            Activity
-          </Text>
-        </View>
-
-        <PressableScale
-          onPress={() => {
-            haptic();
-            router.push('/friends' as any);
-          }}
-          accessibilityRole="button"
-          accessibilityLabel="Friends"
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 6,
-            height: 32,
-            paddingHorizontal: 12,
-            borderRadius: 16,
-            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : theme.panel,
-            borderWidth: 1,
-            borderColor: theme.border,
-          }}
-        >
-          <Feather name="users" size={13} color={theme.ink} />
-          <Text
-            style={{
-              fontFamily: typography.family.sansBold,
-              fontSize: 12.5,
-              color: theme.ink,
-            }}
-          >
-            Friends
-          </Text>
-        </PressableScale>
+          Activity
+        </Text>
       </View>
 
       {/* Underline tabs */}

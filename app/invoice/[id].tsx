@@ -649,6 +649,8 @@ export default function InvoiceScreen() {
         order={order}
         listing={listing}
         isSeller={isSeller}
+        sellerDefaultAddress={sellerDefaultAddress}
+        onConfirmPickup={handleConfirmPickupAndPack}
         onBack={() => safeBack()}
         actionButtons={
           isSeller && order?.payment_method === 'cod' && order?.status === 'pending' ? (
