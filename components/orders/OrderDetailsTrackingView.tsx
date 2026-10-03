@@ -27,8 +27,9 @@ import { BRAND } from '@/lib/brand';
 import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { BuyerProtectionSheet } from '@/components/product/BuyerProtectionSheet';
 import { buyerProtectionFee, formatPrice } from '@/lib/fees';
+import { paymentService } from '@/lib/paymentService';
 import type { Order } from '@/lib/payments';
-import type { Listing } from '@/types';
+import type { Listing, FulfillmentStatus } from '@/types';
 
 export interface OrderDetailsTrackingViewProps {
   order?: Order | null;
@@ -248,8 +249,29 @@ export function OrderDetailsTrackingView({
   const [labelSubTab, setLabelSubTab] = useState<'label' | 'qr'>('label');
   const [readyDeliverModalVisible, setReadyDeliverModalVisible] = useState(false);
   const [howToShipModalVisible, setHowToShipModalVisible] = useState(false);
+  const [originModalVisible, setOriginModalVisible] = useState(false);
 
-  // Ready to Deliver Form State (Rule 2)
+  // Origin State (Image 4)
+  const [countryOfOrigin, setCountryOfOrigin] = useState('United States');
+
+  // Dynamic status state reflecting all statuses: packing, picked, shifting, delivered, completed
+  const initialFulfillmentStatus: FulfillmentStatus =
+    (order?.fulfillment_status as FulfillmentStatus) ||
+    (order?.status === 'completed'
+      ? 'completed'
+      : order?.status === 'delivered'
+      ? 'delivered'
+      : order?.status === 'shifting'
+      ? 'shifting'
+      : order?.status === 'picked'
+      ? 'picked'
+      : order?.status === 'packing'
+      ? 'packing'
+      : 'packing');
+
+  const [currentFulfillment, setCurrentFulfillment] = useState<FulfillmentStatus>(initialFulfillmentStatus);
+
+  // Ready to Deliver Form State
   const [pickupContactName, setPickupContactName] = useState(
     sellerDefaultAddress?.recipient_name || 'Seller Contact',
   );
@@ -278,18 +300,40 @@ export function OrderDetailsTrackingView({
     (order as any)?.tracking_number ||
     (order?.id ? `PAQ-${order.id.slice(0, 3).toUpperCase()}-${order.id.slice(-3).toUpperCase()}` : 'PAQ-327-P21');
 
-  const fulfillment = (order as any)?.fulfillment_status || order?.status;
-  const statusBadge =
-    propStatusLabel ||
-    (fulfillment === 'delivered'
-      ? 'Delivered'
-      : fulfillment === 'shifting' || (order as any)?.shipped_at
-      ? 'In Transit'
-      : fulfillment === 'completed'
-      ? 'Completed'
-      : fulfillment === 'packing'
-      ? 'Picked'
-      : 'In Transit');
+  // Derive status badge & item status badge (Image 4)
+  let statusBadge = propStatusLabel || 'In Transit';
+  let statusPillText = 'Needs Label';
+  let itemStatusBadgeText = 'Preparing Package';
+
+  if (currentFulfillment === 'delivered') {
+    statusBadge = 'Delivered';
+    statusPillText = 'Delivered';
+    itemStatusBadgeText = 'Delivered';
+  } else if (currentFulfillment === 'shifting' || (order as any)?.shipped_at) {
+    statusBadge = 'In Transit';
+    statusPillText = 'In Transit';
+    itemStatusBadgeText = 'In Transit';
+  } else if (currentFulfillment === 'picked') {
+    statusBadge = 'Picked';
+    statusPillText = 'Picked Up';
+    itemStatusBadgeText = 'Picked';
+  } else if (currentFulfillment === 'completed') {
+    statusBadge = 'Completed';
+    statusPillText = 'Completed';
+    itemStatusBadgeText = 'Completed';
+  } else if (currentFulfillment === 'packing') {
+    statusBadge = 'Packing';
+    statusPillText = 'Needs Label';
+    itemStatusBadgeText = 'Preparing Package';
+  } else if (currentFulfillment === 'disputed') {
+    statusBadge = 'Refund Under Review';
+    statusPillText = 'Disputed';
+    itemStatusBadgeText = 'Under Review';
+  } else if (currentFulfillment === 'canceled') {
+    statusBadge = 'Cancelled';
+    statusPillText = 'Cancelled';
+    itemStatusBadgeText = 'Cancelled';
+  }
 
   const addr = (order?.shipping_address as any) || {};
   const recipient =
@@ -313,7 +357,7 @@ export function OrderDetailsTrackingView({
     propItemTitle ||
     listing?.title ||
     (order as any)?.listing?.title ||
-    'Samsung 75" Oled';
+    'Multi Quantity Auction #1';
 
   const note =
     propDeliveryNote ||
@@ -326,6 +370,13 @@ export function OrderDetailsTrackingView({
     'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80';
   const riderTel = propRiderPhone || phone;
 
+  const itemPhoto =
+    listing?.images?.[0] ||
+    (listing as any)?.photos?.[0] ||
+    'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=200&auto=format&fit=crop&q=80';
+  const itemCondition = (listing as any)?.condition || 'New with tags';
+  const orderIdNumber = order?.id ? (order.id.replace(/[^0-9]/g, '').slice(0, 7) || '2636862') : '2636862';
+
   // Buyer protection fee calculation
   const listingPrice = Number(listing?.price ?? (order?.amount_cents ? order.amount_cents / 100 : 1000));
   const protectionFee = buyerProtectionFee(listingPrice);
@@ -335,16 +386,11 @@ export function OrderDetailsTrackingView({
     ? new Date(order.created_at)
     : new Date(Date.now() - 3600000 * 5); // Fallback: 5 hours ago
 
-  const isCompleted = fulfillment === 'completed';
-  const isDelivered = fulfillment === 'delivered' || isCompleted;
-  const isShipped =
-    fulfillment === 'shifting' ||
-    Boolean(order?.shipped_at || (order as any)?.shifted_at) ||
-    isDelivered;
-  const isPacked =
-    fulfillment === 'packing' ||
-    Boolean(order?.packed_at) ||
-    isShipped;
+  const isCompleted = currentFulfillment === 'completed';
+  const isDelivered = currentFulfillment === 'delivered' || isCompleted;
+  const isShipped = currentFulfillment === 'shifting' || isDelivered;
+  const isPicked = currentFulfillment === 'picked' || isShipped;
+  const isPacked = currentFulfillment === 'packing' || isPicked;
 
   const deliveredTimestamp = order?.delivered_at || order?.completed_at;
   const shippedTimestamp = order?.shipped_at || (order as any)?.shifted_at;
@@ -383,7 +429,7 @@ export function OrderDetailsTrackingView({
     return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
-  const pickedTimeLabel = formatTime(pickedTime);
+  const pickedTimeLabel = isPicked ? formatTime(pickedTime) : 'Pending';
   const transitTimeLabel = isShipped ? formatTime(transitTime) : 'Pending';
   const deliveredTimeLabel = isDelivered ? formatTime(deliveredTime) : 'Pending';
 
@@ -432,15 +478,19 @@ export function OrderDetailsTrackingView({
           },
         ]
       : []),
-    {
-      id: 'picked',
-      time: formatTime(pickedTime),
-      date: formatDate(pickedTime),
-      title: 'Package Picked Up & Manifested',
-      description: `Courier collected parcel from seller. Verified at local distribution hub.`,
-      completed: true,
-      isLatest: !isShipped && !isDelivered,
-    },
+    ...(isPicked
+      ? [
+          {
+            id: 'picked',
+            time: formatTime(pickedTime),
+            date: formatDate(pickedTime),
+            title: 'Package Picked Up & Manifested',
+            description: `Courier collected parcel from seller. Verified at local distribution hub.`,
+            completed: true,
+            isLatest: !isShipped && !isDelivered,
+          },
+        ]
+      : []),
     {
       id: 'packed',
       time: formatTime(new Date(placedTime.getTime() + 18 * 60000)),
@@ -448,7 +498,7 @@ export function OrderDetailsTrackingView({
       title: 'Order Packed & Ready',
       description: `Seller packed the items with care and attached waybill #${trackingNumber}.`,
       completed: true,
-      isLatest: false,
+      isLatest: !isPicked,
     },
     {
       id: 'placed',
@@ -535,6 +585,26 @@ export function OrderDetailsTrackingView({
     } else {
       safeBack();
     }
+  };
+
+  // Live Status System Transition Handler (Rule 1)
+  const handleUpdateStatus = async (newStatus: FulfillmentStatus) => {
+    tap('medium');
+    setCurrentFulfillment(newStatus);
+    if (order?.id) {
+      try {
+        await paymentService.advanceOrderFulfillment({
+          orderId: order.id,
+          targetStatus: newStatus,
+        });
+      } catch (e) {
+        console.warn('Status update sync error:', e);
+      }
+    }
+    toast.show(`Order status updated to: ${newStatus.toUpperCase()}`, {
+      variant: 'default',
+      icon: 'check',
+    });
   };
 
   // Save Ready to Deliver Pickup Schedule
@@ -815,13 +885,15 @@ export function OrderDetailsTrackingView({
                   width: 22,
                   height: 22,
                   borderRadius: 11,
-                  backgroundColor: theme.ink,
+                  backgroundColor: isPicked ? theme.ink : isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)',
                   alignItems: 'center',
                   justifyContent: 'center',
                   zIndex: 2,
                 }}
               >
-                <Feather name="check" size={11} color={theme.background} strokeWidth={3} />
+                {isPicked ? (
+                  <Feather name="check" size={11} color={theme.background} strokeWidth={3} />
+                ) : null}
               </View>
 
               {/* Line 1 -> 2 */}
@@ -883,7 +955,7 @@ export function OrderDetailsTrackingView({
               </View>
             </View>
 
-            {/* Labels Beneath Stepper Nodes (Rule 3: Picked instead of Recived) */}
+            {/* Labels Beneath Stepper Nodes */}
             <View
               style={{
                 flexDirection: 'row',
@@ -897,7 +969,7 @@ export function OrderDetailsTrackingView({
                   style={{
                     fontSize: 12,
                     fontFamily: typography.family.sansBold,
-                    color: theme.ink,
+                    color: isPicked ? theme.ink : theme.mute,
                   }}
                 >
                   Picked
@@ -1121,12 +1193,8 @@ export function OrderDetailsTrackingView({
           </Pressable>
         </GroupCard>
 
-        {/* ── Segmented Control: Shipment vs Activity (Rule 3) ── */}
-        <View
-          style={{
-            marginBottom: 16,
-          }}
-        >
+        {/* ── Segmented Control: Shipment vs Activity ── */}
+        <View style={{ marginBottom: 16 }}>
           <View
             style={{
               flexDirection: 'row',
@@ -1211,6 +1279,360 @@ export function OrderDetailsTrackingView({
 
         {activeTab === 'shipment' ? (
           <>
+            {/* ── Shipment Overview & Live Working Status System (Exact Replica of Image 4) ── */}
+            <GroupCard style={{ padding: 18, marginBottom: 16 }}>
+              {/* Header Row: Title "Shipment", Subtitle, Status Pill, Top-right Chat & Close */}
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
+                <View>
+                  <Text
+                    style={{
+                      fontSize: 28,
+                      fontFamily: typography.family.sansBold,
+                      color: theme.ink,
+                      letterSpacing: -0.6,
+                      lineHeight: 32,
+                    }}
+                  >
+                    Shipment
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 14.5,
+                      fontFamily: typography.family.sansMedium,
+                      color: theme.mute,
+                      marginTop: 3,
+                    }}
+                  >
+                    2 Items • #{trackingNumber.replace('PAQ-', '') || '77656'}
+                  </Text>
+                  <View
+                    style={{
+                      alignSelf: 'flex-start',
+                      marginTop: 8,
+                      paddingHorizontal: 10,
+                      paddingVertical: 4,
+                      borderRadius: 6,
+                      borderWidth: 1,
+                      borderColor: theme.border,
+                      backgroundColor: theme.surface,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontFamily: typography.family.sansBold,
+                        color: theme.ink,
+                      }}
+                    >
+                      {statusPillText}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Top Right Actions: Chat with Buyer & Close (Image 4 Replica) */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Pressable
+                    onPress={handleContactSeller}
+                    hitSlop={HIT_SLOP_8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Message buyer"
+                    style={({ pressed }) => ({
+                      width: 38,
+                      height: 38,
+                      borderRadius: 19,
+                      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#F3F4F6',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      opacity: pressed ? 0.75 : 1,
+                    })}
+                  >
+                    <Feather name="message-square" size={18} color={theme.ink} />
+                  </Pressable>
+
+                  <Pressable
+                    onPress={handleBack}
+                    hitSlop={HIT_SLOP_8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Close"
+                    style={({ pressed }) => ({
+                      width: 38,
+                      height: 38,
+                      borderRadius: 19,
+                      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#F3F4F6',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      opacity: pressed ? 0.75 : 1,
+                    })}
+                  >
+                    <Feather name="x" size={18} color={theme.ink} />
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* Items List (Image 4 Exact Multi-Item Layout) */}
+              {[
+                {
+                  id: 'item-1',
+                  title: 'Multi Quantity Auction #2',
+                  orderId: 'Order #2637210',
+                  condition: 'New with tags',
+                  photo: itemPhoto,
+                  origin: countryOfOrigin === 'United States' ? null : countryOfOrigin,
+                },
+                {
+                  id: 'item-2',
+                  title: 'Multi Quantity Auction #1',
+                  orderId: `Order #${orderIdNumber || '2636862'}`,
+                  condition: 'New with tags',
+                  photo: itemPhoto,
+                  origin: countryOfOrigin || 'United States',
+                },
+              ].map((sItem) => (
+                <View
+                  key={sItem.id}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'flex-start',
+                    paddingVertical: 14,
+                    borderTopWidth: StyleSheet.hairlineWidth,
+                    borderTopColor: isDark ? 'rgba(255, 255, 255, 0.08)' : theme.hairline,
+                  }}
+                >
+                  {/* Square Thumbnail with subtle radius */}
+                  <Image
+                    source={{ uri: sItem.photo }}
+                    style={{
+                      width: 72,
+                      height: 72,
+                      borderRadius: 8,
+                      backgroundColor: theme.surface,
+                      borderWidth: 1,
+                      borderColor: theme.border,
+                      marginRight: 14,
+                    }}
+                    contentFit="cover"
+                  />
+
+                  {/* Item Information */}
+                  <View style={{ flex: 1 }}>
+                    {/* Item Status Pill */}
+                    <View
+                      style={{
+                        alignSelf: 'flex-start',
+                        paddingHorizontal: 8,
+                        paddingVertical: 2.5,
+                        borderRadius: 4,
+                        borderWidth: 1,
+                        borderColor: theme.border,
+                        backgroundColor: theme.surface,
+                        marginBottom: 6,
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, fontFamily: typography.family.sansBold, color: theme.ink }}>
+                        {itemStatusBadgeText}
+                      </Text>
+                    </View>
+
+                    {/* Title */}
+                    <Text
+                      style={{
+                        fontSize: 15,
+                        fontFamily: typography.family.sansBold,
+                        color: theme.ink,
+                        letterSpacing: -0.2,
+                        lineHeight: 20,
+                        marginBottom: 3,
+                      }}
+                      numberOfLines={2}
+                    >
+                      {sItem.title}
+                    </Text>
+
+                    {/* Order ID Link */}
+                    <Pressable onPress={() => toast.show(sItem.orderId, { variant: 'default' })}>
+                      <Text
+                        style={{
+                          fontSize: 13.5,
+                          fontFamily: typography.family.sansBold,
+                          color: isDark ? '#A5B4FC' : '#2563EB',
+                          marginBottom: 3,
+                        }}
+                      >
+                        {sItem.orderId}
+                      </Text>
+                    </Pressable>
+
+                    {/* Condition Metadata */}
+                    <Text
+                      style={{
+                        fontSize: 12.5,
+                        fontFamily: typography.family.sans,
+                        color: theme.mute,
+                        marginBottom: 8,
+                      }}
+                    >
+                      {sItem.condition}
+                    </Text>
+
+                    {/* Country of Origin Divider & Row */}
+                    <View
+                      style={{
+                        borderTopWidth: StyleSheet.hairlineWidth,
+                        borderTopColor: isDark ? 'rgba(255, 255, 255, 0.08)' : theme.hairline,
+                        paddingTop: 8,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      {sItem.origin ? (
+                        <>
+                          <Text style={{ fontSize: 12.5, fontFamily: typography.family.sansMedium, color: theme.mute }}>
+                            Country of Origin: <Text style={{ color: theme.ink, fontFamily: typography.family.sansBold }}>{sItem.origin}</Text>
+                          </Text>
+                          <Pressable
+                            onPress={() => setOriginModalVisible(true)}
+                            hitSlop={HIT_SLOP_8}
+                          >
+                            <Text style={{ fontSize: 12.5, fontFamily: typography.family.sansBold, color: isDark ? '#A5B4FC' : '#2563EB' }}>
+                              Edit
+                            </Text>
+                          </Pressable>
+                        </>
+                      ) : (
+                        <>
+                          <Text style={{ fontSize: 12.5, fontFamily: typography.family.sansMedium, color: theme.mute }}>
+                            Country of Origin
+                          </Text>
+                          <Pressable
+                            onPress={() => setOriginModalVisible(true)}
+                            hitSlop={HIT_SLOP_8}
+                          >
+                            <Text style={{ fontSize: 12.5, fontFamily: typography.family.sansBold, color: isDark ? '#A5B4FC' : '#2563EB' }}>
+                              Select
+                            </Text>
+                          </Pressable>
+                        </>
+                      )}
+                    </View>
+                  </View>
+                </View>
+              ))}
+
+              {/* ── Edit Shipment Section (Image 4 Replica) ── */}
+              <View
+                style={{
+                  borderTopWidth: StyleSheet.hairlineWidth,
+                  borderTopColor: isDark ? 'rgba(255, 255, 255, 0.08)' : theme.hairline,
+                  paddingTop: 16,
+                  marginTop: 6,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontFamily: typography.family.sansBold,
+                    color: theme.ink,
+                    letterSpacing: -0.2,
+                    marginBottom: 12,
+                  }}
+                >
+                  Edit Shipment
+                </Text>
+
+                <View style={{ gap: 8, marginBottom: 14 }}>
+                  {/* Unbundle Shipment Action */}
+                  <Pressable
+                    onPress={() => {
+                      tap('light');
+                      toast.show('Shipment unbundled for separate packaging', { variant: 'default', icon: 'layers' });
+                    }}
+                    style={({ pressed }) => ({
+                      height: 44,
+                      borderRadius: radii.pill,
+                      backgroundColor: isDark ? '#2C2C2E' : '#E5E7EB',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      opacity: pressed ? 0.8 : 1,
+                    })}
+                  >
+                    <Text style={{ fontSize: 14, fontFamily: typography.family.sansBold, color: theme.ink }}>
+                      Unbundle Shipment
+                    </Text>
+                  </Pressable>
+
+                  {/* Edit Shipping Details Action */}
+                  <Pressable
+                    onPress={() => {
+                      tap('light');
+                      setReadyDeliverModalVisible(true);
+                    }}
+                    style={({ pressed }) => ({
+                      height: 44,
+                      borderRadius: radii.pill,
+                      backgroundColor: isDark ? '#2C2C2E' : '#E5E7EB',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      opacity: pressed ? 0.8 : 1,
+                    })}
+                  >
+                    <Text style={{ fontSize: 14, fontFamily: typography.family.sansBold, color: theme.ink }}>
+                      Edit Shipping Details
+                    </Text>
+                  </Pressable>
+                </View>
+
+                {/* Quick Status Pipeline Controls (Live Working Status Engine) */}
+                <Text style={{ fontSize: 11.5, fontFamily: typography.family.sansBold, color: theme.mute, textTransform: 'uppercase', marginBottom: 8 }}>
+                  Advance Order Status Pipeline
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                  {[
+                    { key: 'packing' as FulfillmentStatus, label: 'Packing (Needs Label)' },
+                    { key: 'picked' as FulfillmentStatus, label: 'Picked' },
+                    { key: 'shifting' as FulfillmentStatus, label: 'In Transit' },
+                    { key: 'delivered' as FulfillmentStatus, label: 'Delivered' },
+                    { key: 'completed' as FulfillmentStatus, label: 'Completed' },
+                    { key: 'disputed' as FulfillmentStatus, label: 'Disputed' },
+                    { key: 'canceled' as FulfillmentStatus, label: 'Cancelled' },
+                  ].map((s) => {
+                    const isSelected = currentFulfillment === s.key;
+                    return (
+                      <Pressable
+                        key={s.key}
+                        onPress={() => handleUpdateStatus(s.key)}
+                        style={({ pressed }) => [
+                          {
+                            height: 32,
+                            borderRadius: 16,
+                            paddingHorizontal: 12,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: isSelected ? theme.ink : theme.surface,
+                            borderWidth: 1,
+                            borderColor: isSelected ? theme.ink : theme.border,
+                          },
+                          pressed && { opacity: 0.8 },
+                        ]}
+                      >
+                        {isSelected && <Feather name="check" size={12} color={theme.background} style={{ marginRight: 4 }} />}
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontFamily: isSelected ? typography.family.sansBold : typography.family.sansMedium,
+                            color: isSelected ? theme.background : theme.ink,
+                          }}
+                        >
+                          {s.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            </GroupCard>
+
             {/* ── Section: Courier & Dispatch ── */}
             <SectionEyebrow title="Courier & Dispatch" icon="user" />
             <GroupCard>
@@ -1665,6 +2087,62 @@ export function OrderDetailsTrackingView({
         ) : null}
       </ScrollView>
 
+      {/* ── Country of Origin Edit Modal (Image 4) ── */}
+      <Modal
+        visible={originModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setOriginModalVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: theme.overlay, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setOriginModalVisible(false)} />
+          <View
+            style={[
+              {
+                width: '100%',
+                maxWidth: 360,
+                backgroundColor: theme.panel,
+                borderRadius: 20,
+                padding: 20,
+                borderWidth: 1,
+                borderColor: theme.border,
+              },
+              shadow.lg,
+            ]}
+          >
+            <Text style={{ fontSize: 17, fontFamily: typography.family.sansBold, color: theme.ink, marginBottom: 12 }}>
+              Select Country of Origin
+            </Text>
+            {['United States', 'Pakistan', 'United Kingdom', 'Japan', 'Italy', 'Germany'].map((c) => (
+              <Pressable
+                key={c}
+                onPress={() => {
+                  tap('light');
+                  setCountryOfOrigin(c);
+                  setOriginModalVisible(false);
+                  toast.show(`Country of Origin set to: ${c}`, { variant: 'default', icon: 'check' });
+                }}
+                style={({ pressed }) => ({
+                  paddingVertical: 12,
+                  paddingHorizontal: 8,
+                  borderBottomWidth: StyleSheet.hairlineWidth,
+                  borderBottomColor: theme.border,
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  opacity: pressed ? 0.7 : 1,
+                })}
+              >
+                <Text style={{ fontSize: 14.5, fontFamily: countryOfOrigin === c ? typography.family.sansBold : typography.family.sansMedium, color: theme.ink }}>
+                  {c}
+                </Text>
+                {countryOfOrigin === c && <Feather name="check" size={16} color={theme.purple} />}
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      </Modal>
+
       {/* ── Modal 1: "Ship your item" (Exact Replica of Image 2) ── */}
       <Modal
         visible={labelModalVisible}
@@ -2104,7 +2582,7 @@ export function OrderDetailsTrackingView({
                   Ready to deliver
                 </Text>
                 <Text style={{ fontSize: 12, color: theme.mute, fontFamily: typography.family.sans, marginTop: 2 }}>
-                  Set your exact pickup location & select a pickup date
+                  Set your exact pickup location &amp; select a pickup date
                 </Text>
               </View>
 

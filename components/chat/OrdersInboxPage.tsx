@@ -49,13 +49,6 @@ export function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
   const { theme, isDark } = useTheme();
   const { total } = deriveInvoiceAmounts(order, order.listing?.price, buyerProtectionFee);
   const image = order.listing ? cardImageUrl(order.listing, 0) : '';
-  const isShipped = Boolean(
-    (order as any).shipped_at ||
-      (order as any).shifted_at ||
-      (order as any).tracking_number ||
-      order.status === 'shifting' ||
-      (order as any).fulfillment_status === 'shifting',
-  );
 
   const handlePress = () => {
     tap();
@@ -68,6 +61,13 @@ export function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
   const fulfillment = (order as any).fulfillment_status;
   const isDisputed = fulfillment === 'disputed' || order.status === 'disputed';
   const isDelivered = fulfillment === 'delivered' || order.status === 'delivered';
+  const isShipped =
+    order.shipped_at ||
+    (order as any).shifted_at ||
+    (order as any).tracking_number ||
+    order.status === 'shifting' ||
+    fulfillment === 'shifting';
+  const isPicked = fulfillment === 'picked' || order.status === 'picked';
   const isPacking = fulfillment === 'packing' || order.status === 'packing';
   const isCompleted = fulfillment === 'completed' || order.status === 'completed';
   const isAwaitingPayment = fulfillment === 'awaiting_payment' || order.status === 'awaiting_payment';
@@ -108,6 +108,10 @@ export function OrderRow({ order, side }: { order: MyOrder; side: OrderSide }) {
     badgeLabel = 'In Transit';
     badgeBg = isDark ? 'rgba(255, 255, 255, 0.12)' : '#E5E7EB';
     badgeColor = theme.ink;
+  } else if (isPicked) {
+    badgeLabel = 'Picked';
+    badgeBg = isDark ? 'rgba(37, 99, 235, 0.14)' : '#EFF6FF';
+    badgeColor = isDark ? '#93C5FD' : '#2563EB';
   } else if (isPacking) {
     badgeLabel = 'Packing';
     badgeBg = isDark ? 'rgba(255, 255, 255, 0.12)' : '#E5E7EB';

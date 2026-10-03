@@ -95,6 +95,8 @@ export function orderBadge(
       return { label: 'Awaiting payment', tone: 'warn' };
     case 'packing':
       return { label: side === 'bought' ? 'Seller packaging' : 'Packing order', tone: 'neutral' };
+    case 'picked':
+      return { label: side === 'bought' ? 'Picked up by courier' : 'Courier picked up', tone: 'neutral' };
     case 'shifting':
       return { label: 'Dispatched · In transit', tone: 'positive' };
     case 'delivered':

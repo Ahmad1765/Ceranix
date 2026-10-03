@@ -10,6 +10,7 @@ export type InvoiceStatus =
   | 'paid'
   | 'completed'
   | 'packing'
+  | 'picked'
   | 'shifting'
   | 'delivered'
   | 'disputed'
@@ -34,7 +35,7 @@ export type InvoiceStatus =
  *  - `cod_pending` is an active Cash on Delivery order awaiting delivery & collection.
  *  - `confirming` is transient, shown only while re-checking after a checkout
  *    return. It is never derived from the URL.
- *  - Fulfillment state transitions (packing, shifting, delivered, disputed, completed)
+ *  - Fulfillment state transitions (packing, picked, shifting, delivered, disputed, completed)
  *    must reflect their active operational stage rather than falling back to Pending.
  */
 export function deriveInvoiceStatus(
@@ -49,6 +50,7 @@ export function deriveInvoiceStatus(
   if (order?.status === 'failed') return 'failed';
   if (order?.status === 'delivered' || order?.fulfillment_status === 'delivered') return 'delivered';
   if (order?.status === 'shifting' || order?.fulfillment_status === 'shifting') return 'shifting';
+  if (order?.status === 'picked' || order?.fulfillment_status === 'picked') return 'picked';
   if (order?.status === 'packing' || order?.fulfillment_status === 'packing') return 'packing';
   if (order?.status === 'paid') return 'paid';
   if (order?.payment_method === 'cod' && (order?.status === 'pending' || order?.fulfillment_status === 'pending')) return 'cod_pending';
