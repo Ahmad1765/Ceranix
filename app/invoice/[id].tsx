@@ -166,7 +166,7 @@ export default function InvoiceScreen() {
       if (!active) return;
       if (first) {
         setOrder(first);
-      } else if (__DEV__ && placed === '1') {
+      } else if (placed === '1') {
         setOrder({
           id: `order_demo_${Date.now()}`,
           listing_id: String(lookupId),

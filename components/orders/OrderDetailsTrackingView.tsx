@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Pressable,
   ScrollView,
   StyleSheet,
   Platform,
-  Linking,
   Modal,
   TextInput,
   Share,
@@ -212,6 +211,21 @@ function KeyValueRow({
   );
 }
 
+function parseServerDate(val?: string | Date | null): Date | null {
+  if (!val) return null;
+  if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+  let s = String(val).trim();
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}/.test(s)) {
+    s = s.replace(' ', 'T');
+  }
+  if (!/Z|[+-]\d{2}(?::?\d{2})?$/i.test(s)) {
+    s = `${s}Z`;
+  }
+  const parsed = new Date(s);
+  return isNaN(parsed.getTime()) ? null : parsed;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ORDER DETAILS TRACKING VIEW
 // ─────────────────────────────────────────────────────────────────────────────
@@ -357,18 +371,14 @@ export function OrderDetailsTrackingView({
     propItemTitle ||
     listing?.title ||
     (order as any)?.listing?.title ||
-    'Multi Quantity Auction #1';
+    'Tracked Order Item';
 
   const note =
     propDeliveryNote ||
     order?.delivery_notes ||
-    'Fragile';
+    null;
 
-  const rider = propRiderName || (order as any)?.courier_name || 'Mr John';
-  const riderPhoto =
-    propRiderAvatar ||
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80';
-  const riderTel = propRiderPhone || phone;
+  const carrierName = (order as any)?.courier_name || `${BRAND} Express`;
 
   const itemPhoto =
     listing?.images?.[0] ||
@@ -377,56 +387,87 @@ export function OrderDetailsTrackingView({
   const itemCondition = (listing as any)?.condition || 'New with tags';
   const orderIdNumber = order?.id ? (order.id.replace(/[^0-9]/g, '').slice(0, 7) || '2636862') : '2636862';
 
+  const actualItems = useMemo(() => {
+    const rawItems = (order as any)?.order_items;
+    if (rawItems && Array.isArray(rawItems) && rawItems.length > 0) {
+      return rawItems.map((oi: any, idx: number) => ({
+        id: oi.id || `item-${idx}`,
+        title: oi.listing?.title || oi.title || item,
+        orderId: `Order #${orderIdNumber}`,
+        condition: oi.listing?.condition || itemCondition,
+        photo: oi.listing?.images?.[0] || itemPhoto,
+        origin: countryOfOrigin || null,
+      }));
+    }
+    return [
+      {
+        id: 'item-1',
+        title: listing?.title || (order as any)?.listing?.title || item,
+        orderId: `Order #${orderIdNumber}`,
+        condition: itemCondition,
+        photo: itemPhoto,
+        origin: countryOfOrigin || null,
+      },
+    ];
+  }, [order, listing, item, orderIdNumber, itemCondition, itemPhoto, countryOfOrigin]);
+
   // Buyer protection fee calculation
   const listingPrice = Number(listing?.price ?? (order?.amount_cents ? order.amount_cents / 100 : 1000));
   const protectionFee = buyerProtectionFee(listingPrice);
 
   // ── Dynamic order timestamps & live chronological event calculation ──
-  const orderCreatedAt = order?.created_at
-    ? new Date(order.created_at)
-    : new Date(Date.now() - 3600000 * 5); // Fallback: 5 hours ago
+  const orderCreatedAt = useMemo(() => {
+    const parsed = parseServerDate(order?.created_at);
+    if (parsed) return parsed;
+    return new Date(); // Fallback to real-time moment, never 5 hours in the past
+  }, [order?.created_at]);
 
   const isCompleted = currentFulfillment === 'completed';
   const isDelivered = currentFulfillment === 'delivered' || isCompleted;
   const isShipped = currentFulfillment === 'shifting' || isDelivered;
   const isPicked = currentFulfillment === 'picked' || isShipped;
-  const isPacked = currentFulfillment === 'packing' || isPicked;
+  const isPacked = Boolean(order?.packed_at) || isPicked;
 
-  const deliveredTimestamp = order?.delivered_at || order?.completed_at;
-  const shippedTimestamp = order?.shipped_at || (order as any)?.shifted_at;
-  const packedTimestamp = order?.packed_at;
+  const deliveredTimestamp = parseServerDate(order?.delivered_at || order?.completed_at);
+  const shippedTimestamp = parseServerDate(order?.shipped_at || (order as any)?.shifted_at);
+  const pickedTimestamp = parseServerDate((order as any)?.picked_at);
+  const packedTimestamp = parseServerDate(order?.packed_at);
 
-  // Real timestamps
+  // Exact localized timestamps bounded so no stage ever prints into the future
   const placedTime = orderCreatedAt;
-  const pickedTime = packedTimestamp
-    ? new Date(packedTimestamp)
-    : new Date(orderCreatedAt.getTime() + 42 * 60000); // 42m after placed
+  const nowMs = Date.now();
 
-  const transitTime = shippedTimestamp
-    ? new Date(shippedTimestamp)
-    : new Date(pickedTime.getTime() + 75 * 60000); // 1h15m after picked
+  const packedTime = packedTimestamp || (isPacked
+    ? new Date(Math.min(nowMs, placedTime.getTime() + Math.max(60000, Math.floor((nowMs - placedTime.getTime()) * 0.25))))
+    : null);
 
-  const deliveredTime = deliveredTimestamp
-    ? new Date(deliveredTimestamp)
-    : isDelivered
-    ? new Date(transitTime.getTime() + 180 * 60000)
-    : null;
+  const pickedTime = pickedTimestamp || (isPicked
+    ? new Date(Math.min(nowMs, (packedTime ? packedTime.getTime() : placedTime.getTime()) + Math.max(60000, Math.floor((nowMs - placedTime.getTime()) * 0.5))))
+    : null);
 
-  // Formatters for exact time and date
+  const transitTime = shippedTimestamp || (isShipped
+    ? new Date(Math.min(nowMs, (pickedTime ? pickedTime.getTime() : placedTime.getTime()) + Math.max(60000, Math.floor((nowMs - placedTime.getTime()) * 0.75))))
+    : null);
+
+  const deliveredTime = deliveredTimestamp || (isDelivered
+    ? new Date(Math.min(nowMs, (transitTime ? transitTime.getTime() : placedTime.getTime()) + 60000))
+    : null);
+
+  // Standard localized formatters for time and date
   const formatTime = (d: Date | null) => {
     if (!d || isNaN(d.getTime())) return 'Pending';
-    let h = d.getHours();
-    const m = d.getMinutes();
-    const ampm = h >= 12 ? 'pm' : 'am';
-    h = h % 12;
-    h = h ? h : 12;
-    const mStr = m < 10 ? `0${m}` : `${m}`;
-    return `${h}:${mStr}${ampm}`;
+    return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   };
 
   const formatDate = (d: Date | null) => {
     if (!d || isNaN(d.getTime())) return '';
-    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    const now = new Date();
+    const isToday =
+      d.getDate() === now.getDate() &&
+      d.getMonth() === now.getMonth() &&
+      d.getFullYear() === now.getFullYear();
+    if (isToday) return 'Today';
+    return d.toLocaleDateString([], { day: 'numeric', month: 'short' });
   };
 
   const pickedTimeLabel = isPicked ? formatTime(pickedTime) : 'Pending';
@@ -452,7 +493,7 @@ export function OrderDetailsTrackingView({
 
   // Chronological activity timeline events with exact working times
   const activityEvents = [
-    ...(isDelivered
+    ...(isDelivered && deliveredTime
       ? [
           {
             id: 'delivered',
@@ -465,20 +506,20 @@ export function OrderDetailsTrackingView({
           },
         ]
       : []),
-    ...(isShipped
+    ...(isShipped && transitTime
       ? [
           {
             id: 'in_transit',
             time: formatTime(transitTime),
             date: formatDate(transitTime),
             title: 'Out for Delivery / In Transit',
-            description: `Package is on the route with driver ${rider} (${BRAND} Express).`,
+            description: `Package is on the route via ${carrierName}.`,
             completed: true,
             isLatest: !isDelivered,
           },
         ]
       : []),
-    ...(isPicked
+    ...(isPicked && pickedTime
       ? [
           {
             id: 'picked',
@@ -491,15 +532,19 @@ export function OrderDetailsTrackingView({
           },
         ]
       : []),
-    {
-      id: 'packed',
-      time: formatTime(new Date(placedTime.getTime() + 18 * 60000)),
-      date: formatDate(placedTime),
-      title: 'Order Packed & Ready',
-      description: `Seller packed the items with care and attached waybill #${trackingNumber}.`,
-      completed: true,
-      isLatest: !isPicked,
-    },
+    ...(isPacked && packedTime
+      ? [
+          {
+            id: 'packed',
+            time: formatTime(packedTime),
+            date: formatDate(packedTime),
+            title: 'Order Packed & Ready',
+            description: `Seller packed the items with care and attached waybill #${trackingNumber}.`,
+            completed: true,
+            isLatest: !isPicked,
+          },
+        ]
+      : []),
     {
       id: 'placed',
       time: formatTime(placedTime),
@@ -507,7 +552,7 @@ export function OrderDetailsTrackingView({
       title: 'Order Placed & Payment Confirmed',
       description: `Payment secured under ${BRAND} Buyer Protection escrow guarantee.`,
       completed: true,
-      isLatest: false,
+      isLatest: !isPacked && !isPicked && !isShipped && !isDelivered,
     },
   ];
 
@@ -528,38 +573,7 @@ export function OrderDetailsTrackingView({
     }
   };
 
-  // Call Rider Handler
-  const handleCallRider = () => {
-    tap('medium');
-    const sanitized = riderTel.replace(/[^0-9+]/g, '');
-    const url = `tel:${sanitized}`;
-    Linking.canOpenURL(url)
-      .then((supported) => {
-        if (supported) {
-          Linking.openURL(url);
-        } else {
-          toast.show(`Calling ${rider}: ${riderTel}`, {
-            variant: 'default',
-            icon: 'phone',
-          });
-        }
-      })
-      .catch(() => {
-        toast.show(`Calling ${rider}: ${riderTel}`, {
-          variant: 'default',
-          icon: 'phone',
-        });
-      });
-  };
 
-  // Message Rider Handler
-  const handleMessageRider = () => {
-    tap('light');
-    toast.show(`Opened message thread with ${rider}`, {
-      variant: 'default',
-      icon: 'message-square',
-    });
-  };
 
   // Message Seller / Buyer Handler (Matching Image 1)
   const handleContactSeller = () => {
@@ -1303,7 +1317,7 @@ export function OrderDetailsTrackingView({
                       marginTop: 3,
                     }}
                   >
-                    2 Items • #{trackingNumber.replace('PAQ-', '') || '77656'}
+                    {actualItems.length} {actualItems.length === 1 ? 'Item' : 'Items'} • #{trackingNumber.replace('PAQ-', '') || '77656'}
                   </Text>
                   <View
                     style={{
@@ -1369,25 +1383,8 @@ export function OrderDetailsTrackingView({
                 </View>
               </View>
 
-              {/* Items List (Image 4 Exact Multi-Item Layout) */}
-              {[
-                {
-                  id: 'item-1',
-                  title: 'Multi Quantity Auction #2',
-                  orderId: 'Order #2637210',
-                  condition: 'New with tags',
-                  photo: itemPhoto,
-                  origin: countryOfOrigin === 'United States' ? null : countryOfOrigin,
-                },
-                {
-                  id: 'item-2',
-                  title: 'Multi Quantity Auction #1',
-                  orderId: `Order #${orderIdNumber || '2636862'}`,
-                  condition: 'New with tags',
-                  photo: itemPhoto,
-                  origin: countryOfOrigin || 'United States',
-                },
-              ].map((sItem) => (
+              {/* Items List (Dynamic Order Items) */}
+              {actualItems.map((sItem) => (
                 <View
                   key={sItem.id}
                   style={{
@@ -1634,7 +1631,7 @@ export function OrderDetailsTrackingView({
             </GroupCard>
 
             {/* ── Section: Courier & Dispatch ── */}
-            <SectionEyebrow title="Courier & Dispatch" icon="user" />
+            <SectionEyebrow title="Courier & Dispatch" icon="truck" />
             <GroupCard>
               {/* Courier Info Row */}
               <View
@@ -1648,18 +1645,18 @@ export function OrderDetailsTrackingView({
                 }}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 8 }}>
-                  <Image
-                    source={{ uri: riderPhoto }}
+                  <View
                     style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 22,
-                      backgroundColor: theme.surface,
-                      borderWidth: 1,
-                      borderColor: theme.border,
+                      width: 42,
+                      height: 42,
+                      borderRadius: 21,
+                      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#F3F4F6',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                     }}
-                    contentFit="cover"
-                  />
+                  >
+                    <Feather name="truck" size={18} color={theme.ink} />
+                  </View>
                   <View style={{ marginLeft: 12, flex: 1 }}>
                     <Text
                       style={{
@@ -1669,7 +1666,7 @@ export function OrderDetailsTrackingView({
                         letterSpacing: -0.2,
                       }}
                     >
-                      {rider}
+                      {carrierName}
                     </Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3 }}>
                       <View
@@ -1688,54 +1685,43 @@ export function OrderDetailsTrackingView({
                           fontFamily: typography.family.sans,
                         }}
                       >
-                        Assigned Driver · {BRAND} Express
+                        Tracked Courier · {trackingNumber}
                       </Text>
                     </View>
                   </View>
                 </View>
 
-                {/* Quick Driver Communication Actions */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Pressable
-                    onPress={handleMessageRider}
-                    hitSlop={HIT_SLOP_8}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Message ${rider}`}
-                    style={({ pressed }) => ({
-                      width: 38,
-                      height: 38,
-                      borderRadius: 19,
-                      backgroundColor: theme.surface,
-                      borderWidth: 1,
-                      borderColor: theme.border,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      opacity: pressed ? 0.75 : 1,
-                      transform: [{ scale: pressed ? 0.95 : 1 }],
-                    })}
+                {/* Quick Tracking Action */}
+                <Pressable
+                  onPress={handleCopyTracking}
+                  hitSlop={HIT_SLOP_8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Copy Tracking ID"
+                  style={({ pressed }) => ({
+                    paddingHorizontal: 12,
+                    height: 32,
+                    borderRadius: 16,
+                    backgroundColor: theme.surface,
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexDirection: 'row',
+                    gap: 6,
+                    opacity: pressed ? 0.75 : 1,
+                  })}
+                >
+                  <Feather name="copy" size={12} color={theme.ink} />
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontFamily: typography.family.sansMedium,
+                      color: theme.ink,
+                    }}
                   >
-                    <Feather name="message-square" size={16} color={theme.ink} />
-                  </Pressable>
-
-                  <Pressable
-                    onPress={handleCallRider}
-                    hitSlop={HIT_SLOP_8}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Call ${rider}`}
-                    style={({ pressed }) => ({
-                      width: 38,
-                      height: 38,
-                      borderRadius: 19,
-                      backgroundColor: theme.ink,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      opacity: pressed ? 0.85 : 1,
-                      transform: [{ scale: pressed ? 0.95 : 1 }],
-                    })}
-                  >
-                    <Feather name="phone" size={16} color={theme.background} />
-                  </Pressable>
-                </View>
+                    Copy
+                  </Text>
+                </Pressable>
               </View>
 
               {/* Message Buyer / Seller Row (Matching Image 1) */}
@@ -1853,41 +1839,43 @@ export function OrderDetailsTrackingView({
               <KeyValueRow label="Receiver" value={recipient} />
               <KeyValueRow label="Address" value={streetAddress} />
               <KeyValueRow label="Contact" value={phone} />
-              <KeyValueRow label="Item" value={item} />
-              <KeyValueRow
-                label="Note"
-                isLast
-                rightElement={
-                  <View
-                    style={{
-                      height: 30,
-                      borderRadius: 15,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      backgroundColor: isDark ? 'rgba(239, 68, 68, 0.16)' : '#FEF2F2',
-                      paddingHorizontal: 12,
-                      borderWidth: 1,
-                      borderColor: isDark ? 'rgba(239, 68, 68, 0.3)' : '#FECACA',
-                    }}
-                  >
-                    <Feather
-                      name="alert-triangle"
-                      size={12}
-                      color={theme.danger}
-                      style={{ marginRight: 5 }}
-                    />
-                    <Text
+              <KeyValueRow label="Item" value={item} isLast={!note} />
+              {note ? (
+                <KeyValueRow
+                  label="Note"
+                  isLast
+                  rightElement={
+                    <View
                       style={{
-                        fontSize: 12,
-                        fontFamily: typography.family.sansBold,
-                        color: theme.danger,
+                        height: 30,
+                        borderRadius: 15,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        backgroundColor: isDark ? 'rgba(239, 68, 68, 0.16)' : '#FEF2F2',
+                        paddingHorizontal: 12,
+                        borderWidth: 1,
+                        borderColor: isDark ? 'rgba(239, 68, 68, 0.3)' : '#FECACA',
                       }}
                     >
-                      {note}
-                    </Text>
-                  </View>
-                }
-              />
+                      <Feather
+                        name="alert-triangle"
+                        size={12}
+                        color={theme.danger}
+                        style={{ marginRight: 5 }}
+                      />
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontFamily: typography.family.sansBold,
+                          color: theme.danger,
+                        }}
+                      >
+                        {note}
+                      </Text>
+                    </View>
+                  }
+                />
+              ) : null}
             </GroupCard>
           </>
         ) : (
@@ -1924,7 +1912,7 @@ export function OrderDetailsTrackingView({
                 </View>
               </View>
               <Text style={{ fontSize: 12.5, color: theme.mute, fontFamily: typography.family.sans, lineHeight: 17 }}>
-                Carrier: {BRAND} Express · Assigned driver: {rider} · Delivering to {streetAddress}
+                Carrier: {carrierName} · Tracked Courier · Delivering to {streetAddress}
               </Text>
             </GroupCard>
 
@@ -3167,7 +3155,7 @@ export function OrderDetailsTrackingView({
                   lineHeight: 17,
                 }}
               >
-                Estimated delivery to {streetAddress} by {formatDate(new Date(orderCreatedAt.getTime() + 86400000 * 3))}. Driver {rider} is assigned.
+                Estimated delivery to {streetAddress} by {formatDate(new Date(orderCreatedAt.getTime() + 86400000 * 3))}. Tracked via {carrierName}.
               </Text>
             </View>
 
@@ -3182,7 +3170,7 @@ export function OrderDetailsTrackingView({
             >
               <KeyValueRow label="Waybill / Tracking No." value={trackingNumber} />
               <KeyValueRow label="Package Status" value={statusBadge} />
-              <KeyValueRow label="Assigned Driver" value={`${rider} (${phone})`} isLast />
+              <KeyValueRow label="Carrier" value={carrierName} isLast />
             </View>
 
             <Pressable
