@@ -83,4 +83,36 @@ describe('ProductActionBar Invariant & Styling Protection', () => {
     expect(buyTextStyle.color).toBe(lightTheme.background); // #FFFFFF
     expect(buyText.props.children).toBe('Buy now');
   });
+
+  it('renders View Order button for sellers viewing their own sold item', () => {
+    const onViewOrderMock = vi.fn();
+    const element = React.createElement(ProductActionBar, {
+      price: 2500,
+      isOwner: true,
+      isSold: true,
+      onViewOrderPress: onViewOrderMock,
+    });
+    const rendered = (element.type as any)(element.props);
+    const actionRow = rendered.props.children;
+    const [infoView, viewOrderBtn] = actionRow.props.children;
+
+    expect(infoView.props.children[0].props.children).toBe('Item Sold!');
+    const buttonText = viewOrderBtn.props.children.props.children;
+    expect(buttonText).toBe('View Order');
+
+    viewOrderBtn.props.onPress();
+    expect(onViewOrderMock).toHaveBeenCalled();
+  });
+
+  it('renders passive sold banner for non-owners viewing a sold item', () => {
+    const element = React.createElement(ProductActionBar, {
+      price: 2500,
+      isOwner: false,
+      isSold: true,
+    });
+    const rendered = (element.type as any)(element.props);
+    const soldContainer = rendered.props.children;
+    const soldText = soldContainer.props.children.props.children;
+    expect(soldText).toBe('This item has been sold');
+  });
 });

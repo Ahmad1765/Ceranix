@@ -668,7 +668,54 @@ export default function InvoiceScreen() {
         onConfirmPickup={handleConfirmPickupAndPack}
         onBack={() => safeBack()}
         actionButtons={
-          isSeller && order?.payment_method === 'cod' && order?.status === 'pending' ? (
+          isSeller && (order?.fulfillment_status === 'pending' || !order?.fulfillment_status || order?.fulfillment_status === 'awaiting_payment') && isOrderActive && order?.status !== 'completed' && order?.status !== 'canceled' && order?.status !== 'refunded' ? (
+            <Pressable
+              onPress={handleStartPacking}
+              disabled={advancingPacking}
+              style={({ pressed }) => [
+                {
+                  height: 48,
+                  borderRadius: radii.pill,
+                  backgroundColor: theme.primary,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                },
+                pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
+              ]}
+            >
+              {advancingPacking ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <>
+                  <Feather name="box" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF', fontFamily: typography.family.sansBold }}>
+                    Start Packing
+                  </Text>
+                </>
+              )}
+            </Pressable>
+          ) : isSeller && order?.fulfillment_status === 'packing' ? (
+            <Pressable
+              onPress={() => setShowShipModal(true)}
+              style={({ pressed }) => [
+                {
+                  height: 48,
+                  borderRadius: radii.pill,
+                  backgroundColor: theme.primary,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                },
+                pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
+              ]}
+            >
+              <Feather name="truck" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
+              <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF', fontFamily: typography.family.sansBold }}>
+                Mark as Shipped / In-Transit
+              </Text>
+            </Pressable>
+          ) : isSeller && order?.payment_method === 'cod' && (isShipped || order?.fulfillment_status === 'shifting' || order?.fulfillment_status === 'delivered' || order?.status === 'shifting' || order?.status === 'delivered') && order?.status !== 'completed' && order?.fulfillment_status !== 'completed' ? (
             <Pressable
               onPress={handleCompleteCodOrder}
               disabled={completingCod}
@@ -694,26 +741,6 @@ export default function InvoiceScreen() {
                   </Text>
                 </>
               )}
-            </Pressable>
-          ) : isSeller && (order?.fulfillment_status === 'packing' || (!order?.fulfillment_status && isOrderActive && !isShipped)) ? (
-            <Pressable
-              onPress={() => setShowShipModal(true)}
-              style={({ pressed }) => [
-                {
-                  height: 48,
-                  borderRadius: radii.pill,
-                  backgroundColor: theme.primary,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                },
-                pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
-              ]}
-            >
-              <Feather name="truck" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
-              <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF', fontFamily: typography.family.sansBold }}>
-                Mark as Shipped / In-Transit
-              </Text>
             </Pressable>
           ) : isBuyer && (isShipped || order?.fulfillment_status === 'shifting' || order?.fulfillment_status === 'delivered' || order?.status === 'shifting' || order?.status === 'delivered') && order?.status !== 'completed' && order?.fulfillment_status !== 'completed' ? (
             <View style={{ gap: 8, width: '100%' }}>
