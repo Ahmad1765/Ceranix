@@ -51,21 +51,24 @@ export async function fetchOrderForListing(
     } as Order;
   };
 
-  // First check if idOrListingId is a direct order ID match (e.g. from an order row click)
+  // Check if idOrListingId is a valid UUID (Postgres UUID column requires valid syntax)
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrListingId);
-  if (isUuid) {
-    const { data: directOrder, error: directErr } = await supabase
-      .from("orders")
-      .select(SELECT_ORDER_COLS)
-      .eq("id", idOrListingId)
-      .maybeSingle();
-
-    if (!directErr && directOrder) {
-      return formatOrderRow(directOrder);
-    }
+  if (!isUuid) {
+    return null;
   }
 
-  // Fallback to querying by listing_id
+  // 1. Direct order ID match (e.g. from an order row click)
+  const { data: directOrder, error: directErr } = await supabase
+    .from("orders")
+    .select(SELECT_ORDER_COLS)
+    .eq("id", idOrListingId)
+    .maybeSingle();
+
+  if (!directErr && directOrder) {
+    return formatOrderRow(directOrder);
+  }
+
+  // 2. Fallback to querying by listing_id
   const { data, error } = await supabase
     .from("orders")
     .select(SELECT_ORDER_COLS)
@@ -73,7 +76,11 @@ export async function fetchOrderForListing(
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (error) throw new Error(error.message);
+
+  if (error) {
+    console.warn('[payments] fetchOrderForListing query error:', error.message);
+    return null;
+  }
   if (!data) return null;
   return formatOrderRow(data);
 }

@@ -67,11 +67,22 @@ function displayName(
 }
 
 export default function InvoiceScreen() {
-  const { id, paid, placed, method } = useLocalSearchParams<{
+  const {
+    id,
+    paid,
+    placed,
+    method,
+    listing_id: listingIdParam,
+    title: titleParam,
+    amount: amountParam,
+  } = useLocalSearchParams<{
     id: string;
     paid?: string;
     placed?: string;
     method?: string;
+    listing_id?: string;
+    title?: string;
+    amount?: string;
   }>();
   const { profile, user } = useAuth();
   const toast = useToast();
@@ -82,14 +93,14 @@ export default function InvoiceScreen() {
   const [order, setOrder] = useState<Order | null>(null);
   const [orderLoading, setOrderLoading] = useState(true);
 
-  const effectiveListingId = order?.listing_id ?? (id ? String(id) : null);
+  const effectiveListingId = order?.listing_id ?? listingIdParam ?? (id ? String(id) : null);
   const listingQ = useListingQuery(effectiveListingId);
 
   const fallbackListing = order
     ? {
         id: order.listing_id || order.id,
-        title: 'Purchased Item',
-        price: order.amount_cents / 100,
+        title: titleParam || 'Purchased Item',
+        price: (order.amount_cents > 0 ? order.amount_cents : (Number(amountParam) * 100 || 100000)) / 100,
         photos: [],
         images: [],
         thumbnails: [],
@@ -167,13 +178,17 @@ export default function InvoiceScreen() {
       if (first) {
         setOrder(first);
       } else if (placed === '1') {
+        const fallbackAmount = amountParam && !isNaN(Number(amountParam)) && Number(amountParam) > 0
+          ? Number(amountParam)
+          : Number(priceRef.current ?? listing?.price ?? 1000);
+
         setOrder({
-          id: `order_demo_${Date.now()}`,
-          listing_id: String(lookupId),
+          id: lookupId,
+          listing_id: listingIdParam ?? (lookupId !== id ? lookupId : 'demo'),
           buyer_id: user?.id ?? 'buyer_demo',
           seller_id: listing?.seller_id ?? listing?.seller?.id ?? 'seller_demo',
           status: method === 'cod' ? 'pending' : 'paid',
-          amount_cents: Math.round(Number(priceRef.current ?? 1000) * 100),
+          amount_cents: Math.round(fallbackAmount * 100),
           fee_cents: 0,
           currency: 'pkr',
           payment_method: method === 'cod' ? 'cod' : 'card',
@@ -182,7 +197,7 @@ export default function InvoiceScreen() {
       }
       setOrderLoading(false);
 
-      if (paid !== '1' || first?.status === 'paid') return;
+      if (paid !== '1' || placed === '1' || first?.status === 'paid') return;
 
       setConfirming(true);
       for (let i = 0; i < 10; i++) {
@@ -210,7 +225,7 @@ export default function InvoiceScreen() {
       active = false;
       appStateSub.remove();
     };
-  }, [paid, placed, method, id, user?.id, listing?.seller_id, listing?.seller?.id]);
+  }, [paid, placed, method, id, user?.id, listingIdParam, amountParam, listing?.seller_id, listing?.seller?.id]);
 
   // Real-time synchronization for order changes across devices
   useEffect(() => {

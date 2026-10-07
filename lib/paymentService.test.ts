@@ -232,6 +232,7 @@ describe('CodPaymentProvider (Atomic RPC integration)', () => {
     expect(result.status).toBe('pending');
     expect(result.order?.payment_method).toBe('cod');
     expect(result.order?.status).toBe('pending');
+    expect(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(result.orderId!)).toBe(true);
   });
 });
 
@@ -252,6 +253,7 @@ describe('StripePaymentProvider (PCI-Compliant Mock / Gateway)', () => {
     expect(result.status).toBe('paid');
     expect(result.sessionId).toBeDefined();
     expect(result.clientSecret).toBeDefined();
+    expect(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(result.orderId!)).toBe(true);
   });
 });
 

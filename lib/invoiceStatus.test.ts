@@ -92,6 +92,14 @@ describe('deriveInvoiceAmounts', () => {
     });
   });
 
+  it('falls back to listing price if order amount_cents is zero', () => {
+    expect(deriveInvoiceAmounts({ amount_cents: 0, fee_cents: 0 } as any, 2500, buyerProtectionFee)).toEqual({
+      item: 2500,
+      fee: 150,
+      total: 2650,
+    });
+  });
+
   it('is safe on missing or nonsense listing prices', () => {
     for (const bad of [null, undefined, 0, -5, 'abc', NaN]) {
       const a = deriveInvoiceAmounts(null, bad, buyerProtectionFee);

@@ -44,6 +44,7 @@ import { paymentService, normalizeAddressInput } from '@/lib/paymentService';
 import { ShippingAddressSchema } from '@/lib/schemas/order';
 import { getOrCreateConversation, cancelBundleOffersForSoldItem } from '@/lib/chat';
 import { SELECT_LISTING_WITH_SELLER } from '@/lib/listings';
+import { openCheckout } from '@/lib/payments';
 import type { ShippingAddress, Listing } from '@/types';
 
 function tap(style: 'light' | 'medium' = 'light') {
@@ -703,6 +704,12 @@ export default function PaymentScreen() {
         throw new Error(result.error || result.message || 'Checkout failed');
       }
 
+      // If Stripe Checkout session redirect URL was returned, open the external Stripe checkout flow
+      if (result.redirectUrl) {
+        await openCheckout(result.redirectUrl);
+        return;
+      }
+
       const allItemIds = Array.from(
         new Set([String(listing.id), ...bundleItemIds]),
       );
@@ -759,6 +766,8 @@ export default function PaymentScreen() {
           paid: isPaid ? '1' : '0',
           placed: '1',
           side: 'bought',
+          listing_id: String(listing.id),
+          method: selectedMethod === 'cod' ? 'cod' : 'card',
           title:
             isBundle && allTitles.length > 1
               ? `Bundle (${allTitles.length} items)`

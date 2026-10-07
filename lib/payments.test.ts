@@ -107,4 +107,10 @@ describe('lib/payments fetchOrderForListing dual-lookup', () => {
     expect(res?.seller_pickup_address).toEqual({ city: 'Karachi' });
     expect(res?.listing).toEqual({ id: 'listing-1', title: 'Silk Scarf' });
   });
+
+  it('returns null immediately for non-UUID strings without querying Supabase', async () => {
+    const res = await fetchOrderForListing('cod_mock_123456');
+    expect(res).toBeNull();
+    expect(supabase.from).not.toHaveBeenCalled();
+  });
 });

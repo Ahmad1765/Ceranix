@@ -70,7 +70,7 @@ export function deriveInvoiceAmounts(
   listingPrice: unknown,
   feeForPrice: (price: number) => number,
 ): { item: number; fee: number; total: number } {
-  if (order) {
+  if (order && order.amount_cents > 0) {
     const item = order.amount_cents / 100;
     const fee = order.fee_cents / 100;
     return { item, fee, total: item + fee };

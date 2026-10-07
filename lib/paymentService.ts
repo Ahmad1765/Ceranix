@@ -40,10 +40,25 @@ export interface PaymentProvider {
   processCheckout(request: CheckoutRequest): Promise<CheckoutResult>;
 }
 
+const PK = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
+export const STRIPE_ENABLED = PK.startsWith('pk_test_') || PK.startsWith('pk_live_');
+
+export function generateMockOrderId(): string {
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export function isDemoMode(): boolean {
   return (
     process.env.EXPO_PUBLIC_DEMO_MODE === 'true' ||
-    process.env.NODE_ENV === 'test'
+    process.env.NODE_ENV === 'test' ||
+    !STRIPE_ENABLED
   );
 }
 
@@ -181,7 +196,7 @@ export class CodPaymentProvider implements PaymentProvider {
     const itemPrice = request.offerAmount ?? request.listingPrice ?? 1000;
     const amountCents = Math.round(itemPrice * 100);
     const feeCents = Math.round(BUYER_PROTECTION_FEE * 100);
-    const mockOrderId = `cod_mock_${Date.now()}`;
+    const mockOrderId = generateMockOrderId();
 
     const mockOrder: Order = {
       id: mockOrderId,
@@ -220,10 +235,6 @@ export class CodPaymentProvider implements PaymentProvider {
   }
 }
 
-// ── Stripe Payment Gateway (Mock / Live drop-in) ───────────────────────────────
-const PK = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
-export const STRIPE_ENABLED = PK.startsWith('pk_test_') || PK.startsWith('pk_live_');
-
 export class StripePaymentProvider implements PaymentProvider {
   readonly id = 'card' as const;
 
@@ -234,28 +245,32 @@ export class StripePaymentProvider implements PaymentProvider {
 
     // If Stripe is live and configured, invoke edge function for Checkout session
     if (STRIPE_ENABLED) {
-      const returnUrl = this.buildReturnUrl(request.listingId);
-      const { data, error } = await supabase.functions.invoke<{ url: string; sessionId: string }>(
-        'create-checkout-session',
-        {
-          body: {
-            listing_id: request.listingId,
-            return_url: returnUrl,
-            offer_amount: request.offerAmount ?? undefined,
+      try {
+        const returnUrl = this.buildReturnUrl(request.listingId);
+        const { data, error } = await supabase.functions.invoke<{ url: string; sessionId: string }>(
+          'create-checkout-session',
+          {
+            body: {
+              listing_id: request.listingId,
+              return_url: returnUrl,
+              offer_amount: request.offerAmount ?? undefined,
+            },
           },
-        },
-      );
+        );
 
-      if (error) throw new Error(error.message);
-      if (!data?.url) throw new Error('No checkout URL returned from Stripe');
-
-      return {
-        success: true,
-        sessionId: data.sessionId,
-        redirectUrl: data.url,
-        paymentMethod: 'card',
-        status: 'pending',
-      };
+        if (!error && data?.url) {
+          return {
+            success: true,
+            sessionId: data.sessionId,
+            redirectUrl: data.url,
+            paymentMethod: 'card',
+            status: 'pending',
+          };
+        }
+        console.warn('[paymentService] Stripe session creation failed, falling back to simulated checkout:', error?.message);
+      } catch (err: any) {
+        console.warn('[paymentService] Stripe edge function error, falling back to simulated checkout:', err?.message);
+      }
     }
 
     if (!isDemoMode()) {
@@ -322,7 +337,7 @@ export class StripePaymentProvider implements PaymentProvider {
 
     const mockSessionId = backendOrder?.stripe_session_id || `cs_test_mock_${Date.now()}`;
     const mockPaymentIntent = backendOrder?.stripe_payment_intent || `pi_test_mock_${Date.now()}`;
-    const mockOrderId = backendOrder?.id || `order_mock_${Date.now()}`;
+    const mockOrderId = backendOrder?.id || generateMockOrderId();
 
     const mockOrder: Order = backendOrder || {
       id: mockOrderId,
