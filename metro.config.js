@@ -115,6 +115,7 @@ config.resolver.blockList = [
   /[\\/]android[\\/]\.cxx[\\/].*/,
   /[\\/]android[\\/]build[\\/].*/,
   /[\\/]ios[\\/]build[\\/].*/,
+  /[\\/]\.agents[\\/].*/,
 ];
 
 module.exports = withNativeWind(config, { input: './global.css' });
