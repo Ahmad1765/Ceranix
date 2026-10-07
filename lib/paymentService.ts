@@ -741,7 +741,7 @@ export class PaymentService {
         fee_cents: Math.round(BUYER_PROTECTION_FEE * 100),
         currency: 'pkr',
         payment_method: 'cod',
-        status: 'paid',
+        status: 'completed',
         fulfillment_status: 'completed',
         escrow_status: 'COMPLETED_FUNDS_RELEASED',
         created_at: new Date().toISOString(),

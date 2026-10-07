@@ -112,6 +112,36 @@ create index if not exists orders_buyer_status_idx
 create index if not exists orders_seller_status_idx
   on public.orders(seller_id, status, created_at desc);
 
+-- Ensure public.orders has UPDATE RLS policy for buyers, sellers, and admins
+alter table public.orders enable row level security;
+
+drop policy if exists "Buyers, sellers, and admins can update orders" on public.orders;
+create policy "Buyers, sellers, and admins can update orders" on public.orders
+  for update to authenticated
+  using (
+    (select auth.uid()) = buyer_id 
+    or (select auth.uid()) = seller_id
+    or exists (select 1 from public.profiles where id = (select auth.uid()) and is_admin = true)
+  )
+  with check (
+    (select auth.uid()) = buyer_id 
+    or (select auth.uid()) = seller_id
+    or exists (select 1 from public.profiles where id = (select auth.uid()) and is_admin = true)
+  );
+
+-- Ensure subcategory and color columns exist on public.listings
+alter table public.listings
+  add column if not exists subcategory text,
+  add column if not exists color text;
+
+create index if not exists listings_category_subcategory_idx
+  on public.listings(category, subcategory)
+  where is_sold = false;
+
+create index if not exists listings_color_idx
+  on public.listings(color)
+  where is_sold = false;
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 3. WEBHOOK IDEMPOTENCY REGISTRY
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -1005,20 +1035,21 @@ begin
     raise exception 'Invalid target fulfillment status: %', p_target_status using errcode = '22000';
   end if;
 
+  -- Validate state machine progression (permit idempotent calls & awaiting_payment)
   if p_target_status = 'packing' then
-    if v_order.fulfillment_status <> 'pending' then
+    if v_order.fulfillment_status not in ('pending', 'awaiting_payment', 'packing') then
       raise exception 'Cannot advance to packing from %', v_order.fulfillment_status using errcode = '22000';
     end if;
   elsif p_target_status = 'shifting' then
-    if v_order.fulfillment_status not in ('pending', 'packing') then
+    if v_order.fulfillment_status not in ('pending', 'awaiting_payment', 'packing', 'shifting') then
       raise exception 'Cannot advance to shifting from %', v_order.fulfillment_status using errcode = '22000';
     end if;
   elsif p_target_status = 'delivered' then
-    if v_order.fulfillment_status not in ('packing', 'shifting') then
+    if v_order.fulfillment_status not in ('packing', 'shifting', 'delivered') then
       raise exception 'Cannot mark delivered from %', v_order.fulfillment_status using errcode = '22000';
     end if;
   elsif p_target_status = 'completed' then
-    if v_order.fulfillment_status not in ('delivered', 'shifting') then
+    if v_order.fulfillment_status not in ('delivered', 'shifting', 'completed') then
       raise exception 'Cannot complete order from %', v_order.fulfillment_status using errcode = '22000';
     end if;
   end if;
@@ -1027,7 +1058,8 @@ begin
      set fulfillment_status = p_target_status,
          status = case
            when p_target_status = 'completed' then 'completed'
-           when p_target_status = 'shifting' and status = 'pending' then 'paid'
+           -- Only transition card/escrow orders to paid on dispatch; CoD is paid on delivery
+           when p_target_status = 'shifting' and status in ('pending', 'awaiting_payment') and coalesce(payment_method, '') <> 'cod' then 'paid'
            else status
          end,
          escrow_status = case
@@ -1213,6 +1245,107 @@ begin
         'status', 'completed',
         'fulfillment_status', 'completed',
         'completed_at', v_now
+      )
+    );
+  end if;
+
+  return v_order;
+end;
+$$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 8b. RPC: complete_cod_order (Atomic Seller CoD Completion)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+create or replace function public.complete_cod_order(
+  p_order_id uuid
+)
+returns public.orders
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_caller_id uuid := auth.uid();
+  v_order public.orders;
+  v_is_admin boolean := false;
+  v_conv_id uuid;
+  v_now timestamptz := clock_timestamp();
+begin
+  if v_caller_id is null then
+    raise exception 'Authentication required' using errcode = '42501';
+  end if;
+
+  select * into v_order
+    from public.orders
+   where id = p_order_id
+     for update;
+
+  if not found then
+    raise exception 'Order not found' using errcode = 'P0002';
+  end if;
+
+  v_is_admin := coalesce((select is_admin from public.profiles where id = v_caller_id), false);
+
+  if v_caller_id <> v_order.seller_id and not v_is_admin then
+    raise exception 'Only the seller or admin can mark a CoD order as completed' using errcode = '42501';
+  end if;
+
+  if v_order.payment_method <> 'cod' then
+    raise exception 'Order is not Cash on Delivery' using errcode = '22000';
+  end if;
+
+  -- Idempotent return if already completed
+  if v_order.status = 'completed' and v_order.fulfillment_status = 'completed' then
+    return v_order;
+  end if;
+
+  -- Prevent completing canceled or refunded orders
+  if v_order.status in ('canceled', 'refunded') or v_order.fulfillment_status = 'canceled' then
+    raise exception 'Order is canceled or refunded and cannot be completed' using errcode = '22000';
+  end if;
+
+  update public.orders
+     set status = 'completed',
+         fulfillment_status = 'completed',
+         payment_status = 'paid',
+         cod_paid_at = coalesce(cod_paid_at, v_now),
+         delivered_at = coalesce(delivered_at, v_now),
+         completed_at = coalesce(completed_at, v_now),
+         escrow_status = 'COMPLETED_FUNDS_RELEASED'
+   where id = p_order_id
+  returning * into v_order;
+
+  -- Synchronize public.transactions row
+  update public.transactions
+     set status = 'COMPLETED_FUNDS_RELEASED',
+         delivered_at = coalesce(delivered_at, v_now),
+         funds_released_at = coalesce(funds_released_at, v_now),
+         updated_at = v_now
+   where order_id = p_order_id;
+
+  -- Ensure listing is marked is_sold = true
+  update public.listings
+     set is_sold = true
+   where id = v_order.listing_id;
+
+  -- Real-time conversation message
+  select id into v_conv_id
+    from public.conversations
+   where listing_id = v_order.listing_id
+     and ((buyer_id = v_order.buyer_id and seller_id = v_order.seller_id) or (buyer_id = v_order.seller_id and seller_id = v_order.buyer_id))
+   limit 1;
+
+  if v_conv_id is not null then
+    insert into public.messages (
+      conversation_id, sender_id, content, kind, metadata
+    ) values (
+      v_conv_id, v_caller_id, 'Cash on Delivery Collected! 💵 Order completed successfully.', 'system',
+      jsonb_build_object(
+        'order_id', p_order_id,
+        'fulfillment_status', 'completed',
+        'status', 'completed',
+        'updated_at', v_now
       )
     );
   end if;
@@ -1548,6 +1681,7 @@ grant execute on function public.counter_chat_offer(uuid, numeric, text, text, u
 grant execute on function public.process_checkout(uuid, uuid, text, jsonb, numeric, text, text) to authenticated, service_role;
 grant execute on function public.create_cod_order(uuid, uuid, jsonb, numeric, text, text) to authenticated, service_role;
 grant execute on function public.advance_order_fulfillment(uuid, text, text, text, text, text, jsonb) to authenticated, service_role;
+grant execute on function public.complete_cod_order(uuid) to authenticated, service_role;
 grant execute on function public.mark_order_shipped(uuid, text, text) to authenticated, service_role;
 grant execute on function public.confirm_order_received(uuid) to authenticated, service_role;
 grant execute on function public.cancel_order(uuid, text) to authenticated, service_role;

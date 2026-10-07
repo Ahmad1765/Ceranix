@@ -615,6 +615,8 @@ export function SellForm({
           if (!result.ok && isMissingColumn) {
             delete (updatePayload as any).authenticity;
             delete (updatePayload as any).taxonomy_version;
+            delete (updatePayload as any).subcategory;
+            delete (updatePayload as any).color;
             result = await updateListing(editingListing.id, updatePayload);
           }
 
@@ -711,6 +713,8 @@ export function SellForm({
       if (isMissingColumn) {
         delete listingPayload.authenticity;
         delete listingPayload.taxonomy_version;
+        delete listingPayload.subcategory;
+        delete listingPayload.color;
         insertRes = await supabase
           .from('listings')
           .insert(listingPayload)

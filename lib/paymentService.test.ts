@@ -279,7 +279,8 @@ describe('PaymentService Dispatcher & Seller Completion', () => {
 
   it('allows seller to mark CoD order as collected and paid', async () => {
     const updated = await paymentService.markCodOrderPaid('order-cod-456');
-    expect(updated.status).toBe('paid');
+    expect(updated.status).toBe('completed');
+    expect(updated.fulfillment_status).toBe('completed');
     expect(updated.payment_method).toBe('cod');
   });
 
@@ -490,5 +491,49 @@ describe('PaymentService Dispatcher & Seller Completion', () => {
       'fulfillment_status.eq.canceled,status.eq.canceled,status.eq.refunded,status.eq.failed,status.eq.refund_due',
     );
   });
+
+  it('marks COD order as paid and completed via complete_cod_order RPC', async () => {
+    const rpcSpy = vi.spyOn(supabase, 'rpc').mockResolvedValueOnce({
+      data: {
+        id: 'order-cod-456',
+        listing_id: 'listing-456',
+        buyer_id: 'buyer-456',
+        seller_id: 'seller-456',
+        amount_cents: 12000,
+        fee_cents: 500,
+        currency: 'pkr',
+        payment_method: 'cod',
+        status: 'completed',
+        fulfillment_status: 'completed',
+        escrow_status: 'COMPLETED_FUNDS_RELEASED',
+        created_at: new Date().toISOString(),
+      },
+      error: null,
+    } as any);
+
+    const completedOrder = await paymentService.markCodOrderPaid('order-cod-456');
+
+    expect(rpcSpy).toHaveBeenCalledWith('complete_cod_order', {
+      p_order_id: 'order-cod-456',
+    });
+    expect(completedOrder.id).toBe('order-cod-456');
+    expect(completedOrder.status).toBe('completed');
+    expect(completedOrder.fulfillment_status).toBe('completed');
+  });
+
+  it('falls back to demo mode with status completed when complete_cod_order RPC fails in demo', async () => {
+    vi.spyOn(supabase, 'rpc').mockResolvedValueOnce({
+      data: null,
+      error: { message: 'RPC complete_cod_order not found' },
+    } as any);
+
+    const completedOrder = await paymentService.markCodOrderPaid('order-demo-789');
+
+    expect(completedOrder.id).toBe('order-demo-789');
+    expect(completedOrder.status).toBe('completed');
+    expect(completedOrder.fulfillment_status).toBe('completed');
+    expect(completedOrder.escrow_status).toBe('COMPLETED_FUNDS_RELEASED');
+  });
 });
+
 
