@@ -11,7 +11,8 @@ module.exports = defineConfig([
     //   - supabase/functions: Deno edge functions (jsr:/https: imports, Deno
     //     globals) — linting them here just produces false no-unresolved errors
     //   - tests/e2e: Playwright (Node + its own `page` API, not React)
+    //   - waitlist-landing: standalone Vite + React web landing project
     // This mirrors the `exclude` list in tsconfig.json.
-    ignores: ["dist/*", ".expo/*", "supabase/functions/**", "tests/**"],
+    ignores: ["dist/*", ".expo/*", "supabase/functions/**", "tests/**", "waitlist-landing/**"],
   },
 ]);

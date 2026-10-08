@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+  <title>Grabsty — Resale Fashion Stripped of Clutter | Private Alpha Waitlist</title>
+  <meta name="description" content="A disciplined marketplace for archival and curated wardrobes. Engineered with guaranteed Buyer Protection and zero gamification." />
+  
+  <!-- Favicon using SVG Data URI matching Grabsty Purple & Shield -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230F0F0F'/%3E%3Crect x='4' y='4' width='24' height='24' rx='4' fill='%236C47FF'/%3E%3Ctext x='16' y='22' font-family='sans-serif' font-weight='900' font-size='16' fill='%23FFFFFF' text-anchor='middle'%3EG%3C/text%3E%3C/svg%3E" />
+
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Scroll Progress Bar -->
+  <div id="scroll-progress" class="scroll-progress-bar" aria-hidden="true"></div>
+
+  <!-- Noise Film Grain -->
+  <div class="grain-overlay" aria-hidden="true"></div>
+
+  <!-- Mouse Ambient Spotlight Glow -->
+  <div class="cursor-glow" id="cursor-glow" aria-hidden="true"></div>
+
+  <!-- Memphis Floating Graphic Accents -->
+  <div class="memphis-stage" aria-hidden="true">
+    <div class="memphis-shape shape-circle" data-rot="0" data-speed="0.12"></div>
+    <div class="memphis-shape shape-triangle" data-rot="25" data-speed="-0.18"></div>
+    <div class="memphis-shape shape-bar" data-rot="-15" data-speed="0.22"></div>
+    <div class="memphis-shape shape-square-dashed" data-rot="45" data-speed="-0.14"></div>
+    
+    <!-- SVG Memphis Squiggle -->
+    <div class="memphis-shape shape-squiggle" data-rot="12" data-speed="0.25">
+      <svg width="120" height="40" viewBox="0 0 120 40" fill="none">
+        <path d="M5 20 Q 20 0, 35 20 T 65 20 T 95 20 T 115 20" stroke="#6C47FF" stroke-width="6" stroke-linecap="round" fill="none" />
+      </svg>
+    </div>
+
+    <!-- Memphis Asterisk / Star -->
+    <div class="memphis-shape shape-asterisk" data-rot="0" data-speed="-0.08">
+      <svg width="50" height="50" viewBox="0 0 50 50" fill="none">
+        <path d="M25 5 V45 M5 25 H45 M11 11 L39 39 M11 39 L39 11" stroke="#FFFFFF" stroke-width="5" stroke-linecap="square" />
+      </svg>
+    </div>
+
+    <!-- Memphis Zigzag -->
+    <div class="memphis-shape shape-zigzag" data-rot="-20" data-speed="0.16">
+      <svg width="80" height="30" viewBox="0 0 80 30" fill="none">
+        <path d="M5 25 L20 5 L35 25 L50 5 L65 25 L75 10" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+    </div>
+  </div>
+
+  <!-- Site Navigation -->
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="#" class="brand-logo" aria-label="Grabsty Home">
+        GRABSTY<span class="brand-dot"></span>
+      </a>
+      
+      <div class="header-meta">
+        <a href="#waitlist-section" class="header-action-btn">GET ACCESS</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-content">
+    <!-- Hero Section -->
+    <section class="hero-section" id="hero">
+      <h1 class="hero-title" aria-label="Resale Fashion Stripped Of Clutter">
+        <span class="word-mask"><span class="word delay-100">RESALE</span></span>
+        <span class="word-mask"><span class="word delay-150">FASHION</span></span><br class="hero-br" />
+        <span class="word-mask"><span class="word delay-200">STRIPPED</span></span>
+        <span class="word-mask"><span class="word delay-250">OF</span></span>
+        <span class="word-mask"><span class="word delay-300">CLUTTER.</span></span>
+      </h1>
+      
+      <div class="hero-subtitle-box animate-on-scroll reveal-rotate delay-350">
+        <p class="subtitle-text">
+          A disciplined marketplace for archival and curated wardrobes. Engineered with guaranteed Buyer Protection and strictly zero gamification.
+        </p>
+      </div>
+
+      <!-- Funnel Form & Success State -->
+      <div class="funnel-container animate-on-scroll reveal-up delay-450" id="waitlist-section">
+        <div class="form-wrapper" id="form-container">
+          <!-- Referred-By Badge (Dynamically populated if ?ref= is present) -->
+          <div class="referral-banner hidden" id="referral-banner" aria-live="polite">
+            <span class="ref-badge-icon" aria-hidden="true">✦</span>
+            <span>Referred by collector <strong id="referrer-code">#GRB-4810</strong> &bull; You will both jump 50 spots</span>
+          </div>
+
+          <!-- Cohort 01 Capacity Bar (Authentic Scarcity) -->
+          <div class="cohort-capacity-card" aria-label="Cohort 01 Allocation Progress">
+            <div class="cohort-capacity-header">
+              <span class="cohort-cap-label">COHORT 01 ALLOCATION</span>
+              <span class="cohort-cap-count"><strong id="capacity-claimed">4,821</strong> / 5,000 SPOTS (<span id="capacity-pct">96.4%</span>)</span>
+            </div>
+            <div class="cohort-progress-track" role="progressbar" aria-valuenow="96.4" aria-valuemin="0" aria-valuemax="100">
+              <div class="cohort-progress-fill" id="cohort-progress-fill" style="width: 96.4%;"></div>
+            </div>
+            <div class="cohort-capacity-footer">
+              <span class="capacity-live-dot" aria-hidden="true"></span>
+              <span class="capacity-urgency-text">Only <strong id="capacity-remaining">179</strong> alpha passports remaining</span>
+            </div>
+          </div>
+
+          <!-- Waitlist Registration Form -->
+          <form id="waitlist-form" class="waitlist-form" novalidate>
+            <!-- Collector / Seller Role Selector -->
+            <div class="role-selector-wrap">
+              <span class="role-selector-label">I AM JOINING AS:</span>
+              <div class="role-pills" role="radiogroup" aria-label="Select your participant type">
+                <button type="button" role="radio" aria-checked="true" class="role-pill active" data-role="buyer">
+                  <span class="role-pill-indicator">◈</span> ARCHIVE BUYER
+                </button>
+                <button type="button" role="radio" aria-checked="false" class="role-pill" data-role="seller">
+                  <span class="role-pill-indicator">◇</span> CURATED SELLER
+                </button>
+                <button type="button" role="radio" aria-checked="false" class="role-pill" data-role="both">
+                  <span class="role-pill-indicator">◆</span> BOTH
+                </button>
+              </div>
+              <input type="hidden" name="role" id="selected-role" value="buyer" />
+            </div>
+
+            <div class="form-inputs-row">
+              <div class="input-group">
+                <label for="email" class="sr-only">Email address</label>
+                <input 
+                  type="email" 
+                  id="email" 
+                  name="email"
+                  required 
+                  autocomplete="email"
+                  placeholder="name@archival.com" 
+                  class="email-input" 
+                  aria-describedby="email-error"
+                />
+                <div id="email-error" class="input-error-msg" aria-live="polite"></div>
+              </div>
+              
+              <button type="submit" id="submit-btn" class="submit-btn">
+                <span class="btn-text">JOIN WAITLIST</span>
+                <span class="btn-spinner" aria-hidden="true"></span>
+              </button>
+            </div>
+          </form>
+
+          <!-- Canonical Mercari Buyer Protection Badge -->
+          <div class="trust-pill" title="Escrow-Backed Buyer Protection">
+            <svg class="canonical-shield" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="12" fill="#F2F3FE" />
+              <g transform="translate(-5.4, -5.4) scale(1.45)">
+                <path d="M12.033 6.8s-2.93 1.424-5.833 1.424v.168c0 .838.044 1.634.154 2.367.33 2.47 1.233 4.398 2.729 6.01l.066.084c.594.628 1.255 1.131 1.937 1.529.198.125.925.419.925.419s.726-.293.925-.419c.704-.377 1.343-.9 1.937-1.529l.066-.084c1.035-1.11 1.783-2.387 2.245-3.874.22-.67.33-1.361.44-2.136.088-.733.176-1.529.176-2.367v-.168c-2.833 0-5.767-1.424-5.767-1.424z" stroke="#5356EE" stroke-width="0.95" stroke-linejoin="round" />
+                <path d="M9.4 12.013l1.932 1.787 3.668-3.4" stroke="#5356EE" stroke-width="0.95" stroke-linecap="round" stroke-linejoin="round" />
+              </g>
+            </svg>
+            <span class="trust-label">Guaranteed Buyer Protection</span>
+            <span class="trust-bullet">&bull;</span>
+            <span class="trust-sub">Funds in Escrow</span>
+          </div>
+
+          <!-- Social Proof Counter -->
+          <div class="social-counter">
+            <span class="counter-num" id="queue-counter">4,821</span> collectors queued for Cohort 01
+          </div>
+
+          <!-- Status Lookup Switcher -->
+          <div class="lookup-toggle-wrap">
+            <button type="button" id="lookup-toggle-btn" class="lookup-toggle-btn">
+              Already registered? Check queue position & referrals &rarr;
+            </button>
+          </div>
+        </div>
+
+        <!-- Success Confirmation Card with Viral Referral Station -->
+        <div class="success-state hidden" id="success-container" aria-live="polite">
+          <div class="success-card">
+            <div class="success-badge-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </div>
+            <div class="success-queue-tag" id="success-queue-tag">POSITION CONFIRMED</div>
+            <h2 class="success-title" id="success-title">You're On The Waitlist!</h2>
+            <div class="success-meta-row">
+              <span class="success-email" id="confirmed-email"></span>
+              <span class="success-role-badge" id="confirmed-role">COLLECTOR</span>
+            </div>
+            <p class="success-text" id="success-message">
+              We'll send your private invite key the moment Cohort 01 access begins. Keep your wardrobe archive ready.
+            </p>
+
+            <!-- Viral Referral Station -->
+            <div class="referral-station">
+              <div class="ref-station-header">
+                <span class="ref-station-tag">QUEUE JUMP PROTOCOL</span>
+                <h3 class="ref-station-title">Move Up 50 Spots Per Invite</h3>
+                <p class="ref-station-desc">
+                  Share your alpha passport link with fellow collectors. Every verified signup moves your position forward in Cohort 01.
+                </p>
+              </div>
+
+              <div class="ref-link-box">
+                <input 
+                  type="text" 
+                  id="referral-link-input" 
+                  class="ref-link-input" 
+                  readonly 
+                  value="https://grabsty.com/?ref=GRB-4822"
+                  aria-label="Your unique referral link"
+                />
+                <button type="button" id="copy-ref-btn" class="copy-ref-btn">
+                  <span class="copy-text">COPY LINK</span>
+                </button>
+              </div>
+
+              <div class="ref-share-actions">
+                <a id="share-x-btn" class="ref-share-btn share-x" href="#" target="_blank" rel="noopener noreferrer">
+                  SHARE ON 𝕏
+                </a>
+                <a id="share-wa-btn" class="ref-share-btn share-wa" href="#" target="_blank" rel="noopener noreferrer">
+                  WHATSAPP
+                </a>
+                <button type="button" id="native-share-btn" class="ref-share-btn share-native hidden">
+                  SHARE SHEET ↗
+                </button>
+              </div>
+
+              <div class="ref-tracker-pill">
+                <span class="ref-tracker-dot" aria-hidden="true"></span>
+                <span id="ref-count-text">0 Referrals Tracked &bull; Priority Queue Locked</span>
+              </div>
+            </div>
+
+            <div class="success-footer-info">
+              <span class="ticket-id" id="ticket-number">#GRB-4822</span>
+              <span class="ticket-status">ALPHA PASSPORT ISSUED</span>
+            </div>
+
+            <!-- Downloadable Pass & Navigation Actions -->
+            <div class="success-actions-row">
+              <button type="button" id="download-pass-btn" class="secondary-card-btn">
+                DOWNLOAD PASSPORT CARD (.PNG)
+              </button>
+              <button type="button" id="back-to-form-btn" class="back-link-btn">
+                &larr; Register Another Account
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <canvas id="passport-canvas" width="1200" height="630" style="display:none;" aria-hidden="true"></canvas>
+    </section>
+
+    <!-- Kinetic Marquee Section (lapz.io velocity-coupled) -->
+    <div class="marquee-section animate-on-scroll reveal-up delay-200" aria-hidden="true">
+      <div class="marquee-track" id="marquee-track">
+        <div class="marquee-stream">
+          <span>PRIVATE ALPHA COHORT 01</span>
+          <span class="star-sep">✱</span>
+          <span>GUARANTEED ESCROW PROTECTION</span>
+          <span class="star-sep">✱</span>
+          <span>ZERO GAMIFICATION CLUTTER</span>
+          <span class="star-sep">✱</span>
+          <span>ARCHIVAL & CURATED WARDROBES</span>
+          <span class="star-sep">✱</span>
+          <span>DISCIPLINED COMMERCE</span>
+          <span class="star-sep">✱</span>
+        </div>
+        <div class="marquee-stream" aria-hidden="true">
+          <span>PRIVATE ALPHA COHORT 01</span>
+          <span class="star-sep">✱</span>
+          <span>GUARANTEED ESCROW PROTECTION</span>
+          <span class="star-sep">✱</span>
+          <span>ZERO GAMIFICATION CLUTTER</span>
+          <span class="star-sep">✱</span>
+          <span>ARCHIVAL & CURATED WARDROBES</span>
+          <span class="star-sep">✱</span>
+          <span>DISCIPLINED COMMERCE</span>
+          <span class="star-sep">✱</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bento Grid Section (Value Pillars) -->
+    <section class="features-section" id="features">
+      <div class="section-tag animate-on-scroll reveal-rotate">
+        <span>ARCHITECTURAL PRINCIPLES</span>
+      </div>
+      
+      <h2 class="section-heading animate-on-scroll reveal-up delay-100">
+        BUILT FOR COLLECTORS.<br />NOT GAMIFIED CASINOS.
+      </h2>
+
+      <div class="bento-grid">
+        <!-- Card 1: Escrow Protection -->
+        <article class="bento-card card-escrow animate-on-scroll delay-150">
+          <div class="card-header">
+            <span class="card-num">01</span>
+            <span class="card-tag">SECURITY PROTOCOL</span>
+          </div>
+          
+          <div class="card-visual escrow-visual">
+            <div class="escrow-badge">
+              <div class="escrow-icon-wrap">
+                <svg viewBox="0 0 24 24" fill="none" class="escrow-icon">
+                  <circle cx="12" cy="12" r="12" fill="#F2F3FE" />
+                  <g transform="translate(-5.4, -5.4) scale(1.45)">
+                    <path d="M12.033 6.8s-2.93 1.424-5.833 1.424v.168c0 .838.044 1.634.154 2.367.33 2.47 1.233 4.398 2.729 6.01l.066.084c.594.628 1.255 1.131 1.937 1.529.198.125.925.419.925.419s.726-.293.925-.419c.704-.377 1.343-.9 1.937-1.529l.066-.084c1.035-1.11 1.783-2.387 2.245-3.874.22-.67.33-1.361.44-2.136.088-.733.176-1.529.176-2.367v-.168c-2.833 0-5.767-1.424-5.767-1.424z" stroke="#5356EE" stroke-width="0.95" stroke-linejoin="round" />
+                    <path d="M9.4 12.013l1.932 1.787 3.668-3.4" stroke="#5356EE" stroke-width="0.95" stroke-linecap="round" stroke-linejoin="round" />
+                  </g>
+                </svg>
+              </div>
+              <div class="escrow-status-text">
+                <span class="escrow-status-title">ESCROW STATUS: ACTIVE</span>
+                <span class="escrow-status-desc">72-Hour Physical Inspection Window</span>
+              </div>
+            </div>
+            <div class="escrow-timeline">
+              <div class="step-dot active"></div>
+              <div class="step-line active"></div>
+              <div class="step-dot active"></div>
+              <div class="step-line"></div>
+              <div class="step-dot"></div>
+            </div>
+            <div class="timeline-labels">
+              <span>Paid</span>
+              <span>In Escrow</span>
+              <span>Released</span>
+            </div>
+          </div>
+
+          <h3 class="card-title">Guaranteed Escrow Security</h3>
+          <p class="card-desc">
+            Buyer funds never go directly to the seller upon checkout. Payments remain safely secured in cryptographic escrow until you receive and physically verify the garment.
+          </p>
+        </article>
+
+        <!-- Card 2: Archival Wardrobe & Sharp Sold Invariant -->
+        <article class="bento-card card-archival animate-on-scroll delay-250">
+          <div class="card-header">
+            <span class="card-num">02</span>
+            <span class="card-tag">CURATION</span>
+          </div>
+
+          <div class="card-visual item-preview-visual">
+            <div class="mockup-listing-card">
+              <div class="mockup-img-container">
+                <div class="mockup-silhouette">
+                  <svg viewBox="0 0 100 120" fill="none" class="garment-svg">
+                    <path d="M35 15 L50 22 L65 15 L85 35 L75 48 L68 42 L68 110 L32 110 L32 42 L25 48 L15 35 Z" stroke="#6C47FF" stroke-width="3" fill="rgba(108, 71, 255, 0.08)" />
+                    <line x1="50" y1="22" x2="50" y2="110" stroke="#FFFFFF" stroke-dasharray="3 3" stroke-width="2" />
+                  </svg>
+                </div>
+                <!-- Canonical Sharp Sold Badge (Strict Plick Invariant: 0px radius, purple bg) -->
+                <div class="sharp-sold-badge">SOLD</div>
+              </div>
+              <div class="mockup-meta">
+                <div class="mockup-brand">RAF SIMONS &bull; 2002</div>
+                <div class="mockup-item-name">'Virginia Creeper' Sweatshirt</div>
+                <div class="mockup-price">$1,450</div>
+              </div>
+            </div>
+          </div>
+
+          <h3 class="card-title">Editorial Wardrobe Presentation</h3>
+          <p class="card-desc">
+            Multi-angle garment curation. High-resolution weave textures, stitch silhouettes, and provenance documents presented cleanly without distorted filters.
+          </p>
+        </article>
+
+        <!-- Card 3: Anti-Clutter Comparison -->
+        <article class="bento-card card-discipline animate-on-scroll delay-350">
+          <div class="card-header">
+            <span class="card-num">03</span>
+            <span class="card-tag">DISCIPLINE</span>
+          </div>
+
+          <div class="card-visual comparison-visual">
+            <div class="comp-row noise-row">
+              <span class="comp-badge bad">CONVENTIONAL APPS</span>
+              <div class="noise-chips">
+                <span class="fake-chip">SPIN WHEEL!</span>
+                <span class="fake-chip">HURRY! 9 LEFT</span>
+                <span class="fake-chip">35% FLASH SALE</span>
+              </div>
+            </div>
+            
+            <div class="comp-divider">
+              <span>VS</span>
+            </div>
+
+            <div class="comp-row quiet-row">
+              <span class="comp-badge good">GRABSTY DISCIPLINE</span>
+              <div class="quiet-box">
+                <span class="quiet-metric">0 ADVERTS</span>
+                <span class="quiet-metric">0 FLASH NOTIFICATIONS</span>
+                <span class="quiet-metric">PURE ARCHIVE</span>
+              </div>
+            </div>
+          </div>
+
+          <h3 class="card-title">Zero Gamification Clutter</h3>
+          <p class="card-desc">
+            No flashing sticker popups, slot-machine confetti, or deceptive countdown timers. A quiet-luxury platform designed with respect for your focus and aesthetic sensibilities.
+          </p>
+        </article>
+
+        <!-- Wide Metrics Banner Card -->
+        <article class="bento-card card-metrics full-width animate-on-scroll delay-200">
+          <div class="metrics-grid">
+            <div class="metric-item">
+              <span class="metric-value">100%</span>
+              <span class="metric-label">ESCROW PROTECTED</span>
+              <p class="metric-sub">Zero funds released without physical confirmation</p>
+            </div>
+            <div class="metric-divider"></div>
+            <div class="metric-item">
+              <span class="metric-value">0%</span>
+              <span class="metric-label">ALGORITHMIC JUNK</span>
+              <p class="metric-sub">Chronological curation with clean provenance</p>
+            </div>
+            <div class="metric-divider"></div>
+            <div class="metric-item">
+              <span class="metric-value">72hr</span>
+              <span class="metric-label">INSPECTION WINDOW</span>
+              <p class="metric-sub">Full window to verify weave, authenticity & condition</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- FAQ Accordion Section -->
+    <section class="faq-section" id="faq">
+      <div class="section-tag animate-on-scroll reveal-rotate">
+        <span>MEMBERSHIP PROTOCOL</span>
+      </div>
+      <h2 class="section-heading animate-on-scroll reveal-up delay-100">
+        FREQUENTLY ANSWERED.
+      </h2>
+
+      <div class="faq-list animate-on-scroll reveal-up delay-200">
+        <details class="faq-item">
+          <summary class="faq-question">
+            <span>When does Cohort 01 Private Alpha launch?</span>
+            <span class="faq-arrow" aria-hidden="true">&plus;</span>
+          </summary>
+          <div class="faq-answer">
+            <p>
+              Cohort 01 onboarding commences in rolling batches. Waitlist members are admitted based on registration timestamp and curated wardrobe profiles. You will receive an invitation passport with private authentication credentials directly via email.
+            </p>
+          </div>
+        </details>
+
+        <details class="faq-item">
+          <summary class="faq-question">
+            <span>How does the Escrow Buyer Protection safeguard purchases?</span>
+            <span class="faq-arrow" aria-hidden="true">&plus;</span>
+          </summary>
+          <div class="faq-answer">
+            <p>
+              When an item is purchased, your funds are secured in Grabsty Escrow. The seller ships with tracked courier transit. Upon receipt, you have a full 72-hour physical inspection window to verify that the piece precisely matches the listing before payment is released.
+            </p>
+          </div>
+        </details>
+
+        <details class="faq-item">
+          <summary class="faq-question">
+            <span>What apparel and design houses are eligible for Grabsty?</span>
+            <span class="faq-arrow" aria-hidden="true">&plus;</span>
+          </summary>
+          <div class="faq-answer">
+            <p>
+              Grabsty is strictly focused on archival, runway, and contemporary quiet-luxury wardrobes. We welcome curated archival pieces from houses including Maison Margiela, Helmut Lang, Yohji Yamamoto, Raf Simons, Rick Owens, Phoebe Philo era Celine, Jil Sander, and select avant-garde ateliers. Fast fashion and counterfeit goods are strictly prohibited.
+            </p>
+          </div>
+        </details>
+
+        <details class="faq-item">
+          <summary class="faq-question">
+            <span>Are there platform listing fees for early sellers?</span>
+            <span class="faq-arrow" aria-hidden="true">&plus;</span>
+          </summary>
+          <div class="faq-answer">
+            <p>
+              Cohort 01 Founding Sellers receive lifetime preferred fee schedules and zero listing fees during the Private Alpha period. All sellers undergo strict identity and archival inventory verification prior to publishing.
+            </p>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <!-- Bottom Action Funnel Banner -->
+    <section class="bottom-cta-section animate-on-scroll reveal-up">
+      <div class="cta-banner-box">
+        <div class="cta-inner">
+          <h2 class="cta-title">CLAIM YOUR ALPHA PASSPORT.</h2>
+          <p class="cta-desc">Join 4,800+ collectors securing early access to the clutter-free resale ecosystem.</p>
+          <a href="#waitlist-section" class="cta-scroll-btn" id="bottom-cta-btn">GO TO WAITLIST FORM &uarr;</a>
+        </div>
+      </div>
+    </section>
+  </main>
+  
+  <footer class="site-footer">
+    <div class="footer-container">
+      <div class="footer-top">
+        <div class="footer-brand">GRABSTY &copy; <span id="year">2026</span></div>
+        <div class="footer-tagline">ARCHIVAL RESALE &bull; ESCROW GUARANTEED</div>
+      </div>
+      <div class="footer-bottom">
+        <p class="footer-copy">All rights reserved. Designed with disciplined minimalism and zero clutter.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

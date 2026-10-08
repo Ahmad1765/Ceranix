@@ -57,7 +57,7 @@ const EMPTY_SAVED_SEARCHES: SavedSearch[] = [];
 export default function HomeScreen() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
-  const { user, profile, loading: authLoading } = useAuth();
+  const { user, profile } = useAuth();
   const toast = useToast();
   const [alertSheetOpen, setAlertSheetOpen] = useState(false);
   const [searchModeOpen, setSearchModeOpen] = useState(false);
@@ -185,8 +185,6 @@ export default function HomeScreen() {
     columns,
   });
 
-  const authSettled = !authLoading;
-  const showColdStartBanner = authSettled && !user;
   const gridLoading = feedFilter.showingSaved
     ? loadingSaved
     : feedFilter.showingTrending
