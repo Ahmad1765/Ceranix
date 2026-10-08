@@ -6,7 +6,7 @@ import { defineConfig, devices } from '@playwright/test';
 // supabase-mock.ts — no live backend is touched.
 
 const envPort = Number(process.env.PLAYWRIGHT_PORT);
-const PORT = Number.isFinite(envPort) && envPort > 0 ? envPort : 4173;
+const PORT = Number.isFinite(envPort) && envPort > 0 ? envPort : 8081;
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${PORT}`;
 
 export default defineConfig({

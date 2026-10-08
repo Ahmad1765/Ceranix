@@ -604,6 +604,28 @@ export function OrderDetailsTrackingView({
   // Live Status System Transition Handler (Rule 1)
   const handleUpdateStatus = async (newStatus: FulfillmentStatus) => {
     tap('medium');
+    const prevStatus = currentFulfillment;
+
+    if (newStatus === 'canceled') {
+      toast.show('Please use Cancel Order action to specify cancellation details', {
+        variant: 'default',
+        icon: 'alert-circle',
+      });
+      return;
+    }
+    if (newStatus === 'disputed') {
+      toast.show('Please use Report Issue to provide dispute details', {
+        variant: 'default',
+        icon: 'alert-circle',
+      });
+      return;
+    }
+    if (newStatus === 'picked') {
+      setCurrentFulfillment('packing');
+      toast.show('Order scheduled for packaging / pickup', { variant: 'default', icon: 'check' });
+      return;
+    }
+
     setCurrentFulfillment(newStatus);
     if (order?.id) {
       try {
@@ -611,14 +633,24 @@ export function OrderDetailsTrackingView({
           orderId: order.id,
           targetStatus: newStatus,
         });
-      } catch (e) {
+        toast.show(`Order status updated to: ${newStatus.toUpperCase()}`, {
+          variant: 'default',
+          icon: 'check',
+        });
+      } catch (e: any) {
         console.warn('Status update sync error:', e);
+        setCurrentFulfillment(prevStatus);
+        toast.show(e?.message || 'Failed to update order status', {
+          variant: 'default',
+          icon: 'alert-triangle',
+        });
       }
+    } else {
+      toast.show(`Order status updated to: ${newStatus.toUpperCase()}`, {
+        variant: 'default',
+        icon: 'check',
+      });
     }
-    toast.show(`Order status updated to: ${newStatus.toUpperCase()}`, {
-      variant: 'default',
-      icon: 'check',
-    });
   };
 
   // Save Ready to Deliver Pickup Schedule
@@ -638,9 +670,6 @@ export function OrderDetailsTrackingView({
 
     tap('medium');
     const chosenDateStr = pickupSelectedDate === 'tomorrow' ? tomorrowFormatted : dayAfterFormatted;
-    setPickupConfirmed(true);
-    setPickupConfirmedDateStr(chosenDateStr);
-    setReadyDeliverModalVisible(false);
 
     if (onConfirmPickup) {
       try {
@@ -653,15 +682,29 @@ export function OrderDetailsTrackingView({
           postalCode: pickupPostalCode,
           pickupDate: chosenDateStr,
         });
-      } catch (e) {
+        setPickupConfirmed(true);
+        setPickupConfirmedDateStr(chosenDateStr);
+        setReadyDeliverModalVisible(false);
+        toast.show(`Pickup confirmed for ${chosenDateStr}! Driver scheduled.`, {
+          variant: 'default',
+          icon: 'check',
+        });
+      } catch (e: any) {
         console.warn('pickup schedule error', e);
+        toast.show(e?.message || 'Could not schedule pickup', {
+          variant: 'default',
+          icon: 'alert-triangle',
+        });
       }
+    } else {
+      setPickupConfirmed(true);
+      setPickupConfirmedDateStr(chosenDateStr);
+      setReadyDeliverModalVisible(false);
+      toast.show(`Pickup confirmed for ${chosenDateStr}! Driver scheduled.`, {
+        variant: 'default',
+        icon: 'check',
+      });
     }
-
-    toast.show(`Pickup confirmed for ${chosenDateStr}! Driver scheduled.`, {
-      variant: 'default',
-      icon: 'check',
-    });
   };
 
   // Download Label Action (Image 2)

@@ -112,22 +112,19 @@ create index if not exists orders_buyer_status_idx
 create index if not exists orders_seller_status_idx
   on public.orders(seller_id, status, created_at desc);
 
--- Ensure public.orders has UPDATE RLS policy for buyers, sellers, and admins
+-- Ensure public.orders has RLS enabled
 alter table public.orders enable row level security;
 
+-- Revoke direct INSERT/UPDATE/DELETE on orders, transactions, and order_seller_pickups
+-- Allow changes only through SECURITY DEFINER RPCs.
 drop policy if exists "Buyers, sellers, and admins can update orders" on public.orders;
-create policy "Buyers, sellers, and admins can update orders" on public.orders
-  for update to authenticated
-  using (
-    (select auth.uid()) = buyer_id 
-    or (select auth.uid()) = seller_id
-    or exists (select 1 from public.profiles where id = (select auth.uid()) and is_admin = true)
-  )
-  with check (
-    (select auth.uid()) = buyer_id 
-    or (select auth.uid()) = seller_id
-    or exists (select 1 from public.profiles where id = (select auth.uid()) and is_admin = true)
-  );
+drop policy if exists "Buyers, sellers, and admins can insert orders" on public.orders;
+drop policy if exists "Buyers, sellers, and admins can delete orders" on public.orders;
+
+-- Also explicitly drop direct mutation policies on offers (just in case they exist)
+drop policy if exists "Sellers can update offers" on public.offers;
+drop policy if exists "Buyers can update offers" on public.offers;
+drop policy if exists "Users can insert offers" on public.offers;
 
 -- Ensure subcategory and color columns exist on public.listings
 alter table public.listings
@@ -186,6 +183,7 @@ begin
   end if;
 end $$;
 
+drop function if exists public.upsert_shipping_address_with_default(jsonb) cascade;
 create or replace function public.upsert_shipping_address_with_default(p_payload jsonb)
 returns public.shipping_addresses
 language plpgsql
@@ -310,6 +308,7 @@ begin
   end if;
 end $$;
 
+drop function if exists public.set_default_payout(jsonb) cascade;
 create or replace function public.set_default_payout(p_payload jsonb)
 returns public.payout_methods
 language plpgsql
@@ -481,6 +480,7 @@ begin
 end $$;
 
 -- Auto-create transaction trigger for orders
+drop function if exists public.trg_fn_auto_create_order_transaction() cascade;
 create or replace function public.trg_fn_auto_create_order_transaction()
 returns trigger
 language plpgsql
@@ -545,143 +545,189 @@ create trigger trg_auto_create_order_transaction
 -- 8. CHAT OFFERS: accept_chat_offer & counter_chat_offer RPCs
 -- ─────────────────────────────────────────────────────────────────────────────
 
+drop function if exists public.accept_chat_offer(uuid) cascade;
+
 create or replace function public.accept_chat_offer(
   p_offer_message_id uuid
 )
 returns public.orders
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   v_caller_id uuid := auth.uid();
-  v_message record;
-  v_conversation record;
-  v_listing record;
+  v_offer public.offers;
+  v_message public.messages;
+  v_conversation public.conversations;
+  v_listing public.listings;
   v_order public.orders;
-  v_counterparty uuid;
-  v_amount_cents int;
-  v_fee_cents int := 0;
-  v_item_price numeric;
-  v_session_id text;
+  v_amount numeric;
+  v_amount_cents integer;
+  v_is_admin boolean := false;
+  v_now timestamptz := clock_timestamp();
 begin
   if v_caller_id is null then
     raise exception 'Authentication required' using errcode = '42501';
   end if;
 
-  perform set_config('ceranix.in_accept_offer', 'on', true);
+  v_is_admin := coalesce((auth.jwt()->'app_metadata'->>'is_admin')::boolean, false)
+    or coalesce((auth.jwt()->'app_metadata'->>'role') = 'admin', false)
+    or coalesce((select is_admin from public.profiles where id = v_caller_id), false);
 
-  select * into v_message from public.messages where id = p_offer_message_id for update;
-  if not found then
-    raise exception 'Offer message not found' using errcode = 'P0002';
+  -- 1. Locate offer either in public.offers or fall back to public.messages
+  select * into v_offer
+    from public.offers
+   where id = p_offer_message_id or message_id = p_offer_message_id
+     for update;
+
+  if v_offer.id is null then
+    -- Fallback: check messages table
+    select * into v_message
+      from public.messages
+     where id = p_offer_message_id
+       for update;
+
+    if not found then
+      raise exception 'Offer not found' using errcode = 'P0002';
+    end if;
+
+    if v_message.kind <> 'offer' then
+      raise exception 'Message is not an offer' using errcode = '22000';
+    end if;
+
+    select * into v_conversation
+      from public.conversations
+     where id = v_message.conversation_id;
+
+    if not found or v_conversation.listing_id is null then
+      raise exception 'Conversation or listing not found' using errcode = 'P0002';
+    end if;
+
+    if (v_message.metadata->>'amount') ~ '^\s*[0-9]+(\.[0-9]+)?\s*$' then
+      v_amount := (v_message.metadata->>'amount')::numeric;
+    else
+      v_amount := null;
+    end if;
+
+    -- Insert into public.offers so future queries are backed by dedicated table
+    insert into public.offers (
+      id, listing_id, buyer_id, seller_id, amount, status, expires_at,
+      conversation_id, message_id, created_at, updated_at
+    ) values (
+      gen_random_uuid(),
+      v_conversation.listing_id,
+      v_conversation.buyer_id,
+      v_conversation.seller_id,
+      coalesce(v_amount, 0),
+      coalesce(v_message.offer_status, 'pending'),
+      coalesce(v_message.created_at, v_now) + interval '24 hours',
+      v_conversation.id,
+      v_message.id,
+      coalesce(v_message.created_at, v_now),
+      v_now
+    ) returning * into v_offer;
   end if;
 
-  if v_message.kind <> 'offer' then
-    raise exception 'Message is not an offer' using errcode = '22000';
+  -- 2. Validate offer state
+  if v_offer.status not in ('pending', 'proposed') then
+    raise exception 'Offer is no longer active (current status: %)', v_offer.status using errcode = '22000';
   end if;
 
-  if v_message.offer_status not in ('proposed', 'pending') then
-    raise exception 'Offer is no longer active (current status: %)', v_message.offer_status using errcode = '22000';
+  if v_offer.expires_at < v_now then
+    update public.offers set status = 'expired', updated_at = v_now where id = v_offer.id;
+    raise exception 'Offer has expired' using errcode = '22000';
   end if;
 
-  select * into v_conversation from public.conversations where id = v_message.conversation_id;
-  if not found then
-    raise exception 'Conversation not found' using errcode = 'P0002';
-  end if;
+  -- 3. Lock listing row and verify seller
+  select * into v_listing
+    from public.listings
+   where id = v_offer.listing_id
+     for update;
 
-  if v_conversation.listing_id is null then
-    raise exception 'Cannot accept offer on direct conversation without listing' using errcode = '22000';
-  end if;
-
-  v_counterparty := case
-    when v_message.sender_id = v_conversation.buyer_id then v_conversation.seller_id
-    else v_conversation.buyer_id
-  end;
-
-  if v_caller_id <> v_counterparty then
-    raise exception 'Only the offer recipient may accept this offer' using errcode = '42501';
-  end if;
-
-  select * into v_listing from public.listings where id = v_conversation.listing_id for update;
   if not found then
     raise exception 'Listing not found' using errcode = 'P0002';
+  end if;
+
+  if v_caller_id <> v_listing.seller_id and not v_is_admin then
+    raise exception 'Only the verified seller may accept this offer' using errcode = '42501';
   end if;
 
   if v_listing.is_sold then
     raise exception 'Listing has already been sold or committed to another order' using errcode = '23505';
   end if;
 
-  if exists (
-    select 1 from public.orders
-     where listing_id = v_listing.id
-       and status in ('awaiting_payment', 'pending', 'paid', 'packing', 'shifting', 'delivered')
-  ) then
-    raise exception 'Listing already has an active order' using errcode = '23505';
+  -- Validate amount is at most list price
+  if v_offer.amount > v_listing.price and not v_is_admin then
+    raise exception 'Offer amount cannot exceed listing price' using errcode = '22000';
   end if;
 
-  if (v_message.metadata->>'amount') ~ '^\s*[0-9]+(\.[0-9]+)?\s*$' then
-    v_item_price := (v_message.metadata->>'amount')::numeric;
-  else
-    v_item_price := null;
+  v_amount_cents := round(v_offer.amount * 100)::integer;
+
+  -- 4. Mark offer accepted
+  update public.offers
+     set status = 'accepted',
+         accepted_at = v_now,
+         updated_at = v_now
+   where id = v_offer.id;
+
+  -- Decline conflicting active offers for this listing
+  update public.offers
+     set status = 'declined',
+         updated_at = v_now
+   where listing_id = v_listing.id
+     and id <> v_offer.id
+     and status in ('pending', 'proposed');
+
+  -- Synchronize chat message status if linked
+  if v_offer.message_id is not null then
+    update public.messages
+       set offer_status = 'accepted',
+           updated_at = v_now
+     where id = v_offer.message_id;
   end if;
 
-  if v_item_price is null or v_item_price <= 0 then
-    v_item_price := v_listing.price;
-  end if;
-
-  v_amount_cents := round(v_item_price * 100)::integer;
-  if v_amount_cents <= 0 then
-    raise exception 'Invalid offer amount' using errcode = '22000';
-  end if;
-
-  update public.messages
-     set offer_status = 'accepted', updated_at = now()
-   where id = p_offer_message_id;
-
-  update public.messages m
-     set offer_status = 'declined', updated_at = now()
-    from public.conversations c
-   where m.conversation_id = c.id
-     and c.listing_id = v_listing.id
-     and m.id <> p_offer_message_id
-     and m.kind = 'offer'
-     and m.offer_status in ('proposed', 'pending');
-
+  -- 5. Lock inventory with a 24-hour reservation
   update public.listings
-     set is_sold = true
+     set is_sold = true,
+         reserved_until = v_now + interval '24 hours'
    where id = v_listing.id;
 
-  v_session_id := 'offer_' || gen_random_uuid()::text;
+  -- 6. Check for existing awaiting_payment order or create one
+  select * into v_order
+    from public.orders
+   where listing_id = v_listing.id
+     and buyer_id = v_offer.buyer_id
+     and status in ('awaiting_payment', 'pending')
+   limit 1
+   for update;
 
-  insert into public.orders (
-    listing_id, buyer_id, seller_id, amount_cents, fee_cents,
-    currency, stripe_session_id, offer_message_id,
-    status, fulfillment_status, payment_method
-  ) values (
-    v_listing.id, v_conversation.buyer_id, v_conversation.seller_id,
-    v_amount_cents, v_fee_cents, 'pkr', v_session_id,
-    p_offer_message_id, 'awaiting_payment', 'awaiting_payment', 'card'
-  )
-  returning * into v_order;
-
-  insert into public.messages (
-    conversation_id, sender_id, content, kind, metadata
-  ) values (
-    v_conversation.id, v_caller_id,
-    'Offer Accepted! 🤝 Order #' || left(v_order.id::text, 8) || ' created. Inventory reserved awaiting payment.',
-    'system',
-    jsonb_build_object(
-      'order_id', v_order.id,
-      'status', 'awaiting_payment',
-      'fulfillment_status', 'awaiting_payment',
-      'amount_cents', v_amount_cents,
-      'accepted_at', now()
-    )
-  );
+  if v_order.id is not null then
+    update public.orders
+       set amount_cents = v_amount_cents,
+           status = 'awaiting_payment',
+           fulfillment_status = 'awaiting_payment'
+     where id = v_order.id
+    returning * into v_order;
+  else
+    insert into public.orders (
+      listing_id, buyer_id, seller_id, amount_cents, fee_cents,
+      status, fulfillment_status, payment_method, payment_status,
+      shipping_method, shipping_fee_cents, stripe_session_id
+    ) values (
+      v_listing.id, v_offer.buyer_id, v_listing.seller_id,
+      v_amount_cents, 0,
+      'awaiting_payment', 'awaiting_payment', 'card', 'unpaid',
+      'managed', 25000, 'offer_' || v_offer.id::text
+    ) returning * into v_order;
+  end if;
 
   return v_order;
 end;
 $$;
+
+drop function if exists public.counter_chat_offer(uuid, numeric) cascade;
+drop function if exists public.counter_chat_offer(uuid, numeric, text, text, uuid, uuid) cascade;
 
 create or replace function public.counter_chat_offer(
   p_parent_offer_id uuid,
@@ -777,37 +823,62 @@ $$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 9. CHECKOUT PROCESSING & CASH ON DELIVERY (CoD) RPC
--- ─────────────────────────────────────────────────────────────────────────────
+-- Drop older signatures to avoid 42P13 parameter default conflicts
+drop function if exists public.process_checkout(uuid, uuid, text, jsonb, numeric, text) cascade;
+drop function if exists public.process_checkout(uuid, uuid, text, jsonb, numeric, text, text) cascade;
+drop function if exists public.process_checkout(uuid, uuid, text, jsonb, numeric, text, text, uuid[], numeric) cascade;
 
 create or replace function public.process_checkout(
   p_listing_id uuid,
-  p_buyer_id uuid,
-  p_payment_method text,
-  p_shipping_address jsonb,
+  p_buyer_id uuid default null,
+  p_payment_method text default 'cod',
+  p_shipping_address jsonb default null,
   p_offer_amount numeric default null,
   p_delivery_notes text default null,
-  p_shipping_method text default 'managed'
+  p_shipping_method text default 'managed',
+  p_bundle_item_ids uuid[] default null,
+  p_expected_total numeric default null
 )
 returns public.orders
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
-  v_caller_id uuid := coalesce(p_buyer_id, auth.uid());
+  v_caller_id uuid;
+  v_is_service_role boolean := false;
   v_listing record;
-  v_item_price_cents integer;
+  v_item_price_cents integer := 0;
   v_fee_cents integer := 0;
   v_shipping_method text;
   v_shipping_fee_cents integer;
   v_order public.orders;
   v_existing_order public.orders;
-  v_is_authorized_offer_buyer boolean := false;
   v_order_status text;
-  v_offer_message_id uuid := null;
-  v_accepted_offer_amount numeric := null;
   v_session_id text;
+  v_now timestamptz := clock_timestamp();
+  v_all_listing_ids uuid[];
+  v_ordered_listing_ids uuid[];
+  v_bundle_count integer := 1;
+  v_bundle_subtotal_cents integer := 0;
+  v_bundle_discount_pct integer := 0;
+  v_bundle_savings_cents integer := 0;
+  v_total_cents integer := 0;
+  v_accepted_offer record;
+  v_is_seller_mismatch boolean := false;
+  v_seller_id uuid;
 begin
+  v_is_service_role := (coalesce(auth.role(), '') = 'service_role' or coalesce(auth.jwt()->>'role', '') = 'service_role');
+
+  -- Enforce auth.uid() internally; do not trust client-supplied p_buyer_id for authenticated calls
+  if auth.uid() is not null then
+    v_caller_id := auth.uid();
+  elsif v_is_service_role then
+    v_caller_id := p_buyer_id;
+  else
+    raise exception 'Authentication required' using errcode = '42501';
+  end if;
+
   if v_caller_id is null then
     raise exception 'Authentication required' using errcode = '42501';
   end if;
@@ -830,111 +901,100 @@ begin
     else 0
   end;
 
-  select id, seller_id, price, is_sold, title
-    into v_listing
+  -- 1. Gather all listing IDs in bundle
+  v_all_listing_ids := array[p_listing_id];
+  if p_bundle_item_ids is not null and array_length(p_bundle_item_ids, 1) > 0 then
+    select array_agg(distinct item_id) into v_all_listing_ids
+      from unnest(array_cat(v_all_listing_ids, p_bundle_item_ids)) as item_id;
+  end if;
+
+  -- 2. Sort IDs to lock rows in consistent order (prevents database deadlocks)
+  select array_agg(id order by id) into v_ordered_listing_ids
+    from unnest(v_all_listing_ids) as id;
+
+  v_bundle_count := coalesce(cardinality(v_ordered_listing_ids), 1);
+
+  -- 3. Lock all listings FOR UPDATE
+  perform 1 from public.listings where id = any(v_ordered_listing_ids) for update;
+
+  select count(distinct seller_id) > 1, max(seller_id::text)::uuid
+    into v_is_seller_mismatch, v_seller_id
     from public.listings
-   where id = p_listing_id
-     for update;
+   where id = any(v_ordered_listing_ids);
 
-  if not found then
-    raise exception 'Listing not found' using errcode = 'P0002';
+  if v_is_seller_mismatch then
+    raise exception 'All bundled items must be from the same seller' using errcode = '22000';
   end if;
 
-  if v_listing.seller_id = v_caller_id then
-    raise exception 'You cannot buy your own listing' using errcode = '22000';
+  if v_seller_id = v_caller_id then
+    raise exception 'You cannot buy your own listings' using errcode = '22000';
   end if;
 
-  select * into v_existing_order
-    from public.orders
-   where listing_id = p_listing_id
-     and buyer_id = v_caller_id
-     and status in ('awaiting_payment', 'pending')
-   order by created_at desc
-   limit 1
-   for update;
+  -- Verify all items exist
+  if (select count(*) from public.listings where id = any(v_ordered_listing_ids)) <> v_bundle_count then
+    raise exception 'One or more items in the order were not found' using errcode = 'P0002';
+  end if;
 
-  if v_existing_order.id is not null then
-    if v_existing_order.status = 'awaiting_payment' then
-      if p_payment_method = 'cod' then
-        v_order_status := 'pending';
-        v_session_id := coalesce(v_existing_order.stripe_session_id, 'cod_' || gen_random_uuid()::text);
-      else
-        v_order_status := 'awaiting_payment';
-        v_session_id := v_existing_order.stripe_session_id;
+  -- Primary listing record
+  select * into v_listing from public.listings where id = p_listing_id;
+
+  -- 4. Check whether single listing is sold or reserved
+  if v_bundle_count = 1 then
+    -- Check for an accepted offer in public.offers
+    select * into v_accepted_offer
+      from public.offers
+     where listing_id = p_listing_id
+       and buyer_id = v_caller_id
+       and status = 'accepted'
+       and (expires_at > v_now or accepted_at > (v_now - interval '24 hours'))
+     order by accepted_at desc nulls last, created_at desc
+     limit 1;
+
+    if v_listing.is_sold then
+      if v_accepted_offer.id is null then
+        raise exception 'Listing is already sold' using errcode = '22000';
       end if;
-
-      update public.orders
-         set payment_method = p_payment_method,
-             status = v_order_status,
-             fulfillment_status = v_order_status,
-             shipping_method = v_shipping_method,
-             shipping_fee_cents = v_shipping_fee_cents,
-             shipping_address = p_shipping_address,
-             delivery_notes = coalesce(p_delivery_notes, delivery_notes),
-             stripe_session_id = v_session_id
-       where id = v_existing_order.id
-      returning * into v_order;
-
-      update public.listings set is_sold = true where id = p_listing_id;
-
-      -- Sync transaction if present
-      update public.transactions
-         set payment_method = p_payment_method,
-             shipping_fee_cents = v_shipping_fee_cents,
-             status = case when p_payment_method = 'cod' then 'PAYMENT_SECURED_ESCROW' else status end,
-             escrow_secured_at = case when p_payment_method = 'cod' then coalesce(escrow_secured_at, now()) else escrow_secured_at end,
-             updated_at = now()
-       where order_id = v_existing_order.id;
-
-      return v_order;
     end if;
 
-    if v_existing_order.status = 'pending' and v_existing_order.payment_method = 'cod' then
-      update public.orders
-         set shipping_address = coalesce(p_shipping_address, shipping_address),
-             delivery_notes = coalesce(p_delivery_notes, delivery_notes),
-             shipping_method = v_shipping_method,
-             shipping_fee_cents = v_shipping_fee_cents
-       where id = v_existing_order.id
-      returning * into v_order;
-
-      return v_order;
+    if v_accepted_offer.id is not null then
+      v_item_price_cents := round(v_accepted_offer.amount * 100)::integer;
+    else
+      v_item_price_cents := round(v_listing.price * 100)::integer;
     end if;
-  end if;
 
-  if v_listing.is_sold then
-    select exists (
-      select 1
-        from public.messages m
-        join public.conversations c on c.id = m.conversation_id
-       where c.listing_id = p_listing_id
-         and c.buyer_id = v_caller_id
-         and m.kind = 'offer'
-         and m.offer_status = 'accepted'
-    ) into v_is_authorized_offer_buyer;
-
-    if not v_is_authorized_offer_buyer then
-      raise exception 'Listing is already sold' using errcode = '22000';
-    end if;
-  end if;
-
-  select m.id, (m.metadata->>'amount')::numeric
-    into v_offer_message_id, v_accepted_offer_amount
-    from public.messages m
-    join public.conversations c on c.id = m.conversation_id
-   where c.listing_id = p_listing_id
-     and c.buyer_id = v_caller_id
-     and m.kind = 'offer'
-     and m.offer_status = 'accepted'
-   order by m.created_at desc
-   limit 1;
-
-  if v_accepted_offer_amount is not null and v_accepted_offer_amount > 0 then
-    v_item_price_cents := round(v_accepted_offer_amount * 100);
-  elsif p_offer_amount is not null and p_offer_amount > 0 then
-    v_item_price_cents := round(p_offer_amount * 100);
   else
-    v_item_price_cents := round(v_listing.price * 100);
+    -- Bundle purchase: verify none of the items are sold
+    if exists (select 1 from public.listings where id = any(v_ordered_listing_ids) and is_sold = true) then
+      raise exception 'One or more items in the bundle are already sold' using errcode = '22000';
+    end if;
+
+    -- Calculate bundle discount server-side in SQL:
+    -- 2 items: 5%, 3 items: 10%, 4 items: 15%, 5+ items: 20%
+    v_bundle_discount_pct := case
+      when v_bundle_count >= 5 then 20
+      when v_bundle_count = 4 then 15
+      when v_bundle_count = 3 then 10
+      when v_bundle_count = 2 then 5
+      else 0
+    end;
+
+    select sum(round(price * 100))::integer
+      into v_bundle_subtotal_cents
+      from public.listings
+     where id = any(v_ordered_listing_ids);
+
+    v_bundle_savings_cents := round((v_bundle_subtotal_cents * v_bundle_discount_pct) / 100.0)::integer;
+    v_item_price_cents := v_bundle_subtotal_cents - v_bundle_savings_cents;
+  end if;
+
+  -- 5. Price-change protection: verify against expected_total if provided by buyer
+  v_total_cents := v_item_price_cents + v_shipping_fee_cents;
+  if p_expected_total is not null then
+    if abs(round(p_expected_total * 100) - v_total_cents) > 5 then
+      raise exception 'Price has changed: expected total % PKR but calculated % PKR. Please review before proceeding.',
+        p_expected_total, (v_total_cents / 100.0)
+        using errcode = '22000';
+    end if;
   end if;
 
   if p_payment_method = 'cod' then
@@ -945,30 +1005,87 @@ begin
     v_session_id := null;
   end if;
 
+  -- 6. Check existing order
+  select * into v_existing_order
+    from public.orders
+   where listing_id = p_listing_id
+     and buyer_id = v_caller_id
+     and status in ('awaiting_payment', 'pending')
+   order by created_at desc
+   limit 1
+   for update;
+
+  if v_existing_order.id is not null then
+    update public.orders
+       set amount_cents = v_item_price_cents,
+           payment_method = p_payment_method,
+           status = v_order_status,
+           fulfillment_status = v_order_status,
+           shipping_method = v_shipping_method,
+           shipping_fee_cents = v_shipping_fee_cents,
+           shipping_address = p_shipping_address,
+           delivery_notes = coalesce(p_delivery_notes, delivery_notes),
+           stripe_session_id = coalesce(v_session_id, stripe_session_id),
+           bundle_item_ids = case when v_bundle_count > 1 then p_bundle_item_ids else null end,
+           bundle_count = v_bundle_count
+     where id = v_existing_order.id
+    returning * into v_order;
+
+    update public.listings
+       set is_sold = true,
+           reserved_until = case when p_payment_method = 'card' then v_now + interval '24 hours' else null end
+     where id = any(v_ordered_listing_ids);
+
+    -- Sync transactions
+    update public.transactions
+       set payment_method = p_payment_method,
+           amount_cents = v_total_cents,
+           shipping_fee_cents = v_shipping_fee_cents,
+           payout_amount_cents = v_item_price_cents,
+           status = case when p_payment_method = 'cod' then 'PENDING_PAYMENT' else status end,
+           updated_at = v_now
+     where order_id = v_existing_order.id;
+
+    return v_order;
+  end if;
+
+  -- 7. Insert new order
   insert into public.orders (
     listing_id, buyer_id, seller_id, amount_cents, fee_cents,
     status, fulfillment_status, payment_method, payment_status,
     shipping_method, shipping_fee_cents,
-    shipping_address, delivery_notes, stripe_session_id
+    shipping_address, delivery_notes, stripe_session_id,
+    bundle_item_ids, bundle_count
   ) values (
     v_listing.id, v_caller_id, v_listing.seller_id,
     v_item_price_cents, v_fee_cents,
     v_order_status, v_order_status, p_payment_method,
     case when p_payment_method = 'cod' then 'pending' else 'unpaid' end,
     v_shipping_method, v_shipping_fee_cents,
-    p_shipping_address, p_delivery_notes, v_session_id
-  )
-  returning * into v_order;
+    p_shipping_address, p_delivery_notes, v_session_id,
+    case when v_bundle_count > 1 then p_bundle_item_ids else null end,
+    v_bundle_count
+  ) returning * into v_order;
 
-  update public.listings set is_sold = true where id = v_listing.id;
+  -- Mark listing(s) sold / reserved
+  update public.listings
+     set is_sold = true,
+         reserved_until = case when p_payment_method = 'card' then v_now + interval '24 hours' else null end
+   where id = any(v_ordered_listing_ids);
+
   return v_order;
 end;
 $$;
 
+-- Drop older create_cod_order signatures to prevent 42P13 parameter default conflicts
+drop function if exists public.create_cod_order(uuid, jsonb, text, numeric) cascade;
+drop function if exists public.create_cod_order(uuid, uuid, jsonb, numeric, text) cascade;
+drop function if exists public.create_cod_order(uuid, uuid, jsonb, numeric, text, text) cascade;
+
 create or replace function public.create_cod_order(
   p_listing_id uuid,
-  p_buyer_id uuid,
-  p_shipping_address jsonb,
+  p_buyer_id uuid default null,
+  p_shipping_address jsonb default null,
   p_offer_amount numeric default null,
   p_delivery_notes text default null,
   p_shipping_method text default 'managed'
@@ -976,12 +1093,19 @@ create or replace function public.create_cod_order(
 returns public.orders
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 begin
   return public.process_checkout(
-    p_listing_id, p_buyer_id, 'cod',
-    p_shipping_address, p_offer_amount, p_delivery_notes, p_shipping_method
+    p_listing_id => p_listing_id,
+    p_buyer_id => p_buyer_id,
+    p_payment_method => 'cod',
+    p_shipping_address => p_shipping_address,
+    p_offer_amount => p_offer_amount,
+    p_delivery_notes => p_delivery_notes,
+    p_shipping_method => p_shipping_method,
+    p_bundle_item_ids => null,
+    p_expected_total => null
   );
 end;
 $$;
@@ -989,6 +1113,9 @@ $$;
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 10. ADVANCE ORDER FULFILLMENT & LIFECYCLE RPCS
 -- ─────────────────────────────────────────────────────────────────────────────
+
+drop function if exists public.advance_order_fulfillment(uuid, text, text, text, text, text) cascade;
+drop function if exists public.advance_order_fulfillment(uuid, text, text, text, text, text, jsonb) cascade;
 
 create or replace function public.advance_order_fulfillment(
   p_order_id uuid,
@@ -1143,6 +1270,10 @@ begin
 end;
 $$;
 
+drop function if exists public.mark_order_shipped(uuid) cascade;
+drop function if exists public.mark_order_shipped(uuid, text) cascade;
+drop function if exists public.mark_order_shipped(uuid, text, text) cascade;
+
 create or replace function public.mark_order_shipped(
   p_order_id uuid,
   p_courier text default 'Standard Delivery',
@@ -1160,6 +1291,7 @@ begin
 end;
 $$;
 
+drop function if exists public.confirm_order_received(uuid) cascade;
 create or replace function public.confirm_order_received(
   p_order_id uuid
 )
@@ -1257,6 +1389,7 @@ $$;
 -- 8b. RPC: complete_cod_order (Atomic Seller CoD Completion)
 -- ─────────────────────────────────────────────────────────────────────────────
 
+drop function if exists public.complete_cod_order(uuid) cascade;
 create or replace function public.complete_cod_order(
   p_order_id uuid
 )
@@ -1293,6 +1426,10 @@ begin
 
   if v_order.payment_method <> 'cod' then
     raise exception 'Order is not Cash on Delivery' using errcode = '22000';
+  end if;
+
+  if v_order.shipping_method <> 'self_ship' and not v_is_admin then
+    raise exception 'Only self_ship CoD orders can be completed directly by the seller' using errcode = '42501';
   end if;
 
   -- Idempotent return if already completed
@@ -1353,6 +1490,9 @@ begin
   return v_order;
 end;
 $$;
+
+drop function if exists public.cancel_order(uuid) cascade;
+drop function if exists public.cancel_order(uuid, text) cascade;
 
 create or replace function public.cancel_order(
   p_order_id uuid,
@@ -1443,6 +1583,8 @@ begin
   return v_order;
 end;
 $$;
+
+drop function if exists public.advance_escrow_status(uuid, text, text, text, text, text, text) cascade;
 
 create or replace function public.advance_escrow_status(
   p_order_id uuid,
@@ -1626,6 +1768,8 @@ $$;
 -- 11. SUPPORT BOT REPLY RPC
 -- ─────────────────────────────────────────────────────────────────────────────
 
+drop function if exists public.dispatch_support_bot_reply(uuid, text) cascade;
+
 create or replace function public.dispatch_support_bot_reply(
   p_conversation_id uuid,
   p_content text
@@ -1678,7 +1822,7 @@ grant execute on function public.upsert_shipping_address_with_default(jsonb) to 
 grant execute on function public.set_default_payout(jsonb) to authenticated, service_role;
 grant execute on function public.accept_chat_offer(uuid) to authenticated, service_role;
 grant execute on function public.counter_chat_offer(uuid, numeric, text, text, uuid, uuid) to authenticated, service_role;
-grant execute on function public.process_checkout(uuid, uuid, text, jsonb, numeric, text, text) to authenticated, service_role;
+grant execute on function public.process_checkout(uuid, uuid, text, jsonb, numeric, text, text, uuid[], numeric) to authenticated, service_role;
 grant execute on function public.create_cod_order(uuid, uuid, jsonb, numeric, text, text) to authenticated, service_role;
 grant execute on function public.advance_order_fulfillment(uuid, text, text, text, text, text, jsonb) to authenticated, service_role;
 grant execute on function public.complete_cod_order(uuid) to authenticated, service_role;

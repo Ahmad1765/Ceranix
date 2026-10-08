@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, Pressable, Alert, Platform, Animated, Easing, useWindowDimensions } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
 import { SafeContainer } from '@/components/ui/SafeContainer';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
@@ -31,14 +31,17 @@ function PressableScale({
   disabled,
   style,
   children,
+  testID,
 }: {
   onPress: () => void;
   disabled?: boolean;
   style?: any;
   children: React.ReactNode;
+  testID?: string;
 }) {
   return (
     <Pressable
+      testID={testID}
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => [
@@ -53,9 +56,12 @@ function PressableScale({
 
 export default function LoginScreen() {
   const toast = useToast();
+  const params = useLocalSearchParams<{ mode?: string; step?: string }>();
   const { height } = useWindowDimensions();
-  const [step, setStep] = useState<Step>('welcome');
-  const [mode, setMode] = useState<Mode>('signin');
+  const [step, setStep] = useState<Step>(() =>
+    params.step === 'form' || params.mode === 'signin' || params.mode === 'signup' ? 'form' : 'welcome'
+  );
+  const [mode, setMode] = useState<Mode>(() => (params.mode === 'signup' ? 'signup' : 'signin'));
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
@@ -64,6 +70,15 @@ export default function LoginScreen() {
   const [pwFocused, setPwFocused] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [oauthLoading, setOauthLoading] = useState(false);
+  const [forgotCooldown, setForgotCooldown] = useState(0);
+
+  useEffect(() => {
+    if (forgotCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setForgotCooldown((c) => Math.max(0, c - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [forgotCooldown]);
 
   const [stepAnim] = useState(() => new Animated.Value(0));
   const [switchAnim] = useState(() => new Animated.Value(mode === 'signin' ? 0 : 1));
@@ -160,6 +175,13 @@ export default function LoginScreen() {
 
   const handleForgot = async () => {
     tap('light');
+    if (forgotCooldown > 0) {
+      toast.show(`Please wait ${forgotCooldown}s before requesting another reset link`, {
+        variant: 'info',
+        icon: 'mail',
+      });
+      return;
+    }
     if (!EMAIL_RE.test(email.trim())) {
       toast.show('Enter your email above first', { variant: 'info', icon: 'mail' });
       return;
@@ -167,15 +189,25 @@ export default function LoginScreen() {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
       if (error) throw error;
+      setForgotCooldown(60);
       toast.show('Password reset link sent — check your inbox', {
         variant: 'success',
         icon: 'check',
       });
     } catch (e: any) {
-      toast.show(e?.message ?? 'Could not send reset email', {
-        variant: 'default',
-        icon: 'alert-triangle',
-      });
+      const msg = e?.message ?? '';
+      if (/rate_limit|over_email_send_rate_limit|429|too many/i.test(msg)) {
+        setForgotCooldown(120);
+        toast.show('Too many reset attempts. Please wait a couple minutes before trying again.', {
+          variant: 'default',
+          icon: 'alert-triangle',
+        });
+      } else {
+        toast.show(msg || 'Could not send reset email', {
+          variant: 'default',
+          icon: 'alert-triangle',
+        });
+      }
     }
   };
 
@@ -519,6 +551,7 @@ export default function LoginScreen() {
                     Already have an account?
                   </Text>
                   <Pressable
+                    testID="welcome-login-button"
                     onPress={() => openForm('signin')}
                     hitSlop={10}
                     style={({ pressed }) => ({
@@ -550,6 +583,7 @@ export default function LoginScreen() {
                 <View style={{ marginTop: 22 }}>
                   <Field label="Email" icon="mail" focused={emailFocused} error={errors.email}>
                     <TextInput
+                      testID="email-input"
                       placeholder="you@example.com"
                       placeholderTextColor={colors.muteSoft}
                       keyboardType="email-address"
@@ -581,6 +615,7 @@ export default function LoginScreen() {
                       style={{ flexDirection: 'row', alignItems: 'center' }}
                     >
                       <TextInput
+                        testID="password-input"
                         placeholder="At least 8 characters"
                         placeholderTextColor={colors.muteSoft}
                         secureTextEntry={!showPw}
@@ -623,7 +658,9 @@ export default function LoginScreen() {
 
                   {mode === 'signin' && (
                     <Pressable
+                      testID="forgot-password-button"
                       onPress={handleForgot}
+                      disabled={forgotCooldown > 0}
                       hitSlop={8}
                       accessibilityRole="button"
                       accessibilityLabel="Reset your password"
@@ -631,17 +668,18 @@ export default function LoginScreen() {
                         alignSelf: 'flex-end',
                         paddingVertical: 4,
                         marginTop: -2,
-                        opacity: pressed ? 0.6 : 1,
+                        opacity: forgotCooldown > 0 ? 0.45 : pressed ? 0.6 : 1,
                       })}
                     >
                       <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>
-                        Forgot password?
+                        {forgotCooldown > 0 ? `Resend link (${forgotCooldown}s)` : 'Forgot password?'}
                       </Text>
                     </Pressable>
                   )}
                 </View>
 
                 <PressableScale
+                  testID="login-button"
                   onPress={handleSubmit}
                   disabled={loading}
                   style={{}}

@@ -154,6 +154,8 @@ export interface Order {
   completed_at?: string | null;
   escrow_status?: EscrowStatus | null;
   payout_amount_cents?: number | null;
+  bundle_item_ids?: string[] | null;
+  bundle_count?: number | null;
   listing?: any;
   buyer?: any;
   seller?: any;

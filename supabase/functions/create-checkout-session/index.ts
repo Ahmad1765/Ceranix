@@ -130,6 +130,18 @@ Deno.serve(async (req: Request) => {
     const admin = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
+
+    // Rate limit checkout session creation to prevent abuse/bot session flooding (max 15 per 10 minutes)
+    const { error: rlErr } = await admin.rpc('enforce_user_rate_limit', {
+      p_user_id: buyerId,
+      p_action: 'create_checkout_session',
+      p_limit: 15,
+      p_window: '10 minutes',
+    });
+    if (rlErr) {
+      return json({ error: 'Too many checkout attempts. Please wait a few minutes before trying again.' }, 429, origin);
+    }
+
     const { data: paidOrders, error: poErr } = await admin
       .from('orders')
       .select('id')

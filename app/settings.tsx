@@ -438,9 +438,15 @@ export default function SettingsScreen() {
               }
             >
               <ChatGPTButton
-                label={mgr.busy === 'password' ? 'Sending…' : 'Reset password'}
+                label={
+                  mgr.busy === 'password'
+                    ? 'Sending…'
+                    : mgr.resetCooldown > 0
+                    ? `Resend (${mgr.resetCooldown}s)`
+                    : 'Reset password'
+                }
                 loading={mgr.busy === 'password'}
-                disabled={mgr.busy === 'password' || !user?.email}
+                disabled={mgr.busy === 'password' || !user?.email || mgr.resetCooldown > 0}
                 onPress={mgr.handleResetPassword}
               />
             </ChatGPTRow>

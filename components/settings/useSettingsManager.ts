@@ -73,7 +73,16 @@ export function useSettingsManager() {
   const [pushOn, setPushOn] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [shareUsage, setShareUsage] = useState(!isOptedOut());
+  const [resetCooldown, setResetCooldown] = useState(0);
   const mounted = useRef(true);
+
+  useEffect(() => {
+    if (resetCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResetCooldown((c) => Math.max(0, c - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resetCooldown]);
 
   // Address / Payout / Verification / Phone Data
   const [address, setAddress] = useState<ShippingAddress | null>(null);
@@ -378,6 +387,13 @@ export function useSettingsManager() {
       return;
     }
     if (busy) return;
+    if (resetCooldown > 0) {
+      toast.show(`Please wait ${resetCooldown}s before requesting another reset email`, {
+        variant: 'info',
+        icon: 'clock',
+      });
+      return;
+    }
     const ok = await confirm({
       title: 'Send password reset?',
       message: `We'll email ${user.email} a link to change your password.`,
@@ -388,16 +404,26 @@ export function useSettingsManager() {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(user.email!);
       if (error) throw error;
-      toast.show('Reset email sent', { variant: 'success', icon: 'mail' });
+      setResetCooldown(60);
+      toast.show('Reset email sent — check your inbox', { variant: 'success', icon: 'mail' });
     } catch (e: any) {
-      toast.show(e?.message ?? 'Could not send email', {
-        variant: 'default',
-        icon: 'alert-triangle',
-      });
+      const msg = e?.message ?? '';
+      if (/rate_limit|over_email_send_rate_limit|429|too many/i.test(msg)) {
+        setResetCooldown(120);
+        toast.show('Too many reset attempts. Please wait a couple minutes before trying again.', {
+          variant: 'default',
+          icon: 'alert-triangle',
+        });
+      } else {
+        toast.show(msg || 'Could not send email', {
+          variant: 'default',
+          icon: 'alert-triangle',
+        });
+      }
     } finally {
       if (mounted.current) setBusy(null);
     }
-  }, [user?.email, busy, toast]);
+  }, [user?.email, busy, resetCooldown, toast]);
 
   const handleDeleteAccount = useCallback(async () => {
     if (busy) return;
@@ -712,6 +738,7 @@ export function useSettingsManager() {
     removePhone,
     handleLogout,
     handleResetPassword,
+    resetCooldown,
     handleDeleteAccount,
     openSystemSettings,
   };

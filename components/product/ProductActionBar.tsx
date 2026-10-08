@@ -76,7 +76,11 @@ export function ProductActionBar({
     if (allowed === false) return;
   };
 
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
   const handleBuy = () => {
+    if (disabled || isSubmitting) return;
+    setIsSubmitting(true);
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     }
@@ -257,6 +261,7 @@ export function ProductActionBar({
       <View style={styles.actionRow}>
         {!isOwner && (
           <Pressable
+            testID="make-offer-button"
             onPress={handleOffer}
             disabled={disabled}
             accessibilityRole="button"
@@ -277,8 +282,11 @@ export function ProductActionBar({
         )}
 
         <Pressable
+          testID="buy-now-button"
           onPress={handleBuy}
-          disabled={disabled}
+          disabled={disabled || isSubmitting}
+          aria-disabled={disabled || isSubmitting}
+          accessibilityState={{ disabled: disabled || isSubmitting }}
           accessibilityRole="button"
           accessibilityLabel={
             isOwner
@@ -291,7 +299,7 @@ export function ProductActionBar({
             {
               backgroundColor: theme.ink,
               borderColor: theme.ink,
-              opacity: pressed ? 0.88 : 1,
+              opacity: disabled || isSubmitting ? 0.6 : pressed ? 0.88 : 1,
               transform: [{ scale: pressed ? 0.98 : 1 }],
             },
           ]}

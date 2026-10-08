@@ -19,6 +19,7 @@ export interface CheckoutRequest {
   shippingMethod?: ShippingMethod;
   deliveryNotes?: string | null;
   bundleItemIds?: string[];
+  expectedTotal?: number;
 }
 
 export interface CheckoutResult {
@@ -123,6 +124,8 @@ export class CodPaymentProvider implements PaymentProvider {
         p_offer_amount: request.offerAmount ?? null,
         p_delivery_notes: request.deliveryNotes?.trim() || validatedAddress.deliveryInstructions || null,
         p_shipping_method: request.shippingMethod ?? 'managed',
+        p_bundle_item_ids: request.bundleItemIds?.length ? request.bundleItemIds : null,
+        p_expected_total: request.expectedTotal ?? null,
       });
 
       if (!error && data) {
@@ -297,6 +300,8 @@ export class StripePaymentProvider implements PaymentProvider {
         p_offer_amount: request.offerAmount ?? null,
         p_delivery_notes: request.deliveryNotes?.trim() || null,
         p_shipping_method: request.shippingMethod ?? 'managed',
+        p_bundle_item_ids: request.bundleItemIds?.length ? request.bundleItemIds : null,
+        p_expected_total: request.expectedTotal ?? null,
       });
 
       if (!error && data) {
@@ -643,22 +648,6 @@ export class PaymentService {
       // Escrow might not exist for legacy test records or is already completed
     }
 
-    // 2. Direct ledger update fallback on public.transactions
-    try {
-      await supabase
-        .from('transactions')
-        .update({
-          status: 'COMPLETED_FUNDS_RELEASED',
-          funds_released_at: new Date().toISOString(),
-          delivered_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('order_id', orderId)
-        .in('status', ['PAYMENT_SECURED_ESCROW', 'READY_FOR_PICKUP', 'IN_TRANSIT', 'DELIVERED']);
-    } catch {
-      // ignore table update error if table/row missing
-    }
-
     let rpcError: Error | null = null;
     try {
       const { data, error } = await supabase.rpc('confirm_order_received', {
@@ -677,34 +666,8 @@ export class PaymentService {
       rpcError = e instanceof Error ? e : new Error(String(e));
     }
 
-    // Direct fallback
-    let fallbackError: Error | null = null;
-    try {
-      const { data: updatedOrder, error: updateError } = await supabase
-        .from('orders')
-        .update({
-          status: 'completed',
-          fulfillment_status: 'completed',
-          escrow_status: 'COMPLETED_FUNDS_RELEASED',
-          completed_at: new Date().toISOString(),
-        })
-        .eq('id', orderId)
-        .select()
-        .maybeSingle();
-
-      if (updateError) {
-        fallbackError = new Error(updateError.message);
-      } else if (updatedOrder) {
-        capture('order_completed_by_buyer', { order_id: orderId, fallback: true });
-        notifyOrderUpdated((updatedOrder as Order)?.listing_id);
-        return updatedOrder as Order;
-      }
-    } catch (e: any) {
-      fallbackError = e instanceof Error ? e : new Error(String(e));
-    }
-
     if (!isDemoMode()) {
-      throw fallbackError || rpcError || new Error('Failed to confirm order received');
+      throw rpcError || new Error('Failed to confirm order received');
     }
 
     return {
@@ -721,24 +684,9 @@ export class PaymentService {
 
   /**
    * Seller action to mark a Cash on Delivery order as collected and paid.
-   * Clears escrow and marks fulfillment as completed.
+   * Clears escrow and marks fulfillment as completed via atomic Security Definer RPC.
    */
   async markCodOrderPaid(orderId: string): Promise<Order> {
-    // 1. If an escrow transaction exists for this COD order, advance to COMPLETED_FUNDS_RELEASED
-    try {
-      await supabase
-        .from('transactions')
-        .update({
-          status: 'COMPLETED_FUNDS_RELEASED',
-          funds_released_at: new Date().toISOString(),
-          delivered_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('order_id', orderId);
-    } catch {
-      // ignore
-    }
-
     const { data, error } = await supabase.rpc('complete_cod_order', {
       p_order_id: orderId,
     });
@@ -815,7 +763,7 @@ export class PaymentService {
     });
 
     if (error) {
-      if (!isDemoMode()) throw new Error(error.message);
+      if (!isDemoMode() || !orderId.startsWith('demo')) throw new Error(error.message || 'Network error');
       // Demo fallback
       capture('fulfillment_advanced_demo', { order_id: orderId, target_status: targetStatus });
       return {

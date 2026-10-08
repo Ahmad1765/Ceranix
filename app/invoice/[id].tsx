@@ -576,18 +576,21 @@ export default function InvoiceScreen() {
 
     setCompletingReceipt(true);
     try {
-      const updated = await paymentService.confirmOrderReceived({ orderId: order.id });
-      setOrder((prev) => ({ ...(prev ?? {}), ...(updated ?? {}), status: 'completed' } as any));
+      const updated = await paymentService.advanceOrderFulfillment({
+        orderId: order.id,
+        targetStatus: 'delivered',
+      });
+      setOrder(updated);
       if (user?.id) {
         queryClient.invalidateQueries({ queryKey: qk.myOrders(user.id) });
         queryClient.invalidateQueries({ queryKey: ['myOrders'] });
       }
-      toast.show('Order completed! Thank you for confirming.', {
+      toast.show('Delivery confirmed', {
         variant: 'default',
         icon: 'check',
       });
     } catch {
-      toast.show('Failed to update order', { variant: 'default', icon: 'alert-triangle' });
+      toast.show('Network error. Please try again.', { variant: 'default', icon: 'alert-triangle' });
     } finally {
       setCompletingReceipt(false);
     }
@@ -745,6 +748,7 @@ export default function InvoiceScreen() {
           ) : isBuyer && (isShipped || order?.fulfillment_status === 'shifting' || order?.fulfillment_status === 'delivered' || order?.status === 'shifting' || order?.status === 'delivered') && order?.status !== 'completed' && order?.fulfillment_status !== 'completed' ? (
             <View style={{ gap: 8, width: '100%' }}>
               <Pressable
+                testID="confirm-delivery-button"
                 onPress={handleConfirmReceived}
                 disabled={completingReceipt}
                 style={({ pressed }) => [

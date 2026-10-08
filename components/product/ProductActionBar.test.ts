@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { ProductActionBar } from './ProductActionBar';
 import { lightTheme } from '@/lib/theme';
@@ -32,6 +32,10 @@ vi.mock('@/context/ThemeContext', () => ({
 }));
 
 describe('ProductActionBar Invariant & Styling Protection', () => {
+  beforeEach(() => {
+    vi.spyOn(React, 'useState').mockImplementation(((initial: any) => [initial, vi.fn()]) as any);
+  });
+
   it('strictly enforces 10px corner radius and monochrome colors for Offer and Buy buttons', () => {
     const element = React.createElement(ProductActionBar, {
       price: 3180,

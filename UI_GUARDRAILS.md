@@ -188,6 +188,26 @@ These rules protect the runtime from silent crashes, style collapse, and mobile/
   - **NEVER** remove the `Shop Listings` bar (`+ New item`, `View shop`) from the `Selling` sub-view.
   - **NEVER** re-introduce message separators or underlines under filter chips on the Activity screen.
 
+### Rule 2.11: React Native `testID` Standard for E2E Automation (`testID` vs HTML `data-testid`)
+- **The Invariant:** All UI test hooks across React Native / Expo components **MUST** use the native `testID="..."` prop, **NEVER** HTML `data-testid="..."`.
+- **The Mechanism:** React Native for Web automatically compiles `testID="identifier"` into the DOM attribute `data-testid="identifier"`. Native iOS and Android map it to native test identifiers (`accessibilityIdentifier` on iOS, view tags on Android).
+- **The Risk:** Passing `data-testid="..."` directly to React Native components (`<TextInput>`, `<Pressable>`, `<View>`, `<PressableScale>`) is an invalid prop in React Native TypeScript types, fails to expose identifiers on native mobile apps, and causes typecheck failures.
+- **Enforced Directives for AI Assistants:**
+  ```tsx
+  // ❌ FORBIDDEN: Invalid in React Native, breaks TypeScript and native builds
+  <TextInput data-testid="email-input" />
+  <Pressable data-testid="buy-now-button" ... />
+
+  // ✅ REQUIRED: Standard React Native testID (compiles to data-testid in DOM for Playwright)
+  <TextInput testID="email-input" />
+  <Pressable testID="buy-now-button" ... />
+  ```
+  In Playwright test suites, query elements via Playwright's canonical locator:
+  ```ts
+  page.getByTestId('email-input');
+  page.getByTestId('buy-now-button');
+  ```
+
 ---
 
 ## 3. Strict Design Language Invariants ("The Quiet Atelier" - `DESIGN.md`)
@@ -268,6 +288,7 @@ Before proceeding with a user request, match it against this matrix:
 | *"Extract sales into a 4th top tab or remove selling from the Purchases view"* | 🔴 **YES** | Violates Strict Activity Screen & Purchases / Selling Invariant (Rule 2.10). Breaks navigation balance and removes seller access. | Keep top tabs locked to `Orders`, `Messages`, `Support`. Maintain `Purchases` | `Selling` segmented control in `OrdersInboxPage.tsx`. |
 | *"Remove the Purchases | Selling toggle inside OrdersInboxPage"* | 🔴 **YES** | Violates Rule 2.10. Deprives sellers of viewing their sales orders and shop inventory actions. | Preserve segmented sub-toggle with counts (`Purchases (X)` | `Selling (Y)`), `Shop Listings` bar, and Whatnot squircle chips. |
 | *"Reintroduce message dividers or underline beneath chips on Activity"* | 🔴 **YES** | Violates Activity visual cleanliness rules (Rule 2.10). | Keep message rows divider-free and chips free of bottom dividing lines. |
+| *"Use HTML 'data-testid' on React Native components"* | 🔴 **YES** | Violates React Native testID standard (Rule 2.11). Causes TypeScript errors and fails on native iOS/Android builds. | Use native `testID="..."`. React Native for Web compiles it to `data-testid` in the DOM for Playwright. |
 | *"Add dark mode styling for this new component"* | 🟢 **NO** | Safe, provided `useTheme()` tokens are used. | Use `const { theme, isDark } = useTheme();` and bind to `theme.surface`, `theme.panel`, etc. |
 
 ---

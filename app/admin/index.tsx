@@ -121,16 +121,8 @@ export default function AdminConsoleScreen() {
     try {
       const [txs, kycRes, usersRes] = await Promise.all([
         escrowService.fetchLogisticsTransactions('all', 100),
-        supabase
-          .from('verifications')
-          .select('*')
-          .order('submitted_at', { ascending: false })
-          .limit(100),
-        supabase
-          .from('profiles')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(100),
+        supabase.rpc('admin_get_verifications', { p_status: 'all' }),
+        supabase.rpc('admin_get_users', { p_limit: 100 }),
       ]);
 
       setTransactions(txs);
@@ -376,17 +368,11 @@ export default function AdminConsoleScreen() {
     tap('medium');
     setProcessingKycId(item.user_id);
     try {
-      const now = new Date().toISOString();
-      await Promise.all([
-        supabase
-          .from('verifications')
-          .update({ status: decision, reviewed_at: now })
-          .eq('user_id', item.user_id),
-        supabase
-          .from('profiles')
-          .update({ is_verified: decision === 'approved' })
-          .eq('id', item.user_id),
-      ]);
+      const { error } = await supabase.rpc('admin_review_kyc', {
+        p_user_id: item.user_id,
+        p_decision: decision,
+      });
+      if (error) throw error;
 
       toast.show(`Seller verification ${decision}`, {
         variant: 'success',
@@ -409,7 +395,12 @@ export default function AdminConsoleScreen() {
     setTogglingProId(user.id);
     const nextVal = !user.is_pro;
     try {
-      await supabase.from('profiles').update({ is_pro: nextVal }).eq('id', user.id);
+      const { error } = await supabase.rpc('admin_toggle_pro_seller', {
+        p_user_id: user.id,
+        p_is_pro: nextVal,
+      });
+      if (error) throw error;
+
       toast.show(
         `Seller ${user.username} is now ${nextVal ? 'Pro Verified' : 'Standard'}`,
         { variant: 'default', icon: 'check' },
