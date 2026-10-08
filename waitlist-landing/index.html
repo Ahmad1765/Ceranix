@@ -56,11 +56,22 @@
   <!-- Site Navigation -->
   <header class="site-header">
     <div class="header-inner">
-      <a href="#" class="brand-logo" aria-label="Grabsty Home">
-        GRABSTY<span class="brand-dot"></span>
-      </a>
+      <div class="header-left">
+        <a href="#" class="brand-logo" aria-label="Grabsty Home">
+          GRABSTY<span class="brand-dot"></span>
+        </a>
+        <!-- Ambient Global Collector Ticker (Feature 5) -->
+        <div class="header-live-ticker" id="global-ticker" aria-hidden="true">
+          <span class="ticker-pulse-dot"></span>
+          <span class="ticker-text" id="ticker-text">Tokyo: Collector secured #GRB-4819 &bull; 2m ago</span>
+        </div>
+      </div>
       
       <div class="header-meta">
+        <!-- Audio Haptics Toggle (Feature 4) -->
+        <button type="button" id="sfx-toggle-btn" class="header-sfx-btn" title="Toggle Tactile Sound Effects" aria-pressed="true">
+          <span id="sfx-icon">🔊</span> <span class="sfx-label">SFX: ON</span>
+        </button>
         <a href="#waitlist-section" class="header-action-btn">GET ACCESS</a>
       </div>
     </div>
@@ -178,7 +189,10 @@
 
         <!-- Success Confirmation Card with Viral Referral Station -->
         <div class="success-state hidden" id="success-container" aria-live="polite">
-          <div class="success-card">
+          <div class="success-card" id="passport-success-card">
+            <!-- 3D Holographic Glare Layer (Feature 3) -->
+            <div class="foil-glare-overlay" id="foil-overlay" aria-hidden="true"></div>
+            
             <div class="success-badge-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="20 6 9 17 4 12"></polyline>
@@ -340,30 +354,47 @@
           </p>
         </article>
 
-        <!-- Card 2: Archival Wardrobe & Sharp Sold Invariant -->
-        <article class="bento-card card-archival animate-on-scroll delay-250">
+        <!-- Card 2: Interactive Archival Wardrobe Vault (Feature 2) -->
+        <article class="bento-card card-archival animate-on-scroll delay-250" id="archival-vault-card">
           <div class="card-header">
             <span class="card-num">02</span>
             <span class="card-tag">CURATION</span>
           </div>
 
-          <div class="card-visual item-preview-visual">
+          <!-- Interactive Vault Tabs -->
+          <div class="vault-tabs-row" role="tablist" aria-label="Archival selection">
+            <button type="button" class="vault-tab-btn active" data-grail="raf" role="tab" aria-selected="true">
+              RAF '02
+            </button>
+            <button type="button" class="vault-tab-btn" data-grail="lang" role="tab" aria-selected="false">
+              LANG '99
+            </button>
+            <button type="button" class="vault-tab-btn" data-grail="margiela" role="tab" aria-selected="false">
+              MARGIELA '04
+            </button>
+          </div>
+
+          <div class="card-visual item-preview-visual" id="vault-preview-stage">
             <div class="mockup-listing-card">
               <div class="mockup-img-container">
-                <div class="mockup-silhouette">
-                  <svg viewBox="0 0 100 120" fill="none" class="garment-svg">
+                <div class="mockup-silhouette" id="vault-silhouette">
+                  <!-- Dynamic SVG Container for Grails -->
+                  <svg viewBox="0 0 100 120" fill="none" class="garment-svg" id="garment-svg-icon">
                     <path d="M35 15 L50 22 L65 15 L85 35 L75 48 L68 42 L68 110 L32 110 L32 42 L25 48 L15 35 Z" stroke="#6C47FF" stroke-width="3" fill="rgba(108, 71, 255, 0.08)" />
                     <line x1="50" y1="22" x2="50" y2="110" stroke="#FFFFFF" stroke-dasharray="3 3" stroke-width="2" />
                   </svg>
                 </div>
                 <!-- Canonical Sharp Sold Badge (Strict Plick Invariant: 0px radius, purple bg) -->
-                <div class="sharp-sold-badge">SOLD</div>
+                <div class="sharp-sold-badge" id="vault-sold-badge">SOLD</div>
               </div>
               <div class="mockup-meta">
-                <div class="mockup-brand">RAF SIMONS &bull; 2002</div>
-                <div class="mockup-item-name">'Virginia Creeper' Sweatshirt</div>
-                <div class="mockup-price">$1,450</div>
+                <div class="mockup-brand" id="vault-brand">RAF SIMONS &bull; AUTUMN/WINTER 2002</div>
+                <div class="mockup-item-name" id="vault-name">'Virginia Creeper' Sweatshirt</div>
+                <div class="mockup-price" id="vault-price">$1,450</div>
               </div>
+            </div>
+            <div class="vault-provenance-tag" id="vault-provenance">
+              <span>✓ Verified Weave &bull; Antwerp Provenance</span>
             </div>
           </div>
 
@@ -373,39 +404,53 @@
           </p>
         </article>
 
-        <!-- Card 3: Anti-Clutter Comparison -->
-        <article class="bento-card card-discipline animate-on-scroll delay-350">
+        <!-- Card 3: Anti-Clutter Comparison & Interactive X-Ray Toggle -->
+        <article class="bento-card card-discipline animate-on-scroll delay-350" id="discipline-card">
           <div class="card-header">
             <span class="card-num">03</span>
             <span class="card-tag">DISCIPLINE</span>
           </div>
 
-          <div class="card-visual comparison-visual">
-            <div class="comp-row noise-row">
-              <span class="comp-badge bad">CONVENTIONAL APPS</span>
-              <div class="noise-chips">
-                <span class="fake-chip">SPIN WHEEL!</span>
-                <span class="fake-chip">HURRY! 9 LEFT</span>
-                <span class="fake-chip">35% FLASH SALE</span>
+          <!-- Interactive Mode Switcher -->
+          <div class="clutter-toggle-bar" role="tablist" aria-label="Experience comparison">
+            <button type="button" id="clutter-tab-casino" class="clutter-tab-btn" role="tab" aria-selected="false">
+              <span>🎰 CONVENTIONAL</span>
+            </button>
+            <button type="button" id="clutter-tab-discipline" class="clutter-tab-btn active" role="tab" aria-selected="true">
+              <span>✦ GRABSTY DISCIPLINE</span>
+            </button>
+          </div>
+
+          <div class="card-visual comparison-visual mode-discipline" id="comparison-stage">
+            <!-- Casino State (Chaotic Noise) -->
+            <div class="casino-overlay" id="casino-overlay" aria-hidden="true">
+              <div class="casino-banner">⚠️ FLASH SALE: 40% OFF CODE: FOMO99</div>
+              <div class="casino-chips-wrap">
+                <span class="casino-badge blink-slow">SPIN THE WHEEL! 🎡</span>
+                <span class="casino-badge blink-fast">🔥 14 IN CART NOW</span>
+                <span class="casino-badge shake-pill">HURRY! 1 LEFT</span>
+              </div>
+              <div class="casino-countdown">
+                <span>SLOT EXPIRES IN 04:19</span>
               </div>
             </div>
-            
-            <div class="comp-divider">
-              <span>VS</span>
-            </div>
 
-            <div class="comp-row quiet-row">
-              <span class="comp-badge good">GRABSTY DISCIPLINE</span>
-              <div class="quiet-box">
-                <span class="quiet-metric">0 ADVERTS</span>
-                <span class="quiet-metric">0 FLASH NOTIFICATIONS</span>
-                <span class="quiet-metric">PURE ARCHIVE</span>
+            <!-- Grabsty Discipline State (Quiet Luxury) -->
+            <div class="discipline-content" id="discipline-content">
+              <div class="discipline-row">
+                <span class="discipline-metric-badge">0 ADS</span>
+                <span class="discipline-metric-badge">0 FLASH PROMOS</span>
+                <span class="discipline-metric-badge">0 NOTIFICATION SPAM</span>
+              </div>
+              <div class="discipline-status-box">
+                <div class="discipline-indicator-dot"></div>
+                <span class="discipline-status-text">DISCIPLINED COMMERCE PROTOCOL ACTIVE</span>
               </div>
             </div>
           </div>
 
           <h3 class="card-title">Zero Gamification Clutter</h3>
-          <p class="card-desc">
+          <p class="card-desc" id="discipline-card-desc">
             No flashing sticker popups, slot-machine confetti, or deceptive countdown timers. A quiet-luxury platform designed with respect for your focus and aesthetic sensibilities.
           </p>
         </article>

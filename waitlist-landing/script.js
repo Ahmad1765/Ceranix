@@ -18,6 +18,122 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ---------------------------------------------------------------------------
+  // Feature 4: Emil Kowalski Tactile Audio Haptics (Native Web Audio API)
+  // ---------------------------------------------------------------------------
+  class HapticAudioEngine {
+    constructor() {
+      this.ctx = null;
+      this.enabled = localStorage.getItem('grabsty_sfx') !== 'false';
+    }
+    init() {
+      if (!this.ctx) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) this.ctx = new AudioCtx();
+      }
+      if (this.ctx && this.ctx.state === 'suspended') {
+        this.ctx.resume().catch(() => {});
+      }
+    }
+    click() {
+      if (!this.enabled) return;
+      this.init();
+      if (!this.ctx) return;
+      try {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const now = this.ctx.currentTime;
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1400, now);
+        osc.frequency.exponentialRampToValueAtTime(320, now + 0.035);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.035);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.035);
+      } catch {}
+    }
+    success() {
+      if (!this.enabled) return;
+      this.init();
+      if (!this.ctx) return;
+      try {
+        const now = this.ctx.currentTime;
+        [523.25, 659.25, 783.99].forEach((freq, i) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          const t = now + (i * 0.05);
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, t);
+          gain.gain.setValueAtTime(0.06, t);
+          gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.16);
+        });
+      } catch {}
+    }
+    toggle() {
+      this.enabled = !this.enabled;
+      localStorage.setItem('grabsty_sfx', this.enabled ? 'true' : 'false');
+      if (this.enabled) this.click();
+      return this.enabled;
+    }
+  }
+  const hapticAudio = new HapticAudioEngine();
+
+  const sfxToggleBtn = document.getElementById('sfx-toggle-btn');
+  if (sfxToggleBtn) {
+    function updateSfxButton(enabled) {
+      const sfxIcon = document.getElementById('sfx-icon');
+      const sfxLabel = sfxToggleBtn.querySelector('.sfx-label');
+      if (enabled) {
+        sfxToggleBtn.classList.remove('muted');
+        sfxToggleBtn.setAttribute('aria-pressed', 'true');
+        if (sfxIcon) sfxIcon.textContent = '🔊';
+        if (sfxLabel) sfxLabel.textContent = 'SFX: ON';
+      } else {
+        sfxToggleBtn.classList.add('muted');
+        sfxToggleBtn.setAttribute('aria-pressed', 'false');
+        if (sfxIcon) sfxIcon.textContent = '🔇';
+        if (sfxLabel) sfxLabel.textContent = 'SFX: OFF';
+      }
+    }
+    updateSfxButton(hapticAudio.enabled);
+
+    sfxToggleBtn.addEventListener('click', () => {
+      const state = hapticAudio.toggle();
+      updateSfxButton(state);
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Feature 5: Ambient Global Collector Ticker
+  // ---------------------------------------------------------------------------
+  const globalTickerText = document.getElementById('ticker-text');
+  if (globalTickerText) {
+    const TICKER_ENTRIES = [
+      'Tokyo, JP: Collector secured #GRB-4819 • 2m ago',
+      'London, UK: Archivist secured #GRB-4820 • 4m ago',
+      'Paris, FR: Collector secured #GRB-4821 • Just now',
+      'Berlin, DE: Archivist secured #GRB-4818 • 6m ago',
+      'New York, US: Collector secured #GRB-4817 • 9m ago',
+      'Stockholm, SE: Archivist secured #GRB-4816 • 12m ago',
+      'Milan, IT: Collector secured #GRB-4815 • 15m ago'
+    ];
+    let tickerIdx = 0;
+    setInterval(() => {
+      tickerIdx = (tickerIdx + 1) % TICKER_ENTRIES.length;
+      globalTickerText.style.opacity = '0';
+      setTimeout(() => {
+        globalTickerText.textContent = TICKER_ENTRIES[tickerIdx];
+        globalTickerText.style.opacity = '1';
+      }, 250);
+    }, 4200);
+  }
+
+  // ---------------------------------------------------------------------------
   // 2. Scroll Progress Bar
   // ---------------------------------------------------------------------------
   const progressBar = document.getElementById('scroll-progress');
@@ -282,6 +398,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   rolePills.forEach(pill => {
     pill.addEventListener('click', () => {
+      hapticAudio.click();
       rolePills.forEach(p => {
         p.classList.remove('active');
         p.setAttribute('aria-checked', 'false');
@@ -446,6 +563,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderPassportCard({ email, role, ticketCode, isReturning }) {
     activePassportData = { email, role, ticketCode };
+    hapticAudio.success();
 
     const siteBase = window.location.origin + window.location.pathname.replace(/\/$/, '');
     const cleanCode = ticketCode.replace(/^#/, '');
@@ -882,12 +1000,150 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // Feature 1: Interactive Clutter Filter X-Ray Toggle (Bento Card 03)
+  // ---------------------------------------------------------------------------
+  const clutterTabCasino = document.getElementById('clutter-tab-casino');
+  const clutterTabDiscipline = document.getElementById('clutter-tab-discipline');
+  const comparisonStage = document.getElementById('comparison-stage');
+  const disciplineDesc = document.getElementById('discipline-card-desc');
+
+  if (clutterTabCasino && clutterTabDiscipline && comparisonStage) {
+    clutterTabCasino.addEventListener('click', () => {
+      hapticAudio.click();
+      clutterTabCasino.classList.add('active');
+      clutterTabCasino.setAttribute('aria-selected', 'true');
+      clutterTabDiscipline.classList.remove('active');
+      clutterTabDiscipline.setAttribute('aria-selected', 'false');
+
+      comparisonStage.classList.remove('mode-discipline');
+      comparisonStage.classList.add('mode-casino');
+
+      if (disciplineDesc) {
+        disciplineDesc.textContent = 'Conventional marketplaces overwhelm collectors with gambling psychology, flashing popups, and fake countdowns to induce impulsive purchases.';
+      }
+    });
+
+    clutterTabDiscipline.addEventListener('click', () => {
+      hapticAudio.click();
+      clutterTabDiscipline.classList.add('active');
+      clutterTabDiscipline.setAttribute('aria-selected', 'true');
+      clutterTabCasino.classList.remove('active');
+      clutterTabCasino.setAttribute('aria-selected', 'false');
+
+      comparisonStage.classList.remove('mode-casino');
+      comparisonStage.classList.add('mode-discipline');
+
+      if (disciplineDesc) {
+        disciplineDesc.textContent = 'No flashing sticker popups, slot-machine confetti, or deceptive countdown timers. A quiet-luxury platform designed with respect for your focus and aesthetic sensibilities.';
+      }
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Feature 2: Interactive Archival Vault Inspector (Bento Card 02)
+  // ---------------------------------------------------------------------------
+  const VAULT_ITEMS = {
+    raf: {
+      brand: 'RAF SIMONS • AUTUMN/WINTER 2002',
+      name: "'Virginia Creeper' Sweatshirt",
+      price: '$1,450',
+      badge: 'SOLD',
+      provenance: '✓ Verified Weave • Antwerp Provenance',
+      svg: `<path d="M35 15 L50 22 L65 15 L85 35 L75 48 L68 42 L68 110 L32 110 L32 42 L25 48 L15 35 Z" stroke="#6C47FF" stroke-width="3" fill="rgba(108, 71, 255, 0.08)" /><line x1="50" y1="22" x2="50" y2="110" stroke="#FFFFFF" stroke-dasharray="3 3" stroke-width="2" />`
+    },
+    lang: {
+      brand: 'HELMUT LANG • AUTUMN/WINTER 1999',
+      name: 'Classic Raw Painter Selvedge Denim',
+      price: '$980',
+      badge: 'SOLD',
+      provenance: '✓ Bond Street Archive • Selvedge Weave',
+      svg: `<path d="M30 18 L70 18 L74 60 L80 112 L56 112 L50 68 L44 112 L20 112 L26 60 Z" stroke="#6C47FF" stroke-width="3" fill="rgba(108, 71, 255, 0.08)" /><circle cx="42" cy="75" r="3" fill="#FFFFFF" /><circle cx="62" cy="85" r="2.5" fill="#FFFFFF" /><line x1="50" y1="25" x2="50" y2="60" stroke="#FFFFFF" stroke-width="2" />`
+    },
+    margiela: {
+      brand: 'MAISON MARGIELA • AUTUMN/WINTER 2004',
+      name: 'Line 0 Artisanal Reconstructed Leather',
+      price: '$2,800',
+      badge: 'SOLD',
+      provenance: '✓ White 4-Stitch Back Label • Full-Grain',
+      svg: `<path d="M30 15 L50 24 L70 15 L90 32 L82 46 L74 40 L74 108 L26 108 L26 40 L18 46 L10 32 Z" stroke="#6C47FF" stroke-width="3" fill="rgba(108, 71, 255, 0.08)" /><line x1="45" y1="18" x2="55" y2="18" stroke="#FFFFFF" stroke-width="3" /><line x1="45" y1="24" x2="55" y2="24" stroke="#FFFFFF" stroke-width="3" /><line x1="42" y1="42" x2="58" y2="58" stroke="#6C47FF" stroke-width="2" />`
+    }
+  };
+
+  const vaultTabs = document.querySelectorAll('.vault-tab-btn');
+  const vaultBrand = document.getElementById('vault-brand');
+  const vaultName = document.getElementById('vault-name');
+  const vaultPrice = document.getElementById('vault-price');
+  const vaultSoldBadge = document.getElementById('vault-sold-badge');
+  const vaultProvenance = document.getElementById('vault-provenance');
+  const garmentSvgIcon = document.getElementById('garment-svg-icon');
+  const mockupListingCard = document.querySelector('.mockup-listing-card');
+
+  vaultTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      hapticAudio.click();
+      vaultTabs.forEach(t => {
+        t.classList.remove('active');
+        t.setAttribute('aria-selected', 'false');
+      });
+      tab.classList.add('active');
+      tab.setAttribute('aria-selected', 'true');
+
+      const grailKey = tab.getAttribute('data-grail');
+      const item = VAULT_ITEMS[grailKey];
+      if (!item) return;
+
+      if (mockupListingCard) mockupListingCard.style.opacity = '0.3';
+
+      setTimeout(() => {
+        if (vaultBrand) vaultBrand.textContent = item.brand;
+        if (vaultName) vaultName.textContent = item.name;
+        if (vaultPrice) vaultPrice.textContent = item.price;
+        if (vaultSoldBadge) vaultSoldBadge.textContent = item.badge;
+        if (vaultProvenance) vaultProvenance.innerHTML = `<span>${item.provenance}</span>`;
+        if (garmentSvgIcon) garmentSvgIcon.innerHTML = item.svg;
+
+        if (mockupListingCard) mockupListingCard.style.opacity = '1';
+      }, 70);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Feature 3: Dynamic 3D Holographic Foil Specular Sheen (Alpha Passport)
+  // ---------------------------------------------------------------------------
+  const passportSuccessCard = document.getElementById('passport-success-card');
+  if (passportSuccessCard && isFinePointer && !isReducedMotion) {
+    passportSuccessCard.addEventListener('mousemove', (e) => {
+      const rect = passportSuccessCard.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const pctX = ((x / rect.width) * 100).toFixed(1);
+      const pctY = ((y / rect.height) * 100).toFixed(1);
+
+      passportSuccessCard.style.setProperty('--foil-x', `${pctX}%`);
+      passportSuccessCard.style.setProperty('--foil-y', `${pctY}%`);
+
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      const rotX = ((y - centerY) / centerY) * -5;
+      const rotY = ((x - centerX) / centerX) * 5;
+      passportSuccessCard.style.transform = `perspective(800px) rotateX(${rotX.toFixed(2)}deg) rotateY(${rotY.toFixed(2)}deg)`;
+    });
+
+    passportSuccessCard.addEventListener('mouseleave', () => {
+      passportSuccessCard.style.setProperty('--foil-x', `50%`);
+      passportSuccessCard.style.setProperty('--foil-y', `50%`);
+      passportSuccessCard.style.transform = `perspective(800px) rotateX(0deg) rotateY(0deg)`;
+    });
+  }
+
+  // ---------------------------------------------------------------------------
   // 10. Smooth Accordion Handling
   // ---------------------------------------------------------------------------
   const faqDetails = document.querySelectorAll('.faq-item');
   faqDetails.forEach(detail => {
     detail.addEventListener('toggle', () => {
       if (detail.open) {
+        hapticAudio.click();
         faqDetails.forEach(other => {
           if (other !== detail && other.open) {
             other.removeAttribute('open');
@@ -903,6 +1159,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('a[href="#waitlist-section"]').forEach(anchor => {
     anchor.addEventListener('click', (e) => {
       e.preventDefault();
+      hapticAudio.click();
       const target = document.getElementById('waitlist-section');
       if (target) {
         target.scrollIntoView({ behavior: 'smooth', block: 'center' });

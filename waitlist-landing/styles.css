@@ -242,6 +242,77 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 1rem;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+/* Ambient Global Collector Ticker (Feature 5) */
+.header-live-ticker {
+  display: none;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--paper-20);
+  padding: 0.35rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--paper-80);
+  transition: opacity 250ms ease;
+  user-select: none;
+}
+
+@media (min-width: 680px) {
+  .header-live-ticker {
+    display: inline-flex;
+  }
+}
+
+.ticker-pulse-dot {
+  width: 6px;
+  height: 6px;
+  background-color: var(--signal);
+  border-radius: 50%;
+  box-shadow: 0 0 6px var(--signal);
+  animation: pulse-live 2s infinite;
+  flex-shrink: 0;
+}
+
+.ticker-text {
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+/* Audio Haptics Button (Feature 4) */
+.header-sfx-btn {
+  background: transparent;
+  border: 1.5px solid var(--paper-40);
+  color: var(--paper);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: all 120ms ease;
+  letter-spacing: 0.04em;
+}
+
+.header-sfx-btn:hover {
+  border-color: var(--paper);
+  background: var(--paper-10);
+  transform: translateY(-1px);
+}
+
+.header-sfx-btn.muted {
+  opacity: 0.6;
+  border-color: var(--paper-20);
 }
 
 .brand-logo {
@@ -823,6 +894,24 @@ body {
   text-align: center;
   box-shadow: 10px 10px 0 var(--ink), 10px 10px 0 4px var(--paper);
   animation: success-pop 500ms var(--ease-spring) forwards;
+  position: relative;
+  overflow: hidden;
+  will-change: transform;
+}
+
+/* 3D Holographic Specular Foil Layer (Feature 3) */
+.foil-glare-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10;
+  background: radial-gradient(circle 350px at var(--foil-x, 50%) var(--foil-y, 50%), rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0.15) 30%, transparent 70%);
+  mix-blend-mode: overlay;
+  opacity: var(--foil-opacity, 0.85);
+  transition: opacity 300ms ease;
 }
 
 @keyframes success-pop {
@@ -1392,12 +1481,63 @@ body {
   padding: 0 0.25rem;
 }
 
-/* Card 2: Archival Wardrobe & Strict Sharp Sold Badge */
+/* Card 2: Interactive Archival Wardrobe Vault (Feature 2) */
+.vault-tabs-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+  width: 100%;
+}
+
+.vault-tab-btn {
+  background: var(--ink);
+  border: 1.5px solid var(--paper-20);
+  color: var(--paper-60);
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 800;
+  padding: 0.45rem 0.2rem;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  text-align: center;
+  transition: all 120ms ease;
+  white-space: nowrap;
+}
+
+.vault-tab-btn:hover {
+  color: var(--paper);
+  border-color: var(--paper-60);
+}
+
+.vault-tab-btn.active {
+  background: var(--paper);
+  color: var(--ink);
+  border-color: var(--paper);
+  box-shadow: 2px 2px 0 var(--signal);
+}
+
 .mockup-listing-card {
   width: 100%;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.vault-provenance-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: #10B981;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  padding: 0.3rem 0.6rem;
+  margin-top: 0.65rem;
+  align-self: center;
 }
 
 .mockup-img-container {
@@ -1461,74 +1601,193 @@ body {
   color: var(--paper-80);
 }
 
-/* Card 3: Anti-Clutter Comparison */
-.comparison-visual {
-  gap: 0.5rem;
-}
-
-.comp-row {
-  display: flex;
-  flex-direction: column;
+/* Card 3: Interactive Clutter Filter X-Ray Toggle */
+.clutter-toggle-bar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 0.35rem;
-  text-align: left;
+  margin-bottom: 1rem;
+  width: 100%;
 }
 
-.comp-badge {
+.clutter-tab-btn {
+  background: var(--ink);
+  border: 1.5px solid var(--paper-20);
+  color: var(--paper-60);
   font-family: var(--font-mono);
   font-size: 0.625rem;
   font-weight: 800;
-  letter-spacing: 0.05em;
+  padding: 0.45rem 0.35rem;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: all 150ms ease;
+  white-space: nowrap;
 }
 
-.comp-badge.bad {
-  color: var(--paper-40);
-  text-decoration: line-through;
+.clutter-tab-btn:hover {
+  color: var(--paper);
+  border-color: var(--paper-60);
 }
 
-.comp-badge.good {
-  color: var(--signal);
+.clutter-tab-btn.active {
+  background: var(--paper);
+  color: var(--ink);
+  border-color: var(--paper);
+  box-shadow: 2px 2px 0 var(--signal);
 }
 
-.noise-chips {
+.comparison-visual {
+  min-height: 160px;
+  position: relative;
+  overflow: hidden;
+  transition: all 250ms ease;
+  padding: 1rem;
+}
+
+/* Casino Chaotic Mode */
+.comparison-visual.mode-casino {
+  background-color: #1A0D00;
+  border-color: #F59E0B;
+  box-shadow: inset 0 0 15px rgba(245, 158, 11, 0.2);
+}
+
+.casino-overlay {
+  display: none;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+  animation: jitter-in 200ms ease;
+}
+
+.comparison-visual.mode-casino .casino-overlay {
+  display: flex;
+}
+
+.comparison-visual.mode-casino .discipline-content {
+  display: none;
+}
+
+.casino-banner {
+  background: #DC2626;
+  color: #FFFFFF;
+  font-family: var(--font-main);
+  font-weight: 900;
+  font-size: 0.6875rem;
+  padding: 0.3rem 0.5rem;
+  text-align: center;
+  letter-spacing: 0.02em;
+  animation: pulse-red 800ms infinite alternate;
+}
+
+@keyframes pulse-red {
+  from { background-color: #DC2626; transform: scale(1); }
+  to { background-color: #EF4444; transform: scale(1.02); }
+}
+
+.casino-chips-wrap {
   display: flex;
   gap: 0.35rem;
   flex-wrap: wrap;
-}
-
-.fake-chip {
-  font-size: 0.5625rem;
-  font-weight: 800;
-  background: var(--paper-10);
-  color: var(--paper-40);
-  padding: 0.15rem 0.4rem;
-  border: 1px dashed var(--paper-20);
-  opacity: 0.6;
-}
-
-.comp-divider {
-  display: flex;
-  align-items: center;
   justify-content: center;
-  font-family: var(--font-mono);
-  font-size: 0.625rem;
-  font-weight: 800;
-  color: var(--paper-40);
 }
 
-.quiet-box {
+.casino-badge {
+  font-family: var(--font-main);
+  font-size: 0.625rem;
+  font-weight: 900;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid #F59E0B;
+  background: #78350F;
+  color: #FDE68A;
+}
+
+.blink-slow {
+  animation: blink-anim 1.2s infinite;
+}
+
+.blink-fast {
+  animation: blink-anim 600ms infinite;
+  background: #B45309;
+}
+
+.shake-pill {
+  animation: shake-badge 400ms infinite;
+  background: #991B1B;
+  color: #FEE2E2;
+}
+
+@keyframes blink-anim {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+@keyframes shake-badge {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px) rotate(-1deg); }
+  75% { transform: translateX(2px) rotate(1deg); }
+}
+
+.casino-countdown {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 900;
+  color: #EF4444;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 0.25rem 0.5rem;
+  text-align: center;
+  border: 1px dashed #EF4444;
+}
+
+/* Grabsty Discipline Mode */
+.discipline-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  width: 100%;
+}
+
+.discipline-row {
   display: flex;
   gap: 0.4rem;
   flex-wrap: wrap;
+  justify-content: center;
 }
 
-.quiet-metric {
+.discipline-metric-badge {
   font-family: var(--font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   font-weight: 800;
   background: var(--signal-subtle);
   color: var(--paper);
-  border: 1px solid var(--signal);
-  padding: 0.2rem 0.5rem;
+  border: 1.5px solid var(--signal);
+  padding: 0.35rem 0.6rem;
+  letter-spacing: 0.05em;
+}
+
+.discipline-status-box {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--paper-20);
+  padding: 0.5rem 0.75rem;
+  justify-content: center;
+}
+
+.discipline-indicator-dot {
+  width: 6px;
+  height: 6px;
+  background: #10B981;
+  border-radius: 50%;
+  box-shadow: 0 0 6px #10B981;
+}
+
+.discipline-status-text {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: var(--paper-80);
+  letter-spacing: 0.06em;
 }
 
 /* Card Typography */
