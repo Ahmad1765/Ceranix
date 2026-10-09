@@ -1,0 +1,11 @@
+# robots.txt for Grabsty
+User-agent: *
+Disallow: /admin
+Disallow: /admin/
+Disallow: /invoice/
+Disallow: /payment/
+Disallow: /auth/
+Disallow: /conversation/
+Allow: /
+
+Sitemap: https://grabsty.com/sitemap.xml

@@ -6,7 +6,11 @@
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
-  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+  Permissions-Policy: camera=(self), microphone=(), geolocation=(), payment=(self)
+  Cross-Origin-Opener-Policy: same-origin-allow-popups
+  X-Permitted-Cross-Domain-Policies: none
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://checkout.stripe.com https://js.stripe.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://*.stripe.com; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://api.stripe.com https://exp.host https://*.posthog.com https://cdn.jsdelivr.net; frame-src 'self' https://checkout.stripe.com https://js.stripe.com; object-src 'none'; base-uri 'self'; form-action 'self';
 
 # Content-addressed by Metro — the hash changes when the bytes do, so these can
 # be cached forever. This is what keeps a repeat visit off the slow path.

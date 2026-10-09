@@ -348,26 +348,23 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   updateCapacityDisplay(currentClaimed);
 
-  // Live count sync from Supabase if table exists
+  // Live count sync from Supabase using secure get_waitlist_count RPC
   async function fetchLiveSupabaseCount() {
     try {
-      const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/${SUPABASE_CONFIG.tableName}?select=count`, {
-        method: 'HEAD',
+      const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/rpc/get_waitlist_count`, {
+        method: 'POST',
         headers: {
           'apikey': SUPABASE_CONFIG.anonKey,
           'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`,
-          'Range': '0-0',
-          'Prefer': 'count=exact'
-        }
+          'Content-Type': 'application/json',
+        },
       });
       if (res.ok) {
-        const range = res.headers.get('content-range');
-        if (range && range.includes('/')) {
-          const dbCount = parseInt(range.split('/')[1], 10);
-          if (!isNaN(dbCount) && dbCount > 0) {
-            currentClaimed = BASE_CLAIMED + dbCount;
-            updateCapacityDisplay(currentClaimed);
-          }
+        const count = await res.json();
+        const dbCount = Number(count);
+        if (!isNaN(dbCount) && dbCount > 0) {
+          currentClaimed = BASE_CLAIMED + dbCount;
+          updateCapacityDisplay(currentClaimed);
         }
       }
     } catch {
@@ -531,9 +528,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const refCountText = document.getElementById('ref-count-text');
     if (refCountText) {
+      refCountText.textContent = '';
       if (count > 0) {
         const spotsJumped = count * 50;
-        refCountText.innerHTML = `<strong>${count} Collector${count > 1 ? 's' : ''} Invited</strong> &bull; Jumped ${spotsJumped} spots forward ⚡`;
+        const strong = document.createElement('strong');
+        strong.textContent = `${count} Collector${count > 1 ? 's' : ''} Invited`;
+        refCountText.appendChild(strong);
+        refCountText.appendChild(document.createTextNode(` • Jumped ${spotsJumped} spots forward ⚡`));
       } else {
         refCountText.textContent = '0 Referrals Tracked • Priority Queue Locked';
       }
@@ -1098,8 +1099,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (vaultBrand) vaultBrand.textContent = item.brand;
         if (vaultName) vaultName.textContent = item.name;
         if (vaultPrice) vaultPrice.textContent = item.price;
-        if (vaultSoldBadge) vaultSoldBadge.textContent = item.badge;
-        if (vaultProvenance) vaultProvenance.innerHTML = `<span>${item.provenance}</span>`;
+        if (vaultProvenance) {
+          vaultProvenance.textContent = '';
+          const span = document.createElement('span');
+          span.textContent = item.provenance;
+          vaultProvenance.appendChild(span);
+        }
         if (garmentSvgIcon) garmentSvgIcon.innerHTML = item.svg;
 
         if (mockupListingCard) mockupListingCard.style.opacity = '1';
