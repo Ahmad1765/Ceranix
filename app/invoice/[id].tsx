@@ -669,6 +669,7 @@ export default function InvoiceScreen() {
         isSeller={isSeller}
         sellerDefaultAddress={sellerDefaultAddress}
         onConfirmPickup={handleConfirmPickupAndPack}
+        onOrderUpdate={(updated) => setOrder(updated)}
         onBack={() => safeBack()}
         actionButtons={
           isSeller && (order?.fulfillment_status === 'pending' || !order?.fulfillment_status || order?.fulfillment_status === 'awaiting_payment') && isOrderActive && order?.status !== 'completed' && order?.status !== 'canceled' && order?.status !== 'refunded' ? (

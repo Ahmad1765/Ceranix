@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Pressable,
@@ -40,6 +40,7 @@ export interface OrderDetailsTrackingViewProps {
   initialTab?: 'shipment' | 'activity';
   onConfirmPickup?: (address: any) => Promise<void>;
   sellerDefaultAddress?: any;
+  onOrderUpdate?: (updatedOrder: Order) => void;
   // Overrides or custom fallbacks matching mockup
   trackingId?: string;
   statusLabel?: string;
@@ -227,6 +228,66 @@ function parseServerDate(val?: string | Date | null): Date | null {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ORDER FULFILLMENT STATUS NORMALIZER
+// ─────────────────────────────────────────────────────────────────────────────
+
+function deriveFulfillmentStatus(
+  order: Order | null | undefined,
+  propStatusLabel?: string,
+): FulfillmentStatus {
+  // 1. Explicit fulfillment_status on order
+  const fs = (order?.fulfillment_status || '').toLowerCase();
+  if (fs === 'completed') return 'completed';
+  if (fs === 'delivered') return 'delivered';
+  if (fs === 'shifting' || fs === 'in_transit' || fs === 'shipped') return 'shifting';
+  if (fs === 'picked') return 'picked';
+  if (fs === 'packing') return 'packing';
+  if (fs === 'disputed') return 'disputed';
+  if (fs === 'canceled' || fs === 'cancelled') return 'canceled';
+
+  // 2. Escrow status on order
+  const es = ((order as any)?.escrow_status || '').toUpperCase();
+  if (es === 'COMPLETED_FUNDS_RELEASED') return 'completed';
+  if (es === 'DELIVERED') return 'delivered';
+  if (es === 'IN_TRANSIT') return 'shifting';
+  if (es === 'READY_FOR_PICKUP') return (order as any)?.picked_up_at || (order as any)?.picked_at ? 'picked' : 'packing';
+  if (es === 'DISPUTED') return 'disputed';
+  if (es === 'CANCELLED') return 'canceled';
+
+  // 3. Timestamps
+  if (order?.completed_at) return 'completed';
+  if (order?.delivered_at) return 'delivered';
+  if (order?.shipped_at || (order as any)?.shifted_at) return 'shifting';
+  if ((order as any)?.picked_up_at || (order as any)?.picked_at) return 'picked';
+  if (order?.packed_at) return 'packing';
+
+  // 4. Order status
+  const st = (order?.status || '').toLowerCase();
+  if (st === 'completed') return 'completed';
+  if (st === 'delivered') return 'delivered';
+  if (st === 'shifting' || st === 'in_transit' || st === 'shipped') return 'shifting';
+  if (st === 'picked') return 'picked';
+  if (st === 'packing') return 'packing';
+  if (st === 'disputed') return 'disputed';
+  if (st === 'canceled' || st === 'cancelled') return 'canceled';
+
+  // 5. Fallback from propStatusLabel if supplied
+  if (propStatusLabel) {
+    const psl = propStatusLabel.toLowerCase();
+    if (psl.includes('deliver')) return 'delivered';
+    if (psl.includes('transit') || psl.includes('shift') || psl.includes('dispatch')) return 'shifting';
+    if (psl.includes('pick')) return 'picked';
+    if (psl.includes('pack')) return 'packing';
+    if (psl.includes('complete')) return 'completed';
+    if (psl.includes('dispute') || psl.includes('review')) return 'disputed';
+    if (psl.includes('cancel')) return 'canceled';
+  }
+
+  if (st === 'paid') return 'packing';
+  return 'packing';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ORDER DETAILS TRACKING VIEW
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -240,6 +301,7 @@ export function OrderDetailsTrackingView({
   initialTab = 'shipment',
   onConfirmPickup,
   sellerDefaultAddress,
+  onOrderUpdate,
   trackingId: propTrackingId,
   statusLabel: propStatusLabel,
   receiverName: propReceiverName,
@@ -268,22 +330,26 @@ export function OrderDetailsTrackingView({
   // Origin State (Image 4)
   const [countryOfOrigin, setCountryOfOrigin] = useState('United States');
 
-  // Dynamic status state reflecting all statuses: packing, picked, shifting, delivered, completed
-  const initialFulfillmentStatus: FulfillmentStatus =
-    (order?.fulfillment_status as FulfillmentStatus) ||
-    (order?.status === 'completed'
-      ? 'completed'
-      : order?.status === 'delivered'
-      ? 'delivered'
-      : order?.status === 'shifting'
-      ? 'shifting'
-      : order?.status === 'picked'
-      ? 'picked'
-      : order?.status === 'packing'
-      ? 'packing'
-      : 'packing');
+  // Dynamic status state synchronized reactively with incoming order
+  const [currentFulfillment, setCurrentFulfillment] = useState<FulfillmentStatus>(() =>
+    deriveFulfillmentStatus(order, propStatusLabel),
+  );
 
-  const [currentFulfillment, setCurrentFulfillment] = useState<FulfillmentStatus>(initialFulfillmentStatus);
+  useEffect(() => {
+    setCurrentFulfillment(deriveFulfillmentStatus(order, propStatusLabel));
+  }, [
+    order?.fulfillment_status,
+    order?.status,
+    (order as any)?.escrow_status,
+    order?.shipped_at,
+    (order as any)?.shifted_at,
+    order?.delivered_at,
+    order?.completed_at,
+    order?.packed_at,
+    (order as any)?.picked_up_at,
+    (order as any)?.picked_at,
+    propStatusLabel,
+  ]);
 
   // Ready to Deliver Form State
   const [pickupContactName, setPickupContactName] = useState(
@@ -315,38 +381,40 @@ export function OrderDetailsTrackingView({
     (order?.id ? `PAQ-${order.id.slice(0, 3).toUpperCase()}-${order.id.slice(-3).toUpperCase()}` : 'PAQ-327-P21');
 
   // Derive status badge & item status badge (Image 4)
-  let statusBadge = propStatusLabel || 'In Transit';
+  let statusBadge = propStatusLabel;
   let statusPillText = 'Needs Label';
   let itemStatusBadgeText = 'Preparing Package';
 
   if (currentFulfillment === 'delivered') {
-    statusBadge = 'Delivered';
+    statusBadge = statusBadge || 'Delivered';
     statusPillText = 'Delivered';
     itemStatusBadgeText = 'Delivered';
-  } else if (currentFulfillment === 'shifting' || (order as any)?.shipped_at) {
-    statusBadge = 'In Transit';
+  } else if (currentFulfillment === 'shifting' || (order as any)?.shipped_at || (order as any)?.shifted_at) {
+    statusBadge = statusBadge || 'In Transit';
     statusPillText = 'In Transit';
     itemStatusBadgeText = 'In Transit';
   } else if (currentFulfillment === 'picked') {
-    statusBadge = 'Picked';
+    statusBadge = statusBadge || 'Picked';
     statusPillText = 'Picked Up';
     itemStatusBadgeText = 'Picked';
   } else if (currentFulfillment === 'completed') {
-    statusBadge = 'Completed';
+    statusBadge = statusBadge || 'Completed';
     statusPillText = 'Completed';
     itemStatusBadgeText = 'Completed';
   } else if (currentFulfillment === 'packing') {
-    statusBadge = 'Packing';
+    statusBadge = statusBadge || 'Packing';
     statusPillText = 'Needs Label';
     itemStatusBadgeText = 'Preparing Package';
   } else if (currentFulfillment === 'disputed') {
-    statusBadge = 'Refund Under Review';
+    statusBadge = statusBadge || 'Refund Under Review';
     statusPillText = 'Disputed';
     itemStatusBadgeText = 'Under Review';
   } else if (currentFulfillment === 'canceled') {
-    statusBadge = 'Cancelled';
+    statusBadge = statusBadge || 'Cancelled';
     statusPillText = 'Cancelled';
     itemStatusBadgeText = 'Cancelled';
+  } else {
+    statusBadge = statusBadge || (order?.status === 'paid' ? 'Paid' : 'Preparing');
   }
 
   const addr = (order?.shipping_address as any) || {};
@@ -422,15 +490,32 @@ export function OrderDetailsTrackingView({
     return new Date(); // Fallback to real-time moment, never 5 hours in the past
   }, [order?.created_at]);
 
-  const isCompleted = currentFulfillment === 'completed';
-  const isDelivered = currentFulfillment === 'delivered' || isCompleted;
-  const isShipped = currentFulfillment === 'shifting' || isDelivered;
-  const isPicked = currentFulfillment === 'picked' || isShipped;
-  const isPacked = Boolean(order?.packed_at) || isPicked;
+  const isCompleted =
+    currentFulfillment === 'completed' ||
+    Boolean(order?.completed_at) ||
+    (order as any)?.escrow_status === 'COMPLETED_FUNDS_RELEASED';
+  const isDelivered =
+    currentFulfillment === 'delivered' ||
+    isCompleted ||
+    Boolean(order?.delivered_at) ||
+    (order as any)?.escrow_status === 'DELIVERED';
+  const isShipped =
+    currentFulfillment === 'shifting' ||
+    isDelivered ||
+    Boolean(order?.shipped_at || (order as any)?.shifted_at) ||
+    (order as any)?.escrow_status === 'IN_TRANSIT';
+  const isPicked =
+    currentFulfillment === 'picked' ||
+    isShipped ||
+    Boolean((order as any)?.picked_up_at || (order as any)?.picked_at || pickupConfirmed);
+  const isPacked =
+    Boolean(order?.packed_at) ||
+    isPicked ||
+    currentFulfillment === 'packing';
 
   const deliveredTimestamp = parseServerDate(order?.delivered_at || order?.completed_at);
   const shippedTimestamp = parseServerDate(order?.shipped_at || (order as any)?.shifted_at);
-  const pickedTimestamp = parseServerDate((order as any)?.picked_at);
+  const pickedTimestamp = parseServerDate((order as any)?.picked_up_at || (order as any)?.picked_at);
   const packedTimestamp = parseServerDate(order?.packed_at);
 
   // Exact localized timestamps bounded so no stage ever prints into the future
@@ -598,58 +683,6 @@ export function OrderDetailsTrackingView({
       onBack();
     } else {
       safeBack();
-    }
-  };
-
-  // Live Status System Transition Handler (Rule 1)
-  const handleUpdateStatus = async (newStatus: FulfillmentStatus) => {
-    tap('medium');
-    const prevStatus = currentFulfillment;
-
-    if (newStatus === 'canceled') {
-      toast.show('Please use Cancel Order action to specify cancellation details', {
-        variant: 'default',
-        icon: 'alert-circle',
-      });
-      return;
-    }
-    if (newStatus === 'disputed') {
-      toast.show('Please use Report Issue to provide dispute details', {
-        variant: 'default',
-        icon: 'alert-circle',
-      });
-      return;
-    }
-    if (newStatus === 'picked') {
-      setCurrentFulfillment('packing');
-      toast.show('Order scheduled for packaging / pickup', { variant: 'default', icon: 'check' });
-      return;
-    }
-
-    setCurrentFulfillment(newStatus);
-    if (order?.id) {
-      try {
-        await paymentService.advanceOrderFulfillment({
-          orderId: order.id,
-          targetStatus: newStatus,
-        });
-        toast.show(`Order status updated to: ${newStatus.toUpperCase()}`, {
-          variant: 'default',
-          icon: 'check',
-        });
-      } catch (e: any) {
-        console.warn('Status update sync error:', e);
-        setCurrentFulfillment(prevStatus);
-        toast.show(e?.message || 'Failed to update order status', {
-          variant: 'default',
-          icon: 'alert-triangle',
-        });
-      }
-    } else {
-      toast.show(`Order status updated to: ${newStatus.toUpperCase()}`, {
-        variant: 'default',
-        icon: 'check',
-      });
     }
   };
 
@@ -1568,108 +1601,63 @@ export function OrderDetailsTrackingView({
                   marginTop: 6,
                 }}
               >
-                <Text
-                  style={{
-                    fontSize: 16,
-                    fontFamily: typography.family.sansBold,
-                    color: theme.ink,
-                    letterSpacing: -0.2,
-                    marginBottom: 12,
-                  }}
-                >
-                  Edit Shipment
-                </Text>
-
-                <View style={{ gap: 8, marginBottom: 14 }}>
-                  {/* Unbundle Shipment Action */}
-                  <Pressable
-                    onPress={() => {
-                      tap('light');
-                      toast.show('Shipment unbundled for separate packaging', { variant: 'default', icon: 'layers' });
-                    }}
-                    style={({ pressed }) => ({
-                      height: 44,
-                      borderRadius: radii.pill,
-                      backgroundColor: isDark ? '#2C2C2E' : '#E5E7EB',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      opacity: pressed ? 0.8 : 1,
-                    })}
-                  >
-                    <Text style={{ fontSize: 14, fontFamily: typography.family.sansBold, color: theme.ink }}>
-                      Unbundle Shipment
+                {isSeller && (
+                  <>
+                    <Text
+                      style={{
+                        fontSize: 16,
+                        fontFamily: typography.family.sansBold,
+                        color: theme.ink,
+                        letterSpacing: -0.2,
+                        marginBottom: 12,
+                      }}
+                    >
+                      Edit Shipment
                     </Text>
-                  </Pressable>
 
-                  {/* Edit Shipping Details Action */}
-                  <Pressable
-                    onPress={() => {
-                      tap('light');
-                      setReadyDeliverModalVisible(true);
-                    }}
-                    style={({ pressed }) => ({
-                      height: 44,
-                      borderRadius: radii.pill,
-                      backgroundColor: isDark ? '#2C2C2E' : '#E5E7EB',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      opacity: pressed ? 0.8 : 1,
-                    })}
-                  >
-                    <Text style={{ fontSize: 14, fontFamily: typography.family.sansBold, color: theme.ink }}>
-                      Edit Shipping Details
-                    </Text>
-                  </Pressable>
-                </View>
-
-                {/* Quick Status Pipeline Controls (Live Working Status Engine) */}
-                <Text style={{ fontSize: 11.5, fontFamily: typography.family.sansBold, color: theme.mute, textTransform: 'uppercase', marginBottom: 8 }}>
-                  Advance Order Status Pipeline
-                </Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                  {[
-                    { key: 'packing' as FulfillmentStatus, label: 'Packing (Needs Label)' },
-                    { key: 'picked' as FulfillmentStatus, label: 'Picked' },
-                    { key: 'shifting' as FulfillmentStatus, label: 'In Transit' },
-                    { key: 'delivered' as FulfillmentStatus, label: 'Delivered' },
-                    { key: 'completed' as FulfillmentStatus, label: 'Completed' },
-                    { key: 'disputed' as FulfillmentStatus, label: 'Disputed' },
-                    { key: 'canceled' as FulfillmentStatus, label: 'Cancelled' },
-                  ].map((s) => {
-                    const isSelected = currentFulfillment === s.key;
-                    return (
+                    <View style={{ gap: 8 }}>
+                      {/* Unbundle Shipment Action */}
                       <Pressable
-                        key={s.key}
-                        onPress={() => handleUpdateStatus(s.key)}
-                        style={({ pressed }) => [
-                          {
-                            height: 32,
-                            borderRadius: 16,
-                            paddingHorizontal: 12,
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            backgroundColor: isSelected ? theme.ink : theme.surface,
-                            borderWidth: 1,
-                            borderColor: isSelected ? theme.ink : theme.border,
-                          },
-                          pressed && { opacity: 0.8 },
-                        ]}
+                        onPress={() => {
+                          tap('light');
+                          toast.show('Shipment unbundled for separate packaging', { variant: 'default', icon: 'layers' });
+                        }}
+                        style={({ pressed }) => ({
+                          height: 44,
+                          borderRadius: radii.pill,
+                          backgroundColor: isDark ? '#2C2C2E' : '#E5E7EB',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          opacity: pressed ? 0.8 : 1,
+                        })}
                       >
-                        {isSelected && <Feather name="check" size={12} color={theme.background} style={{ marginRight: 4 }} />}
-                        <Text
-                          style={{
-                            fontSize: 12,
-                            fontFamily: isSelected ? typography.family.sansBold : typography.family.sansMedium,
-                            color: isSelected ? theme.background : theme.ink,
-                          }}
-                        >
-                          {s.label}
+                        <Text style={{ fontSize: 14, fontFamily: typography.family.sansBold, color: theme.ink }}>
+                          Unbundle Shipment
                         </Text>
                       </Pressable>
-                    );
-                  })}
-                </ScrollView>
+
+                      {/* Edit Shipping Details Action */}
+                      <Pressable
+                        onPress={() => {
+                          tap('light');
+                          setReadyDeliverModalVisible(true);
+                        }}
+                        style={({ pressed }) => ({
+                          height: 44,
+                          borderRadius: radii.pill,
+                          backgroundColor: isDark ? '#2C2C2E' : '#E5E7EB',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          opacity: pressed ? 0.8 : 1,
+                        })}
+                      >
+                        <Text style={{ fontSize: 14, fontFamily: typography.family.sansBold, color: theme.ink }}>
+                          Edit Shipping Details
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </>
+                )}
               </View>
             </GroupCard>
 

@@ -1168,7 +1168,7 @@ begin
 
   v_is_admin := coalesce((select is_admin from public.profiles where id = v_caller_id), false);
 
-  if p_target_status in ('packing', 'shifting') then
+  if p_target_status in ('packing', 'picked', 'shifting') then
     if v_caller_id <> v_order.seller_id and not v_is_admin then
       raise exception 'Only the verified seller or admin may advance fulfillment to %', p_target_status using errcode = '42501';
     end if;
@@ -1181,16 +1181,16 @@ begin
   end if;
 
   -- Validate state machine progression (permit idempotent calls & awaiting_payment)
-  if p_target_status = 'packing' then
-    if v_order.fulfillment_status not in ('pending', 'awaiting_payment', 'packing') then
-      raise exception 'Cannot advance to packing from %', v_order.fulfillment_status using errcode = '22000';
+  if p_target_status in ('packing', 'picked') then
+    if v_order.fulfillment_status not in ('pending', 'awaiting_payment', 'packing', 'picked') then
+      raise exception 'Cannot advance to % from %', p_target_status, v_order.fulfillment_status using errcode = '22000';
     end if;
   elsif p_target_status = 'shifting' then
-    if v_order.fulfillment_status not in ('pending', 'awaiting_payment', 'packing', 'shifting') then
+    if v_order.fulfillment_status not in ('pending', 'awaiting_payment', 'packing', 'picked', 'shifting') then
       raise exception 'Cannot advance to shifting from %', v_order.fulfillment_status using errcode = '22000';
     end if;
   elsif p_target_status = 'delivered' then
-    if v_order.fulfillment_status not in ('packing', 'shifting', 'delivered') then
+    if v_order.fulfillment_status not in ('packing', 'picked', 'shifting', 'delivered') then
       raise exception 'Cannot mark delivered from %', v_order.fulfillment_status using errcode = '22000';
     end if;
   elsif p_target_status = 'completed' then
@@ -1208,13 +1208,13 @@ begin
            else status
          end,
          escrow_status = case
-           when p_target_status = 'packing' then 'READY_FOR_PICKUP'
+           when p_target_status in ('packing', 'picked') then 'READY_FOR_PICKUP'
            when p_target_status = 'shifting' then 'IN_TRANSIT'
            when p_target_status = 'delivered' then 'DELIVERED'
            when p_target_status = 'completed' then 'COMPLETED_FUNDS_RELEASED'
            else escrow_status
          end,
-         packed_at = case when p_target_status = 'packing' then coalesce(packed_at, v_now) else packed_at end,
+         packed_at = case when p_target_status in ('packing', 'picked') then coalesce(packed_at, v_now) else packed_at end,
          shifted_at = case when p_target_status = 'shifting' then coalesce(shifted_at, v_now) else shifted_at end,
          shipped_at = case when p_target_status = 'shifting' then coalesce(shipped_at, v_now) else shipped_at end,
          delivered_at = case when p_target_status in ('delivered', 'completed') then coalesce(delivered_at, v_now) else delivered_at end,
@@ -1236,14 +1236,14 @@ begin
 
   update public.transactions
      set status = case
-           when p_target_status = 'packing' then 'READY_FOR_PICKUP'
+           when p_target_status in ('packing', 'picked') then 'READY_FOR_PICKUP'
            when p_target_status = 'shifting' then 'IN_TRANSIT'
            when p_target_status = 'delivered' then 'DELIVERED'
            when p_target_status = 'completed' then 'COMPLETED_FUNDS_RELEASED'
            else status
          end,
-         ready_for_pickup_at = case when p_target_status = 'packing' then coalesce(ready_for_pickup_at, v_now) else ready_for_pickup_at end,
-         picked_up_at = case when p_target_status = 'shifting' then coalesce(picked_up_at, v_now) else picked_up_at end,
+         ready_for_pickup_at = case when p_target_status in ('packing', 'picked') then coalesce(ready_for_pickup_at, v_now) else ready_for_pickup_at end,
+         picked_up_at = case when p_target_status in ('picked', 'shifting') then coalesce(picked_up_at, v_now) else picked_up_at end,
          delivered_at = case when p_target_status in ('delivered', 'completed') then coalesce(delivered_at, v_now) else delivered_at end,
          funds_released_at = case when p_target_status = 'completed' then coalesce(funds_released_at, v_now) else funds_released_at end,
          courier_name = coalesce(p_courier, courier_name),
@@ -1260,6 +1260,7 @@ begin
   if v_conv_id is not null then
     v_system_msg := case
       when p_target_status = 'packing' then 'Seller has begun packing! 📦 Pickup scheduled.'
+      when p_target_status = 'picked' then 'Package Picked Up by Courier! 📦 In transit shortly.'
       when p_target_status = 'shifting' then 'Package Shifting / Dispatched! 🚚' ||
         case when v_order.courier_name is not null then E'\nCourier: ' || v_order.courier_name else '' end ||
         case when v_order.tracking_number is not null and length(trim(v_order.tracking_number)) > 0 then E'\nTracking #: ' || v_order.tracking_number else '' end

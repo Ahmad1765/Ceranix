@@ -261,15 +261,15 @@ begin
   end if;
 
   -- Role and state machine transition enforcement
-  if p_target_status = 'packing' then
+  if p_target_status in ('packing', 'picked') then
     if v_caller_id <> v_order.seller_id and not v_is_admin then
-      raise exception 'Forbidden: only the seller or admin can mark order as packing' using errcode = '42501';
+      raise exception 'Forbidden: only the seller or admin can mark order as packing or picked' using errcode = '42501';
     end if;
     if v_order.payment_method = 'card' and v_order.status = 'awaiting_payment' and not v_is_admin then
       raise exception 'Cannot pack order awaiting card payment confirmation' using errcode = '22000';
     end if;
-    if v_order.fulfillment_status not in ('pending', 'awaiting_payment', 'packing') and not v_is_admin then
-      raise exception 'Cannot advance to packing from %', v_order.fulfillment_status using errcode = '22000';
+    if v_order.fulfillment_status not in ('pending', 'awaiting_payment', 'packing', 'picked') and not v_is_admin then
+      raise exception 'Cannot advance to % from %', p_target_status, v_order.fulfillment_status using errcode = '22000';
     end if;
 
   elsif p_target_status = 'shifting' then
@@ -279,7 +279,7 @@ begin
     if v_order.payment_method = 'card' and v_order.status = 'awaiting_payment' and not v_is_admin then
       raise exception 'Cannot dispatch order awaiting card payment confirmation' using errcode = '22000';
     end if;
-    if v_order.fulfillment_status not in ('packing', 'pending', 'shifting') and not v_is_admin then
+    if v_order.fulfillment_status not in ('packing', 'picked', 'pending', 'shifting') and not v_is_admin then
       raise exception 'Cannot advance to shifting from %', v_order.fulfillment_status using errcode = '22000';
     end if;
 
@@ -292,7 +292,7 @@ begin
     if not v_is_service_role and v_caller_id <> v_order.buyer_id and not v_is_admin then
       raise exception 'Forbidden: only courier webhook, admin, or buyer can confirm delivery' using errcode = '42501';
     end if;
-    if v_order.fulfillment_status not in ('shifting', 'delivered') and not v_is_admin then
+    if v_order.fulfillment_status not in ('packing', 'picked', 'shifting', 'delivered') and not v_is_admin then
       raise exception 'Cannot mark delivered from %', v_order.fulfillment_status using errcode = '22000';
     end if;
 
@@ -316,13 +316,13 @@ begin
            else status
          end,
          escrow_status = case
-           when p_target_status = 'packing' then 'READY_FOR_PICKUP'
+           when p_target_status in ('packing', 'picked') then 'READY_FOR_PICKUP'
            when p_target_status = 'shifting' then 'IN_TRANSIT'
            when p_target_status = 'delivered' then 'DELIVERED'
            when p_target_status = 'completed' then 'COMPLETED_FUNDS_RELEASED'
            else escrow_status
          end,
-         packed_at = case when p_target_status = 'packing' then coalesce(packed_at, v_now) else packed_at end,
+         packed_at = case when p_target_status in ('packing', 'picked') then coalesce(packed_at, v_now) else packed_at end,
          shifted_at = case when p_target_status = 'shifting' then coalesce(shifted_at, v_now) else shifted_at end,
          shipped_at = case when p_target_status = 'shifting' then coalesce(shipped_at, v_now) else shipped_at end,
          delivered_at = case when p_target_status in ('delivered', 'completed') then coalesce(delivered_at, v_now) else delivered_at end,
@@ -346,14 +346,14 @@ begin
   -- Synchronize ledger row in public.transactions
   update public.transactions
      set status = case
-           when p_target_status = 'packing' then 'READY_FOR_PICKUP'
+           when p_target_status in ('packing', 'picked') then 'READY_FOR_PICKUP'
            when p_target_status = 'shifting' then 'IN_TRANSIT'
            when p_target_status = 'delivered' then 'DELIVERED'
            when p_target_status = 'completed' then 'COMPLETED_FUNDS_RELEASED'
            else status
          end,
-         ready_for_pickup_at = case when p_target_status = 'packing' then coalesce(ready_for_pickup_at, v_now) else ready_for_pickup_at end,
-         picked_up_at = case when p_target_status = 'shifting' then coalesce(picked_up_at, v_now) else picked_up_at end,
+         ready_for_pickup_at = case when p_target_status in ('packing', 'picked') then coalesce(ready_for_pickup_at, v_now) else ready_for_pickup_at end,
+         picked_up_at = case when p_target_status in ('picked', 'shifting') then coalesce(picked_up_at, v_now) else picked_up_at end,
          delivered_at = case when p_target_status in ('delivered', 'completed') then coalesce(delivered_at, v_now) else delivered_at end,
          funds_released_at = case when p_target_status = 'completed' then coalesce(funds_released_at, v_now) else funds_released_at end,
          courier_name = coalesce(p_courier, courier_name),
@@ -371,6 +371,7 @@ begin
   if v_conv_id is not null then
     v_system_msg := case
       when p_target_status = 'packing' then 'Seller has begun packing! 📦 Pickup scheduled.'
+      when p_target_status = 'picked' then 'Package Picked Up by Courier! 📦 In transit shortly.'
       when p_target_status = 'shifting' then 'Package Shifting / Dispatched! 🚚' ||
         case when v_order.courier_name is not null then E'\nCourier: ' || v_order.courier_name else '' end ||
         case when v_order.tracking_number is not null and length(trim(v_order.tracking_number)) > 0 then E'\nTracking #: ' || v_order.tracking_number else '' end

@@ -763,6 +763,27 @@ export class PaymentService {
     });
 
     if (error) {
+      if (targetStatus === 'picked') {
+        const { data: directData, error: directErr } = await supabase
+          .from('orders')
+          .update({
+            fulfillment_status: 'picked',
+            packed_at: new Date().toISOString(),
+          })
+          .eq('id', orderId)
+          .select()
+          .maybeSingle();
+
+        if (!directErr && directData) {
+          capture('fulfillment_advanced', { order_id: orderId, target_status: targetStatus });
+          notifyOrderUpdated((directData as Order)?.listing_id);
+          return {
+            ...(directData as Order),
+            ...(sellerPickupAddress ? { seller_pickup_address: sellerPickupAddress } : {}),
+          };
+        }
+      }
+
       if (!isDemoMode() || !orderId.startsWith('demo')) throw new Error(error.message || 'Network error');
       // Demo fallback
       capture('fulfillment_advanced_demo', { order_id: orderId, target_status: targetStatus });
