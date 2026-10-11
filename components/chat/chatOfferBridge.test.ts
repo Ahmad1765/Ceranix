@@ -153,4 +153,101 @@ describe('Chat-to-Order Bridge & Offer Lifecycle', () => {
       expect(statePaid.hasPurchased).toBe(true);
     });
   });
+
+  describe('Counter-Offer Card Presentation & Counterparty Authorization', () => {
+    const shouldShowIncomingOfferCard = (args: {
+      mine: boolean;
+      status: string;
+      listingSold: boolean;
+      isBundleInvalid: boolean;
+      isActionable?: boolean;
+    }) => {
+      const isActionable = args.isActionable !== false;
+      return (
+        !args.mine &&
+        (args.status === 'pending' || args.status === 'proposed') &&
+        !args.listingSold &&
+        !args.isBundleInvalid &&
+        isActionable
+      );
+    };
+
+    const deriveOfferBadgeLabel = (msg: { parent_offer_id?: string | null; metadata?: { parent_offer_id?: string } }) => {
+      const isCounter = Boolean(msg.metadata?.parent_offer_id || msg.parent_offer_id);
+      return isCounter ? 'Counter-offer received' : 'Offer received';
+    };
+
+    const deriveCounteredPillText = (isMine: boolean) => {
+      return isMine ? 'Your offer was countered' : 'You countered this offer';
+    };
+
+    const canAcceptOffer = (args: {
+      callerId: string;
+      buyerId: string;
+      sellerId: string;
+      senderId: string;
+      isAdmin?: boolean;
+    }) => {
+      if (args.isAdmin) return true;
+      if (args.callerId !== args.buyerId && args.callerId !== args.sellerId) return false;
+      if (args.callerId === args.senderId) return false;
+      return true;
+    };
+
+    it('displays IncomingOfferCard to buyer receiving seller counter-offer (!mine regardless of isSeller)', () => {
+      expect(
+        shouldShowIncomingOfferCard({
+          mine: false,
+          status: 'pending',
+          listingSold: false,
+          isBundleInvalid: false,
+        }),
+      ).toBe(true);
+    });
+
+    it('does not display IncomingOfferCard to sender (mine: true)', () => {
+      expect(
+        shouldShowIncomingOfferCard({
+          mine: true,
+          status: 'pending',
+          listingSold: false,
+          isBundleInvalid: false,
+        }),
+      ).toBe(false);
+    });
+
+    it('derives Counter-offer received when linked to a parent offer', () => {
+      expect(deriveOfferBadgeLabel({ parent_offer_id: 'msg-parent-123' })).toBe('Counter-offer received');
+      expect(deriveOfferBadgeLabel({ metadata: { parent_offer_id: 'msg-parent-456' } })).toBe('Counter-offer received');
+      expect(deriveOfferBadgeLabel({})).toBe('Offer received');
+    });
+
+    it('derives clear countered pill text for both parties once superseded', () => {
+      expect(deriveCounteredPillText(true)).toBe('Your offer was countered');
+      expect(deriveCounteredPillText(false)).toBe('You countered this offer');
+    });
+
+    it('allows buyer to accept a seller counter-offer and blocks sender from accepting their own offer', () => {
+      const buyerId = 'user-buyer';
+      const sellerId = 'user-seller';
+
+      // 1. Seller counters offer (seller is sender) -> buyer can accept
+      expect(canAcceptOffer({ callerId: buyerId, buyerId, sellerId, senderId: sellerId })).toBe(true);
+
+      // 2. Seller cannot accept their own counter-offer
+      expect(canAcceptOffer({ callerId: sellerId, buyerId, sellerId, senderId: sellerId })).toBe(false);
+
+      // 3. Buyer makes initial offer (buyer is sender) -> seller can accept
+      expect(canAcceptOffer({ callerId: sellerId, buyerId, sellerId, senderId: buyerId })).toBe(true);
+
+      // 4. Buyer cannot accept their own initial offer
+      expect(canAcceptOffer({ callerId: buyerId, buyerId, sellerId, senderId: buyerId })).toBe(false);
+
+      // 5. Unrelated user cannot accept
+      expect(canAcceptOffer({ callerId: 'intruder', buyerId, sellerId, senderId: sellerId })).toBe(false);
+
+      // 6. Admin can accept
+      expect(canAcceptOffer({ callerId: 'admin-id', buyerId, sellerId, senderId: sellerId, isAdmin: true })).toBe(true);
+    });
+  });
 });

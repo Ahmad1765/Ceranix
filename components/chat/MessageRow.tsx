@@ -270,6 +270,7 @@ function IncomingOfferCard({
   onAccept,
   onDecline,
   onCounterOffer,
+  badgeLabel = 'Offer received',
 }: {
   amount: number;
   listingPrice: number | null;
@@ -277,6 +278,7 @@ function IncomingOfferCard({
   onAccept: () => void;
   onDecline: () => void;
   onCounterOffer?: () => void;
+  badgeLabel?: string;
 }) {
   const { theme, isDark } = useTheme();
   const showStruck = !!listingPrice && listingPrice > amount;
@@ -319,7 +321,7 @@ function IncomingOfferCard({
               color: theme.ink,
             }}
           >
-            Offer received
+            {badgeLabel}
           </Text>
         </View>
 
@@ -724,9 +726,10 @@ function OfferBubble(
     );
   }
 
-  // 3. Image 5: Incoming Active Offer Card with "Counter" & "Accept" for Seller
+  // 3. Image 5: Incoming Active Offer Card with "Counter" & "Accept" (for whichever user received the offer)
   const isActionable = msg.metadata?.actionable !== false;
-  if (!mine && isSeller && (status === 'pending' || status === 'proposed') && !listingSold && !isBundleInvalid && isActionable) {
+  const isCounter = Boolean(msg.metadata?.parent_offer_id || msg.parent_offer_id);
+  if (!mine && (status === 'pending' || status === 'proposed') && !listingSold && !isBundleInvalid && isActionable) {
     return (
       <IncomingOfferCard
         amount={amount}
@@ -735,6 +738,7 @@ function OfferBubble(
         onAccept={onAccept}
         onDecline={onDecline}
         onCounterOffer={onCounterOffer}
+        badgeLabel={isCounter ? 'Counter-offer received' : 'Offer received'}
       />
     );
   }
@@ -760,9 +764,7 @@ function OfferBubble(
       ? `You declined their offer: ${formattedAmt}`
       : `They declined your offer: ${formattedAmt}`;
   } else if (status === 'countered') {
-    pillText = mine
-      ? `You countered with: ${formattedAmt}`
-      : `Countered with: ${formattedAmt}`;
+    pillText = mine ? 'Your offer was countered' : 'You countered this offer';
   } else if (status === 'expired') {
     pillText = mine ? 'Your offer has expired' : 'Offer has expired';
   } else if (status === 'canceled' || isBundleInvalid) {
@@ -774,7 +776,7 @@ function OfferBubble(
   } else {
     // Pending
     if (mine) {
-      pillText = 'You made an offer';
+      pillText = isCounter ? 'You sent a counter-offer' : 'You made an offer';
     } else {
       pillText = `Made you an offer: ${formattedAmt}`;
     }

@@ -567,6 +567,9 @@ declare
   v_is_admin boolean := false;
   v_now timestamptz := clock_timestamp();
 begin
+  -- Bypass trigger locks during atomic transaction
+  perform set_config('ceranix.in_accept_offer', 'on', true);
+
   if v_caller_id is null then
     raise exception 'Authentication required' using errcode = '42501';
   end if;
@@ -627,6 +630,13 @@ begin
       coalesce(v_message.created_at, v_now),
       v_now
     ) returning * into v_offer;
+  else
+    -- Load message if linked so we can verify original sender
+    if v_offer.message_id is not null then
+      select * into v_message
+        from public.messages
+       where id = v_offer.message_id;
+    end if;
   end if;
 
   -- 2. Validate offer state
@@ -639,7 +649,7 @@ begin
     raise exception 'Offer has expired' using errcode = '22000';
   end if;
 
-  -- 3. Lock listing row and verify seller
+  -- 3. Lock listing row
   select * into v_listing
     from public.listings
    where id = v_offer.listing_id
@@ -649,8 +659,13 @@ begin
     raise exception 'Listing not found' using errcode = 'P0002';
   end if;
 
-  if v_caller_id <> v_listing.seller_id and not v_is_admin then
-    raise exception 'Only the verified seller may accept this offer' using errcode = '42501';
+  -- 4. Authorize caller: must be participant (buyer or seller) or admin, and cannot accept their own offer
+  if v_caller_id <> v_offer.buyer_id and v_caller_id <> v_offer.seller_id and not v_is_admin then
+    raise exception 'Not authorized to accept an offer in this conversation' using errcode = '42501';
+  end if;
+
+  if v_message.id is not null and v_message.sender_id is not null and v_caller_id = v_message.sender_id and not v_is_admin then
+    raise exception 'Cannot accept your own offer' using errcode = '22000';
   end if;
 
   if v_listing.is_sold then
@@ -751,6 +766,9 @@ declare
   v_content text;
   v_amount_val numeric;
 begin
+  -- Bypass trigger locks during atomic transaction
+  perform set_config('ceranix.in_counter_offer', 'on', true);
+
   v_sender_id := coalesce(v_caller_id, p_sender_id);
   if v_sender_id is null then
     raise exception 'Authentication required' using errcode = '42501';

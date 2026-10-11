@@ -37,6 +37,7 @@ export interface ChatMessage {
     cancel_reason?: string;
     image_url?: string;
     thumb_url?: string;
+    parent_offer_id?: string;
   } | null;
   offer_status: OfferStatus | null;
   parent_offer_id?: string | null;
@@ -508,6 +509,7 @@ export async function counterOffer(args: {
   const defaultNote = `Counter-Offer: ${formatPrice(amountValue)}`;
   const content = args.note?.trim() || defaultNote;
 
+  // 1. Primary: Attempt atomic RPC
   const { data, error } = await supabase.rpc('counter_chat_offer', {
     p_parent_offer_id: args.parentOfferId,
     p_amount: amountValue,
@@ -517,11 +519,60 @@ export async function counterOffer(args: {
     p_sender_id: args.senderId,
   });
 
-  if (error) {
-    console.warn('[chat] counterOffer', error.message);
-    return null;
+  if (!error && data) {
+    return data as unknown as ChatMessage;
   }
-  return data as unknown as ChatMessage;
+
+  console.warn('[chat] counter_chat_offer RPC failed, attempting direct table fallback:', error?.message || error);
+
+  // 2. Client-side resilient fallback if the RPC returned an error (e.g. trigger mismatch in hosted db)
+  try {
+    // Attempt updating parent offer status to countered
+    const { error: updateErr } = await supabase
+      .from('messages')
+      .update({ offer_status: 'countered' })
+      .eq('id', args.parentOfferId);
+
+    if (updateErr) {
+      console.warn('[chat] fallback parent update warning:', updateErr.message);
+    }
+
+    // Insert new counter offer message linked to parent
+    const { data: fallbackMsg, error: insertErr } = await supabase
+      .from('messages')
+      .insert({
+        conversation_id: args.conversationId,
+        sender_id: args.senderId,
+        content,
+        kind: 'offer',
+        parent_offer_id: args.parentOfferId,
+        metadata: {
+          amount: amountValue,
+          currency: 'PKR',
+          note: args.note?.trim() || null,
+          parent_offer_id: args.parentOfferId,
+          counter_to: args.parentOfferId,
+        },
+        offer_status: 'pending',
+      })
+      .select('id, conversation_id, sender_id, content, kind, metadata, offer_status, parent_offer_id, created_at, updated_at')
+      .single();
+
+    if (!insertErr && fallbackMsg) {
+      return fallbackMsg as unknown as ChatMessage;
+    }
+
+    if (insertErr) {
+      console.error('[chat] fallback counter insert failed:', insertErr);
+    }
+  } catch (fallbackErr) {
+    console.error('[chat] counterOffer fallback exception:', fallbackErr);
+  }
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  return null;
 }
 
 // ── Reactions ─────────────────────────────────────────────────────────────

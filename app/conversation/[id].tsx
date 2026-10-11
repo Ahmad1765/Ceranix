@@ -44,7 +44,7 @@ import { type as typography } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
 import { confirm } from '@/lib/confirm';
-import { isImageMessage } from '@/lib/chat';
+import { isImageMessage, type ChatMessage } from '@/lib/chat';
 import { EmptyState, SafeContainer } from '@/components/ui';
 import { explainCoverage } from '@/components/SafetyBanner';
 import { HIT_SLOP_8 } from '@/lib/responsive';
@@ -241,6 +241,7 @@ export default function ConversationScreen() {
   // ── Sheet & Context Menu Visibility States ───────────────────────────────
   const [pressed, setPressed] = useState<{ msg: any; anchor: Anchor } | null>(null);
   const [offerVisible, setOfferVisible] = useState(false);
+  const [counterParentMsg, setCounterParentMsg] = useState<ChatMessage | null>(null);
   const [plusOpen, setPlusOpen] = useState(false);
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -345,6 +346,11 @@ export default function ConversationScreen() {
     return actions;
   }, [handleCopy, handleDeleteMessage, pressed?.msg, user]);
 
+  const openNewOffer = useCallback(() => {
+    setCounterParentMsg(null);
+    setOfferVisible(true);
+  }, []);
+
   // ── Context Action Sheets Menus ──────────────────────────────────────────
   const plusActions: ChatAction[] = useMemo(
     () => [
@@ -356,7 +362,7 @@ export default function ConversationScreen() {
               hint: thread.convListingPrice ? `Listed at ${formatPrice(thread.convListingPrice)}` : undefined,
               icon: 'tag' as const,
               tone: 'primary' as const,
-              onPress: () => setOfferVisible(true),
+              onPress: openNewOffer,
             },
           ]
         : []),
@@ -378,7 +384,7 @@ export default function ConversationScreen() {
         onPress: explainCoverage,
       },
     ],
-    [thread.canOffer, thread.convListingPrice, thread.convListingId, openListing],
+    [thread.canOffer, thread.convListingPrice, thread.convListingId, openListing, openNewOffer],
   );
 
   const overflowActions: ChatAction[] = useMemo(
@@ -391,7 +397,7 @@ export default function ConversationScreen() {
               hint: thread.convListingPrice ? `Listed at ${formatPrice(thread.convListingPrice)}` : undefined,
               icon: 'tag' as const,
               tone: 'primary' as const,
-              onPress: () => setOfferVisible(true),
+              onPress: openNewOffer,
             },
           ]
         : []),
@@ -537,7 +543,10 @@ export default function ConversationScreen() {
           reactions={thread.byMessage.get(item.msg.id) ?? EMPTY_REACTIONS}
           onAccept={() => thread.handleOfferResponse(item.msg, 'accepted')}
           onDecline={() => thread.handleOfferResponse(item.msg, 'declined')}
-          onCounterOffer={() => setOfferVisible(true)}
+          onCounterOffer={() => {
+            setCounterParentMsg(item.msg);
+            setOfferVisible(true);
+          }}
           onPay={(amount, bundleIds) => {
             if (!thread.convListingId) return;
             const params: Record<string, string> = { offer: String(amount) };
@@ -822,10 +831,21 @@ export default function ConversationScreen() {
         listingPrice={thread.convListingPrice}
         listingTitle={thread.conv?.listing?.title}
         listingThumb={thread.listingThumb}
-        onCloseOffer={() => setOfferVisible(false)}
+        onCloseOffer={() => {
+          setOfferVisible(false);
+          setCounterParentMsg(null);
+        }}
         onSubmitOffer={async (amount) => {
-          const success = await thread.handleSendOffer(amount, '');
-          if (success) setOfferVisible(false);
+          if (counterParentMsg) {
+            const success = await thread.handleCounterOffer(counterParentMsg, amount);
+            if (success) {
+              setOfferVisible(false);
+              setCounterParentMsg(null);
+            }
+          } else {
+            const success = await thread.handleSendOffer(amount, '');
+            if (success) setOfferVisible(false);
+          }
         }}
       />
 

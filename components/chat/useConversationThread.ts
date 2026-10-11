@@ -852,7 +852,7 @@ export function useConversationThread(
         return false;
       } catch (e: any) {
         captureError(e, { fn: 'conversation.counterOffer' });
-        toast.show("Couldn't send counter-offer", { variant: 'default', icon: 'alert-triangle' });
+        toast.show(e?.message || "Couldn't send counter-offer", { variant: 'default', icon: 'alert-triangle' });
         return false;
       }
     },
