@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 // Type-only in the other direction (lib/orders.ts imports `type MyOrder` from
 // here), so this pair does not form a runtime cycle.
 import { normalizeMyOrder } from "@/lib/orders";
+import type { Order as CanonicalOrder, OrderStatus, FulfillmentStatus, FulfillmentType } from "@/types";
 
 // Server returns the hosted Stripe Checkout URL for a given listing.
 type SessionResponse = { url: string; sessionId: string };
@@ -15,8 +16,6 @@ type SessionResponse = { url: string; sessionId: string };
 // controlled listing-lifecycle toggle (app/product/[id].tsx "Mark as sold"),
 // so trusting it lets a seller forge a Paid invoice, or flip a genuinely paid
 // one back to Pending and send the buyer to pay a second time.
-import type { Order as CanonicalOrder, OrderStatus, FulfillmentStatus, FulfillmentType } from "@/types";
-
 export type { OrderStatus, FulfillmentStatus, FulfillmentType };
 export type Order = CanonicalOrder;
 

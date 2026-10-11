@@ -26,7 +26,6 @@ import { BRAND } from '@/lib/brand';
 import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { BuyerProtectionSheet } from '@/components/product/BuyerProtectionSheet';
 import { buyerProtectionFee, formatPrice } from '@/lib/fees';
-import { paymentService } from '@/lib/paymentService';
 import type { Order } from '@/lib/payments';
 import type { Listing, FulfillmentStatus } from '@/types';
 
@@ -337,19 +336,7 @@ export function OrderDetailsTrackingView({
 
   useEffect(() => {
     setCurrentFulfillment(deriveFulfillmentStatus(order, propStatusLabel));
-  }, [
-    order?.fulfillment_status,
-    order?.status,
-    (order as any)?.escrow_status,
-    order?.shipped_at,
-    (order as any)?.shifted_at,
-    order?.delivered_at,
-    order?.completed_at,
-    order?.packed_at,
-    (order as any)?.picked_up_at,
-    (order as any)?.picked_at,
-    propStatusLabel,
-  ]);
+  }, [order, propStatusLabel]);
 
   // Ready to Deliver Form State
   const [pickupContactName, setPickupContactName] = useState(

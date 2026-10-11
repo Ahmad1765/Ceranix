@@ -1,35 +1,29 @@
 import { useEffect, useState, useRef } from 'react';
-import { View, Pressable, ScrollView, ActivityIndicator, Share, Platform, Linking, AppState } from 'react-native';
+import { View, Pressable, ActivityIndicator, Share, Platform, AppState } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, router } from 'expo-router';
-import { Image } from 'expo-image';
+import { useLocalSearchParams } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/context/ThemeContext';
-import { type as typography, radii, tabularNumberStyle } from '@/lib/theme';
+import { type as typography, radii } from '@/lib/theme';
 import { useQueryClient } from '@tanstack/react-query';
 import { qk } from '@/lib/queries/keys';
 import { useListingQuery } from '@/lib/queries';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { safeBack } from '@/lib/nav';
-import { HIT_SLOP_8, CONTENT_MAX_WIDTH } from '@/lib/responsive';
-import { buyerProtectionFee, formatPrice, MANAGED_SHIPPING_FEE } from '@/lib/fees';
+import { buyerProtectionFee, formatPrice } from '@/lib/fees';
 import { fetchOrderForListing, type Order } from '@/lib/payments';
-import { deriveInvoiceStatus, deriveInvoiceAmounts } from '@/lib/invoiceStatus';
+import { deriveInvoiceAmounts } from '@/lib/invoiceStatus';
 import { confirm } from '@/lib/confirm';
 import { paymentService } from '@/lib/paymentService';
 import { supabase } from '@/lib/supabase';
-import { generateMapsLink } from '@/lib/maps';
-import { BRAND } from '@/lib/brand';
 import { OrderDetailsTrackingView } from '@/components/orders/OrderDetailsTrackingView';
-import { OrderStepper } from '@/components/orders/OrderStepper';
 import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { CancelOrderModal } from '@/components/orders/CancelOrderModal';
 import { MarkShippedModal } from '@/components/orders/MarkShippedModal';
 import { SellerPickupModal, type SellerPickupAddressInput } from '@/components/orders/SellerPickupModal';
-import { cardImageUrl, getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 
 function tap(style: 'light' | 'medium' = 'light') {
   if (Platform.OS !== 'ios') return;
@@ -45,25 +39,6 @@ function deriveInvoiceNumber(id: string): string {
   const n = parseInt(hex, 16);
   if (!Number.isFinite(n)) return '00000000';
   return String(Math.abs(n) % 100000000).padStart(8, '0');
-}
-
-function stripHexSuffix(s: string): string {
-  if (/^(user|profile)[0-9a-f]{4,}$/i.test(s)) {
-    const cleaned = s.replace(/[0-9a-f]+$/i, '');
-    if (cleaned.length >= 3) return cleaned;
-  }
-  const cleaned = s.replace(/[0-9a-f]{6,}$/i, '');
-  return cleaned.length >= 3 ? cleaned : s;
-}
-
-function displayName(
-  fullName: string | null | undefined,
-  username: string | null | undefined,
-): string {
-  const name = (fullName ?? '').trim();
-  if (name) return name;
-  if (!username) return 'User';
-  return stripHexSuffix(username);
 }
 
 export default function InvoiceScreen() {
@@ -225,7 +200,7 @@ export default function InvoiceScreen() {
       active = false;
       appStateSub.remove();
     };
-  }, [paid, placed, method, id, user?.id, listingIdParam, amountParam, listing?.seller_id, listing?.seller?.id]);
+  }, [paid, placed, method, id, user?.id, listingIdParam, amountParam, listing?.seller_id, listing?.seller?.id, listing?.price]);
 
   // Real-time synchronization for order changes across devices
   useEffect(() => {
@@ -329,21 +304,11 @@ export default function InvoiceScreen() {
     );
   }
 
-  const {
-    item: itemPrice,
-    total,
-  } = deriveInvoiceAmounts(order, listing?.price, buyerProtectionFee);
+  const { total } = deriveInvoiceAmounts(order, listing?.price, buyerProtectionFee);
   const seller = listing?.seller ?? (order as any)?.seller ?? null;
   const isSeller = Boolean(user?.id && (user.id === listing?.seller_id || user.id === seller?.id || user.id === order?.seller_id));
   const isBuyer = Boolean(user?.id && (order?.buyer_id ? user.id === order.buyer_id : !isSeller));
-  const isAdmin = Boolean(profile?.is_admin);
   const invoiceNumber = deriveInvoiceNumber(order?.id || listing?.id || String(id));
-  const buyerName = isBuyer
-    ? displayName(profile?.full_name, profile?.username)
-    : displayName((order as any)?.buyer?.full_name, (order as any)?.buyer?.username) || 'Buyer';
-  const status = deriveInvoiceStatus(order, confirming);
-  const heroImage = listing ? cardImageUrl(listing, 0) : '';
-  const mapsUrl = generateMapsLink(order?.shipping_address);
 
   const onShare = async () => {
     tap('light');
@@ -353,51 +318,6 @@ export default function InvoiceScreen() {
       });
     } catch {
       toast.show('Share failed', { variant: 'default', icon: 'alert-triangle' });
-    }
-  };
-
-  const onShareDispatchSlip = async () => {
-    tap('light');
-    const addr = order?.shipping_address as any;
-    const recipient = addr?.recipientName || addr?.recipient_name || buyerName;
-    const street = [addr?.line1, addr?.line2].filter(Boolean).join(', ');
-    const cityArea = [addr?.city, addr?.state, addr?.postalCode || addr?.postal_code].filter(Boolean).join(', ');
-    const phone = addr?.phone ? `📞 Phone: ${addr.phone}` : '';
-    const note = order?.delivery_notes ? `📝 Note: ${order.delivery_notes}` : '';
-    const paymentLine =
-      order?.payment_method === 'cod'
-        ? `💵 *COLLECT CASH ON DELIVERY: ${formatPrice(total)}*`
-        : '💳 *PRE-PAID VIA CARD*';
-
-    const lines: string[] = [
-      `📦 *${BRAND.toUpperCase()} DISPATCH SLIP*`,
-      `Order: #${invoiceNumber}`,
-      `Item: ${listing?.title || 'Purchased Item'}`,
-      '',
-      `👤 Recipient: ${recipient}`,
-      ...(street ? [`📍 Address: ${street}`] : []),
-      ...(cityArea ? [`🏙️ ${cityArea}`] : []),
-      ...(phone ? [phone] : []),
-      ...(note ? [note] : []),
-      '',
-      paymentLine,
-      ...(mapsUrl ? ['', `🗺️ Google Maps Link: ${mapsUrl}`] : []),
-    ];
-
-    const dispatchSlipText = lines.join('\n');
-
-    try {
-      await Share.share({ message: dispatchSlipText });
-    } catch {
-      toast.show('Share failed', { variant: 'default', icon: 'alert-triangle' });
-    }
-  };
-
-  const handleContactOtherUser = () => {
-    tap('light');
-    const targetListingId = listing?.id || order?.listing_id;
-    if (targetListingId) {
-      router.push(`/conversation/new?listing=${targetListingId}` as any);
     }
   };
 
@@ -677,17 +597,12 @@ export default function InvoiceScreen() {
     }
   };
 
-  const handleCompleteCodOrder = () => handleConfirmCodPayment('seller');
-
   const isOrderActive =
     order?.status === 'paid' ||
     order?.status === 'pending' ||
     order?.status === 'packing' ||
     order?.status === 'shifting' ||
     order?.status === 'delivered';
-  const isAwaitingPayment =
-    order?.status === 'awaiting_payment' ||
-    order?.fulfillment_status === 'awaiting_payment';
   const isShipped = Boolean(
     order?.shipped_at ||
     (order as any)?.shifted_at ||
@@ -715,6 +630,7 @@ export default function InvoiceScreen() {
         onConfirmPickup={handleConfirmPickupAndPack}
         onOrderUpdate={(updated) => setOrder(updated)}
         onBack={() => safeBack()}
+        onShare={onShare}
         actionButtons={
           isSeller && (order?.fulfillment_status === 'pending' || !order?.fulfillment_status || order?.fulfillment_status === 'awaiting_payment') && isOrderActive && order?.status !== 'completed' && order?.status !== 'canceled' && order?.status !== 'refunded' ? (
             <Pressable
@@ -990,21 +906,5 @@ export default function InvoiceScreen() {
         defaultContactName={profile?.full_name || profile?.username}
       />
     </SafeAreaView>
-  );
-}
-
-function MetaRow({ label, children, theme }: { label: string; children: React.ReactNode; theme: any }) {
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingVertical: 8,
-      }}
-    >
-      <Text style={{ fontSize: 13.5, color: theme.mute, fontFamily: typography.family.sansMedium }}>{label}</Text>
-      {children}
-    </View>
   );
 }
