@@ -49,6 +49,7 @@ alter table public.orders
       'awaiting_payment',
       'pending',
       'packing',
+      'picked',
       'shifting',
       'delivered',
       'completed',

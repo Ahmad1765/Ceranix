@@ -773,22 +773,28 @@ export class PaymentService {
     });
 
     if (error) {
-      if (targetStatus === 'picked') {
-        const { data: directData, error: directErr } = await supabase
-          .from('orders')
-          .update({
-            fulfillment_status: 'picked',
-            packed_at: new Date().toISOString(),
-          })
-          .eq('id', orderId)
-          .select()
-          .maybeSingle();
+      if (
+        targetStatus === 'picked' &&
+        (error.message.includes('orders_fulfillment_status_check') ||
+         error.message.includes('violates check constraint'))
+      ) {
+        // Graceful fallback for unmigrated databases where 'picked' is not yet in orders_fulfillment_status_check
+        const { data: retryData, error: retryErr } = await supabase.rpc('advance_order_fulfillment', {
+          p_order_id: orderId,
+          p_target_status: 'packing',
+          p_courier: courier?.trim() || null,
+          p_tracking_number: trackingNumber?.trim() || null,
+          p_supplier_order_id: supplierOrderId?.trim() || null,
+          p_supplier_name: supplierName?.trim() || null,
+          p_seller_pickup_address: sellerPickupAddress ?? null,
+        });
 
-        if (!directErr && directData) {
-          capture('fulfillment_advanced', { order_id: orderId, target_status: targetStatus });
-          notifyOrderUpdated((directData as Order)?.listing_id);
+        if (!retryErr && retryData) {
+          capture('fulfillment_advanced', { order_id: orderId, target_status: 'picked', fallback: 'packing' });
+          notifyOrderUpdated((retryData as Order)?.listing_id);
           return {
-            ...(directData as Order),
+            ...(retryData as Order),
+            fulfillment_status: 'picked',
             ...(sellerPickupAddress ? { seller_pickup_address: sellerPickupAddress } : {}),
           };
         }
