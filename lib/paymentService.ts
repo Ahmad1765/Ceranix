@@ -683,18 +683,23 @@ export class PaymentService {
   }
 
   /**
-   * Seller action to mark a Cash on Delivery order as collected and paid.
-   * Clears escrow and marks fulfillment as completed via atomic Security Definer RPC.
+   * Dual Buyer & Seller action to confirm Cash on Delivery payment.
+   * Both parties must select "Confirm COD Payment" to finalize the order.
+   * Clears escrow and marks fulfillment as completed via atomic Security Definer RPC once both confirm.
    */
-  async markCodOrderPaid(orderId: string): Promise<Order> {
-    const { data, error } = await supabase.rpc('complete_cod_order', {
-      p_order_id: orderId,
-    });
+  async markCodOrderPaid(orderId: string, role?: 'seller' | 'buyer'): Promise<Order> {
+    const params: { p_order_id: string; p_role?: string } = { p_order_id: orderId };
+    if (role) {
+      params.p_role = role;
+    }
+
+    const { data, error } = await supabase.rpc('complete_cod_order', params);
 
     if (error) {
       if (!isDemoMode()) throw new Error(error.message);
       // Fallback for mock demo mode only when RPC is unavailable
-      capture('cod_order_completed', { order_id: orderId, demo_mode: true });
+      capture('cod_order_completed', { order_id: orderId, role, demo_mode: true });
+      const nowIso = new Date().toISOString();
       return {
         id: orderId,
         listing_id: 'mock-listing',
@@ -707,23 +712,28 @@ export class PaymentService {
         status: 'completed',
         fulfillment_status: 'completed',
         escrow_status: 'COMPLETED_FUNDS_RELEASED',
-        created_at: new Date().toISOString(),
+        cod_paid_at: nowIso,
+        cod_buyer_confirmed_at: nowIso,
+        cod_seller_confirmed_at: nowIso,
+        created_at: nowIso,
       };
     }
 
     if (data) {
-      // Ensure fulfillment_status is synchronized to completed
-      try {
-        await supabase
-          .from('orders')
-          .update({
-            fulfillment_status: 'completed',
-            completed_at: new Date().toISOString(),
-          })
-          .eq('id', orderId);
-      } catch {}
+      // Synchronize fulfillment_status to completed ONLY when the order is finalized
+      if ((data as Order)?.status === 'completed') {
+        try {
+          await supabase
+            .from('orders')
+            .update({
+              fulfillment_status: 'completed',
+              completed_at: new Date().toISOString(),
+            })
+            .eq('id', orderId);
+        } catch {}
+      }
 
-      capture('cod_order_completed', { order_id: orderId });
+      capture('cod_order_confirmed', { order_id: orderId, role, status: (data as Order)?.status });
       notifyOrderUpdated((data as Order)?.listing_id);
       return data as Order;
     }

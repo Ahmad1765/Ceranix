@@ -152,6 +152,9 @@ export interface Order {
   shipped_at?: string | null;
   delivered_at?: string | null;
   completed_at?: string | null;
+  cod_paid_at?: string | null;
+  cod_buyer_confirmed_at?: string | null;
+  cod_seller_confirmed_at?: string | null;
   escrow_status?: EscrowStatus | null;
   payout_amount_cents?: number | null;
   bundle_item_ids?: string[] | null;

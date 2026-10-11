@@ -535,6 +535,75 @@ describe('PaymentService Dispatcher & Seller Completion', () => {
     expect(completedOrder.status).toBe('completed');
     expect(completedOrder.fulfillment_status).toBe('completed');
     expect(completedOrder.escrow_status).toBe('COMPLETED_FUNDS_RELEASED');
+    expect(completedOrder.cod_buyer_confirmed_at).toBeTruthy();
+    expect(completedOrder.cod_seller_confirmed_at).toBeTruthy();
+  });
+
+  it('records seller COD confirmation and retains in-progress state until buyer confirms', async () => {
+    const now = new Date().toISOString();
+    const rpcSpy = vi.spyOn(supabase, 'rpc').mockResolvedValueOnce({
+      data: {
+        id: 'order-cod-456',
+        listing_id: 'listing-456',
+        buyer_id: 'buyer-456',
+        seller_id: 'seller-456',
+        amount_cents: 12000,
+        fee_cents: 500,
+        currency: 'pkr',
+        payment_method: 'cod',
+        status: 'delivered',
+        fulfillment_status: 'delivered',
+        cod_seller_confirmed_at: now,
+        cod_buyer_confirmed_at: null,
+        created_at: now,
+      },
+      error: null,
+    } as any);
+
+    const order = await paymentService.markCodOrderPaid('order-cod-456', 'seller');
+
+    expect(rpcSpy).toHaveBeenCalledWith('complete_cod_order', {
+      p_order_id: 'order-cod-456',
+      p_role: 'seller',
+    });
+    expect(order.cod_seller_confirmed_at).toBe(now);
+    expect(order.cod_buyer_confirmed_at).toBeNull();
+    expect(order.status).toBe('delivered');
+  });
+
+  it('finalizes COD order to completed once both buyer and seller confirm COD payment', async () => {
+    const now = new Date().toISOString();
+    const rpcSpy = vi.spyOn(supabase, 'rpc').mockResolvedValueOnce({
+      data: {
+        id: 'order-cod-456',
+        listing_id: 'listing-456',
+        buyer_id: 'buyer-456',
+        seller_id: 'seller-456',
+        amount_cents: 12000,
+        fee_cents: 500,
+        currency: 'pkr',
+        payment_method: 'cod',
+        status: 'completed',
+        fulfillment_status: 'completed',
+        escrow_status: 'COMPLETED_FUNDS_RELEASED',
+        cod_paid_at: now,
+        cod_seller_confirmed_at: now,
+        cod_buyer_confirmed_at: now,
+        created_at: now,
+      },
+      error: null,
+    } as any);
+
+    const finalized = await paymentService.markCodOrderPaid('order-cod-456', 'buyer');
+
+    expect(rpcSpy).toHaveBeenCalledWith('complete_cod_order', {
+      p_order_id: 'order-cod-456',
+      p_role: 'buyer',
+    });
+    expect(finalized.status).toBe('completed');
+    expect(finalized.fulfillment_status).toBe('completed');
+    expect(finalized.cod_buyer_confirmed_at).toBe(now);
+    expect(finalized.cod_seller_confirmed_at).toBe(now);
   });
 });
 

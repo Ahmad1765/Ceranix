@@ -14,11 +14,13 @@ alter table public.orders enable row level security;
 alter table public.transactions enable row level security;
 alter table public.order_seller_pickups enable row level security;
 
--- Add bundle tracking columns to public.orders
+-- Add bundle tracking and COD confirmation columns to public.orders
 alter table public.orders
   add column if not exists bundle_item_ids uuid[],
   add column if not exists bundle_count integer default 1,
-  add column if not exists payment_status text not null default 'pending';
+  add column if not exists payment_status text not null default 'pending',
+  add column if not exists cod_buyer_confirmed_at timestamptz,
+  add column if not exists cod_seller_confirmed_at timestamptz;
 
 -- Drop all permissive and legacy write policies
 drop policy if exists "Buyers, sellers, and admins can update orders" on public.orders;
@@ -408,9 +410,11 @@ grant execute on function public.advance_order_fulfillment(uuid, text, text, tex
 -- ─────────────────────────────────────────────────────────────────────────────
 
 drop function if exists public.complete_cod_order(uuid) cascade;
+drop function if exists public.complete_cod_order(uuid, text) cascade;
 
 create or replace function public.complete_cod_order(
-  p_order_id uuid
+  p_order_id uuid,
+  p_role text default null
 )
 returns public.orders
 language plpgsql
@@ -424,6 +428,8 @@ declare
   v_is_admin boolean := false;
   v_conv_id uuid;
   v_now timestamptz := clock_timestamp();
+  v_is_buyer boolean := false;
+  v_is_seller boolean := false;
 begin
   v_is_service_role := (coalesce(auth.role(), '') = 'service_role' or coalesce(auth.jwt()->>'role', '') = 'service_role');
 
@@ -449,20 +455,6 @@ begin
     raise exception 'Order is not Cash on Delivery' using errcode = '22000';
   end if;
 
-  -- For managed courier delivery, the seller cannot unilaterally confirm cash collection
-  -- Cash collection must be confirmed by courier webhook (service_role), buyer, or admin
-  if coalesce(v_order.shipping_method, 'managed') = 'managed' then
-    if not v_is_service_role and not v_is_admin and v_caller_id <> v_order.buyer_id then
-      raise exception 'For managed courier orders, Cash on Delivery completion must be confirmed by courier webhook, buyer, or admin'
-        using errcode = '42501';
-    end if;
-  else
-    -- Self-ship / in-person handover: seller, buyer, or admin can confirm
-    if v_caller_id <> v_order.seller_id and v_caller_id <> v_order.buyer_id and not v_is_admin then
-      raise exception 'Unauthorized to confirm this self-shipped CoD order' using errcode = '42501';
-    end if;
-  end if;
-
   -- Idempotent return if already completed
   if v_order.status = 'completed' and v_order.fulfillment_status = 'completed' then
     return v_order;
@@ -472,55 +464,124 @@ begin
     raise exception 'Order is canceled or refunded and cannot be completed' using errcode = '22000';
   end if;
 
-  update public.orders
-     set status = 'completed',
-         fulfillment_status = 'completed',
-         payment_status = 'paid',
-         cod_paid_at = coalesce(cod_paid_at, v_now),
-         delivered_at = coalesce(delivered_at, v_now),
-         completed_at = coalesce(completed_at, v_now),
-         escrow_status = 'COMPLETED_FUNDS_RELEASED'
-   where id = p_order_id
-  returning * into v_order;
+  -- Verify caller authorization
+  v_is_buyer := (v_caller_id = v_order.buyer_id);
+  v_is_seller := (v_caller_id = v_order.seller_id);
 
-  update public.transactions
-     set status = 'COMPLETED_FUNDS_RELEASED',
-         delivered_at = coalesce(delivered_at, v_now),
-         funds_released_at = coalesce(funds_released_at, v_now),
-         updated_at = v_now
-   where order_id = p_order_id;
+  if not v_is_admin and not v_is_service_role and not v_is_buyer and not v_is_seller then
+    raise exception 'Unauthorized to confirm COD payment for this order' using errcode = '42501';
+  end if;
 
-  update public.listings
-     set is_sold = true,
-         reserved_until = null
-   where id = v_order.listing_id;
+  -- Record confirmation timestamp based on role
+  if v_is_admin or v_is_service_role then
+    if p_role = 'buyer' then
+      v_order.cod_buyer_confirmed_at := coalesce(v_order.cod_buyer_confirmed_at, v_now);
+    elsif p_role = 'seller' then
+      v_order.cod_seller_confirmed_at := coalesce(v_order.cod_seller_confirmed_at, v_now);
+    else
+      -- Admin or courier service role confirming full completion
+      v_order.cod_buyer_confirmed_at := coalesce(v_order.cod_buyer_confirmed_at, v_now);
+      v_order.cod_seller_confirmed_at := coalesce(v_order.cod_seller_confirmed_at, v_now);
+    end if;
+  else
+    if v_is_buyer or p_role = 'buyer' then
+      v_order.cod_buyer_confirmed_at := coalesce(v_order.cod_buyer_confirmed_at, v_now);
+    end if;
+    if v_is_seller or p_role = 'seller' then
+      v_order.cod_seller_confirmed_at := coalesce(v_order.cod_seller_confirmed_at, v_now);
+    end if;
+  end if;
 
-  select id into v_conv_id
-    from public.conversations
-   where listing_id = v_order.listing_id
-     and ((buyer_id = v_order.buyer_id and seller_id = v_order.seller_id) or (buyer_id = v_order.seller_id and seller_id = v_order.buyer_id))
-   limit 1;
+  -- Both buyer and seller must confirm COD payment to finalize the order
+  if v_order.cod_buyer_confirmed_at is not null and v_order.cod_seller_confirmed_at is not null then
+    update public.orders
+       set cod_buyer_confirmed_at = v_order.cod_buyer_confirmed_at,
+           cod_seller_confirmed_at = v_order.cod_seller_confirmed_at,
+           status = 'completed',
+           fulfillment_status = 'completed',
+           payment_status = 'paid',
+           cod_paid_at = coalesce(cod_paid_at, v_now),
+           delivered_at = coalesce(delivered_at, v_now),
+           completed_at = coalesce(completed_at, v_now),
+           escrow_status = 'COMPLETED_FUNDS_RELEASED'
+     where id = p_order_id
+    returning * into v_order;
 
-  if v_conv_id is not null then
-    insert into public.messages (
-      conversation_id, sender_id, content, kind, metadata
-    ) values (
-      v_conv_id, coalesce(v_caller_id, v_order.seller_id), 'Cash on Delivery Collected! 💵 Order completed successfully.', 'system',
-      jsonb_build_object(
-        'order_id', p_order_id,
-        'fulfillment_status', 'completed',
-        'status', 'completed',
-        'updated_at', v_now
-      )
-    );
+    update public.transactions
+       set status = 'COMPLETED_FUNDS_RELEASED',
+           delivered_at = coalesce(delivered_at, v_now),
+           funds_released_at = coalesce(funds_released_at, v_now),
+           updated_at = v_now
+     where order_id = p_order_id;
+
+    update public.listings
+       set is_sold = true,
+           reserved_until = null
+     where id = v_order.listing_id;
+
+    select id into v_conv_id
+      from public.conversations
+     where listing_id = v_order.listing_id
+       and ((buyer_id = v_order.buyer_id and seller_id = v_order.seller_id) or (buyer_id = v_order.seller_id and seller_id = v_order.buyer_id))
+     limit 1;
+
+    if v_conv_id is not null then
+      insert into public.messages (
+        conversation_id, sender_id, content, kind, metadata
+      ) values (
+        v_conv_id, coalesce(v_caller_id, v_order.seller_id), 'Cash on Delivery confirmed by both buyer and seller! 💵 Order completed successfully.', 'system',
+        jsonb_build_object(
+          'order_id', p_order_id,
+          'fulfillment_status', 'completed',
+          'status', 'completed',
+          'cod_paid_at', v_now,
+          'updated_at', v_now
+        )
+      );
+    end if;
+  else
+    -- Only one party has confirmed so far: persist confirmation timestamp & waiting state
+    update public.orders
+       set cod_buyer_confirmed_at = v_order.cod_buyer_confirmed_at,
+           cod_seller_confirmed_at = v_order.cod_seller_confirmed_at,
+           delivered_at = coalesce(delivered_at, v_now)
+     where id = p_order_id
+    returning * into v_order;
+
+    select id into v_conv_id
+      from public.conversations
+     where listing_id = v_order.listing_id
+       and ((buyer_id = v_order.buyer_id and seller_id = v_order.seller_id) or (buyer_id = v_order.seller_id and seller_id = v_order.buyer_id))
+     limit 1;
+
+    if v_conv_id is not null then
+      insert into public.messages (
+        conversation_id, sender_id, content, kind, metadata
+      ) values (
+        v_conv_id, coalesce(v_caller_id, v_order.seller_id),
+        case
+          when v_order.cod_seller_confirmed_at is not null and v_order.cod_buyer_confirmed_at is null then
+            'Seller has selected Confirm COD Payment. ⏳ Waiting for buyer to confirm COD payment to finalize.'
+          else
+            'Buyer has selected Confirm COD Payment. ⏳ Waiting for seller to confirm COD payment to finalize.'
+        end,
+        'system',
+        jsonb_build_object(
+          'order_id', p_order_id,
+          'cod_seller_confirmed_at', v_order.cod_seller_confirmed_at,
+          'cod_buyer_confirmed_at', v_order.cod_buyer_confirmed_at,
+          'updated_at', v_now
+        )
+      );
+    end if;
   end if;
 
   return v_order;
 end;
 $$;
 
-revoke execute on function public.complete_cod_order(uuid) from public, anon;
-grant execute on function public.complete_cod_order(uuid) to authenticated, service_role;
+revoke execute on function public.complete_cod_order(uuid, text) from public, anon;
+grant execute on function public.complete_cod_order(uuid, text) to authenticated, service_role;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 6. HARDENED RPC: confirm_order_received
