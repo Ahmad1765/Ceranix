@@ -226,6 +226,17 @@ function parseServerDate(val?: string | Date | null): Date | null {
   return isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function formatCondition(condition?: string): string {
+  if (!condition) return 'New with tags';
+  const map: Record<string, string> = {
+    new_with_tags: 'New with tags',
+    like_new: 'Like new',
+    good: 'Good',
+    fair: 'Fair',
+  };
+  return map[condition] || condition.replace(/_/g, ' ');
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ORDER FULFILLMENT STATUS NORMALIZER
 // ─────────────────────────────────────────────────────────────────────────────
@@ -293,7 +304,7 @@ function deriveFulfillmentStatus(
 export function OrderDetailsTrackingView({
   order,
   listing,
-  isSeller = true,
+  isSeller = false,
   onBack,
   onShare,
   actionButtons,
@@ -316,18 +327,12 @@ export function OrderDetailsTrackingView({
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const [activeTab, setActiveTab] = useState<'shipment' | 'activity'>(initialTab);
-  const [trackingModalVisible, setTrackingModalVisible] = useState(false);
   const [bpSheetOpen, setBpSheetOpen] = useState(false);
 
   // Seller Modals (Rule 1 & 2)
   const [labelModalVisible, setLabelModalVisible] = useState(false);
   const [labelSubTab, setLabelSubTab] = useState<'label' | 'qr'>('label');
   const [readyDeliverModalVisible, setReadyDeliverModalVisible] = useState(false);
-  const [howToShipModalVisible, setHowToShipModalVisible] = useState(false);
-  const [originModalVisible, setOriginModalVisible] = useState(false);
-
-  // Origin State (Image 4)
-  const [countryOfOrigin, setCountryOfOrigin] = useState('United States');
 
   // Dynamic status state synchronized reactively with incoming order
   const [currentFulfillment, setCurrentFulfillment] = useState<FulfillmentStatus>(() =>
@@ -367,9 +372,12 @@ export function OrderDetailsTrackingView({
     (order as any)?.tracking_number ||
     (order?.id ? `PAQ-${order.id.slice(0, 3).toUpperCase()}-${order.id.slice(-3).toUpperCase()}` : 'PAQ-327-P21');
 
-  // Derive status badge & item status badge (Image 4)
+  // Derive status badge & item status badge (Clean & Role-Accurate)
   let statusBadge = propStatusLabel;
-  let statusPillText = 'Needs Label';
+  if (!isSeller && (statusBadge === 'Needs Label' || statusBadge === 'Packing')) {
+    statusBadge = 'Preparing Order';
+  }
+  let statusPillText = isSeller ? 'Needs Label' : 'Preparing Order';
   let itemStatusBadgeText = 'Preparing Package';
 
   if (currentFulfillment === 'delivered') {
@@ -389,8 +397,8 @@ export function OrderDetailsTrackingView({
     statusPillText = 'Completed';
     itemStatusBadgeText = 'Completed';
   } else if (currentFulfillment === 'packing') {
-    statusBadge = statusBadge || 'Packing';
-    statusPillText = 'Needs Label';
+    statusBadge = statusBadge || (isSeller ? 'Needs Label' : 'Preparing Order');
+    statusPillText = isSeller ? 'Needs Label' : 'Preparing Order';
     itemStatusBadgeText = 'Preparing Package';
   } else if (currentFulfillment === 'disputed') {
     statusBadge = statusBadge || 'Refund Under Review';
@@ -401,7 +409,7 @@ export function OrderDetailsTrackingView({
     statusPillText = 'Cancelled';
     itemStatusBadgeText = 'Cancelled';
   } else {
-    statusBadge = statusBadge || (order?.status === 'paid' ? 'Paid' : 'Preparing');
+    statusBadge = statusBadge || (order?.status === 'paid' ? (isSeller ? 'Needs Label' : 'Paid') : (isSeller ? 'Needs Label' : 'Preparing Order'));
   }
 
   if (order?.payment_method === 'cod' && currentFulfillment !== 'completed' && currentFulfillment !== 'canceled' && currentFulfillment !== 'disputed') {
@@ -461,7 +469,6 @@ export function OrderDetailsTrackingView({
         orderId: `Order #${orderIdNumber}`,
         condition: oi.listing?.condition || itemCondition,
         photo: oi.listing?.images?.[0] || itemPhoto,
-        origin: countryOfOrigin || null,
       }));
     }
     return [
@@ -471,10 +478,9 @@ export function OrderDetailsTrackingView({
         orderId: `Order #${orderIdNumber}`,
         condition: itemCondition,
         photo: itemPhoto,
-        origin: countryOfOrigin || null,
       },
     ];
-  }, [order, listing, item, orderIdNumber, itemCondition, itemPhoto, countryOfOrigin]);
+  }, [order, listing, item, orderIdNumber, itemCondition, itemPhoto]);
 
   // Buyer protection fee calculation
   const listingPrice = Number(listing?.price ?? (order?.amount_cents ? order.amount_cents / 100 : 1000));
@@ -668,12 +674,6 @@ export function OrderDetailsTrackingView({
     }
   };
 
-  // Track Shipping Handler
-  const handleTrackShipping = () => {
-    tap('light');
-    setTrackingModalVisible(true);
-  };
-
   const handleBack = () => {
     tap('light');
     if (onBack) {
@@ -814,31 +814,8 @@ export function OrderDetailsTrackingView({
             Tracking
           </Text>
 
-          {/* Symmetrical Right Action / Spacer */}
-          {onShare ? (
-            <Pressable
-              onPress={onShare}
-              hitSlop={HIT_SLOP_8}
-              accessibilityRole="button"
-              accessibilityLabel="Share order"
-              style={({ pressed }) => ({
-                width: 36,
-                height: 36,
-                borderRadius: 18,
-                backgroundColor: theme.surface,
-                borderWidth: 1,
-                borderColor: theme.border,
-                alignItems: 'center',
-                justifyContent: 'center',
-                opacity: pressed ? 0.75 : 1,
-                transform: [{ scale: pressed ? 0.96 : 1 }],
-              })}
-            >
-              <Feather name="share" size={16} color={theme.ink} />
-            </Pressable>
-          ) : (
-            <View style={{ width: 36 }} />
-          )}
+          {/* Symmetrical Right Spacer */}
+          <View style={{ width: 36 }} />
         </View>
       </View>
 
@@ -1130,330 +1107,152 @@ export function OrderDetailsTrackingView({
             </View>
           </View>
 
-          {/* Track Shipping Action Button */}
-          <Pressable
-            onPress={handleTrackShipping}
-            accessibilityRole="button"
-            accessibilityLabel="Track Shipping status"
-            style={({ pressed }) => ({
-              backgroundColor: theme.ink,
-              height: 48,
-              borderRadius: radii.pill,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginTop: 20,
-              opacity: pressed ? 0.88 : 1,
-              transform: [{ scale: pressed ? 0.97 : 1 }],
-            })}
-          >
-            <Feather name="box" size={16} color={theme.background} />
-            <Text
-              style={{
-                fontSize: 14,
-                fontFamily: typography.family.sansBold,
-                color: theme.background,
-                marginLeft: 8,
-                letterSpacing: -0.2,
-              }}
-            >
-              Track Shipping
-            </Text>
-          </Pressable>
         </GroupCard>
 
-        {/* ── Seller Actions: Combined "Get a label" & "Ready to deliver" (Image 3 Design) ── */}
-        <GroupCard>
-          {/* Row 1: Get a label (Opens Image 2) */}
-          <Pressable
-            onPress={() => {
-              tap('light');
-              setLabelModalVisible(true);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Get a label"
-            style={({ pressed }) => [
-              {
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingHorizontal: 16,
-                paddingVertical: 14,
-                minHeight: 54,
-                borderBottomWidth: StyleSheet.hairlineWidth,
-                borderBottomColor: isDark ? 'rgba(255,255,255,0.08)' : theme.hairline,
-              },
-              pressed && { opacity: 0.75, backgroundColor: theme.surface },
-            ]}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 8 }}>
-              <Feather name="printer" size={19} color={theme.ink} style={{ width: 26 }} />
-              <Text
-                style={{
-                  fontSize: 15.5,
-                  fontFamily: typography.family.sansBold,
-                  color: theme.ink,
-                  letterSpacing: -0.2,
-                  marginLeft: 8,
-                }}
-              >
-                Get a label
-              </Text>
-            </View>
+        {/* ── Seller Actions: Combined "Get a label" & "Ready to deliver" (Seller Only) ── */}
+        {isSeller ? (
+          <GroupCard>
+            {/* Row 1: Get a label (Opens Image 2) */}
+            <Pressable
+              onPress={() => {
+                tap('light');
+                setLabelModalVisible(true);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Get a label"
+              style={({ pressed }) => [
+                {
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingHorizontal: 16,
+                  paddingVertical: 14,
+                  minHeight: 54,
+                  borderBottomWidth: StyleSheet.hairlineWidth,
+                  borderBottomColor: isDark ? 'rgba(255,255,255,0.08)' : theme.hairline,
+                },
+                pressed && { opacity: 0.75, backgroundColor: theme.surface },
+              ]}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 8 }}>
+                <Feather name="printer" size={19} color={theme.ink} style={{ width: 26 }} />
+                <Text
+                  style={{
+                    fontSize: 15.5,
+                    fontFamily: typography.family.sansBold,
+                    color: theme.ink,
+                    letterSpacing: -0.2,
+                    marginLeft: 8,
+                  }}
+                >
+                  Get a label
+                </Text>
+              </View>
 
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text
-                style={{
-                  fontSize: 13.5,
-                  color: theme.mute,
-                  fontFamily: typography.family.sansMedium,
-                }}
-              >
-                Print / QR code
-              </Text>
-              <Feather name="chevron-right" size={16} color={theme.mute} />
-            </View>
-          </Pressable>
-
-          {/* Row 2: Ready to deliver (Opens Pickup Scheduler & Required Contact Modal) */}
-          <Pressable
-            onPress={() => {
-              tap('light');
-              setReadyDeliverModalVisible(true);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Ready to deliver"
-            style={({ pressed }) => [
-              {
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingHorizontal: 16,
-                paddingVertical: 14,
-                minHeight: 54,
-              },
-              pressed && { opacity: 0.75, backgroundColor: theme.surface },
-            ]}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 8 }}>
-              <Ionicons name="cube-outline" size={20} color={theme.ink} style={{ width: 26 }} />
-              <Text
-                style={{
-                  fontSize: 15.5,
-                  fontFamily: typography.family.sansBold,
-                  color: theme.ink,
-                  letterSpacing: -0.2,
-                  marginLeft: 8,
-                }}
-              >
-                Ready to deliver
-              </Text>
-            </View>
-
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              {pickupConfirmed ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Feather name="check-circle" size={14} color="#10B981" />
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      color: '#10B981',
-                      fontFamily: typography.family.sansBold,
-                    }}
-                  >
-                    {pickupConfirmedDateStr || 'Scheduled'}
-                  </Text>
-                </View>
-              ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Text
                   style={{
                     fontSize: 13.5,
-                    color: theme.purple,
-                    fontFamily: typography.family.sansBold,
+                    color: theme.mute,
+                    fontFamily: typography.family.sansMedium,
                   }}
                 >
-                  Schedule pickup
+                  Print / QR code
                 </Text>
-              )}
-              <Feather name="chevron-right" size={16} color={theme.mute} />
-            </View>
-          </Pressable>
-        </GroupCard>
+                <Feather name="chevron-right" size={16} color={theme.mute} />
+              </View>
+            </Pressable>
 
-        {/* ── Segmented Control: Shipment vs Activity ── */}
-        <View style={{ marginBottom: 16 }}>
-          <View
-            style={{
-              flexDirection: 'row',
-              backgroundColor: isDark ? '#1C1C1E' : '#F3F4F6',
-              borderRadius: 10,
-              padding: 3,
-            }}
-          >
+            {/* Row 2: Ready to deliver (Opens Pickup Scheduler & Required Contact Modal) */}
             <Pressable
               onPress={() => {
                 tap('light');
-                setActiveTab('shipment');
+                setReadyDeliverModalVisible(true);
               }}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: activeTab === 'shipment' }}
-              style={{
-                flex: 1,
-                paddingVertical: 8,
-                borderRadius: 8,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: activeTab === 'shipment' ? (isDark ? '#2C2C2E' : '#FFFFFF') : 'transparent',
-                ...(activeTab === 'shipment' && Platform.OS !== 'web'
-                  ? {
-                      shadowColor: '#000',
-                      shadowOffset: { width: 0, height: 1 },
-                      shadowOpacity: 0.12,
-                      shadowRadius: 2,
-                      elevation: 2,
-                    }
-                  : {}),
-              }}
+              accessibilityRole="button"
+              accessibilityLabel="Ready to deliver"
+              style={({ pressed }) => [
+                {
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingHorizontal: 16,
+                  paddingVertical: 14,
+                  minHeight: 54,
+                },
+                pressed && { opacity: 0.75, backgroundColor: theme.surface },
+              ]}
             >
-              <Text
-                style={{
-                  fontFamily: activeTab === 'shipment' ? typography.family.sansBold : typography.family.sansMedium,
-                  fontSize: 13.5,
-                  color: activeTab === 'shipment' ? theme.ink : theme.mute,
-                }}
-              >
-                Shipment
-              </Text>
-            </Pressable>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 8 }}>
+                <Ionicons name="cube-outline" size={20} color={theme.ink} style={{ width: 26 }} />
+                <Text
+                  style={{
+                    fontSize: 15.5,
+                    fontFamily: typography.family.sansBold,
+                    color: theme.ink,
+                    letterSpacing: -0.2,
+                    marginLeft: 8,
+                  }}
+                >
+                  Ready to deliver
+                </Text>
+              </View>
 
-            <Pressable
-              onPress={() => {
-                tap('light');
-                setActiveTab('activity');
-              }}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: activeTab === 'activity' }}
-              style={{
-                flex: 1,
-                paddingVertical: 8,
-                borderRadius: 8,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: activeTab === 'activity' ? (isDark ? '#2C2C2E' : '#FFFFFF') : 'transparent',
-                ...(activeTab === 'activity' && Platform.OS !== 'web'
-                  ? {
-                      shadowColor: '#000',
-                      shadowOffset: { width: 0, height: 1 },
-                      shadowOpacity: 0.12,
-                      shadowRadius: 2,
-                      elevation: 2,
-                    }
-                  : {}),
-              }}
-            >
-              <Text
-                style={{
-                  fontFamily: activeTab === 'activity' ? typography.family.sansBold : typography.family.sansMedium,
-                  fontSize: 13.5,
-                  color: activeTab === 'activity' ? theme.ink : theme.mute,
-                }}
-              >
-                Activity
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-
-        {activeTab === 'shipment' ? (
-          <>
-            {/* ── Shipment Overview & Live Working Status System (Exact Replica of Image 4) ── */}
-            <GroupCard style={{ padding: 18, marginBottom: 16 }}>
-              {/* Header Row: Title "Shipment", Subtitle, Status Pill, Top-right Chat & Close */}
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
-                <View>
-                  <Text
-                    style={{
-                      fontSize: 28,
-                      fontFamily: typography.family.sansBold,
-                      color: theme.ink,
-                      letterSpacing: -0.6,
-                      lineHeight: 32,
-                    }}
-                  >
-                    Shipment
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 14.5,
-                      fontFamily: typography.family.sansMedium,
-                      color: theme.mute,
-                      marginTop: 3,
-                    }}
-                  >
-                    {actualItems.length} {actualItems.length === 1 ? 'Item' : 'Items'} • #{trackingNumber.replace('PAQ-', '') || '77656'}
-                  </Text>
-                  <View
-                    style={{
-                      alignSelf: 'flex-start',
-                      marginTop: 8,
-                      paddingHorizontal: 10,
-                      paddingVertical: 4,
-                      borderRadius: 6,
-                      borderWidth: 1,
-                      borderColor: theme.border,
-                      backgroundColor: theme.surface,
-                    }}
-                  >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                {pickupConfirmed ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Feather name="check-circle" size={14} color="#10B981" />
                     <Text
                       style={{
-                        fontSize: 12,
+                        fontSize: 13,
+                        color: '#10B981',
                         fontFamily: typography.family.sansBold,
-                        color: theme.ink,
                       }}
                     >
-                      {statusPillText}
+                      {pickupConfirmedDateStr || 'Scheduled'}
                     </Text>
                   </View>
-                </View>
-
-                {/* Top Right Actions: Chat with Buyer & Close (Image 4 Replica) */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Pressable
-                    onPress={handleContactSeller}
-                    hitSlop={HIT_SLOP_8}
-                    accessibilityRole="button"
-                    accessibilityLabel="Message buyer"
-                    style={({ pressed }) => ({
-                      width: 38,
-                      height: 38,
-                      borderRadius: 19,
-                      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#F3F4F6',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      opacity: pressed ? 0.75 : 1,
-                    })}
+                ) : (
+                  <Text
+                    style={{
+                      fontSize: 13.5,
+                      color: theme.purple,
+                      fontFamily: typography.family.sansBold,
+                    }}
                   >
-                    <Feather name="message-square" size={18} color={theme.ink} />
-                  </Pressable>
+                    Schedule pickup
+                  </Text>
+                )}
+                <Feather name="chevron-right" size={16} color={theme.mute} />
+              </View>
+            </Pressable>
+          </GroupCard>
+        ) : null}
 
-                  <Pressable
-                    onPress={handleBack}
-                    hitSlop={HIT_SLOP_8}
-                    accessibilityRole="button"
-                    accessibilityLabel="Close"
-                    style={({ pressed }) => ({
-                      width: 38,
-                      height: 38,
-                      borderRadius: 19,
-                      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#F3F4F6',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      opacity: pressed ? 0.75 : 1,
-                    })}
-                  >
-                    <Feather name="x" size={18} color={theme.ink} />
-                  </Pressable>
-                </View>
+        {/* ── Items Overview Card ── */}
+        <GroupCard style={{ padding: 18, marginBottom: 16 }}>
+          {/* Header Row */}
+          <View style={{ marginBottom: 14 }}>
+            <Text
+              style={{
+                fontSize: 18,
+                fontFamily: typography.family.sansBold,
+                color: theme.ink,
+                letterSpacing: -0.3,
+              }}
+            >
+              {isSeller ? 'Items to pack' : 'Order details'}
+            </Text>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontFamily: typography.family.sans,
+                    color: theme.mute,
+                    marginTop: 2,
+                  }}
+                >
+                  {actualItems.length} {actualItems.length === 1 ? 'Item' : 'Items'}
+                </Text>
               </View>
 
               {/* Items List (Dynamic Order Items) */}
@@ -1485,24 +1284,6 @@ export function OrderDetailsTrackingView({
 
                   {/* Item Information */}
                   <View style={{ flex: 1 }}>
-                    {/* Item Status Pill */}
-                    <View
-                      style={{
-                        alignSelf: 'flex-start',
-                        paddingHorizontal: 8,
-                        paddingVertical: 2.5,
-                        borderRadius: 4,
-                        borderWidth: 1,
-                        borderColor: theme.border,
-                        backgroundColor: theme.surface,
-                        marginBottom: 6,
-                      }}
-                    >
-                      <Text style={{ fontSize: 11, fontFamily: typography.family.sansBold, color: theme.ink }}>
-                        {itemStatusBadgeText}
-                      </Text>
-                    </View>
-
                     {/* Title */}
                     <Text
                       style={{
@@ -1538,327 +1319,13 @@ export function OrderDetailsTrackingView({
                         fontSize: 12.5,
                         fontFamily: typography.family.sans,
                         color: theme.mute,
-                        marginBottom: 8,
                       }}
                     >
-                      {sItem.condition}
+                      {formatCondition(sItem.condition)}
                     </Text>
-
-                    {/* Country of Origin Divider & Row */}
-                    <View
-                      style={{
-                        borderTopWidth: StyleSheet.hairlineWidth,
-                        borderTopColor: isDark ? 'rgba(255, 255, 255, 0.08)' : theme.hairline,
-                        paddingTop: 8,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                      }}
-                    >
-                      {sItem.origin ? (
-                        <>
-                          <Text style={{ fontSize: 12.5, fontFamily: typography.family.sansMedium, color: theme.mute }}>
-                            Country of Origin: <Text style={{ color: theme.ink, fontFamily: typography.family.sansBold }}>{sItem.origin}</Text>
-                          </Text>
-                          <Pressable
-                            onPress={() => setOriginModalVisible(true)}
-                            hitSlop={HIT_SLOP_8}
-                          >
-                            <Text style={{ fontSize: 12.5, fontFamily: typography.family.sansBold, color: isDark ? '#A5B4FC' : '#2563EB' }}>
-                              Edit
-                            </Text>
-                          </Pressable>
-                        </>
-                      ) : (
-                        <>
-                          <Text style={{ fontSize: 12.5, fontFamily: typography.family.sansMedium, color: theme.mute }}>
-                            Country of Origin
-                          </Text>
-                          <Pressable
-                            onPress={() => setOriginModalVisible(true)}
-                            hitSlop={HIT_SLOP_8}
-                          >
-                            <Text style={{ fontSize: 12.5, fontFamily: typography.family.sansBold, color: isDark ? '#A5B4FC' : '#2563EB' }}>
-                              Select
-                            </Text>
-                          </Pressable>
-                        </>
-                      )}
-                    </View>
                   </View>
                 </View>
               ))}
-
-              {/* ── Edit Shipment Section (Image 4 Replica) ── */}
-              <View
-                style={{
-                  borderTopWidth: StyleSheet.hairlineWidth,
-                  borderTopColor: isDark ? 'rgba(255, 255, 255, 0.08)' : theme.hairline,
-                  paddingTop: 16,
-                  marginTop: 6,
-                }}
-              >
-                {isSeller && (
-                  <>
-                    <Text
-                      style={{
-                        fontSize: 16,
-                        fontFamily: typography.family.sansBold,
-                        color: theme.ink,
-                        letterSpacing: -0.2,
-                        marginBottom: 12,
-                      }}
-                    >
-                      Edit Shipment
-                    </Text>
-
-                    <View style={{ gap: 8 }}>
-                      {/* Unbundle Shipment Action */}
-                      <Pressable
-                        onPress={() => {
-                          tap('light');
-                          toast.show('Shipment unbundled for separate packaging', { variant: 'default', icon: 'layers' });
-                        }}
-                        style={({ pressed }) => ({
-                          height: 44,
-                          borderRadius: radii.pill,
-                          backgroundColor: isDark ? '#2C2C2E' : '#E5E7EB',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          opacity: pressed ? 0.8 : 1,
-                        })}
-                      >
-                        <Text style={{ fontSize: 14, fontFamily: typography.family.sansBold, color: theme.ink }}>
-                          Unbundle Shipment
-                        </Text>
-                      </Pressable>
-
-                      {/* Edit Shipping Details Action */}
-                      <Pressable
-                        onPress={() => {
-                          tap('light');
-                          setReadyDeliverModalVisible(true);
-                        }}
-                        style={({ pressed }) => ({
-                          height: 44,
-                          borderRadius: radii.pill,
-                          backgroundColor: isDark ? '#2C2C2E' : '#E5E7EB',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          opacity: pressed ? 0.8 : 1,
-                        })}
-                      >
-                        <Text style={{ fontSize: 14, fontFamily: typography.family.sansBold, color: theme.ink }}>
-                          Edit Shipping Details
-                        </Text>
-                      </Pressable>
-                    </View>
-                  </>
-                )}
-              </View>
-            </GroupCard>
-
-            {/* ── Section: Courier & Dispatch ── */}
-            <SectionEyebrow title="Courier & Dispatch" icon="truck" />
-            <GroupCard>
-              {/* Courier Info Row */}
-              <View
-                style={{
-                  padding: 16,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  borderBottomWidth: StyleSheet.hairlineWidth,
-                  borderBottomColor: isDark ? 'rgba(255,255,255,0.08)' : theme.hairline,
-                }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 8 }}>
-                  <View
-                    style={{
-                      width: 42,
-                      height: 42,
-                      borderRadius: 21,
-                      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#F3F4F6',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Feather name="truck" size={18} color={theme.ink} />
-                  </View>
-                  <View style={{ marginLeft: 12, flex: 1 }}>
-                    <Text
-                      style={{
-                        fontSize: 15,
-                        fontFamily: typography.family.sansBold,
-                        color: theme.ink,
-                        letterSpacing: -0.2,
-                      }}
-                    >
-                      {carrierName}
-                    </Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3 }}>
-                      <View
-                        style={{
-                          width: 6,
-                          height: 6,
-                          borderRadius: 3,
-                          backgroundColor: '#10B981',
-                          marginRight: 6,
-                        }}
-                      />
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          color: theme.mute,
-                          fontFamily: typography.family.sans,
-                        }}
-                      >
-                        Tracked Courier · {trackingNumber}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-
-                {/* Quick Tracking Action */}
-                <Pressable
-                  onPress={handleCopyTracking}
-                  hitSlop={HIT_SLOP_8}
-                  accessibilityRole="button"
-                  accessibilityLabel="Copy Tracking ID"
-                  style={({ pressed }) => ({
-                    paddingHorizontal: 12,
-                    height: 32,
-                    borderRadius: 16,
-                    backgroundColor: theme.surface,
-                    borderWidth: 1,
-                    borderColor: theme.border,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexDirection: 'row',
-                    gap: 6,
-                    opacity: pressed ? 0.75 : 1,
-                  })}
-                >
-                  <Feather name="copy" size={12} color={theme.ink} />
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      fontFamily: typography.family.sansMedium,
-                      color: theme.ink,
-                    }}
-                  >
-                    Copy
-                  </Text>
-                </Pressable>
-              </View>
-
-              {/* Message Buyer / Seller Row (Matching Image 1) */}
-              <Pressable
-                onPress={handleContactSeller}
-                accessibilityRole="button"
-                accessibilityLabel={isSeller ? 'Message Buyer' : 'Message Seller'}
-                style={({ pressed }) => [
-                  {
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    paddingHorizontal: 16,
-                    paddingVertical: 14,
-                    minHeight: 54,
-                    borderBottomWidth: StyleSheet.hairlineWidth,
-                    borderBottomColor: isDark ? 'rgba(255,255,255,0.08)' : theme.hairline,
-                  },
-                  pressed && { opacity: 0.75, backgroundColor: theme.surface },
-                ]}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 8 }}>
-                  <View
-                    style={{
-                      width: 38,
-                      height: 38,
-                      borderRadius: 19,
-                      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#F3F4F6',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Feather name="message-square" size={17} color={theme.ink} />
-                  </View>
-
-                  <Text
-                    style={{
-                      fontSize: 15,
-                      fontFamily: typography.family.sansBold,
-                      color: theme.ink,
-                      marginLeft: 12,
-                      letterSpacing: -0.2,
-                    }}
-                  >
-                    {isSeller ? 'Message Buyer' : 'Message Seller'}
-                  </Text>
-                </View>
-
-                <Feather name="chevron-right" size={18} color={theme.mute} />
-              </Pressable>
-
-              {/* Buyer Protection Fee Row (Matching Checkout Module 5) */}
-              <Pressable
-                onPress={() => {
-                  tap('light');
-                  setBpSheetOpen(true);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel="View Buyer Protection details"
-                style={({ pressed }) => [
-                  {
-                    paddingHorizontal: 16,
-                    paddingVertical: 14,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    minHeight: 56,
-                  },
-                  pressed && { opacity: 0.8, backgroundColor: theme.surface },
-                ]}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, paddingRight: 8 }}>
-                  <ShieldCheckIcon size={24} />
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Text
-                        style={{
-                          fontSize: 14.5,
-                          fontFamily: typography.family.sansBold,
-                          color: theme.ink,
-                        }}
-                      >
-                        {BRAND} Buyer Protection
-                      </Text>
-                      <Text
-                        style={{
-                          fontSize: 13,
-                          fontFamily: typography.family.sansBold,
-                          color: theme.purple,
-                        }}
-                      >
-                        {formatPrice(protectionFee)}
-                      </Text>
-                    </View>
-                    <Text
-                      style={{
-                        fontSize: 12,
-                        color: theme.mute,
-                        fontFamily: typography.family.sans,
-                        marginTop: 2,
-                        lineHeight: 16,
-                      }}
-                    >
-                      48-hour inspection period · Full refund if item differs or doesn&apos;t arrive
-                    </Text>
-                  </View>
-                </View>
-                <Feather name="chevron-right" size={16} color={theme.mute} />
-              </Pressable>
             </GroupCard>
 
             {/* ── Section: Delivery Details ── */}
@@ -1867,11 +1334,10 @@ export function OrderDetailsTrackingView({
               <KeyValueRow label="Receiver" value={recipient} />
               <KeyValueRow label="Address" value={streetAddress} />
               <KeyValueRow label="Contact" value={phone} />
-              <KeyValueRow label="Item" value={item} isLast={!note} />
+              <KeyValueRow label="Courier" value={carrierName} />
               {note ? (
                 <KeyValueRow
                   label="Note"
-                  isLast
                   rightElement={
                     <View
                       style={{
@@ -1904,162 +1370,27 @@ export function OrderDetailsTrackingView({
                   }
                 />
               ) : null}
-            </GroupCard>
-          </>
-        ) : (
-          /* ── Full Activity View with Exact Timestamps (Rule 1 & 3) ── */
-          <>
-            {/* Status Summary Banner */}
-            <GroupCard
-              style={{
-                padding: 16,
-                backgroundColor: isDark ? 'rgba(108, 71, 255, 0.12)' : '#F2F3FE',
-                borderColor: isDark ? 'rgba(108, 71, 255, 0.28)' : 'rgba(83, 86, 238, 0.22)',
-              }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Ionicons name="cube" size={18} color={theme.purple} />
-                  <Text style={{ fontSize: 14.5, fontFamily: typography.family.sansBold, color: theme.ink }}>
-                    {trackingNumber}
-                  </Text>
-                </View>
-                <View
-                  style={{
-                    height: 26,
-                    borderRadius: 13,
-                    backgroundColor: theme.purple,
-                    paddingHorizontal: 12,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Text style={{ fontSize: 11.5, fontFamily: typography.family.sansBold, color: '#FFFFFF' }}>
-                    {statusBadge}
-                  </Text>
-                </View>
-              </View>
-              <Text style={{ fontSize: 12.5, color: theme.mute, fontFamily: typography.family.sans, lineHeight: 17 }}>
-                Carrier: {carrierName} · Tracked Courier · Delivering to {streetAddress}
-              </Text>
-            </GroupCard>
 
-            {/* Chronological Activity Timeline */}
-            <SectionEyebrow title="Activity Timeline" icon="activity" badge={`${activityEvents.length} updates`} />
-            <GroupCard style={{ padding: 18 }}>
-              {activityEvents.map((evt, idx) => {
-                const isLast = idx === activityEvents.length - 1;
-                return (
-                  <View key={evt.id} style={{ flexDirection: 'row', minHeight: isLast ? 48 : 64 }}>
-                    {/* Timestamp Column */}
-                    <View style={{ width: 84, paddingRight: 6 }}>
-                      <Text
-                        style={[
-                          {
-                            fontSize: 13,
-                            fontFamily: typography.family.sansBold,
-                            color: theme.ink,
-                          },
-                          tabularNumberStyle,
-                        ]}
-                      >
-                        {evt.time}
-                      </Text>
-                      <Text
-                        style={[
-                          {
-                            fontSize: 11,
-                            color: theme.mute,
-                            fontFamily: typography.family.sans,
-                            marginTop: 1,
-                          },
-                          tabularNumberStyle,
-                        ]}
-                      >
-                        {evt.date}
-                      </Text>
-                    </View>
-
-                    {/* Stepper Node & Connector */}
-                    <View style={{ alignItems: 'center', width: 22 }}>
-                      <View
-                        style={{
-                          width: evt.isLatest ? 20 : 18,
-                          height: evt.isLatest ? 20 : 18,
-                          borderRadius: evt.isLatest ? 10 : 9,
-                          backgroundColor: theme.ink,
-                          borderWidth: evt.isLatest ? 2 : 0,
-                          borderColor: theme.purple,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          zIndex: 2,
-                        }}
-                      >
-                        <Feather name="check" size={10} color={theme.background} strokeWidth={3} />
-                      </View>
-                      {!isLast && (
-                        <View
-                          style={{
-                            flex: 1,
-                            width: 1,
-                            borderWidth: 1,
-                            borderStyle: 'dashed',
-                            borderColor: isDark ? 'rgba(255,255,255,0.2)' : theme.hairline,
-                            marginVertical: 4,
-                          }}
-                        />
-                      )}
-                    </View>
-
-                    {/* Event Description */}
-                    <View style={{ flex: 1, paddingLeft: 12, paddingBottom: isLast ? 0 : 16 }}>
-                      <Text
-                        style={{
-                          fontSize: 13.5,
-                          color: theme.ink,
-                          fontFamily: typography.family.sansBold,
-                          marginBottom: 2,
-                        }}
-                      >
-                        {evt.title}
-                      </Text>
-                      <Text
-                        style={{
-                          fontSize: 12.5,
-                          color: theme.mute,
-                          lineHeight: 17,
-                          fontFamily: typography.family.sansMedium,
-                        }}
-                      >
-                        {evt.description}
-                      </Text>
-                    </View>
-                  </View>
-                );
-              })}
-            </GroupCard>
-
-            {/* ── "How to ship" Section Under Shipment Activity (Rule 3) ── */}
-            <SectionEyebrow title="Shipping Guide" icon="help-circle" />
-            <GroupCard>
+              {/* Message Buyer / Seller Action (Integrated in Delivery Details) */}
               <Pressable
-                onPress={() => {
-                  tap('light');
-                  setHowToShipModalVisible(true);
-                }}
+                onPress={handleContactSeller}
                 accessibilityRole="button"
-                accessibilityLabel="How to ship step-by-step guide"
+                accessibilityLabel={isSeller ? 'Message Buyer' : 'Message Seller'}
                 style={({ pressed }) => [
                   {
-                    padding: 16,
                     flexDirection: 'row',
                     alignItems: 'center',
                     justifyContent: 'space-between',
+                    paddingHorizontal: 16,
+                    paddingVertical: 14,
+                    minHeight: 52,
+                    borderTopWidth: StyleSheet.hairlineWidth,
+                    borderTopColor: isDark ? 'rgba(255,255,255,0.08)' : theme.hairline,
                   },
-                  pressed && { opacity: 0.8, backgroundColor: theme.surface },
+                  pressed && { opacity: 0.75, backgroundColor: theme.surface },
                 ]}
               >
-                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 8 }}>
                   <View
                     style={{
                       width: 36,
@@ -2068,32 +1399,126 @@ export function OrderDetailsTrackingView({
                       backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#F3F4F6',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      marginRight: 12,
                     }}
                   >
-                    <Feather name="info" size={17} color={theme.ink} />
+                    <Feather name="message-square" size={16} color={theme.ink} />
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14.5, fontFamily: typography.family.sansBold, color: theme.ink }}>
-                      How to ship
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: 12.5,
-                        color: theme.mute,
-                        fontFamily: typography.family.sans,
-                        marginTop: 2,
-                      }}
-                    >
-                      Read our step-by-step guide
-                    </Text>
-                  </View>
+
+                  <Text
+                    style={{
+                      fontSize: 14.5,
+                      fontFamily: typography.family.sansBold,
+                      color: theme.ink,
+                      marginLeft: 12,
+                      letterSpacing: -0.2,
+                    }}
+                  >
+                    {isSeller ? 'Message Buyer' : 'Message Seller'}
+                  </Text>
                 </View>
-                <Feather name="chevron-right" size={16} color={theme.mute} />
+
+                <Feather name="chevron-right" size={18} color={theme.mute} />
               </Pressable>
             </GroupCard>
-          </>
-        )}
+
+            {/* ── Chronological Activity Timeline (Bottom of Fulfillment View) ── */}
+            {activityEvents.length > 0 ? (
+              <>
+                <SectionEyebrow title="Activity Timeline" icon="activity" badge={`${activityEvents.length} updates`} />
+                <GroupCard style={{ padding: 18 }}>
+                  {activityEvents.map((evt, idx) => {
+                    const isLast = idx === activityEvents.length - 1;
+                    return (
+                      <View key={evt.id} style={{ flexDirection: 'row', minHeight: isLast ? 48 : 64 }}>
+                        {/* Timestamp Column */}
+                        <View style={{ width: 84, paddingRight: 6 }}>
+                          <Text
+                            style={[
+                              {
+                                fontSize: 13,
+                                fontFamily: typography.family.sansBold,
+                                color: theme.ink,
+                              },
+                              tabularNumberStyle,
+                            ]}
+                          >
+                            {evt.time}
+                          </Text>
+                          <Text
+                            style={[
+                              {
+                                fontSize: 11,
+                                color: theme.mute,
+                                fontFamily: typography.family.sans,
+                                marginTop: 1,
+                              },
+                              tabularNumberStyle,
+                            ]}
+                          >
+                            {evt.date}
+                          </Text>
+                        </View>
+
+                        {/* Stepper Node & Connector */}
+                        <View style={{ alignItems: 'center', width: 22 }}>
+                          <View
+                            style={{
+                              width: evt.isLatest ? 20 : 18,
+                              height: evt.isLatest ? 20 : 18,
+                              borderRadius: evt.isLatest ? 10 : 9,
+                              backgroundColor: theme.ink,
+                              borderWidth: evt.isLatest ? 2 : 0,
+                              borderColor: theme.purple,
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              zIndex: 2,
+                            }}
+                          >
+                            <Feather name="check" size={10} color={theme.background} strokeWidth={3} />
+                          </View>
+                          {!isLast && (
+                            <View
+                              style={{
+                                flex: 1,
+                                width: 1,
+                                borderWidth: 1,
+                                borderStyle: 'dashed',
+                                borderColor: isDark ? 'rgba(255,255,255,0.2)' : theme.hairline,
+                                marginVertical: 4,
+                              }}
+                            />
+                          )}
+                        </View>
+
+                        {/* Event Description */}
+                        <View style={{ flex: 1, paddingLeft: 12, paddingBottom: isLast ? 0 : 16 }}>
+                          <Text
+                            style={{
+                              fontSize: 13.5,
+                              color: theme.ink,
+                              fontFamily: typography.family.sansBold,
+                              marginBottom: 2,
+                            }}
+                          >
+                            {evt.title}
+                          </Text>
+                          <Text
+                            style={{
+                              fontSize: 12.5,
+                              color: theme.mute,
+                              lineHeight: 17,
+                              fontFamily: typography.family.sansMedium,
+                            }}
+                          >
+                            {evt.description}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </GroupCard>
+              </>
+            ) : null}
 
         {/* ── Contextual Order Action Buttons (Invoice E2E & Flow Compliant) ── */}
         {actionButtons ? (
@@ -2103,61 +1528,7 @@ export function OrderDetailsTrackingView({
         ) : null}
       </ScrollView>
 
-      {/* ── Country of Origin Edit Modal (Image 4) ── */}
-      <Modal
-        visible={originModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setOriginModalVisible(false)}
-      >
-        <View style={{ flex: 1, backgroundColor: theme.overlay, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setOriginModalVisible(false)} />
-          <View
-            style={[
-              {
-                width: '100%',
-                maxWidth: 360,
-                backgroundColor: theme.panel,
-                borderRadius: 20,
-                padding: 20,
-                borderWidth: 1,
-                borderColor: theme.border,
-              },
-              shadow.lg,
-            ]}
-          >
-            <Text style={{ fontSize: 17, fontFamily: typography.family.sansBold, color: theme.ink, marginBottom: 12 }}>
-              Select Country of Origin
-            </Text>
-            {['United States', 'Pakistan', 'United Kingdom', 'Japan', 'Italy', 'Germany'].map((c) => (
-              <Pressable
-                key={c}
-                onPress={() => {
-                  tap('light');
-                  setCountryOfOrigin(c);
-                  setOriginModalVisible(false);
-                  toast.show(`Country of Origin set to: ${c}`, { variant: 'default', icon: 'check' });
-                }}
-                style={({ pressed }) => ({
-                  paddingVertical: 12,
-                  paddingHorizontal: 8,
-                  borderBottomWidth: StyleSheet.hairlineWidth,
-                  borderBottomColor: theme.border,
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  opacity: pressed ? 0.7 : 1,
-                })}
-              >
-                <Text style={{ fontSize: 14.5, fontFamily: countryOfOrigin === c ? typography.family.sansBold : typography.family.sansMedium, color: theme.ink }}>
-                  {c}
-                </Text>
-                {countryOfOrigin === c && <Feather name="check" size={16} color={theme.purple} />}
-              </Pressable>
-            ))}
-          </View>
-        </View>
-      </Modal>
+
 
       {/* ── Modal 1: "Ship your item" (Exact Replica of Image 2) ── */}
       <Modal
@@ -2491,36 +1862,7 @@ export function OrderDetailsTrackingView({
                 </View>
               )}
 
-              {/* "How to ship" card inside Image 2 modal */}
-              <Pressable
-                onPress={() => setHowToShipModalVisible(true)}
-                style={({ pressed }) => [
-                  {
-                    backgroundColor: isDark ? '#1C1C1E' : '#F3F4F6',
-                    borderRadius: 12,
-                    paddingHorizontal: 16,
-                    paddingVertical: 14,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: 16,
-                  },
-                  pressed && { opacity: 0.8 },
-                ]}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 8 }}>
-                  <Feather name="info" size={18} color={theme.ink} style={{ marginRight: 12 }} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14.5, fontFamily: typography.family.sansBold, color: theme.ink }}>
-                      How to ship
-                    </Text>
-                    <Text style={{ fontSize: 12, color: theme.mute, fontFamily: typography.family.sans, marginTop: 1 }}>
-                      Read our step-by-step guide
-                    </Text>
-                  </View>
-                </View>
-                <Feather name="chevron-right" size={16} color={theme.mute} />
-              </Pressable>
+
 
               {/* Download Label CTA Button */}
               <Pressable
@@ -2900,333 +2242,7 @@ export function OrderDetailsTrackingView({
         </View>
       </Modal>
 
-      {/* ── Modal 3: "How to ship - Step-by-Step Guide" ── */}
-      <Modal
-        visible={howToShipModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setHowToShipModalVisible(false)}
-      >
-        <View style={{ flex: 1, backgroundColor: theme.overlay, justifyContent: 'flex-end' }}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setHowToShipModalVisible(false)} />
-          <View
-            style={[
-              {
-                backgroundColor: theme.panel,
-                borderTopLeftRadius: 24,
-                borderTopRightRadius: 24,
-                borderWidth: 1,
-                borderColor: theme.border,
-                paddingHorizontal: 20,
-                paddingTop: 16,
-                paddingBottom: Math.max(insets.bottom, 20) + 12,
-                maxHeight: '88%',
-                maxWidth: CONTENT_MAX_WIDTH,
-                width: '100%',
-                alignSelf: 'center',
-              },
-              shadow.lg,
-            ]}
-          >
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingBottom: 12,
-                borderBottomWidth: StyleSheet.hairlineWidth,
-                borderBottomColor: theme.border,
-                marginBottom: 16,
-              }}
-            >
-              <View>
-                <Text style={{ fontSize: 17, fontFamily: typography.family.sansBold, color: theme.ink }}>
-                  How to ship
-                </Text>
-                <Text style={{ fontSize: 12, color: theme.mute, fontFamily: typography.family.sans, marginTop: 2 }}>
-                  Step-by-step seller packing &amp; dispatch guidelines
-                </Text>
-              </View>
 
-              <Pressable
-                onPress={() => setHowToShipModalVisible(false)}
-                hitSlop={HIT_SLOP_8}
-                style={({ pressed }) => ({
-                  width: 32,
-                  height: 32,
-                  borderRadius: 16,
-                  backgroundColor: theme.surface,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  opacity: pressed ? 0.75 : 1,
-                })}
-              >
-                <Feather name="x" size={16} color={theme.ink} />
-              </Pressable>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
-              {[
-                {
-                  step: '1',
-                  title: 'Secure Packaging',
-                  description:
-                    'Place item inside a sturdy box or tear-resistant mailer. Add bubble wrap or tissue cushioning so the item does not shift.',
-                  icon: 'package',
-                },
-                {
-                  step: '2',
-                  title: 'Label Placement',
-                  description:
-                    'Print your shipping label or prepare the QR code. Tape the printed label flat on top without covering the barcode or address.',
-                  icon: 'file-text',
-                },
-                {
-                  step: '3',
-                  title: 'Hand Over at Pickup',
-                  description:
-                    `Courier will arrive on your chosen pickup date (${pickupConfirmedDateStr || tomorrowFormatted}). Hand over the package and request a digital receipt.`,
-                  icon: 'truck',
-                },
-                {
-                  step: '4',
-                  title: 'Automatic Tracking & Escrow',
-                  description:
-                    'The tracking stepper will flip to Picked and then In Transit as soon as scanned. Payout is released after 48-hour delivery verification.',
-                  icon: 'shield',
-                },
-              ].map((item, index) => (
-                <View
-                  key={index}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'flex-start',
-                    marginBottom: 16,
-                    backgroundColor: theme.surface,
-                    borderRadius: 12,
-                    padding: 14,
-                    borderWidth: 1,
-                    borderColor: theme.border,
-                  }}
-                >
-                  <View
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 14,
-                      backgroundColor: theme.ink,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginRight: 12,
-                      marginTop: 2,
-                    }}
-                  >
-                    <Text style={{ fontSize: 13, fontFamily: typography.family.sansBold, color: theme.background }}>
-                      {item.step}
-                    </Text>
-                  </View>
-
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14.5, fontFamily: typography.family.sansBold, color: theme.ink, marginBottom: 3 }}>
-                      {item.title}
-                    </Text>
-                    <Text style={{ fontSize: 12.5, color: theme.mute, fontFamily: typography.family.sans, lineHeight: 17 }}>
-                      {item.description}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-
-              <Pressable
-                onPress={() => setHowToShipModalVisible(false)}
-                style={({ pressed }) => ({
-                  height: 48,
-                  borderRadius: radii.pill,
-                  backgroundColor: theme.ink,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginTop: 8,
-                  opacity: pressed ? 0.88 : 1,
-                })}
-              >
-                <Text style={{ fontSize: 14.5, fontFamily: typography.family.sansBold, color: theme.background }}>
-                  Got it
-                </Text>
-              </Pressable>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ── Buyer Protection Breakdown Sheet ── */}
-      <BuyerProtectionSheet
-        visible={bpSheetOpen}
-        onClose={() => setBpSheetOpen(false)}
-        itemPrice={listingPrice}
-      />
-
-      {/* ── Live Track Shipping Modal (Carrier Sheet) ── */}
-      <Modal
-        visible={trackingModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setTrackingModalVisible(false)}
-      >
-        <View style={{ flex: 1, backgroundColor: theme.overlay, justifyContent: 'flex-end' }}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setTrackingModalVisible(false)} />
-          <View
-            style={[
-              {
-                backgroundColor: theme.panel,
-                borderTopLeftRadius: 20,
-                borderTopRightRadius: 20,
-                borderWidth: 1,
-                borderColor: theme.border,
-                padding: 22,
-                maxHeight: '82%',
-                maxWidth: CONTENT_MAX_WIDTH,
-                width: '100%',
-                alignSelf: 'center',
-              },
-              shadow.lg,
-            ]}
-          >
-            <View
-              style={{
-                width: 36,
-                height: 4,
-                borderRadius: 2,
-                backgroundColor: theme.hairline,
-                alignSelf: 'center',
-                marginBottom: 18,
-              }}
-            />
-
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: 16,
-              }}
-            >
-              <View>
-                <Text
-                  style={{
-                    fontSize: 17,
-                    fontFamily: typography.family.sansBold,
-                    color: theme.ink,
-                    letterSpacing: -0.3,
-                  }}
-                >
-                  Live Shipment Tracking
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 12,
-                    color: theme.mute,
-                    marginTop: 2,
-                    fontFamily: typography.family.sans,
-                  }}
-                >
-                  Carrier: {BRAND} Managed Express Delivery
-                </Text>
-              </View>
-
-              <Pressable
-                onPress={() => setTrackingModalVisible(false)}
-                hitSlop={HIT_SLOP_8}
-                style={({ pressed }) => ({
-                  width: 32,
-                  height: 32,
-                  borderRadius: 16,
-                  backgroundColor: theme.surface,
-                  borderWidth: 1,
-                  borderColor: theme.border,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  opacity: pressed ? 0.7 : 1,
-                })}
-              >
-                <Feather name="x" size={16} color={theme.ink} />
-              </Pressable>
-            </View>
-
-            <View
-              style={{
-                backgroundColor: isDark ? 'rgba(108, 71, 255, 0.16)' : '#F2F3FE',
-                borderRadius: 14,
-                padding: 14,
-                marginBottom: 16,
-                borderWidth: 1,
-                borderColor: isDark ? 'rgba(108, 71, 255, 0.3)' : 'rgba(83, 86, 238, 0.22)',
-              }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Feather name="truck" size={16} color={theme.purple} />
-                <Text
-                  style={{
-                    fontSize: 14,
-                    fontFamily: typography.family.sansBold,
-                    color: theme.purple,
-                  }}
-                >
-                  On Schedule · {statusBadge}
-                </Text>
-              </View>
-              <Text
-                style={{
-                  fontSize: 12.5,
-                  color: isDark ? '#C7D2FE' : '#3730A3',
-                  marginTop: 4,
-                  fontFamily: typography.family.sans,
-                  lineHeight: 17,
-                }}
-              >
-                Estimated delivery to {streetAddress} by {formatDate(new Date(orderCreatedAt.getTime() + 86400000 * 3))}. Tracked via {carrierName}.
-              </Text>
-            </View>
-
-            <View
-              style={{
-                borderWidth: 1,
-                borderColor: theme.border,
-                borderRadius: 12,
-                overflow: 'hidden',
-                backgroundColor: theme.background,
-              }}
-            >
-              <KeyValueRow label="Waybill / Tracking No." value={trackingNumber} />
-              <KeyValueRow label="Package Status" value={statusBadge} />
-              <KeyValueRow label="Carrier" value={carrierName} isLast />
-            </View>
-
-            <Pressable
-              onPress={() => setTrackingModalVisible(false)}
-              style={({ pressed }) => ({
-                backgroundColor: theme.ink,
-                height: 48,
-                borderRadius: radii.pill,
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginTop: 20,
-                opacity: pressed ? 0.9 : 1,
-              })}
-            >
-              <Text
-                style={{
-                  fontSize: 14.5,
-                  fontFamily: typography.family.sansBold,
-                  color: theme.background,
-                  letterSpacing: -0.2,
-                }}
-              >
-                Done
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }

@@ -32,7 +32,6 @@ import {
   sanitizeBundleItemIds,
   computeCheckoutItemPrice,
 } from '@/lib/bundle';
-import { usePrompt } from '@/components/PromptDialog';
 import { AddressSheet, type AddressForm } from '@/components/settings/AddressSheet';
 import { BuyerProtectionSheet } from '@/components/product/BuyerProtectionSheet';
 import {
@@ -292,11 +291,6 @@ export default function PaymentScreen() {
   const [hasChosenMethod, setHasChosenMethod] = useState<boolean>(true);
   const [paymentOptionsOpen, setPaymentOptionsOpen] = useState(false);
 
-  // Discount & Gift Card state (Plick style)
-  const { prompt, element: promptElement } = usePrompt();
-  const [discountCode, setDiscountCode] = useState<string | null>(null);
-  const [discountAmount, setDiscountAmount] = useState<number>(0);
-
   // Buyer protection sheet
   const [bpSheetOpen, setBpSheetOpen] = useState(false);
 
@@ -454,10 +448,7 @@ export default function PaymentScreen() {
   const salesTax = 0;
   const totalAmount =
     Math.round((itemPrice + bpFee + deliveryFee + salesTax) * 100) / 100;
-  const finalTotal = Math.max(
-    0,
-    Math.round((totalAmount - discountAmount) * 100) / 100,
-  );
+  const finalTotal = Math.max(0, totalAmount);
 
   const handleSaveAddress = async (form: AddressForm) => {
     let validated: any;
@@ -591,48 +582,6 @@ export default function PaymentScreen() {
     if (selectedMethod === 'easypaisa') return walletNumber ? `Easypaisa (${walletNumber})` : 'Easypaisa';
     return 'Card';
   })();
-
-  const handleDiscountPress = async () => {
-    tap('light');
-    if (discountCode) {
-      setDiscountCode(null);
-      setDiscountAmount(0);
-      toast.show('Discount removed', { variant: 'default', icon: 'check' });
-      return;
-    }
-    const code = await prompt({
-      title: 'Add discount',
-      message: 'Enter your promo or discount code.',
-      placeholder: 'e.g. PLICK10',
-      submitLabel: 'Apply',
-    });
-    if (code) {
-      const trimmed = code.trim().toUpperCase();
-      const discount = Math.round(itemPrice * 0.1 * 100) / 100;
-      setDiscountCode(trimmed);
-      setDiscountAmount(discount);
-      toast.show(`Discount applied: -${formatPrice(discount)}`, {
-        variant: 'default',
-        icon: 'check',
-      });
-    }
-  };
-
-  const handleGiftCardPress = async () => {
-    tap('light');
-    const code = await prompt({
-      title: 'Add gift card',
-      message: 'Enter your 16-digit gift card number.',
-      placeholder: 'XXXX-XXXX-XXXX-XXXX',
-      submitLabel: 'Apply',
-    });
-    if (code) {
-      toast.show('Gift card code saved', {
-        variant: 'default',
-        icon: 'check',
-      });
-    }
-  };
 
   const handlePay = async () => {
     if (paying) return;
@@ -1231,74 +1180,6 @@ export default function PaymentScreen() {
                   {deliveryFee > 0 ? formatPrice(deliveryFee) : 'Free'}
                 </Text>
               </View>
-
-              {/* Delivery Note Presets */}
-              <View
-                style={{
-                  marginTop: 10,
-                  paddingTop: 10,
-                  borderTopWidth: StyleSheet.hairlineWidth,
-                  borderTopColor: theme.border,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 12.5,
-                    fontFamily: typography.family.sans,
-                    color: theme.mute,
-                  }}
-                >
-                  Delivery note
-                </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  {['Fragile', 'Leave at door'].map((preset) => {
-                    const isSelected = deliveryNotes === preset;
-                    return (
-                      <Pressable
-                        key={preset}
-                        onPress={() => {
-                          tap('light');
-                          setDeliveryNotes(isSelected ? '' : preset);
-                        }}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: isSelected }}
-                        style={({ pressed }) => ({
-                          height: 28,
-                          paddingHorizontal: 10,
-                          borderRadius: 14,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          backgroundColor: isSelected
-                            ? isDark
-                              ? 'rgba(239, 68, 68, 0.16)'
-                              : '#FEF2F2'
-                            : theme.surface,
-                          borderWidth: 1,
-                          borderColor: isSelected
-                            ? isDark
-                              ? 'rgba(239, 68, 68, 0.3)'
-                              : '#FECACA'
-                            : theme.border,
-                          opacity: pressed ? 0.8 : 1,
-                        })}
-                      >
-                        <Text
-                          style={{
-                            fontSize: 11.5,
-                            fontFamily: typography.family.sansBold,
-                            color: isSelected ? theme.danger : theme.mute,
-                          }}
-                        >
-                          {preset === 'Fragile' ? '⚠️ Fragile' : preset}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </View>
             </View>
           ) : (
             <Pressable
@@ -1491,39 +1372,6 @@ export default function PaymentScreen() {
             </View>
           )}
 
-          {/* Promo / Discount Code row (if applicable) */}
-          {discountAmount > 0 && (
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 14.5,
-                  fontFamily: typography.family.sansMedium,
-                  color: theme.purple,
-                }}
-              >
-                Discount {discountCode ? `(${discountCode})` : ''}
-              </Text>
-              <Text
-                style={[
-                  {
-                    fontSize: 14.5,
-                    fontFamily: typography.family.sansBold,
-                    color: theme.purple,
-                  },
-                  tabularNumberStyle,
-                ]}
-              >
-                − {formatPrice(discountAmount)}
-              </Text>
-            </View>
-          )}
-
           {/* Row 3: Total */}
           <View
             style={{
@@ -1559,69 +1407,6 @@ export default function PaymentScreen() {
           </View>
         </GroupCard>
 
-        {/* Add discount link: Right-aligned under Order Summary */}
-        <Pressable
-          onPress={handleDiscountPress}
-          hitSlop={HIT_SLOP_8}
-          accessibilityRole="button"
-          accessibilityLabel="Add discount code"
-          style={({ pressed }) => [
-            {
-              alignSelf: 'flex-end',
-              marginTop: 6,
-              marginBottom: 16,
-              paddingVertical: 4,
-            },
-            pressed && { opacity: 0.7 },
-          ]}
-        >
-          <Text
-            style={{
-              fontSize: 13.5,
-              fontFamily: typography.family.sansBold,
-              color: theme.ink,
-              textDecorationLine: 'underline',
-            }}
-          >
-            {discountCode ? `Discount: ${discountCode} (Remove)` : 'Add discount'}
-          </Text>
-        </Pressable>
-
-        {/* ── Add gift card card (Plick Section) ── */}
-        <Pressable
-          onPress={handleGiftCardPress}
-          accessibilityRole="button"
-          accessibilityLabel="Add gift card"
-          style={({ pressed }) => [
-            {
-              backgroundColor: theme.panel,
-              borderRadius: 14,
-              overflow: 'hidden',
-              borderWidth: 1,
-              borderColor: isDark ? '#262626' : 'rgba(0,0,0,0.08)',
-              paddingHorizontal: 16,
-              paddingVertical: 18,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: 12,
-            },
-            pressed && { opacity: 0.75 },
-          ]}
-        >
-          <Text
-            style={{
-              fontSize: 14.5,
-              fontFamily: typography.family.sansBold,
-              color: theme.ink,
-              letterSpacing: -0.1,
-            }}
-          >
-            Add gift card
-          </Text>
-          <Feather name="chevron-right" size={18} color={theme.ink} />
-        </Pressable>
-
         {/* ── Payment Method card (Plick Section) ── */}
         <Pressable
           onPress={() => {
@@ -1639,7 +1424,7 @@ export default function PaymentScreen() {
               borderColor: isDark ? '#262626' : 'rgba(0,0,0,0.08)',
               paddingHorizontal: 16,
               paddingVertical: 16,
-              marginBottom: 24,
+              marginBottom: 20,
             },
             pressed && { opacity: 0.75 },
           ]}
@@ -1674,18 +1459,6 @@ export default function PaymentScreen() {
             </View>
             <Feather name="chevron-right" size={18} color={theme.ink} />
           </View>
-          <Text
-            style={{
-              fontSize: 12.5,
-              color: theme.mute,
-              fontFamily: typography.family.sans,
-              marginTop: 6,
-            }}
-          >
-            {hasChosenMethod
-              ? `You have selected ${selectedMethodTitle}. Want to change?`
-              : 'Select your payment method.'}
-          </Text>
         </Pressable>
 
         {/* ── Primary Action: Pay Button (Plick Standard) ── */}
@@ -1817,9 +1590,6 @@ export default function PaymentScreen() {
         itemPrice={itemPrice}
         onClose={() => setBpSheetOpen(false)}
       />
-
-      {/* Cross-platform Prompt Dialog (Discounts / Gift Cards) */}
-      {promptElement}
     </SafeAreaView>
   );
 }

@@ -47,11 +47,13 @@ export default function InvoiceScreen() {
     paid,
     placed,
     method,
+    role,
     listing_id: listingIdParam,
     title: titleParam,
     amount: amountParam,
   } = useLocalSearchParams<{
     id: string;
+    role?: string;
     paid?: string;
     placed?: string;
     method?: string;
@@ -245,7 +247,7 @@ export default function InvoiceScreen() {
     if (id === 'demo' || id === 'PAQ-327-P21' || !id) {
       return (
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top']}>
-          <OrderDetailsTrackingView onBack={() => safeBack()} />
+          <OrderDetailsTrackingView onBack={() => safeBack()} isSeller={role === 'seller'} />
         </SafeAreaView>
       );
     }
@@ -306,7 +308,7 @@ export default function InvoiceScreen() {
 
   const { total } = deriveInvoiceAmounts(order, listing?.price, buyerProtectionFee);
   const seller = listing?.seller ?? (order as any)?.seller ?? null;
-  const isSeller = Boolean(user?.id && (user.id === listing?.seller_id || user.id === seller?.id || user.id === order?.seller_id));
+  const isSeller = role ? role === 'seller' : Boolean(user?.id && (user.id === listing?.seller_id || user.id === seller?.id || user.id === order?.seller_id));
   const isBuyer = Boolean(user?.id && (order?.buyer_id ? user.id === order.buyer_id : !isSeller));
   const invoiceNumber = deriveInvoiceNumber(order?.id || listing?.id || String(id));
 
