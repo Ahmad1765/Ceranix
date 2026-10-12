@@ -31,28 +31,19 @@ export function dateAndTime(iso: string): string {
   return `${day} ${timeOfDay(iso)}`;
 }
 
-/** The stamp printed under a bubble group. */
+/** The stamp printed under a bubble group: e.g. "20:55" or "16:14" */
 export function bubbleStamp(iso: string): string {
-  return isSameDay(iso, new Date().toISOString()) ? timeOfDay(iso) : dateAndTime(iso);
+  return timeOfDay(iso);
 }
 
-/** "Today" / "Yesterday" / "11 Jul" / "11 Jul 2025" — the in-thread divider. */
+/** "Feb 23 2025" / "Dec 10 2025" / "May 27 2026" — the in-thread divider. */
 export function dayLabel(iso: string): string {
   const d = new Date(iso);
-  const today = startOfDay(new Date());
-  const day = startOfDay(d);
-  if (day === today) return 'Today';
-  // startOfDay of "24h ago", not "midnight minus 24h" — on a DST changeover the
-  // latter lands at 23:00 or 01:00 of the previous day and never matches, so
-  // "Yesterday" silently degraded to a bare date twice a year.
-  if (day === startOfDay(new Date(today - DAY_MS))) return 'Yesterday';
-  const sameYear = d.getFullYear() === new Date().getFullYear();
-  return d.toLocaleDateString(
-    [],
-    sameYear
-      ? { day: 'numeric', month: 'short' }
-      : { day: 'numeric', month: 'short', year: 'numeric' },
-  );
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const month = months[d.getMonth()] || 'Jan';
+  const day = d.getDate();
+  const year = d.getFullYear();
+  return `${month} ${day} ${year}`;
 }
 
 /** "19 days ago" — the inbox stamp. Coarse on purpose: an inbox row answers

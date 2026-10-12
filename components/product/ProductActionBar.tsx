@@ -11,7 +11,7 @@ import * as Haptics from 'expo-haptics';
 import { Text } from '@/lib/rnText';
 import { formatPrice } from '@/lib/currency';
 import { useTheme } from '@/context/ThemeContext';
-import { tabularNumberStyle } from '@/lib/theme';
+import { radii, tabularNumberStyle } from '@/lib/theme';
 
 export interface ProductActionBarProps {
   price?: number;
@@ -24,10 +24,15 @@ export interface ProductActionBarProps {
   onBuyPress?: () => void;
   onChatPress?: () => void;
   onViewOrderPress?: () => void;
+  onCompleteCheckoutPress?: () => void;
   isOwner?: boolean;
   isSold?: boolean;
   hasPurchased?: boolean;
+  isAwaitingPayment?: boolean;
+  awaitingAmount?: number;
   disabled?: boolean;
+  isBundle?: boolean;
+  bundleCount?: number;
   className?: string;
   style?: ViewStyle;
 }
@@ -43,10 +48,15 @@ export function ProductActionBar({
   onBuyPress,
   onChatPress,
   onViewOrderPress,
+  onCompleteCheckoutPress,
   isOwner = false,
   isSold = false,
   hasPurchased = false,
+  isAwaitingPayment = false,
+  awaitingAmount,
   disabled = false,
+  isBundle = false,
+  bundleCount,
   className = '',
   style,
 }: ProductActionBarProps) {
@@ -66,12 +76,61 @@ export function ProductActionBar({
     if (allowed === false) return;
   };
 
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
   const handleBuy = () => {
+    if (disabled || isSubmitting) return;
+    setIsSubmitting(true);
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     }
     onBuyPress?.();
   };
+
+  if (isAwaitingPayment) {
+    return (
+      <View
+        className={className}
+        style={[
+          styles.container,
+          {
+            backgroundColor: theme.surface,
+            borderTopColor: theme.border,
+            paddingBottom: Math.max(safeBottom, 16),
+          },
+          style,
+        ]}
+      >
+        <View style={styles.actionRow}>
+          <View style={{ flex: 1, marginRight: 10, justifyContent: 'center' }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: theme.primary, fontFamily: 'Inter_700Bold' }}>
+              Offer accepted!
+            </Text>
+            <Text style={{ fontSize: 11.5, color: theme.mute, fontFamily: 'Inter_500Medium' }}>
+              Complete checkout to lock order
+            </Text>
+          </View>
+          <Pressable
+            onPress={onCompleteCheckoutPress}
+            style={({ pressed }) => [
+              styles.buyButton,
+              {
+                backgroundColor: theme.ink,
+                paddingHorizontal: 18,
+                height: 48,
+                borderRadius: 10,
+                opacity: pressed ? 0.85 : 1,
+              },
+            ]}
+          >
+            <Text style={[styles.buyButtonText, { color: theme.background, fontFamily: 'Inter_700Bold' }]}>
+              {awaitingAmount ? `Pay ${formatPrice(awaitingAmount)}` : 'Pay now'}
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
 
   if (hasPurchased) {
     return (
@@ -115,6 +174,54 @@ export function ProductActionBar({
     );
   }
 
+  if (isOwner && isSold) {
+    return (
+      <View
+        className={className}
+        style={[
+          styles.container,
+          {
+            backgroundColor: theme.surface,
+            borderTopColor: theme.border,
+            paddingBottom: Math.max(safeBottom, 16),
+          },
+          style,
+        ]}
+      >
+        <View style={styles.actionRow}>
+          <View style={{ flex: 1, marginRight: 10, justifyContent: 'center' }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: theme.primary, fontFamily: 'Inter_700Bold' }}>
+              Item Sold!
+            </Text>
+            <Text style={{ fontSize: 11.5, color: theme.mute, fontFamily: 'Inter_500Medium' }}>
+              View order and manage fulfillment
+            </Text>
+          </View>
+          <Pressable
+            onPress={onViewOrderPress}
+            accessibilityRole="button"
+            accessibilityLabel="View sold order"
+            accessibilityHint="Opens the order details and fulfillment dashboard"
+            style={({ pressed }) => [
+              styles.buyButton,
+              {
+                backgroundColor: theme.ink,
+                paddingHorizontal: 18,
+                height: 48,
+                borderRadius: 10,
+                opacity: pressed ? 0.85 : 1,
+              },
+            ]}
+          >
+            <Text style={[styles.buyButtonText, { color: theme.background, fontFamily: 'Inter_700Bold' }]}>
+              View Order
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
   if (isSold) {
     return (
       <View
@@ -149,9 +256,12 @@ export function ProductActionBar({
         style,
       ]}
     >
+      {/* PROTECTED INVARIANT (Rule 2.9): Offer & Buy buttons must strictly remain 10px radius (borderRadius: 10)
+          and monochrome palette (Paper White / Solid Ink). Never style Buy now purple or convert to pill radius. */}
       <View style={styles.actionRow}>
         {!isOwner && (
           <Pressable
+            testID="make-offer-button"
             onPress={handleOffer}
             disabled={disabled}
             accessibilityRole="button"
@@ -172,8 +282,11 @@ export function ProductActionBar({
         )}
 
         <Pressable
+          testID="buy-now-button"
           onPress={handleBuy}
-          disabled={disabled}
+          disabled={disabled || isSubmitting}
+          aria-disabled={disabled || isSubmitting}
+          accessibilityState={{ disabled: disabled || isSubmitting }}
           accessibilityRole="button"
           accessibilityLabel={
             isOwner
@@ -186,7 +299,7 @@ export function ProductActionBar({
             {
               backgroundColor: theme.ink,
               borderColor: theme.ink,
-              opacity: pressed ? 0.88 : 1,
+              opacity: disabled || isSubmitting ? 0.6 : pressed ? 0.88 : 1,
               transform: [{ scale: pressed ? 0.98 : 1 }],
             },
           ]}
@@ -264,7 +377,7 @@ const styles = StyleSheet.create({
   },
   soldContainer: {
     height: 48,
-    borderRadius: 10,
+    borderRadius: radii.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },

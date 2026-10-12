@@ -77,6 +77,36 @@ Deno.serve(async (req: Request) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
+    // Abuse control: Enforce per-user sliding window limit (max 3 toggles per 24 hours)
+    const { error: rlErr } = await admin.rpc('enforce_user_rate_limit', {
+      p_user_id: user.id,
+      p_action: 'seller_subscription_toggle',
+      p_limit: 3,
+      p_window: '24 hours',
+    });
+    if (rlErr) {
+      return json(
+        { error: 'You can only change your seller program status up to 3 times per 24 hours. Please try again later.' },
+        429
+      );
+    }
+
+    // Verify caller profile exists and is active
+    const { data: profile, error: profErr } = await admin
+      .from('profiles')
+      .select('id, is_pro, username')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profErr || !profile) {
+      return json({ error: 'Profile not found' }, 404);
+    }
+
+    // No-op if status is unchanged
+    if (profile.is_pro === body.is_pro) {
+      return json({ success: true, profile, unchanged: true });
+    }
+
     const { data, error } = await admin.rpc('update_seller_subscription', {
       p_user_id: user.id,
       p_is_pro: body.is_pro,

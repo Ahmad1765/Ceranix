@@ -25,7 +25,7 @@ export function useSheetSearchFocus(ref: RefObject<TextInput | null>) {
   useEffect(() => {
     let cancelled = false;
     const focus = () => {
-      if (cancelled) return;
+      if (cancelled || !ref.current) return;
       if (Platform.OS === 'web') {
         if (typeof window !== 'undefined') {
           window.scrollTo(0, 0);
@@ -49,20 +49,26 @@ export function useSheetSearchFocus(ref: RefObject<TextInput | null>) {
       }
     };
 
-    // Web takes focus the instant the field exists, rather than waiting for a
-    // trigger below. On mobile web the keyboard is already up — DiscoverSheet's
-    // <KeyboardPrimer> claimed it during the tap — and it only STAYS up if
-    // focus moves straight to another text input. Waiting ~450ms here would let
-    // the browser decide the primer's blur meant "done typing" and drop it.
-    if (Platform.OS === 'web') focus();
+    // Immediate attempt
+    focus();
+
+    // Staggered retries to catch window transitions across devices & native modal animations
+    const t1 = setTimeout(focus, 50);
+    const t2 = setTimeout(focus, 150);
+    const t3 = setTimeout(focus, 300);
+    const t4 = setTimeout(focus, BACKSTOP_MS);
+    const t5 = setTimeout(focus, 650);
 
     const task = InteractionManager.runAfterInteractions(focus);
-    const backstop = setTimeout(focus, BACKSTOP_MS);
 
     return () => {
       cancelled = true;
       task.cancel();
-      clearTimeout(backstop);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      clearTimeout(t4);
+      clearTimeout(t5);
     };
   }, [ref]);
 }

@@ -82,7 +82,7 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
         link: true,
         onPress: () => {
           tap('selection');
-          router.push(`/?q=${encodeURIComponent(brandVal)}` as any);
+          router.push(`/?searchOpen=1&searchQuery=${encodeURIComponent(brandVal)}` as any);
         },
         trailing: <Feather name="chevron-right" size={18} color={theme.mute} />,
       });
@@ -229,7 +229,7 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
               <Pressable
                 onPress={() => {
                   tap('selection');
-                  router.push(`/?category=${encodeURIComponent(listing.category)}` as any);
+                  router.push(`/?searchOpen=1&searchCategory=${encodeURIComponent(listing.category)}` as any);
                 }}
                 style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
               >
@@ -249,7 +249,7 @@ export const ProductDetailsTable = memo(function ProductDetailsTable({
                     onPress={() => {
                       tap('selection');
                       router.push(
-                        `/?category=${encodeURIComponent(listing.category)}&sub=${encodeURIComponent(listing.subcategory!)}` as any,
+                        `/?searchOpen=1&searchCategory=${encodeURIComponent(listing.category)}&searchQuery=${encodeURIComponent(listing.subcategory!)}` as any,
                       );
                     }}
                     style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}

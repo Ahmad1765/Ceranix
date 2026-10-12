@@ -147,8 +147,9 @@ export const TAXONOMY_CATEGORIES: TaxonomyCategory[] = [
 
 // Special cross-cutting tag (from sheet: Implementation Notes #5)
 export const UNBRANDED_LOCAL_TAILOR = 'Unbranded / Local Tailor';
+export const NO_BRAND = 'No brand';
 
-// ── Complete Seed Brand List (from sheet: Brands) ─────────────────────────
+// ── Complete Seed Brand List (from sheet: Brands & Global Marketplace) ─────
 export const TAXONOMY_BRANDS: TaxonomyBrand[] = [
   // Premium / Luxury
   { name: 'Gucci', tier: 'Premium / Luxury', categoryRelevance: 'Bags, Footwear, Eyewear, Clothing', categoryCodes: ['CAT-01', 'CAT-02', 'CAT-04', 'CAT-05'] },
@@ -163,16 +164,45 @@ export const TAXONOMY_BRANDS: TaxonomyBrand[] = [
   { name: 'Tom Ford', tier: 'Premium / Luxury', categoryRelevance: 'Eyewear', categoryCodes: ['CAT-05'] },
   { name: 'Burberry', tier: 'Premium / Luxury', categoryRelevance: 'Clothing, Eyewear, Accessories', categoryCodes: ['CAT-01', 'CAT-02', 'CAT-05'] },
   { name: 'Rolex', tier: 'Premium / Luxury', categoryRelevance: 'Watches', categoryCodes: ['CAT-06'] },
+  { name: 'Ralph Lauren', tier: 'Premium / Luxury', categoryRelevance: "Men's & Women's Clothing, Accessories", categoryCodes: ['CAT-01', 'CAT-02', 'CAT-03', 'CAT-05'] },
 
-  // Moderate / Mass
+  // Moderate / Mass / High-Street Fashion (Vinted Core Brands)
   { name: "Levi's", tier: 'Moderate / Mass', categoryRelevance: "Men's & Women's Clothing", categoryCodes: ['CAT-01', 'CAT-02'] },
   { name: 'Zara', tier: 'Moderate / Mass', categoryRelevance: "Men's & Women's Clothing", categoryCodes: ['CAT-01', 'CAT-02'] },
   { name: 'H&M', tier: 'Moderate / Mass', categoryRelevance: "Men's & Women's Clothing", categoryCodes: ['CAT-01', 'CAT-02'] },
+  { name: 'The North Face', tier: 'Moderate / Mass', categoryRelevance: 'Outerwear, Footwear, Bags, Activewear', categoryCodes: ['CAT-01', 'CAT-02', 'CAT-04', 'CAT-05'] },
+  { name: 'French Connection', tier: 'Moderate / Mass', categoryRelevance: "Men's & Women's Clothing, Accessories", categoryCodes: ['CAT-01', 'CAT-02'] },
+  { name: 'FatFace', tier: 'Moderate / Mass', categoryRelevance: "Men's & Women's Clothing", categoryCodes: ['CAT-01', 'CAT-02'] },
+  { name: 'FCUK', tier: 'Moderate / Mass', categoryRelevance: "Men's & Women's Clothing", categoryCodes: ['CAT-01', 'CAT-02'] },
+  { name: 'Card Factory', tier: 'Moderate / Mass', categoryRelevance: 'Accessories & Gifts', categoryCodes: ['CAT-05'] },
+  { name: 'Liverpool Football Club', tier: 'Moderate / Mass', categoryRelevance: "Sportswear, Men's Clothing", categoryCodes: ['CAT-01', 'CAT-02', 'CAT-03'] },
+  { name: 'FC Barcelona', tier: 'Moderate / Mass', categoryRelevance: "Sportswear, Men's Clothing", categoryCodes: ['CAT-01', 'CAT-02', 'CAT-03'] },
+  { name: 'Face', tier: 'Moderate / Mass', categoryRelevance: "Clothing & Beauty", categoryCodes: ['CAT-01', 'CAT-07'] },
+  { name: "Angel's Face", tier: 'Kids & Girls', categoryRelevance: "Girls' Clothing & Accessories", categoryCodes: ['CAT-01', 'CAT-03'] },
+  { name: 'Max Factor', tier: 'Moderate / Mass', categoryRelevance: 'Beauty, Makeup, Cosmetics', categoryCodes: ['CAT-07'] },
+  { name: 'Marco Tozzi', tier: 'Footwear', categoryRelevance: 'Footwear & Bags', categoryCodes: ['CAT-04', 'CAT-05'] },
+  { name: 'Anna Field', tier: 'Moderate / Mass', categoryRelevance: "Women's Clothing, Shoes, Bags", categoryCodes: ['CAT-01', 'CAT-04', 'CAT-05'] },
+  { name: 'Pull & Bear', tier: 'Moderate / Mass', categoryRelevance: "Men's & Women's Clothing, Shoes", categoryCodes: ['CAT-01', 'CAT-02', 'CAT-04'] },
+  { name: 'Gémo', tier: 'Moderate / Mass', categoryRelevance: "Clothing & Shoes", categoryCodes: ['CAT-01', 'CAT-02', 'CAT-03', 'CAT-04'] },
+  { name: 'Rylko', tier: 'Footwear', categoryRelevance: 'Footwear & Bags', categoryCodes: ['CAT-04', 'CAT-05'] },
+  { name: 'Sebago', tier: 'Footwear', categoryRelevance: 'Footwear & Casualwear', categoryCodes: ['CAT-04'] },
+  { name: 'TU', tier: 'Moderate / Mass', categoryRelevance: "Men's, Women's & Kids Clothing", categoryCodes: ['CAT-01', 'CAT-02', 'CAT-03', 'CAT-04'] },
   { name: 'Nike', tier: 'Moderate / Mass', categoryRelevance: 'Footwear, Activewear', categoryCodes: ['CAT-01', 'CAT-02', 'CAT-04'] },
   { name: 'Adidas', tier: 'Moderate / Mass', categoryRelevance: 'Footwear, Activewear', categoryCodes: ['CAT-01', 'CAT-02', 'CAT-04'] },
   { name: 'Puma', tier: 'Moderate / Mass', categoryRelevance: 'Footwear, Activewear', categoryCodes: ['CAT-01', 'CAT-02', 'CAT-04'] },
   { name: 'Bershka', tier: 'Moderate / Mass', categoryRelevance: "Women's Clothing", categoryCodes: ['CAT-01'] },
   { name: 'Mango', tier: 'Moderate / Mass', categoryRelevance: "Women's Clothing", categoryCodes: ['CAT-01'] },
+  { name: 'Stradivarius', tier: 'Moderate / Mass', categoryRelevance: "Women's Clothing, Shoes, Accessories", categoryCodes: ['CAT-01', 'CAT-04', 'CAT-05'] },
+  { name: 'ASOS', tier: 'Moderate / Mass', categoryRelevance: "Men's & Women's Clothing", categoryCodes: ['CAT-01', 'CAT-02'] },
+  { name: 'Topshop', tier: 'Moderate / Mass', categoryRelevance: "Women's Clothing", categoryCodes: ['CAT-01'] },
+  { name: 'New Look', tier: 'Moderate / Mass', categoryRelevance: "Women's Clothing & Footwear", categoryCodes: ['CAT-01', 'CAT-04'] },
+  { name: 'River Island', tier: 'Moderate / Mass', categoryRelevance: "Men's & Women's Clothing", categoryCodes: ['CAT-01', 'CAT-02'] },
+  { name: 'Primark', tier: 'Moderate / Mass', categoryRelevance: "Men's, Women's & Kids Clothing", categoryCodes: ['CAT-01', 'CAT-02', 'CAT-03'] },
+  { name: 'Urban Outfitters', tier: 'Moderate / Mass', categoryRelevance: "Men's & Women's Clothing", categoryCodes: ['CAT-01', 'CAT-02'] },
+  { name: 'Brandy Melville', tier: 'Moderate / Mass', categoryRelevance: "Women's Clothing", categoryCodes: ['CAT-01'] },
+  { name: 'Tommy Hilfiger', tier: 'Moderate / Mass', categoryRelevance: "Men's & Women's Clothing, Bags", categoryCodes: ['CAT-01', 'CAT-02', 'CAT-05'] },
+  { name: 'Calvin Klein', tier: 'Moderate / Mass', categoryRelevance: "Men's & Women's Clothing, Bags", categoryCodes: ['CAT-01', 'CAT-02', 'CAT-05'] },
+  { name: 'Gap', tier: 'Moderate / Mass', categoryRelevance: "Men's, Women's & Kids Clothing", categoryCodes: ['CAT-01', 'CAT-02', 'CAT-03'] },
   { name: 'Uniqlo', tier: 'Moderate / Mass', categoryRelevance: "Men's & Women's Clothing", categoryCodes: ['CAT-01', 'CAT-02'] },
   { name: 'Cotton On', tier: 'Moderate / Mass', categoryRelevance: "Men's & Women's Clothing", categoryCodes: ['CAT-01', 'CAT-02'] },
   { name: "Victoria's Secret", tier: 'Moderate / Mass', categoryRelevance: "Women's Clothing", categoryCodes: ['CAT-01'] },
@@ -664,15 +694,15 @@ export function smartClassify(
   if (isShalwarKameez || isLawnUnstitched || isBridalFormal) {
     suggestedBrands = EASTERN_WEAR_PREFERRED_BRANDS;
   } else if (isFootwear) {
-    suggestedBrands = ['Nike', 'Adidas', 'Puma', 'Borjan', 'Servis', 'Bata', 'Stoneage', 'Jordans', UNBRANDED_LOCAL_TAILOR];
+    suggestedBrands = ['Nike', 'Adidas', 'Puma', 'Borjan', 'Servis', 'Bata', 'Stoneage', 'Jordans', NO_BRAND];
   } else if (isEyewear) {
     suggestedBrands = ['Ray-Ban', 'Oakley', 'DITA', 'Persol', 'Police', 'Tom Ford', 'Gucci'];
   } else if (isBags) {
-    suggestedBrands = ['Gucci', 'Louis Vuitton', 'Coach', 'Michael Kors', 'Chanel', 'Prada', 'Fossil', UNBRANDED_LOCAL_TAILOR];
+    suggestedBrands = ['Gucci', 'Louis Vuitton', 'Coach', 'Michael Kors', 'Chanel', 'Prada', 'Fossil', NO_BRAND];
   } else if (isWatchesJewelry) {
-    suggestedBrands = ['Rolex', 'Cartier', 'Fossil', 'Michael Kors', UNBRANDED_LOCAL_TAILOR];
+    suggestedBrands = ['Rolex', 'Cartier', 'Fossil', 'Michael Kors', NO_BRAND];
   } else if (detectedBrand) {
-    suggestedBrands = [detectedBrand, UNBRANDED_LOCAL_TAILOR];
+    suggestedBrands = [detectedBrand, NO_BRAND];
   }
 
   return {
@@ -890,7 +920,11 @@ export function checkBrandCategoryCompatibility(
   brandName: string | null | undefined,
   subcategoryId?: string | null,
 ): { compatible: boolean; advisory?: string } {
-  if (!brandName || brandName === UNBRANDED_LOCAL_TAILOR) {
+  if (
+    !brandName ||
+    brandName.toLowerCase() === 'no brand' ||
+    brandName === UNBRANDED_LOCAL_TAILOR
+  ) {
     return { compatible: true };
   }
 
@@ -903,7 +937,7 @@ export function checkBrandCategoryCompatibility(
     if (!isEyewearSub && subcategoryId) {
       return {
         compatible: false,
-        advisory: `${brand.name} typically makes Eyewear (Sunglasses & Frames). Keep ${brand.name} or switch to Unbranded / Local Tailor?`,
+        advisory: `${brand.name} typically makes Eyewear (Sunglasses & Frames). Keep ${brand.name} or switch to No brand?`,
       };
     }
   }

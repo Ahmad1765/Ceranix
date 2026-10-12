@@ -1,10 +1,22 @@
-export { SectionCard, Row, ToggleRow, Divider } from './SettingsRow';
+export {
+  SectionCard,
+  Row,
+  ToggleRow,
+  Divider,
+  ChatGPTRow,
+  ChatGPTButton,
+  ChatGPTSwitchRow,
+  ChatGPTTabItem,
+  ChatGPTGroup,
+  ChatGPTItem,
+} from './SettingsRow';
 export { SettingsHero } from './SettingsHero';
 export { BundleDiscountSheet } from './BundleDiscountSheet';
 export { AddressSheet, type AddressForm } from './AddressSheet';
 export { PayoutSheet, type PayoutForm } from './PayoutSheet';
 export { VerificationSheet, type VerifyForm } from './VerificationSheet';
 export { ThemeSheet } from './ThemeSheet';
+export { PhoneSheet } from './PhoneSheet';
 export { SubscriptionSheet } from './SubscriptionSheet';
 export {
   useSettingsManager,

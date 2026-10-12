@@ -1,15 +1,28 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, FlatList, Pressable, RefreshControl, Animated, Platform, useWindowDimensions, NativeSyntheticEvent, NativeScrollEvent, LayoutChangeEvent, ScrollView, Alert } from 'react-native';
+import {
+  View,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  Animated,
+  Platform,
+  useWindowDimensions,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+  LayoutChangeEvent,
+  ScrollView,
+  Alert,
+  StyleSheet,
+} from 'react-native';
 import { Text } from '@/lib/rnText';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/lib/auth';
 import {
   subscribeToInbox,
-  isTransactionalConversation,
   isConversationUnread,
   type ConversationRow,
 } from '@/lib/chat';
@@ -28,17 +41,23 @@ import { InboxRow, InboxSkeleton, OrdersInboxPage } from '@/components/chat';
 import { HIT_SLOP_8, useTabBarClearance } from '@/lib/responsive';
 import { PressableScale } from '@/components/PressableScale';
 
-type InboxTab = 'selling' | 'buying' | 'orders' | 'support';
-type ConversationTab = Exclude<InboxTab, 'support' | 'orders'>;
+type InboxTab = 'orders' | 'messages' | 'support';
+type MessageChip = 'all' | 'buying' | 'selling' | 'socials';
 
 const EMPTY_CONVERSATIONS: ConversationRow[] = [];
 const keyById = (item: ConversationRow) => item.id;
 
-const INBOX_TABS: { value: InboxTab; label: string }[] = [
-  { value: 'selling', label: 'Selling' },
-  { value: 'buying', label: 'Buying' },
+export const INBOX_TABS: { value: InboxTab; label: string }[] = [
+  { value: 'messages', label: 'Messages' },
   { value: 'orders', label: 'Orders' },
   { value: 'support', label: 'Support' },
+];
+
+const MESSAGE_CHIPS: { key: MessageChip; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'buying', label: 'Buying' },
+  { key: 'selling', label: 'Selling' },
+  { key: 'socials', label: 'Socials' },
 ];
 
 const TAB_COUNT = INBOX_TABS.length;
@@ -68,29 +87,14 @@ function TabBadge({ count }: { count: number }) {
       pointerEvents="none"
       style={{
         position: 'absolute',
-        left: '100%',
-        bottom: '58%',
-        marginLeft: 3,
-        minWidth: 16,
-        height: 16,
-        paddingHorizontal: 4,
-        borderRadius: 8,
-        backgroundColor: colors.primary,
-        alignItems: 'center',
-        justifyContent: 'center',
+        top: 2,
+        right: -8,
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#EF4444',
       }}
-    >
-      <Text
-        style={{
-          fontFamily: typography.family.sansBold,
-          fontSize: 10,
-          lineHeight: 12,
-          color: colors.white,
-        }}
-      >
-        {count > 9 ? '9+' : count}
-      </Text>
-    </View>
+    />
   );
 }
 
@@ -119,12 +123,7 @@ function UnderlineTabs({
   });
 
   return (
-    <View
-      style={{
-        borderBottomWidth: 1,
-        borderBottomColor: theme.hairline,
-      }}
-    >
+    <View style={{ position: 'relative' }}>
       <View style={{ flexDirection: 'row' }}>
         {INBOX_TABS.map((t) => {
           const active = t.value === value;
@@ -142,11 +141,12 @@ function UnderlineTabs({
                 paddingVertical: 14,
               }}
             >
-              <View>
+              <View style={{ position: 'relative' }}>
                 <Text
+                  numberOfLines={1}
                   style={{
                     fontFamily: active ? typography.family.sansBold : typography.family.sansMedium,
-                    fontSize: 15,
+                    fontSize: 14.5,
                     color: active ? theme.ink : theme.muteSoft,
                     letterSpacing: -0.1,
                   }}
@@ -164,7 +164,7 @@ function UnderlineTabs({
           pointerEvents="none"
           style={{
             position: 'absolute',
-            bottom: -1,
+            bottom: 0,
             left: 0,
             height: 2.5,
             width: underlineWidth,
@@ -178,19 +178,31 @@ function UnderlineTabs({
   );
 }
 
-function emptyStateFor(tab: ConversationTab) {
-  switch (tab) {
-    case 'selling':
+function emptyStateFor(chip: MessageChip) {
+  switch (chip) {
+    case 'all':
       return {
-        icon: 'tag' as const,
-        title: 'No buyer chats yet',
-        description: 'Post a great listing and buyers will reach out to make offers.',
+        icon: 'message-circle' as const,
+        title: 'No messages yet',
+        description: 'Your conversations with buyers, sellers, and other members live here.',
       };
     case 'buying':
       return {
         icon: 'shopping-bag' as const,
-        title: 'No conversations yet',
-        description: 'Found something you love? Tap message on the listing to chat.',
+        title: 'No buying chats yet',
+        description: 'Found something you love? Tap message on any listing to chat with the seller.',
+      };
+    case 'selling':
+      return {
+        icon: 'tag' as const,
+        title: 'No buyer chats yet',
+        description: 'Post a great listing and buyers will reach out to make offers and ask questions.',
+      };
+    case 'socials':
+      return {
+        icon: 'users' as const,
+        title: 'No social messages yet',
+        description: 'Connect with sellers and other collectors directly from their profiles.',
       };
   }
 }
@@ -213,19 +225,26 @@ const InboxListRow = memo(function InboxListRow({
   return <InboxRow conv={conv} userId={userId} onPress={onPress} />;
 });
 
-function ConversationPage({
-  data,
+function MessagesPage({
+  allData,
   userId,
-  tab,
+  activeChip,
+  onChipChange,
   pageWidth,
   pageHeight,
   refreshing,
   onRefresh,
   bottomInset,
 }: {
-  data: ConversationRow[];
+  allData: {
+    all: ConversationRow[];
+    buying: ConversationRow[];
+    selling: ConversationRow[];
+    socials: ConversationRow[];
+  };
   userId: string;
-  tab: ConversationTab;
+  activeChip: MessageChip;
+  onChipChange: (chip: MessageChip) => void;
   pageWidth: number;
   pageHeight: number;
   refreshing: boolean;
@@ -233,19 +252,80 @@ function ConversationPage({
   bottomInset: number;
 }) {
   const { theme } = useTheme();
-  const empty = emptyStateFor(tab);
+  const currentData = allData[activeChip] ?? allData.all;
+  const empty = emptyStateFor(activeChip);
+
   const renderItem = useCallback(
     ({ item }: { item: ConversationRow }) => <InboxListRow conv={item} userId={userId} />,
     [userId],
   );
+
   return (
-    <View style={{ width: pageWidth, height: pageHeight }}>
+    <View style={{ width: pageWidth, height: pageHeight, flex: 1 }}>
+      {/* 4 Filter Chips (Universal 30px pill geometry & theme tokens) */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingVertical: 10,
+          gap: 8,
+          alignItems: 'center',
+        }}
+        style={{
+          backgroundColor: theme.background,
+          flexGrow: 0,
+        }}
+      >
+        {MESSAGE_CHIPS.map((chip) => {
+          const active = activeChip === chip.key;
+          return (
+            <Pressable
+              key={chip.key}
+              onPress={() => {
+                haptic();
+                onChipChange(chip.key);
+              }}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={chip.label}
+              style={({ pressed }) => [
+                {
+                  height: 30,
+                  borderRadius: 15,
+                  paddingHorizontal: 14,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: active
+                    ? theme.ink
+                    : theme.surface,
+                },
+                pressed && { opacity: 0.8 },
+              ]}
+            >
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: active ? '700' : '600',
+                  color: active
+                    ? theme.background
+                    : theme.ink,
+                  fontFamily: active ? typography.family.sansBold : typography.family.sansSemibold,
+                }}
+              >
+                {chip.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      {/* Messages FlatList */}
       <FlatList
         style={{ flex: 1 }}
-        data={data}
+        data={currentData}
         keyExtractor={keyById}
         renderItem={renderItem}
-        ItemSeparatorComponent={InboxSeparator}
         windowSize={7}
         initialNumToRender={10}
         maxToRenderPerBatch={8}
@@ -254,7 +334,7 @@ function ConversationPage({
         ListEmptyComponent={
           <EmptyState icon={empty.icon} title={empty.title} description={empty.description} />
         }
-        contentContainerStyle={data.length === 0 ? { flex: 1 } : { paddingBottom: bottomInset }}
+        contentContainerStyle={currentData.length === 0 ? { flex: 1 } : { paddingBottom: bottomInset }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />
         }
@@ -307,7 +387,7 @@ function SupportPage({
     } catch (e) {
       setStartingChat(false);
       console.warn('[support] failed to start', e);
-      Alert.alert('Support unavailable', 'Failed to connect to Ceranix Support. Please try again later.');
+      Alert.alert('Support unavailable', 'Failed to connect to Grabsty Support. Please try again later.');
     }
   };
 
@@ -324,7 +404,7 @@ function SupportPage({
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />
         }
       >
-        {/* Ceranix Support Assistant Hero Card */}
+        {/* Grabsty Support Assistant Hero Card */}
         <View
           style={{
             backgroundColor: theme.surface,
@@ -410,7 +490,7 @@ function SupportPage({
           >
             <Feather name="message-square" size={16} color="#FFFFFF" />
             <Text style={{ fontFamily: typography.family.sansBold, fontSize: 14, color: '#FFFFFF' }}>
-              {startingChat ? 'Connecting…' : 'Chat with Ceranix Support'}
+              {startingChat ? 'Connecting…' : 'Chat with Grabsty Support'}
             </Text>
           </PressableScale>
         </View>
@@ -503,11 +583,8 @@ function SupportPage({
                 overflow: 'hidden',
               }}
             >
-              {data.map((conv, idx) => (
-                <View key={conv.id}>
-                  <InboxListRow conv={conv} userId={userId} />
-                  {idx < data.length - 1 && <InboxSeparator />}
-                </View>
+              {data.map((conv) => (
+                <InboxListRow key={conv.id} conv={conv} userId={userId} />
               ))}
             </View>
           </View>
@@ -636,7 +713,29 @@ export default function InboxScreen() {
   const { user, loading: authLoading } = useAuth();
   const { width: pageWidth } = useWindowDimensions();
   const tabBarClearance = useTabBarClearance();
-  const [activeTab, setActiveTab] = useState<InboxTab>('buying');
+
+  const params = useLocalSearchParams<{
+    tab?: string;
+    side?: string;
+    justPaid?: string;
+    title?: string;
+    amount?: string;
+  }>();
+
+  const requestedTab: InboxTab =
+    params.tab === 'orders' || params.side
+      ? 'orders'
+      : params.tab === 'support'
+      ? 'support'
+      : 'messages';
+
+  const initialChip: MessageChip =
+    params.tab === 'buying' || params.tab === 'selling' || params.tab === 'socials'
+      ? (params.tab as MessageChip)
+      : 'all';
+
+  const [activeTab, setActiveTab] = useState<InboxTab>(requestedTab);
+  const [messageFilter, setMessageFilter] = useState<MessageChip>(initialChip);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [pagerHeight, setPagerHeight] = useState(0);
 
@@ -649,7 +748,7 @@ export default function InboxScreen() {
   const conversations = inboxQ.data ?? EMPTY_CONVERSATIONS;
   const loading = inboxQ.isLoading;
   const refreshing = inboxQ.isRefetching;
-  const { refetch: inboxRefetch, isStale: inboxStale } = inboxQ;
+  const { refetch: inboxRefetch } = inboxQ;
 
   const pagerRef = useRef<FlatList<{ value: InboxTab; label: string }>>(null);
   const [scrollX] = useState(() => new Animated.Value(0));
@@ -688,37 +787,53 @@ export default function InboxScreen() {
   }, [userId, inboxRefetch]);
 
   // Tab data partition:
-  // - Selling: chats where user is seller (listing or direct)
-  // - Buying: chats where user is buyer (listing or direct)
+  // - Messages: { all, buying, selling, socials }
   // - Support: chats involving Support Bot
-  const pageData = useMemo<Record<ConversationTab | 'support', ConversationRow[]>>(() => {
+  const pageData = useMemo(() => {
     const uid = user?.id;
     if (!uid) {
-      return { selling: [], buying: [], support: [] };
+      return {
+        messages: { all: [], buying: [], selling: [], socials: [] },
+        support: [],
+      };
     }
+    const nonSupport = conversations.filter((c) => !isSupportConversation(c));
+    const support = conversations.filter((c) => isSupportConversation(c));
+
+    const buying = nonSupport.filter(
+      (c) => c.buyer_id === uid && Boolean(c.listing_id || c.listing),
+    );
+    const selling = nonSupport.filter(
+      (c) => c.seller_id === uid && Boolean(c.listing_id || c.listing),
+    );
+    // Socials: chats without a listing (direct user-to-user messages)
+    const socials = nonSupport.filter(
+      (c) => !c.listing_id && !c.listing,
+    );
+
     return {
-      selling: conversations.filter(
-        (c) => c.seller_id === uid && !isSupportConversation(c),
-      ),
-      buying: conversations.filter(
-        (c) => c.buyer_id === uid && !isSupportConversation(c),
-      ),
-      support: conversations.filter((c) => isSupportConversation(c)),
+      messages: {
+        all: nonSupport,
+        buying,
+        selling,
+        socials,
+      },
+      support,
     };
   }, [conversations, user?.id]);
 
   const tabBadges = useMemo(() => {
-    let sellingCount = 0;
-    let buyingCount = 0;
+    let messagesCount = 0;
+    let supportCount = 0;
     if (userId) {
-      pageData.selling.forEach((c) => {
-        if (isConversationUnread(c, userId)) sellingCount++;
+      pageData.messages.all.forEach((c) => {
+        if (isConversationUnread(c, userId)) messagesCount++;
       });
-      pageData.buying.forEach((c) => {
-        if (isConversationUnread(c, userId)) buyingCount++;
+      pageData.support.forEach((c) => {
+        if (isConversationUnread(c, userId)) supportCount++;
       });
     }
-    return { selling: sellingCount, buying: buyingCount };
+    return { messages: messagesCount, support: supportCount };
   }, [pageData, userId]);
 
   const onRefresh = useCallback(async () => {
@@ -753,37 +868,63 @@ export default function InboxScreen() {
   );
 
   useEffect(() => {
-    const index = INBOX_TABS.findIndex((t) => t.value === activeTabRef.current);
+    if (!params.tab && !params.side) return;
+    if (params.tab === 'orders' || params.tab === 'purchases' || params.tab === 'sales' || params.tab === 'selling' || params.side) {
+      if (activeTabRef.current !== 'orders') {
+        goToTab('orders');
+      }
+    } else if (params.tab === 'support') {
+      if (activeTabRef.current !== 'support') {
+        goToTab('support');
+      }
+    } else if (params.tab === 'messages') {
+      if (activeTabRef.current !== 'messages') {
+        goToTab('messages');
+      }
+    } else if (params.tab === 'buying' || params.tab === 'selling' || params.tab === 'socials' || params.tab === 'all') {
+      if (activeTabRef.current !== 'messages') {
+        goToTab('messages');
+      }
+      setMessageFilter(params.tab as MessageChip);
+    }
+  }, [params.tab, params.side, goToTab]);
+
+  useEffect(() => {
+    const target = params.tab && INBOX_TABS.some((t) => t.value === params.tab)
+      ? (params.tab as InboxTab)
+      : activeTabRef.current;
+    const index = INBOX_TABS.findIndex((t) => t.value === target);
     if (index < 0) return;
     pagerRef.current?.scrollToOffset({ offset: index * pageWidth, animated: false });
-  }, [pageWidth]);
+  }, [pageWidth, params.tab]);
 
-  const [initialScrollIndex] = useState(() =>
-    INBOX_TABS.findIndex((t) => t.value === activeTab),
-  );
+  const [initialScrollIndex] = useState(() => {
+    const idx = INBOX_TABS.findIndex((t) => t.value === requestedTab);
+    return idx >= 0 ? idx : 0;
+  });
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.background }}>
       {/* Header */}
       <View
         style={{
-          flexDirection: 'row',
+          height: 48,
           alignItems: 'center',
           justifyContent: 'center',
-          paddingHorizontal: 20,
-          paddingTop: 8,
-          paddingBottom: 14,
+          paddingHorizontal: 16,
         }}
       >
         <Text
           style={{
             fontFamily: typography.family.sansBold,
-            fontSize: 18,
+            fontSize: 20,
+            fontWeight: '700',
             color: theme.ink,
-            letterSpacing: -0.2,
+            letterSpacing: -0.4,
+            textAlign: 'center',
           }}
         >
-          Inbox
+          Activity
         </Text>
       </View>
 
@@ -812,7 +953,7 @@ export default function InboxScreen() {
             showsHorizontalScrollIndicator={false}
             bounces={false}
             style={{ flex: 1 }}
-            initialScrollIndex={initialScrollIndex >= 0 ? initialScrollIndex : 1}
+            initialScrollIndex={initialScrollIndex >= 0 ? initialScrollIndex : 0}
             getItemLayout={(_, index) => ({
               length: pageWidth,
               offset: pageWidth * index,
@@ -832,6 +973,10 @@ export default function InboxScreen() {
                     pageWidth={pageWidth}
                     pageHeight={pagerHeight}
                     bottomInset={tabBarClearance}
+                    initialSide={params.side === 'sold' || params.tab === 'sales' || params.tab === 'selling' ? 'sold' : 'bought'}
+                    justPaid={params.justPaid}
+                    recentTitle={params.title}
+                    recentAmount={params.amount}
                   />
                 );
               }
@@ -849,10 +994,11 @@ export default function InboxScreen() {
                 );
               }
               return (
-                <ConversationPage
-                  data={pageData[item.value]}
+                <MessagesPage
+                  allData={pageData.messages}
                   userId={user.id}
-                  tab={item.value}
+                  activeChip={messageFilter}
+                  onChipChange={setMessageFilter}
                   pageWidth={pageWidth}
                   pageHeight={pagerHeight}
                   refreshing={refreshing}

@@ -1,4 +1,4 @@
-import type { Condition, Gender, Listing } from '@/types';
+import type { Category, Condition, Gender, Listing } from '@/types';
 import type { PhotoSlot } from '@/lib/photoClean/slots';
 import type { SellFormValues, ParcelSize } from '@/lib/schemas/sell';
 import { queryClient } from '@/lib/queryClient';
@@ -16,11 +16,11 @@ export function createDefaultSellValues(): SellFormValues {
     price: '',
     brand: '',
     size: '',
-    condition: 'good',
-    category: 'clothing',
+    condition: null,
+    category: null,
     subcategory: null,
     color: null,
-    gender: 'women',
+    gender: null,
     tags: [],
     parcelSize: null,
     authenticity: null,
@@ -45,11 +45,11 @@ export function listingToSellFormValues(listing: Listing | null | undefined): Se
     price: listing.price != null ? String(listing.price) : '',
     brand: listing.brand || '',
     size: listing.size || '',
-    condition: (listing.condition as Condition) || 'good',
-    category: (listing.category as any) || 'clothing',
+    condition: (listing.condition as Condition) || null,
+    category: (listing.category as Category) || null,
     subcategory: listing.subcategory || null,
     color: listing.color || null,
-    gender: (listing.gender as Gender) || 'women',
+    gender: (listing.gender as Gender) || null,
     tags: Array.isArray(listing.tags) ? listing.tags : [],
     parcelSize: (listing.parcel_size as ParcelSize) || null,
     authenticity: (listing.authenticity as any) || null,

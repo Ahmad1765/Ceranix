@@ -91,9 +91,31 @@ Deno.serve(async (req: Request) => {
     }
     if (bytes.length > MAX_IMAGE_BYTES) return json({ error: 'Image too large' }, 413);
 
+    // Validate magic bytes to ensure file is actually an image (JPEG, PNG, WEBP)
+    const isJpeg = bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF;
+    const isPng = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47;
+    const isWebp = bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46;
+    if (!isJpeg && !isPng && !isWebp) {
+      return json({ error: 'Invalid image format. Supported formats: JPEG, PNG, WEBP' }, 400);
+    }
+
     const admin = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
+
+    // Abuse control: Enforce per-user sliding window limit (max 15/hr)
+    const { error: rlErr } = await admin.rpc('enforce_user_rate_limit', {
+      p_user_id: userData.user.id,
+      p_action: 'remove_background_hourly',
+      p_limit: 15,
+      p_window: '1 hour',
+    });
+    if (rlErr) {
+      return json(
+        { error: 'Rate limit reached: Maximum 15 AI background removals per hour. Please try again later.' },
+        429
+      );
+    }
 
     const tmpPath = `tmp/${crypto.randomUUID()}.jpg`;
     const { error: upErr } = await admin.storage

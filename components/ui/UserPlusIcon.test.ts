@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
+import { UserPlusIcon } from './UserPlusIcon';
 
 vi.mock('react-native', () => ({
   Platform: { OS: 'web', select: (obj: any) => obj.web || obj.default },
@@ -24,8 +25,6 @@ vi.mock('@/context/ThemeContext', () => ({
     isDark: false,
   }),
 }));
-
-import { UserPlusIcon } from './UserPlusIcon';
 
 function render(element: React.ReactElement<any>) {
   const Component = element.type as any;

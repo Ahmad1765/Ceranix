@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { usePriceDropsQuery, useMyFeedListingsQuery } from '@/lib/queries';
 import { useOpenedNewsIds } from '@/lib/newsStorage';
 import { BRAND } from '@/lib/brand';
-import { NewsRowSkeleton, NewsSkeletonList } from './NewsRowSkeleton';
+import { NewsSkeletonList } from './NewsRowSkeleton';
 import { NewsActivityRow, type ActivityItem } from './NewsActivityRow';
 import type { Listing } from '@/types';
 

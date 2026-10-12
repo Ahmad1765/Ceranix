@@ -77,12 +77,12 @@ test.describe('Network failures', () => {
     // never match one.
     await page.getByRole('button', { name: 'Categories' }).click();
     // The Categories TAB opens the search sheet in its landing state, whose box
-    // reads "Search Carrinex..." — discoverSearch() matches the per-tab copy on
+    // reads "Search Grabsty..." — discoverSearch() matches the per-tab copy on
     // the Discover SCREEN ("Search items, brands, sellers", …), which this flow
     // never reaches. The app was behaving correctly the whole time: the sheet
     // opens fine with the REST route aborted, which is exactly what this test
     // set out to prove.
-    await expect(page.getByPlaceholder(/^Search Carrinex/)).toBeVisible();
+    await expect(page.getByPlaceholder(/^Search Grabsty/)).toBeVisible();
   });
 
   test('slow network — header renders before the feed resolves', async ({ page }) => {
@@ -132,7 +132,7 @@ test.describe('Network failures', () => {
     // then intercepts the click on Home, so the old Discover→Home round trip
     // never actually left Home. Chat is a real route.
     // Icon-only dock — address tabs by accessible role/name, not text.
-    await page.getByRole('button', { name: 'Inbox' }).click();
+    await page.getByRole('button', { name: /Activity|Inbox/i }).click();
     await page.getByRole('button', { name: 'Home' }).click();
     await page.waitForTimeout(2500);
     // We accept either: real listings now visible, OR the empty state still

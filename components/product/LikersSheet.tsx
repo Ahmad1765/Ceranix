@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { View, Pressable, FlatList, ActivityIndicator, Platform } from 'react-native';
+import { View, Pressable, FlatList, ActivityIndicator } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
@@ -10,7 +10,7 @@ import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { useFollowStateQuery, useToggleFollow, useListingLikersQuery } from '@/lib/queries';
 import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
-import { radii } from '@/lib/theme';
+
 import type { ListingLiker } from '@/types';
 
 function LikerRow({ liker, onClose }: { liker: ListingLiker; onClose: () => void }) {

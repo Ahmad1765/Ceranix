@@ -39,6 +39,10 @@ export interface SafeContainerProps {
   contentContainerStyle?: StyleProp<ViewStyle>;
   /** ScrollView props pass-through (when mode='scroll') */
   scrollViewProps?: Omit<ScrollViewProps, 'style' | 'contentContainerStyle'>;
+  /** Keyboard vertical offset for KeyboardAvoidingView (when mode='keyboard-avoiding') */
+  keyboardVerticalOffset?: number;
+  /** KeyboardAvoidingView behavior override (defaults to 'padding' on iOS, undefined on Android) */
+  keyboardBehavior?: 'padding' | 'height' | 'position';
 }
 
 /**
@@ -115,6 +119,8 @@ export const SafeContainer = React.forwardRef<View, SafeContainerProps>(
       style,
       contentContainerStyle,
       scrollViewProps,
+      keyboardVerticalOffset,
+      keyboardBehavior,
     }: SafeContainerProps,
     ref
   ) {
@@ -223,11 +229,26 @@ export const SafeContainer = React.forwardRef<View, SafeContainerProps>(
   }
 
   // Keyboard Avoiding Mode (for forms, chat threads, authentication, checkout flows)
+  const resolvedBehavior =
+    keyboardBehavior ??
+    Platform.select({
+      ios: 'padding' as const,
+      android: undefined,
+      default: undefined,
+    });
+  const resolvedOffset =
+    keyboardVerticalOffset ??
+    Platform.select({
+      ios: 0,
+      android: 0,
+      default: 0,
+    });
+
   return (
     <KeyboardAvoidingView
       ref={ref as any}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      behavior={resolvedBehavior}
+      keyboardVerticalOffset={resolvedOffset}
       className={className}
       style={[
         styles.fill,

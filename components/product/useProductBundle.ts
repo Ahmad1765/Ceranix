@@ -29,6 +29,7 @@ type UseProductBundleProps = {
   guestGate: ReturnType<typeof useGuestGate>;
   /** When false the bundle tab is hidden and relatedTab defaults to 'similar'. */
   bundlesEnabled?: boolean;
+  sellerItemsLoading?: boolean;
 };
 
 export function serializeBundleIds(ids: string[] | Iterable<string>): string {
@@ -44,6 +45,7 @@ export function useProductBundle({
   user,
   guestGate,
   bundlesEnabled = false,
+  sellerItemsLoading = false,
 }: UseProductBundleProps) {
   const toast = useToast();
   const [selectedBundleIds, setSelectedBundleIds] = useState<Set<string>>(new Set());
@@ -51,15 +53,44 @@ export function useProductBundle({
     sellerItems.length > 0 ? 'members' : 'similar',
   );
 
-  // Sync tab when sellerItems change (e.g. if current seller has no items, default to similar)
-  useEffect(() => {
-    if (sellerItems.length === 0) setRelatedTab('similar');
-  }, [sellerItems.length]);
-
   // Reset bundle selection whenever the viewed listing changes
   useEffect(() => {
     setSelectedBundleIds(new Set());
   }, [listing?.id]);
+
+  // If any item in the bundle is bought by another buyer, automatically remove it and cancel bundle if only 1 item remains
+  useEffect(() => {
+    if (sellerItemsLoading || selectedBundleIds.size === 0) return;
+    const soldOrMissingIds: string[] = [];
+    selectedBundleIds.forEach((id) => {
+      const found = sellerItems.find((s) => s.id === id);
+      if (!found || found.is_sold) {
+        soldOrMissingIds.push(id);
+      }
+    });
+
+    if (soldOrMissingIds.length > 0) {
+      setSelectedBundleIds((prev) => {
+        const next = new Set(prev);
+        soldOrMissingIds.forEach((id) => next.delete(id));
+        return next;
+      });
+      toast.show('An item in your bundle was purchased by someone else and removed', {
+        variant: 'default',
+        icon: 'info',
+      });
+    }
+  }, [sellerItems, selectedBundleIds, sellerItemsLoading, toast]);
+
+  useEffect(() => {
+    if (listing?.is_sold && selectedBundleIds.size > 0) {
+      setSelectedBundleIds(new Set());
+      toast.show('This item was purchased by someone else', {
+        variant: 'default',
+        icon: 'info',
+      });
+    }
+  }, [listing?.is_sold, selectedBundleIds.size, toast]);
 
   const handleToggleBundleItem = useCallback((id: string) => {
     tap('selection');

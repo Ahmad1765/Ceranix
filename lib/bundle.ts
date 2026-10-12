@@ -65,18 +65,23 @@ export function computeBundlePricing(
   const subtotal =
     money(basePrice) + addOnPrices.reduce((acc, p) => acc + money(p), 0);
 
+  const hasExplicitSellerDiscount = sellerDiscountPct !== undefined;
   const hasSellerDiscount =
-    sellerDiscountPct != null && Number.isFinite(sellerDiscountPct) && sellerDiscountPct > 0;
+    sellerDiscountPct != null && Number.isFinite(sellerDiscountPct) && Number(sellerDiscountPct) > 0;
   const customPct = hasSellerDiscount
-    ? Math.min(30, Math.max(0, sellerDiscountPct))
+    ? Math.min(30, Math.max(0, Number(sellerDiscountPct)))
     : 0;
 
   // Walk tiers high→low so the first match is the largest qualifying discount.
   const tier = [...BUNDLE_TIERS].reverse().find((t) => itemCount >= t.count) ?? BUNDLE_TIERS[0];
 
+  // The seller has sole authority over bundle discounts:
+  // - If the seller configured a positive discount, use customPct.
+  // - If the seller disabled discounts (0 or null), discount is strictly 0% (does not qualify).
+  // - If sellerDiscountPct is completely omitted (undefined), fall back to standard tier pricing.
   const pct =
     itemCount >= BUNDLE_MIN_ITEMS
-      ? (hasSellerDiscount ? customPct : tier.pct)
+      ? (hasExplicitSellerDiscount ? customPct : tier.pct)
       : 0;
   const qualifies = itemCount >= BUNDLE_MIN_ITEMS && pct > 0;
   // Round to cents so the buyer is never charged a fraction of a cent.
@@ -84,10 +89,14 @@ export function computeBundlePricing(
   const total = Math.max(0, subtotal - savings);
   const progress = hasSellerDiscount
     ? Math.max(0, Math.min(1, (itemCount - 1) / (BUNDLE_MIN_ITEMS - 1)))
-    : Math.max(0, Math.min(1, (itemCount - 1) / (BUNDLE_TIERS.length - 1)));
+    : hasExplicitSellerDiscount
+      ? 0
+      : Math.max(0, Math.min(1, (itemCount - 1) / (BUNDLE_TIERS.length - 1)));
   const nextTier = hasSellerDiscount
     ? (itemCount < BUNDLE_MIN_ITEMS ? { count: 2, pct: customPct, label: '2+ items' } : undefined)
-    : BUNDLE_TIERS.find((t) => t.count > itemCount);
+    : hasExplicitSellerDiscount
+      ? undefined
+      : BUNDLE_TIERS.find((t) => t.count > itemCount);
 
   return { itemCount, subtotal, tier, pct, qualifies, savings, total, progress, nextTier };
 }

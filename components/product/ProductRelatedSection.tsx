@@ -58,71 +58,52 @@ export const ProductRelatedSection = memo(function ProductRelatedSection({
   const { theme } = useTheme();
   const { cardWidth } = useProductDimensions();
 
-  // Check item availability
-  const hasSellerItems = sellerItems.length > 0;
-  const hasSimilarItems = similarItems.length > 0;
-
-  if (!hasSellerItems && !hasSimilarItems) {
-    return null;
-  }
-
-  // When both exist, show the switchable tabs
-  const showTabs = hasSellerItems && hasSimilarItems;
-  const effectiveTab = showTabs ? relatedTab : hasSellerItems ? 'members' : 'similar';
+  const effectiveTab = relatedTab;
 
   return (
     <View style={{ marginTop: 22 }} onLayout={onLayout}>
-      {/* Tab Pills: When both seller items and similar items exist */}
-      {showTabs ? (
-        <View style={{ flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 4 }}>
-          {(['members', 'similar'] as const).map((tab) => {
-            const active = effectiveTab === tab;
-            return (
-              <Pressable
-                key={tab}
-                onPress={() => {
-                  tap('selection');
-                  onTabChange(tab);
+      {/* Tab Pills: Always display both Seller's items and Similar items buttons */}
+      <View style={{ flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 4 }}>
+        {(['members', 'similar'] as const).map((tab) => {
+          const active = effectiveTab === tab;
+          return (
+            <Pressable
+              key={tab}
+              onPress={() => {
+                tap('selection');
+                onTabChange(tab);
+              }}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 16,
+                paddingVertical: 9,
+                borderRadius: 999,
+                backgroundColor: active ? theme.selected : theme.white,
+                borderWidth: 1,
+                borderColor: theme.border,
+                transform: [{ scale: pressed ? 0.96 : 1 }],
+              })}
+            >
+              <Ionicons
+                name={tab === 'members' ? 'person' : 'sparkles'}
+                size={13}
+                color={theme.ink}
+                style={{ marginRight: 6 }}
+              />
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: '700',
+                  color: theme.ink,
                 }}
-                style={({ pressed }) => ({
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingHorizontal: 16,
-                  paddingVertical: 9,
-                  borderRadius: 999,
-                  backgroundColor: active ? theme.selected : theme.white,
-                  borderWidth: 1,
-                  borderColor: theme.border,
-                  transform: [{ scale: pressed ? 0.96 : 1 }],
-                })}
               >
-                <Ionicons
-                  name={tab === 'members' ? 'person' : 'sparkles'}
-                  size={13}
-                  color={theme.ink}
-                  style={{ marginRight: 6 }}
-                />
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: '700',
-                    color: theme.ink,
-                  }}
-                >
-                  {tab === 'members' ? "Seller's items" : 'Similar items'}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      ) : (
-        /* Single Section Title */
-        <View style={{ paddingHorizontal: 16, marginBottom: 4 }}>
-          <Text style={{ fontSize: 17, fontWeight: '800', color: theme.ink, letterSpacing: -0.3 }}>
-            {hasSellerItems ? "Seller's items" : 'Similar items'}
-          </Text>
-        </View>
-      )}
+                {tab === 'members' ? "Seller's items" : 'Similar items'}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
 
       {/* Tab Contents */}
       {effectiveTab === 'members' ? (

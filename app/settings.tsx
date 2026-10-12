@@ -1,421 +1,1127 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// SETTINGS SCREEN (CONTAINER / COORDINATOR)
+// SETTINGS SCREEN (CHATGPT-INSPIRED CLEAN & LAPTOP-FRIENDLY ARCHITECTURE)
 // ─────────────────────────────────────────────────────────────────────────────
 //
-// 💡 EDUCATIONAL PATTERN: Decoupling App Preferences & Account Domain Lifecycles
+// 💡 Architectural Blueprint:
+// 1. Laptop/Desktop View (>= 768px):
+//    Two-column centered dialog matching ChatGPT web settings:
+//    - Left Sidebar (230px): Tab navigation with icons, active highlight, and profile summary.
+//    - Right Content Panel: Active tab header with close (X) button, and clean high-density rows.
 //
-// 1. Separation of Responsibilities:
-//    SettingsScreen acts as the layout coordinator. All stateful domain logic
-//    (payout methods, addresses, identity checks, vacation mode, analytics opt-out,
-//    push registration, password reset, and deletion flows) is encapsulated in
-//    `useSettingsManager`.
+// 2. Mobile View (< 768px):
+//    Full-screen responsive layout with universal 30px category pill tabs and clean rows.
 //
-// 2. Deep-Link Support:
-//    Direct navigation paths (e.g. `?open=bundle` or `?open=account`) automatically
-//    expand the relevant section or modal sheet upon arrival.
+// 3. Domain Logic:
+//    Decoupled via `useSettingsManager` for address CRUD, payouts, verification,
+//    vacation mode, bundle discounts, push notifications, and auth flows.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { View, Pressable, ScrollView, Platform, ActivityIndicator, Linking } from 'react-native';
+import { useState } from 'react';
+import {
+  View,
+  Pressable,
+  ScrollView,
+  Platform,
+  Linking,
+  useWindowDimensions,
+  Switch,
+} from 'react-native';
 import { Text } from '@/lib/rnText';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import Constants from 'expo-constants';
+import { Image } from 'expo-image';
 import { useAuth } from '@/lib/auth';
 import { safeBack } from '@/lib/nav';
 import { tap } from '@/lib/haptics';
 import { useTheme } from '@/context/ThemeContext';
-import { CONTENT_MAX_WIDTH } from '@/lib/responsive';
+import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
+import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
+import { bp } from '@/lib/responsive';
+import { BRAND } from '@/lib/brand';
 import {
-  SectionCard,
-  Row,
-  ToggleRow,
-  Divider,
-  SettingsHero,
-  SheetLabel,
   BundleDiscountSheet,
   AddressSheet,
   PayoutSheet,
   VerificationSheet,
-  ThemeSheet,
+  PhoneSheet,
   SubscriptionSheet,
   useSettingsManager,
   TERMS_URL,
   PRIVACY_URL,
   SUPPORT_EMAIL,
+  ChatGPTRow,
+  ChatGPTButton,
+  ChatGPTSwitchRow,
+  ChatGPTTabItem,
+  ChatGPTGroup,
+  ChatGPTItem,
+  type Section,
 } from '@/components/settings';
+
+interface TabConfig {
+  key: Section;
+  label: string;
+  icon: keyof typeof Feather.glyphMap;
+  badge?: string;
+}
+
+const TABS: TabConfig[] = [
+  { key: 'general', label: 'General', icon: 'sliders' },
+  { key: 'account', label: 'Account', icon: 'user' },
+  { key: 'shop', label: 'Purchases & Sales', icon: 'shopping-bag' },
+  { key: 'verify', label: 'Verification & Payouts', icon: 'shield' },
+  { key: 'security', label: 'Security', icon: 'lock' },
+  { key: 'help', label: 'Help & Legal', icon: 'help-circle' },
+];
 
 export default function SettingsScreen() {
   const { profile, user, session } = useAuth();
-  const { theme, mode, isDark, setThemeMode } = useTheme();
+  const { theme, isDark } = useTheme();
+  const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const isLaptop = width >= bp.lg;
 
   const mgr = useSettingsManager();
+
+  // ponytail: normalize enhance -> general for backward compatibility with deep links
+  const activeTab: Section =
+    mgr.open === 'enhance' ? 'general' : (mgr.open ?? 'general');
+
+  // ponytail: admin hub is off-platform (/admin) and removed from consumer user profiles
+  const visibleTabs = TABS;
+  const currentTab = visibleTabs.find((t) => t.key === activeTab) ?? visibleTabs[0];
 
   const vacationOn = !!profile?.vacation_mode;
   const bundlePct = profile?.bundle_discount_pct ?? 0;
   const bundleOn = bundlePct > 0;
 
-  return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.background }}>
-      {/* Top Header */}
+  const initial =
+    ((profile?.full_name || profile?.username || 'U').trim().charAt(0) || 'U').toUpperCase();
+
+  // ── Render Active Tab Rows ────────────────────────────────────────────────
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'general':
+        return (
+          <>
+            {Platform.OS !== 'web' && (
+              <ChatGPTSwitchRow
+                label="Push notifications"
+                desc="Receive alerts for offers, orders, and messages on this device"
+                value={mgr.pushOn}
+                onValueChange={mgr.handlePushToggle}
+                disabled={!session}
+              />
+            )}
+
+            <ChatGPTRow
+              label="System notification settings"
+              desc="Open system preferences to manage notification alerts"
+            >
+              <ChatGPTButton
+                label="Manage"
+                onPress={() => {
+                  tap('light');
+                  mgr.openSystemSettings();
+                }}
+              />
+            </ChatGPTRow>
+
+            <ChatGPTSwitchRow
+              label="Share usage data"
+              desc={`Help us improve ${BRAND} with anonymous diagnostic telemetry. No personal content is collected.`}
+              value={mgr.shareUsage}
+              onValueChange={mgr.setShareUsage}
+            />
+
+            <ChatGPTRow
+              label="Version"
+              desc={`v${Constants.expoConfig?.version ?? '1.0.0'} (${Platform.OS})`}
+            >
+              <ChatGPTButton label="Up to date" variant="ghost" disabled />
+            </ChatGPTRow>
+          </>
+        );
+
+      case 'account':
+        return (
+          <>
+            {profile ? (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 16,
+                  borderBottomWidth: 1,
+                  borderBottomColor: theme.border,
+                }}
+              >
+                <View
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 24,
+                    backgroundColor: isDark ? theme.panel : 'rgba(0,0,0,0.06)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    marginRight: 14,
+                  }}
+                >
+                  {profile.avatar_url ? (
+                    <Image
+                      source={{ uri: getOptimizedImageUrl(profile.avatar_url, { width: 96 }) }}
+                      style={{ width: 48, height: 48 }}
+                      contentFit="cover"
+                      cachePolicy="memory-disk"
+                      transition={IMAGE_TRANSITION}
+                    />
+                  ) : (
+                    <Text style={{ fontSize: 20, fontWeight: '800', color: theme.text }}>
+                      {initial}
+                    </Text>
+                  )}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text
+                      style={{ fontSize: 15, fontWeight: '700', color: theme.text }}
+                      numberOfLines={1}
+                    >
+                      {profile.full_name || profile.username}
+                    </Text>
+                    {profile.is_verified && (
+                      <View style={{ marginLeft: 6 }}>
+                        <ShieldCheckIcon size={16} />
+                      </View>
+                    )}
+                  </View>
+                  <Text style={{ fontSize: 13, color: theme.textMuted, marginTop: 2 }}>
+                    @{profile.username}
+                  </Text>
+                </View>
+                <ChatGPTButton
+                  label="Edit profile"
+                  icon="edit-2"
+                  onPress={() => {
+                    tap('light');
+                    router.push('/profile/edit');
+                  }}
+                />
+              </View>
+            ) : (
+              <ChatGPTRow
+                label="Sign in"
+                desc="Access your profile, saved listings, and shop preferences"
+              >
+                <ChatGPTButton
+                  label="Sign in"
+                  icon="log-in"
+                  onPress={() => router.push('/auth/login')}
+                />
+              </ChatGPTRow>
+            )}
+
+            {user?.email && (
+              <ChatGPTRow label="Email address" desc={user.email}>
+                <ChatGPTButton label="Primary" variant="ghost" disabled />
+              </ChatGPTRow>
+            )}
+
+            <ChatGPTRow
+              label="Phone number"
+              desc={
+                mgr.phone
+                  ? mgr.phone
+                  : 'Add mobile number for courier dispatch and delivery updates'
+              }
+            >
+              <ChatGPTButton
+                label={mgr.phone ? 'Manage' : 'Add phone'}
+                icon="phone"
+                onPress={() => {
+                  tap('light');
+                  mgr.setShowPhone(true);
+                }}
+              />
+            </ChatGPTRow>
+
+            <ChatGPTRow
+              label="Seller Membership"
+              desc={profile?.is_pro ? 'Pro Seller Program · Active' : 'Standard marketplace account'}
+            >
+              <ChatGPTButton
+                label={profile?.is_pro ? 'Manage Pro' : 'Upgrade'}
+                onPress={() => {
+                  tap('light');
+                  mgr.setShowSubscription(true);
+                }}
+              />
+            </ChatGPTRow>
+
+            <ChatGPTSwitchRow
+              label="Public saved collection"
+              desc={
+                mgr.savedCollectionPrivacy === 'public'
+                  ? 'Public — other members can view your curated collections on your profile'
+                  : 'Private — only you can view your saved items'
+              }
+              value={mgr.savedCollectionPrivacy === 'public'}
+              onValueChange={(val) => {
+                mgr.setSavedCollectionPrivacy(val ? 'public' : 'private');
+              }}
+            />
+
+            <ChatGPTRow
+              label="Find & invite friends"
+              desc="Search members or share your invite link"
+            >
+              <ChatGPTButton
+                label="Find members"
+                icon="user-plus"
+                onPress={() => {
+                  tap('light');
+                  router.push('/friends' as any);
+                }}
+              />
+            </ChatGPTRow>
+
+            {session && (
+              <ChatGPTRow
+                label="Sign out"
+                desc="Sign out of your account on this device"
+              >
+                <ChatGPTButton
+                  label={mgr.busy === 'logout' ? 'Signing out…' : 'Log out'}
+                  icon="log-out"
+                  loading={mgr.busy === 'logout'}
+                  disabled={mgr.busy === 'logout'}
+                  onPress={mgr.handleLogout}
+                />
+              </ChatGPTRow>
+            )}
+          </>
+        );
+
+      case 'shop':
+        return (
+          <>
+            <ChatGPTRow
+              label="Orders & invoices"
+              desc="View your purchases, buyer invoices, and seller order records"
+            >
+              <ChatGPTButton
+                label="View orders"
+                icon="external-link"
+                onPress={() =>
+                  router.push({ pathname: '/(tabs)/chat', params: { tab: 'orders' } } as any)
+                }
+              />
+            </ChatGPTRow>
+
+            <ChatGPTRow
+              label="Bundle discount"
+              desc={
+                bundleOn
+                  ? `Active · ${bundlePct}% off orders containing 2 or more items`
+                  : 'Offer automatic tiered discounts when buyers bundle items from your shop'
+              }
+            >
+              <ChatGPTButton
+                label={bundleOn ? `${bundlePct}% Off` : 'Configure'}
+                onPress={() => {
+                  tap('light');
+                  mgr.setShowBundle(true);
+                }}
+              />
+            </ChatGPTRow>
+
+            <ChatGPTSwitchRow
+              label="Vacation mode"
+              desc={
+                vacationOn
+                  ? 'Your shop listings are temporarily hidden from the marketplace feed'
+                  : "Pause your listings while you're away without removing inventory"
+              }
+              value={vacationOn}
+              onValueChange={mgr.setVacationMode}
+              disabled={!user?.id}
+            />
+          </>
+        );
+
+      case 'verify':
+        return (
+          <>
+            <ChatGPTRow
+              label="Identity verification"
+              desc={
+                mgr.loadingExtras
+                  ? 'Loading status…'
+                  : mgr.verification?.status === 'approved'
+                    ? 'Verified seller account'
+                    : mgr.verification?.status === 'submitted'
+                      ? 'Identity verification submitted and pending review'
+                      : 'Verify your government ID for trusted buyer/seller protection'
+              }
+            >
+              {mgr.verification?.status === 'approved' ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <ShieldCheckIcon size={16} />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: theme.text }}>
+                    Verified
+                  </Text>
+                </View>
+              ) : (
+                <ChatGPTButton
+                  label={mgr.verification?.status === 'submitted' ? 'Pending' : 'Verify ID'}
+                  icon="shield"
+                  onPress={() => {
+                    tap('light');
+                    mgr.setShowVerify(true);
+                  }}
+                />
+              )}
+            </ChatGPTRow>
+
+            <ChatGPTRow
+              label="Payout method"
+              desc={
+                mgr.loadingExtras
+                  ? 'Loading…'
+                  : mgr.payout
+                    ? `${mgr.payout.kind === 'bank' ? 'Bank' : 'Wallet'} · ${mgr.payout.label} ••${mgr.payout.account_last4}`
+                    : 'Add a bank account or wallet for automatic sales disbursements'
+              }
+            >
+              <ChatGPTButton
+                label={mgr.payout ? 'Manage' : 'Add payout'}
+                onPress={() => {
+                  tap('light');
+                  mgr.setShowPayout(true);
+                }}
+              />
+            </ChatGPTRow>
+
+            <ChatGPTRow
+              label="Shipping address"
+              desc={
+                mgr.loadingExtras
+                  ? 'Loading…'
+                  : mgr.address
+                    ? `${mgr.address.line1}, ${mgr.address.city}`
+                    : 'Dispatch and return address used on generated shipping labels'
+              }
+            >
+              <ChatGPTButton
+                label={mgr.address ? 'Edit address' : 'Add address'}
+                onPress={() => {
+                  tap('light');
+                  mgr.setShowAddress(true);
+                }}
+              />
+            </ChatGPTRow>
+          </>
+        );
+
+      case 'security':
+        return (
+          <>
+            <ChatGPTRow
+              label="Password"
+              desc={
+                mgr.busy === 'password'
+                  ? 'Sending reset link…'
+                  : 'Send a secure password reset link to your email'
+              }
+            >
+              <ChatGPTButton
+                label={
+                  mgr.busy === 'password'
+                    ? 'Sending…'
+                    : mgr.resetCooldown > 0
+                    ? `Resend (${mgr.resetCooldown}s)`
+                    : 'Reset password'
+                }
+                loading={mgr.busy === 'password'}
+                disabled={mgr.busy === 'password' || !user?.email || mgr.resetCooldown > 0}
+                onPress={mgr.handleResetPassword}
+              />
+            </ChatGPTRow>
+
+            <ChatGPTRow
+              label="Delete account"
+              desc="Permanently delete your account and remove all personal information and listings. This cannot be undone."
+              destructive
+            >
+              <ChatGPTButton
+                label={mgr.busy === 'delete' ? 'Deleting…' : 'Delete account'}
+                destructive
+                loading={mgr.busy === 'delete'}
+                disabled={mgr.busy === 'delete'}
+                onPress={mgr.handleDeleteAccount}
+              />
+            </ChatGPTRow>
+          </>
+        );
+
+      case 'help':
+        return (
+          <>
+            <ChatGPTRow
+              label="Customer Support"
+              desc={session ? `Chat live with 24/7 ${BRAND} Concierge` : SUPPORT_EMAIL}
+            >
+              <ChatGPTButton
+                label="Contact"
+                icon="message-square"
+                onPress={() => {
+                  if (session) {
+                    router.push('/conversation/new?support=true' as any);
+                  } else {
+                    Linking.openURL(`mailto:${SUPPORT_EMAIL}`).catch(() => {});
+                  }
+                }}
+              />
+            </ChatGPTRow>
+
+            <ChatGPTRow
+              label="Terms of service"
+              desc="Marketplace rules, policies, and community guidelines"
+            >
+              <ChatGPTButton
+                label="View terms"
+                icon="external-link"
+                onPress={() => Linking.openURL(TERMS_URL).catch(() => {})}
+              />
+            </ChatGPTRow>
+
+            <ChatGPTRow
+              label="Privacy policy"
+              desc="Data governance, cookies, and privacy rights"
+            >
+              <ChatGPTButton
+                label="View policy"
+                icon="external-link"
+                onPress={() => Linking.openURL(PRIVACY_URL).catch(() => {})}
+              />
+            </ChatGPTRow>
+
+            <ChatGPTRow
+              label="Application version"
+              desc={`Release ${Constants.expoConfig?.version ?? '1.0.0'}`}
+            >
+              <ChatGPTButton label="Up to date" variant="ghost" disabled />
+            </ChatGPTRow>
+          </>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  // ── 1. Laptop / Desktop Two-Column Layout ─────────────────────────────────
+  if (isLaptop) {
+    const dialogWidth = Math.min(880, width - 48);
+    const dialogHeight = Math.min(620, Math.max(500, height - 72));
+
+    return (
       <View
         style={{
-          borderBottomWidth: 1,
-          borderBottomColor: theme.border,
-          backgroundColor: theme.background,
+          flex: 1,
+          backgroundColor: isDark ? '#141414' : '#FFFFFF',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 24,
         }}
       >
+        {/* ChatGPT Centered Settings Dialog */}
         <View
           style={{
+            width: dialogWidth,
+            height: dialogHeight,
+            backgroundColor: theme.panel,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: theme.border,
             flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingHorizontal: 20,
-            paddingTop: 8,
-            paddingBottom: 14,
-            width: '100%',
-            maxWidth: CONTENT_MAX_WIDTH,
-            alignSelf: 'center',
+            overflow: 'hidden',
+            shadowColor: '#000000',
+            shadowOpacity: isDark ? 0.35 : 0.08,
+            shadowOffset: { width: 0, height: 6 },
+            shadowRadius: 24,
+            elevation: 8,
           }}
         >
-          <Pressable
-            onPress={() => safeBack()}
-            hitSlop={12}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-            style={({ pressed }) => ({
-              width: 38,
-              height: 38,
-              borderRadius: 19,
-              backgroundColor: theme.surface,
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderWidth: 1,
-              borderColor: theme.border,
-              opacity: pressed ? 0.7 : 1,
-            })}
-          >
-            <Feather name="arrow-left" size={18} color={theme.text} />
-          </Pressable>
-          <Text
+          {/* Left Navigation Sidebar */}
+          <View
             style={{
-              fontSize: 13,
-              fontWeight: '700',
-              color: theme.text,
-              letterSpacing: 1.4,
-              textTransform: 'uppercase',
+              width: 230,
+              borderRightWidth: 1,
+              borderRightColor: theme.border,
+              backgroundColor: isDark ? '#1A1A1A' : '#FAFAFA',
+              display: 'flex',
+              flexDirection: 'column',
             }}
           >
-            Settings
-          </Text>
-          <View style={{ width: 38 }} />
+            <View style={{ paddingHorizontal: 16, paddingTop: 18, paddingBottom: 12 }}>
+              <Text
+                style={{
+                  fontSize: 16,
+                  fontWeight: '700',
+                  color: theme.text,
+                  letterSpacing: -0.2,
+                }}
+              >
+                Settings
+              </Text>
+            </View>
+
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 16 }}
+              style={{ flex: 1 }}
+            >
+              {visibleTabs.map((tab) => (
+                <ChatGPTTabItem
+                  key={tab.key}
+                  icon={tab.icon}
+                  label={tab.label}
+                  active={activeTab === tab.key}
+                  badge={tab.badge}
+                  onPress={() => mgr.toggleSection(tab.key)}
+                />
+              ))}
+            </ScrollView>
+
+            {/* Bottom Profile / Account Snippet */}
+            <View
+              style={{
+                padding: 12,
+                borderTopWidth: 1,
+                borderTopColor: theme.border,
+                backgroundColor: isDark ? '#1A1A1A' : '#FAFAFA',
+              }}
+            >
+              {profile ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 16,
+                      backgroundColor: isDark ? theme.panel : 'rgba(0,0,0,0.06)',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden',
+                      marginRight: 10,
+                    }}
+                  >
+                    {profile.avatar_url ? (
+                      <Image
+                        source={{ uri: getOptimizedImageUrl(profile.avatar_url, { width: 64 }) }}
+                        style={{ width: 32, height: 32 }}
+                        contentFit="cover"
+                        cachePolicy="memory-disk"
+                      />
+                    ) : (
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: theme.text }}>
+                        {initial}
+                      </Text>
+                    )}
+                  </View>
+                  <View style={{ flex: 1, marginRight: 6 }}>
+                    <Text
+                      style={{ fontSize: 12, fontWeight: '700', color: theme.text }}
+                      numberOfLines={1}
+                    >
+                      {profile.full_name || profile.username}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: theme.textMuted }} numberOfLines={1}>
+                      @{profile.username}
+                    </Text>
+                  </View>
+                </View>
+              ) : (
+                <Pressable
+                  onPress={() => router.push('/auth/login')}
+                  style={({ pressed }) => ({
+                    paddingVertical: 6,
+                    alignItems: 'center',
+                    opacity: pressed ? 0.7 : 1,
+                  })}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: theme.text }}>
+                    Sign in to {BRAND}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+
+          {/* Right Content Panel */}
+          <View style={{ flex: 1, backgroundColor: theme.panel, display: 'flex' }}>
+            {/* Header with Title and Close (X) */}
+            <View
+              style={{
+                height: 56,
+                paddingHorizontal: 24,
+                borderBottomWidth: 1,
+                borderBottomColor: theme.border,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <Text style={{ fontSize: 16, fontWeight: '700', color: theme.text }}>
+                {currentTab.label}
+              </Text>
+              <Pressable
+                onPress={() => safeBack()}
+                accessibilityRole="button"
+                accessibilityLabel="Close settings"
+                hitSlop={8}
+                style={({ pressed }) => ({
+                  width: 32,
+                  height: 32,
+                  borderRadius: 16,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: pressed
+                    ? (isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)')
+                    : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'),
+                })}
+              >
+                <Feather name="x" size={16} color={theme.text} />
+              </Pressable>
+            </View>
+
+            {/* Scrollable Settings Rows */}
+            <ScrollView
+              showsVerticalScrollIndicator={true}
+              contentContainerStyle={{
+                paddingHorizontal: 24,
+                paddingVertical: 10,
+                paddingBottom: 32,
+              }}
+              style={{ flex: 1 }}
+            >
+              {renderTabContent()}
+            </ScrollView>
+          </View>
         </View>
+
+        {/* Modal Sheets */}
+        <BundleDiscountSheet
+          visible={mgr.showBundle}
+          currentPct={bundlePct}
+          onClose={() => mgr.setShowBundle(false)}
+          onSave={async (pct) => {
+            await mgr.setBundlePct(pct);
+            mgr.setShowBundle(false);
+          }}
+        />
+
+        <AddressSheet
+          visible={mgr.showAddress}
+          initial={mgr.address}
+          onClose={() => mgr.setShowAddress(false)}
+          onSave={async (form) => {
+            const ok = await mgr.saveAddress(form);
+            if (ok) mgr.setShowAddress(false);
+          }}
+          onRemove={
+            mgr.address?.id
+              ? async () => {
+                  await mgr.removeAddress();
+                  mgr.setShowAddress(false);
+                }
+              : undefined
+          }
+        />
+
+        <PayoutSheet
+          visible={mgr.showPayout}
+          initial={mgr.payout}
+          onClose={() => mgr.setShowPayout(false)}
+          onSave={async (form) => {
+            const ok = await mgr.savePayout(form);
+            if (ok) mgr.setShowPayout(false);
+          }}
+          onRemove={
+            mgr.payout?.id
+              ? async () => {
+                  await mgr.removePayout();
+                  mgr.setShowPayout(false);
+                }
+              : undefined
+          }
+        />
+
+        <VerificationSheet
+          visible={mgr.showVerify}
+          initial={mgr.verification}
+          onClose={() => mgr.setShowVerify(false)}
+          onSave={async (form) => {
+            const ok = await mgr.saveVerification(form);
+            if (ok) mgr.setShowVerify(false);
+          }}
+        />
+
+        <SubscriptionSheet
+          visible={mgr.showSubscription}
+          onClose={() => mgr.setShowSubscription(false)}
+        />
+
+        <PhoneSheet
+          visible={mgr.showPhone}
+          initialPhone={mgr.phone}
+          onClose={() => mgr.setShowPhone(false)}
+          onSave={mgr.savePhone}
+          onRemove={mgr.phone ? mgr.removePhone : undefined}
+        />
+      </View>
+    );
+  }
+
+  // ── 2. Mobile Responsive Layout (Faithful ChatGPT Mobile Settings) ────────
+  return (
+    <SafeAreaView
+      edges={['top']}
+      style={{
+        flex: 1,
+        backgroundColor: isDark ? '#141414' : '#FFFFFF',
+      }}
+    >
+      {/* Top Floating Close Button matching Video */}
+      <View
+        style={{
+          flexDirection: 'row',
+          justifyContent: 'flex-end',
+          alignItems: 'center',
+          paddingHorizontal: 16,
+          paddingTop: 8,
+          paddingBottom: 4,
+        }}
+      >
+        <Pressable
+          onPress={() => {
+            tap('light');
+            safeBack();
+          }}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Close settings"
+          style={({ pressed }) => ({
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            backgroundColor: isDark ? '#212121' : '#FFFFFF',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderWidth: 1,
+            borderColor: isDark ? '#2E2E2E' : 'rgba(0,0,0,0.08)',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: isDark ? 0.25 : 0.06,
+            shadowRadius: 3,
+            elevation: 2,
+            opacity: pressed ? 0.75 : 1,
+          })}
+        >
+          <Feather name="x" size={18} color={theme.text} />
+        </Pressable>
       </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
-          paddingHorizontal: 20,
-          paddingBottom: 60,
-          width: '100%',
-          maxWidth: CONTENT_MAX_WIDTH,
-          alignSelf: 'center',
+          paddingHorizontal: 16,
+          paddingTop: 4,
+          paddingBottom: insets.bottom + 40,
         }}
       >
-        {/* Profile / Account Hero */}
-        <SettingsHero
-          profile={profile}
-          hasSession={!!session}
-          onEditProfile={() => {
-            tap('light');
-            router.push('/profile/edit');
-          }}
-          onSignIn={() => router.push('/auth/login')}
-        />
-
-        {/* Administration Section (Admins Only) */}
-        {profile?.is_admin && (
-          <SectionCard
-            icon="truck"
-            title="Administration"
-            subtitle="Platform management & logistics"
-            expanded={mgr.open === 'admin'}
-            onToggle={() => mgr.toggleSection('admin')}
+        {/* Centered Profile Hero Section matching Video (Frame 0) */}
+        <View style={{ alignItems: 'center', marginBottom: 20 }}>
+          <Pressable
+            onPress={() => {
+              tap('light');
+              router.push('/profile/edit');
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Edit profile"
+            style={({ pressed }) => ({
+              opacity: pressed ? 0.85 : 1,
+              alignItems: 'center',
+            })}
           >
-            <Row
-              label="Admin Logistics Hub"
-              desc="Manage courier dispatch, pickup & tracking"
-              onPress={() => {
-                tap('light');
-                router.push('/admin/logistics' as any);
+            <View
+              style={{
+                width: 76,
+                height: 76,
+                borderRadius: 38,
+                backgroundColor: isDark ? '#2C2C2E' : '#E8A5C8',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 10,
+                position: 'relative',
               }}
-              chevron
-              badge="ADMIN"
-            />
-          </SectionCard>
-        )}
+            >
+              {profile?.avatar_url ? (
+                <Image
+                  source={{ uri: getOptimizedImageUrl(profile.avatar_url, { width: 152 }) }}
+                  style={{ width: 76, height: 76, borderRadius: 38 }}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                />
+              ) : (
+                <Text style={{ fontSize: 24, fontWeight: '800', color: '#FFFFFF' }}>
+                  {initial}
+                </Text>
+              )}
 
-        {/* 1. Purchases & Sales Accordion */}
-        <SectionCard
-          icon="shopping-bag"
-          title="Purchases & Sales"
-          subtitle="My shop, promotions & discounts"
-          expanded={mgr.open === 'shop'}
-          onToggle={() => mgr.toggleSection('shop')}
-        >
-          <Row
-            label="Order history"
-            desc="Your orders, invoices & payouts"
-            onPress={() => router.push('/orders' as any)}
-            chevron
-          />
-          <Divider />
-          <Row
-            label="Bundle discount"
-            desc={bundleOn ? `Active · ${bundlePct}% off bundles` : 'Tap to set a bundle discount'}
-            onPress={() => {
-              tap('light');
-              mgr.setShowBundle(true);
-            }}
-            chevron
-            badge={bundleOn ? `${bundlePct}%` : undefined}
-          />
-          <Divider />
-          <ToggleRow
-            label="Vacation mode"
-            desc={
-              vacationOn
-                ? 'Your listings are hidden from the feed'
-                : "Pause your listings while you're away"
-            }
-            value={vacationOn}
-            onValueChange={mgr.setVacationMode}
-            disabled={!user?.id}
-          />
-          <Divider />
-          <Row
-            label="Find & invite friends"
-            desc="Search members or sync contacts"
-            onPress={() => {
-              tap('light');
-              router.push('/friends' as any);
-            }}
-            chevron
-          />
-          <Divider />
-          <Row
-            label="Share your profile"
-            desc={profile?.username ? `@${profile.username}` : 'Send a link to your shop'}
-            onPress={() => {
-              if (profile?.id) router.push(`/user/${profile.id}` as any);
-            }}
-            chevron
-            disabled={!profile?.id}
-          />
-        </SectionCard>
+              {/* Edit Pencil Badge on bottom right of avatar */}
+              <View
+                style={{
+                  position: 'absolute',
+                  bottom: -2,
+                  right: -2,
+                  width: 26,
+                  height: 26,
+                  borderRadius: 13,
+                  backgroundColor: isDark ? '#2C2C2E' : '#FFFFFF',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 2,
+                  borderColor: isDark ? '#141414' : '#FFFFFF',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.15,
+                  shadowRadius: 2,
+                  elevation: 2,
+                }}
+              >
+                <Feather name="edit-2" size={12} color={theme.text} />
+              </View>
+            </View>
 
-        {/* 2. Verification, Payouts & Shipping Accordion */}
-        <SectionCard
-          icon="shield"
-          title="Verification, payouts & shipping"
-          subtitle="Settings for purchases & sales"
-          expanded={mgr.open === 'verify'}
-          onToggle={() => mgr.toggleSection('verify')}
-        >
-          <Row
-            label="Identity verification"
-            desc={
-              mgr.loadingExtras
-                ? 'Loading…'
-                : mgr.verification
-                  ? `Status: ${mgr.verification.status}`
-                  : 'Not submitted'
-            }
-            onPress={() => {
-              tap('light');
-              mgr.setShowVerify(true);
-            }}
-            chevron
-            badge={
-              mgr.verification?.status === 'approved'
-                ? 'Verified'
-                : mgr.verification?.status === 'submitted'
-                  ? 'Pending'
-                  : undefined
-            }
-          />
-          <Divider />
-          <Row
-            label="Payout method"
-            desc={
-              mgr.loadingExtras
-                ? 'Loading…'
-                : mgr.payout
-                  ? `${mgr.payout.kind === 'bank' ? 'Bank' : 'Wallet'} · ${mgr.payout.label} ••${mgr.payout.account_last4}`
-                  : 'Add a bank or wallet'
-            }
-            onPress={() => {
-              tap('light');
-              mgr.setShowPayout(true);
-            }}
-            chevron
-          />
-          <Divider />
-          <Row
-            label="Shipping address"
-            desc={
-              mgr.loadingExtras
-                ? 'Loading…'
-                : mgr.address
-                  ? `${mgr.address.line1}, ${mgr.address.city}`
-                  : 'Where do we ship from?'
-            }
-            onPress={() => {
-              tap('light');
-              mgr.setShowAddress(true);
-            }}
-            chevron
-          />
-          <Divider />
-          <Row
-            label="Bundle discounts"
-            desc={
-              bundleOn
-                ? `${bundlePct}% discount on bundles of 2+ items`
-                : 'Disabled — offer discounts when buyers bundle'
-            }
-            onPress={() => {
-              tap('light');
-              mgr.setShowBundle(true);
-            }}
-            chevron
-            badge={bundleOn ? `${bundlePct}% OFF` : 'OFF'}
-          />
-        </SectionCard>
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: '700',
+                color: theme.text,
+                letterSpacing: -0.2,
+                textAlign: 'center',
+              }}
+            >
+              {profile?.full_name || profile?.username || 'Team Member'}
+            </Text>
+            {profile?.username && (
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: theme.textMuted,
+                  marginTop: 2,
+                  textAlign: 'center',
+                }}
+              >
+                @{profile.username}
+              </Text>
+            )}
+          </Pressable>
+        </View>
 
-        {/* 3. Enhance Experience & Personalization Accordion */}
-        <SectionCard
-          icon="sliders"
-          title="Enhance the experience"
-          subtitle="Personalization, badges & subscriptions"
-          expanded={mgr.open === 'enhance'}
-          onToggle={() => mgr.toggleSection('enhance')}
+        {/* Upgrade Card matching Video ("Do more with ChatGPT" -> "Do more with Carrinex Pro") */}
+        <View
+          style={{
+            backgroundColor: theme.panel,
+            borderRadius: 16,
+            padding: 16,
+            marginBottom: 20,
+            borderWidth: 1,
+            borderColor: isDark ? '#262626' : 'rgba(0,0,0,0.08)',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: isDark ? 0.2 : 0.04,
+            shadowRadius: 3,
+            elevation: 1,
+          }}
         >
-          {Platform.OS !== 'web' && (
-            <>
-              <ToggleRow
-                label="Push notifications"
-                desc="Messages, offers & sales on this device"
-                value={mgr.pushOn}
-                onValueChange={mgr.handlePushToggle}
-                disabled={!session}
-              />
-              <Divider />
-            </>
-          )}
-          <Row
-            label="Notifications"
-            desc="Push, email & in-app"
-            onPress={mgr.openSystemSettings}
-            chevron
-          />
-          <Divider />
-          <ToggleRow
-            label="Dark mode"
-            desc={isDark ? 'Dark monotone appearance active' : 'Light monotone appearance active'}
-            value={isDark}
-            onValueChange={(val) => {
-              setThemeMode(val ? 'dark' : 'light');
-            }}
-          />
-          <Divider />
-          <Row
-            label="Theme & Appearance"
-            desc={`Mode: ${mode.charAt(0).toUpperCase() + mode.slice(1)} (${isDark ? 'Dark monotone' : 'Light monotone'})`}
-            onPress={() => {
-              tap('light');
-              mgr.setShowTheme(true);
-            }}
-            chevron
-          />
-          <Divider />
-          <ToggleRow
-            label="Public Saved Collection"
-            desc={
-              mgr.savedCollectionPrivacy === 'public'
-                ? 'Public — other users can view your collections on your profile'
-                : 'Private — only you can view your saved collections'
-            }
-            value={mgr.savedCollectionPrivacy === 'public'}
-            onValueChange={(val) => {
-              mgr.setSavedCollectionPrivacy(val ? 'public' : 'private');
-            }}
-          />
-          <Divider />
-          <Row
-            label="Seller Program & Subscriptions"
-            desc={profile?.is_pro ? 'Pro Seller Program · Active' : 'Upgrade to Pro Seller Program'}
+          <View style={{ flex: 1, paddingRight: 12 }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text }}>
+              {profile?.is_pro ? `${BRAND} Pro Active` : `Do more with ${BRAND} Pro`}
+            </Text>
+            <Text
+              style={{
+                fontSize: 12,
+                color: theme.textMuted,
+                marginTop: 3,
+                lineHeight: 16,
+              }}
+            >
+              {profile?.is_pro
+                ? 'Enjoy verified status, 0% escrow fees & priority dispatch.'
+                : 'Get higher limits, verified status, and access to advanced selling tools.'}
+            </Text>
+          </View>
+          <Pressable
             onPress={() => {
               tap('light');
               mgr.setShowSubscription(true);
             }}
-            chevron
-            badge={profile?.is_pro ? 'PRO' : 'FREE'}
-          />
-        </SectionCard>
+            style={({ pressed }) => ({
+              backgroundColor: theme.ink,
+              paddingHorizontal: 16,
+              paddingVertical: 9,
+              borderRadius: 20,
+              opacity: pressed ? 0.8 : 1,
+            })}
+          >
+            <Text style={{ fontSize: 13, fontWeight: '700', color: theme.background }}>
+              {profile?.is_pro ? 'Manage' : 'Upgrade'}
+            </Text>
+          </Pressable>
+        </View>
 
-        {/* 4. Manage Account Accordion */}
-        <SectionCard
-          icon="user"
-          title="Manage account"
-          subtitle="Email, password & deletion"
-          expanded={mgr.open === 'account'}
-          onToggle={() => mgr.toggleSection('account')}
-        >
-          {user?.email && (
-            <>
-              <View style={{ paddingVertical: 14 }}>
-                <SheetLabel>Email</SheetLabel>
-                <Text
-                  style={{ fontSize: 14, fontWeight: '700', color: theme.text, marginTop: 4 }}
-                  numberOfLines={1}
-                >
-                  {user.email}
-                </Text>
-              </View>
-              <Divider />
-            </>
+        {/* Group 1: Account matching Video (Frame 1) */}
+        <ChatGPTGroup title="Account">
+          <ChatGPTItem
+            icon="mail"
+            label="Email"
+            value={user?.email || 'Not configured'}
+          />
+          <ChatGPTItem
+            icon="phone"
+            label="Phone number"
+            value={mgr.phone ? mgr.phone : 'Add'}
+            chevron
+            onPress={() => mgr.setShowPhone(true)}
+          />
+          <ChatGPTItem
+            icon="shield"
+            label="Identity verification"
+            value={
+              mgr.verification?.status === 'approved'
+                ? 'Verified'
+                : mgr.verification?.status === 'submitted'
+                  ? 'Pending'
+                  : 'Verify ID'
+            }
+            chevron
+            onPress={() => mgr.setShowVerify(true)}
+          />
+          <ChatGPTItem
+            icon="credit-card"
+            label="Payout method"
+            value={
+              mgr.payout
+                ? `${mgr.payout.kind === 'bank' ? 'Bank' : 'Wallet'} · ••${mgr.payout.account_last4}`
+                : 'Add'
+            }
+            chevron
+            onPress={() => mgr.setShowPayout(true)}
+          />
+          <ChatGPTItem
+            icon="map-pin"
+            label="Shipping address"
+            value={mgr.address ? `${mgr.address.city}` : 'Add'}
+            chevron
+            isLast
+            onPress={() => mgr.setShowAddress(true)}
+          />
+        </ChatGPTGroup>
+
+        {/* Group 2: App settings matching Video */}
+        <ChatGPTGroup title="App settings">
+          <ChatGPTItem
+            icon="shopping-bag"
+            label="Purchases & Orders"
+            chevron
+            onPress={() =>
+              router.push({ pathname: '/(tabs)/chat', params: { tab: 'orders' } } as any)
+            }
+          />
+          <ChatGPTItem
+            icon="percent"
+            label="Bundle discounts"
+            value={bundleOn ? `${bundlePct}% Off` : 'Configure'}
+            chevron
+            onPress={() => mgr.setShowBundle(true)}
+          />
+          <ChatGPTItem
+            icon="pause-circle"
+            label="Vacation mode"
+            rightElement={
+              <Switch
+                value={vacationOn}
+                onValueChange={(val: boolean) => {
+                  tap('light');
+                  mgr.setVacationMode(val);
+                }}
+                disabled={!user?.id}
+                trackColor={{ false: theme.border, true: theme.accent }}
+                thumbColor={theme.accent?.toUpperCase() === '#FFFFFF' ? '#000000' : '#FFFFFF'}
+                ios_backgroundColor={theme.border}
+              />
+            }
+          />
+          {Platform.OS !== 'web' && (
+            <ChatGPTItem
+              icon="bell"
+              label="Notifications"
+              rightElement={
+                <Switch
+                  value={mgr.pushOn}
+                  onValueChange={mgr.handlePushToggle}
+                  disabled={!session}
+                  trackColor={{ false: theme.border, true: theme.accent }}
+                  thumbColor={theme.accent?.toUpperCase() === '#FFFFFF' ? '#000000' : '#FFFFFF'}
+                  ios_backgroundColor={theme.border}
+                />
+              }
+            />
           )}
-          <Row
-            label="Change password"
-            desc={mgr.busy === 'password' ? 'Sending email…' : 'Send a reset link via email'}
-            onPress={mgr.handleResetPassword}
+          <ChatGPTItem
+            icon="lock"
+            label="Security & login"
+            value="Reset password"
             chevron
-            disabled={mgr.busy === 'password' || !user?.email}
-            loading={mgr.busy === 'password'}
+            onPress={mgr.handleResetPassword}
           />
-          <Divider />
-          <Row
-            label="Delete account"
-            desc="Permanently remove your data"
-            onPress={mgr.handleDeleteAccount}
-            destructive
-            disabled={mgr.busy === 'delete'}
-            loading={mgr.busy === 'delete'}
+          <ChatGPTItem
+            icon="share-2"
+            label="Share usage data"
+            isLast
+            rightElement={
+              <Switch
+                value={mgr.shareUsage}
+                onValueChange={mgr.setShareUsage}
+                trackColor={{ false: theme.border, true: theme.accent }}
+                thumbColor={theme.accent?.toUpperCase() === '#FFFFFF' ? '#000000' : '#FFFFFF'}
+                ios_backgroundColor={theme.border}
+              />
+            }
           />
-        </SectionCard>
+        </ChatGPTGroup>
 
-        {/* 5. Help Center Accordion */}
-        <SectionCard
-          icon="help-circle"
-          title="Help center"
-          subtitle="Support & guides"
-          expanded={mgr.open === 'help'}
-          onToggle={() => mgr.toggleSection('help')}
-        >
-          <Row
-            label="Contact support"
-            desc={session ? 'Chat with 24/7 Ceranix Concierge' : SUPPORT_EMAIL}
+        {/* Group 4: Get help matching Video (Frame 4 & 5) */}
+        <ChatGPTGroup title="Get help">
+          <ChatGPTItem
+            icon="flag"
+            label="Report app issue"
+            chevron
+            onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=App Issue Report`).catch(() => {})}
+          />
+          <ChatGPTItem
+            icon="help-circle"
+            label="Help Center"
+            chevron
             onPress={() => {
               if (session) {
                 router.push('/conversation/new?support=true' as any);
@@ -423,96 +1129,38 @@ export default function SettingsScreen() {
                 Linking.openURL(`mailto:${SUPPORT_EMAIL}`).catch(() => {});
               }
             }}
-            chevron
           />
-          <Divider />
-          <Row
-            label="Terms of service"
-            onPress={() => Linking.openURL(TERMS_URL).catch(() => {})}
+          <ChatGPTItem
+            icon="shield"
+            label="Privacy Center"
             chevron
-          />
-          <Divider />
-          <Row
-            label="Privacy policy"
             onPress={() => Linking.openURL(PRIVACY_URL).catch(() => {})}
+          />
+          <ChatGPTItem
+            icon="file-text"
+            label="Terms of service"
             chevron
+            onPress={() => Linking.openURL(TERMS_URL).catch(() => {})}
           />
-          <Divider />
-          <ToggleRow
-            label="Share usage data"
-            desc="Helps us improve the app. No personal content is collected."
-            value={mgr.shareUsage}
-            onValueChange={mgr.setShareUsage}
+          <ChatGPTItem
+            icon="info"
+            label="About"
+            value={`v${Constants.expoConfig?.version ?? '1.0.0'}`}
+            isLast
           />
-        </SectionCard>
+        </ChatGPTGroup>
 
-        {/* Log out Button */}
-        {session && (
-          <Pressable
-            onPress={mgr.handleLogout}
+        {/* Standalone Log Out Button matching Video (Frame 5) */}
+        <ChatGPTGroup>
+          <ChatGPTItem
+            icon="log-out"
+            label={mgr.busy === 'logout' ? 'Logging out…' : 'Log out'}
+            destructive
+            isLast
             disabled={mgr.busy === 'logout'}
-            accessibilityRole="button"
-            accessibilityState={{ busy: mgr.busy === 'logout' }}
-            style={({ pressed }) => ({
-              height: 58,
-              borderRadius: 16,
-              backgroundColor: theme.accent,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginTop: 8,
-              overflow: 'hidden',
-              opacity: mgr.busy === 'logout' ? 0.7 : 1,
-              transform: [{ scale: pressed && mgr.busy !== 'logout' ? 0.985 : 1 }],
-            })}
-          >
-            <View
-              style={{
-                position: 'absolute',
-                right: 0,
-                top: 0,
-                bottom: 0,
-                width: 58,
-                backgroundColor: theme.accent === '#FFFFFF' ? '#EEEEEE' : theme.text,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              {mgr.busy === 'logout' ? (
-                <ActivityIndicator color={theme.accent === '#FFFFFF' ? '#0F0F0F' : '#FFFFFF'} />
-              ) : (
-                <Feather
-                  name="log-out"
-                  size={18}
-                  color={theme.accent === '#FFFFFF' ? '#0F0F0F' : '#FFFFFF'}
-                />
-              )}
-            </View>
-            <Text
-              style={{
-                fontSize: 16,
-                fontWeight: '800',
-                color: theme.accent === '#FFFFFF' ? '#0F0F0F' : '#FFFFFF',
-                marginRight: 58,
-              }}
-            >
-              {mgr.busy === 'logout' ? 'Signing out…' : 'Log out'}
-            </Text>
-          </Pressable>
-        )}
-
-        <Text
-          style={{
-            textAlign: 'center',
-            fontSize: 11,
-            color: theme.textMuted,
-            marginTop: 18,
-            fontWeight: '600',
-            letterSpacing: 0.4,
-          }}
-        >
-          Version {Constants.expoConfig?.version ?? '1.0.0'}
-        </Text>
+            onPress={mgr.handleLogout}
+          />
+        </ChatGPTGroup>
       </ScrollView>
 
       {/* Modal Sheets */}
@@ -572,14 +1220,17 @@ export default function SettingsScreen() {
         }}
       />
 
-      <ThemeSheet
-        visible={mgr.showTheme}
-        onClose={() => mgr.setShowTheme(false)}
-      />
-
       <SubscriptionSheet
         visible={mgr.showSubscription}
         onClose={() => mgr.setShowSubscription(false)}
+      />
+
+      <PhoneSheet
+        visible={mgr.showPhone}
+        initialPhone={mgr.phone}
+        onClose={() => mgr.setShowPhone(false)}
+        onSave={mgr.savePhone}
+        onRemove={mgr.phone ? mgr.removePhone : undefined}
       />
     </SafeAreaView>
   );

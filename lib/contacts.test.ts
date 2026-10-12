@@ -32,7 +32,7 @@ describe('Contact Sync Normalization & Crypto', () => {
 
   it('normalizes email addresses by trimming and lowercasing', () => {
     expect(normalizeEmail('  User.Name@Example.COM  ')).toBe('user.name@example.com');
-    expect(normalizeEmail('test@ceranix.com')).toBe('test@ceranix.com');
+    expect(normalizeEmail('test@grabsty.com')).toBe('test@grabsty.com');
     expect(normalizeEmail('not-an-email')).toBeNull();
     expect(normalizeEmail('')).toBeNull();
   });
@@ -46,8 +46,8 @@ describe('Contact Sync Normalization & Crypto', () => {
 
 describe('Social Invite Links & URLs', () => {
   it('generates clean profile invite URLs', () => {
-    const url = getProfileInviteUrl('carrinex');
-    expect(url).toContain('/user/@carrinex');
+    const url = getProfileInviteUrl('grabsty');
+    expect(url).toContain('/user/@grabsty');
   });
 
   it('strips redundant leading @ in usernames', () => {

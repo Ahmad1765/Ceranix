@@ -25,9 +25,9 @@ describe('createDefaultSellValues', () => {
     expect(values.price).toBe('');
     expect(values.slots).toEqual([]);
     expect(values.tags).toEqual([]);
-    expect(values.condition).toBe('good');
-    expect(values.category).toBe('clothing');
-    expect(values.gender).toBe('women');
+    expect(values.condition).toBeNull();
+    expect(values.category).toBeNull();
+    expect(values.gender).toBeNull();
     expect(values.parcelSize).toBeNull();
   });
 
@@ -46,9 +46,9 @@ describe('listingToSellFormValues', () => {
     expect(values.title).toBe('');
     expect(values.price).toBe('');
     expect(values.slots).toEqual([]);
-    expect(values.condition).toBe('good');
-    expect(values.category).toBe('clothing');
-    expect(values.gender).toBe('women');
+    expect(values.condition).toBeNull();
+    expect(values.category).toBeNull();
+    expect(values.gender).toBeNull();
   });
 
   it('returns fresh array instances on subsequent null/undefined calls', () => {

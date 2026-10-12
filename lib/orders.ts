@@ -18,11 +18,14 @@ export type OrderSide = 'bought' | 'sold';
  * longer listed" with no image — a wrong answer on a screen about money, which
  * is why this is normalized rather than asserted.
  */
-export function normalizeMyOrder(row: {
-  listing: MyOrder['listing'] | MyOrder['listing'][];
-}): { listing: MyOrder['listing'] } {
-  const { listing } = row;
-  return { ...row, listing: Array.isArray(listing) ? (listing[0] ?? null) : listing };
+export function normalizeMyOrder(row: any): any {
+  const { listing, buyer, seller } = row;
+  return {
+    ...row,
+    listing: Array.isArray(listing) ? (listing[0] ?? null) : (listing ?? null),
+    buyer: Array.isArray(buyer) ? (buyer[0] ?? null) : (buyer ?? null),
+    seller: Array.isArray(seller) ? (seller[0] ?? null) : (seller ?? null),
+  };
 }
 
 /**
@@ -92,6 +95,8 @@ export function orderBadge(
       return { label: 'Awaiting payment', tone: 'warn' };
     case 'packing':
       return { label: side === 'bought' ? 'Seller packaging' : 'Packing order', tone: 'neutral' };
+    case 'picked':
+      return { label: side === 'bought' ? 'Picked up by courier' : 'Courier picked up', tone: 'neutral' };
     case 'shifting':
       return { label: 'Dispatched · In transit', tone: 'positive' };
     case 'delivered':
@@ -104,4 +109,43 @@ export function orderBadge(
       return { label: 'Awaiting payment', tone: 'warn' };
     }
   }
+}
+
+export type OrderCategory = 'in_progress' | 'completed' | 'refunds' | 'canceled';
+
+/**
+ * Categorize an order into one of the 4 mutually exclusive states
+ * for the Orders Dashboard filter tabs: All, In Progress, Completed, Refunds, Canceled.
+ *
+ * Precedence:
+ * 1. Refunds: status or fulfillment_status is refunded/refund_due/partially_refunded.
+ * 2. Canceled / Failed: status or fulfillment_status is canceled/failed.
+ * 3. Completed: fulfillment_status or status is completed.
+ * 4. In Progress: any active order (pending, paid, awaiting_payment, packing, shifting, delivered, disputed).
+ */
+export function getOrderCategory(order: {
+  status?: string | null;
+  fulfillment_status?: string | null;
+}): OrderCategory {
+  const status = (order.status ?? '').toLowerCase();
+  const fulfillment = ((order.fulfillment_status ?? '') as string).toLowerCase();
+
+  if (
+    status === 'refunded' ||
+    status === 'refund_due' ||
+    status === 'partially_refunded' ||
+    fulfillment === 'refunded'
+  ) {
+    return 'refunds';
+  }
+
+  if (status === 'canceled' || status === 'failed' || fulfillment === 'canceled') {
+    return 'canceled';
+  }
+
+  if (fulfillment === 'completed' || status === 'completed') {
+    return 'completed';
+  }
+
+  return 'in_progress';
 }

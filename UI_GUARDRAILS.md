@@ -117,12 +117,17 @@ These rules protect the runtime from silent crashes, style collapse, and mobile/
 
 ---
 
-### Rule 2.6: Mobile Safari Viewport & Keyboard Docking (`components/ui/SafeContainer.tsx`)
-- **The Invariant:** On mobile web (iOS Safari), virtual keyboard appearances trigger WebKit's two-viewport model (`visualViewport.offsetTop` and `visualViewport.height`). Pinned full-screen or bottom-docked containers (like chat composers or sticky action bars) must sync with `visualViewport.offsetTop` and must never use uncompensated `position: fixed; top: 0` without offset tracking.
-- **The Risk:** In Mobile Safari, focusing an input causes WebKit to pan the visual viewport upward (~180–250px). A naive `position: fixed; top: 0` element remains relative to the layout viewport, which pushes the top header off the screen and leaves a massive empty gap above the keyboard.
+### Rule 2.6: Cross-Platform Keyboard Docking & Mobile Safari Viewport (`components/ui/SafeContainer.tsx`)
+- **The Invariant:** Across iOS, Android, and mobile web, virtual keyboard appearances and composer docking must remain fluid, flush, and platform-aware without layout jitter, double-padding, or message list detachment.
+  1. **iOS Native Docking & Smooth Animation:** Always use `<SafeContainer mode="keyboard-avoiding">` with `behavior="padding"` and platform-appropriate `keyboardVerticalOffset`. The bottom composer dock must animate bottom padding smoothly via `Animated.Value` (`keyboardAnim`) synced with `keyboardWillShow` and `keyboardWillHide` event durations (`e.duration`) and native bezier curves (`Easing.bezier(0.17, 0.59, 0.4, 0.77)`). Never toggle dock padding using discrete binary states (`paddingBottom: keyboardUp ? 6 : insets.bottom`), as this causes severe ~28px visual jumping and snapping before or after the keyboard animates.
+  2. **Android Native Resizing:** In Android, `windowSoftInputMode="adjustResize"` automatically shrinks the window. `KeyboardAvoidingView` behavior must remain `undefined` on Android to prevent double-offsetting bugs (which push inputs to the middle of the screen). Dock padding transitions smoothly (150ms) to sit flush above the keyboard.
+  3. **Message List Anchor & Insets:** In chat message lists (`FlatList`), always use `onLayout` to keep the list anchored to the bottom when the viewport contracts, and depend on stable `scrollToBottom` callbacks instead of entire `thread` object references in effects. Avoid unconditional `justifyContent: 'flex-end'` on `contentContainerStyle` for long threads (`>= 8` messages) to prevent breaking native scroll virtualization.
+  4. **Mobile Safari Viewport Sync:** On mobile web (iOS Safari), virtual keyboard appearances trigger WebKit's two-viewport model (`visualViewport.offsetTop` and `visualViewport.height`). Pinned full-screen or bottom-docked containers must sync with `visualViewport.offsetTop` and must never use uncompensated `position: fixed; top: 0` without offset tracking. When in full-screen pinned modes (like chat), lock `html` and `body` `overflow: hidden; height: 100%` on web to prevent iOS Safari from rubber-banding or scrolling the root canvas.
+- **The Risk:** Binary padding toggles cause jarring layout jumps; un-shimmed Android KeyboardAvoidingView doubles keyboard height; naive FlatList `flex-end` corrupts scroll boundaries and hides recent messages; naive `position: fixed` pushes headers off-screen on Safari.
 - **Enforced Pattern:**
-  - Always use `<SafeContainer mode="keyboard-avoiding">` or bind container styles to `window.visualViewport`'s `offsetTop` and `height`.
-  - When in full-screen pinned modes (like chat), lock `html` and `body` `overflow: hidden; height: 100%` on web to prevent iOS Safari from rubber-banding or scrolling the root canvas.
+  - Always use `<SafeContainer mode="keyboard-avoiding" keyboardVerticalOffset={...}>`.
+  - Use `keyboardAnim.interpolate({ inputRange: [0, 1], outputRange: [Math.max(insets.bottom, 12), DOCK_GAP_KEYBOARD] })` in an `<Animated.View>` dock.
+  - In effects, depend on stable `scrollToBottom` callback references instead of volatile hook objects.
 
 ### Rule 2.7: Strict Mercari Buyer Protection Shield Geometry (`components/ui/ShieldCheckIcon.tsx`)
 - **The Invariant:** All buyer protection and seller verification marks across the entire application **MUST** strictly use the canonical Mercari shield and checkmark design implemented in `<ShieldCheckIcon>` (`@/components/ui/ShieldCheckIcon`). The icon renders inside a `0 0 24 24` viewBox with a scaled Mercari group transform:
@@ -154,6 +159,55 @@ These rules protect the runtime from silent crashes, style collapse, and mobile/
   - **NEVER** set `borderRadius` greater than `0` in `components/ui/SoldBadge.tsx`.
   - **NEVER** introduce ad-hoc sold pills or inline badge containers in `ListingCard`, `TikTokListingCard`, `ProductHeroSection`, or any other listing surface. Always import and render `<SoldBadge>`.
 
+### Rule 2.9: Strict Monochrome 10px Product Action Bar (`components/product/ProductActionBar.tsx`)
+- **The Invariant:** The conversion action buttons on the product detail page (`Make an offer` and `Buy now`) in `components/product/ProductActionBar.tsx` are permanently locked to their canonical monochrome 10px geometry:
+  - **Button Height:** Strictly `48` (`height: 48`).
+  - **Corner Radius:** Strictly `10` (`borderRadius: 10`). Never convert to pill capsules (`borderRadius: radii.pill` or `borderRadius: 9999`).
+  - **Border Width:** Strictly `1` (`borderWidth: 1`).
+  - **"Make an offer" Button:** Clean Paper White background (`theme.panel` / `#FFFFFF`), hairline border (`theme.border`), and Ink bold text (`theme.ink` / `#111111`).
+  - **"Buy now" Button:** Solid Ink background (`theme.ink` / `#111111`), Solid Ink border (`theme.ink`), and Paper White bold text (`theme.background` / `#FFFFFF`).
+  - **Copy:** Strictly clean copy (`{isOwner ? 'Edit listing' : 'Buy now'}` and `'Make an offer'`). Never add bundle prefix text or turn the background into Signal Purple (`theme.purple` / `#6C47FF`).
+- **The Risk:** Attempts to convert the action bar into pill-shaped buttons, turn 'Buy now' purple, or introduce dynamic bundle badges disrupt the calm atelier aesthetic and break visual rhythm on the product view.
+- **Enforced Directives for AI Assistants:**
+  - **NEVER** change `borderRadius` from `10` in `styles.offerButton` or `styles.buyButton` in `components/product/ProductActionBar.tsx`.
+  - **NEVER** set `backgroundColor` or `borderColor` of `buyButton` to `theme.purple` or `#6C47FF`.
+  - **NEVER** remove or alter the monochrome pairing of Paper White (`theme.panel`) and Solid Ink (`theme.ink`).
+
+### Rule 2.10: Strict Activity Screen & Purchases / Selling Invariant (`app/(tabs)/chat.tsx`, `components/chat/OrdersInboxPage.tsx`)
+- **The Invariant:** The Activity screen is organized into three consolidated top tabs: `Orders`, `Messages`, and `Support`. Sales and seller inventory management must permanently live **inside** the `Orders` view, never extracted into a 4th top tab or removed:
+  - **Top Tabs:** Strictly 3 tabs: `Orders` (`orders`), `Messages` (`messages`), `Support` (`support`).
+  - **Sub-Toggle in OrdersInboxPage:** A segmented toggle between `Purchases` and `Selling` with item count badges (`Purchases (X)` | `Selling (Y)`) positioned directly above the filter chips.
+  - **Selling Sub-View Actions:** When `Selling` is selected, `OrdersInboxPage` must display the `Shop Listings` quick-action bar with `+ New item` (`sell.open()`) and `View shop` (navigating to `/(tabs)/profile?tab=selling`), allowing sellers quick access to inventory creation and shop management.
+  - **Whatnot Squircle Filter Chips:** Filter chips in `OrdersInboxPage` strictly use squircle geometry (`borderRadius: 8`, `height: 36`, active Paper White in dark / Solid Ink in light mode, inactive `#2C2C2E` / `#E5E7EB`) with categories: `All`, `In Progress`, `Completed`, `Refunds`, `Canceled`. Underline dividing lines beneath filter chips are strictly removed.
+  - **Whatnot Order Row Layout:** Order cards render with 72x72 square thumbnail (8px radius), status pill on top (`Completed`, `In Transit`, `Cancelled`, `Refund Under Review`, etc.), bold title, price, date, counterparty link, and hairline bottom border. Chevron icons are omitted.
+  - **Clean Message Rows:** Dividers between message list rows and the underline under the 4 message filter chips are strictly removed.
+- **The Risk:** Future AI models might attempt to split Sales into a separate top tab (breaking navigation balance), remove the Selling switcher (leaving sellers without a way to view their sales/listings), or alter the Whatnot squircle filter chips back to generic pills or reintroduce clunky horizontal dividers.
+- **Enforced Directives for AI Assistants:**
+  - **NEVER** remove `Selling` from the `Purchases & Selling` tab or attempt to create a separate top tab for Sales.
+  - **NEVER** remove the `Purchases` | `Selling` segmented control inside `components/chat/OrdersInboxPage.tsx`.
+  - **NEVER** remove the `Shop Listings` bar (`+ New item`, `View shop`) from the `Selling` sub-view.
+  - **NEVER** re-introduce message separators or underlines under filter chips on the Activity screen.
+
+### Rule 2.11: React Native `testID` Standard for E2E Automation (`testID` vs HTML `data-testid`)
+- **The Invariant:** All UI test hooks across React Native / Expo components **MUST** use the native `testID="..."` prop, **NEVER** HTML `data-testid="..."`.
+- **The Mechanism:** React Native for Web automatically compiles `testID="identifier"` into the DOM attribute `data-testid="identifier"`. Native iOS and Android map it to native test identifiers (`accessibilityIdentifier` on iOS, view tags on Android).
+- **The Risk:** Passing `data-testid="..."` directly to React Native components (`<TextInput>`, `<Pressable>`, `<View>`, `<PressableScale>`) is an invalid prop in React Native TypeScript types, fails to expose identifiers on native mobile apps, and causes typecheck failures.
+- **Enforced Directives for AI Assistants:**
+  ```tsx
+  // ❌ FORBIDDEN: Invalid in React Native, breaks TypeScript and native builds
+  <TextInput data-testid="email-input" />
+  <Pressable data-testid="buy-now-button" ... />
+
+  // ✅ REQUIRED: Standard React Native testID (compiles to data-testid in DOM for Playwright)
+  <TextInput testID="email-input" />
+  <Pressable testID="buy-now-button" ... />
+  ```
+  In Playwright test suites, query elements via Playwright's canonical locator:
+  ```ts
+  page.getByTestId('email-input');
+  page.getByTestId('buy-now-button');
+  ```
+
 ---
 
 ## 3. Strict Design Language Invariants ("The Quiet Atelier" - `DESIGN.md`)
@@ -167,7 +221,8 @@ Carrinex is a disciplined, quiet-luxury resale marketplace. Restraint communicat
 | **Resale Clutter** | Poshmark/Depop-style badges, ribbons, star ratings, stickers, promotional overlays, or emoji as decoration. | Clean, quiet presentation. Product photography and seller words are the centerpiece. Use Feather or Ionicons, never decorative emoji. |
 | **Action Hierarchy** | Multiple filled purple buttons on the same screen. | **One Primary Action Rule:** Exactly ONE primary purple CTA per screen. Secondary actions must be Ghost (white + hairline border), Dark (ink), or Soft (purple tint). |
 | **Shadows** | Dramatic, heavy, dark drop-shadows (>16% opacity). | **Whisper Shadow Rule:** Shadows must be ≤16% opacity, flat by default, or color-matched to the element casting it. |
-| **Button Shapes** | Rectangular or sharp-cornered buttons. | All interactive buttons and chips must use **Pill Radius** (`rounded: 999px`). Containers use `16px–28px` radius. |
+| **Button Shapes** | Rectangular or sharp-cornered buttons. | All interactive buttons and chips must use **Pill Radius** (`rounded: 999px`). Containers use `16px–28px` radius. Approved canonical exception: Product Action Bar (Rule 2.9) strictly uses 10px radius (`borderRadius: 10`). |
+| **Product Action Bar Buttons** | Changing 'Buy now' to purple, altering 10px corner radius, or adding dynamic bundle prefixes. | **Strict Monochrome 10px Product Action Bar:** Both 'Make an offer' and 'Buy now' buttons in `ProductActionBar.tsx` strictly use `height: 48` and `borderRadius: 10`. 'Make an offer' is Paper White (`theme.panel`) with hairline border and Ink text. 'Buy now' is Solid Ink (`theme.ink`) with white text (`theme.background`). Never style 'Buy now' with Signal Purple or convert to pill capsules. |
 | **Micro-Interactions**| Color swapping on press. | Physical spring give: scale to `0.97` and opacity to `0.9` on press (`PressableScale`). |
 | **Shield / Protection Icon** | Generic SVG curves (`M12 3C7.5 3...`), Feather `shield`, or non-purple/indigo colors (e.g. Vinted teal `#007782`). | **Unified Mercari Shield Icon Rule:** All buyer protection and verification marks across the entire application (Home feed `ListingCard`, `RelatedItemCard`, Product detail `ProductOverviewHeader`, `BuyerProtectionSheet`, `SafetyBanner`, `CheckoutSheet`, `SettingsHero`, `ProfileHeader`) **MUST** use the canonical circular badge `<ShieldCheckIcon>` (`@/components/ui/ShieldCheckIcon`) in a `0 0 24 24` viewBox. Strictly preserves the Mercari shield path (`d="M12.033 6.8s-2.93 1.424..."`) and checkmark (`d="M9.4 12.013l..."`) inside `<G transform="translate(-5.4, -5.4) scale(1.45)">` with `#F2F3FE` badge fill and `#5356EE` stroke. Never replace or alter this geometry. |
 | **Filter / Controls Icon** | Vertical sliders (`Feather` `sliders`), generic funnels (`filter`), or text labels like "Filter" / "Filters" beside the icon. | **Horizontal Slider Trio & Icon-Only Rule:** All filter buttons and filter chips across the application (Home header `FeedSearch`, Discover `SearchFilterChips`, search overlays) **MUST** use the canonical `<FilterSlidersIcon>` (`@/components/ui/FilterSlidersIcon`) and **MUST NOT** include the word "Filter" or "Filters". The control renders strictly as an icon-only pill or circular container matching the quiet atelier aesthetic. Features 3 horizontal tracks with staggered circular slider knobs (top-left, middle-right, bottom-left) in a canonical `0 0 24 24` viewBox (`strokeWidth={1.65}`, default `size={19}`). Horizontal lines connect seamlessly to the hollow circular knobs with zero broken gaps. Knob centers remain hollow (`fill="none"`) so the button fill (Paper White at rest, Solid Ink when active) shows cleanly through. |
@@ -195,8 +250,11 @@ The following files represent high-risk architectural hubs. Any AI asked to modi
 | `components/ListingCard.tsx` | Feed Performance | Renders in `FlashList`. Uses raw `expo-image`, cached like states, unified `<ShieldCheckIcon>`, and strict 4:5 aspect ratio. |
 | `components/chat/ListingBar.tsx` | Transaction Flow | Pinned to bottom above chat composer deliberately to keep negotiation item in context. |
 | `components/GuestGate.tsx` | Auth Guard | Guards authenticated actions; prevents unauthenticated RPC errors. |
-| `components/ui/SafeContainer.tsx` | Layout / Viewport Engine | Mobile-native safe area and keyboard avoiding container with iOS Safari visualViewport synchronization. |
+| `components/ui/SafeContainer.tsx` | Layout / Viewport Engine | Mobile-native safe area and keyboard avoiding container with platform-specific behavior/offsets and iOS Safari visualViewport synchronization. |
 | `components/ui/SoldBadge.tsx` | Visual Identity / Listings | Canonical sharp Sold badge across all listing cards and detail overlays. Strictly enforces 90° sharp corners (`borderRadius: 0`) and Signal Purple palette. AI must NEVER round corners or replace with inline pills. |
+| `components/product/ProductActionBar.tsx` | Visual Identity / Conversion | Product detail bottom action bar. Strictly enforces 10px corners (`borderRadius: 10`) and monochrome palette (Paper White 'Make an offer', Solid Ink 'Buy now'). AI must NEVER style 'Buy now' purple or convert buttons to pill radius. |
+| `app/(tabs)/chat.tsx` | Navigation / Activity | Activity tab coordinator. Strictly locked to 3 top tabs: `Orders`, `Messages`, `Support`. AI must NEVER split sales into a 4th tab or remove selling. |
+| `components/chat/OrdersInboxPage.tsx` | Transactions / Orders & Selling | Orders and selling hub. Enforces segmented sub-toggle between `Purchases` and `Selling`, `Shop Listings` quick inventory bar (`+ New item`, `View shop`), and 36px Whatnot squircle filter chips. |
 | `app/_layout.tsx` | Root Providers | Controls font preloading, Sentry, Alert shim, and React Query offline persistence. |
 
 ---
@@ -223,8 +281,14 @@ Before proceeding with a user request, match it against this matrix:
 | *"Add an unauthenticated quick checkout / chat"* | 🔴 **YES** | Bypasses `GuestGate` security, crashing Supabase RPC queries. | Wrap the action in `guestGate.gate(() => proceed())`. |
 | *"Make unselected buttons, search bars, or chips grey (#F6F6F6)"* | 🔴 **YES** | Violates Paper White Resting State; makes active controls look disabled/greyed out. | Use Paper White (`theme.panel` / `#FFFFFF` in light mode) with hairline border (`theme.border`) for resting controls. |
 | *"Use naive 'position: fixed; top: 0' on mobile web chat or forms"* | 🔴 **YES** | Violates Mobile Safari Viewport Sync Rule (Rule 2.6). Pushes headers off-screen and leaves blank space above keyboard. | Use `<SafeContainer mode="keyboard-avoiding">` with `top: visualViewport.offsetTop` and `height: visualViewport.height`. |
+| *"Use discrete binary toggles (keyboardUp ? 6 : insets.bottom) for keyboard dock padding"* | 🔴 **YES** | Violates Cross-Platform Keyboard Docking Invariant (Rule 2.6). Causes severe visual snapping and layout jitter during keyboard transitions. | Animate dock padding via `Animated.Value` (`keyboardAnim`) synced with keyboard event durations. |
 | *"Make the Sold badge rounded, pill-shaped, or change its border radius"* | 🔴 **YES** | Violates Strict Sharp Sold Badge Geometry (Rule 2.8). Breaks editorial brand aesthetic. | Maintain strict rectangular geometry (`borderRadius: 0`) in `<SoldBadge>` (`@/components/ui/SoldBadge`). |
 | *"Use an inline pill or ad-hoc container for 'Sold' status on cards"* | 🔴 **YES** | Violates Single Component Invariant for Sold badges. | Import and render canonical `<SoldBadge size="sm" />` from `@/components/ui/SoldBadge`. |
+| *"Turn 'Buy now' purple or make ProductActionBar buttons pill-shaped"* | 🔴 **YES** | Violates Strict Monochrome 10px Product Action Bar Invariant (Rule 2.9). | Maintain `height: 48`, `borderRadius: 10`, `theme.panel` for 'Make an offer', and `theme.ink` for 'Buy now'. |
+| *"Extract sales into a 4th top tab or remove selling from the Purchases view"* | 🔴 **YES** | Violates Strict Activity Screen & Purchases / Selling Invariant (Rule 2.10). Breaks navigation balance and removes seller access. | Keep top tabs locked to `Orders`, `Messages`, `Support`. Maintain `Purchases` | `Selling` segmented control in `OrdersInboxPage.tsx`. |
+| *"Remove the Purchases | Selling toggle inside OrdersInboxPage"* | 🔴 **YES** | Violates Rule 2.10. Deprives sellers of viewing their sales orders and shop inventory actions. | Preserve segmented sub-toggle with counts (`Purchases (X)` | `Selling (Y)`), `Shop Listings` bar, and Whatnot squircle chips. |
+| *"Reintroduce message dividers or underline beneath chips on Activity"* | 🔴 **YES** | Violates Activity visual cleanliness rules (Rule 2.10). | Keep message rows divider-free and chips free of bottom dividing lines. |
+| *"Use HTML 'data-testid' on React Native components"* | 🔴 **YES** | Violates React Native testID standard (Rule 2.11). Causes TypeScript errors and fails on native iOS/Android builds. | Use native `testID="..."`. React Native for Web compiles it to `data-testid` in the DOM for Playwright. |
 | *"Add dark mode styling for this new component"* | 🟢 **NO** | Safe, provided `useTheme()` tokens are used. | Use `const { theme, isDark } = useTheme();` and bind to `theme.surface`, `theme.panel`, etc. |
 
 ---

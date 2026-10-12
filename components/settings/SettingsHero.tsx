@@ -7,6 +7,7 @@ import { useTheme } from '@/context/ThemeContext';
 
 
 import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
+import { BRAND } from '@/lib/brand';
 import type { User as Profile } from '@/types';
 
 export function SettingsHero({
@@ -58,7 +59,7 @@ export function SettingsHero({
           }}
         />
         <Text style={{ fontSize: 14, color: theme.textMuted, lineHeight: 20, flex: 1 }}>
-          Manage your shop, account and how you appear on Carrinex.
+          Manage your shop, account and how you appear on {BRAND}.
         </Text>
       </View>
 

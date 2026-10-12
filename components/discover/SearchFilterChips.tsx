@@ -167,7 +167,7 @@ export const SearchFilterChips = memo(function SearchFilterChips({
   }, [activeModal, filters.priceMin, filters.priceMax]);
 
   const activeCount = useMemo(() => countActiveSearchFilters(filters), [filters]);
-  const activeIconColor = isDark ? '#FFFFFF' : '#0F0F0F';
+  const activeIconColor = isDark ? '#FFFFFF' : theme.ink;
 
   // Formatted count label: "500+ results" or "X results"
   const formattedCountText = useMemo(() => {
@@ -386,35 +386,6 @@ export const SearchFilterChips = memo(function SearchFilterChips({
         contentContainerStyle={styles.chipsScrollContent}
         style={styles.chipsScrollView}
       >
-        {/* Chip 1: Filter (Main trigger) */}
-        <Pressable
-          onPress={() => {
-            haptic();
-            if (onOpenFullFilter) {
-              onOpenFullFilter();
-            } else {
-              setActiveModal('all');
-            }
-          }}
-          style={({ pressed }) => [
-            styles.chip,
-            styles.filterIconChip,
-            activeCount > 0 ? styles.chipActive : styles.chipInactive,
-            { transform: [{ scale: pressed ? 0.96 : 1 }] },
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel={onOpenFullFilter ? 'Open all filters' : 'Open filters modal'}
-        >
-          <FilterSlidersIcon
-            size={14.5}
-            color={activeCount > 0 ? activeIconColor : theme.text}
-          />
-          {activeCount > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{activeCount}</Text>
-            </View>
-          )}
-        </Pressable>
 
         {/* Chip 2: Category */}
         <Pressable
@@ -600,35 +571,6 @@ export const SearchFilterChips = memo(function SearchFilterChips({
           />
         </Pressable>
 
-        {/* Chip 8: Material */}
-        <Pressable
-          onPress={() => {
-            haptic();
-            setActiveModal('material');
-          }}
-          style={({ pressed }) => [
-            styles.chip,
-            filters.material ? styles.chipActive : styles.chipInactive,
-            { transform: [{ scale: pressed ? 0.96 : 1 }] },
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel={`Filter by material. Currently ${materialLabel}`}
-        >
-          <Text
-            style={[
-              styles.chipText,
-              filters.material ? styles.chipTextActive : styles.chipTextInactive,
-            ]}
-          >
-            {materialLabel}
-          </Text>
-          <Feather
-            name="chevron-down"
-            size={12.5}
-            color={filters.material ? activeIconColor : theme.mute}
-            style={{ marginLeft: 4 }}
-          />
-        </Pressable>
 
         {/* Chip 9: Sort by */}
         <Pressable
@@ -1725,12 +1667,12 @@ function createStyles(theme: ThemeTokens, isDark: boolean) {
       }),
     },
     chipActive: {
-      backgroundColor: isDark ? '#2C2C30' : '#EBEBEF',
-      borderColor: isDark ? 'rgba(255, 255, 255, 0.22)' : 'rgba(15, 15, 15, 0.20)',
+      backgroundColor: isDark ? (theme.selected ?? '#2C2C30') : '#F0F1F5',
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.16)' : '#E5E7EB',
       borderWidth: 1,
       ...Platform.select({
         web: {
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
         } as any,
       }),
     },
@@ -1745,7 +1687,7 @@ function createStyles(theme: ThemeTokens, isDark: boolean) {
       fontWeight: '500',
     },
     chipTextActive: {
-      color: isDark ? '#FFFFFF' : '#0F0F0F',
+      color: isDark ? '#FFFFFF' : theme.ink,
       fontWeight: '600',
       fontFamily: typography.family.sansBold,
     },

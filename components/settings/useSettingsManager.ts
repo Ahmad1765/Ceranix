@@ -20,6 +20,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
+import { uploadVerificationDocument } from '@/lib/upload';
 import {
   ensurePermissionAndRegister,
   isThisDeviceRegistered,
@@ -36,12 +37,29 @@ import type {
 } from '@/components/settings';
 import type { PayoutMethod, ShippingAddress, Verification } from '@/types';
 
-export const SUPPORT_EMAIL = 'support@carrinex.app';
+export const SUPPORT_EMAIL = 'support@grabsty.com';
 export const TERMS_URL = `${APP_URL}/terms`;
 export const PRIVACY_URL = `${APP_URL}/privacy`;
 
-export type Section = 'admin' | 'shop' | 'verify' | 'enhance' | 'account' | 'help';
-export const SECTIONS: readonly Section[] = ['admin', 'shop', 'verify', 'enhance', 'account', 'help'];
+export type Section =
+  | 'general'
+  | 'account'
+  | 'shop'
+  | 'verify'
+  | 'security'
+  | 'help'
+  | 'admin'
+  | 'enhance';
+export const SECTIONS: readonly Section[] = [
+  'general',
+  'account',
+  'shop',
+  'verify',
+  'security',
+  'help',
+  'admin',
+  'enhance',
+];
 export type Busy = 'logout' | 'delete' | 'password' | null;
 
 export function useSettingsManager() {
@@ -49,17 +67,28 @@ export function useSettingsManager() {
   const toast = useToast();
   const params = useLocalSearchParams<{ open?: string }>();
 
-  const [openSection, setOpenSection] = useState<Section | null>(null);
+  // ponytail: default to 'general' for ChatGPT-style direct tab navigation
+  const [openSection, setOpenSection] = useState<Section>('general');
   const [busy, setBusy] = useState<Busy>(null);
   const [pushOn, setPushOn] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [shareUsage, setShareUsage] = useState(!isOptedOut());
+  const [resetCooldown, setResetCooldown] = useState(0);
   const mounted = useRef(true);
 
-  // Address / Payout / Verification Data
+  useEffect(() => {
+    if (resetCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResetCooldown((c) => Math.max(0, c - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resetCooldown]);
+
+  // Address / Payout / Verification / Phone Data
   const [address, setAddress] = useState<ShippingAddress | null>(null);
   const [payout, setPayout] = useState<PayoutMethod | null>(null);
   const [verification, setVerification] = useState<Verification | null>(null);
+  const [phone, setPhone] = useState<string | null>(null);
   const [loadingExtras, setLoadingExtras] = useState(true);
 
   // Modal Visibility States
@@ -69,6 +98,7 @@ export function useSettingsManager() {
   const [showBundle, setShowBundle] = useState(false);
   const [showTheme, setShowTheme] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
+  const [showPhone, setShowPhone] = useState(false);
 
   useEffect(() => {
     mounted.current = true;
@@ -83,6 +113,7 @@ export function useSettingsManager() {
       setAddress(null);
       setPayout(null);
       setVerification(null);
+      setPhone(null);
       setLoadingExtras(false);
       return;
     }
@@ -112,7 +143,12 @@ export function useSettingsManager() {
       if (!mounted.current) return;
       setAddress((a.data as ShippingAddress | null) ?? null);
       setPayout((p.data as PayoutMethod | null) ?? null);
-      setVerification((v.data as Verification | null) ?? null);
+      const vRec = (v.data as Verification | null) ?? null;
+      if (vRec && !vRec.id_photo_url && vRec.notes) {
+        vRec.id_photo_url = vRec.notes;
+      }
+      setVerification(vRec);
+      setPhone(profile?.phone || user?.phone || (user?.user_metadata as any)?.phone || null);
     } catch (e) {
       console.warn('[settings] loadExtras failed', e);
     } finally {
@@ -162,17 +198,24 @@ export function useSettingsManager() {
         setShowVerify(true);
         break;
       case 'theme':
-        setOpenSection('enhance');
-        setShowTheme(true);
+      case 'notifications':
+      case 'enhance':
+      case 'general':
+        setOpenSection('general');
+        if (target === 'theme') setShowTheme(true);
         break;
       case 'subscription':
       case 'pro':
-        setOpenSection('enhance');
+        setOpenSection('account');
         setShowSubscription(true);
         break;
-      case 'notifications':
-      case 'enhance':
-        setOpenSection('enhance');
+      case 'phone':
+        setOpenSection('account');
+        setShowPhone(true);
+        break;
+      case 'security':
+      case 'password':
+        setOpenSection('security');
         break;
       case 'shop':
       case 'account':
@@ -191,7 +234,7 @@ export function useSettingsManager() {
   // ── 3. Section Toggling ───────────────────────────────────────────────────
   const toggleSection = useCallback((s: Section) => {
     tap('light');
-    setOpenSection((prev) => (prev === s ? null : s));
+    setOpenSection(s);
   }, []);
 
   // ── 4. DB Sync Actions (Vacation, Bundle, Push, Analytics) ────────────────
@@ -212,7 +255,7 @@ export function useSettingsManager() {
       }
       await refreshProfile();
     },
-    [user?.id, refreshProfile],
+    [user?.id, refreshProfile, toast],
   );
 
   const setBundlePct = useCallback(
@@ -232,10 +275,10 @@ export function useSettingsManager() {
       }
       await refreshProfile();
     },
-    [user?.id, refreshProfile],
+    [user?.id, refreshProfile, toast],
   );
 
-  const savedCollectionPrivacy: 'public' | 'private' = profile?.saved_collection_privacy ?? 'public';
+  const savedCollectionPrivacy: 'public' | 'private' = profile?.saved_collection_privacy ?? 'private';
 
   const setSavedCollectionPrivacy = useCallback(
     async (privacy: 'public' | 'private') => {
@@ -253,7 +296,7 @@ export function useSettingsManager() {
       }
       await refreshProfile();
     },
-    [user?.id, refreshProfile],
+    [user?.id, refreshProfile, toast],
   );
 
   const openSystemSettings = useCallback(async () => {
@@ -344,6 +387,13 @@ export function useSettingsManager() {
       return;
     }
     if (busy) return;
+    if (resetCooldown > 0) {
+      toast.show(`Please wait ${resetCooldown}s before requesting another reset email`, {
+        variant: 'info',
+        icon: 'clock',
+      });
+      return;
+    }
     const ok = await confirm({
       title: 'Send password reset?',
       message: `We'll email ${user.email} a link to change your password.`,
@@ -354,16 +404,26 @@ export function useSettingsManager() {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(user.email!);
       if (error) throw error;
-      toast.show('Reset email sent', { variant: 'success', icon: 'mail' });
+      setResetCooldown(60);
+      toast.show('Reset email sent — check your inbox', { variant: 'success', icon: 'mail' });
     } catch (e: any) {
-      toast.show(e?.message ?? 'Could not send email', {
-        variant: 'default',
-        icon: 'alert-triangle',
-      });
+      const msg = e?.message ?? '';
+      if (/rate_limit|over_email_send_rate_limit|429|too many/i.test(msg)) {
+        setResetCooldown(120);
+        toast.show('Too many reset attempts. Please wait a couple minutes before trying again.', {
+          variant: 'default',
+          icon: 'alert-triangle',
+        });
+      } else {
+        toast.show(msg || 'Could not send email', {
+          variant: 'default',
+          icon: 'alert-triangle',
+        });
+      }
     } finally {
       if (mounted.current) setBusy(null);
     }
-  }, [user?.email, busy, toast]);
+  }, [user?.email, busy, resetCooldown, toast]);
 
   const handleDeleteAccount = useCallback(async () => {
     if (busy) return;
@@ -464,18 +524,63 @@ export function useSettingsManager() {
         account_last4: form.account_last4.trim(),
         is_default: true,
       };
-      const { data, error } = await supabase.rpc('set_default_payout', {
-        p_payload: payout?.id ? { ...payload, id: payout.id } : payload,
-      });
 
-      if (error) {
-        toast.show(error.message ?? 'Could not save payout', {
+      let savedData: PayoutMethod | null = null;
+      let rpcError: Error | null = null;
+
+      try {
+        const { data, error } = await supabase.rpc('set_default_payout', {
+          p_payload: payout?.id ? { ...payload, id: payout.id } : payload,
+        });
+        if (!error && data) {
+          savedData = data as PayoutMethod;
+        } else if (error) {
+          rpcError = new Error(error.message);
+        }
+      } catch (err: any) {
+        rpcError = err instanceof Error ? err : new Error(String(err));
+      }
+
+      // Direct database fallback if RPC not yet deployed or failed
+      if (!savedData) {
+        try {
+          await supabase
+            .from('payout_methods')
+            .update({ is_default: false })
+            .eq('user_id', user.id)
+            .eq('is_default', true);
+
+          if (payout?.id) {
+            const { data, error } = await supabase
+              .from('payout_methods')
+              .update(payload)
+              .eq('id', payout.id)
+              .eq('user_id', user.id)
+              .select()
+              .single();
+            if (!error && data) savedData = data as PayoutMethod;
+          } else {
+            const { data, error } = await supabase
+              .from('payout_methods')
+              .insert(payload)
+              .select()
+              .single();
+            if (!error && data) savedData = data as PayoutMethod;
+          }
+        } catch {
+          // continue to check savedData
+        }
+      }
+
+      if (!savedData) {
+        toast.show(rpcError?.message ?? 'Could not save payout method', {
           variant: 'default',
           icon: 'alert-triangle',
         });
         return false;
       }
-      if (mounted.current) setPayout(data as PayoutMethod);
+
+      if (mounted.current) setPayout(savedData);
       toast.show('Payout method saved', { variant: 'success', icon: 'check' });
       return true;
     },
@@ -499,12 +604,24 @@ export function useSettingsManager() {
   const saveVerification = useCallback(
     async (form: VerifyForm): Promise<boolean> => {
       if (!user?.id) return false;
+
+      let photoUrl = form.id_photo_url || null;
+      if (form.local_image?.uri) {
+        try {
+          photoUrl = await uploadVerificationDocument(form.local_image, user.id);
+        } catch (uploadErr) {
+          console.warn('[settings] verification photo upload failed; using fallback', uploadErr);
+          photoUrl = form.local_image.uri;
+        }
+      }
+
       const payload = {
         user_id: user.id,
         status: 'submitted' as const,
         legal_name: form.legal_name.trim(),
         document_kind: form.document_kind,
         document_number_last4: form.document_number_last4.trim() || null,
+        notes: photoUrl || (verification?.notes ?? null),
         submitted_at: new Date().toISOString(),
       };
       const { data, error } = await supabase
@@ -519,12 +636,62 @@ export function useSettingsManager() {
         });
         return false;
       }
-      if (mounted.current) setVerification(data as Verification);
+      const record = (data as Verification) ?? null;
+      if (record && !record.id_photo_url && record.notes) {
+        record.id_photo_url = record.notes;
+      }
+      if (mounted.current) setVerification(record);
       toast.show('Verification submitted', { variant: 'success', icon: 'check' });
       return true;
     },
-    [user?.id, toast],
+    [user?.id, verification?.notes, toast],
   );
+
+  const savePhone = useCallback(
+    async (phoneNum: string): Promise<boolean> => {
+      if (!user?.id) return false;
+      const clean = phoneNum.trim();
+      try {
+        await supabase
+          .from('profiles')
+          .update({ phone: clean })
+          .eq('id', user.id);
+
+        await supabase.auth.updateUser({
+          phone: clean.startsWith('+') ? clean : undefined,
+          data: { phone: clean },
+        }).catch(() => {});
+
+        await refreshProfile().catch(() => {});
+        if (mounted.current) setPhone(clean);
+        toast.show('Phone number saved', { variant: 'success', icon: 'check' });
+        return true;
+      } catch (e: any) {
+        toast.show(e?.message ?? 'Could not save phone number', {
+          variant: 'default',
+          icon: 'alert-triangle',
+        });
+        return false;
+      }
+    },
+    [user?.id, refreshProfile, toast],
+  );
+
+  const removePhone = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      await supabase.from('profiles').update({ phone: null }).eq('id', user.id);
+      await supabase.auth.updateUser({ data: { phone: null } }).catch(() => {});
+      await refreshProfile().catch(() => {});
+      if (mounted.current) setPhone(null);
+      toast.show('Phone number removed', { variant: 'default', icon: 'trash-2' });
+    } catch (e: any) {
+      toast.show(e?.message ?? 'Could not remove phone', {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
+    }
+  }, [user?.id, refreshProfile, toast]);
 
   return {
     open: openSection,
@@ -541,6 +708,8 @@ export function useSettingsManager() {
     address,
     payout,
     verification,
+    phone,
+    setPhone,
     loadingExtras,
     showAddress,
     setShowAddress,
@@ -554,6 +723,8 @@ export function useSettingsManager() {
     setShowTheme,
     showSubscription,
     setShowSubscription,
+    showPhone,
+    setShowPhone,
     setVacationMode,
     setBundlePct,
     savedCollectionPrivacy,
@@ -563,8 +734,11 @@ export function useSettingsManager() {
     savePayout,
     removePayout,
     saveVerification,
+    savePhone,
+    removePhone,
     handleLogout,
     handleResetPassword,
+    resetCooldown,
     handleDeleteAccount,
     openSystemSettings,
   };

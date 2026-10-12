@@ -17,6 +17,7 @@ import { tap } from '@/lib/haptics';
 import { useTheme } from '@/context/ThemeContext';
 import { type as typography } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
+import { BRAND } from '@/lib/brand';
 import type { ShippingAddress } from '@/types';
 
 export interface SellerPickupAddressInput {
@@ -197,7 +198,7 @@ export function SellerPickupModal({
                     fontFamily: typography.family.sans,
                   }}
                 >
-                  Ceranix Operations will arrange a courier to collect from here.
+                  {BRAND} Operations will arrange a courier to collect from here.
                 </Text>
               </View>
 

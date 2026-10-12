@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
-import { View } from 'react-native';
+import { View, ActivityIndicator } from 'react-native';
 import { SellForm } from '@/components/sell/SellSheet';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/context/ThemeContext';
@@ -8,7 +8,7 @@ import { useGuestGate } from '@/components/GuestGate';
 import { useListingQuery } from '@/lib/queries/useListingsQueries';
 
 export default function SellScreen() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { theme } = useTheme();
   const guestGate = useGuestGate();
   const params = useLocalSearchParams<{ id?: string }>();
@@ -16,15 +16,16 @@ export default function SellScreen() {
 
   const { data: listing } = useListingQuery(listingId);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     if (router.canGoBack()) {
       router.back();
     } else {
       router.replace('/(tabs)');
     }
-  };
+  }, []);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user) {
       guestGate.prompt({
         title: 'Sign in to sell',
@@ -33,10 +34,14 @@ export default function SellScreen() {
       });
       handleClose();
     }
-  }, [user]);
+  }, [authLoading, user, guestGate, handleClose]);
 
-  if (!user) {
-    return <View style={{ flex: 1, backgroundColor: theme.background }} />;
+  if (authLoading || !user) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center' }}>
+        {authLoading ? <ActivityIndicator color={theme.purple} /> : null}
+      </View>
+    );
   }
 
   return (

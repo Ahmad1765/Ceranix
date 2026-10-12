@@ -145,15 +145,22 @@ export default function NewConversationScreen() {
         buyerId: user.id,
         sellerId: targetUserId,
         listingId: null,
-      }).then((conv) => {
-        if (conv?.id) {
-          router.replace(`/conversation/${conv.id}` as any);
-        }
-      }).catch((err) => {
-        captureError(err, { fn: 'conversationNew.directRedirect' });
-      });
+      })
+        .then((conv) => {
+          if (conv?.id) {
+            router.replace(`/conversation/${conv.id}` as any);
+          }
+        })
+        .catch((err) => {
+          console.warn('[conversation/new] failed to initialize conversation', err);
+          captureError(err, { fn: 'conversationNew.directRedirect' });
+          toast.show('Could not start conversation. Please try again.', {
+            variant: 'default',
+            icon: 'alert-triangle',
+          });
+        });
     }
-  }, [listingId, targetUserId, isSupport, user]);
+  }, [listingId, targetUserId, isSupport, user, toast]);
 
   // Base price reference for offer presets and ceiling.
   // Non-bundle: listing.price (authoritative from the DB).
@@ -341,6 +348,7 @@ export default function NewConversationScreen() {
           isBundle: isBundle,
           bundleItemIds: isBundle ? bundleItemIds : undefined,
           bundleCount: isBundle ? bundleCount : undefined,
+          baseListingId: listing.id,
         });
         ok = !!saved;
       } else {

@@ -15,7 +15,7 @@ test.describe("Auth modal", () => {
   test("welcome step shows brand, hero copy, and three CTAs", async ({
     page,
   }) => {
-    await expect(page.getByText("Carrinex").first()).toBeVisible();
+    await expect(page.getByText("Grabsty").first()).toBeVisible();
     await expect(
       page.getByText(/Your story[\s\S]*starts now\./i),
     ).toBeVisible();

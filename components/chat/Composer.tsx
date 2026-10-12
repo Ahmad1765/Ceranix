@@ -31,7 +31,7 @@ export function Composer({
   onPlus,
   onFocus,
   onBlur,
-  placeholder = 'Write a message…',
+  placeholder = 'Write a private message',
   disabledReason,
   uploadingImage = false,
 }: {

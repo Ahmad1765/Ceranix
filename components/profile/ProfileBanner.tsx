@@ -9,7 +9,7 @@ import { CONTENT_MAX_WIDTH } from '@/lib/responsive';
 import { getOptimizedImageUrl } from '@/lib/images';
 
 export const AVATAR_SIZE = 96;
-const RING = 0;
+
 export const BANNER_ASPECT = 16 / 9;
 
 export function bannerSizeFor(viewportWidth: number): { width: number; height: number } {

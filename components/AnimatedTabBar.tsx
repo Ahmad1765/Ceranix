@@ -150,18 +150,32 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
       previewIdx.value = NO_PREVIEW;
       return;
     }
+
     const focused = route.key === activeKey;
+    // Emit tabPress synchronously during the user touch/click gesture so any listener
+    // that calls e.preventDefault() (like Categories opening DiscoverSheet or Sell opening SellSheet)
+    // runs synchronously with active user activation — allowing immediate soft keyboard / keypad focus.
     const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
     if (!focused && !event.defaultPrevented) {
-      if (HAPTICS) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      const t0 = __DEV__ ? Date.now() : 0;
-      navigation.navigate(route.name);
-      if (__DEV__) {
-        requestAnimationFrame(() =>
+      const doNavigate = () => {
+        if (HAPTICS) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        const t0 = __DEV__ ? Date.now() : 0;
+        navigation.navigate(route.name);
+        if (__DEV__) {
           requestAnimationFrame(() =>
-            console.log(`[tab] ${route.name} ${Date.now() - t0}ms`),
-          ),
-        );
+            requestAnimationFrame(() =>
+              console.log(`[tab] ${route.name} ${Date.now() - t0}ms`),
+            ),
+          );
+        }
+      };
+
+      if (Platform.OS === 'web') {
+        // Defer navigation slightly on web to let the browser's synthetic click
+        // finish on the tab dock instead of hitting underlying buttons in the new view.
+        setTimeout(doNavigate, 80);
+      } else {
+        doNavigate();
       }
     }
     previewIdx.value = NO_PREVIEW;
@@ -252,7 +266,7 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
   return (
     <Animated.View
       ref={containerRef}
-      pointerEvents={shouldHideTabBar ? 'none' : 'box-none'}
+      pointerEvents={shouldHideTabBar ? 'none' : 'auto'}
       style={[
         {
           position: 'absolute',
@@ -275,6 +289,23 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
             flexDirection: 'row',
             height: BAR_HEIGHT,
           }}
+          {...(Platform.OS === 'web'
+            ? {
+                onClick: (e: any) => {
+                  e?.stopPropagation?.();
+                  e?.preventDefault?.();
+                },
+                onTouchEnd: (e: any) => {
+                  e?.stopPropagation?.();
+                },
+                onPointerDown: (e: any) => {
+                  e?.stopPropagation?.();
+                },
+                onPointerUp: (e: any) => {
+                  e?.stopPropagation?.();
+                },
+              }
+            : {})}
         >
           {routes.map((route, pos) => {
             const { options } = descriptors[route.key];
@@ -361,6 +392,23 @@ function TabItem({
         paddingTop: 6,
         paddingBottom: 2,
       }}
+      {...(Platform.OS === 'web'
+        ? {
+            onClick: (e: any) => {
+              e?.stopPropagation?.();
+              e?.preventDefault?.();
+            },
+            onTouchEnd: (e: any) => {
+              e?.stopPropagation?.();
+            },
+            onPointerDown: (e: any) => {
+              e?.stopPropagation?.();
+            },
+            onPointerUp: (e: any) => {
+              e?.stopPropagation?.();
+            },
+          }
+        : {})}
     >
       <Animated.View style={[{ width: ICON, height: ICON }, wrapStyle]}>
         <Animated.View style={[StyleSheet.absoluteFill, outlineStyle]}>

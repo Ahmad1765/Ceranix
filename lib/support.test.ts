@@ -116,7 +116,7 @@ describe('support & direct conversation helpers', () => {
   describe('generateSupportResponse', () => {
     it('returns default assistant greeting when query has no matching keywords', () => {
       const response = generateSupportResponse('hello, what is the meaning of life?');
-      expect(response).toContain("Hi there! I'm the Ceranix Support Assistant");
+      expect(response).toContain("Hi there! I'm the Grabsty Support Assistant");
     });
 
     it('matches single whole-term keyword correctly', () => {
@@ -128,7 +128,7 @@ describe('support & direct conversation helpers', () => {
       // "disorder" contains "order" as substring, but is not a whole-term match
       // "disembarked" contains "bank" as substring, but is not a whole-term match
       const response = generateSupportResponse('There was disorder when the passengers disembarked.');
-      expect(response).toContain("Hi there! I'm the Ceranix Support Assistant");
+      expect(response).toContain("Hi there! I'm the Grabsty Support Assistant");
     });
 
     it('scores entries and returns the highest-scoring topic rather than the first match', () => {
@@ -136,7 +136,7 @@ describe('support & direct conversation helpers', () => {
       // but mentions "protection", "refund", and "damaged" (3 matches for Buyer Protection topic)
       const query = 'How does protection work on my order? I want a refund because the item was damaged.';
       const response = generateSupportResponse(query);
-      expect(response).toContain('Ceranix Buyer Protection');
+      expect(response).toContain('Grabsty Buyer Protection');
       expect(response).not.toContain('Tracking Your Order');
     });
 

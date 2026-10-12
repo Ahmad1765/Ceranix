@@ -64,26 +64,29 @@ export function useUserSafetyActions(options: SafetyActionOptions = {}) {
             text: r.label,
             onPress: async () => {
               setBusy(true);
-              const ok = await reportUser({
-                reporterId: user.id,
-                reportedUserId: targetUserId,
-                reason: r.id,
-                listingId: listingId ?? null,
-              });
-              setBusy(false);
+              try {
+                const ok = await reportUser({
+                  reporterId: user.id,
+                  reportedUserId: targetUserId,
+                  reason: r.id,
+                  listingId: listingId ?? null,
+                });
 
-              if (ok) {
-                capture('user_reported', { reported_user_id: targetUserId, reason: r.id });
-                toast.show('Thanks — our team will review this report.', {
-                  variant: 'success',
-                  icon: 'check',
-                });
-                options.onReported?.();
-              } else {
-                toast.show("Couldn't submit report. Please try again.", {
-                  variant: 'default',
-                  icon: 'alert-triangle',
-                });
+                if (ok) {
+                  capture('user_reported', { reported_user_id: targetUserId, reason: r.id });
+                  toast.show('Thanks — our team will review this report.', {
+                    variant: 'success',
+                    icon: 'check',
+                  });
+                  options.onReported?.();
+                } else {
+                  toast.show("Couldn't submit report. Please try again.", {
+                    variant: 'default',
+                    icon: 'alert-triangle',
+                  });
+                }
+              } finally {
+                setBusy(false);
               }
             },
           })),
@@ -116,26 +119,29 @@ export function useUserSafetyActions(options: SafetyActionOptions = {}) {
             text: r.label,
             onPress: async () => {
               setBusy(true);
-              const ok = await reportListing({
-                listingId,
-                reporterId: user.id,
-                reportedUserId: sellerId ?? null,
-                reason: r.id,
-              });
-              setBusy(false);
+              try {
+                const ok = await reportListing({
+                  listingId,
+                  reporterId: user.id,
+                  reportedUserId: sellerId ?? null,
+                  reason: r.id,
+                });
 
-              if (ok) {
-                capture('listing_reported', { listing_id: listingId, reason: r.id });
-                toast.show('Thanks — our team will review this listing.', {
-                  variant: 'success',
-                  icon: 'check',
-                });
-                options.onReported?.();
-              } else {
-                toast.show("Couldn't submit report", {
-                  variant: 'default',
-                  icon: 'alert-triangle',
-                });
+                if (ok) {
+                  capture('listing_reported', { listing_id: listingId, reason: r.id });
+                  toast.show('Thanks — our team will review this listing.', {
+                    variant: 'success',
+                    icon: 'check',
+                  });
+                  options.onReported?.();
+                } else {
+                  toast.show("Couldn't submit report", {
+                    variant: 'default',
+                    icon: 'alert-triangle',
+                  });
+                }
+              } finally {
+                setBusy(false);
               }
             },
           })),
@@ -175,19 +181,22 @@ export function useUserSafetyActions(options: SafetyActionOptions = {}) {
             style: 'destructive' as const,
             onPress: async () => {
               setBusy(true);
-              const ok = await blockUser({
-                blockerId: user.id,
-                blockedId: targetUserId,
-                blockedUsername: targetUsername,
-              });
-              setBusy(false);
+              try {
+                const ok = await blockUser({
+                  blockerId: user.id,
+                  blockedId: targetUserId,
+                  blockedUsername: targetUsername,
+                });
 
-              if (ok) {
-                capture('user_blocked', { blocked_user_id: targetUserId });
-                toast.show(`Blocked ${userLabel}`, { variant: 'info', icon: 'slash' });
-                options.onBlocked?.(targetUserId);
-              } else {
-                toast.show("Couldn't block user", { variant: 'default', icon: 'alert-triangle' });
+                if (ok) {
+                  capture('user_blocked', { blocked_user_id: targetUserId });
+                  toast.show(`Blocked ${userLabel}`, { variant: 'info', icon: 'slash' });
+                  options.onBlocked?.(targetUserId);
+                } else {
+                  toast.show("Couldn't block user", { variant: 'default', icon: 'alert-triangle' });
+                }
+              } finally {
+                setBusy(false);
               }
             },
           },
@@ -212,20 +221,23 @@ export function useUserSafetyActions(options: SafetyActionOptions = {}) {
             text: 'Unblock',
             onPress: async () => {
               setBusy(true);
-              const ok = await unblockUser({
-                blockerId: user.id,
-                blockedId: targetUserId,
-              });
-              setBusy(false);
-
-              if (ok) {
-                toast.show(`Unblocked ${userLabel}`, { variant: 'success', icon: 'check' });
-                options.onUnblocked?.(targetUserId);
-              } else {
-                toast.show("Couldn't unblock user", {
-                  variant: 'default',
-                  icon: 'alert-triangle',
+              try {
+                const ok = await unblockUser({
+                  blockerId: user.id,
+                  blockedId: targetUserId,
                 });
+
+                if (ok) {
+                  toast.show(`Unblocked ${userLabel}`, { variant: 'success', icon: 'check' });
+                  options.onUnblocked?.(targetUserId);
+                } else {
+                  toast.show("Couldn't unblock user", {
+                    variant: 'default',
+                    icon: 'alert-triangle',
+                  });
+                }
+              } finally {
+                setBusy(false);
               }
             },
           },

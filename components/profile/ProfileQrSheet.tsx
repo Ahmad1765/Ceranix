@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { View, Pressable, Platform } from 'react-native';
+import { View, Pressable } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import QRCode from 'react-native-qrcode-svg';

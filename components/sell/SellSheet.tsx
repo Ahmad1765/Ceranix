@@ -6,15 +6,15 @@
 // screen is currently showing and leaves the tab bar's active tab untouched
 // underneath — exactly like the Offer button's sheet on the product page.
 import {
-  createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode,
+  createContext, useCallback, useContext, useEffect, useMemo, useState, useRef, type ReactNode,
 } from 'react';
 import { capture } from '@/lib/analytics';
 import {
   View, Pressable, ScrollView, Alert, ActivityIndicator,
-  KeyboardAvoidingView, Platform, useWindowDimensions, Modal,
+  KeyboardAvoidingView, Platform, useWindowDimensions,
 } from 'react-native';
 import { Text, TextInput } from '@/lib/rnText';
-import { SafeAreaProvider, SafeAreaView, initialWindowMetrics, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import Feather from '@expo/vector-icons/Feather';
@@ -31,7 +31,7 @@ import { putCachedListing } from '@/lib/listingCache';
 import { emitListingCreated } from '@/lib/listingEvents';
 import { invalidateFresh } from '@/lib/freshness';
 import { router } from 'expo-router';
-import type { Condition, Gender, Listing } from '@/types';
+import type { Category, Condition, Gender, Listing } from '@/types';
 import { categoryLabel, hasSubcategories, subcategoryLabel } from '@/lib/categories';
 import { formatPrice, CURRENCY_SYMBOL } from '@/lib/currency';
 import { itemColorLabel } from '@/lib/itemColors';
@@ -39,7 +39,7 @@ import { SafetyBanner } from '@/components/SafetyBanner';
 import { radii, type as typography } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 import {
-  SingleSelectSheet, TextFieldSheet, SizeSheet, PriceSheet, ColorSheet, CategorySheet, TagsSheet,
+  SingleSelectSheet, SizeSheet, PriceSheet, ColorSheet, CategorySheet, TagsSheet,
   type SelectOption,
 } from '@/components/sell/PickerSheets';
 import { useForm, Controller } from 'react-hook-form';
@@ -55,6 +55,7 @@ import {
   UNBRANDED_LOCAL_TAILOR,
   TAXONOMY_VERSION,
 } from '@/lib/taxonomy';
+import { useGuestGate } from '@/components/GuestGate';
 
 const DISPLAY_BOLD = typography.family.sansBold;
 
@@ -100,13 +101,29 @@ export function useSellSheet(): SellSheetApi {
   return ctx;
 }
 
-import { useGuestGate } from '@/components/GuestGate';
+
 
 export function SellSheetProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const guestGate = useGuestGate();
 
-  const open = useCallback((listingToEdit?: Listing | null) => {
+  const open = useCallback((listingToEdit?: Listing | null | any, e?: any) => {
+    // If an event was passed as first or second arg, stop propagation
+    const eventObj =
+      listingToEdit && typeof listingToEdit.stopPropagation === 'function'
+        ? listingToEdit
+        : e && typeof e.stopPropagation === 'function'
+          ? e
+          : null;
+    if (eventObj) {
+      eventObj.stopPropagation();
+      eventObj.preventDefault?.();
+    }
+    const realListing =
+      listingToEdit && typeof listingToEdit.stopPropagation === 'function'
+        ? null
+        : listingToEdit;
+
     if (!user?.id) {
       guestGate.prompt({
         title: 'Sign in to sell',
@@ -115,10 +132,20 @@ export function SellSheetProvider({ children }: { children: ReactNode }) {
       });
       return false;
     }
-    if (listingToEdit?.id) {
-      router.push(`/sell?id=${listingToEdit.id}` as any);
+
+    const doNavigate = () => {
+      if (realListing?.id) {
+        router.push(`/sell?id=${realListing.id}` as any);
+      } else {
+        router.push('/sell' as any);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      // ponytail: defer navigation on web so synthetic touch/click finishes on the Sell button instead of bleeding into the new view
+      setTimeout(doNavigate, 80);
     } else {
-      router.push('/sell' as any);
+      doNavigate();
     }
     return true;
   }, [user, guestGate]);
@@ -221,8 +248,18 @@ function RowField({
   disabled?: boolean;
 }) {
   const { theme } = useTheme();
-  const handlePress = () => {
+  const lastPressRef = useRef(Platform.OS === 'web' ? Date.now() : 0);
+  const handlePress = (e?: any) => {
     if (disabled) return;
+    if (e && typeof e.stopPropagation === 'function') {
+      e.stopPropagation();
+      if (Platform.OS === 'web' && typeof e.preventDefault === 'function') {
+        e.preventDefault();
+      }
+    }
+    const now = Date.now();
+    if (now - lastPressRef.current < 450) return;
+    lastPressRef.current = now;
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     }
@@ -319,6 +356,34 @@ export function SellForm({
   const { width } = useWindowDimensions();
   const [publishing, setPublishing] = useState(false);
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
+  const isNavigatingSheetRef = useRef(Platform.OS === 'web');
+
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const timer = setTimeout(() => {
+        isNavigatingSheetRef.current = false;
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  const openSheet = useCallback((sheet: ActiveSheet) => {
+    if (isNavigatingSheetRef.current || activeSheet !== null) return;
+    isNavigatingSheetRef.current = true;
+    setActiveSheet(sheet);
+    setTimeout(() => {
+      isNavigatingSheetRef.current = false;
+    }, 400);
+  }, [activeSheet]);
+
+  const closeSheet = useCallback(() => {
+    if (isNavigatingSheetRef.current) return;
+    isNavigatingSheetRef.current = true;
+    setActiveSheet(null);
+    setTimeout(() => {
+      isNavigatingSheetRef.current = false;
+    }, 400);
+  }, []);
 
   const isEditing = !!editingListing;
   const initialValues = useMemo(
@@ -378,6 +443,18 @@ export function SellForm({
     return checkBrandCategoryCompatibility(brand, subcategory);
   }, [brand, subcategory]);
 
+  const setCoverPhoto = (index: number) => {
+    if (index <= 0 || index >= slots.length) return;
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    }
+    const currentSlots = [...(slots as PhotoSlot[])];
+    const [selected] = currentSlots.splice(index, 1);
+    currentSlots.unshift(selected);
+    setValue('slots', currentSlots, { shouldValidate: true });
+    toast.show('Cover photo updated', { variant: 'default', icon: 'check' });
+  };
+
   const tile = useMemo(() => {
     const pagePad = 16 * 2;
     const cardPad = 14 * 2;
@@ -387,25 +464,33 @@ export function SellForm({
   }, [width]);
 
   const pickImages = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: true,
-      quality: 0.8,
-      selectionLimit: MAX_IMAGES,
-      base64: true,
-    });
-    if (!result.canceled) {
-      const room = MAX_IMAGES - slots.length;
-      const picked = result.assets.slice(0, room);
-      const newSlots = picked.map((a) => ({
-        ...makeSlot(
-          { uri: a.uri, base64: a.base64 ?? null },
-          (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`),
-        ),
-        status: 'done' as const,
-      }));
-      const updatedSlots = [...slots, ...newSlots].slice(0, MAX_IMAGES);
-      setValue('slots', updatedSlots, { shouldValidate: true });
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: true,
+        quality: 0.8,
+        selectionLimit: MAX_IMAGES,
+        base64: true,
+      });
+      if (!result.canceled) {
+        const room = MAX_IMAGES - slots.length;
+        const picked = result.assets.slice(0, room);
+        const newSlots = picked.map((a) => ({
+          ...makeSlot(
+            { uri: a.uri, base64: a.base64 ?? null },
+            (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`),
+          ),
+          status: 'done' as const,
+        }));
+        const updatedSlots = [...slots, ...newSlots].slice(0, MAX_IMAGES);
+        setValue('slots', updatedSlots, { shouldValidate: true });
+      }
+    } catch (err: any) {
+      console.warn('[SellSheet] pickImages error', err);
+      toast.show('Could not access photo library. Please check app permissions.', {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
     }
   };
 
@@ -415,19 +500,28 @@ export function SellForm({
   };
 
   const isBrandEntered = Boolean(brand && brand.trim().length > 0);
-  const isBrandedItem = isBrandEntered && brand !== UNBRANDED_LOCAL_TAILOR;
+  const isBrandedItem =
+    isBrandEntered &&
+    brand !== UNBRANDED_LOCAL_TAILOR &&
+    brand.toLowerCase() !== 'no brand';
   const isAuthenticityValid = !isBrandedItem || Boolean(authenticity);
 
   const canPublish =
     title?.trim().length > 0 &&
     parseFloat(price || '0') > 0 &&
     slots.length > 0 &&
-    (!hasSubcategories(category) || !!subcategory) &&
+    Boolean(category) &&
+    (!hasSubcategories(category as Category) || !!subcategory) &&
+    Boolean(condition) &&
+    Boolean(gender) &&
     isAuthenticityValid;
 
   const onValidSubmit = async (formData: SellFormValues) => {
     if (!user) {
       Alert.alert('Sign in required', 'Please sign in to publish a listing.');
+      return;
+    }
+    if (!formData.category || !formData.condition || !formData.gender) {
       return;
     }
 
@@ -521,6 +615,8 @@ export function SellForm({
           if (!result.ok && isMissingColumn) {
             delete (updatePayload as any).authenticity;
             delete (updatePayload as any).taxonomy_version;
+            delete (updatePayload as any).subcategory;
+            delete (updatePayload as any).color;
             result = await updateListing(editingListing.id, updatePayload);
           }
 
@@ -617,6 +713,8 @@ export function SellForm({
       if (isMissingColumn) {
         delete listingPayload.authenticity;
         delete listingPayload.taxonomy_version;
+        delete listingPayload.subcategory;
+        delete listingPayload.color;
         insertRes = await supabase
           .from('listings')
           .insert(listingPayload)
@@ -884,22 +982,22 @@ export function SellForm({
                         style={{ width: '100%', height: '100%' }}
                         contentFit="cover"
                       />
-                      {i === 0 && (
+                      {i === 0 ? (
                         <View
                           style={{
                             position: 'absolute',
                             top: 6,
                             left: 6,
-                            paddingHorizontal: 8,
+                            paddingHorizontal: 7,
                             paddingVertical: 3,
                             borderRadius: radii.pill,
-                            backgroundColor: theme.ink,
+                            backgroundColor: theme.purple,
                           }}
                         >
                           <Text
                             style={{
-                              color: theme.background,
-                              fontSize: 9,
+                              color: '#FFFFFF',
+                              fontSize: 8.5,
                               fontFamily: DISPLAY_BOLD,
                               letterSpacing: 0.6,
                             }}
@@ -907,6 +1005,36 @@ export function SellForm({
                             COVER
                           </Text>
                         </View>
+                      ) : (
+                        <Pressable
+                          onPress={() => setCoverPhoto(i)}
+                          accessibilityRole="button"
+                          accessibilityLabel="Set as cover photo"
+                          style={({ pressed }) => ({
+                            position: 'absolute',
+                            bottom: 6,
+                            left: 6,
+                            right: 6,
+                            paddingVertical: 3,
+                            paddingHorizontal: 4,
+                            borderRadius: radii.pill,
+                            backgroundColor: 'rgba(15,15,15,0.72)',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            opacity: pressed ? 0.75 : 1,
+                          })}
+                        >
+                          <Text
+                            style={{
+                              color: '#FFFFFF',
+                              fontSize: 9,
+                              fontFamily: DISPLAY_BOLD,
+                              letterSpacing: 0.2,
+                            }}
+                          >
+                            Set cover
+                          </Text>
+                        </Pressable>
                       )}
                       <Pressable
                         onPress={() => {
@@ -1159,7 +1287,10 @@ export function SellForm({
                                 }
                                 setValue('brand', bName, { shouldValidate: true });
                                 setIsCustomBrand(false);
-                                if (bName === UNBRANDED_LOCAL_TAILOR) {
+                                if (
+                                  bName.toLowerCase() === 'no brand' ||
+                                  bName === UNBRANDED_LOCAL_TAILOR
+                                ) {
                                   setValue('authenticity', null, { shouldValidate: true });
                                 } else if (!authenticity) {
                                   setTimeout(() => setActiveSheet('authenticity'), 200);
@@ -1285,7 +1416,7 @@ export function SellForm({
               label="Category"
               value={categoryValue}
               placeholder="Select category"
-              onPress={() => setActiveSheet('category')}
+              onPress={() => openSheet('category')}
             />
 
             {!compatibility.compatible && compatibility.advisory ? (
@@ -1310,7 +1441,7 @@ export function SellForm({
                 </View>
                 <Pressable
                   onPress={() => {
-                    setValue('brand', UNBRANDED_LOCAL_TAILOR, { shouldValidate: true });
+                    setValue('brand', 'No brand', { shouldValidate: true });
                     setValue('authenticity', null, { shouldValidate: true });
                   }}
                   style={({ pressed }) => ({
@@ -1335,7 +1466,7 @@ export function SellForm({
               label="Brand"
               value={brand}
               placeholder="Add brand"
-              onPress={() => setActiveSheet('brand')}
+              onPress={() => openSheet('brand')}
             />
 
             {isBrandedItem ? (
@@ -1358,7 +1489,7 @@ export function SellForm({
                   disabled={isCustomBrand}
                   onPress={() => {
                     if (!isCustomBrand) {
-                      setActiveSheet('authenticity');
+                      openSheet('authenticity');
                     }
                   }}
                 />
@@ -1385,7 +1516,7 @@ export function SellForm({
               label="Size"
               value={size}
               placeholder="Add size"
-              onPress={() => setActiveSheet('size')}
+              onPress={() => openSheet('size')}
             />
 
             <RowField
@@ -1393,15 +1524,34 @@ export function SellForm({
               label="Condition"
               value={CONDITIONS.find((c) => c.value === condition)?.label ?? ''}
               placeholder="Add condition"
-              onPress={() => setActiveSheet('condition')}
+              onPress={() => openSheet('condition')}
             />
+            {condition ? (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  paddingHorizontal: 16,
+                  paddingVertical: 7,
+                  backgroundColor: theme.surface,
+                  borderBottomWidth: 1,
+                  borderBottomColor: theme.border,
+                }}
+              >
+                <Feather name="check" size={12} color={theme.purple} />
+                <Text style={{ fontSize: 11.5, color: theme.mute, flex: 1 }} numberOfLines={1}>
+                  {CONDITIONS.find((c) => c.value === condition)?.hint}
+                </Text>
+              </View>
+            ) : null}
 
             <RowField
               icon="droplet"
               label="Color"
               value={color ? itemColorLabel(color) : ''}
               placeholder="Add color"
-              onPress={() => setActiveSheet('colors')}
+              onPress={() => openSheet('colors')}
             />
 
             <RowField
@@ -1409,7 +1559,7 @@ export function SellForm({
               label="Gender"
               value={GENDERS.find((g) => g.value === gender)?.label ?? ''}
               placeholder="Add gender"
-              onPress={() => setActiveSheet('gender')}
+              onPress={() => openSheet('gender')}
             />
 
             <RowField
@@ -1417,10 +1567,25 @@ export function SellForm({
               label="Tags"
               value={tags.length ? `${tags.length} tag${tags.length === 1 ? '' : 's'}` : ''}
               placeholder="Add discovery tags"
-              onPress={() => setActiveSheet('tags')}
+              onPress={() => openSheet('tags')}
               isLast
             />
           </View>
+
+          {errors.category?.message ? (
+            <Text
+              accessibilityRole="alert"
+              style={{
+                fontSize: 12,
+                color: theme.danger ?? '#EF4444',
+                paddingHorizontal: 4,
+                paddingTop: 4,
+                fontFamily: typography.family.sansMedium,
+              }}
+            >
+              {errors.category.message}
+            </Text>
+          ) : null}
 
           {errors.subcategory?.message ? (
             <Text
@@ -1434,6 +1599,36 @@ export function SellForm({
               }}
             >
               {errors.subcategory.message}
+            </Text>
+          ) : null}
+
+          {errors.condition?.message ? (
+            <Text
+              accessibilityRole="alert"
+              style={{
+                fontSize: 12,
+                color: theme.danger ?? '#EF4444',
+                paddingHorizontal: 4,
+                paddingTop: 4,
+                fontFamily: typography.family.sansMedium,
+              }}
+            >
+              {errors.condition.message}
+            </Text>
+          ) : null}
+
+          {errors.gender?.message ? (
+            <Text
+              accessibilityRole="alert"
+              style={{
+                fontSize: 12,
+                color: theme.danger ?? '#EF4444',
+                paddingHorizontal: 4,
+                paddingTop: 4,
+                fontFamily: typography.family.sansMedium,
+              }}
+            >
+              {errors.gender.message}
             </Text>
           ) : null}
 
@@ -1469,7 +1664,7 @@ export function SellForm({
               label="Price"
               value={price && Number.isFinite(parseFloat(price)) ? formatPrice(parseFloat(price), { whole: true }) : ''}
               placeholder={`Set price (${CURRENCY_SYMBOL})`}
-              onPress={() => setActiveSheet('price')}
+              onPress={() => openSheet('price')}
             />
 
             <RowField
@@ -1477,7 +1672,7 @@ export function SellForm({
               label="Parcel size"
               value={PARCEL_SIZES.find((p) => p.value === parcelSize)?.label ?? ''}
               placeholder="Select parcel size"
-              onPress={() => setActiveSheet('parcel')}
+              onPress={() => openSheet('parcel')}
               isLast
             />
           </View>
@@ -1559,41 +1754,47 @@ export function SellForm({
           setValue('category', c, { shouldValidate: true });
           setValue('subcategory', s, { shouldValidate: true });
         }}
-        onClose={() => setActiveSheet(null)}
+        onClose={closeSheet}
       />
       <BrandSheet
         visible={activeSheet === 'brand'}
         value={brand}
-        categoryCode={category}
+        categoryCode={category || undefined}
         subcategoryId={subcategory}
         onSelectBrand={(bName, isCustom) => {
           setValue('brand', bName, { shouldValidate: true });
           setIsCustomBrand(!!isCustom);
-          if (bName === UNBRANDED_LOCAL_TAILOR) {
+          if (
+            bName.toLowerCase() === 'no brand' ||
+            bName === UNBRANDED_LOCAL_TAILOR
+          ) {
             setValue('authenticity', null, { shouldValidate: true });
           } else if (isCustom) {
             setValue('authenticity', 'not_sure', { shouldValidate: true });
           } else {
             if (!authenticity) {
-              setTimeout(() => setActiveSheet('authenticity'), 200);
+              setTimeout(() => {
+                isNavigatingSheetRef.current = false;
+                setActiveSheet('authenticity');
+              }, 250);
             }
           }
         }}
-        onClose={() => setActiveSheet(null)}
+        onClose={closeSheet}
       />
       <AuthenticitySheet
         visible={activeSheet === 'authenticity'}
         brandName={brand}
         value={authenticity}
         onChange={(auth) => setValue('authenticity', auth, { shouldValidate: true })}
-        onClose={() => setActiveSheet(null)}
+        onClose={closeSheet}
       />
       <SizeSheet
         visible={activeSheet === 'size'}
-        categoryCode={category}
+        categoryCode={category || undefined}
         value={size}
         onChange={(s) => setValue('size', s, { shouldValidate: true })}
-        onClose={() => setActiveSheet(null)}
+        onClose={closeSheet}
       />
       <SingleSelectSheet
         visible={activeSheet === 'condition'}
@@ -1601,13 +1802,13 @@ export function SellForm({
         options={CONDITIONS}
         value={condition}
         onChange={(c) => setValue('condition', c, { shouldValidate: true })}
-        onClose={() => setActiveSheet(null)}
+        onClose={closeSheet}
       />
       <ColorSheet
         visible={activeSheet === 'colors'}
         value={color ?? null}
         onChange={(cl) => setValue('color', cl, { shouldValidate: true })}
-        onClose={() => setActiveSheet(null)}
+        onClose={closeSheet}
       />
       <SingleSelectSheet
         visible={activeSheet === 'gender'}
@@ -1615,19 +1816,19 @@ export function SellForm({
         options={GENDERS}
         value={gender}
         onChange={(g) => setValue('gender', g, { shouldValidate: true })}
-        onClose={() => setActiveSheet(null)}
+        onClose={closeSheet}
       />
       <TagsSheet
         visible={activeSheet === 'tags'}
         value={tags}
         onChange={(t) => setValue('tags', t, { shouldValidate: true })}
-        onClose={() => setActiveSheet(null)}
+        onClose={closeSheet}
       />
       <PriceSheet
         visible={activeSheet === 'price'}
         value={price}
         onChange={(p) => setValue('price', p, { shouldValidate: true })}
-        onClose={() => setActiveSheet(null)}
+        onClose={closeSheet}
       />
       <SingleSelectSheet<ParcelSize>
         visible={activeSheet === 'parcel'}
@@ -1635,7 +1836,7 @@ export function SellForm({
         options={PARCEL_SIZES}
         value={parcelSize ?? null}
         onChange={(ps) => setValue('parcelSize', ps, { shouldValidate: true })}
-        onClose={() => setActiveSheet(null)}
+        onClose={closeSheet}
       />
     </SafeAreaView>
   );

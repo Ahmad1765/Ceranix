@@ -19,7 +19,7 @@
 //    smooth 60fps gesture handling.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Pressable, Alert, Share, type LayoutChangeEvent } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -49,17 +49,15 @@ import { confirm } from '@/lib/confirm';
 import { logListingView } from '@/lib/recommendations';
 import { capture, buildListingViewedProps } from '@/lib/analytics';
 import { useAuth } from '@/lib/auth';
-import { fetchOrderForListing, type Order } from '@/lib/payments';
 import { useToast } from '@/lib/toast';
 import { captureError } from '@/lib/sentry';
-import { getOrCreateConversation, sendOffer } from '@/lib/chat';
+import { fetchOrderForListing, type Order } from '@/lib/payments';
+import { getOrCreateConversation, sendOffer, cancelBundleOffersForSoldItem } from '@/lib/chat';
 import { cardImageUrl, prefetchImages, getImagePlaceholder } from '@/lib/images';
 import { SaveListSheet } from '@/components/SaveListSheet';
-import { colors } from '@/lib/theme';
 import { FullscreenImageViewer } from '@/components/product/FullscreenImageViewer';
 import { ProductActionBar } from '@/components/product/ProductActionBar';
 import { SellerOptionsSheet } from '@/components/product/SellerOptionsSheet';
-import { CheckoutSheet } from '@/components/product/CheckoutSheet';
 import { OfferSheet } from '@/components/product/OfferSheet';
 import type { PopIconHandle } from '@/components/product/PopIcon';
 import { ProductSkeleton } from '@/components/product/ProductSkeleton';
@@ -74,8 +72,8 @@ import { useTheme } from '@/context/ThemeContext';
 import { BRAND, APP_URL } from '@/lib/brand';
 import { reportListing, REPORT_REASONS } from '@/lib/reports';
 import { useGuestGate } from '@/components/GuestGate';
-import { buyerProtectionFee, orderTotal, formatPrice, DEFAULT_SHIPPING_FEE } from '@/lib/fees';
-import { isBundlesEnabled } from '@/lib/bundle';
+import { buyerProtectionFee, orderTotal, formatPrice } from '@/lib/fees';
+import { isBundlesEnabled, computeBundlePricing } from '@/lib/bundle';
 import { useSellSheet } from '@/components/sell/SellSheet';
 import { BuyerProtectionSheet } from '@/components/product/BuyerProtectionSheet';
 import { errorMessage } from '@/lib/errors';
@@ -168,7 +166,25 @@ export default function ProductScreen() {
     user,
     guestGate,
     bundlesEnabled: sellerBundlesEnabled,
+    sellerItemsLoading: sellerItemsQ.isLoading,
   });
+
+  const selectedSellerItems = useMemo(
+    () => sellerItems.filter((s: Listing) => bundle.selectedBundleIds.has(s.id)),
+    [sellerItems, bundle.selectedBundleIds],
+  );
+
+  const isBundleActive = bundle.selectedBundleIds.size > 0;
+  const bundleCount = 1 + bundle.selectedBundleIds.size;
+
+  const bundlePricing = useMemo(() => {
+    if (!isBundleActive || !listing) return null;
+    return computeBundlePricing(
+      listing.price,
+      selectedSellerItems.map((s: Listing) => Number(s.price ?? 0)),
+      listing.seller?.bundle_discount_pct ?? 0,
+    );
+  }, [isBundleActive, listing, selectedSellerItems]);
 
   // ── Social & Follow State ────────────────────────────────────────────────
   const sellerId = listing?.seller?.id ?? '';
@@ -286,7 +302,9 @@ export default function ProductScreen() {
     }
 
     if (committed === next) {
-      toast.show(successMessage, { variant: 'success', icon: 'check' });
+      if (next && listing.id) {
+        cancelBundleOffersForSoldItem(listing.id).catch(() => {});
+      }
     } else {
       toast.show("Couldn't update the listing", {
         variant: 'default',
@@ -336,15 +354,8 @@ export default function ProductScreen() {
     }
     if (!sellerId || sellerId === user.id || followBusy) return;
 
-    const sellerHandle = listing?.seller?.username ?? 'seller';
+
     const wasFollowing = followed;
-    const undoFollow = async () => {
-      try {
-        await toggleFollowM.mutateAsync({ currentlyFollowing: true });
-      } catch {
-        toast.show('Could not undo', { variant: 'default', icon: 'alert-triangle' });
-      }
-    };
 
     let next: any = null;
     let failure: unknown = null;
@@ -489,16 +500,16 @@ export default function ProductScreen() {
 
   if (notFound) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}>
+      <View style={{ flex: 1, backgroundColor: theme.background, paddingTop: insets.top }}>
         <Pressable onPress={() => safeBack()} hitSlop={10} style={{ padding: 16 }}>
-          <Feather name="arrow-left" size={22} color={colors.ink} />
+          <Feather name="arrow-left" size={22} color={theme.ink} />
         </Pressable>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
-          <Feather name="alert-circle" size={42} color={colors.mute} />
-          <Text style={{ fontSize: 17, fontWeight: '700', color: colors.ink, marginTop: 14 }}>
+          <Feather name="alert-circle" size={42} color={theme.mute} />
+          <Text style={{ fontSize: 17, fontWeight: '700', color: theme.ink, marginTop: 14 }}>
             Listing not available
           </Text>
-          <Text style={{ fontSize: 14, color: colors.mute, marginTop: 6, textAlign: 'center' }}>
+          <Text style={{ fontSize: 14, color: theme.mute, marginTop: 6, textAlign: 'center' }}>
             It may have been removed or never existed.
           </Text>
         </View>
@@ -508,16 +519,16 @@ export default function ProductScreen() {
 
   if (listingQ.isError && !listing) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}>
+      <View style={{ flex: 1, backgroundColor: theme.background, paddingTop: insets.top }}>
         <Pressable onPress={() => safeBack()} hitSlop={10} style={{ padding: 16 }}>
-          <Feather name="arrow-left" size={22} color={colors.ink} />
+          <Feather name="arrow-left" size={22} color={theme.ink} />
         </Pressable>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
-          <Feather name="wifi-off" size={36} color={colors.mute} />
-          <Text style={{ fontSize: 17, fontWeight: '800', color: colors.ink, marginTop: 14, letterSpacing: -0.3 }}>
+          <Feather name="wifi-off" size={36} color={theme.mute} />
+          <Text style={{ fontSize: 17, fontWeight: '800', color: theme.ink, marginTop: 14, letterSpacing: -0.3 }}>
             Couldn&apos;t load this listing
           </Text>
-          <Text style={{ fontSize: 13, color: colors.mute, marginTop: 6, textAlign: 'center', lineHeight: 19 }}>
+          <Text style={{ fontSize: 13, color: theme.mute, marginTop: 6, textAlign: 'center', lineHeight: 19 }}>
             {loadErrorText === 'Request timed out'
               ? 'The connection is slow right now. Try again in a moment.'
               : 'Something went wrong. Check your connection and try again.'}
@@ -529,15 +540,15 @@ export default function ProductScreen() {
               height: 48,
               borderRadius: 14,
               paddingHorizontal: 28,
-              backgroundColor: colors.ink,
+              backgroundColor: theme.ink,
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center',
               opacity: pressed ? 0.85 : 1,
             })}
           >
-            <Feather name="refresh-cw" size={14} color={colors.white} />
-            <Text style={{ color: colors.white, fontWeight: '800', fontSize: 14, marginLeft: 8 }}>
+            <Feather name="refresh-cw" size={14} color="#FFFFFF" />
+            <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 14, marginLeft: 8 }}>
               Retry
             </Text>
           </Pressable>
@@ -553,6 +564,8 @@ export default function ProductScreen() {
   const itemPrice = Number(listing.price ?? 0);
   const bpFee = buyerProtectionFee(itemPrice);
   const buyTotal = orderTotal(itemPrice);
+
+  const activeBuyTotal = bundlePricing ? bundlePricing.total : buyTotal;
   const images = listing.images ?? [];
   const heroPlaceholder = placeholderImage || cardImageUrl(listing, 0) || undefined;
 
@@ -664,18 +677,36 @@ export default function ProductScreen() {
       {/* 7. Fixed Bottom Thumb Zone Action Bar (Z: 50) */}
       <ProductActionBar
         price={itemPrice}
-        buyTotal={buyTotal}
+        buyTotal={activeBuyTotal}
         bottomInset={insets.bottom}
         isOwner={isOwnListing}
         isSold={listing.is_sold || Boolean(buyerOrder)}
-        hasPurchased={Boolean(buyerOrder)}
+        hasPurchased={Boolean(buyerOrder && buyerOrder.status !== 'awaiting_payment')}
+        isAwaitingPayment={Boolean(buyerOrder && buyerOrder.status === 'awaiting_payment')}
+        awaitingAmount={buyerOrder?.amount_cents ? Math.round(buyerOrder.amount_cents / 100) : undefined}
+        onCompleteCheckoutPress={() => {
+          tap('medium');
+          const amount = buyerOrder?.amount_cents ? Math.round(buyerOrder.amount_cents / 100) : undefined;
+          router.push({
+            pathname: `/payment/${listing.id}`,
+            params: amount ? { offer: String(amount) } : undefined,
+          } as any);
+        }}
         onViewOrderPress={() => {
           tap('selection');
-          router.push(`/invoice/${listing.id}` as any);
+          router.push(`/invoice/${buyerOrder?.id || listing.id}` as any);
         }}
         onChatPress={() => openChat('message')}
         onOfferPress={() => {
-          if (canOffer()) engagement.setOfferVisible(true);
+          if (!canOffer()) return;
+          if (isBundleActive) {
+            bundle.handleSendBundleOffer(
+              bundlePricing?.total ?? itemPrice,
+              Array.from(bundle.selectedBundleIds),
+            );
+            return;
+          }
+          engagement.setOfferVisible(true);
         }}
         onBuyPress={() => {
           tap('medium');
@@ -685,43 +716,32 @@ export default function ProductScreen() {
           }
           if (!user) {
             guestGate.prompt({
-              title: 'Almost yours',
-              message: 'Create a free account to check out securely with buyer protection included.',
-              icon: 'shopping-bag',
+              title: isBundleActive ? 'Sign in to bundle' : 'Almost yours',
+              message: isBundleActive
+                ? 'Create a free account to buy bundled items with a discount.'
+                : 'Create a free account to check out securely with buyer protection included.',
+              icon: isBundleActive ? 'package' : 'shopping-bag',
               cta: 'Create account & continue',
             });
             return;
           }
           if (!listing?.id) return;
-          engagement.setCheckoutVisible(true);
-        }}
-      />
 
-      {/* 8. Modal & Sheet Overlays */}
-      <CheckoutSheet
-        visible={engagement.checkoutVisible}
-        product={{
-          id: listing.id,
-          title: listing.title,
-          price: itemPrice,
-          imageUrl: images[0],
-          sellerName: listing.seller?.username || 'Seller',
-          shippingFee: DEFAULT_SHIPPING_FEE,
-          buyerProtectionFee: bpFee,
-        }}
-        onClose={() => engagement.setCheckoutVisible(false)}
-        onConfirmPay={({ fulfillment, paymentMethod }) => {
-          engagement.setCheckoutVisible(false);
+          if (isBundleActive) {
+            bundle.handleBuyBundle(
+              bundlePricing?.total ?? itemPrice,
+              Array.from(bundle.selectedBundleIds),
+            );
+            return;
+          }
+
           router.push({
             pathname: `/payment/${listing.id}`,
-            params: {
-              fulfillment,
-              paymentMethod,
-            },
           } as any);
         }}
       />
 
+      {/* 8. Modal & Sheet Overlays */}
       {user?.id ? (
         <SaveListSheet
           visible={engagement.saveListVisible}

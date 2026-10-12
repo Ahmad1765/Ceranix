@@ -74,7 +74,11 @@ export function MobileTabBar({
     }
 
     if (isSellFab && onSellPress) {
-      onSellPress();
+      if (Platform.OS === 'web') {
+        setTimeout(onSellPress, 80);
+      } else {
+        onSellPress();
+      }
       return;
     }
 
@@ -243,7 +247,13 @@ function SellFabButton({
     <View style={styles.fabWrapper}>
       <Animated.View style={[styles.fabContainer, animatedStyle]}>
         <Pressable
-          onPress={onPress}
+          onPress={(e) => {
+            e?.stopPropagation?.();
+            if (Platform.OS === 'web') {
+              (e as any)?.preventDefault?.();
+            }
+            onPress();
+          }}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
           style={styles.fabButton}

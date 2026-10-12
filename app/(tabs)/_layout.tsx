@@ -23,6 +23,7 @@ export default function TabsLayout() {
         listeners={{
           tabPress: (e) => {
             e.preventDefault();
+            (e as any)?.stopPropagation?.();
             openDiscoverSheet();
           },
         }}
@@ -43,11 +44,12 @@ export default function TabsLayout() {
         listeners={{
           tabPress: (e) => {
             e.preventDefault();
+            (e as any)?.stopPropagation?.();
             openSellSheet();
           },
         }}
       />
-      <Tabs.Screen name="chat" options={{ title: 'Inbox' }} />
+      <Tabs.Screen name="chat" options={{ title: 'Activity' }} />
       <Tabs.Screen name="profile" options={{ title: 'Account' }} />
     </Tabs>
   );

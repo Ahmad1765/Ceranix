@@ -1,45 +1,50 @@
 import { describe, it, expect } from 'vitest';
 import { orderTotal, buyerProtectionFee } from '@/lib/fees';
 import { formatPrice } from '@/lib/currency';
+import { OFFER_PRESET_TIERS, calculateTierPrices, isValidOfferAmount } from './offerHelpers';
 
 describe('OfferSheet calculations and formatting', () => {
-  it('calculates 10% and 20% discount presets correctly', () => {
-    const askingPrice = 20;
-    const preset10 = Math.max(1, Math.round(askingPrice * 0.9));
-    const preset20 = Math.max(1, Math.round(askingPrice * 0.8));
+  it('contains the 5 preset tiers from Reference Image 7', () => {
+    const labels = OFFER_PRESET_TIERS.map((t) => t.label);
+    expect(labels).toEqual(['-20%', '-15%', '-10%', '-5%', 'Custom']);
+  });
 
-    expect(preset10).toBe(18);
-    expect(preset20).toBe(16);
+  it('calculates the exact reference discount amounts for $180 asking price (Image 7)', () => {
+    const askingPrice = 180;
+    const tiers = calculateTierPrices(askingPrice);
+
+    // -20% of 180 is 144 (exact match to Image 7 $144)
+    expect(tiers['20']).toBe(144);
+    expect(tiers['15']).toBe(153);
+    expect(tiers['10']).toBe(162);
+    expect(tiers['5']).toBe(171);
   });
 
   it('handles higher asking prices with clean integer rounding', () => {
     const askingPrice = 155;
-    const preset10 = Math.max(1, Math.round(askingPrice * 0.9));
-    const preset20 = Math.max(1, Math.round(askingPrice * 0.8));
+    const tiers = calculateTierPrices(askingPrice);
 
-    expect(preset10).toBe(140);
-    expect(preset20).toBe(124);
+    expect(tiers['10']).toBe(140);
+    expect(tiers['20']).toBe(124);
   });
 
   it('validates offer amounts against asking price', () => {
     const askingPrice = 20;
 
-    const isValid = (amount: number) => amount > 0 && amount < askingPrice;
-
-    expect(isValid(15)).toBe(true);
-    expect(isValid(18)).toBe(true);
-    expect(isValid(0)).toBe(false);
-    expect(isValid(-5)).toBe(false);
-    expect(isValid(20)).toBe(false);
-    expect(isValid(25)).toBe(false);
+    expect(isValidOfferAmount(15, askingPrice)).toBe(true);
+    expect(isValidOfferAmount(18, askingPrice)).toBe(true);
+    expect(isValidOfferAmount(0, askingPrice)).toBe(false);
+    expect(isValidOfferAmount(-5, askingPrice)).toBe(false);
+    expect(isValidOfferAmount(20, askingPrice)).toBe(false);
+    expect(isValidOfferAmount(25, askingPrice)).toBe(false);
   });
 
   it('computes buyer total with buyer protection fee included', () => {
-    const offerAmount = 15;
+    const offerAmount = 144;
     const fee = buyerProtectionFee(offerAmount);
     const total = orderTotal(offerAmount);
 
     expect(total).toBe(offerAmount + fee);
-    expect(formatPrice(total)).toContain('15');
+    expect(formatPrice(total)).toBe(formatPrice(offerAmount + fee));
   });
 });

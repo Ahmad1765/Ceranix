@@ -57,6 +57,7 @@ import {
   subscribeToMessages,
   subscribeToReactions,
   updateOfferStatus,
+  checkAndCancelInvalidBundleOffers,
   otherParticipant,
   isImageMessage,
   getMessageImageUrl,
@@ -114,6 +115,231 @@ export function useConversationThread(
     let cancelled = false;
     setLoading(true);
 
+    if (conversationId === 'demo') {
+      const myId = user?.id || 'demo-seller';
+      const otherId = 'demo-buyer';
+      setConv({
+        id: 'demo',
+        listing_id: 'listing-demo',
+        buyer_id: otherId,
+        seller_id: myId,
+        last_message: 'hello thank you for showing interest!',
+        last_sender_id: myId,
+        updated_at: new Date('2025-02-25T15:30:00Z').toISOString(),
+        buyer_last_read_at: new Date().toISOString(),
+        seller_last_read_at: new Date().toISOString(),
+        listing: {
+          id: 'listing-demo',
+          title: 'Vintage Designer Jacket',
+          price: 35,
+          images: ['https://images.unsplash.com/photo-1551028719-00167b16eac5?w=400'],
+          thumbnails: ['https://images.unsplash.com/photo-1551028719-00167b16eac5?w=120'],
+          is_sold: false,
+        },
+        buyer: {
+          id: otherId,
+          username: 'bella',
+          full_name: 'Bella',
+          avatar_url: null,
+          location: 'New York, NY',
+          rating: 5,
+          total_sales: 12,
+        },
+      });
+      setMessages([
+        {
+          id: 'm1',
+          conversation_id: 'demo',
+          sender_id: otherId,
+          content: 'Offer: $90.00',
+          kind: 'offer',
+          offer_status: 'pending',
+          metadata: { amount: 90, actionable: false },
+          created_at: '2025-02-23T20:55:00Z',
+        },
+        {
+          id: 'm2',
+          conversation_id: 'demo',
+          sender_id: myId,
+          content: 'Declined offer: $90.00',
+          kind: 'offer',
+          offer_status: 'declined',
+          metadata: { amount: 90 },
+          created_at: '2025-02-24T16:14:00Z',
+        },
+        {
+          id: 'm3',
+          conversation_id: 'demo',
+          sender_id: otherId,
+          content: 'Offer: $123.00',
+          kind: 'offer',
+          offer_status: 'pending',
+          metadata: { amount: 123, actionable: false },
+          created_at: '2025-02-24T16:16:00Z',
+        },
+        {
+          id: 'm4',
+          conversation_id: 'demo',
+          sender_id: myId,
+          content: 'Countered with: $140.00',
+          kind: 'offer',
+          offer_status: 'countered',
+          metadata: { amount: 140 },
+          created_at: '2025-02-24T16:18:00Z',
+        },
+        {
+          id: 'm5',
+          conversation_id: 'demo',
+          sender_id: otherId,
+          content: 'Countered with: $125.00',
+          kind: 'offer',
+          offer_status: 'countered',
+          metadata: { amount: 125 },
+          created_at: '2025-02-25T15:25:00Z',
+        },
+        {
+          id: 'm6',
+          conversation_id: 'demo',
+          sender_id: myId,
+          content: 'hello thank you for showing interest! unfortunately i will be firm on the price considering that every other listing is $200+ thank you!',
+          kind: 'text',
+          metadata: null,
+          offer_status: null,
+          created_at: '2025-02-25T15:26:00Z',
+        },
+        {
+          id: 'm7',
+          conversation_id: 'demo',
+          sender_id: myId,
+          content: 'Your offer has expired',
+          kind: 'offer',
+          offer_status: 'expired',
+          metadata: { amount: 20 },
+          created_at: '2025-12-10T13:59:00Z',
+        },
+        {
+          id: 'm8',
+          conversation_id: 'demo',
+          sender_id: myId,
+          content: 'Special offer',
+          kind: 'offer',
+          offer_status: 'pending',
+          metadata: { amount: 23, is_special_offer: true },
+          created_at: new Date(Date.now() - 3600 * 1000 * 1.35).toISOString(),
+        },
+        {
+          id: 'm9',
+          conversation_id: 'demo',
+          sender_id: otherId,
+          content: 'can you stop sending offers',
+          kind: 'text',
+          metadata: null,
+          offer_status: null,
+          created_at: '2025-12-11T09:06:00Z',
+        },
+        {
+          id: 'm10',
+          conversation_id: 'demo',
+          sender_id: otherId,
+          content: 'Offer is no longer available',
+          kind: 'offer',
+          offer_status: 'canceled',
+          metadata: { amount: 50 },
+          created_at: '2026-05-27T20:50:00Z',
+        },
+        {
+          id: 'm11',
+          conversation_id: 'demo',
+          sender_id: otherId,
+          content: 'girl',
+          kind: 'text',
+          metadata: null,
+          offer_status: null,
+          created_at: '2026-05-28T12:59:00Z',
+        },
+        {
+          id: 'm12',
+          conversation_id: 'demo',
+          sender_id: otherId,
+          content: 'cease',
+          kind: 'text',
+          metadata: null,
+          offer_status: null,
+          created_at: '2026-05-28T13:00:00Z',
+        },
+        {
+          id: 'm13',
+          conversation_id: 'demo',
+          sender_id: otherId,
+          content: 'Offer received',
+          kind: 'offer',
+          offer_status: 'pending',
+          metadata: { amount: 18 },
+          created_at: new Date(Date.now() - 3600 * 1000 * 13.25).toISOString(),
+        },
+      ]);
+      setLoading(false);
+      return;
+    }
+
+    if (conversationId === 'demo-deal') {
+      const myId = user?.id || 'demo-buyer';
+      const sellerId = 'demo-seller';
+      setConv({
+        id: 'demo-deal',
+        listing_id: 'listing-demo',
+        buyer_id: myId,
+        seller_id: sellerId,
+        last_message: "I accepted ur offer why haven't you bought",
+        last_sender_id: sellerId,
+        updated_at: new Date('2026-07-22T22:39:00Z').toISOString(),
+        buyer_last_read_at: new Date().toISOString(),
+        seller_last_read_at: new Date().toISOString(),
+        listing: {
+          id: 'listing-demo',
+          title: 'Vintage Cotton Tee',
+          price: 6,
+          images: ['https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=400'],
+          thumbnails: ['https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=120'],
+          is_sold: false,
+        },
+      });
+      setMessages([
+        {
+          id: 'd1',
+          conversation_id: 'demo-deal',
+          sender_id: myId,
+          content: 'You made an offer',
+          kind: 'offer',
+          offer_status: 'pending',
+          metadata: { amount: 4.7 },
+          created_at: new Date(Date.now() - 3600 * 1000 * 4.7).toISOString(),
+        },
+        {
+          id: 'd2',
+          conversation_id: 'demo-deal',
+          sender_id: sellerId,
+          content: "It's a deal",
+          kind: 'offer',
+          offer_status: 'accepted',
+          metadata: { amount: 4.7 },
+          created_at: new Date(Date.now() - 3600 * 1000 * 4.7).toISOString(),
+        },
+        {
+          id: 'd3',
+          conversation_id: 'demo-deal',
+          sender_id: sellerId,
+          content: "I accepted ur offer why haven't you bought",
+          kind: 'text',
+          metadata: null,
+          offer_status: null,
+          created_at: new Date(Date.now() - 3600 * 1000 * 2).toISOString(),
+        },
+      ]);
+      setLoading(false);
+      return;
+    }
+
     (async () => {
       let loaded:
         | [
@@ -149,8 +375,8 @@ export function useConversationThread(
               conversation_id: conversationId,
               sender_id: SUPPORT_BOT_USER_ID,
               content:
-                `👋 Welcome to Ceranix Support!\n\n` +
-                `How can we assist you today? Feel free to ask about your orders, Buyer Protection, payments, or selling on Ceranix.`,
+                `👋 Welcome to Grabsty Support!\n\n` +
+                `How can we assist you today? Feel free to ask about your orders, Buyer Protection, payments, or selling on Grabsty.`,
               kind: 'text',
               metadata: null,
               offer_status: null,
@@ -161,6 +387,28 @@ export function useConversationThread(
         }
         setMessages(initialMsgs);
         setReactions(loaded[2]);
+
+        // Auto-cancel bundle offers if any item in the bundle was purchased by another buyer
+        checkAndCancelInvalidBundleOffers(initialMsgs, loaded[0]?.listing_id)
+          .then((canceledIds) => {
+            if (!cancelled && canceledIds.length > 0) {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  canceledIds.includes(m.id)
+                    ? {
+                        ...m,
+                        offer_status: 'canceled',
+                        metadata: {
+                          ...m.metadata,
+                          bundle_invalid: true,
+                        },
+                      }
+                    : m,
+                ),
+              );
+            }
+          })
+          .catch(() => {});
       }
       setLoading(false);
     })();
@@ -197,9 +445,13 @@ export function useConversationThread(
   // ── Read Receipts Synchronization ────────────────────────────────────────
   useEffect(() => {
     if (!conversationId || !user?.id) return;
-    markConversationRead(conversationId, user.id).then(() => {
-      queryClient.invalidateQueries({ queryKey: qk.inbox(user.id) });
-    });
+    markConversationRead(conversationId, user.id)
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: qk.inbox(user.id) });
+      })
+      .catch((error) => {
+        console.warn('[chat] markConversationRead error', error);
+      });
   }, [conversationId, user?.id, messages.length, queryClient]);
 
   // ── Realtime Reactions Subscription ──────────────────────────────────────
@@ -222,17 +474,29 @@ export function useConversationThread(
   // ── Scroll & Pin to Bottom Handlers ──────────────────────────────────────
   const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
-    pinnedRef.current = contentSize.height - (contentOffset.y + layoutMeasurement.height) < 60;
+    if (layoutMeasurement.height <= 0) return;
+    const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
+    pinnedRef.current = distanceFromBottom < 80;
   }, []);
 
-  const followEnd = useCallback(() => {
-    if (pinnedRef.current) listRef.current?.scrollToEnd({ animated: false });
+  const followEnd = useCallback((force: boolean = false, animated: boolean = false) => {
+    if (force || pinnedRef.current) listRef.current?.scrollToEnd({ animated });
+  }, []);
+
+  const scrollToBottom = useCallback((animated: boolean = false) => {
+    pinnedRef.current = true;
+    listRef.current?.scrollToEnd({ animated });
   }, []);
 
   // ── Derived Participant & Listing State ──────────────────────────────────
   const isSupport = useMemo(() => isSupportConversation(conv), [conv]);
-  const other = useMemo(() => (user && conv ? otherParticipant(conv, user.id) : null), [user, conv]);
-  const isSeller = !!user && !!conv && conv.seller_id === user.id;
+  const currentUserId = user?.id || (conversationId.startsWith('demo') ? (conversationId === 'demo-deal' ? 'demo-buyer' : 'demo-seller') : null);
+  const other = useMemo(() => {
+    if (!conv) return null;
+    if (currentUserId) return otherParticipant(conv, currentUserId);
+    return conv.buyer || null;
+  }, [currentUserId, conv]);
+  const isSeller = Boolean(currentUserId && conv && conv.seller_id === currentUserId);
   const rows = useMemo(() => buildThreadRows(messages), [messages]);
 
   const convListingId = conv?.listing_id ?? null;
@@ -243,7 +507,7 @@ export function useConversationThread(
 
   const senderName = isSupport
     ? SUPPORT_BOT_NAME
-    : other?.full_name || other?.username || 'User';
+    : other?.full_name || other?.username || (conv?.buyer ? conv.buyer.full_name || conv.buyer.username : null) || 'User';
   const otherAvatar = isSupport
     ? SUPPORT_BOT_AVATAR
     : other?.avatar_url
@@ -542,6 +806,8 @@ export function useConversationThread(
           }
           if (user?.id) {
             queryClient.invalidateQueries({ queryKey: qk.inbox(user.id) });
+            queryClient.invalidateQueries({ queryKey: qk.myOrders(user.id) });
+            queryClient.invalidateQueries({ queryKey: ['myOrders'] });
           }
           toast.show('Offer accepted! Order created.', {
             variant: 'success',
@@ -586,7 +852,7 @@ export function useConversationThread(
         return false;
       } catch (e: any) {
         captureError(e, { fn: 'conversation.counterOffer' });
-        toast.show("Couldn't send counter-offer", { variant: 'default', icon: 'alert-triangle' });
+        toast.show(e?.message || "Couldn't send counter-offer", { variant: 'default', icon: 'alert-triangle' });
         return false;
       }
     },
@@ -716,6 +982,7 @@ export function useConversationThread(
     pinnedRef,
     onScroll,
     followEnd,
+    scrollToBottom,
     other,
     isSeller,
     rows,

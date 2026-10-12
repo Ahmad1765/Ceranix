@@ -96,8 +96,11 @@ export function PayoutSheet({
         onPress={async () => {
           if (!canSave) return;
           setSaving(true);
-          await onSave(form);
-          setSaving(false);
+          try {
+            await onSave(form);
+          } finally {
+            setSaving(false);
+          }
         }}
       />
       {onRemove && (
@@ -106,8 +109,11 @@ export function PayoutSheet({
           disabled={saving}
           onPress={async () => {
             setSaving(true);
-            await onRemove();
-            setSaving(false);
+            try {
+              await onRemove();
+            } finally {
+              setSaving(false);
+            }
           }}
         />
       )}

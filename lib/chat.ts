@@ -10,7 +10,9 @@ export type OfferStatus =
   | 'declined'
   | 'countered'
   | 'expired'
-  | 'withdrawn';
+  | 'withdrawn'
+  | 'canceled'
+  | 'paid';
 
 export interface ChatMessage {
   id: string;
@@ -26,10 +28,16 @@ export interface ChatMessage {
     payment_status?: string;
     paid?: boolean;
     is_bundle?: boolean;
+    is_special_offer?: boolean;
+    actionable?: boolean;
+    base_listing_id?: string;
     bundle_item_ids?: string[];
     bundle_count?: number;
+    bundle_invalid?: boolean;
+    cancel_reason?: string;
     image_url?: string;
     thumb_url?: string;
+    parent_offer_id?: string;
   } | null;
   offer_status: OfferStatus | null;
   parent_offer_id?: string | null;
@@ -295,6 +303,7 @@ export async function sendOffer(args: {
   isBundle?: boolean;
   bundleItemIds?: string[];
   bundleCount?: number;
+  baseListingId?: string;
 }): Promise<ChatMessage | null> {
   if (!Number.isFinite(args.amount) || args.amount <= 0) return null;
   const amountValue = Number(args.amount.toFixed(2));
@@ -316,6 +325,7 @@ export async function sendOffer(args: {
         currency: 'PKR',
         note: args.note?.trim() || null,
         is_bundle: isBundle,
+        base_listing_id: args.baseListingId ?? undefined,
         bundle_item_ids: args.bundleItemIds ?? undefined,
         bundle_count: count,
       },
@@ -344,6 +354,129 @@ export async function updateOfferStatus(
     return false;
   }
   return true;
+}
+
+/**
+ * Automatically cancels any bundle offers across messages if a referenced item has been sold.
+ * Uses a server-side security-definer operation to cancel regardless of caller RLS visibility.
+ */
+export async function cancelBundleOffersForSoldItem(soldListingId: string): Promise<string[]> {
+  if (!soldListingId) return [];
+  try {
+    // 1. Server-side RPC operation (security definer cancels regardless of caller RLS visibility)
+    if (typeof (supabase as any).rpc === 'function') {
+      const { data, error } = await supabase.rpc('cancel_bundle_offers_for_sold_item', {
+        p_sold_listing_id: soldListingId,
+      });
+      if (!error && Array.isArray(data)) {
+        return data as string[];
+      }
+    }
+
+    // 2. Direct server query and update fallback
+    const { data: offers, error: selectErr } = await supabase
+      .from('messages')
+      .select('id')
+      .eq('kind', 'offer')
+      .in('offer_status', ['pending', 'proposed'])
+      .or(
+        `metadata->>base_listing_id.eq.${soldListingId},metadata->bundle_item_ids.cs.["${soldListingId}"]`,
+      );
+
+    if (selectErr || !offers || offers.length === 0) return [];
+
+    const invalidOfferIds = offers.map((o) => o.id);
+
+    const { error: updateError } = await supabase
+      .from('messages')
+      .update({ offer_status: 'canceled' })
+      .in('id', invalidOfferIds);
+
+    if (updateError) {
+      console.warn('[chat] cancelBundleOffersForSoldItem update error', updateError);
+      return [];
+    }
+    return invalidOfferIds;
+  } catch (err) {
+    console.warn('[chat] cancelBundleOffersForSoldItem error', err);
+    return [];
+  }
+}
+
+/**
+ * Checks a list of messages for active bundle offers, verifies if any bundled item is sold,
+ * and cancels those offers automatically.
+ */
+export async function checkAndCancelInvalidBundleOffers(
+  messages: ChatMessage[],
+  convListingId?: string | null,
+): Promise<string[]> {
+  const activeBundleOffers = messages.filter(
+    (m) =>
+      m.kind === 'offer' &&
+      (m.metadata?.is_bundle || (m.metadata?.bundle_item_ids && m.metadata.bundle_item_ids.length > 0)) &&
+      m.offer_status !== 'canceled' &&
+      m.offer_status !== 'declined' &&
+      m.offer_status !== 'expired',
+  );
+
+  if (activeBundleOffers.length === 0) return [];
+
+  const allItemIds = new Set<string>();
+  if (convListingId) allItemIds.add(convListingId);
+  activeBundleOffers.forEach((m) => {
+    if (m.metadata?.base_listing_id) allItemIds.add(m.metadata.base_listing_id);
+    if (m.metadata?.bundle_item_ids && Array.isArray(m.metadata.bundle_item_ids)) {
+      m.metadata.bundle_item_ids.forEach((id: string) => allItemIds.add(id));
+    }
+  });
+
+  if (allItemIds.size === 0) return [];
+
+  try {
+    const { data: listings, error } = await supabase
+      .from('listings')
+      .select('id, is_sold')
+      .in('id', Array.from(allItemIds));
+
+    if (error || !listings) return [];
+
+    const soldIds = new Set(listings.filter((l) => l.is_sold).map((l) => l.id));
+    if (soldIds.size === 0) return [];
+
+    const invalidOfferIds: string[] = [];
+    activeBundleOffers.forEach((m) => {
+      // Exclude accepted and paid offers so their own sold listing does not trigger cancellation
+      if (m.offer_status === 'accepted' || m.offer_status === 'paid') {
+        return;
+      }
+      const itemIds = [
+        convListingId,
+        m.metadata?.base_listing_id,
+        ...(m.metadata?.bundle_item_ids || []),
+      ].filter(Boolean);
+      if (itemIds.some((id) => soldIds.has(id as string))) {
+        invalidOfferIds.push(m.id);
+      }
+    });
+
+    if (invalidOfferIds.length > 0) {
+      const { error: updateError } = await supabase
+        .from('messages')
+        .update({ offer_status: 'canceled' })
+        .in('id', invalidOfferIds);
+
+      if (updateError) {
+        console.warn('[chat] checkAndCancelInvalidBundleOffers update error', updateError);
+        return [];
+      }
+    }
+
+    return invalidOfferIds;
+  } catch (err) {
+    console.warn('[chat] checkAndCancelInvalidBundleOffers error', err);
+    return [];
+  }
 }
 
 /**
@@ -376,6 +509,7 @@ export async function counterOffer(args: {
   const defaultNote = `Counter-Offer: ${formatPrice(amountValue)}`;
   const content = args.note?.trim() || defaultNote;
 
+  // 1. Primary: Attempt atomic RPC
   const { data, error } = await supabase.rpc('counter_chat_offer', {
     p_parent_offer_id: args.parentOfferId,
     p_amount: amountValue,
@@ -385,11 +519,60 @@ export async function counterOffer(args: {
     p_sender_id: args.senderId,
   });
 
-  if (error) {
-    console.warn('[chat] counterOffer', error.message);
-    return null;
+  if (!error && data) {
+    return data as unknown as ChatMessage;
   }
-  return data as unknown as ChatMessage;
+
+  console.warn('[chat] counter_chat_offer RPC failed, attempting direct table fallback:', error?.message || error);
+
+  // 2. Client-side resilient fallback if the RPC returned an error (e.g. trigger mismatch in hosted db)
+  try {
+    // Attempt updating parent offer status to countered
+    const { error: updateErr } = await supabase
+      .from('messages')
+      .update({ offer_status: 'countered' })
+      .eq('id', args.parentOfferId);
+
+    if (updateErr) {
+      console.warn('[chat] fallback parent update warning:', updateErr.message);
+    }
+
+    // Insert new counter offer message linked to parent
+    const { data: fallbackMsg, error: insertErr } = await supabase
+      .from('messages')
+      .insert({
+        conversation_id: args.conversationId,
+        sender_id: args.senderId,
+        content,
+        kind: 'offer',
+        parent_offer_id: args.parentOfferId,
+        metadata: {
+          amount: amountValue,
+          currency: 'PKR',
+          note: args.note?.trim() || null,
+          parent_offer_id: args.parentOfferId,
+          counter_to: args.parentOfferId,
+        },
+        offer_status: 'pending',
+      })
+      .select('id, conversation_id, sender_id, content, kind, metadata, offer_status, parent_offer_id, created_at, updated_at')
+      .single();
+
+    if (!insertErr && fallbackMsg) {
+      return fallbackMsg as unknown as ChatMessage;
+    }
+
+    if (insertErr) {
+      console.error('[chat] fallback counter insert failed:', insertErr);
+    }
+  } catch (fallbackErr) {
+    console.error('[chat] counterOffer fallback exception:', fallbackErr);
+  }
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  return null;
 }
 
 // ── Reactions ─────────────────────────────────────────────────────────────
@@ -566,15 +749,6 @@ export function subscribeToInbox(
         schema: 'public',
         table: 'conversations',
         filter: `seller_id=eq.${userId}`,
-      },
-      onChange,
-    )
-    .on(
-      'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages',
       },
       onChange,
     )

@@ -155,7 +155,7 @@ function fromMessage(
     return [
       {
         userId: senderId,
-        title: 'Ceranix',
+        title: 'Grabsty',
         body: `Your offer was ${next}`,
         data,
         idempotencyKey: `messages:${messageId}:${next}:${senderId}`,

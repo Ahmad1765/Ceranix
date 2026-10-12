@@ -100,7 +100,7 @@ function timeoutFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Res
 // On native or in environments without `navigator.locks` (legacy browsers,
 // SSR), we fall through to bare execution since there's no cross-tab race
 // to worry about there.
-const LOCK_ACQUIRE_CEILING_MS = 3_000;
+const LOCK_ACQUIRE_CEILING_MS = 10_000;
 
 async function boundedLock<R>(
   name: string,
@@ -114,10 +114,12 @@ async function boundedLock<R>(
     return fn();
   }
 
-  const ceiling = Math.min(
-    Number.isFinite(acquireTimeout) ? acquireTimeout : LOCK_ACQUIRE_CEILING_MS,
-    LOCK_ACQUIRE_CEILING_MS,
-  );
+  // If acquireTimeout is not positive (e.g. -1 sentinel from @supabase/auth-js for indefinite wait),
+  // use the bounded ceiling so navigator.locks has time to acquire normally.
+  const ceiling =
+    typeof acquireTimeout === 'number' && acquireTimeout > 0
+      ? Math.min(acquireTimeout, LOCK_ACQUIRE_CEILING_MS)
+      : LOCK_ACQUIRE_CEILING_MS;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ceiling);
@@ -139,7 +141,6 @@ async function boundedLock<R>(
     if (!isAbort) throw err;
     // Lock wedged on another tab/extension/service worker. Run unguarded
     // — duplicate token refresh is worth it to keep the UI responsive.
-    console.warn(`[supabase] lock '${name}' wait timed out, running unguarded`);
     return fn();
   } finally {
     clearTimeout(timer);

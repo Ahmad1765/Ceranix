@@ -2,7 +2,7 @@
 // name was hardcoded per-screen and had drifted ("Carrinix" vs "Carrinex"), and
 // the web base URL was duplicated in profile/settings/user. Import from here so
 // user-facing copy and share links stay consistent everywhere.
-export const BRAND = 'Carrinex';
+export const BRAND = 'Grabsty';
 
 // Public web base (deep links / share URLs).
-export const APP_URL = 'https://ceranix.vercel.app';
+export const APP_URL = 'https://grabsty.com';

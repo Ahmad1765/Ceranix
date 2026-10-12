@@ -9,8 +9,8 @@ import {
 } from '@/lib/chat';
 
 export const SUPPORT_BOT_USER_ID = '00000000-0000-0000-0000-000000000001';
-export const SUPPORT_BOT_NAME = 'Ceranix Support';
-export const SUPPORT_BOT_USERNAME = 'ceranix_support';
+export const SUPPORT_BOT_NAME = 'Grabsty Support';
+export const SUPPORT_BOT_USERNAME = 'grabsty_support';
 export const SUPPORT_BOT_AVATAR = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=80';
 
 export interface SupportTopic {
@@ -34,7 +34,7 @@ export const SUPPORT_TOPICS: SupportTopic[] = [
     icon: 'shield',
     title: 'Buyer Protection & Refunds',
     description: 'Learn how your purchases and money are safe',
-    prompt: 'How does Buyer Protection and refunds work on Ceranix?',
+    prompt: 'How does Buyer Protection and refunds work on Grabsty?',
   },
   {
     id: 'payouts_fees',
@@ -74,8 +74,8 @@ const KNOWLEDGE_BASE: { keywords: string[]; title: string; answer: string }[] = 
     keywords: ['protection', 'refund', 'money back', 'guarantee', 'damaged', 'not as described', 'return', 'cancel'],
     title: 'Buyer Protection Guarantee',
     answer:
-      `🛡️ **Ceranix Buyer Protection**\n\n` +
-      `Every transaction processed through Ceranix is 100% protected:\n\n` +
+      `🛡️ **Grabsty Buyer Protection**\n\n` +
+      `Every transaction processed through Grabsty is 100% protected:\n\n` +
       `• **Safe Escrow**: We hold your payment securely until you receive and inspect your parcel.\n` +
       `• **48-Hour Inspection Window**: You have 2 days from delivery to verify your item. If it’s damaged or not as described, tap "I have an issue" to pause payout.\n` +
       `• **Full Refund Guarantee**: If an item never arrives or is counterfeit, you get a full refund including shipping fees.`,
@@ -85,7 +85,7 @@ const KNOWLEDGE_BASE: { keywords: string[]; title: string; answer: string }[] = 
     title: 'Seller Payouts & Wallet',
     answer:
       `💳 **Seller Payouts**\n\n` +
-      `• Once the buyer confirms delivery (or 48h after courier delivery), funds are released to your **Ceranix Balance**.\n` +
+      `• Once the buyer confirms delivery (or 48h after courier delivery), funds are released to your **Grabsty Balance**.\n` +
       `• You can instantly withdraw to any Pakistani Bank Account, JazzCash, or Easypaisa.\n` +
       `• Withdrawals are processed within 24 business hours with zero hidden deduction fees.`,
   },
@@ -103,9 +103,9 @@ const KNOWLEDGE_BASE: { keywords: string[]; title: string; answer: string }[] = 
     title: 'Safety & Reporting',
     answer:
       `🚫 **Safety & Reporting Policy**\n\n` +
-      `• Ceranix maintains a zero-tolerance policy against scams, replicas, and harassment.\n` +
+      `• Grabsty maintains a zero-tolerance policy against scams, replicas, and harassment.\n` +
       `• Tap the **•••** menu at the top right of any chat or listing to report.\n` +
-      `• Our moderation team reviews all reports within 2 hours. Never transfer money outside the Ceranix checkout system.`,
+      `• Our moderation team reviews all reports within 2 hours. Never transfer money outside the Grabsty checkout system.`,
   },
   {
     keywords: ['offer', 'negotiate', 'bargain', 'counter'],
@@ -172,7 +172,7 @@ export function generateSupportResponse(query: string): string {
 
   // Default intelligent assistant response
   return (
-    `👋 **Hi there! I'm the Ceranix Support Assistant.**\n\n` +
+    `👋 **Hi there! I'm the Grabsty Support Assistant.**\n\n` +
     `Thank you for reaching out. Here are the most common things I can assist you with right away:\n\n` +
     `• **"Track my order"** — Live status, courier info and delivery estimates\n` +
     `• **"Buyer Protection"** — Refunds, damaged items & safety policies\n` +
@@ -191,8 +191,8 @@ export async function ensureSupportProfile(): Promise<void> {
         username: SUPPORT_BOT_USERNAME,
         full_name: SUPPORT_BOT_NAME,
         avatar_url: SUPPORT_BOT_AVATAR,
-        bio: 'Official Ceranix Customer Support & Help Assistant. Available 24/7.',
-        location: 'Ceranix Care, PK',
+        bio: 'Official Grabsty Customer Support & Help Assistant. Available 24/7.',
+        location: 'Grabsty Care, PK',
         rating: 5.0,
         total_sales: 9999,
       },
@@ -232,8 +232,8 @@ export async function getOrCreateSupportConversation(userId: string): Promise<Co
   if (created) {
     // Send welcome message via secure RPC or fallback
     const welcomeMsg =
-      `👋 Welcome to Ceranix Support!\n\n` +
-      `How can we assist you today? Feel free to ask about your orders, Buyer Protection, payments, or selling on Ceranix.`;
+      `👋 Welcome to Grabsty Support!\n\n` +
+      `How can we assist you today? Feel free to ask about your orders, Buyer Protection, payments, or selling on Grabsty.`;
 
     try {
       const { data, error } = await supabase.rpc('dispatch_support_bot_reply', {

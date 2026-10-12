@@ -225,12 +225,12 @@ export default function FriendsScreen() {
       setHasSynced(true);
 
       if (result.matchedFriends.length > 0) {
-        toast.show(`Found ${result.matchedFriends.length} friends on Ceranix!`, {
+        toast.show(`Found ${result.matchedFriends.length} friends on ${BRAND}!`, {
           variant: 'default',
           icon: 'check',
         });
       } else {
-        toast.show('No contacts registered on Ceranix yet. Invite them!', {
+        toast.show(`No contacts registered on ${BRAND} yet. Invite them!`, {
           variant: 'default',
           icon: 'users',
         });
@@ -490,7 +490,7 @@ export default function FriendsScreen() {
                 >
                   <Feather name="send" size={14} color={theme.background} />
                   <Text style={{ fontFamily: typography.family.sansBold, fontSize: 13, fontWeight: '700', color: theme.background }}>
-                    Invite to Ceranix
+                    Invite to {BRAND}
                   </Text>
                 </PressableScale>
               </View>
@@ -543,7 +543,7 @@ export default function FriendsScreen() {
                       Find Phone Contacts
                     </Text>
                     <Text style={{ fontFamily: typography.family.sans, fontSize: 12.5, color: theme.mute, marginTop: 1 }}>
-                      Discover people you know already on Ceranix
+                      Discover people you know already on {BRAND}
                     </Text>
                   </View>
                 </View>
@@ -855,7 +855,7 @@ export default function FriendsScreen() {
                     paddingHorizontal: 2,
                   }}
                 >
-                  Contacts on Ceranix ({matchedFriends.length})
+                  Contacts on {BRAND} ({matchedFriends.length})
                 </Text>
                 <View style={{ gap: 8 }}>
                   {matchedFriends.map((f) => (

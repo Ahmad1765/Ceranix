@@ -11,10 +11,11 @@ import { memo, useMemo } from 'react';
 import { View, Pressable } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { router } from 'expo-router';
-import Feather from '@expo/vector-icons/Feather';
+
 import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { useTheme } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
+import { categoryLabel } from '@/lib/categories';
 import {
   BRAND_PURPLE,
   conditionLabel,
@@ -22,7 +23,7 @@ import {
   timeAgo,
 } from '@/components/product/shared';
 import type { Listing, ListingLiker } from '@/types';
-import { Platform } from 'react-native';
+
 
 
 type ProductOverviewHeaderProps = {
@@ -42,7 +43,7 @@ export const ProductOverviewHeader = memo(function ProductOverviewHeader({
   likers,
   onOpenLikersSheet,
 }: ProductOverviewHeaderProps) {
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
   const heartCount = Math.max(0, Number(listing.likes ?? 0), likers?.length ?? 0);
   const itemPrice = Number(listing.price ?? 0);
 
@@ -52,16 +53,18 @@ export const ProductOverviewHeader = memo(function ProductOverviewHeader({
     const uploaded = listing.created_at ? timeAgo(listing.created_at) : '';
     const sizeVal = listing.size?.trim();
     const brandVal = listing.brand?.trim();
+    const catVal = listing.category ? categoryLabel(listing.category) : '';
     const locationVal = listing.seller?.location?.trim();
 
     return [
+      catVal ? { text: catVal, link: true, isCategory: true, categoryKey: listing.category } : null,
       sizeVal ? { text: `Size ${sizeVal}` } : null,
       cond ? { text: cond } : null,
-      brandVal ? { text: brandVal, link: true } : null,
+      brandVal ? { text: brandVal, link: true, isCategory: false } : null,
       locationVal ? { text: locationVal } : null,
       uploaded ? { text: `Uploaded ${uploaded}` } : null,
-    ].filter(Boolean) as { text: string; link?: boolean }[];
-  }, [listing.size, listing.condition, listing.brand, listing.seller?.location, listing.created_at]);
+    ].filter(Boolean) as { text: string; link?: boolean; isCategory?: boolean; categoryKey?: string }[];
+  }, [listing.category, listing.size, listing.condition, listing.brand, listing.seller?.location, listing.created_at]);
 
   return (
     <View style={{ paddingHorizontal: 20, paddingTop: 22, paddingBottom: 14 }}>
@@ -153,7 +156,11 @@ export const ProductOverviewHeader = memo(function ProductOverviewHeader({
                   accessibilityLabel={`Shop more from ${s.text}`}
                   onPress={() => {
                     tap('selection');
-                    router.push(`/?q=${encodeURIComponent(s.text)}` as any);
+                    if (s.isCategory && s.categoryKey) {
+                      router.push(`/?searchOpen=1&searchCategory=${encodeURIComponent(s.categoryKey)}` as any);
+                    } else {
+                      router.push(`/?searchOpen=1&searchQuery=${encodeURIComponent(s.text)}` as any);
+                    }
                   }}
                 >
                   {s.text}

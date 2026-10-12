@@ -1,7 +1,6 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { useColorScheme } from 'react-native';
+import React, { createContext, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { lightTheme, darkTheme, ThemeTokens, setActiveTheme } from '../lib/theme';
+import { lightTheme, ThemeTokens, setActiveTheme } from '../lib/theme';
 
 try {
   // Ensure react-native-css-interop runtime flag is permanently 'class' mode
@@ -24,64 +23,39 @@ export interface ThemeContextData {
 
 const ThemeContext = createContext<ThemeContextData | undefined>(undefined);
 
+/**
+ * ThemeProvider: Dark Mode is disabled across the app.
+ * Always renders in Light mode with consistent tokens and white/slate canvas.
+ */
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const systemColorScheme = useColorScheme();
-  const [mode, setMode] = useState<ThemeMode>('system');
-  const [hydrated, setHydrated] = useState(false);
-
-  // Load saved preference on startup
-  useEffect(() => {
-    let mounted = true;
-    AsyncStorage.getItem('@theme_mode')
-      .then((savedMode) => {
-        if (!mounted) return;
-        if (savedMode === 'light' || savedMode === 'dark' || savedMode === 'system') {
-          setMode(savedMode);
-        }
-      })
-      .catch((e) => {
-        console.warn('[ThemeContext] Failed to load theme mode', e);
-      })
-      .finally(() => {
-        if (mounted) setHydrated(true);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const isDark = mode === 'system' ? systemColorScheme === 'dark' : mode === 'dark';
-  const theme = isDark ? darkTheme : lightTheme;
+  const mode: ThemeMode = 'light';
+  const isDark = false;
+  const hydrated = true;
+  const theme = lightTheme;
 
   // Keep static token references in sync with theme state
-  setActiveTheme(theme);
+  setActiveTheme(lightTheme);
+
   useEffect(() => {
-    setActiveTheme(theme);
+    setActiveTheme(lightTheme);
     if (typeof document !== 'undefined') {
-      document.documentElement.style.backgroundColor = theme.background;
-      document.body.style.backgroundColor = theme.background;
-      if (isDark) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
+      document.documentElement.style.backgroundColor = lightTheme.background;
+      document.body.style.backgroundColor = lightTheme.background;
+      document.documentElement.classList.remove('dark');
     }
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { colorScheme } = require('nativewind');
       if (colorScheme && typeof colorScheme.set === 'function') {
-        colorScheme.set(isDark ? 'dark' : 'light');
+        colorScheme.set('light');
       }
     } catch {}
-  }, [theme, isDark]);
+  }, []);
 
-  const setThemeMode = async (newMode: ThemeMode) => {
-    const nextIsDark = newMode === 'system' ? systemColorScheme === 'dark' : newMode === 'dark';
-    setActiveTheme(nextIsDark ? darkTheme : lightTheme);
-    setMode(newMode);
+  const setThemeMode = async (_newMode: ThemeMode) => {
+    setActiveTheme(lightTheme);
     try {
-      await AsyncStorage.setItem('@theme_mode', newMode);
+      await AsyncStorage.setItem('@theme_mode', 'light');
     } catch (e) {
       console.warn('[ThemeContext] Failed to save theme mode', e);
     }

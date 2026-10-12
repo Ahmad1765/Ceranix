@@ -32,6 +32,13 @@ describe('getShippingFee', () => {
     expect(shippingFee(500, 'managed')).toBe(250);
     expect(shippingFee(500, 'self_ship')).toBe(0);
   });
+
+  it('supports parcel delivery rates: small and medium 130 PKR, large 180 PKR', () => {
+    expect(getShippingFee('managed', 'small')).toBe(130);
+    expect(getShippingFee('managed', 'medium')).toBe(130);
+    expect(getShippingFee('managed', 'large')).toBe(180);
+    expect(getShippingFee('managed', null)).toBe(130);
+  });
 });
 
 describe('buyerProtectionFee', () => {

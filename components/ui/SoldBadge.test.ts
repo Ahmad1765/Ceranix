@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
+import { SoldBadge } from './SoldBadge';
 
 vi.mock('react-native', () => ({
   Platform: { OS: 'web', select: (obj: any) => obj.web || obj.default },
@@ -11,8 +12,6 @@ vi.mock('react-native', () => ({
 vi.mock('@/lib/rnText', () => ({
   Text: (props: any) => React.createElement('span', props, props.children),
 }));
-
-import { SoldBadge } from './SoldBadge';
 
 function render(element: React.ReactElement<any>) {
   const Component = element.type as any;
@@ -72,4 +71,3 @@ describe('SoldBadge Component', () => {
     });
   });
 });
-

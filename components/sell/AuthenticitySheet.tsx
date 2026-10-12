@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { View, Pressable, Platform } from 'react-native';
 import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
@@ -60,11 +60,13 @@ export function AuthenticitySheet({
   const { theme } = useTheme();
   const [selected, setSelected] = useState<Authenticity | null | undefined>(value);
   const [luxuryWarning, setLuxuryWarning] = useState<string | null>(null);
+  const selectingRef = useRef(false);
 
   useEffect(() => {
     if (visible) {
       setSelected(value);
       setLuxuryWarning(null);
+      selectingRef.current = false;
     }
   }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -72,6 +74,7 @@ export function AuthenticitySheet({
   const isDesigner = isHighValueDesigner(brandName);
 
   const handleSelectOption = (optValue: Authenticity) => {
+    if (selectingRef.current) return;
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     }
@@ -79,11 +82,12 @@ export function AuthenticitySheet({
     // Trademark policy guardrail: Apple Guideline 5.2.3 and Google Play Counterfeit Policy
     if (optValue === 'inspired' && isTrademark) {
       setLuxuryWarning(
-        `Registered international luxury items (${brandName}) cannot be listed as "Inspired" under the brand's trademark name. To comply with platform policies, please select "Unbranded / Local Tailor" for inspired designs or verify authenticity as "Original".`,
+        `Registered international luxury items (${brandName}) cannot be listed as "Inspired" under the brand's trademark name. To comply with platform policies, please select "No brand" for inspired designs or verify authenticity as "Original".`,
       );
       return;
     }
 
+    selectingRef.current = true;
     setLuxuryWarning(null);
     setSelected(optValue);
     onChange(optValue);

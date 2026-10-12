@@ -88,6 +88,17 @@ Deno.serve(async (req: Request) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
+    // Rate limit: max 2 account deletion attempts per hour per user to prevent abuse
+    const { error: rlErr } = await admin.rpc('enforce_user_rate_limit', {
+      p_user_id: user.id,
+      p_action: 'account_deletion',
+      p_limit: 2,
+      p_window: '1 hour',
+    });
+    if (rlErr) {
+      return json({ error: 'Too many requests. Please try again later.' }, 429);
+    }
+
     // Log the deletion request (required success). user_id is a plain uuid
     // column (no FK), so the audit row survives the auth user deletion below.
     const { error: insertErr } = await admin.from('account_deletion_requests').insert({
