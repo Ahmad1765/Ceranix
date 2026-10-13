@@ -6,8 +6,12 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
-  const isReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const isFinePointer = window.matchMedia('(pointer: fine)').matches;
+  const isReducedMotion = (typeof window !== 'undefined' && window.matchMedia) 
+    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches 
+    : false;
+  const isFinePointer = (typeof window !== 'undefined' && window.matchMedia) 
+    ? window.matchMedia('(pointer: fine)').matches 
+    : true;
 
   // ---------------------------------------------------------------------------
   // 1. Dynamic Footer Year & Queue Counter
@@ -23,7 +27,12 @@ document.addEventListener('DOMContentLoaded', () => {
   class HapticAudioEngine {
     constructor() {
       this.ctx = null;
-      this.enabled = localStorage.getItem('grabsty_sfx') !== 'false';
+      this.enabled = true;
+      try {
+        this.enabled = localStorage.getItem('grabsty_sfx') !== 'false';
+      } catch {
+        this.enabled = true;
+      }
     }
     init() {
       if (!this.ctx) {
@@ -76,7 +85,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     toggle() {
       this.enabled = !this.enabled;
-      localStorage.setItem('grabsty_sfx', this.enabled ? 'true' : 'false');
+      try {
+        localStorage.setItem('grabsty_sfx', this.enabled ? 'true' : 'false');
+      } catch {}
       if (this.enabled) this.click();
       return this.enabled;
     }
@@ -189,11 +200,21 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }, {
       root: null,
-      rootMargin: '0px 0px -40px 0px',
-      threshold: 0.12
+      rootMargin: '100px 0px 50px 0px',
+      threshold: 0.01
     });
 
     revealElements.forEach(el => revealObserver.observe(el));
+
+    // Fallback: Ensure elements visible in the initial viewport are immediately revealed
+    setTimeout(() => {
+      revealElements.forEach(el => {
+        const rect = el.getBoundingClientRect();
+        if (rect.top < window.innerHeight + 80) {
+          el.classList.add('in-view');
+        }
+      });
+    }, 100);
   } else {
     revealElements.forEach(el => el.classList.add('in-view'));
   }
