@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+  <title>Grabsty — Resale Fashion & Lahore Architecture Design | Waitlist</title>
+  <meta name="description" content="A disciplined marketplace for archival fashion and Lahore Architecture Design. Engineered with guaranteed Buyer Protection and zero clutter." />
+  
+  <!-- Favicon using SVG Data URI matching Grabsty Purple & Shield -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230F0F0F'/%3E%3Crect x='4' y='4' width='24' height='24' rx='4' fill='%236C47FF'/%3E%3Ctext x='16' y='22' font-family='sans-serif' font-weight='900' font-size='16' fill='%23FFFFFF' text-anchor='middle'%3EG%3C/text%3E%3C/svg%3E" />
+
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Scroll Progress Bar -->
+  <div id="scroll-progress" class="scroll-progress-bar" aria-hidden="true"></div>
+
+  <!-- Noise Film Grain -->
+  <div class="grain-overlay" aria-hidden="true"></div>
+
+  <!-- Mouse Ambient Spotlight Glow -->
+  <div class="cursor-glow" id="cursor-glow" aria-hidden="true"></div>
+
+  <!-- Celebration Party Popper Canvas -->
+  <canvas id="party-popper-canvas" class="party-popper-canvas" aria-hidden="true"></canvas>
+
+  <!-- Memphis Floating Graphic Accents -->
+  <div class="memphis-stage" aria-hidden="true">
+    <div class="memphis-shape shape-circle" data-rot="0" data-speed="0.12"></div>
+    <div class="memphis-shape shape-triangle" data-rot="25" data-speed="-0.18"></div>
+    <div class="memphis-shape shape-bar" data-rot="-15" data-speed="0.22"></div>
+    <div class="memphis-shape shape-square-dashed" data-rot="45" data-speed="-0.14"></div>
+    
+    <!-- SVG Memphis Squiggle -->
+    <div class="memphis-shape shape-squiggle" data-rot="12" data-speed="0.25">
+      <svg width="120" height="40" viewBox="0 0 120 40" fill="none">
+        <path d="M5 20 Q 20 0, 35 20 T 65 20 T 95 20 T 115 20" stroke="#6C47FF" stroke-width="6" stroke-linecap="round" fill="none" />
+      </svg>
+    </div>
+
+    <!-- Memphis Asterisk / Star -->
+    <div class="memphis-shape shape-asterisk" data-rot="0" data-speed="-0.08">
+      <svg width="50" height="50" viewBox="0 0 50 50" fill="none">
+        <path d="M25 5 V45 M5 25 H45 M11 11 L39 39 M11 39 L39 11" stroke="#FFFFFF" stroke-width="5" stroke-linecap="square" />
+      </svg>
+    </div>
+
+    <!-- Memphis Zigzag -->
+    <div class="memphis-shape shape-zigzag" data-rot="-20" data-speed="0.16">
+      <svg width="80" height="30" viewBox="0 0 80 30" fill="none">
+        <path d="M5 25 L20 5 L35 25 L50 5 L65 25 L75 10" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+    </div>
+  </div>
+
+  <!-- Site Navigation -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="header-left">
+        <a href="#" class="brand-logo" aria-label="Grabsty Home">
+          GRABSTY<span class="brand-dot"></span>
+        </a>
+        <!-- Ambient Lahore & Regional Waitlist Ticker -->
+        <div class="header-live-ticker" id="global-ticker" aria-hidden="true">
+          <span class="ticker-pulse-dot"></span>
+          <span class="ticker-text" id="ticker-text">Lahore, PK: Architecture Studio joined waitlist &bull; Just now</span>
+        </div>
+      </div>
+      
+      <div class="header-meta">
+        <!-- Audio Haptics Toggle -->
+        <button type="button" id="sfx-toggle-btn" class="header-sfx-btn" title="Toggle Tactile Sound Effects" aria-pressed="true">
+          <span id="sfx-icon">🔊</span> <span class="sfx-label">SFX: ON</span>
+        </button>
+        <a href="#waitlist-section" class="header-action-btn">JOIN WAITLIST</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-content">
+    <!-- Hero Section -->
+    <section class="hero-section" id="hero">
+      <h1 class="hero-title" aria-label="Resale Fashion Stripped Of Clutter">
+        <span class="word-mask"><span class="word delay-100">RESALE</span></span>
+        <span class="word-mask"><span class="word delay-150">FASHION</span></span><br class="hero-br" />
+        <span class="word-mask"><span class="word delay-200">STRIPPED</span></span>
+        <span class="word-mask"><span class="word delay-250">OF</span></span>
+        <span class="word-mask"><span class="word delay-300">CLUTTER.</span></span>
+      </h1>
+      
+      <div class="hero-subtitle-box animate-on-scroll reveal-rotate delay-350">
+        <p class="subtitle-text">
+          A disciplined marketplace for archival fashion and Lahore Architecture Design. Engineered with guaranteed Escrow Buyer Protection and strictly zero clutter.
+        </p>
+      </div>
+
+      <!-- Funnel Form & Success State -->
+      <div class="funnel-container animate-on-scroll reveal-up delay-450" id="waitlist-section">
+        <div class="form-wrapper" id="form-container">
+          <!-- Referred-By Badge (Dynamically populated if ?ref= is present) -->
+          <div class="referral-banner hidden" id="referral-banner" aria-live="polite">
+            <span class="ref-badge-icon" aria-hidden="true">✦</span>
+            <span>Referred by collector <strong id="referrer-code">#GRB-1024</strong> &bull; Priority registration unlocked</span>
+          </div>
+
+          <!-- Waitlist Hub Badge (Accurate Location Banner) -->
+          <div class="waitlist-location-card">
+            <div class="waitlist-loc-left">
+              <span class="loc-pin-icon" aria-hidden="true">📍</span>
+              <div class="loc-text-col">
+                <span class="loc-title">WAITLIST HUB: LAHORE, PAKISTAN</span>
+                <span class="loc-sub">Curated Archival Fashion &amp; Lahore Architecture Design</span>
+              </div>
+            </div>
+            <span class="loc-status-pill">OFFICIAL WAITLIST</span>
+          </div>
+
+          <!-- Waitlist Registration Form -->
+          <form id="waitlist-form" class="waitlist-form" novalidate>
+            <!-- Collector / Seller Role Selector -->
+            <div class="role-selector-wrap">
+              <span class="role-selector-label">I AM JOINING AS:</span>
+              <div class="role-pills" role="radiogroup" aria-label="Select your participant type">
+                <button type="button" role="radio" aria-checked="true" class="role-pill active" data-role="buyer">
+                  <span class="role-pill-indicator">◈</span> ARCHIVE BUYER
+                </button>
+                <button type="button" role="radio" aria-checked="false" class="role-pill" data-role="seller">
+                  <span class="role-pill-indicator">◇</span> CURATED SELLER
+                </button>
+                <button type="button" role="radio" aria-checked="false" class="role-pill" data-role="both">
+                  <span class="role-pill-indicator">◆</span> BOTH
+                </button>
+              </div>
+              <input type="hidden" name="role" id="selected-role" value="buyer" />
+            </div>
+
+            <!-- Focus / Interest Selector (Lahore Architecture Design & Fashion) -->
+            <div class="interest-selector-wrap">
+              <span class="role-selector-label">DESIGN &amp; CURATION FOCUS:</span>
+              <div class="interest-pills" role="radiogroup" aria-label="Select your curation focus">
+                <button type="button" role="radio" aria-checked="false" class="interest-pill" data-interest="architecture">
+                  <span class="interest-icon">🏛️</span> LAHORE ARCHITECTURE DESIGN
+                </button>
+                <button type="button" role="radio" aria-checked="false" class="interest-pill" data-interest="fashion">
+                  <span class="interest-icon">🪡</span> ARCHIVAL FASHION
+                </button>
+                <button type="button" role="radio" aria-checked="true" class="interest-pill active" data-interest="both">
+                  <span class="interest-icon">✦</span> BOTH
+                </button>
+              </div>
+              <input type="hidden" name="interest" id="selected-interest" value="both" />
+              <input type="hidden" name="city" id="selected-city" value="Lahore" />
+            </div>
+
+            <!-- Form Inputs: Name, Phone Number, Optional Email -->
+            <div class="form-fields-grid">
+              <!-- Full Name (Required) -->
+              <div class="input-group">
+                <label for="name" class="field-label">FULL NAME <span class="field-req">*</span></label>
+                <input 
+                  type="text" 
+                  id="name" 
+                  name="name"
+                  required 
+                  autocomplete="name"
+                  placeholder="e.g. Zainab Malik" 
+                  class="form-text-input" 
+                  aria-describedby="name-error"
+                />
+                <div id="name-error" class="input-error-msg" aria-live="polite"></div>
+              </div>
+
+              <!-- Phone Number (Required) -->
+              <div class="input-group">
+                <label for="phone" class="field-label">PHONE NUMBER <span class="field-req">*</span></label>
+                <input 
+                  type="tel" 
+                  id="phone" 
+                  name="phone"
+                  required 
+                  autocomplete="tel"
+                  placeholder="e.g. +92 300 1234567" 
+                  class="form-text-input" 
+                  aria-describedby="phone-error"
+                />
+                <div id="phone-error" class="input-error-msg" aria-live="polite"></div>
+              </div>
+
+              <!-- Email (Optional) -->
+              <div class="input-group input-group-full">
+                <label for="email" class="field-label">EMAIL ADDRESS <span class="field-opt">(OPTIONAL)</span></label>
+                <input 
+                  type="email" 
+                  id="email" 
+                  name="email"
+                  autocomplete="email"
+                  placeholder="name@archival.com (optional)" 
+                  class="form-text-input" 
+                  aria-describedby="email-error"
+                />
+                <div id="email-error" class="input-error-msg" aria-live="polite"></div>
+              </div>
+            </div>
+
+            <div class="form-action-row">
+              <button type="submit" id="submit-btn" class="submit-btn">
+                <span class="btn-text">JOIN WAITLIST</span>
+                <span class="btn-spinner" aria-hidden="true"></span>
+              </button>
+            </div>
+          </form>
+
+          <!-- Canonical Escrow Buyer Protection Badge -->
+          <div class="trust-pill" title="Escrow-Backed Buyer Protection">
+            <svg class="canonical-shield" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="12" fill="#F2F3FE" />
+              <g transform="translate(-5.4, -5.4) scale(1.45)">
+                <path d="M12.033 6.8s-2.93 1.424-5.833 1.424v.168c0 .838.044 1.634.154 2.367.33 2.47 1.233 4.398 2.729 6.01l.066.084c.594.628 1.255 1.131 1.937 1.529.198.125.925.419.925.419s.726-.293.925-.419c.704-.377 1.343-.9 1.937-1.529l.066-.084c1.035-1.11 1.783-2.387 2.245-3.874.22-.67.33-1.361.44-2.136.088-.733.176-1.529.176-2.367v-.168c-2.833 0-5.767-1.424-5.767-1.424z" stroke="#5356EE" stroke-width="0.95" stroke-linejoin="round" />
+                <path d="M9.4 12.013l1.932 1.787 3.668-3.4" stroke="#5356EE" stroke-width="0.95" stroke-linecap="round" stroke-linejoin="round" />
+              </g>
+            </svg>
+            <span class="trust-label">Guaranteed Buyer Protection</span>
+            <span class="trust-bullet">&bull;</span>
+            <span class="trust-sub">Funds in Escrow</span>
+          </div>
+
+          <!-- Status Lookup Switcher -->
+          <div class="lookup-toggle-wrap">
+            <button type="button" id="lookup-toggle-btn" class="lookup-toggle-btn">
+              Already registered? Check your waitlist status &rarr;
+            </button>
+          </div>
+        </div>
+
+        <!-- Success Confirmation Card -->
+        <div class="success-state hidden" id="success-container" aria-live="polite">
+          <div class="success-card" id="waitlist-success-card">
+            <div class="success-badge-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </div>
+            <div class="success-queue-tag" id="success-queue-tag">WAITLIST SPOT CONFIRMED</div>
+            <h2 class="success-title" id="success-title">You're On The Waitlist!</h2>
+            
+            <div class="success-details-box">
+              <div class="success-detail-item">
+                <span class="detail-label">NAME</span>
+                <span class="detail-value" id="confirmed-name">—</span>
+              </div>
+              <div class="success-detail-item">
+                <span class="detail-label">PHONE</span>
+                <span class="detail-value" id="confirmed-phone">—</span>
+              </div>
+              <div class="success-detail-item" id="confirmed-email-row">
+                <span class="detail-label">EMAIL</span>
+                <span class="detail-value" id="confirmed-email">—</span>
+              </div>
+              <div class="success-detail-item">
+                <span class="detail-label">LOCATION</span>
+                <span class="detail-value" id="confirmed-location">Lahore, Pakistan</span>
+              </div>
+              <div class="success-detail-item">
+                <span class="detail-label">ROLE &amp; FOCUS</span>
+                <span class="detail-value" id="confirmed-role">COLLECTOR &bull; ARCHITECTURE &amp; FASHION</span>
+              </div>
+            </div>
+
+            <p class="success-text" id="success-message">
+              We'll send your private launch access invite directly via SMS / WhatsApp when onboarding opens in Lahore. Keep your collection ready.
+            </p>
+
+            <!-- Referral Station -->
+            <div class="referral-station">
+              <div class="ref-station-header">
+                <span class="ref-station-tag">COMMUNITY INVITATION</span>
+                <h3 class="ref-station-title">Invite Curators &amp; Designers in Lahore</h3>
+                <p class="ref-station-desc">
+                  Share your unique waitlist link with fellow collectors and design enthusiasts.
+                </p>
+              </div>
+
+              <div class="ref-link-box">
+                <input 
+                  type="text" 
+                  id="referral-link-input" 
+                  class="ref-link-input" 
+                  readonly 
+                  value="https://grabsty.com/?ref=GRB-1001"
+                  aria-label="Your unique referral link"
+                />
+                <button type="button" id="copy-ref-btn" class="copy-ref-btn">
+                  <span class="copy-text">COPY LINK</span>
+                </button>
+              </div>
+
+              <div class="ref-share-actions">
+                <a id="share-wa-btn" class="ref-share-btn share-wa" href="#" target="_blank" rel="noopener noreferrer">
+                  WHATSAPP
+                </a>
+                <a id="share-x-btn" class="ref-share-btn share-x" href="#" target="_blank" rel="noopener noreferrer">
+                  SHARE ON 𝕏
+                </a>
+                <button type="button" id="native-share-btn" class="ref-share-btn share-native hidden">
+                  SHARE SHEET ↗
+                </button>
+              </div>
+
+              <div class="ref-tracker-pill">
+                <span class="ref-tracker-dot" aria-hidden="true"></span>
+                <span id="ref-count-text">0 Referrals Tracked</span>
+              </div>
+            </div>
+
+            <div class="success-footer-info">
+              <span class="ticket-id" id="ticket-number">#GRB-1001</span>
+              <span class="ticket-status">WAITLIST ENTRY CONFIRMED</span>
+            </div>
+
+            <div class="success-actions-row">
+              <button type="button" id="back-to-form-btn" class="back-link-btn">
+                &larr; Register Another Waitlist Member
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Kinetic Marquee Section -->
+    <div class="marquee-section animate-on-scroll reveal-up delay-200" aria-hidden="true">
+      <div class="marquee-track" id="marquee-track">
+        <div class="marquee-stream">
+          <span>LAHORE WAITLIST OPEN</span>
+          <span class="star-sep">✱</span>
+          <span>LAHORE ARCHITECTURE DESIGN</span>
+          <span class="star-sep">✱</span>
+          <span>GUARANTEED ESCROW PROTECTION</span>
+          <span class="star-sep">✱</span>
+          <span>ZERO GAMIFICATION CLUTTER</span>
+          <span class="star-sep">✱</span>
+          <span>ARCHIVAL &amp; CURATED WARDROBES</span>
+          <span class="star-sep">✱</span>
+          <span>DISCIPLINED COMMERCE</span>
+          <span class="star-sep">✱</span>
+        </div>
+        <div class="marquee-stream" aria-hidden="true">
+          <span>LAHORE WAITLIST OPEN</span>
+          <span class="star-sep">✱</span>
+          <span>LAHORE ARCHITECTURE DESIGN</span>
+          <span class="star-sep">✱</span>
+          <span>GUARANTEED ESCROW PROTECTION</span>
+          <span class="star-sep">✱</span>
+          <span>ZERO GAMIFICATION CLUTTER</span>
+          <span class="star-sep">✱</span>
+          <span>ARCHIVAL &amp; CURATED WARDROBES</span>
+          <span class="star-sep">✱</span>
+          <span>DISCIPLINED COMMERCE</span>
+          <span class="star-sep">✱</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lahore Architecture Design & Curated Focus Section -->
+    <section class="features-section" id="features">
+      <div class="section-tag animate-on-scroll reveal-rotate">
+        <span>CURATED FOCUS</span>
+      </div>
+      
+      <h2 class="section-heading animate-on-scroll reveal-up delay-100">
+        LAHORE ARCHITECTURE DESIGN.<br />CURATED WITHOUT CLUTTER.
+      </h2>
+
+      <div class="lahore-architecture-card animate-on-scroll reveal-up delay-150">
+        <div class="arch-card-header">
+          <div class="arch-badge-group">
+            <span class="arch-card-tag">LAHORE, PK</span>
+            <span class="arch-card-pill">HERITAGE GEOMETRY &bull; MODERN DISCIPLINE</span>
+          </div>
+          <span class="arch-badge-city">EST. 2026</span>
+        </div>
+
+        <div class="arch-card-content-grid">
+          <div class="arch-card-visual">
+            <div class="arch-blueprint-frame">
+              <svg viewBox="0 0 420 250" fill="none" class="arch-blueprint-svg" aria-hidden="true">
+                <!-- Architectural Grid Blueprint -->
+                <defs>
+                  <pattern id="archGridPattern" width="24" height="24" patternUnits="userSpaceOnUse">
+                    <path d="M 24 0 L 0 0 0 24" fill="none" stroke="rgba(255, 255, 255, 0.07)" stroke-width="1"/>
+                  </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#archGridPattern)" />
+                
+                <!-- Mughal Structural Arch & Modernist Geometry -->
+                <path d="M110 200 V105 Q110 50 210 32 Q310 50 310 105 V200" stroke="#6C47FF" stroke-width="3" fill="rgba(108, 71, 255, 0.08)"/>
+                <path d="M140 200 V115 Q140 75 210 60 Q280 75 280 115 V200" stroke="#FFFFFF" stroke-width="1.75" stroke-dasharray="4 4" fill="none"/>
+                
+                <!-- Baseline & Foundation Plinth -->
+                <line x1="60" y1="200" x2="360" y2="200" stroke="#FFFFFF" stroke-width="2.5"/>
+                <line x1="85" y1="208" x2="335" y2="208" stroke="#6C47FF" stroke-width="1.5"/>
+                
+                <!-- Center Axis & Crosshair -->
+                <line x1="210" y1="20" x2="210" y2="215" stroke="rgba(255, 255, 255, 0.35)" stroke-dasharray="2 3" stroke-width="1"/>
+                <circle cx="210" cy="32" r="4" fill="#6C47FF"/>
+                
+                <!-- Dimension Markers -->
+                <line x1="75" y1="35" x2="75" y2="200" stroke="rgba(255, 255, 255, 0.25)" stroke-width="1"/>
+                <line x1="70" y1="35" x2="80" y2="35" stroke="rgba(255, 255, 255, 0.4)" stroke-width="1"/>
+                <line x1="70" y1="200" x2="80" y2="200" stroke="rgba(255, 255, 255, 0.4)" stroke-width="1"/>
+                
+                <text x="210" y="232" fill="#FFFFFF" font-family="'JetBrains Mono', monospace" font-size="11" text-anchor="middle" font-weight="700" letter-spacing="0.1em">LAHORE ARCHITECTURAL ELEVATION 01 &bull; 31.5204° N, 74.3587° E</text>
+              </svg>
+            </div>
+          </div>
+
+          <div class="arch-card-info">
+            <h3 class="arch-info-title">Where Mughal Spatial Geometry Meets Modern Atelier Discipline</h3>
+            <p class="arch-info-desc">
+              Lahore is a city defined by architectural conviction — from the precision of Mughal brickwork and arches to mid-century brutalist forms and modern design studios.
+            </p>
+            <p class="arch-info-desc">
+              Grabsty bridges this architectural heritage directly into peer-to-peer curation. Alongside archival fashion, our Lahore waitlist includes architectural design collections, curated spatial objects, architectural prints, and structural garments.
+            </p>
+            <div class="arch-tags-list">
+              <span class="arch-tag-pill">🏛️ Structural Blueprints</span>
+              <span class="arch-tag-pill">📐 Mughal Geometric Order</span>
+              <span class="arch-tag-pill">🪡 Archival Wardrobes</span>
+              <span class="arch-tag-pill">📦 Escrow Protected</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Wide Metrics Banner Card -->
+      <article class="bento-card card-metrics full-width animate-on-scroll delay-200" style="margin-top: 2rem;">
+        <div class="metrics-grid">
+          <div class="metric-item">
+            <span class="metric-value">100%</span>
+            <span class="metric-label">ESCROW PROTECTED</span>
+            <p class="metric-sub">Zero funds released to seller without physical confirmation</p>
+          </div>
+          <div class="metric-divider"></div>
+          <div class="metric-item">
+            <span class="metric-value">0%</span>
+            <span class="metric-label">ALGORITHMIC JUNK</span>
+            <p class="metric-sub">Chronological curation with clean local provenance</p>
+          </div>
+          <div class="metric-divider"></div>
+          <div class="metric-item">
+            <span class="metric-value">72hr</span>
+            <span class="metric-label">INSPECTION WINDOW</span>
+            <p class="metric-sub">Full window to verify authenticity, weave &amp; condition</p>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- Important & Relevant Queries (FAQ Accordion Section) -->
+    <section class="faq-section" id="faq">
+      <div class="section-tag animate-on-scroll reveal-rotate">
+        <span>WAITLIST QUERIES</span>
+      </div>
+      <h2 class="section-heading animate-on-scroll reveal-up delay-100">
+        FREQUENTLY ANSWERED.
+      </h2>
+
+      <div class="faq-list animate-on-scroll reveal-up delay-200">
+        <!-- Query 1 -->
+        <details class="faq-item">
+          <summary class="faq-question">
+            <span>What is Grabsty and how does the waitlist work?</span>
+            <span class="faq-arrow" aria-hidden="true">&plus;</span>
+          </summary>
+          <div class="faq-answer">
+            <p>
+              Grabsty is a disciplined marketplace for curated archival fashion and Lahore Architecture Design. Joining the waitlist reserves your priority access when our marketplace opens in Lahore. You will be among the first to explore listings, buy, and sell with escrow protection.
+            </p>
+          </div>
+        </details>
+
+        <!-- Query 2 -->
+        <details class="faq-item">
+          <summary class="faq-question">
+            <span>How does the Escrow Buyer Protection safeguard purchases?</span>
+            <span class="faq-arrow" aria-hidden="true">&plus;</span>
+          </summary>
+          <div class="faq-answer">
+            <p>
+              When you purchase an item on Grabsty, your funds are safely held in escrow — they are never released directly to the seller upon checkout. The seller ships with tracked courier transit. Upon delivery, you have a full 72-hour physical inspection window to verify that the piece precisely matches the listing before payment is released.
+            </p>
+          </div>
+        </details>
+
+        <!-- Query 3 -->
+        <details class="faq-item">
+          <summary class="faq-question">
+            <span>Why do you require a phone number and full name?</span>
+            <span class="faq-arrow" aria-hidden="true">&plus;</span>
+          </summary>
+          <div class="faq-answer">
+            <p>
+              We notify waitlist members directly via SMS or WhatsApp as onboarding begins in Lahore. This ensures a verified, bot-free community of genuine buyers and sellers. Email is completely optional for anyone who prefers email confirmations.
+            </p>
+          </div>
+        </details>
+
+        <!-- Query 4 -->
+        <details class="faq-item">
+          <summary class="faq-question">
+            <span>What items and designs can be listed on Grabsty?</span>
+            <span class="faq-arrow" aria-hidden="true">&plus;</span>
+          </summary>
+          <div class="faq-answer">
+            <p>
+              Grabsty is curated for archival fashion, designer garments, contemporary quiet luxury, and Lahore Architecture Design collections (including spatial objects, architectural prints, and structural design pieces). Mass-market fast fashion, bootlegs, and counterfeit goods are strictly prohibited.
+            </p>
+          </div>
+        </details>
+
+        <!-- Query 5 -->
+        <details class="faq-item">
+          <summary class="faq-question">
+            <span>Is there any fee to join the waitlist or list items?</span>
+            <span class="faq-arrow" aria-hidden="true">&plus;</span>
+          </summary>
+          <div class="faq-answer">
+            <p>
+              Joining the waitlist is 100% free. Founding waitlist sellers also receive waived listing fees and lifetime preferred fee schedules during the launch period.
+            </p>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <!-- Bottom Action Funnel Banner -->
+    <section class="bottom-cta-section animate-on-scroll reveal-up">
+      <div class="cta-banner-box">
+        <div class="cta-inner">
+          <h2 class="cta-title">JOIN THE LAHORE WAITLIST.</h2>
+          <p class="cta-desc">Join collectors, curators, and design studios in Lahore on the official waitlist.</p>
+          <a href="#waitlist-section" class="cta-scroll-btn" id="bottom-cta-btn">GO TO WAITLIST FORM &uarr;</a>
+        </div>
+      </div>
+    </section>
+  </main>
+  
+  <footer class="site-footer">
+    <div class="footer-container">
+      <div class="footer-top">
+        <div class="footer-brand">GRABSTY &copy; <span id="year">2026</span></div>
+        <div class="footer-tagline">ARCHIVAL RESALE &bull; ESCROW GUARANTEED</div>
+      </div>
+      <div class="footer-bottom">
+        <p class="footer-copy">All rights reserved. Designed with disciplined minimalism and zero clutter.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
