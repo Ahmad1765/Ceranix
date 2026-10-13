@@ -180,6 +180,20 @@ body {
   filter: drop-shadow(0 0 18px rgba(108, 71, 255, 0.18));
 }
 
+@media (max-width: 1180px) {
+  .heritage-stage,
+  .memphis-stage {
+    opacity: 0.2;
+  }
+}
+
+@media (max-width: 860px) {
+  .heritage-stage,
+  .memphis-stage {
+    display: none !important;
+  }
+}
+
 .shape-arch {
   top: 13%;
   left: 5%;
@@ -2528,6 +2542,7 @@ body {
   }
 
   .cursor-glow,
+  .heritage-shape,
   .memphis-shape {
     display: none !important;
   }
