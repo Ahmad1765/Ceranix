@@ -677,10 +677,10 @@ export default function PaymentScreen() {
       const allTitles = allOrderItems.map((item) => item.title).filter(Boolean);
       const orderMessageContent =
         isBundle && allTitles.length > 1
-          ? `Done!\nThank you, your order for a ${allTitles.length}-item bundle (${allTitles.join(', ')}) has been received.`
+          ? `Thank you, your order for a ${allTitles.length}-item bundle (${allTitles.join(', ')}) has been received.`
           : isPaid
-            ? "Done!\nThank you, we have received your payment. It's being processed."
-            : "Done!\nYour order has been placed. It's being processed.";
+            ? "Thank you, we have received your payment. It's being processed."
+            : "Your order has been placed. It's being processed.";
 
       try {
         const conv = await getOrCreateConversation({

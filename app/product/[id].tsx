@@ -684,6 +684,8 @@ export default function ProductScreen() {
         hasPurchased={Boolean(buyerOrder && buyerOrder.status !== 'awaiting_payment')}
         isAwaitingPayment={Boolean(buyerOrder && buyerOrder.status === 'awaiting_payment')}
         awaitingAmount={buyerOrder?.amount_cents ? Math.round(buyerOrder.amount_cents / 100) : undefined}
+        isBundle={isBundleActive}
+        bundleCount={bundleCount}
         onCompleteCheckoutPress={() => {
           tap('medium');
           const amount = buyerOrder?.amount_cents ? Math.round(buyerOrder.amount_cents / 100) : undefined;
