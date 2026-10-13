@@ -182,9 +182,12 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
   };
 
   // Mount the tab under the finger BEFORE the finger lifts.
+  // Sheet-only tabs ('discover', 'upload') must not be preloaded, because their
+  // route components redirect back to '/' or mount modals.
   const preload = (pos: number) => {
     const route = routes[pos];
     if (!route || route.key === activeKey) return;
+    if (route.name === 'discover' || route.name === 'upload') return;
     navigation.preload(route.name);
   };
 
@@ -203,11 +206,14 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
   useEffect(() => {
     if (warmed.current || count === 0) return;
     warmed.current = true;
-    const timers = Array.from({ length: count }, (_, i) =>
-      setTimeout(() => preloadAt(i), WARM_DELAY + i * WARM_STEP),
-    );
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    for (let i = 0; i < count; i++) {
+      const route = routes[i];
+      if (route && (route.name === 'discover' || route.name === 'upload')) continue;
+      timers.push(setTimeout(() => preloadAt(i), WARM_DELAY + i * WARM_STEP));
+    }
     return () => timers.forEach(clearTimeout);
-  }, [count, preloadAt]);
+  }, [count, preloadAt, routes]);
 
   // ---- gesture (worklets only) ----
   const gesture = useMemo(() => {

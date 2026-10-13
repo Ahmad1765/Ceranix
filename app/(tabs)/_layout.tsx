@@ -19,7 +19,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="index" options={{ title: 'Home' }} />
       <Tabs.Screen
         name="discover"
-        options={{ title: 'Categories' }}
+        options={{ title: 'Browse' }}
         listeners={{
           tabPress: (e) => {
             e.preventDefault();

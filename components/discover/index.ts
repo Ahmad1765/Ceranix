@@ -1,4 +1,10 @@
-export { useDiscoverSheet, DiscoverSheetProvider } from './DiscoverSheet';
+export {
+  useDiscoverSheet,
+  DiscoverSheetProvider,
+  useBrowseSheet,
+  BrowseSheetProvider,
+  type BrowseSheetApi,
+} from './DiscoverSheet';
 export { DiscoverHeader } from './DiscoverHeader';
 export { DiscoverItemsGrid } from './DiscoverItemsGrid';
 export {
