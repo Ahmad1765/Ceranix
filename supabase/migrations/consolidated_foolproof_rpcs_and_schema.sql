@@ -689,14 +689,6 @@ begin
          updated_at = v_now
    where id = v_offer.id;
 
-  -- Decline conflicting active offers for this listing
-  update public.offers
-     set status = 'declined',
-         updated_at = v_now
-   where listing_id = v_listing.id
-     and id <> v_offer.id
-     and status in ('pending', 'proposed');
-
   -- Synchronize chat message status if linked
   if v_offer.message_id is not null then
     update public.messages
@@ -705,13 +697,10 @@ begin
      where id = v_offer.message_id;
   end if;
 
-  -- 5. Lock inventory with a 24-hour reservation
-  update public.listings
-     set is_sold = true,
-         reserved_until = v_now + interval '24 hours'
-   where id = v_listing.id;
+  -- NOTE: Inventory is NOT reserved or marked sold upon offer acceptance.
+  -- The listing remains active and purchasable until payment is actually fulfilled.
 
-  -- 6. Check for existing awaiting_payment order or create one
+  -- 5. Check for existing awaiting_payment order or create one
   select * into v_order
     from public.orders
    where listing_id = v_listing.id
@@ -972,9 +961,7 @@ begin
      limit 1;
 
     if v_listing.is_sold then
-      if v_accepted_offer.id is null then
-        raise exception 'Listing is already sold' using errcode = '22000';
-      end if;
+      raise exception 'Listing is already sold' using errcode = '22000';
     end if;
 
     if v_accepted_offer.id is not null then

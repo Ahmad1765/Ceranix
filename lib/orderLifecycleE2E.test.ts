@@ -61,9 +61,9 @@ describe('Foolproof Buying & Selling Lifecycle (End-to-End)', () => {
       const offerMessageId = 'msg_offer_999';
       const buyerId = 'user_buyer_02';
 
-      // 1. Accepted offer sets listing is_sold: true
-      const updatedListing = { ...mockListing, is_sold: true };
-      expect(updatedListing.is_sold).toBe(true);
+      // 1. Accepted offer does NOT set listing is_sold: true (inventory stays active until payment)
+      const updatedListing = { ...mockListing, is_sold: false };
+      expect(updatedListing.is_sold).toBe(false);
 
       // 2. Order created in awaiting_payment state
       const createdOrder: Partial<Order> = {

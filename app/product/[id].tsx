@@ -680,9 +680,9 @@ export default function ProductScreen() {
         buyTotal={activeBuyTotal}
         bottomInset={insets.bottom}
         isOwner={isOwnListing}
-        isSold={listing.is_sold || Boolean(buyerOrder)}
+        isSold={listing.is_sold || Boolean(buyerOrder && buyerOrder.status !== 'awaiting_payment')}
         hasPurchased={Boolean(buyerOrder && buyerOrder.status !== 'awaiting_payment')}
-        isAwaitingPayment={Boolean(buyerOrder && buyerOrder.status === 'awaiting_payment')}
+        isAwaitingPayment={Boolean(buyerOrder && buyerOrder.status === 'awaiting_payment' && !listing.is_sold)}
         awaitingAmount={buyerOrder?.amount_cents ? Math.round(buyerOrder.amount_cents / 100) : undefined}
         isBundle={isBundleActive}
         bundleCount={bundleCount}
