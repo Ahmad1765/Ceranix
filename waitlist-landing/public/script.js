@@ -125,14 +125,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const globalTickerText = document.getElementById('ticker-text');
   if (globalTickerText) {
     const TICKER_ENTRIES = [
-      'Lahore, PK: Architecture Studio joined waitlist • Just now',
-      'Lahore, PK: Curated seller joined waitlist • 2m ago',
-      'Gulberg, Lahore: Archival collector secured spot • 4m ago',
-      'DHA, Lahore: Architecture enthusiast joined • 6m ago',
-      'Model Town, Lahore: Archive buyer joined • 9m ago',
-      'Cantt, Lahore: Curated archivist joined • 12m ago',
-      'Karachi, PK: Design studio joined waitlist • 15m ago',
-      'Islamabad, PK: Curated collector joined • 18m ago'
+      'Gulberg III, Lahore: Interior architect joined waitlist • Just now',
+      'Walled City (Delhi Gate), Lahore: Archival textile collector joined • 2m ago',
+      'Mall Road (NCA alumni), Lahore: Spatial design studio registered • 4m ago',
+      'DHA Phase 5, Lahore: Architecture enthusiast joined • 6m ago',
+      'Model Town, Lahore: Vintage archive seller secured spot • 9m ago',
+      'Cantt, Lahore: Heritage brick & spatial curator joined • 12m ago',
+      'Gulberg II, Lahore: Structural garment designer registered • 15m ago',
+      'Lahore Fort Quarter: Architectural drawing archivist joined • 18m ago'
     ];
     let tickerIdx = 0;
     setInterval(() => {
@@ -220,9 +220,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ---------------------------------------------------------------------------
-  // 5. Parallax on Memphis Floating Accents
+  // 5. Parallax on Heritage Floating Architectural Accents
   // ---------------------------------------------------------------------------
-  const shapes = document.querySelectorAll('.memphis-shape');
+  const shapes = document.querySelectorAll('.heritage-shape, .memphis-shape');
   if (shapes.length > 0 && !isReducedMotion) {
     let lastScrollY = window.scrollY;
     let ticking = false;
@@ -1042,4 +1042,34 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // 22. Architectural Blueprint Study Switcher (Study 01 vs Study 02)
+  // ---------------------------------------------------------------------------
+  const studyTabs = document.querySelectorAll('.arch-study-tab');
+  const study01 = document.getElementById('blueprint-study-01');
+  const study02 = document.getElementById('blueprint-study-02');
+
+  studyTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const studyId = tab.getAttribute('data-study');
+      hapticAudio.click();
+
+      studyTabs.forEach(t => {
+        t.classList.remove('active');
+        t.setAttribute('aria-selected', 'false');
+      });
+      tab.classList.add('active');
+      tab.setAttribute('aria-selected', 'true');
+
+      if (studyId === '01') {
+        if (study01) study01.classList.remove('hidden');
+        if (study02) study02.classList.add('hidden');
+      } else if (studyId === '02') {
+        if (study01) study01.classList.add('hidden');
+        if (study02) study02.classList.remove('hidden');
+      }
+    });
+  });
 });
+
