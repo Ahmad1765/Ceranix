@@ -109,18 +109,19 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ---------------------------------------------------------------------------
-  // Feature 5: Ambient Global Collector Ticker
+  // Feature 5: Ambient Lahore & Regional Waitlist Ticker
   // ---------------------------------------------------------------------------
   const globalTickerText = document.getElementById('ticker-text');
   if (globalTickerText) {
     const TICKER_ENTRIES = [
-      'Tokyo, JP: Collector secured #GRB-4819 • 2m ago',
-      'London, UK: Archivist secured #GRB-4820 • 4m ago',
-      'Paris, FR: Collector secured #GRB-4821 • Just now',
-      'Berlin, DE: Archivist secured #GRB-4818 • 6m ago',
-      'New York, US: Collector secured #GRB-4817 • 9m ago',
-      'Stockholm, SE: Archivist secured #GRB-4816 • 12m ago',
-      'Milan, IT: Collector secured #GRB-4815 • 15m ago'
+      'Lahore, PK: Architecture Studio joined waitlist • Just now',
+      'Lahore, PK: Curated seller joined waitlist • 2m ago',
+      'Gulberg, Lahore: Archival collector secured spot • 4m ago',
+      'DHA, Lahore: Architecture enthusiast joined • 6m ago',
+      'Model Town, Lahore: Archive buyer joined • 9m ago',
+      'Cantt, Lahore: Curated archivist joined • 12m ago',
+      'Karachi, PK: Design studio joined waitlist • 15m ago',
+      'Islamabad, PK: Curated collector joined • 18m ago'
     ];
     let tickerIdx = 0;
     setInterval(() => {
@@ -324,57 +325,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // ---------------------------------------------------------------------------
-  // 10. Cohort 01 Capacity Bar & Scarcity Tracker
-  // ---------------------------------------------------------------------------
-  const COHORT_CAP = 5000;
-  const BASE_CLAIMED = 4821;
-  let currentClaimed = BASE_CLAIMED;
-
-  const capacityClaimedEl = document.getElementById('capacity-claimed');
-  const capacityPctEl = document.getElementById('capacity-pct');
-  const capacityRemainingEl = document.getElementById('capacity-remaining');
-  const cohortProgressFill = document.getElementById('cohort-progress-fill');
-  const queueCounter = document.getElementById('queue-counter');
-
-  function updateCapacityDisplay(claimed) {
-    const pct = ((claimed / COHORT_CAP) * 100).toFixed(1);
-    const remaining = Math.max(0, COHORT_CAP - claimed);
-
-    if (capacityClaimedEl) capacityClaimedEl.textContent = claimed.toLocaleString();
-    if (capacityPctEl) capacityPctEl.textContent = `${pct}%`;
-    if (capacityRemainingEl) capacityRemainingEl.textContent = remaining.toLocaleString();
-    if (queueCounter) queueCounter.textContent = claimed.toLocaleString();
-    if (cohortProgressFill) cohortProgressFill.style.width = `${Math.min(100, pct)}%`;
-  }
-  updateCapacityDisplay(currentClaimed);
-
-  // Live count sync from Supabase using secure get_waitlist_count RPC
-  async function fetchLiveSupabaseCount() {
-    try {
-      const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/rpc/get_waitlist_count`, {
-        method: 'POST',
-        headers: {
-          'apikey': SUPABASE_CONFIG.anonKey,
-          'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      if (res.ok) {
-        const count = await res.json();
-        const dbCount = Number(count);
-        if (!isNaN(dbCount) && dbCount > 0) {
-          currentClaimed = BASE_CLAIMED + dbCount;
-          updateCapacityDisplay(currentClaimed);
-        }
-      }
-    } catch {
-      // Gracefully fall back to local count
-    }
-  }
-  fetchLiveSupabaseCount();
-
-  // ---------------------------------------------------------------------------
-  // 11. Referral Ingestion (?ref= query param)
+  // 10. Referral Ingestion (?ref= query param)
   // ---------------------------------------------------------------------------
   const urlParams = new URLSearchParams(window.location.search);
   const referredByCode = urlParams.get('ref') ? urlParams.get('ref').trim().toUpperCase() : null;
@@ -387,7 +338,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ---------------------------------------------------------------------------
-  // 12. Participant Role Selector (Buyer / Seller / Both)
+  // 11. Participant Role & Curation Focus Selectors (Lahore Architecture Focus)
   // ---------------------------------------------------------------------------
   const rolePills = document.querySelectorAll('.role-pill');
   const selectedRoleInput = document.getElementById('selected-role');
@@ -422,6 +373,38 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  const interestPills = document.querySelectorAll('.interest-pill');
+  const selectedInterestInput = document.getElementById('selected-interest');
+  let currentInterest = 'both';
+
+  interestPills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      hapticAudio.click();
+      interestPills.forEach(p => {
+        p.classList.remove('active');
+        p.setAttribute('aria-checked', 'false');
+      });
+      pill.classList.add('active');
+      pill.setAttribute('aria-checked', 'true');
+      currentInterest = pill.getAttribute('data-interest') || 'both';
+      if (selectedInterestInput) {
+        selectedInterestInput.value = currentInterest;
+      }
+    });
+
+    pill.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        const next = pill.nextElementSibling || interestPills[0];
+        next.focus();
+        next.click();
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        const prev = pill.previousElementSibling || interestPills[interestPills.length - 1];
+        prev.focus();
+        prev.click();
+      }
+    });
+  });
+
   // ---------------------------------------------------------------------------
   // 13. Dual Persistence Engine (LocalStorage + Supabase REST)
   // ---------------------------------------------------------------------------
@@ -436,15 +419,19 @@ document.addEventListener('DOMContentLoaded', () => {
   function saveToLocalStorage(record) {
     try {
       const stored = getLocalWaitlist();
-      const existingIdx = stored.findIndex(item => item.email.toLowerCase() === record.email.toLowerCase());
+      const existingIdx = stored.findIndex(item => {
+        if (record.phone && item.phone && item.phone === record.phone) return true;
+        if (record.email && item.email && item.email.toLowerCase() === record.email.toLowerCase()) return true;
+        return false;
+      });
       if (existingIdx >= 0) {
         stored[existingIdx] = { ...stored[existingIdx], ...record };
       } else {
         stored.push(record);
       }
       localStorage.setItem('grabsty_waitlist', JSON.stringify(stored));
-      // Store current user identifier for quick restore
-      localStorage.setItem('grabsty_last_email', record.email);
+      if (record.email) localStorage.setItem('grabsty_last_email', record.email);
+      if (record.phone) localStorage.setItem('grabsty_last_phone', record.phone);
     } catch (err) {
       console.warn('LocalStorage save warning:', err);
     }
@@ -542,14 +529,105 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ---------------------------------------------------------------------------
-  // 15. Success State / Passport Presentation
+  // Feature: Celebration Party Popper Animation (Native HTML5 Canvas)
+  // ---------------------------------------------------------------------------
+  function triggerPartyPopper() {
+    hapticAudio.success();
+    const canvas = document.getElementById('party-popper-canvas');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    canvas.width = width;
+    canvas.height = height;
+
+    if (isReducedMotion) {
+      return;
+    }
+
+    const COLORS = ['#6C47FF', '#F59E0B', '#EC4899', '#10B981', '#FFFFFF', '#0F0F0F', '#60A5FA'];
+    const particles = [];
+    const PARTICLE_COUNT = 140;
+
+    const btnRect = submitBtn ? submitBtn.getBoundingClientRect() : null;
+    const originX = btnRect ? (btnRect.left + btnRect.width / 2) : (width / 2);
+    const originY = btnRect ? (btnRect.top + btnRect.height / 2) : (height * 0.55);
+
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      const angle = (Math.random() * Math.PI * 1.5) - (Math.PI * 1.25);
+      const speed = Math.random() * 20 + 8;
+      particles.push({
+        x: originX,
+        y: originY,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - (Math.random() * 6 + 4),
+        size: Math.random() * 8 + 5,
+        color: COLORS[Math.floor(Math.random() * COLORS.length)],
+        rotation: Math.random() * 360,
+        rotationSpeed: (Math.random() - 0.5) * 18,
+        isStreamer: Math.random() > 0.6,
+        opacity: 1,
+        decay: Math.random() * 0.012 + 0.008,
+        gravity: 0.42,
+        drag: 0.965
+      });
+    }
+
+    let animId = null;
+    function renderFrame() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      let aliveCount = 0;
+
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        if (p.opacity <= 0.01) continue;
+        aliveCount++;
+
+        p.vx *= p.drag;
+        p.vy = (p.vy * p.drag) + p.gravity;
+        p.x += p.vx;
+        p.y += p.vy;
+        p.rotation += p.rotationSpeed;
+        p.opacity -= p.decay;
+
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, p.opacity);
+        ctx.translate(p.x, p.y);
+        ctx.rotate((p.rotation * Math.PI) / 180);
+        ctx.fillStyle = p.color;
+
+        if (p.isStreamer) {
+          ctx.fillRect(-p.size / 2, -p.size * 1.5, p.size, p.size * 3);
+        } else {
+          ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+        }
+
+        ctx.restore();
+      }
+
+      if (aliveCount > 0) {
+        animId = requestAnimationFrame(renderFrame);
+      } else {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        cancelAnimationFrame(animId);
+      }
+    }
+    renderFrame();
+  }
+
+  // ---------------------------------------------------------------------------
+  // 15. Success State Presentation
   // ---------------------------------------------------------------------------
   const formContainer = document.getElementById('form-container');
   const successContainer = document.getElementById('success-container');
   const successQueueTag = document.getElementById('success-queue-tag');
   const successTitle = document.getElementById('success-title');
   const successMessage = document.getElementById('success-message');
+  const confirmedName = document.getElementById('confirmed-name');
+  const confirmedPhone = document.getElementById('confirmed-phone');
   const confirmedEmail = document.getElementById('confirmed-email');
+  const confirmedLocation = document.getElementById('confirmed-location');
   const confirmedRole = document.getElementById('confirmed-role');
   const ticketNumber = document.getElementById('ticket-number');
   const referralLinkInput = document.getElementById('referral-link-input');
@@ -557,38 +635,44 @@ document.addEventListener('DOMContentLoaded', () => {
   const shareXBtn = document.getElementById('share-x-btn');
   const shareWaBtn = document.getElementById('share-wa-btn');
   const nativeShareBtn = document.getElementById('native-share-btn');
-  const downloadPassBtn = document.getElementById('download-pass-btn');
   const backToFormBtn = document.getElementById('back-to-form-btn');
 
-  let activePassportData = null;
+  let activeWaitlistData = null;
 
-  function renderPassportCard({ email, role, ticketCode, isReturning }) {
-    activePassportData = { email, role, ticketCode };
-    hapticAudio.success();
+  function renderWaitlistSuccess({ name, phone, email, city, role, interest, ticketCode, isReturning }) {
+    activeWaitlistData = { name, phone, email, city, role, interest, ticketCode };
 
     const siteBase = window.location.origin + window.location.pathname.replace(/\/$/, '');
     const cleanCode = ticketCode.replace(/^#/, '');
     const uniqueRefUrl = `${siteBase}?ref=${cleanCode}`;
 
     if (ticketNumber) ticketNumber.textContent = `#${cleanCode}`;
-    if (confirmedEmail) confirmedEmail.textContent = email;
+    if (confirmedName) confirmedName.textContent = name || 'Waitlist Member';
+    if (confirmedPhone) confirmedPhone.textContent = phone || '—';
+    if (confirmedEmail) confirmedEmail.textContent = email ? email : 'Not provided (SMS/WhatsApp notifications)';
+    if (confirmedLocation) confirmedLocation.textContent = city ? `${city}, Pakistan` : 'Lahore, Pakistan';
 
     if (confirmedRole) {
-      const roleLabels = { buyer: 'COLLECTOR', seller: 'ARCHIVIST', both: 'HYBRID' };
-      confirmedRole.textContent = roleLabels[role] || 'COLLECTOR';
+      const roleLabels = { buyer: 'BUYER', seller: 'CURATED SELLER', both: 'BUYER & SELLER' };
+      const interestLabels = {
+        architecture: 'LAHORE ARCHITECTURE DESIGN',
+        fashion: 'ARCHIVAL FASHION',
+        both: 'ARCHITECTURE & FASHION'
+      };
+      confirmedRole.textContent = `${roleLabels[role] || 'COLLECTOR'} • ${interestLabels[interest] || 'ARCHITECTURE & FASHION'}`;
     }
 
     if (isReturning) {
-      if (successQueueTag) successQueueTag.textContent = 'WELCOME BACK • PASSPORT ACTIVE';
-      if (successTitle) successTitle.textContent = 'Passport Retrieved!';
+      if (successQueueTag) successQueueTag.textContent = 'WELCOME BACK • WAITLIST ACTIVE';
+      if (successTitle) successTitle.textContent = 'Waitlist Entry Retrieved!';
       if (successMessage) {
-        successMessage.textContent = 'Your private alpha reservation is confirmed. Keep sharing your passport link to move further up the queue.';
+        successMessage.textContent = 'Your registration is confirmed. We will notify you via SMS / WhatsApp the moment Grabsty opens in Lahore.';
       }
     } else {
-      if (successQueueTag) successQueueTag.textContent = 'POSITION CONFIRMED';
+      if (successQueueTag) successQueueTag.textContent = 'WAITLIST SPOT CONFIRMED';
       if (successTitle) successTitle.textContent = "You're On The Waitlist!";
       if (successMessage) {
-        successMessage.textContent = "We'll send your private invite key the moment Cohort 01 access begins. Keep your wardrobe archive ready.";
+        successMessage.textContent = "We will send your invite key directly via SMS or WhatsApp as onboarding begins in Lahore. Keep your wardrobe and design collections ready.";
       }
     }
 
@@ -598,12 +682,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Social Sharing Links
     if (shareXBtn) {
-      const xText = encodeURIComponent(`Just claimed my Alpha Passport for @Grabsty — resale fashion stripped of clutter. Join Cohort 01 private waitlist: ${uniqueRefUrl}`);
+      const xText = encodeURIComponent(`Joined the Grabsty waitlist in Lahore — resale fashion and architecture design stripped of clutter: ${uniqueRefUrl}`);
       shareXBtn.href = `https://twitter.com/intent/tweet?text=${xText}`;
     }
 
     if (shareWaBtn) {
-      const waText = encodeURIComponent(`Join Cohort 01 on Grabsty (archival resale, guaranteed escrow protection): ${uniqueRefUrl}`);
+      const waText = encodeURIComponent(`Join the Grabsty waitlist in Lahore (curated resale fashion & architecture design with escrow protection): ${uniqueRefUrl}`);
       shareWaBtn.href = `https://api.whatsapp.com/send?text=${waText}`;
     }
 
@@ -611,8 +695,8 @@ document.addEventListener('DOMContentLoaded', () => {
       nativeShareBtn.classList.remove('hidden');
       nativeShareBtn.onclick = () => {
         navigator.share({
-          title: 'Grabsty — Alpha Passport',
-          text: 'Resale fashion stripped of clutter. Join Cohort 01 with guaranteed escrow protection.',
+          title: 'Grabsty — Lahore Waitlist',
+          text: 'Resale fashion & Lahore Architecture Design with guaranteed escrow protection.',
           url: uniqueRefUrl
         }).catch(() => {});
       };
@@ -631,44 +715,89 @@ document.addEventListener('DOMContentLoaded', () => {
   // 16. Waitlist Form Submission
   // ---------------------------------------------------------------------------
   const waitlistForm = document.getElementById('waitlist-form');
+  const nameInput = document.getElementById('name');
+  const nameError = document.getElementById('name-error');
+  const phoneInput = document.getElementById('phone');
+  const phoneError = document.getElementById('phone-error');
   const emailInput = document.getElementById('email');
   const emailError = document.getElementById('email-error');
 
   function validateEmail(email) {
+    if (!email) return true;
     const re = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
     return re.test(String(email).toLowerCase().trim());
   }
 
-  if (emailInput) {
-    emailInput.addEventListener('input', () => {
-      if (emailInput.classList.contains('has-error')) {
-        emailInput.classList.remove('has-error');
-        if (emailError) emailError.textContent = '';
-      }
-    });
-  }
+  [nameInput, phoneInput, emailInput].forEach(inp => {
+    if (inp) {
+      inp.addEventListener('input', () => {
+        if (inp.classList.contains('has-error')) {
+          inp.classList.remove('has-error');
+          const errEl = document.getElementById(`${inp.id}-error`);
+          if (errEl) errEl.textContent = '';
+        }
+      });
+    }
+  });
 
   if (waitlistForm) {
     waitlistForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const emailVal = emailInput.value.trim().toLowerCase();
 
-      if (!validateEmail(emailVal)) {
-        emailInput.classList.add('has-error');
-        if (emailError) {
-          emailError.textContent = 'Please enter a valid archival email address.';
+      const nameVal = nameInput ? nameInput.value.trim() : '';
+      const phoneVal = phoneInput ? phoneInput.value.trim() : '';
+      const emailVal = emailInput ? emailInput.value.trim().toLowerCase() : '';
+      const cityVal = 'Lahore';
+
+      // 1. Validate Name
+      if (!nameVal) {
+        if (nameInput) {
+          nameInput.classList.add('has-error');
+          nameInput.focus();
         }
-        emailInput.focus();
+        if (nameError) nameError.textContent = 'Please enter your full name.';
         return;
       }
 
-      // Check if user already registered locally first
+      // 2. Validate Phone (Required, at least 7 digits)
+      const digitsOnly = phoneVal.replace(/\D/g, '');
+      if (!phoneVal || digitsOnly.length < 7) {
+        if (phoneInput) {
+          phoneInput.classList.add('has-error');
+          phoneInput.focus();
+        }
+        if (phoneError) phoneError.textContent = 'Please enter a valid phone number (at least 7 digits).';
+        return;
+      }
+
+      // 3. Validate Email (Optional)
+      if (emailVal && !validateEmail(emailVal)) {
+        if (emailInput) {
+          emailInput.classList.add('has-error');
+          emailInput.focus();
+        }
+        if (emailError) emailError.textContent = 'Please enter a valid email address or leave blank.';
+        return;
+      }
+
+      // Fire celebratory Party Popper animation!
+      triggerPartyPopper();
+
+      // Check if user already registered locally first (by phone or email)
       const localUsers = getLocalWaitlist();
-      const existingLocal = localUsers.find(u => u.email.toLowerCase() === emailVal);
+      const existingLocal = localUsers.find(u => 
+        (phoneVal && u.phone === phoneVal) || 
+        (emailVal && u.email && u.email.toLowerCase() === emailVal)
+      );
+
       if (existingLocal) {
-        renderPassportCard({
-          email: existingLocal.email,
+        renderWaitlistSuccess({
+          name: existingLocal.name || nameVal,
+          phone: existingLocal.phone || phoneVal,
+          email: existingLocal.email || emailVal,
+          city: existingLocal.city || cityVal,
           role: existingLocal.role || currentRole,
+          interest: existingLocal.interest || currentInterest,
           ticketCode: existingLocal.referral_code || `GRB-${existingLocal.ticket_number}`,
           isReturning: true
         });
@@ -676,65 +805,56 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       // Enter Loading State
-      submitBtn.disabled = true;
-      submitBtn.classList.add('loading');
-      const btnText = submitBtn.querySelector('.btn-text');
-      if (btnText) btnText.textContent = 'VERIFYING...';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.classList.add('loading');
+        const btnText = submitBtn.querySelector('.btn-text');
+        if (btnText) btnText.textContent = 'REGISTERING...';
+      }
 
-      const nextQueue = currentClaimed + 1;
-      const ticketCode = `GRB-${nextQueue}`;
+      const nextTicket = 1000 + (localUsers.length + 1);
+      const ticketCode = `GRB-${nextTicket}`;
 
       const payload = {
-        email: emailVal,
+        name: nameVal,
+        phone: phoneVal,
+        email: emailVal || null,
+        city: cityVal,
         role: currentRole,
-        ticket_number: nextQueue,
+        interest: currentInterest,
+        ticket_number: nextTicket,
         referral_code: ticketCode,
         referred_by: referredByCode || null,
         created_at: new Date().toISOString()
       };
 
-      // Save locally immediately (offline-first resilience)
+      // Save locally immediately
       saveToLocalStorage({ ...payload, synced: false });
 
-      // Dispatch to Supabase with timeout race
+      // Dispatch to Supabase
       let supabaseResp = null;
       try {
         const [res] = await Promise.allSettled([
           postToSupabase(payload),
-          new Promise(resolve => setTimeout(resolve, 600))
+          new Promise(resolve => setTimeout(resolve, 500))
         ]);
         supabaseResp = res.status === 'fulfilled' ? res.value : null;
       } catch {}
 
-      // Handle 409 Conflict (User already exists in Supabase DB)
-      if (supabaseResp && supabaseResp.conflict) {
-        const existingRemote = await fetchUserFromSupabase(emailVal);
-        if (existingRemote) {
-          saveToLocalStorage({ ...existingRemote, synced: true });
-          submitBtn.disabled = false;
-          submitBtn.classList.remove('loading');
-          if (btnText) btnText.textContent = 'JOIN WAITLIST';
-          renderPassportCard({
-            email: existingRemote.email,
-            role: existingRemote.role || 'buyer',
-            ticketCode: existingRemote.referral_code || `GRB-${existingRemote.ticket_number}`,
-            isReturning: true
-          });
-          return;
-        }
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('loading');
+        const btnText = submitBtn.querySelector('.btn-text');
+        if (btnText) btnText.textContent = 'JOIN WAITLIST';
       }
 
-      // Successful new registration
-      currentClaimed = nextQueue;
-      updateCapacityDisplay(currentClaimed);
-
-      submitBtn.disabled = false;
-      submitBtn.classList.remove('loading');
-      if (btnText) btnText.textContent = 'JOIN WAITLIST';
-
-      renderPassportCard({
+      renderWaitlistSuccess({
+        name: nameVal,
+        phone: phoneVal,
         email: emailVal,
+        city: cityVal,
         role: currentRole,
+        interest: currentInterest,
         ticketCode: ticketCode,
         isReturning: false
       });
@@ -747,43 +867,28 @@ document.addEventListener('DOMContentLoaded', () => {
   const lookupToggleBtn = document.getElementById('lookup-toggle-btn');
   if (lookupToggleBtn) {
     lookupToggleBtn.addEventListener('click', async () => {
-      const lastEmail = localStorage.getItem('grabsty_last_email');
       const localUsers = getLocalWaitlist();
-
-      if (lastEmail) {
-        const match = localUsers.find(u => u.email.toLowerCase() === lastEmail.toLowerCase());
-        if (match) {
-          renderPassportCard({
-            email: match.email,
-            role: match.role || 'buyer',
-            ticketCode: match.referral_code || `GRB-${match.ticket_number}`,
-            isReturning: true
-          });
-          return;
-        }
-      }
-
       if (localUsers.length > 0) {
-        const first = localUsers[localUsers.length - 1];
-        renderPassportCard({
-          email: first.email,
-          role: first.role || 'buyer',
-          ticketCode: first.referral_code || `GRB-${first.ticket_number}`,
+        const last = localUsers[localUsers.length - 1];
+        renderWaitlistSuccess({
+          name: last.name || '',
+          phone: last.phone || '',
+          email: last.email || '',
+          city: last.city || 'Lahore',
+          role: last.role || 'buyer',
+          interest: last.interest || 'both',
+          ticketCode: last.referral_code || `GRB-${last.ticket_number}`,
           isReturning: true
         });
         return;
       }
 
-      // Prompt to type email
-      if (emailInput) {
-        emailInput.focus();
-        emailInput.placeholder = 'Type your registered email...';
-        if (emailError) {
-          emailError.style.color = 'var(--paper)';
-          emailError.textContent = 'Enter your email above and hit Join to retrieve your passport.';
+      if (phoneInput) {
+        phoneInput.focus();
+        if (phoneError) {
+          phoneError.textContent = 'Enter your phone number above and click Join Waitlist to check.';
           setTimeout(() => {
-            emailError.textContent = '';
-            emailError.style.color = '';
+            phoneError.textContent = '';
           }, 3500);
         }
       }
@@ -795,10 +900,11 @@ document.addEventListener('DOMContentLoaded', () => {
     backToFormBtn.addEventListener('click', () => {
       successContainer.classList.add('hidden');
       formContainer.classList.remove('hidden');
-      if (emailInput) {
-        emailInput.value = '';
-        emailInput.placeholder = 'name@archival.com';
-        emailInput.focus();
+      if (nameInput) {
+        nameInput.value = '';
+        if (phoneInput) phoneInput.value = '';
+        if (emailInput) emailInput.value = '';
+        nameInput.focus();
       }
     });
   }
@@ -842,131 +948,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ---------------------------------------------------------------------------
-  // 19. Native Client-Side Canvas Passport PNG Generator
-  // ---------------------------------------------------------------------------
-  if (downloadPassBtn) {
-    downloadPassBtn.addEventListener('click', () => {
-      if (!activePassportData) return;
-      const canvas = document.getElementById('passport-canvas');
-      if (!canvas) return;
-
-      const ctx = canvas.getContext('2d');
-      const w = 1200;
-      const h = 630;
-      canvas.width = w;
-      canvas.height = h;
-
-      const { email, role, ticketCode } = activePassportData;
-      const cleanCode = ticketCode.replace(/^#/, '');
-
-      // Dark Ink Background
-      ctx.fillStyle = '#0F0F0F';
-      ctx.fillRect(0, 0, w, h);
-
-      // Blueprint dot matrix
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-      for (let x = 20; x < w; x += 30) {
-        for (let y = 20; y < h; y += 30) {
-          ctx.fillRect(x, y, 2, 2);
-        }
-      }
-
-      // Purple brutalist drop shadow & card frame
-      ctx.fillStyle = '#6C47FF';
-      ctx.fillRect(58, 58, w - 100, h - 100);
-
-      ctx.fillStyle = '#171717';
-      ctx.fillRect(50, 50, w - 100, h - 100);
-
-      ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = 4;
-      ctx.strokeRect(50, 50, w - 100, h - 100);
-
-      // Tag
-      ctx.fillStyle = '#6C47FF';
-      ctx.fillRect(85, 85, 175, 38);
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = 'bold 16px "JetBrains Mono", monospace';
-      ctx.fillText('COHORT 01 ALPHA', 105, 110);
-
-      // Brand Title
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = '900 48px Inter, sans-serif';
-      ctx.fillText('GRABSTY', 285, 114);
-
-      ctx.fillStyle = '#6C47FF';
-      ctx.beginPath();
-      ctx.arc(508, 102, 6, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Subtitle
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-      ctx.font = '16px Inter, sans-serif';
-      ctx.fillText('RESALE FASHION STRIPPED OF CLUTTER • ALPHA PASSPORT', 85, 168);
-
-      // Divider
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(85, 195);
-      ctx.lineTo(w - 85, 195);
-      ctx.stroke();
-
-      // Large Ticket Number
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = '900 64px "JetBrains Mono", monospace';
-      ctx.fillText(`#${cleanCode}`, 85, 285);
-
-      // Role Badge
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(85, 315, 210, 44);
-      ctx.fillStyle = '#0F0F0F';
-      ctx.font = '900 18px "JetBrains Mono", monospace';
-      ctx.fillText(`ROLE: ${role.toUpperCase()}`, 105, 344);
-
-      // User Email
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-      ctx.font = '500 24px "JetBrains Mono", monospace';
-      ctx.fillText(email, 85, 415);
-
-      // Security Protocol Box
-      ctx.fillStyle = '#1F1F1F';
-      ctx.fillRect(720, 235, 395, 205);
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-      ctx.strokeRect(720, 235, 395, 205);
-
-      ctx.fillStyle = '#6C47FF';
-      ctx.font = 'bold 15px "JetBrains Mono", monospace';
-      ctx.fillText('PROTOCOL VERIFICATION', 745, 275);
-
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = '16px Inter, sans-serif';
-      ctx.fillText('✓ Guaranteed Buyer Escrow', 745, 315);
-      ctx.fillText('✓ 72-Hour Physical Inspection', 745, 350);
-      ctx.fillText('✓ Zero Gamification / Zero Ads', 745, 385);
-
-      // Bottom Banner
-      ctx.fillStyle = '#6C47FF';
-      ctx.fillRect(50, h - 110, w - 100, 60);
-
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = 'bold 18px "JetBrains Mono", monospace';
-      ctx.fillText('INVITE FELLOW COLLECTORS TO JUMP 50 SPOTS FORWARD', 85, h - 74);
-      ctx.font = 'bold 16px "JetBrains Mono", monospace';
-      ctx.fillText(`REF: ${cleanCode}`, w - 235, h - 74);
-
-      // Save as PNG
-      const link = document.createElement('a');
-      link.download = `grabsty-alpha-passport-${cleanCode}.png`;
-      link.href = canvas.toDataURL('image/png');
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    });
-  }
-
-  // ---------------------------------------------------------------------------
-  // 20. Admin CSV Export Shortcut (Ctrl+Shift+E or Cmd+Shift+E)
+  // 19. Admin CSV Export Shortcut (Ctrl+Shift+E or Cmd+Shift+E)
   // ---------------------------------------------------------------------------
   window.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'E' || e.key === 'e')) {
@@ -977,9 +959,13 @@ document.addEventListener('DOMContentLoaded', () => {
           alert('No local waitlist signups recorded yet on this browser.');
           return;
         }
-        const headers = ['Email', 'Role', 'Ticket Number', 'Referral Code', 'Referred By', 'Created At'];
+        const headers = ['Name', 'Phone', 'Email', 'City', 'Interest', 'Role', 'Ticket Number', 'Referral Code', 'Referred By', 'Created At'];
         const rows = stored.map(s => [
+          `"${s.name || ''}"`,
+          `"${s.phone || ''}"`,
           `"${s.email || ''}"`,
+          `"${s.city || 'Lahore'}"`,
+          `"${s.interest || 'both'}"`,
           `"${s.role || ''}"`,
           `"${s.ticket_number || ''}"`,
           `"${s.referral_code || ''}"`,
@@ -990,7 +976,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement('a');
         link.setAttribute('href', encodedUri);
-        link.setAttribute('download', `grabsty_waitlist_${new Date().toISOString().slice(0, 10)}.csv`);
+        link.setAttribute('download', `grabsty_lahore_waitlist_${new Date().toISOString().slice(0, 10)}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -1001,148 +987,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Feature 1: Interactive Clutter Filter X-Ray Toggle (Bento Card 03)
-  // ---------------------------------------------------------------------------
-  const clutterTabCasino = document.getElementById('clutter-tab-casino');
-  const clutterTabDiscipline = document.getElementById('clutter-tab-discipline');
-  const comparisonStage = document.getElementById('comparison-stage');
-  const disciplineDesc = document.getElementById('discipline-card-desc');
-
-  if (clutterTabCasino && clutterTabDiscipline && comparisonStage) {
-    clutterTabCasino.addEventListener('click', () => {
-      hapticAudio.click();
-      clutterTabCasino.classList.add('active');
-      clutterTabCasino.setAttribute('aria-selected', 'true');
-      clutterTabDiscipline.classList.remove('active');
-      clutterTabDiscipline.setAttribute('aria-selected', 'false');
-
-      comparisonStage.classList.remove('mode-discipline');
-      comparisonStage.classList.add('mode-casino');
-
-      if (disciplineDesc) {
-        disciplineDesc.textContent = 'Conventional marketplaces overwhelm collectors with gambling psychology, flashing popups, and fake countdowns to induce impulsive purchases.';
-      }
-    });
-
-    clutterTabDiscipline.addEventListener('click', () => {
-      hapticAudio.click();
-      clutterTabDiscipline.classList.add('active');
-      clutterTabDiscipline.setAttribute('aria-selected', 'true');
-      clutterTabCasino.classList.remove('active');
-      clutterTabCasino.setAttribute('aria-selected', 'false');
-
-      comparisonStage.classList.remove('mode-casino');
-      comparisonStage.classList.add('mode-discipline');
-
-      if (disciplineDesc) {
-        disciplineDesc.textContent = 'No flashing sticker popups, slot-machine confetti, or deceptive countdown timers. A quiet-luxury platform designed with respect for your focus and aesthetic sensibilities.';
-      }
-    });
-  }
-
-  // ---------------------------------------------------------------------------
-  // Feature 2: Interactive Archival Vault Inspector (Bento Card 02)
-  // ---------------------------------------------------------------------------
-  const VAULT_ITEMS = {
-    raf: {
-      brand: 'RAF SIMONS • AUTUMN/WINTER 2002',
-      name: "'Virginia Creeper' Sweatshirt",
-      price: '$1,450',
-      badge: 'SOLD',
-      provenance: '✓ Verified Weave • Antwerp Provenance',
-      svg: `<path d="M35 15 L50 22 L65 15 L85 35 L75 48 L68 42 L68 110 L32 110 L32 42 L25 48 L15 35 Z" stroke="#6C47FF" stroke-width="3" fill="rgba(108, 71, 255, 0.08)" /><line x1="50" y1="22" x2="50" y2="110" stroke="#FFFFFF" stroke-dasharray="3 3" stroke-width="2" />`
-    },
-    lang: {
-      brand: 'HELMUT LANG • AUTUMN/WINTER 1999',
-      name: 'Classic Raw Painter Selvedge Denim',
-      price: '$980',
-      badge: 'SOLD',
-      provenance: '✓ Bond Street Archive • Selvedge Weave',
-      svg: `<path d="M30 18 L70 18 L74 60 L80 112 L56 112 L50 68 L44 112 L20 112 L26 60 Z" stroke="#6C47FF" stroke-width="3" fill="rgba(108, 71, 255, 0.08)" /><circle cx="42" cy="75" r="3" fill="#FFFFFF" /><circle cx="62" cy="85" r="2.5" fill="#FFFFFF" /><line x1="50" y1="25" x2="50" y2="60" stroke="#FFFFFF" stroke-width="2" />`
-    },
-    margiela: {
-      brand: 'MAISON MARGIELA • AUTUMN/WINTER 2004',
-      name: 'Line 0 Artisanal Reconstructed Leather',
-      price: '$2,800',
-      badge: 'SOLD',
-      provenance: '✓ White 4-Stitch Back Label • Full-Grain',
-      svg: `<path d="M30 15 L50 24 L70 15 L90 32 L82 46 L74 40 L74 108 L26 108 L26 40 L18 46 L10 32 Z" stroke="#6C47FF" stroke-width="3" fill="rgba(108, 71, 255, 0.08)" /><line x1="45" y1="18" x2="55" y2="18" stroke="#FFFFFF" stroke-width="3" /><line x1="45" y1="24" x2="55" y2="24" stroke="#FFFFFF" stroke-width="3" /><line x1="42" y1="42" x2="58" y2="58" stroke="#6C47FF" stroke-width="2" />`
-    }
-  };
-
-  const vaultTabs = document.querySelectorAll('.vault-tab-btn');
-  const vaultBrand = document.getElementById('vault-brand');
-  const vaultName = document.getElementById('vault-name');
-  const vaultPrice = document.getElementById('vault-price');
-  const vaultSoldBadge = document.getElementById('vault-sold-badge');
-  const vaultProvenance = document.getElementById('vault-provenance');
-  const garmentSvgIcon = document.getElementById('garment-svg-icon');
-  const mockupListingCard = document.querySelector('.mockup-listing-card');
-
-  vaultTabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      hapticAudio.click();
-      vaultTabs.forEach(t => {
-        t.classList.remove('active');
-        t.setAttribute('aria-selected', 'false');
-      });
-      tab.classList.add('active');
-      tab.setAttribute('aria-selected', 'true');
-
-      const grailKey = tab.getAttribute('data-grail');
-      const item = VAULT_ITEMS[grailKey];
-      if (!item) return;
-
-      if (mockupListingCard) mockupListingCard.style.opacity = '0.3';
-
-      setTimeout(() => {
-        if (vaultBrand) vaultBrand.textContent = item.brand;
-        if (vaultName) vaultName.textContent = item.name;
-        if (vaultPrice) vaultPrice.textContent = item.price;
-        if (vaultProvenance) {
-          vaultProvenance.textContent = '';
-          const span = document.createElement('span');
-          span.textContent = item.provenance;
-          vaultProvenance.appendChild(span);
-        }
-        if (garmentSvgIcon) garmentSvgIcon.innerHTML = item.svg;
-
-        if (mockupListingCard) mockupListingCard.style.opacity = '1';
-      }, 70);
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // Feature 3: Dynamic 3D Holographic Foil Specular Sheen (Alpha Passport)
-  // ---------------------------------------------------------------------------
-  const passportSuccessCard = document.getElementById('passport-success-card');
-  if (passportSuccessCard && isFinePointer && !isReducedMotion) {
-    passportSuccessCard.addEventListener('mousemove', (e) => {
-      const rect = passportSuccessCard.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const pctX = ((x / rect.width) * 100).toFixed(1);
-      const pctY = ((y / rect.height) * 100).toFixed(1);
-
-      passportSuccessCard.style.setProperty('--foil-x', `${pctX}%`);
-      passportSuccessCard.style.setProperty('--foil-y', `${pctY}%`);
-
-      const centerX = rect.width / 2;
-      const centerY = rect.height / 2;
-      const rotX = ((y - centerY) / centerY) * -5;
-      const rotY = ((x - centerX) / centerX) * 5;
-      passportSuccessCard.style.transform = `perspective(800px) rotateX(${rotX.toFixed(2)}deg) rotateY(${rotY.toFixed(2)}deg)`;
-    });
-
-    passportSuccessCard.addEventListener('mouseleave', () => {
-      passportSuccessCard.style.setProperty('--foil-x', `50%`);
-      passportSuccessCard.style.setProperty('--foil-y', `50%`);
-      passportSuccessCard.style.transform = `perspective(800px) rotateX(0deg) rotateY(0deg)`;
-    });
-  }
-
-  // ---------------------------------------------------------------------------
-  // 10. Smooth Accordion Handling
+  // 20. Smooth Accordion Handling
   // ---------------------------------------------------------------------------
   const faqDetails = document.querySelectorAll('.faq-item');
   faqDetails.forEach(detail => {
@@ -1159,7 +1004,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // 11. Smooth Navigation & Focus Anchor Handling
+  // 21. Smooth Navigation & Focus Anchor Handling
   // ---------------------------------------------------------------------------
   document.querySelectorAll('a[href="#waitlist-section"]').forEach(anchor => {
     anchor.addEventListener('click', (e) => {
@@ -1169,8 +1014,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (target) {
         target.scrollIntoView({ behavior: 'smooth', block: 'center' });
         setTimeout(() => {
-          if (emailInput && !emailInput.disabled) {
-            emailInput.focus();
+          if (nameInput && !nameInput.disabled) {
+            nameInput.focus();
           }
         }, 450);
       }

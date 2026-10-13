@@ -102,8 +102,34 @@ body {
 }
 
 /* ==========================================================================
+   Celebration Party Popper Canvas
+   ========================================================================== */
+.party-popper-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 99999;
+}
+
+/* ==========================================================================
    Texture & Ambient Stage
    ========================================================================== */
+
+/* Celebration Party Popper Overlay Canvas */
+.party-popper-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 10000;
+  display: block;
+}
+
 .grain-overlay {
   position: fixed;
   top: 0;
@@ -478,86 +504,61 @@ body {
 }
 
 /* ==========================================================================
-   Cohort 01 Capacity Bar (Scarcity & Live Progress)
+   Waitlist Location Banner (Lahore Focus)
    ========================================================================== */
-.cohort-capacity-card {
+.waitlist-location-card {
   width: 100%;
   background-color: var(--ink-surface);
   border: 2px solid var(--paper);
   padding: 0.85rem 1.15rem;
   margin-bottom: 1.15rem;
   box-shadow: 4px 4px 0 var(--signal);
-  text-align: left;
-}
-
-.cohort-capacity-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  margin-bottom: 0.5rem;
-  gap: 0.5rem;
+  gap: 0.75rem;
   flex-wrap: wrap;
+  text-align: left;
 }
 
-.cohort-cap-label {
-  color: var(--paper-60);
+.waitlist-loc-left {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
 }
 
-.cohort-cap-count {
+.loc-pin-icon {
+  font-size: 1.125rem;
+}
+
+.loc-text-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.loc-title {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
   color: var(--paper);
 }
 
-.cohort-cap-count strong {
-  color: var(--signal-hover);
-}
-
-.cohort-progress-track {
-  width: 100%;
-  height: 8px;
-  background-color: var(--ink);
-  border: 1.5px solid var(--paper-40);
-  position: relative;
-  overflow: hidden;
-}
-
-.cohort-progress-fill {
-  height: 100%;
-  background: var(--signal);
-  box-shadow: 0 0 10px var(--signal-glow);
-  transition: width 800ms var(--ease-out);
-}
-
-.cohort-capacity-footer {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  margin-top: 0.5rem;
-  font-family: var(--font-mono);
+.loc-sub {
   font-size: 0.6875rem;
   color: var(--paper-80);
 }
 
-.capacity-live-dot {
-  width: 7px;
-  height: 7px;
-  background-color: #EF4444;
-  border-radius: 50%;
-  box-shadow: 0 0 6px #EF4444;
-  animation: pulse-live 1.8s infinite;
-}
-
-@keyframes pulse-live {
-  0% { transform: scale(0.9); opacity: 0.7; }
-  50% { transform: scale(1.3); opacity: 1; box-shadow: 0 0 10px #EF4444; }
-  100% { transform: scale(0.9); opacity: 0.7; }
-}
-
-.capacity-urgency-text strong {
+.loc-status-pill {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 800;
   color: var(--paper);
+  background-color: var(--signal);
+  padding: 0.25rem 0.55rem;
+  border: 1px solid var(--paper);
+  letter-spacing: 0.05em;
 }
 
 /* ==========================================================================
@@ -589,11 +590,13 @@ body {
 }
 
 /* ==========================================================================
-   Role Selector
+   Role & Interest Selectors
    ========================================================================== */
-.role-selector-wrap {
+.role-selector-wrap,
+.interest-selector-wrap {
   width: 100%;
   text-align: left;
+  margin-bottom: 0.25rem;
 }
 
 .role-selector-label {
@@ -637,13 +640,15 @@ body {
   }
 }
 
-.role-pill:hover {
+.role-pill:hover,
+.interest-pill:hover {
   border-color: var(--paper-60);
   color: var(--paper);
   background-color: var(--ink-elevated);
 }
 
-.role-pill.active {
+.role-pill.active,
+.interest-pill.active {
   background-color: var(--paper);
   color: var(--ink);
   border-color: var(--paper);
@@ -654,6 +659,44 @@ body {
   font-size: 0.65rem;
 }
 
+/* Interest Selector Pills (Lahore Architecture Design Focus) */
+.interest-pills {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+@media (min-width: 520px) {
+  .interest-pills {
+    grid-template-columns: 1.15fr 1fr;
+  }
+  .interest-pills button[data-interest="both"] {
+    grid-column: 1 / -1;
+  }
+}
+
+.interest-pill {
+  background-color: var(--ink-surface);
+  border: 2px solid var(--paper-20);
+  color: var(--paper-80);
+  font-family: var(--font-main);
+  font-weight: 800;
+  font-size: 0.6875rem;
+  letter-spacing: 0.03em;
+  padding: 0.6rem 0.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  transition: all 120ms ease;
+}
+
+.interest-icon {
+  font-size: 0.75rem;
+}
+
 .waitlist-form {
   width: 100%;
   display: flex;
@@ -662,56 +705,81 @@ body {
   margin-bottom: 1.15rem;
 }
 
-.form-inputs-row {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
+/* ==========================================================================
+   Form Fields Grid & Inputs
+   ========================================================================== */
+.form-fields-grid {
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 0.85rem;
+  width: 100%;
+  text-align: left;
 }
 
-@media (min-width: 600px) {
-  .form-inputs-row {
-    flex-direction: row;
-    align-items: flex-start;
+@media (min-width: 580px) {
+  .form-fields-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .input-group-full {
+    grid-column: 1 / -1;
   }
 }
 
 .input-group {
-  flex: 1;
   width: 100%;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
 }
 
-.email-input {
+.field-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--paper-80);
+  margin-bottom: 0.35rem;
+}
+
+.field-req {
+  color: var(--signal);
+}
+
+.field-opt {
+  color: var(--paper-60);
+  font-weight: 600;
+  font-size: 0.625rem;
+}
+
+.form-text-input {
   width: 100%;
-  height: 52px;
+  height: 48px;
   background-color: var(--paper);
   border: 3px solid var(--ink);
-  padding: 0 1.25rem;
+  padding: 0 1rem;
   color: var(--ink);
   font-family: var(--font-main);
-  font-size: 1rem;
+  font-size: 0.9375rem;
   font-weight: 700;
   outline: none;
   transition: transform 150ms var(--ease-out), box-shadow 150ms var(--ease-out), border-color 150ms ease;
-  box-shadow: 4px 4px 0 var(--signal);
+  box-shadow: 3px 3px 0 var(--signal);
 }
 
-.email-input::placeholder {
-  color: rgba(15, 15, 15, 0.5);
+.form-text-input::placeholder {
+  color: rgba(15, 15, 15, 0.45);
   font-weight: 600;
 }
 
-.email-input:focus {
+.form-text-input:focus {
   transform: translate(-2px, -2px);
-  box-shadow: 6px 6px 0 var(--signal);
+  box-shadow: 5px 5px 0 var(--signal);
 }
 
-.email-input.has-error {
+.form-text-input.has-error {
   border-color: var(--error);
-  box-shadow: 4px 4px 0 var(--error);
+  box-shadow: 3px 3px 0 var(--error);
   animation: input-shake 300ms ease;
 }
 
@@ -725,9 +793,18 @@ body {
   font-size: 0.75rem;
   font-weight: 700;
   color: var(--error);
-  margin-top: 0.4rem;
+  margin-top: 0.35rem;
   min-height: 1rem;
   text-align: left;
+}
+
+.form-action-row {
+  width: 100%;
+  margin-top: 0.25rem;
+}
+
+.form-action-row .submit-btn {
+  width: 100%;
 }
 
 /* Primary CTA Button (Strict 1-Primary CTA Rule) */
@@ -899,21 +976,6 @@ body {
   will-change: transform;
 }
 
-/* 3D Holographic Specular Foil Layer (Feature 3) */
-.foil-glare-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 10;
-  background: radial-gradient(circle 350px at var(--foil-x, 50%) var(--foil-y, 50%), rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0.15) 30%, transparent 70%);
-  mix-blend-mode: overlay;
-  opacity: var(--foil-opacity, 0.85);
-  transition: opacity 300ms ease;
-}
-
 @keyframes success-pop {
   0% { transform: scale(0.9) rotate(-3deg); opacity: 0; }
   100% { transform: scale(1) rotate(0deg); opacity: 1; }
@@ -954,39 +1016,53 @@ body {
   color: var(--paper);
   text-transform: uppercase;
   letter-spacing: -0.02em;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.85rem;
   text-shadow: 2px 2px 0 var(--ink);
 }
 
-.success-meta-row {
+/* Success Details Box */
+.success-details-box {
+  width: 100%;
+  background-color: var(--ink);
+  border: 2px solid var(--paper);
+  padding: 1rem 1.15rem;
+  margin-bottom: 1.15rem;
   display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  text-align: left;
+  box-shadow: 4px 4px 0 var(--ink);
+}
+
+.success-detail-item {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-  flex-wrap: wrap;
-  justify-content: center;
+  gap: 0.75rem;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.15);
+  padding-bottom: 0.4rem;
 }
 
-.success-email {
-  font-family: var(--font-mono);
-  font-size: 0.9375rem;
-  font-weight: 700;
-  color: var(--paper);
-  background-color: rgba(15, 15, 15, 0.3);
-  padding: 0.25rem 0.75rem;
-  border-radius: 4px;
+.success-detail-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
 }
 
-.success-role-badge {
+.detail-label {
   font-family: var(--font-mono);
   font-size: 0.6875rem;
   font-weight: 800;
-  background-color: var(--paper);
-  color: var(--ink);
-  padding: 0.25rem 0.6rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  border: 2px solid var(--ink);
+  color: var(--signal);
+  letter-spacing: 0.08em;
+}
+
+.detail-value {
+  font-family: var(--font-main);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--paper);
+  text-align: right;
+  word-break: break-all;
 }
 
 .success-text {
@@ -1324,6 +1400,134 @@ body {
   color: var(--paper);
   margin-bottom: 3.5rem;
   text-transform: uppercase;
+}
+
+/* ==========================================================================
+   Lahore Architecture Design Showcase Card
+   ========================================================================== */
+.lahore-architecture-card {
+  width: 100%;
+  background-color: var(--ink-surface);
+  border: 3px solid var(--paper);
+  box-shadow: 8px 8px 0 var(--signal);
+  padding: 2.25rem 2rem;
+  margin-bottom: 2.5rem;
+  text-align: left;
+}
+
+.arch-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.75rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 2px dashed var(--paper-20);
+}
+
+.arch-badge-group {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.arch-card-tag {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 900;
+  color: var(--paper);
+  background-color: var(--signal);
+  padding: 0.25rem 0.65rem;
+  border: 1px solid var(--paper);
+}
+
+.arch-card-pill {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--paper-80);
+}
+
+.arch-badge-city {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--paper-60);
+}
+
+.arch-card-content-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  align-items: center;
+}
+
+@media (min-width: 880px) {
+  .arch-card-content-grid {
+    grid-template-columns: 1.15fr 1fr;
+  }
+}
+
+.arch-card-visual {
+  width: 100%;
+  background-color: var(--ink);
+  border: 2px solid var(--paper-40);
+  box-shadow: 5px 5px 0 var(--paper);
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.arch-blueprint-frame {
+  width: 100%;
+}
+
+.arch-blueprint-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.arch-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  text-align: left;
+}
+
+.arch-info-title {
+  font-size: 1.45rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: var(--paper);
+  line-height: 1.25;
+}
+
+.arch-info-desc {
+  font-size: 0.9375rem;
+  color: var(--paper-80);
+  line-height: 1.6;
+}
+
+.arch-tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.arch-tag-pill {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  color: var(--paper);
+  background-color: var(--ink);
+  border: 1.5px solid var(--paper);
+  box-shadow: 2px 2px 0 var(--signal);
+  padding: 0.35rem 0.65rem;
 }
 
 .bento-grid {
