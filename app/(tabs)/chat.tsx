@@ -35,6 +35,7 @@ import {
   SUPPORT_BOT_AVATAR,
 } from '@/lib/support';
 import { useInboxQuery } from '@/lib/queries';
+import { markActivitySeen } from '@/hooks/useActivityDot';
 import { colors, radii, shadow, type as typography } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { EmptyState, BellIcon } from '@/components/ui';
@@ -834,6 +835,7 @@ export default function InboxScreen() {
   useFocusEffect(
     useCallback(() => {
       inboxRefetch();
+      markActivitySeen();
     }, [inboxRefetch]),
   );
 

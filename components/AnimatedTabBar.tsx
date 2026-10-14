@@ -21,6 +21,8 @@ import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useTheme } from '@/context/ThemeContext';
 import { useIsKeyboardShown } from '@/hooks/useIsKeyboardShown';
 import { Text } from '@/lib/rnText';
+import { lightTheme } from '@/lib/theme';
+import { useActivityDot } from '@/hooks/useActivityDot';
 import {
   HomeTabIcon,
   CategoriesTabIcon,
@@ -345,6 +347,33 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
   );
 }
 
+// Activity tab dot: new messages, offers or a sale. Its own component so the
+// hook's state only ever re-renders this 9px view — never the dock or its
+// gesture worklets (UI_GUARDRAILS Rule 2.3). Signal Purple, ringed in the bar
+// colour so it reads as a notch cut into the icon.
+function ActivityDot({ ringColor }: { ringColor: string }) {
+  const show = useActivityDot();
+  if (!show) return null;
+  return (
+    <View
+      pointerEvents="none"
+      accessible
+      accessibilityLabel="New activity"
+      style={{
+        position: 'absolute',
+        top: -2,
+        right: -4,
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: lightTheme.purple,
+        borderWidth: 2,
+        borderColor: ringColor,
+      }}
+    />
+  );
+}
+
 function TabItem({
   index,
   routeName,
@@ -423,6 +452,7 @@ function TabItem({
         <Animated.View style={[StyleSheet.absoluteFill, filledStyle]}>
           {renderTabIcon(routeName, true, activeColor, ICON, barBg)}
         </Animated.View>
+        {routeName === 'chat' && <ActivityDot ringColor={barBg} />}
       </Animated.View>
       <Text
         style={{
