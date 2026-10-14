@@ -23,3 +23,7 @@
 # The one file that must never be cached: it names the current bundle hash.
 /index.html
   Cache-Control: public, max-age=0, must-revalidate
+
+# Service worker: never cached, so browsers always pick up a new version.
+/sw.js
+  Cache-Control: no-cache

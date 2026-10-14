@@ -24,11 +24,49 @@ import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { routeForNotificationData } from '@/lib/notificationRouting';
+import {
+  browserLabel,
+  currentSubscription,
+  subscribe as subscribeWeb,
+  subscriptionKeys,
+  webPermission,
+  webPushSupported,
+} from '@/lib/webPush';
 
 const PROMPTED_KEY = 'push_prompted';
 
-/** Remote push is iOS/Android only — web push (VAPID) is a separate slice. */
+/** Expo push (iOS/Android). Browsers go through lib/webPush.ts instead. */
 const SUPPORTED = Platform.OS === 'ios' || Platform.OS === 'android';
+const IS_WEB = Platform.OS === 'web';
+
+/** Can this device receive push at all? Drives whether Settings shows the toggle. */
+export function pushSupported(): boolean {
+  return SUPPORTED || (IS_WEB && webPushSupported());
+}
+
+/** Browser: subscribe (permission already granted) and store the subscription. */
+async function registerWeb(userId: string): Promise<boolean> {
+  if (!userId || webPermission() !== 'granted') return false;
+  try {
+    const sub = await subscribeWeb();
+    const keys = sub ? subscriptionKeys(sub) : null;
+    if (!sub || !keys) return false;
+    const { error } = await supabase.rpc('register_web_push', {
+      p_endpoint: sub.endpoint,
+      p_p256dh: keys.p256dh,
+      p_auth: keys.auth,
+      p_device_name: browserLabel(),
+    });
+    if (error) {
+      console.warn('[push] register_web_push failed', error.message);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.warn('[push] web registration failed', e);
+    return false;
+  }
+}
 
 /**
  * getExpoPushTokenAsync needs the EAS project id to address the device. It is
@@ -86,6 +124,7 @@ export async function getPermissionStatus(): Promise<Notifications.PermissionSta
  * is already granted — it never prompts. Safe to call on every sign-in.
  */
 export async function registerForPush(userId: string): Promise<boolean> {
+  if (IS_WEB) return registerWeb(userId);
   if (!SUPPORTED || !userId) return false;
   // A simulator/emulator cannot receive a remote push and returns no token.
   if (!Device.isDevice) return false;
@@ -130,6 +169,20 @@ export async function registerForPush(userId: string): Promise<boolean> {
 export async function ensurePermissionAndRegister(
   userId: string,
 ): Promise<{ granted: boolean; blocked: boolean }> {
+  if (IS_WEB) {
+    if (!webPushSupported()) return { granted: false, blocked: false };
+    try {
+      // Browsers only show the prompt from a user gesture (the Settings toggle),
+      // and once denied only the site settings can undo it.
+      let permission = Notification.permission;
+      if (permission === 'default') permission = await Notification.requestPermission();
+      if (permission !== 'granted') return { granted: false, blocked: permission === 'denied' };
+      return { granted: await registerWeb(userId), blocked: false };
+    } catch (e) {
+      console.warn('[push] web permission request failed', e);
+      return { granted: false, blocked: false };
+    }
+  }
   if (!SUPPORTED) return { granted: false, blocked: false };
   try {
     const current = await Notifications.getPermissionsAsync();
@@ -160,6 +213,18 @@ let lastToken: string | null = null;
  * signOut() silently deletes nothing.
  */
 export async function unregisterThisDevice(): Promise<void> {
+  if (IS_WEB) {
+    try {
+      const sub = await currentSubscription();
+      if (!sub) return;
+      const { error } = await supabase.from('user_devices').delete().eq('expo_push_token', sub.endpoint);
+      if (error) console.warn('[push] unregister failed', error.message);
+      await sub.unsubscribe();
+    } catch (e) {
+      console.warn('[push] web unregister failed', e);
+    }
+    return;
+  }
   if (!SUPPORTED) return;
   try {
     let token = lastToken;
@@ -189,6 +254,17 @@ export async function unregisterThisDevice(): Promise<void> {
  * because revoking our registration does not revoke the OS grant.
  */
 export async function isThisDeviceRegistered(): Promise<boolean> {
+  if (IS_WEB) {
+    if (webPermission() !== 'granted') return false;
+    const sub = await currentSubscription();
+    if (!sub) return false;
+    const { data, error } = await supabase
+      .from('user_devices')
+      .select('id')
+      .eq('expo_push_token', sub.endpoint)
+      .maybeSingle();
+    return !error && !!data;
+  }
   if (!SUPPORTED || !Device.isDevice) return false;
   const id = projectId();
   if (!id) return false;

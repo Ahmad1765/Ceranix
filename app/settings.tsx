@@ -106,7 +106,7 @@ export default function SettingsScreen() {
       case 'general':
         return (
           <>
-            {Platform.OS !== 'web' && (
+            {mgr.pushSupported && (
               <ChatGPTSwitchRow
                 label="Push notifications"
                 desc="Receive alerts for offers, orders, and messages on this device"
@@ -1001,7 +1001,7 @@ export default function SettingsScreen() {
               />
             }
           />
-          {Platform.OS !== 'web' && (
+          {mgr.pushSupported && (
             <ChatGPTItem
               icon="bell"
               label="Notifications"

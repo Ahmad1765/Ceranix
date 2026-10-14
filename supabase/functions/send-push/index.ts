@@ -38,6 +38,11 @@ import {
   type PushNotification,
   type WebhookPayload,
 } from './mapper.ts';
+import {
+  buildWebPushPayload,
+  isAllowedWebPushEndpoint,
+  isExpiredSubscriptionStatus,
+} from './webPush.ts';
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 // Expo accepts up to 100 messages per request.
@@ -152,6 +157,66 @@ type ExpoMessage = {
   channelId: 'default';
 };
 
+type Device = {
+  user_id: string;
+  expo_push_token: string;
+  platform: string | null;
+  web_push_keys: { p256dh?: string; auth?: string } | null;
+};
+
+// Web push signing. The public half is also in lib/webPush.ts (it is public by
+// design); the private half is a function secret. Unset keys disable web push
+// only — native delivery is unaffected.
+const VAPID_PUBLIC_KEY = Deno.env.get('VAPID_PUBLIC_KEY');
+const VAPID_PRIVATE_KEY = Deno.env.get('VAPID_PRIVATE_KEY');
+const webPushReady = !!(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY);
+
+// Loaded on first use, so a problem with the library can only ever affect web
+// delivery: Expo (native) sends never wait on it.
+type WebPushLib = {
+  setVapidDetails(subject: string, publicKey: string, privateKey: string): void;
+  sendNotification(sub: unknown, payload: string, options: Record<string, unknown>): Promise<unknown>;
+};
+let webpushLib: Promise<WebPushLib> | null = null;
+function loadWebPush(): Promise<WebPushLib> {
+  webpushLib ??= import('npm:web-push@3.6.7').then((m) => {
+    const lib = (m.default ?? m) as WebPushLib;
+    lib.setVapidDetails(
+      Deno.env.get('VAPID_SUBJECT') ?? 'mailto:support@grabsty.com',
+      VAPID_PUBLIC_KEY!,
+      VAPID_PRIVATE_KEY!,
+    );
+    return lib;
+  });
+  return webpushLib;
+}
+
+/**
+ * Send to one browser. Returns true when the subscription is gone for good
+ * (404/410) so the caller prunes it, like Expo's DeviceNotRegistered.
+ */
+async function sendWeb(device: Device, n: PushNotification): Promise<boolean> {
+  const keys = device.web_push_keys;
+  if (!webPushReady || !keys?.p256dh || !keys?.auth) return false;
+  if (!isAllowedWebPushEndpoint(device.expo_push_token)) return true;
+  try {
+    const webpush = await loadWebPush();
+    await webpush.sendNotification(
+      { endpoint: device.expo_push_token, keys: { p256dh: keys.p256dh, auth: keys.auth } },
+      JSON.stringify(buildWebPushPayload(n)),
+      { TTL: 60 * 60 * 24, urgency: 'high' },
+    );
+    return false;
+  } catch (e) {
+    const status = (e as { statusCode?: number }).statusCode;
+    if (isExpiredSubscriptionStatus(status)) return true;
+    // Anything else (rate limit, push service hiccup) is transient. Not thrown:
+    // one browser failing must not cost the user's other devices their push.
+    console.warn('[send-push] web push failed', status ?? e);
+    return false;
+  }
+}
+
 /** POST one batch and return the tokens Expo reported as unregistered. */
 async function sendBatch(batch: ExpoMessage[]): Promise<string[]> {
   const res = await fetch(EXPO_PUSH_URL, {
@@ -222,16 +287,27 @@ Deno.serve(async (req) => {
     const recipientIds = [...new Set(unsent.map((n) => n.userId))];
     const { data: devices, error: devErr } = await admin
       .from('user_devices')
-      .select('user_id, expo_push_token')
+      .select('user_id, expo_push_token, platform, web_push_keys')
       .in('user_id', recipientIds);
     if (devErr) throw new Error(`token lookup: ${devErr.message}`);
 
     const tokensByUser = new Map<string, string[]>();
-    for (const row of (devices ?? []) as { user_id: string; expo_push_token: string }[]) {
+    const webByUser = new Map<string, Device[]>();
+    for (const row of (devices ?? []) as Device[]) {
+      if (row.platform === 'web') {
+        webByUser.set(row.user_id, [...(webByUser.get(row.user_id) ?? []), row]);
+        continue;
+      }
       const list = tokensByUser.get(row.user_id) ?? [];
       list.push(row.expo_push_token);
       tokensByUser.set(row.user_id, list);
     }
+
+    // Browsers: one encrypted request per subscription.
+    const webSends = unsent.flatMap((n) =>
+      (webByUser.get(n.userId) ?? []).map(async (d) => ((await sendWeb(d, n)) ? d.expo_push_token : null)),
+    );
+    const deadWeb = (await Promise.all(webSends)).filter((t): t is string => !!t);
 
     const messages: ExpoMessage[] = unsent.flatMap((n) =>
       (tokensByUser.get(n.userId) ?? []).map((to) => ({
@@ -243,13 +319,13 @@ Deno.serve(async (req) => {
         channelId: 'default' as const,
       })),
     );
-    if (messages.length === 0) {
+    if (messages.length === 0 && webSends.length === 0) {
       // Recipient has no registered device — nothing to do, and a retry would
       // not change that.
       return json({ sent: 0, reason: 'no devices' });
     }
 
-    const dead: string[] = [];
+    const dead: string[] = [...deadWeb];
     for (let i = 0; i < messages.length; i += EXPO_BATCH_SIZE) {
       dead.push(...(await sendBatch(messages.slice(i, i + EXPO_BATCH_SIZE))));
     }
@@ -262,7 +338,7 @@ Deno.serve(async (req) => {
       if (error) console.error('[send-push] prune failed', error.message);
     }
 
-    return json({ sent: messages.length, pruned: dead.length });
+    return json({ sent: messages.length + webSends.length, pruned: dead.length });
   } catch (e) {
     // 500 asks Supabase to retry, which is right for a transient Expo/network
     // failure. The idempotency claim above means a retry that arrives after a
