@@ -246,3 +246,9 @@ jobs:
             (select count(*) from pg_tables where schemaname = 'public') as tables,
             (select count(*) from pg_policies where schemaname = 'public') as policies,
             (select count(*) from storage.buckets) as buckets;"
+
+      - name: Run SQL tests
+        run: |
+          set -euo pipefail
+          # Throwaway DB: these tests insert users/orders and assert security rules.
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/support_bot_tests.sql

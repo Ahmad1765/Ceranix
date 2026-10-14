@@ -2136,9 +2136,9 @@ export default function AdminConsoleScreen() {
                               </View>
                             ) : (
                               supportMessages.map((msg) => {
-                                const isSupport =
-                                  msg.sender_id === SUPPORT_BOT_USER_ID ||
-                                  Boolean((msg.metadata as any)?.is_admin_support);
+                                // Sender only: any user can set message metadata,
+                                // so it must not decide what counts as "support".
+                                const isSupport = msg.sender_id === SUPPORT_BOT_USER_ID;
                                 return (
                                   <View
                                     key={msg.id}

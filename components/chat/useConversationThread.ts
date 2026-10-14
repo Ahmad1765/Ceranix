@@ -38,7 +38,6 @@ import { reportListing } from '@/lib/reports';
 import {
   isSupportConversation,
   sendSupportBotReply,
-  generateSupportResponse,
   SUPPORT_BOT_USER_ID,
   SUPPORT_BOT_NAME,
   SUPPORT_BOT_AVATAR,
@@ -602,18 +601,6 @@ export function useConversationThread(
                 botReply = await sendSupportBotReply(conversationId, text);
               } catch (err) {
                 console.warn('[conversation] support bot reply error', err);
-              }
-
-              if (!botReply) {
-                try {
-                  botReply = await sendMessage({
-                    conversationId,
-                    senderId: SUPPORT_BOT_USER_ID,
-                    content: generateSupportResponse(text),
-                  });
-                } catch (persistErr) {
-                  console.warn('[conversation] support bot fallback persist failed', persistErr);
-                }
               }
 
               if (botReply) {

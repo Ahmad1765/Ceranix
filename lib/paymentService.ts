@@ -662,7 +662,6 @@ export class PaymentService {
       if (buyerId) {
         await startDisputeSupportChat({
           orderId,
-          reason,
           buyerId,
         });
       }
