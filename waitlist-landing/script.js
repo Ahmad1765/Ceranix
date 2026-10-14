@@ -786,6 +786,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (existingLocal) {
         triggerPartyPopper();
+        if (window.grabsty3d) window.grabsty3d.celebrate();
         renderWaitlistSuccess({
           name: existingLocal.name || nameVal,
           phone: existingLocal.phone || phoneVal,
@@ -861,6 +862,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       saveToLocalStorage({ ...payload, created_at: new Date().toISOString() });
       triggerPartyPopper();
+      if (window.grabsty3d) window.grabsty3d.celebrate();
       renderWaitlistSuccess({
         name: nameVal,
         phone: phoneVal,

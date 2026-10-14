@@ -2552,3 +2552,36 @@ body {
     transform: none !important;
   }
 }
+
+/* ==========================================================================
+   3D layer (scene3d.js)
+   ========================================================================== */
+#scene-3d {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 600ms ease;
+}
+
+/* The WebGL objects take over from the flat heritage SVG accents. */
+body.has-3d .heritage-stage { display: none; }
+
+.tilt-3d {
+  transition: transform 180ms ease-out;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.tilt-3d-title {
+  transition: transform 300ms ease-out;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tilt-3d, .tilt-3d-title { transform: none !important; }
+}

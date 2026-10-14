@@ -2,10 +2,10 @@
   "name": "grabsty-waitlist",
   "version": "1.0.0",
   "private": true,
-  "description": "Grabsty Lahore Resale & Architecture Design Waitlist Landing Page",
+  "description": "Grabsty waitlist landing page",
   "scripts": {
     "dev": "npx serve -l 3000",
     "start": "npx serve -l 3000",
-    "build": "node -e \"const fs=require('fs'); fs.mkdirSync('public', {recursive:true}); ['index.html','styles.css','script.js'].forEach(f=>fs.copyFileSync(f, 'public/'+f)); console.log('Static build ready in . and public/');\""
+    "build": "node -e \"const fs=require('fs'); fs.mkdirSync('public/vendor', {recursive:true}); ['index.html','styles.css','script.js','scene3d.js','vendor/three.module.min.js'].forEach(f=>fs.copyFileSync(f, 'public/'+f)); console.log('Static build ready in . and public/');\""
   }
 }
