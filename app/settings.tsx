@@ -47,7 +47,6 @@ import {
   PayoutSheet,
   VerificationSheet,
   PhoneSheet,
-  SubscriptionSheet,
   useSettingsManager,
   TERMS_URL,
   PRIVACY_URL,
@@ -129,13 +128,6 @@ export default function SettingsScreen() {
                 }}
               />
             </ChatGPTRow>
-
-            <ChatGPTSwitchRow
-              label="Share usage data"
-              desc={`Help us improve ${BRAND} with anonymous diagnostic telemetry. No personal content is collected.`}
-              value={mgr.shareUsage}
-              onValueChange={mgr.setShareUsage}
-            />
 
             <ChatGPTRow
               label="Version"
@@ -245,19 +237,6 @@ export default function SettingsScreen() {
                 onPress={() => {
                   tap('light');
                   mgr.setShowPhone(true);
-                }}
-              />
-            </ChatGPTRow>
-
-            <ChatGPTRow
-              label="Seller Membership"
-              desc={profile?.is_pro ? 'Pro Seller Program · Active' : 'Standard marketplace account'}
-            >
-              <ChatGPTButton
-                label={profile?.is_pro ? 'Manage Pro' : 'Upgrade'}
-                onPress={() => {
-                  tap('light');
-                  mgr.setShowSubscription(true);
                 }}
               />
             </ChatGPTRow>
@@ -782,11 +761,6 @@ export default function SettingsScreen() {
           }}
         />
 
-        <SubscriptionSheet
-          visible={mgr.showSubscription}
-          onClose={() => mgr.setShowSubscription(false)}
-        />
-
         <PhoneSheet
           visible={mgr.showPhone}
           initialPhone={mgr.phone}
@@ -945,62 +919,7 @@ export default function SettingsScreen() {
           </Pressable>
         </View>
 
-        {/* Upgrade Card matching Video ("Do more with ChatGPT" -> "Do more with Carrinex Pro") */}
-        <View
-          style={{
-            backgroundColor: theme.panel,
-            borderRadius: 16,
-            padding: 16,
-            marginBottom: 20,
-            borderWidth: 1,
-            borderColor: isDark ? '#262626' : 'rgba(0,0,0,0.08)',
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: isDark ? 0.2 : 0.04,
-            shadowRadius: 3,
-            elevation: 1,
-          }}
-        >
-          <View style={{ flex: 1, paddingRight: 12 }}>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text }}>
-              {profile?.is_pro ? `${BRAND} Pro Active` : `Do more with ${BRAND} Pro`}
-            </Text>
-            <Text
-              style={{
-                fontSize: 12,
-                color: theme.textMuted,
-                marginTop: 3,
-                lineHeight: 16,
-              }}
-            >
-              {profile?.is_pro
-                ? 'Enjoy verified status, 0% escrow fees & priority dispatch.'
-                : 'Get higher limits, verified status, and access to advanced selling tools.'}
-            </Text>
-          </View>
-          <Pressable
-            onPress={() => {
-              tap('light');
-              mgr.setShowSubscription(true);
-            }}
-            style={({ pressed }) => ({
-              backgroundColor: theme.ink,
-              paddingHorizontal: 16,
-              paddingVertical: 9,
-              borderRadius: 20,
-              opacity: pressed ? 0.8 : 1,
-            })}
-          >
-            <Text style={{ fontSize: 13, fontWeight: '700', color: theme.background }}>
-              {profile?.is_pro ? 'Manage' : 'Upgrade'}
-            </Text>
-          </Pressable>
-        </View>
-
-        {/* Group 1: Account matching Video (Frame 1) */}
+        {/* Group 1: Account */}
         <ChatGPTGroup title="Account">
           <ChatGPTItem
             icon="mail"
@@ -1103,35 +1022,16 @@ export default function SettingsScreen() {
             label="Security & login"
             value="Reset password"
             chevron
-            onPress={mgr.handleResetPassword}
-          />
-          <ChatGPTItem
-            icon="share-2"
-            label="Share usage data"
             isLast
-            rightElement={
-              <Switch
-                value={mgr.shareUsage}
-                onValueChange={mgr.setShareUsage}
-                trackColor={{ false: theme.border, true: theme.accent }}
-                thumbColor={theme.accent?.toUpperCase() === '#FFFFFF' ? '#000000' : '#FFFFFF'}
-                ios_backgroundColor={theme.border}
-              />
-            }
+            onPress={mgr.handleResetPassword}
           />
         </ChatGPTGroup>
 
-        {/* Group 4: Get help matching Video (Frame 4 & 5) */}
-        <ChatGPTGroup title="Get help">
-          <ChatGPTItem
-            icon="flag"
-            label="Report app issue"
-            chevron
-            onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=App Issue Report`).catch(() => {})}
-          />
+        {/* Group 4: Support & Legal */}
+        <ChatGPTGroup title="Support & Legal">
           <ChatGPTItem
             icon="message-square"
-            label="Contact Support"
+            label="Customer Support"
             value={session ? "Chat live" : "Sign in"}
             chevron
             onPress={async () => {
@@ -1153,20 +1053,8 @@ export default function SettingsScreen() {
             }}
           />
           <ChatGPTItem
-            icon="help-circle"
-            label="Help Center"
-            chevron
-            onPress={() => {
-              if (session) {
-                router.push('/conversation/new?support=true' as any);
-              } else {
-                Linking.openURL(`mailto:${SUPPORT_EMAIL}`).catch(() => {});
-              }
-            }}
-          />
-          <ChatGPTItem
             icon="shield"
-            label="Privacy Center"
+            label="Privacy policy"
             chevron
             onPress={() => Linking.openURL(PRIVACY_URL).catch(() => {})}
           />
@@ -1252,11 +1140,6 @@ export default function SettingsScreen() {
           const ok = await mgr.saveVerification(form);
           if (ok) mgr.setShowVerify(false);
         }}
-      />
-
-      <SubscriptionSheet
-        visible={mgr.showSubscription}
-        onClose={() => mgr.setShowSubscription(false)}
       />
 
       <PhoneSheet
