@@ -32,8 +32,8 @@ test.describe('Tab navigation', () => {
   // current screen (components/discover/DiscoverSheet.tsx). Picking something
   // in the sheet is what navigates, so this asserts both halves.
   // Located by role/aria-label, not text: the tab bar is icon-only.
-  test('Categories tab opens the search sheet, which routes on pick', async ({ page }) => {
-    await page.getByRole('button', { name: 'Categories' }).click();
+  test('Browse tab opens the search sheet, which routes on pick', async ({ page }) => {
+    await page.getByRole('button', { name: /Browse|Categories/i }).click();
     await expect(page.getByPlaceholder(/^Search \w+\.\.\.$/)).toBeVisible();
     await expect(page.getByText('Browse', { exact: true })).toBeVisible();
     await expect(page.getByText('Topics', { exact: true })).toBeVisible();

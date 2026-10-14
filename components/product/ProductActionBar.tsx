@@ -291,7 +291,7 @@ export function ProductActionBar({
           accessibilityLabel={
             isOwner
               ? 'Edit listing'
-              : `Buy now for ${buyTotal ? formatPrice(buyTotal) : price ? formatPrice(price) : ''}`
+              : `${isBundle || (bundleCount !== undefined && bundleCount > 1) ? 'Buy bundle' : 'Buy now'} for ${buyTotal ? formatPrice(buyTotal) : price ? formatPrice(price) : ''}`
           }
           accessibilityHint="Proceeds to secure checkout"
           style={({ pressed }) => [
@@ -305,7 +305,7 @@ export function ProductActionBar({
           ]}
         >
           <Text style={[styles.buyButtonText, { color: theme.background }]}>
-            {isOwner ? 'Edit listing' : 'Buy now'}
+            {isOwner ? 'Edit listing' : isBundle || (bundleCount !== undefined && bundleCount > 1) ? 'Buy bundle' : 'Buy now'}
           </Text>
         </Pressable>
       </View>

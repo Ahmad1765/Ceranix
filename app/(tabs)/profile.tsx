@@ -122,25 +122,63 @@ function ProfileScreenInner() {
     [collections.activeListId, collections.listListings, savedItems],
   );
 
+  // ── Status Filter States (All, Available, Sold) ──────────────────────────
+  const [sellingFilter, setSellingFilter] = useState<'all' | 'available' | 'sold'>('all');
+  const [likedFilter, setLikedFilter] = useState<'all' | 'available' | 'sold'>('all');
+  const [savedFilter, setSavedFilter] = useState<'all' | 'available' | 'sold'>('all');
+
+  const sellingAvailableCount = useMemo(() => selling.filter((l) => !l.is_sold).length, [selling]);
+  const sellingSoldCount = useMemo(() => selling.length - sellingAvailableCount, [selling, sellingAvailableCount]);
+
+  const likedAvailableCount = useMemo(() => liked.filter((l) => !l.is_sold).length, [liked]);
+  const likedSoldCount = useMemo(() => liked.length - likedAvailableCount, [liked, likedAvailableCount]);
+
+  const savedAvailableCount = useMemo(
+    () => visibleSavedListings.filter((l) => !l.is_sold).length,
+    [visibleSavedListings],
+  );
+  const savedSoldCount = useMemo(
+    () => visibleSavedListings.length - savedAvailableCount,
+    [visibleSavedListings, savedAvailableCount],
+  );
+
+  const filteredSelling = useMemo(() => {
+    if (sellingFilter === 'available') return selling.filter((l) => !l.is_sold);
+    if (sellingFilter === 'sold') return selling.filter((l) => l.is_sold);
+    return selling;
+  }, [selling, sellingFilter]);
+
+  const filteredLiked = useMemo(() => {
+    if (likedFilter === 'available') return liked.filter((l) => !l.is_sold);
+    if (likedFilter === 'sold') return liked.filter((l) => l.is_sold);
+    return liked;
+  }, [liked, likedFilter]);
+
+  const filteredSaved = useMemo(() => {
+    if (savedFilter === 'available') return visibleSavedListings.filter((l) => !l.is_sold);
+    if (savedFilter === 'sold') return visibleSavedListings.filter((l) => l.is_sold);
+    return visibleSavedListings;
+  }, [visibleSavedListings, savedFilter]);
+
   // ── Grid Listings Derivation ─────────────────────────────────────────────
   const gridListings = useMemo<Listing[]>(() => {
-    if (activeTab === 'selling') return loadingSelling ? EMPTY_LISTINGS : selling;
-    if (activeTab === 'liked') return loadingLiked ? EMPTY_LISTINGS : liked;
+    if (activeTab === 'selling') return loadingSelling ? EMPTY_LISTINGS : filteredSelling;
+    if (activeTab === 'liked') return loadingLiked ? EMPTY_LISTINGS : filteredLiked;
     if (activeTab === 'collections') {
       const busy = collections.activeListId ? collections.loadingListListings : loadingSaved;
-      return busy ? EMPTY_LISTINGS : visibleSavedListings;
+      return busy ? EMPTY_LISTINGS : filteredSaved;
     }
     return EMPTY_LISTINGS;
   }, [
     activeTab,
-    selling,
     loadingSelling,
-    liked,
+    filteredSelling,
     loadingLiked,
+    filteredLiked,
     collections.activeListId,
     collections.loadingListListings,
     loadingSaved,
-    visibleSavedListings,
+    filteredSaved,
   ]);
 
   const gridRows = useMemo(() => {
@@ -214,6 +252,16 @@ function ProfileScreenInner() {
     }
   }, [profileId, profileUsername, toast]);
 
+  // Hooks must run before the early return below.
+  const handleStatusFilterChange = useCallback(
+    (f: 'all' | 'available' | 'sold') => {
+      if (activeTab === 'selling') setSellingFilter(f);
+      else if (activeTab === 'liked') setLikedFilter(f);
+      else if (activeTab === 'collections') setSavedFilter(f);
+    },
+    [activeTab],
+  );
+
   if (!profile) {
     return (
       <SafeContainer
@@ -238,6 +286,34 @@ function ProfileScreenInner() {
             ? collections.loadingListListings
             : loadingSaved
           : false;
+
+  const currentStatusFilter =
+    activeTab === 'selling'
+      ? sellingFilter
+      : activeTab === 'liked'
+        ? likedFilter
+        : savedFilter;
+
+  const currentTotalCount =
+    activeTab === 'selling'
+      ? selling.length
+      : activeTab === 'liked'
+        ? liked.length
+        : visibleSavedListings.length;
+
+  const currentAvailableCount =
+    activeTab === 'selling'
+      ? sellingAvailableCount
+      : activeTab === 'liked'
+        ? likedAvailableCount
+        : savedAvailableCount;
+
+  const currentSoldCount =
+    activeTab === 'selling'
+      ? sellingSoldCount
+      : activeTab === 'liked'
+        ? likedSoldCount
+        : savedSoldCount;
 
   return (
     <SafeContainer edges={['top', 'left', 'right']} backgroundColor={colors.background} style={{ flex: 1 }}>
@@ -281,6 +357,11 @@ function ProfileScreenInner() {
               loadingListings={loadingListings}
               gridListingsCount={gridListings.length}
               onPostItem={() => openSellSheet()}
+              statusFilter={currentStatusFilter}
+              setStatusFilter={handleStatusFilterChange}
+              totalCount={currentTotalCount}
+              availableCount={currentAvailableCount}
+              soldCount={currentSoldCount}
             />
 
           </>

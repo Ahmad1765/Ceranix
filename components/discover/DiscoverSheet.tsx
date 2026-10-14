@@ -55,7 +55,6 @@ import { HIT_SLOP_8 } from '@/lib/responsive';
 import { getSearchSuggestions } from '@/lib/searchSuggestions';
 import { PreSearchSuggestions } from '@/components/home/PreSearchSuggestions';
 import { SearchLanding, type BrowseAction, type TopicAction } from './SearchLanding';
-import { useSheetSearchFocus } from './useSheetSearchFocus';
 import { useTheme } from '@/context/ThemeContext';
 
 // Every navigation out of the sheet carries a monotonic `n`. Without it,
@@ -80,96 +79,18 @@ export function useDiscoverSheet(): DiscoverSheetApi {
   return ctx;
 }
 
-/**
- * Renders `children` only once the browser has painted at least one frame
- * without them.
- *
- * The Discover tab's press handler calls setVisible(true), and everything under
- * the Modal used to mount in that same tick: SafeAreaProvider,
- * GestureHandlerRootView, the shell, and the body — which additionally kicks off
- * a listings query for the Topics covers. Nothing could paint until all of it
- * finished, which measured as a 789ms long task and made this the app's worst
- * interaction by a wide margin (280ms INP unthrottled, 824ms at 4x CPU).
- *
- * Two nested rAFs, not one: a single `requestAnimationFrame` scheduled from an
- * effect still runs BEFORE the next paint, so the body would land in the very
- * frame we are trying to keep clear. The second one fires after that frame has
- * been painted.
- *
- * The sheet's own slide-up runs 240ms, so the body arrives well inside the
- * entry animation — the user sees the sheet start moving on touch, which is the
- * whole point, and never sees an empty sheet come to rest.
- */
-function DeferAfterPaint({ children }: { children: ReactNode }) {
-  const [painted, setPainted] = useState(false);
-  useEffect(() => {
-    let inner = 0;
-    const outer = requestAnimationFrame(() => {
-      inner = requestAnimationFrame(() => setPainted(true));
-    });
-    return () => {
-      cancelAnimationFrame(outer);
-      if (inner) cancelAnimationFrame(inner);
-    };
-  }, []);
-  return painted ? <>{children}</> : null;
-}
-
-// Keeps the soft keyboard up across the sheet's mount, on mobile web only.
-//
-// Mobile browsers raise the on-screen keyboard only for a focus() that runs
-// inside the tap's own task, while the page still holds user activation. The
-// sheet's real search field can't satisfy that: it doesn't exist yet when the
-// tab is pressed, and by the time it mounts and useSheetSearchFocus runs, the
-// activation is spent — so the field focuses with the caret blinking and no
-// keyboard, which is the bug this fixes.
-//
-// So focus lands on this always-mounted field DURING the tap, which brings the
-// keyboard up, and the real field takes focus a frame later. Browsers keep the
-// keyboard raised when focus moves between text inputs, so the handover is
-// invisible.
-//
-// It must stay focusable to do that job: `display:none`, `visibility:hidden`,
-// `readOnly` and `disabled` all make focus() a no-op, which is why this is an
-// opacity-0 one-pixel field rather than a hidden one. It's removed from the
-// accessibility tree instead, since it is not a real control.
-function KeyboardPrimer({ inputRef }: { inputRef: RefObject<TextInput | null> }) {
-  if (Platform.OS !== 'web') return null;
-  return (
-    <TextInput
-      ref={inputRef}
-      // Not a control anyone should reach deliberately.
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      style={{
-        position: 'fixed' as any,
-        top: 0,
-        left: 0,
-        width: 1,
-        height: 1,
-        opacity: 0,
-        padding: 0,
-        borderWidth: 0,
-        pointerEvents: 'none',
-      }}
-      {...({ tabIndex: -1, 'aria-hidden': true } as any)}
-    />
-  );
-}
+export const useBrowseSheet = useDiscoverSheet;
+export const BrowseSheetProvider = DiscoverSheetProvider;
+export type BrowseSheetApi = DiscoverSheetApi;
 
 export function DiscoverSheetProvider({ children }: { children: ReactNode }) {
   const [visible, setVisible] = useState(false);
-  // See <KeyboardPrimer/> below for why this exists.
-  const primerRef = useRef<TextInput>(null);
   const searchInputRef = useRef<TextInput>(null);
   const open = useCallback((e?: any) => {
     if (e && typeof e.stopPropagation === 'function') {
       e.stopPropagation();
       e.preventDefault?.();
     }
-    // MUST stay synchronous, and MUST come before setVisible: it has to run
-    // inside the tap's own task to count as user-activated. See KeyboardPrimer.
-    if (Platform.OS === 'web') primerRef.current?.focus();
     setVisible(true);
   }, []);
   const close = useCallback(() => setVisible(false), []);
@@ -204,16 +125,11 @@ export function DiscoverSheetProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={api}>
       {children}
-      <KeyboardPrimer inputRef={primerRef} />
       <Modal
         visible={visible}
         animationType="slide"
         transparent
         onRequestClose={close}
-        onShow={() => {
-          // Native iOS & Android trigger onShow when slide presentation finishes.
-          searchInputRef.current?.focus?.();
-        }}
         statusBarTranslucent
         navigationBarTranslucent
       >
@@ -232,13 +148,7 @@ export function DiscoverSheetProvider({ children }: { children: ReactNode }) {
                 works on web/iOS and does nothing on Android. */}
             <GestureHandlerRootView style={{ flex: 1 }}>
               <SheetShell onClose={close} skin={DEFAULT_HANDLE}>
-                {/* Body mounts one painted frame after the shell — see
-                    DeferAfterPaint. The shell is what slides up, so the tap
-                    gets a visible response immediately instead of waiting on
-                    the body's whole subtree and its listings query. */}
-                <DeferAfterPaint>
-                  <DiscoverSheetBody onClose={close} searchInputRef={searchInputRef} />
-                </DeferAfterPaint>
+                <DiscoverSheetBody onClose={close} searchInputRef={searchInputRef} />
               </SheetShell>
             </GestureHandlerRootView>
           </SafeAreaProvider>
@@ -424,11 +334,8 @@ function DiscoverSheetBody({
   const searchBg = isDark ? theme.surface : '#F0F1F5';
   const [query, setQuery] = useState('');
 
-  // Opening the sheet is unambiguously an intent to search, so the keyboard
-  // comes up with it rather than costing a second tap.
   const internalRef = useRef<TextInput>(null);
   const searchRef = searchInputRef ?? internalRef;
-  useSheetSearchFocus(searchRef);
 
   // Hold the covers fetch until the slide-up has finished. RN's performance
   // guide is explicit that work competing with a transition is what makes it
@@ -546,7 +453,6 @@ function DiscoverSheetBody({
           <Feather name="search" size={16} color={theme.mute} style={{ flexShrink: 0 }} />
           <TextInput
             ref={searchRef}
-            autoFocus
             value={query}
             onChangeText={setQuery}
             onSubmitEditing={submit}

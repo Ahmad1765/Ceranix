@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { Text } from '@/lib/rnText';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import { tap } from '@/lib/haptics';
 import { type as typography, tabularNumberStyle } from '@/lib/theme';
@@ -344,6 +344,14 @@ export const OrdersInboxPage = memo(function OrdersInboxPage({
   const q = useMyOrdersQuery(userId);
   const { refetch, isPending, isRefetching } = q;
 
+  // Orders change on other devices too (a buyer's purchase lands in the seller's
+  // Selling list), so re-check whenever Activity comes into view.
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch]),
+  );
+
   useEffect(() => {
     if (justPaid === '1' || justPaid === '0') {
       setShowToast(true);
@@ -358,9 +366,19 @@ export const OrdersInboxPage = memo(function OrdersInboxPage({
     listRef.current?.scrollToOffset({ offset: 0, animated: false });
   }, [filter, subTab]);
 
+  const sanitizedOrders = useMemo(
+    () =>
+      (q.data ?? []).filter(
+        (o) =>
+          o.status !== 'awaiting_payment' &&
+          (o as any).fulfillment_status !== 'awaiting_payment',
+      ),
+    [q.data],
+  );
+
   const { bought, sold } = useMemo(
-    () => partitionOrders(q.data ?? [], userId),
-    [q.data, userId],
+    () => partitionOrders(sanitizedOrders, userId),
+    [sanitizedOrders, userId],
   );
 
   const filterList = useCallback(

@@ -1,12 +1,12 @@
 import { supabase } from '@/lib/supabase';
 import {
   getOrCreateConversation,
-  sendMessage,
   CONVERSATION_SELECT,
   isTransactionalConversation,
   type ConversationRow,
   type ChatMessage,
 } from '@/lib/chat';
+import { SUPPORT_KNOWLEDGE_BASE, SUPPORT_DEFAULT_REPLY, SUPPORT_WELCOME_MESSAGE } from '@/lib/supportReplies';
 
 export const SUPPORT_BOT_USER_ID = '00000000-0000-0000-0000-000000000001';
 export const SUPPORT_BOT_NAME = 'Grabsty Support';
@@ -59,65 +59,6 @@ export const SUPPORT_TOPICS: SupportTopic[] = [
   },
 ];
 
-const KNOWLEDGE_BASE: { keywords: string[]; title: string; answer: string }[] = [
-  {
-    keywords: ['track', 'order', 'delivery', 'package', 'shipping', 'dispatch', 'courier', 'where is'],
-    title: 'Order Tracking & Delivery',
-    answer:
-      `📦 **Tracking Your Order**\n\n` +
-      `1. Head to your **Profile** > **My Orders**.\n` +
-      `2. Tap on your active order to view live courier status, tracking number, and estimated delivery date.\n` +
-      `3. Sellers have up to **5 business days** to dispatch. Once shipped, standard delivery takes 2–4 business days across Pakistan.\n\n` +
-      `Need help with a delayed parcel? Feel free to reply with your order details.`,
-  },
-  {
-    keywords: ['protection', 'refund', 'money back', 'guarantee', 'damaged', 'not as described', 'return', 'cancel'],
-    title: 'Buyer Protection Guarantee',
-    answer:
-      `🛡️ **Grabsty Buyer Protection**\n\n` +
-      `Every transaction processed through Grabsty is 100% protected:\n\n` +
-      `• **Safe Escrow**: We hold your payment securely until you receive and inspect your parcel.\n` +
-      `• **48-Hour Inspection Window**: You have 2 days from delivery to verify your item. If it’s damaged or not as described, tap "I have an issue" to pause payout.\n` +
-      `• **Full Refund Guarantee**: If an item never arrives or is counterfeit, you get a full refund including shipping fees.`,
-  },
-  {
-    keywords: ['payout', 'withdraw', 'bank', 'easypaisa', 'jazzcash', 'wallet', 'funds', 'seller money'],
-    title: 'Seller Payouts & Wallet',
-    answer:
-      `💳 **Seller Payouts**\n\n` +
-      `• Once the buyer confirms delivery (or 48h after courier delivery), funds are released to your **Grabsty Balance**.\n` +
-      `• You can instantly withdraw to any Pakistani Bank Account, JazzCash, or Easypaisa.\n` +
-      `• Withdrawals are processed within 24 business hours with zero hidden deduction fees.`,
-  },
-  {
-    keywords: ['bundle', 'discount', 'multiple', 'combine'],
-    title: 'Bundles & Combined Shipping',
-    answer:
-      `🛍️ **Bundle Discounts & Combined Shipping**\n\n` +
-      `• You can bundle up to 10 items from the same seller to save on shipping fees.\n` +
-      `• Tap **Shop Bundle** on any listing to add more pieces from that seller's closet.\n` +
-      `• You can send a single bundle offer with your desired total price!`,
-  },
-  {
-    keywords: ['report', 'scam', 'fake', 'counterfeit', 'fraud', 'abuse', 'harass', 'block'],
-    title: 'Safety & Reporting',
-    answer:
-      `🚫 **Safety & Reporting Policy**\n\n` +
-      `• Grabsty maintains a zero-tolerance policy against scams, replicas, and harassment.\n` +
-      `• Tap the **•••** menu at the top right of any chat or listing to report.\n` +
-      `• Our moderation team reviews all reports within 2 hours. Never transfer money outside the Grabsty checkout system.`,
-  },
-  {
-    keywords: ['offer', 'negotiate', 'bargain', 'counter'],
-    title: 'Offers & Negotiations',
-    answer:
-      `🤝 **Making & Countering Offers**\n\n` +
-      `• Buyers can offer up to 25 times per day to keep closet discussions active.\n` +
-      `• When a seller accepts your offer, you have 24 hours to complete checkout before the item is unlocked for other buyers.\n` +
-      `• Sellers can accept, decline, or counter with their preferred price directly in chat.`,
-  },
-];
-
 export function isSupportConversation(conv: ConversationRow | null | undefined): boolean {
   if (!conv) return false;
   return (
@@ -149,11 +90,11 @@ function matchesKeyword(text: string, kw: string): boolean {
 export function generateSupportResponse(query: string): string {
   const clean = query.toLowerCase().trim();
 
-  let bestMatch: (typeof KNOWLEDGE_BASE)[number] | null = null;
+  let bestMatch: (typeof SUPPORT_KNOWLEDGE_BASE)[number] | null = null;
   let highestScore = 0;
 
   // Find highest scoring topic by number of matched whole-term keywords
-  for (const item of KNOWLEDGE_BASE) {
+  for (const item of SUPPORT_KNOWLEDGE_BASE) {
     let score = 0;
     for (const kw of item.keywords) {
       if (matchesKeyword(clean, kw)) {
@@ -170,16 +111,7 @@ export function generateSupportResponse(query: string): string {
     return bestMatch.answer;
   }
 
-  // Default intelligent assistant response
-  return (
-    `👋 **Hi there! I'm the Grabsty Support Assistant.**\n\n` +
-    `Thank you for reaching out. Here are the most common things I can assist you with right away:\n\n` +
-    `• **"Track my order"** — Live status, courier info and delivery estimates\n` +
-    `• **"Buyer Protection"** — Refunds, damaged items & safety policies\n` +
-    `• **"Seller Payouts"** — Bank, JazzCash, Easypaisa withdrawal timelines\n` +
-    `• **"Shipping Guide"** — Packaging, labels & drop-off points\n\n` +
-    `Please type your question or specify what you need help with, and our team will ensure you're taken care of!`
-  );
+  return SUPPORT_DEFAULT_REPLY;
 }
 
 export async function ensureSupportProfile(): Promise<void> {
@@ -230,63 +162,187 @@ export async function getOrCreateSupportConversation(userId: string): Promise<Co
   });
 
   if (created) {
-    // Send welcome message via secure RPC or fallback
-    const welcomeMsg =
-      `👋 Welcome to Grabsty Support!\n\n` +
-      `How can we assist you today? Feel free to ask about your orders, Buyer Protection, payments, or selling on Grabsty.`;
-
-    try {
-      const { data, error } = await supabase.rpc('dispatch_support_bot_reply', {
-        p_conversation_id: created.id,
-        p_content: welcomeMsg,
-      });
-      if (error || !data) {
-        await sendMessage({
-          conversationId: created.id,
-          senderId: SUPPORT_BOT_USER_ID,
-          content: welcomeMsg,
-        });
-      }
-    } catch {
-      await sendMessage({
-        conversationId: created.id,
-        senderId: SUPPORT_BOT_USER_ID,
-        content: welcomeMsg,
-      });
-    }
+    // Only the server can post as the bot (RLS rejects inserts with someone
+    // else's sender_id), and only one of its built-in replies.
+    const { error } = await supabase.rpc('dispatch_support_bot_reply', {
+      p_conversation_id: created.id,
+      p_content: SUPPORT_WELCOME_MESSAGE,
+    });
+    if (error) console.warn('[support] welcome message failed', error.message);
   }
 
   return created;
 }
 
 export async function sendSupportBotReply(conversationId: string, userMessage: string): Promise<ChatMessage | null> {
-  const replyText = generateSupportResponse(userMessage);
-
-  // 1. Trusted server-side RPC path enforcing sender identity & authorization
-  try {
-    const { data, error } = await supabase.rpc('dispatch_support_bot_reply', {
-      p_conversation_id: conversationId,
-      p_content: replyText,
-    });
-    if (!error && data) {
-      return data as unknown as ChatMessage;
-    }
-    if (error) {
-      console.warn('[support] server rpc dispatch_support_bot_reply error, falling back', error.message);
-    }
-  } catch (rpcErr) {
-    console.warn('[support] server rpc dispatch_support_bot_reply failed, falling back', rpcErr);
+  const { data, error } = await supabase.rpc('dispatch_support_bot_reply', {
+    p_conversation_id: conversationId,
+    p_content: generateSupportResponse(userMessage),
+  });
+  if (error) {
+    console.warn('[support] bot reply failed', error.message);
+    return null;
   }
+  return (data as unknown as ChatMessage) ?? null;
+}
 
-  // 2. Direct fallback (for tests and offline/demo environments)
+// ── Admin Support Team Interfaces & Helpers ─────────────────────────────────
+
+export interface AdminSupportConversation {
+  id: string;
+  user_id: string;
+  username: string;
+  full_name: string;
+  avatar_url?: string | null;
+  last_message?: string | null;
+  updated_at: string;
+  message_count: number;
+  is_dispute: boolean;
+}
+
+/**
+ * Automatically starts a support chat for an order dispute and has the server
+ * post the "ticket opened" notice. The server builds the notice from the
+ * order's stored dispute reason, so the client can't put words in the bot's mouth.
+ */
+export async function startDisputeSupportChat({
+  orderId,
+  buyerId,
+}: {
+  orderId: string;
+  buyerId: string;
+}): Promise<ConversationRow | null> {
   try {
-    return await sendMessage({
-      conversationId,
-      senderId: SUPPORT_BOT_USER_ID,
-      content: replyText,
-    });
+    const conv = await getOrCreateSupportConversation(buyerId);
+    if (!conv) return null;
+
+    const { error } = await supabase.rpc('post_dispute_support_notice', { p_order_id: orderId });
+    if (error) console.warn('[support] dispute notice failed', error.message);
+
+    return conv;
   } catch (err) {
-    console.warn('[support] bot reply fallback error', err);
+    console.warn('[support] startDisputeSupportChat failed', err);
     return null;
   }
 }
+
+/**
+ * Fetch all support conversations for the administrative workbench.
+ */
+export async function fetchAdminSupportConversations(
+  filter: 'all' | 'disputes' | 'general' = 'all',
+): Promise<AdminSupportConversation[]> {
+  try {
+    const { data, error } = await supabase.rpc('admin_get_support_conversations', {
+      p_filter: filter,
+    });
+    if (!error && data) {
+      return data as AdminSupportConversation[];
+    }
+  } catch (e) {
+    console.warn('[support] admin_get_support_conversations rpc failed, falling back', e);
+  }
+
+  // Fallback: direct query on conversations
+  try {
+    const { data: convs, error } = await supabase
+      .from('conversations')
+      .select(`
+        id,
+        buyer_id,
+        seller_id,
+        last_message,
+        updated_at,
+        buyer:profiles!conversations_buyer_id_fkey(id, username, full_name, avatar_url),
+        seller:profiles!conversations_seller_id_fkey(id, username, full_name, avatar_url)
+      `)
+      .or(`buyer_id.eq.${SUPPORT_BOT_USER_ID},seller_id.eq.${SUPPORT_BOT_USER_ID}`)
+      .order('updated_at', { ascending: false });
+
+    if (error || !convs) return [];
+
+    return convs.map((c: any) => {
+      const isBotBuyer = c.buyer_id === SUPPORT_BOT_USER_ID;
+      const user = isBotBuyer ? c.seller : c.buyer;
+      const isDispute = (c.last_message || '').toLowerCase().includes('dispute');
+      return {
+        id: c.id,
+        user_id: user?.id || (isBotBuyer ? c.seller_id : c.buyer_id),
+        username: user?.username || 'member',
+        full_name: user?.full_name || 'Grabsty Member',
+        avatar_url: user?.avatar_url,
+        last_message: c.last_message,
+        updated_at: c.updated_at,
+        message_count: 1,
+        is_dispute: isDispute,
+      };
+    }).filter((item) => {
+      if (filter === 'disputes') return item.is_dispute;
+      if (filter === 'general') return !item.is_dispute;
+      return true;
+    });
+  } catch (err) {
+    console.warn('[support] fetchAdminSupportConversations fallback failed', err);
+    return [];
+  }
+}
+
+/**
+ * Fetch messages for a support conversation for admin viewing.
+ */
+export async function fetchAdminSupportMessages(
+  conversationId: string,
+): Promise<ChatMessage[]> {
+  try {
+    const { data, error } = await supabase.rpc('admin_get_support_messages', {
+      p_conversation_id: conversationId,
+    });
+    if (!error && data) {
+      return data as ChatMessage[];
+    }
+  } catch (e) {
+    console.warn('[support] admin_get_support_messages rpc failed, falling back', e);
+  }
+
+  // Fallback direct messages query
+  try {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: true });
+
+    if (error || !data) return [];
+    return data as ChatMessage[];
+  } catch (err) {
+    console.warn('[support] fetchAdminSupportMessages fallback failed', err);
+    return [];
+  }
+}
+
+/**
+ * Admin personally responds to a user query in a support conversation.
+ */
+export async function adminSendSupportMessage({
+  conversationId,
+  content,
+}: {
+  conversationId: string;
+  content: string;
+}): Promise<ChatMessage | null> {
+  const trimmed = content.trim();
+  if (!trimmed) return null;
+
+  // Server checks is_admin() and posts as the support account. No client-side
+  // fallback: anything else would let non-admins impersonate support.
+  const { data, error } = await supabase.rpc('admin_send_support_message', {
+    p_conversation_id: conversationId,
+    p_content: trimmed,
+  });
+  if (error) {
+    console.warn('[support] admin_send_support_message failed', error.message);
+    return null;
+  }
+  return (data as ChatMessage) ?? null;
+}
+

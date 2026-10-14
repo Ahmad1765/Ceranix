@@ -30,6 +30,7 @@ type UseProductBundleProps = {
   /** When false the bundle tab is hidden and relatedTab defaults to 'similar'. */
   bundlesEnabled?: boolean;
   sellerItemsLoading?: boolean;
+  onOpenOfferSheet?: () => void;
 };
 
 export function serializeBundleIds(ids: string[] | Iterable<string>): string {
@@ -46,6 +47,7 @@ export function useProductBundle({
   guestGate,
   bundlesEnabled = false,
   sellerItemsLoading = false,
+  onOpenOfferSheet,
 }: UseProductBundleProps) {
   const toast = useToast();
   const [selectedBundleIds, setSelectedBundleIds] = useState<Set<string>>(new Set());
@@ -165,6 +167,10 @@ export function useProductBundle({
         toast.show("That's your own listing", { variant: 'default', icon: 'info' });
         return;
       }
+      if (onOpenOfferSheet) {
+        onOpenOfferSheet();
+        return;
+      }
       const ids = selectedItemIds ?? Array.from(selectedBundleIds);
       const params: Record<string, string> = {
         listing: listing.id,
@@ -179,7 +185,7 @@ export function useProductBundle({
         params,
       } as any);
     },
-    [user, listing, selectedBundleIds, guestGate, toast],
+    [user, listing, selectedBundleIds, guestGate, toast, onOpenOfferSheet],
   );
 
   return {

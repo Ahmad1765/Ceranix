@@ -119,4 +119,18 @@ describe('ProductActionBar Invariant & Styling Protection', () => {
     const soldText = soldContainer.props.children.props.children;
     expect(soldText).toBe('This item has been sold');
   });
+
+  it('renders "Buy bundle" text when multiple items in bundle are selected', () => {
+    const element = React.createElement(ProductActionBar, {
+      price: 3180,
+      buyTotal: 6800,
+      isBundle: true,
+      bundleCount: 2,
+    });
+    const rendered = (element.type as any)(element.props);
+    const actionRow = rendered.props.children;
+    const [, buyButton] = actionRow.props.children;
+    const buyText = buyButton.props.children;
+    expect(buyText.props.children).toBe('Buy bundle');
+  });
 });

@@ -314,28 +314,15 @@ describe('PaymentService Dispatcher & Seller Completion', () => {
     expect(received.id).toBe('order-recv-123');
   });
 
-  it('records failed bundled item and returns partial-failure when bundled item RPC fails in COD', async () => {
+  it('orders a COD bundle with one process_checkout call covering every item', async () => {
     const provider = new CodPaymentProvider();
-    (supabase.rpc as any).mockImplementation(async (fn: any, args: any) => {
-      if (args?.p_listing_id === 'primary-listing-id') {
-        return {
-          data: {
-            id: 'order-primary-123',
-            amount_cents: 100000,
-            status: 'pending',
-          },
-          error: null,
-        } as any;
-      }
-      return {
-        data: null,
-        error: { message: 'Listing is already sold' },
-      } as any;
-    });
+    const rpc = supabase.rpc as any;
+    rpc.mockReset();
+    rpc.mockResolvedValue({ data: { id: 'order-bundle-1', amount_cents: 180000, status: 'pending' }, error: null });
 
     const result = await provider.processCheckout({
       listingId: 'primary-listing-id',
-      bundleItemIds: ['failed-bundle-id'],
+      bundleItemIds: ['addon-1', 'addon-2'],
       paymentMethod: 'cod',
       shippingAddress: {
         recipient_name: 'Test Buyer',
@@ -348,49 +335,37 @@ describe('PaymentService Dispatcher & Seller Completion', () => {
       },
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('failed-bundle-id');
-    expect(result.failedBundleItemIds).toEqual(['failed-bundle-id']);
-    expect(result.orderId).toBe('order-primary-123');
+    // A second per-item call would always fail: the first call already sold them.
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc.mock.calls[0][1].p_bundle_item_ids).toEqual(['addon-1', 'addon-2']);
+    expect(result.success).toBe(true);
+    expect(result.orderId).toBe('order-bundle-1');
   });
 
-  it('records failed bundled item and returns partial-failure when bundled item RPC fails in Card', async () => {
-    const provider = new StripePaymentProvider();
-    (supabase.rpc as any).mockImplementation(async (fn: any, args: any) => {
-      if (args?.p_listing_id === 'primary-card-listing-id') {
-        return {
-          data: {
-            id: 'order-card-123',
-            amount_cents: 200000,
-            status: 'paid',
+  it('surfaces a failed COD checkout outside demo mode instead of faking an order', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('EXPO_PUBLIC_DEMO_MODE', '');
+    vi.stubEnv('EXPO_PUBLIC_SUPABASE_URL', 'https://example.supabase.co');
+    try {
+      (supabase.rpc as any).mockResolvedValue({ data: null, error: { message: 'Listing is already sold' } });
+      await expect(
+        new CodPaymentProvider().processCheckout({
+          listingId: 'sold-listing',
+          paymentMethod: 'cod',
+          shippingAddress: {
+            recipient_name: 'Test Buyer',
+            phone: '03001234567',
+            line1: '123 Test St',
+            city: 'Lahore',
+            state: 'Punjab',
+            postal_code: '54000',
+            country: 'Pakistan',
           },
-          error: null,
-        } as any;
-      }
-      return {
-        data: null,
-        error: { message: 'Listing unavailable' },
-      } as any;
-    });
-
-    const result = await provider.processCheckout({
-      listingId: 'primary-card-listing-id',
-      bundleItemIds: ['failed-card-bundle-id'],
-      paymentMethod: 'card',
-      shippingAddress: {
-        recipient_name: 'Card Buyer',
-        phone: '03001234567',
-        line1: '456 Test Ave',
-        city: 'Lahore',
-        state: 'Punjab',
-        postal_code: '54000',
-        country: 'Pakistan',
-      },
-    });
-
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('failed-card-bundle-id');
-    expect(result.failedBundleItemIds).toEqual(['failed-card-bundle-id']);
+        }),
+      ).rejects.toThrow('Listing is already sold');
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('passes shippingMethod to process_checkout RPC', async () => {

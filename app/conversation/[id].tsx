@@ -654,6 +654,9 @@ export default function ConversationScreen() {
         />
       </View>
 
+      {/* Safety Notice Box (At the top of the chat interface, Reference Image 5) */}
+      <SafetyNote onPress={explainCoverage} />
+
       {/* Message Thread FlatList */}
       <FlatList
         ref={thread.listRef}
@@ -686,9 +689,6 @@ export default function ConversationScreen() {
         scrollEventThrottle={16}
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
-        ListHeaderComponent={
-          <SafetyNote onPress={explainCoverage} />
-        }
         ListEmptyComponent={
           <View style={{ paddingHorizontal: 32, paddingVertical: 16 }}>
             <Text

@@ -443,12 +443,23 @@ export const HomeSearchView = memo(function HomeSearchView({
 
   useEffect(() => {
     const onBackPress = () => {
+      if (hasSubmitted) {
+        setHasSubmitted(false);
+        inputRef.current?.focus?.();
+        setQuery('');
+        setSearchFilters(EMPTY_SEARCH_FILTERS);
+        ++searchRequestIdRef.current;
+        setSellerResults([]);
+        setListingResults([]);
+        setLoading(false);
+        return true;
+      }
       handleClose();
       return true;
     };
     const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => subscription.remove();
-  }, [handleClose]);
+  }, [hasSubmitted, handleClose]);
 
   const rootAnimatedStyle = useAnimatedStyle(() => {
     const translateX = interpolate(
@@ -697,11 +708,10 @@ export const HomeSearchView = memo(function HomeSearchView({
     return () => clearTimeout(timer);
   }, [query, searchFilters.category, hasSubmitted, runSearch]);
 
-  // Handle Tab Switch by clicking header
+  // Handle Tab Switch by clicking header (preserves open keyboard)
   const handleTabPress = useCallback(
     (tab: SearchTab) => {
       haptic();
-      Keyboard.dismiss();
       setActiveTab(tab);
       const targetX = tab === 'listings' ? 0 : screenWidth;
       pagerRef.current?.scrollTo({ x: targetX, animated: true });
@@ -710,6 +720,7 @@ export const HomeSearchView = memo(function HomeSearchView({
         duration: 240,
         useNativeDriver: false,
       }).start();
+      inputRef.current?.focus?.();
     },
     [screenWidth, scrollX],
   );
@@ -728,15 +739,15 @@ export const HomeSearchView = memo(function HomeSearchView({
     [screenWidth, activeTab, scrollX],
   );
 
-  // Handle Momentum Scroll End for Horizontal Pager
+  // Handle Momentum Scroll End for Horizontal Pager (preserves open keyboard)
   const handleMomentumScrollEnd = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       const offsetX = e.nativeEvent.contentOffset.x;
       const pageIndex = Math.round(offsetX / screenWidth);
       const newTab: SearchTab = pageIndex === 0 ? 'listings' : 'seller';
       if (newTab !== activeTab) {
-        Keyboard.dismiss();
         setActiveTab(newTab);
+        inputRef.current?.focus?.();
       }
     },
     [screenWidth, activeTab],
@@ -750,6 +761,7 @@ export const HomeSearchView = memo(function HomeSearchView({
 
   const handleTouchEnd = useCallback(
     (e: any) => {
+      if (hasSubmitted) return;
       const currentX = e.nativeEvent?.pageX ?? e.nativeEvent?.clientX ?? 0;
       const currentY = e.nativeEvent?.pageY ?? e.nativeEvent?.clientY ?? 0;
       const deltaX = currentX - touchStartX.current;
@@ -769,7 +781,7 @@ export const HomeSearchView = memo(function HomeSearchView({
         }
       }
     },
-    [activeTab, handleTabPress, handleClose],
+    [hasSubmitted, activeTab, handleTabPress, handleClose],
   );
 
   // Suggestion selection from pre-search suggestions list
@@ -969,50 +981,66 @@ export const HomeSearchView = memo(function HomeSearchView({
             </Pressable>
           </View>
 
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             {historyItems.map((item) => (
-              <Pressable
+              <View
                 key={item.term}
-                onPress={() => handleSelectTag(item.term, item.tab || 'listings')}
-                style={({ pressed }) => ({
+                style={{
+                  height: 30,
+                  backgroundColor: isDark ? theme.surface : theme.panel,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                  borderRadius: 15,
                   flexDirection: 'row',
                   alignItems: 'center',
-                  backgroundColor: isDark ? theme.surface : '#F2F2F5',
-                  borderRadius: 8,
-                  paddingVertical: 7.5,
-                  paddingHorizontal: 12,
-                  opacity: pressed ? 0.75 : 1,
-                })}
+                  overflow: 'hidden',
+                }}
               >
-                <Text
-                  style={{
-                    fontSize: 14.5,
-                    fontWeight: '600',
-                    fontFamily: typography.family.sansBold,
-                    color: isDark ? '#FFFFFF' : '#111111',
-                    letterSpacing: -0.1,
-                  }}
+                <Pressable
+                  onPress={() => handleSelectTag(item.term, item.tab || 'listings')}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Search for ${item.term}`}
+                  style={({ pressed }) => ({
+                    paddingLeft: 12,
+                    paddingRight: 4,
+                    height: '100%',
+                    justifyContent: 'center',
+                    opacity: pressed ? 0.7 : 1,
+                  })}
                 >
-                  {item.term}
-                </Text>
+                  <Text
+                    style={{
+                      fontSize: 12.5,
+                      fontWeight: '500',
+                      fontFamily: typography.family.sansMedium,
+                      color: theme.text,
+                    }}
+                    numberOfLines={1}
+                  >
+                    {item.term}
+                  </Text>
+                </Pressable>
 
                 <Pressable
-                  onPress={(e) => {
-                    e.stopPropagation();
+                  onPress={() => {
                     haptic();
                     removeSearch(item.term);
                   }}
-                  hitSlop={8}
-                  accessibilityLabel={`Remove ${item.term}`}
+                  hitSlop={6}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove ${item.term} from recent searches`}
                   style={({ pressed }) => ({
-                    marginLeft: 8,
-                    padding: 2,
-                    opacity: pressed ? 0.5 : 1,
+                    paddingRight: 8,
+                    paddingLeft: 2,
+                    height: '100%',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    opacity: pressed ? 0.5 : 0.8,
                   })}
                 >
-                  <Feather name="x" size={13.5} color={isDark ? '#9CA3AF' : '#111111'} />
+                  <Feather name="x" size={13} color={isDark ? '#9CA3AF' : '#6B7280'} />
                 </Pressable>
-              </Pressable>
+              </View>
             ))}
           </View>
         </View>
@@ -1194,7 +1222,7 @@ export const HomeSearchView = memo(function HomeSearchView({
       onTouchStart={Platform.OS === 'web' ? handleTouchStart : undefined}
       onTouchEnd={Platform.OS === 'web' ? handleTouchEnd : undefined}
     >
-      {/* ── Top Header Row (Plick layout before searching; results layout with Star after search) ─── */}
+      {/* ── Top Header Row (Redesigned matching Reference Image 2 & 3) ─── */}
       <View
         style={{
           flexDirection: 'row',
@@ -1202,15 +1230,15 @@ export const HomeSearchView = memo(function HomeSearchView({
           paddingHorizontal: 16,
           paddingTop: 8,
           paddingBottom: 8,
-          gap: 12,
+          gap: 10,
           borderBottomWidth: 0,
         }}
       >
-        {/* Back Button '<' (Visible only in results mode after a search has been made) */}
-        {hasSubmitted && (
-          <Pressable
-            onPress={() => {
-              haptic();
+        {/* Back Button '<' (Always visible on left, matching Reference Image 2 & 3) */}
+        <Pressable
+          onPress={() => {
+            haptic();
+            if (hasSubmitted) {
               setHasSubmitted(false);
               inputRef.current?.focus?.();
               setQuery('');
@@ -1219,28 +1247,30 @@ export const HomeSearchView = memo(function HomeSearchView({
               setSellerResults([]);
               setListingResults([]);
               setLoading(false);
-            }}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Back to search"
-            style={({ pressed }) => ({
-              width: 32,
-              height: 46,
-              alignItems: 'center',
-              justifyContent: 'center',
-              opacity: pressed ? 0.6 : 1,
-              transform: [{ scale: pressed ? 0.94 : 1 }],
-            })}
-          >
-            <Feather
-              name="chevron-left"
-              size={28}
-              color={theme.text}
-            />
-          </Pressable>
-        )}
+            } else {
+              handleClose();
+            }
+          }}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={hasSubmitted ? "Back to search" : "Close search"}
+          style={({ pressed }) => ({
+            width: 32,
+            height: 44,
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: pressed ? 0.6 : 1,
+            transform: [{ scale: pressed ? 0.94 : 1 }],
+          })}
+        >
+          <Feather
+            name="chevron-left"
+            size={28}
+            color={theme.text}
+          />
+        </Pressable>
 
-        {/* Search Input Box (Plick reference: clean light grey pill) */}
+        {/* Search Input Box (Pill shape matching Reference Image 2) */}
         <Animated.View
           style={[
             {
@@ -1249,9 +1279,9 @@ export const HomeSearchView = memo(function HomeSearchView({
               alignItems: 'center',
               backgroundColor: isDark ? theme.surface : '#F4F4F5',
               borderRadius: radii.pill,
-              paddingLeft: 12,
-              paddingRight: query.length > 0 ? 8 : 12,
-              height: 46,
+              paddingLeft: 14,
+              paddingRight: query.length > 0 ? 8 : 14,
+              height: 44,
               borderWidth: 0,
             },
             searchBarAnimatedStyle,
@@ -1331,36 +1361,7 @@ export const HomeSearchView = memo(function HomeSearchView({
           )}
         </Animated.View>
 
-        {/* Before Searching: Clean 'Cancel' button matching Image 1 */}
-        {!hasSubmitted && (
-          <Pressable
-            onPress={handleClose}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Cancel"
-            style={({ pressed }) => ({
-              paddingLeft: 4,
-              paddingRight: 0,
-              paddingVertical: 8,
-              opacity: pressed ? 0.6 : 1,
-              justifyContent: 'center',
-              alignItems: 'center',
-            })}
-          >
-            <Text
-              style={{
-                fontFamily: typography.family.sansBold,
-                fontSize: 16,
-                fontWeight: '600',
-                color: theme.ink,
-              }}
-            >
-              Cancel
-            </Text>
-          </Pressable>
-        )}
-
-        {/* After Searching: Save Your Search Star / Favourite Button */}
+        {/* After Searching: Save Your Search Star / Favourite Button (Reference Image 3) */}
         {hasSubmitted && (
           <Pressable
             onPress={handleToggleSaveSearch}
@@ -1398,7 +1399,8 @@ export const HomeSearchView = memo(function HomeSearchView({
         )}
       </View>
 
-        {/* ── Tab Switcher ('Items' & 'Members') - Matching Image 1 ─────────── */}
+      {/* ── Tab Switcher ('Items' & 'Members') - Hidden when search is completed (hasSubmitted) ── */}
+      {!hasSubmitted && (
         <View
           style={{
             flexDirection: 'row',
@@ -1474,7 +1476,7 @@ export const HomeSearchView = memo(function HomeSearchView({
             </Text>
           </Pressable>
 
-          {/* ── Continuous Sliding Black Underline Indicator (Image 1) ─ */}
+          {/* ── Continuous Sliding Black Underline Indicator ── */}
           <RNAnimated.View
             pointerEvents="none"
             style={{
@@ -1488,48 +1490,14 @@ export const HomeSearchView = memo(function HomeSearchView({
             }}
           />
         </View>
+      )}
 
-        {/* ── Horizontal Swipeable Pager for Items & Members ───────────────── */}
-        <ScrollView
-          ref={pagerRef}
-          horizontal
-          pagingEnabled
-          scrollEnabled={true}
-          showsHorizontalScrollIndicator={false}
-          contentOffset={{ x: activeTab === 'listings' ? 0 : screenWidth, y: 0 }}
-          onScroll={handleScroll}
-          onMomentumScrollEnd={handleMomentumScrollEnd}
-          scrollEventThrottle={16}
-          style={[
-            { flex: 1 },
-            Platform.OS === 'web' && ({
-              scrollSnapType: 'x mandatory',
-              WebkitOverflowScrolling: 'touch',
-            } as any),
-          ]}
-          contentContainerStyle={{ width: screenWidth * 2 }}
-        >
-          {/* ── Page 0: Items ──────────────────────────────────────────────── */}
-          <View
-            style={[
-              { width: screenWidth, flex: 1, backgroundColor: theme.background },
-              Platform.OS === 'web' && ({
-                scrollSnapAlign: 'start',
-                scrollSnapStop: 'always',
-                flexShrink: 0,
-              } as any),
-            ]}
-          >
-            {(!hasQuery && !searchFilters.category && !hasSubmitted) ? (
-              renderListingsIdleLanding
-            ) : (hasQuery && !hasSubmitted) ? (
-              <PreSearchSuggestions
-                query={query}
-                suggestions={suggestions}
-                onSelect={handleSelectSuggestion}
-                onPopulate={handlePopulateSuggestion}
-              />
-            ) : loading ? (
+      {/* ── Main Content Area ── */}
+      {hasSubmitted ? (
+        /* Completed Search Results (Items and Members tab switcher is hidden, as shown in Reference Image 3) */
+        <View style={{ flex: 1, backgroundColor: theme.background }}>
+          {activeTab === 'listings' ? (
+            loading ? (
               <View style={{ paddingVertical: 40, alignItems: 'center' }}>
                 <ActivityIndicator size="small" color={theme.purple} />
               </View>
@@ -1576,11 +1544,99 @@ export const HomeSearchView = memo(function HomeSearchView({
                   </View>
                 )}
               </ScrollView>
+            )
+          ) : (
+            /* activeTab === 'seller' */
+            loading ? (
+              <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                <ActivityIndicator size="small" color={theme.purple} />
+              </View>
+            ) : sellerResults.length > 0 ? (
+              <FlatList
+                data={sellerResults}
+                keyExtractor={(item) => item.id}
+                renderItem={renderSellerItem}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                contentContainerStyle={{ paddingBottom: 40 }}
+                ListHeaderComponent={
+                  <View
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 12,
+                      borderBottomWidth: 1,
+                      borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        fontWeight: '600',
+                        color: theme.text,
+                      }}
+                    >
+                      {sellerResults.length} {sellerResults.length === 1 ? 'member' : 'members'}
+                      {hasQuery ? ` for “${query.trim()}”` : ''}
+                    </Text>
+                  </View>
+                }
+              />
+            ) : (
+              <View style={{ paddingVertical: 48, paddingHorizontal: 20, alignItems: 'center' }}>
+                <Text style={{ fontSize: 14, color: theme.mute, textAlign: 'center' }}>
+                  {hasQuery
+                    ? `No members found matching “${query.trim()}”`
+                    : 'No members found'}
+                </Text>
+              </View>
+            )
+          )}
+        </View>
+      ) : (
+        /* Pre-Search State (Horizontal Pager between Items & Members with active Tab Switcher) */
+        <ScrollView
+          ref={pagerRef}
+          horizontal
+          pagingEnabled
+          scrollEnabled={true}
+          showsHorizontalScrollIndicator={false}
+          contentOffset={{ x: activeTab === 'listings' ? 0 : screenWidth, y: 0 }}
+          onScroll={handleScroll}
+          onMomentumScrollEnd={handleMomentumScrollEnd}
+          scrollEventThrottle={16}
+          style={[
+            { flex: 1 },
+            Platform.OS === 'web' && ({
+              scrollSnapType: 'x mandatory',
+              WebkitOverflowScrolling: 'touch',
+            } as any),
+          ]}
+          contentContainerStyle={{ width: screenWidth * 2 }}
+        >
+          {/* ── Page 0: Items ── */}
+          <View
+            style={[
+              { width: screenWidth, flex: 1, backgroundColor: theme.background },
+              Platform.OS === 'web' && ({
+                scrollSnapAlign: 'start',
+                scrollSnapStop: 'always',
+                flexShrink: 0,
+              } as any),
+            ]}
+          >
+            {!hasQuery && !searchFilters.category ? (
+              renderListingsIdleLanding
+            ) : (
+              <PreSearchSuggestions
+                query={query}
+                suggestions={suggestions}
+                onSelect={handleSelectSuggestion}
+                onPopulate={handlePopulateSuggestion}
+              />
             )}
-
           </View>
 
-          {/* ── Page 1: Seller ────────────────────────────────────────────────── */}
+          {/* ── Page 1: Seller ── */}
           <View
             style={[
               { width: screenWidth, flex: 1, backgroundColor: theme.background },
@@ -1638,6 +1694,7 @@ export const HomeSearchView = memo(function HomeSearchView({
             )}
           </View>
         </ScrollView>
+      )}
       </Animated.View>
   );
 });

@@ -7,6 +7,7 @@ import {
   type ValidatedShippingAddress,
 } from '@/types/validation/order';
 import type { Order, PaymentMethod, OrderStatus, FulfillmentStatus, ShippingMethod, SellerPickupAddress } from '@/types';
+import { startDisputeSupportChat } from '@/lib/support';
 
 export interface CheckoutRequest {
   listingId: string;
@@ -56,11 +57,9 @@ export function generateMockOrderId(): string {
 }
 
 export function isDemoMode(): boolean {
-  return (
-    process.env.EXPO_PUBLIC_DEMO_MODE === 'true' ||
-    process.env.NODE_ENV === 'test' ||
-    !STRIPE_ENABLED
-  );
+  // Never inferred from a missing Stripe key: that is the production COD-only
+  // configuration, where a failed RPC must surface instead of faking success.
+  return process.env.EXPO_PUBLIC_DEMO_MODE === 'true' || process.env.NODE_ENV === 'test';
 }
 
 // ── Helper to normalize address shape for Zod validation ──────────────────────
@@ -135,43 +134,6 @@ export class CodPaymentProvider implements PaymentProvider {
           order_id: data.id,
           amount_cents: data.amount_cents,
         });
-
-        const failedBundleIds: string[] = [];
-        if (request.bundleItemIds?.length) {
-          for (const bundleId of request.bundleItemIds) {
-            try {
-              const { error: bundleErr } = await supabase.rpc('process_checkout', {
-                p_listing_id: bundleId,
-                p_buyer_id: request.buyerId ?? null,
-                p_payment_method: 'cod',
-                p_shipping_address: validatedAddress,
-                p_offer_amount: null,
-                p_delivery_notes: request.deliveryNotes?.trim() || validatedAddress.deliveryInstructions || null,
-                p_shipping_method: request.shippingMethod ?? 'managed',
-              });
-              if (bundleErr) {
-                console.warn('[paymentService] cod bundled item checkout failed', bundleId, bundleErr);
-                failedBundleIds.push(bundleId);
-              }
-            } catch (err) {
-              console.warn('[paymentService] cod bundled item checkout failed', bundleId, err);
-              failedBundleIds.push(bundleId);
-            }
-          }
-        }
-
-        if (failedBundleIds.length > 0) {
-          return {
-            success: false,
-            orderId: data.id,
-            order: data as Order,
-            paymentMethod: 'cod',
-            status: 'pending',
-            error: `Failed to checkout bundled items: ${failedBundleIds.join(', ')}`,
-            message: 'Primary order placed, but some bundled items failed to checkout',
-            failedBundleItemIds: failedBundleIds,
-          };
-        }
 
         return {
           success: true,
@@ -283,68 +245,10 @@ export class StripePaymentProvider implements PaymentProvider {
     // Mock Stripe Payment Sheet / PaymentIntent simulation
     await new Promise((resolve) => setTimeout(resolve, 600));
 
-    // Try executing atomic process_checkout on backend for card
-    let backendOrder: Order | null = null;
-    let cardRpcError: Error | null = null;
-    let validatedAddress: ValidatedShippingAddress | null = null;
-    const failedBundleIds: string[] = [];
-    try {
-      const normalized = request.shippingAddress ? normalizeAddressInput(request.shippingAddress) : null;
-      validatedAddress = normalized ? ShippingAddressSchema.parse(normalized) : null;
-
-      const { data, error } = await supabase.rpc('process_checkout', {
-        p_listing_id: request.listingId,
-        p_buyer_id: request.buyerId ?? null,
-        p_payment_method: 'card',
-        p_shipping_address: validatedAddress,
-        p_offer_amount: request.offerAmount ?? null,
-        p_delivery_notes: request.deliveryNotes?.trim() || null,
-        p_shipping_method: request.shippingMethod ?? 'managed',
-        p_bundle_item_ids: request.bundleItemIds?.length ? request.bundleItemIds : null,
-        p_expected_total: request.expectedTotal ?? null,
-      });
-
-      if (!error && data) {
-        backendOrder = data as Order;
-        if (request.bundleItemIds?.length) {
-          for (const bundleId of request.bundleItemIds) {
-            try {
-              const { error: bundleErr } = await supabase.rpc('process_checkout', {
-                p_listing_id: bundleId,
-                p_buyer_id: request.buyerId ?? null,
-                p_payment_method: 'card',
-                p_shipping_address: validatedAddress,
-                p_offer_amount: null,
-                p_delivery_notes: request.deliveryNotes?.trim() || null,
-                p_shipping_method: request.shippingMethod ?? 'managed',
-              });
-              if (bundleErr) {
-                console.warn('[paymentService] card bundled item checkout failed', bundleId, bundleErr);
-                failedBundleIds.push(bundleId);
-              }
-            } catch (err) {
-              console.warn('[paymentService] card bundled item checkout failed', bundleId, err);
-              failedBundleIds.push(bundleId);
-            }
-          }
-        }
-      } else if (error) {
-        cardRpcError = new Error(error.message);
-      }
-    } catch (e: any) {
-      cardRpcError = e instanceof Error ? e : new Error(String(e));
-    }
-
-    if (!backendOrder && !isDemoMode()) {
-      if (cardRpcError) throw cardRpcError;
-      throw new Error('Checkout failed: could not create order');
-    }
-
-    const mockSessionId = backendOrder?.stripe_session_id || `cs_test_mock_${Date.now()}`;
-    const mockPaymentIntent = backendOrder?.stripe_payment_intent || `pi_test_mock_${Date.now()}`;
-    const mockOrderId = backendOrder?.id || generateMockOrderId();
-
-    const mockOrder: Order = backendOrder || {
+    const mockSessionId = `cs_test_mock_${Date.now()}`;
+    const mockPaymentIntent = `pi_test_mock_${Date.now()}`;
+    const mockOrderId = generateMockOrderId();
+    const mockOrder: Order = {
       id: mockOrderId,
       listing_id: request.listingId,
       buyer_id: request.buyerId ?? 'mock-buyer',
@@ -357,57 +261,18 @@ export class StripePaymentProvider implements PaymentProvider {
       offer_message_id: null,
       payment_method: 'card',
       status: 'paid',
-      shipping_address: validatedAddress,
+      shipping_address: null,
       delivery_notes: request.deliveryNotes ?? null,
       created_at: new Date().toISOString(),
     };
-
-    const isDemo = !backendOrder;
-    const finalAmountCents = backendOrder ? backendOrder.amount_cents : amountCents;
 
     capture('checkout_completed', {
       listing_id: request.listingId,
       payment_method: 'card',
       order_id: mockOrderId,
-      amount_cents: finalAmountCents,
-      demo_mode: isDemo,
+      amount_cents: amountCents,
+      demo_mode: true,
     });
-
-    if (backendOrder && !STRIPE_ENABLED) {
-      try {
-        await supabase
-          .from('orders')
-          .update({
-            status: 'paid',
-            payment_status: 'paid',
-            fulfillment_status: 'pending',
-            payment_authorized_at: new Date().toISOString(),
-          })
-          .eq('id', backendOrder.id);
-        backendOrder.status = 'paid';
-        backendOrder.payment_status = 'paid';
-        backendOrder.fulfillment_status = 'pending';
-      } catch {
-        // demo ignore
-      }
-    }
-
-    const status = (backendOrder?.status as any) || 'paid';
-
-    if (failedBundleIds.length > 0) {
-      return {
-        success: false,
-        orderId: mockOrderId,
-        order: mockOrder,
-        sessionId: mockSessionId,
-        clientSecret: `${mockPaymentIntent}_secret_test`,
-        paymentMethod: 'card',
-        status,
-        error: `Failed to checkout bundled items: ${failedBundleIds.join(', ')}`,
-        message: 'Primary order placed, but some bundled items failed to checkout',
-        failedBundleItemIds: failedBundleIds,
-      };
-    }
 
     return {
       success: true,
@@ -416,10 +281,8 @@ export class StripePaymentProvider implements PaymentProvider {
       sessionId: mockSessionId,
       clientSecret: `${mockPaymentIntent}_secret_test`,
       paymentMethod: 'card',
-      status,
-      message: isDemo
-        ? 'Demo Card payment processed successfully'
-        : 'Card payment processed successfully',
+      status: 'paid',
+      message: 'Demo Card payment processed successfully',
     };
   }
 
@@ -512,43 +375,8 @@ export class PaymentService {
       rpcError = e instanceof Error ? e : new Error(String(e));
     }
 
-    // Direct fallback: update orders row + listings row
-    let fallbackError: Error | null = null;
-    try {
-      const { data: updatedOrder, error: updateError } = await supabase
-        .from('orders')
-        .update({
-          status: 'canceled',
-          cancel_reason: reason,
-        })
-        .eq('id', orderId)
-        .select()
-        .maybeSingle();
-
-      if (updateError) {
-        fallbackError = new Error(updateError.message);
-      } else if (updatedOrder) {
-        if (listingId) {
-          const { error: listingError } = await supabase
-            .from('listings')
-            .update({ is_sold: false })
-            .eq('id', listingId);
-          if (listingError) {
-            fallbackError = new Error(listingError.message);
-          }
-        }
-        if (!fallbackError) {
-          capture('order_cancelled', { order_id: orderId, reason, fallback: true });
-          notifyOrderUpdated(listingId ?? (updatedOrder as Order)?.listing_id);
-          return updatedOrder as Order;
-        }
-      }
-    } catch (e: any) {
-      fallbackError = e instanceof Error ? e : new Error(String(e));
-    }
-
     if (!isDemoMode()) {
-      throw fallbackError || rpcError || new Error('Failed to cancel order');
+      throw rpcError || new Error('Failed to cancel order');
     }
 
     capture('order_cancelled', { order_id: orderId, reason, demo_mode: true });
@@ -594,32 +422,8 @@ export class PaymentService {
       rpcError = e instanceof Error ? e : new Error(String(e));
     }
 
-    // Direct fallback
-    let fallbackError: Error | null = null;
-    try {
-      const { data: updatedOrder, error: updateError } = await supabase
-        .from('orders')
-        .update({
-          courier_name: courier,
-          tracking_number: trackingNumber,
-          shipped_at: new Date().toISOString(),
-        })
-        .eq('id', orderId)
-        .select()
-        .maybeSingle();
-
-      if (updateError) {
-        fallbackError = new Error(updateError.message);
-      } else if (updatedOrder) {
-        capture('order_shipped', { order_id: orderId, courier, tracking_number: trackingNumber, fallback: true });
-        return updatedOrder as Order;
-      }
-    } catch (e: any) {
-      fallbackError = e instanceof Error ? e : new Error(String(e));
-    }
-
     if (!isDemoMode()) {
-      throw fallbackError || rpcError || new Error('Failed to mark order as shipped');
+      throw rpcError || new Error('Failed to mark order as shipped');
     }
 
     return {
@@ -637,17 +441,6 @@ export class PaymentService {
    * Atomically transitions escrow to COMPLETED_FUNDS_RELEASED and marks order completed.
    */
   async confirmOrderReceived({ orderId }: { orderId: string }): Promise<Order> {
-    // 1. Advance escrow transaction to COMPLETED_FUNDS_RELEASED if present
-    try {
-      await supabase.rpc('advance_escrow_status', {
-        p_order_id: orderId,
-        p_target_status: 'COMPLETED_FUNDS_RELEASED',
-        p_notes: 'Buyer confirmed receipt (Everything is OK). Escrow funds released to seller.',
-      });
-    } catch {
-      // Escrow might not exist for legacy test records or is already completed
-    }
-
     let rpcError: Error | null = null;
     try {
       const { data, error } = await supabase.rpc('confirm_order_received', {
@@ -720,19 +513,6 @@ export class PaymentService {
     }
 
     if (data) {
-      // Synchronize fulfillment_status to completed ONLY when the order is finalized
-      if ((data as Order)?.status === 'completed') {
-        try {
-          await supabase
-            .from('orders')
-            .update({
-              fulfillment_status: 'completed',
-              completed_at: new Date().toISOString(),
-            })
-            .eq('id', orderId);
-        } catch {}
-      }
-
       capture('cod_order_confirmed', { order_id: orderId, role, status: (data as Order)?.status });
       notifyOrderUpdated((data as Order)?.listing_id);
       return data as Order;
@@ -861,8 +641,35 @@ export class PaymentService {
     }
 
     capture('order_disputed', { order_id: orderId, reason });
-    notifyOrderUpdated((data as Order)?.listing_id);
-    return data as Order;
+    const finalOrder = (data as Order);
+    notifyOrderUpdated(finalOrder?.listing_id);
+
+    // Automatically start a support chat when an order is disputed
+    try {
+      let buyerId: string | undefined = finalOrder?.buyer_id;
+      if (!buyerId) {
+        const { data: o } = await supabase
+          .from('orders')
+          .select('buyer_id')
+          .eq('id', orderId)
+          .maybeSingle();
+        buyerId = o?.buyer_id;
+      }
+      if (!buyerId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        buyerId = user?.id;
+      }
+      if (buyerId) {
+        await startDisputeSupportChat({
+          orderId,
+          buyerId,
+        });
+      }
+    } catch (e) {
+      console.warn('[paymentService] failed to auto-start support chat for dispute', e);
+    }
+
+    return finalOrder;
   }
 
   /**

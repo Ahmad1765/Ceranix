@@ -23,6 +23,7 @@ import { supabase } from '@/lib/supabase';
 import { uploadVerificationDocument } from '@/lib/upload';
 import {
   ensurePermissionAndRegister,
+  pushSupported,
   isThisDeviceRegistered,
   unregisterThisDevice,
 } from '@/lib/notifications';
@@ -97,7 +98,6 @@ export function useSettingsManager() {
   const [showVerify, setShowVerify] = useState(false);
   const [showBundle, setShowBundle] = useState(false);
   const [showTheme, setShowTheme] = useState(false);
-  const [showSubscription, setShowSubscription] = useState(false);
   const [showPhone, setShowPhone] = useState(false);
 
   useEffect(() => {
@@ -178,7 +178,6 @@ export function useSettingsManager() {
     setShowPayout(false);
     setShowVerify(false);
     setShowTheme(false);
-    setShowSubscription(false);
 
     switch (target) {
       case 'bundle':
@@ -203,11 +202,6 @@ export function useSettingsManager() {
       case 'general':
         setOpenSection('general');
         if (target === 'theme') setShowTheme(true);
-        break;
-      case 'subscription':
-      case 'pro':
-        setOpenSection('account');
-        setShowSubscription(true);
         break;
       case 'phone':
         setOpenSection('account');
@@ -309,7 +303,7 @@ export function useSettingsManager() {
   }, [toast]);
 
   useEffect(() => {
-    if (Platform.OS === 'web' || !session) return;
+    if (!pushSupported() || !session) return;
     let cancelled = false;
     isThisDeviceRegistered()
       .then((on) => {
@@ -331,7 +325,12 @@ export function useSettingsManager() {
           const { granted, blocked } = await ensurePermissionAndRegister(user.id);
           setPushOn(granted);
           if (!granted) {
-            if (blocked) {
+            if (blocked && Platform.OS === 'web') {
+              toast.show("Notifications are blocked for this site. Allow them in your browser's site settings.", {
+                variant: 'info',
+                icon: 'bell',
+              });
+            } else if (blocked) {
               toast.show('Enable notifications in system settings', {
                 variant: 'info',
                 icon: 'bell',
@@ -721,10 +720,9 @@ export function useSettingsManager() {
     setShowBundle,
     showTheme,
     setShowTheme,
-    showSubscription,
-    setShowSubscription,
     showPhone,
     setShowPhone,
+    pushSupported: pushSupported(),
     setVacationMode,
     setBundlePct,
     savedCollectionPrivacy,

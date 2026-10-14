@@ -1,3 +1,4 @@
+html { overflow-x: clip; }
 :root {
   /* Strict Grabsty 3-Hue Palette */
   --ink: #0F0F0F;
@@ -49,9 +50,13 @@ html {
 
 body {
   background-color: var(--ink);
-  /* Memphis Micro-Dot Blueprint Matrix */
-  background-image: radial-gradient(var(--paper-10) 1.5px, transparent 1.5px);
-  background-size: 24px 24px;
+  /* Architectural Drafting Matrix: Hairline Grid + Coordinates Crosshairs */
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    radial-gradient(circle at 50% 50%, rgba(108, 71, 255, 0.045) 1px, transparent 1px);
+  background-size: 32px 32px, 32px 32px, 16px 16px;
+  background-position: 0 0, 0 0, 8px 8px;
   color: var(--paper);
   font-family: var(--font-main);
   min-height: 100vh;
@@ -102,8 +107,22 @@ body {
 }
 
 /* ==========================================================================
+   Celebration Party Popper Canvas
+   ========================================================================== */
+.party-popper-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 99999;
+}
+
+/* ==========================================================================
    Texture & Ambient Stage
    ========================================================================== */
+
 .grain-overlay {
   position: fixed;
   top: 0;
@@ -113,6 +132,20 @@ body {
   pointer-events: none;
   z-index: 9998;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.06'/%3E%3C/svg%3E");
+}
+
+/* Subtle Mughal Jaali Islamic Star Watermark */
+.jaali-watermark {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120' fill='none'%3E%3Cpath d='M60 0L75 45L120 60L75 75L60 120L45 75L0 60L45 45Z' stroke='%23FFFFFF' stroke-width='1'/%3E%3Crect x='30' y='30' width='60' height='60' stroke='%236C47FF' stroke-width='0.8' transform='rotate(45 60 60)'/%3E%3Ccircle cx='60' cy='60' r='20' stroke='%23FFFFFF' stroke-width='0.8' stroke-dasharray='3 3'/%3E%3C/svg%3E");
+  background-size: 120px 120px;
 }
 
 .cursor-glow {
@@ -128,7 +161,8 @@ body {
   will-change: transform;
 }
 
-/* Memphis Floating Stage Accents */
+/* Lahore Architectural Floating Accents Stage */
+.heritage-stage,
 .memphis-stage {
   position: absolute;
   top: 0;
@@ -140,78 +174,76 @@ body {
   z-index: 2;
 }
 
+.heritage-shape,
 .memphis-shape {
   position: absolute;
   will-change: transform;
+  filter: drop-shadow(0 0 18px rgba(108, 71, 255, 0.18));
 }
 
-.shape-circle {
-  top: 14%;
-  left: 6%;
-  width: 68px;
-  height: 68px;
-  border: 4px solid var(--signal);
-  border-radius: 50%;
-  animation: float-slow 7s ease-in-out infinite alternate;
+@media (max-width: 1180px) {
+  .heritage-stage,
+  .memphis-stage {
+    opacity: 0.2;
+  }
 }
 
-.shape-triangle {
-  top: 22%;
-  right: 8%;
-  width: 0;
-  height: 0;
-  border-left: 28px solid transparent;
-  border-right: 28px solid transparent;
-  border-bottom: 48px solid var(--paper);
-  filter: drop-shadow(4px 4px 0 var(--signal));
-  animation: float-rev 8s ease-in-out infinite alternate;
+@media (max-width: 860px) {
+  .heritage-stage,
+  .memphis-stage {
+    display: none !important;
+  }
 }
 
-.shape-bar {
+.shape-arch {
+  top: 13%;
+  left: 5%;
+  animation: float-slow 8s ease-in-out infinite alternate;
+}
+
+.shape-jharokha {
+  top: 23%;
+  right: 6%;
+  animation: float-rev 9s ease-in-out infinite alternate;
+}
+
+.shape-jaali {
   top: 48%;
   left: 4%;
-  width: 76px;
-  height: 18px;
-  background-color: var(--signal);
-  box-shadow: 4px 4px 0 var(--paper);
-  animation: float-slow 9s ease-in-out infinite alternate;
+  animation: spin-slow 50s linear infinite;
 }
 
-.shape-square-dashed {
-  top: 36%;
-  right: 6%;
-  width: 44px;
-  height: 44px;
-  border: 4px dashed var(--paper);
-  animation: float-rev 6s ease-in-out infinite alternate;
+.shape-meridian {
+  top: 38%;
+  right: 5%;
+  animation: float-slow 11s ease-in-out infinite alternate;
 }
 
-.shape-squiggle {
+.shape-dome {
   top: 68%;
-  left: 8%;
-  animation: float-slow 10s ease-in-out infinite alternate;
+  left: 7%;
+  animation: float-rev 10s ease-in-out infinite alternate;
 }
 
-.shape-asterisk {
-  top: 78%;
-  right: 10%;
-  animation: spin-slow 24s linear infinite;
-}
-
-.shape-zigzag {
-  top: 86%;
-  left: 12%;
-  animation: float-rev 8s ease-in-out infinite alternate;
+.shape-muqarnas {
+  top: 80%;
+  right: 8%;
+  animation: float-slow 9s ease-in-out infinite alternate;
 }
 
 @keyframes float-slow {
   0% { transform: translateY(0px) rotate(0deg); }
-  100% { transform: translateY(-22px) rotate(8deg); }
+  100% { transform: translateY(-20px) rotate(6deg); }
 }
 
 @keyframes float-rev {
   0% { transform: translateY(0px) rotate(0deg); }
-  100% { transform: translateY(22px) rotate(-8deg); }
+  100% { transform: translateY(20px) rotate(-6deg); }
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 @keyframes spin-slow {
@@ -388,6 +420,33 @@ body {
   text-align: center;
 }
 
+/* Lahore Heritage Coordinates Tag */
+.hero-heritage-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: var(--ink);
+  border: 1.5px solid var(--paper-20);
+  padding: 0.35rem 0.85rem;
+  margin-bottom: 1.25rem;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  color: var(--paper-80);
+  box-shadow: 3px 3px 0 var(--signal);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.heritage-pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--signal);
+  box-shadow: 0 0 8px var(--signal);
+  animation: pulse-live 2s infinite;
+}
+
 /* Hero Typography */
 .hero-title {
   font-size: clamp(2.25rem, 5.8vw, 4.5rem);
@@ -478,86 +537,75 @@ body {
 }
 
 /* ==========================================================================
-   Cohort 01 Capacity Bar (Scarcity & Live Progress)
+   Waitlist Location Banner (Lahore Focus)
    ========================================================================== */
-.cohort-capacity-card {
+.waitlist-location-card {
   width: 100%;
   background-color: var(--ink-surface);
   border: 2px solid var(--paper);
   padding: 0.85rem 1.15rem;
   margin-bottom: 1.15rem;
   box-shadow: 4px 4px 0 var(--signal);
-  text-align: left;
-}
-
-.cohort-capacity-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  margin-bottom: 0.5rem;
-  gap: 0.5rem;
+  gap: 0.75rem;
   flex-wrap: wrap;
+  text-align: left;
 }
 
-.cohort-cap-label {
-  color: var(--paper-60);
+.waitlist-loc-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
-.cohort-cap-count {
+.loc-arch-badge {
+  width: 40px;
+  height: 40px;
+  background-color: var(--ink);
+  border: 1.5px solid var(--paper-20);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 2px 2px 0 var(--signal);
+}
+
+.loc-arch-svg {
+  width: 28px;
+  height: 28px;
+  display: block;
+}
+
+.loc-text-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.loc-title {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
   color: var(--paper);
 }
 
-.cohort-cap-count strong {
-  color: var(--signal-hover);
-}
-
-.cohort-progress-track {
-  width: 100%;
-  height: 8px;
-  background-color: var(--ink);
-  border: 1.5px solid var(--paper-40);
-  position: relative;
-  overflow: hidden;
-}
-
-.cohort-progress-fill {
-  height: 100%;
-  background: var(--signal);
-  box-shadow: 0 0 10px var(--signal-glow);
-  transition: width 800ms var(--ease-out);
-}
-
-.cohort-capacity-footer {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  margin-top: 0.5rem;
-  font-family: var(--font-mono);
+.loc-sub {
   font-size: 0.6875rem;
   color: var(--paper-80);
 }
 
-.capacity-live-dot {
-  width: 7px;
-  height: 7px;
-  background-color: #EF4444;
-  border-radius: 50%;
-  box-shadow: 0 0 6px #EF4444;
-  animation: pulse-live 1.8s infinite;
-}
-
-@keyframes pulse-live {
-  0% { transform: scale(0.9); opacity: 0.7; }
-  50% { transform: scale(1.3); opacity: 1; box-shadow: 0 0 10px #EF4444; }
-  100% { transform: scale(0.9); opacity: 0.7; }
-}
-
-.capacity-urgency-text strong {
+.loc-status-pill {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 800;
   color: var(--paper);
+  background-color: var(--signal);
+  padding: 0.25rem 0.55rem;
+  border: 1px solid var(--paper);
+  letter-spacing: 0.05em;
 }
 
 /* ==========================================================================
@@ -589,11 +637,13 @@ body {
 }
 
 /* ==========================================================================
-   Role Selector
+   Role & Interest Selectors
    ========================================================================== */
-.role-selector-wrap {
+.role-selector-wrap,
+.interest-selector-wrap {
   width: 100%;
   text-align: left;
+  margin-bottom: 0.25rem;
 }
 
 .role-selector-label {
@@ -637,13 +687,15 @@ body {
   }
 }
 
-.role-pill:hover {
+.role-pill:hover,
+.interest-pill:hover {
   border-color: var(--paper-60);
   color: var(--paper);
   background-color: var(--ink-elevated);
 }
 
-.role-pill.active {
+.role-pill.active,
+.interest-pill.active {
   background-color: var(--paper);
   color: var(--ink);
   border-color: var(--paper);
@@ -654,6 +706,56 @@ body {
   font-size: 0.65rem;
 }
 
+/* Interest Selector Pills (Lahore Architecture Design Focus) */
+.interest-pills {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+@media (min-width: 520px) {
+  .interest-pills {
+    grid-template-columns: 1.15fr 1fr;
+  }
+  .interest-pills button[data-interest="both"] {
+    grid-column: 1 / -1;
+  }
+}
+
+.interest-pill {
+  background-color: var(--ink-surface);
+  border: 2px solid var(--paper-20);
+  color: var(--paper-80);
+  font-family: var(--font-main);
+  font-weight: 800;
+  font-size: 0.6875rem;
+  letter-spacing: 0.03em;
+  padding: 0.6rem 0.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  transition: all 120ms ease;
+}
+
+.interest-icon {
+  font-size: 0.75rem;
+}
+
+.interest-icon-svg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: currentColor;
+}
+
+.interest-icon-svg svg {
+  display: block;
+}
+
 .waitlist-form {
   width: 100%;
   display: flex;
@@ -662,56 +764,81 @@ body {
   margin-bottom: 1.15rem;
 }
 
-.form-inputs-row {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
+/* ==========================================================================
+   Form Fields Grid & Inputs
+   ========================================================================== */
+.form-fields-grid {
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 0.85rem;
+  width: 100%;
+  text-align: left;
 }
 
-@media (min-width: 600px) {
-  .form-inputs-row {
-    flex-direction: row;
-    align-items: flex-start;
+@media (min-width: 580px) {
+  .form-fields-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .input-group-full {
+    grid-column: 1 / -1;
   }
 }
 
 .input-group {
-  flex: 1;
   width: 100%;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
 }
 
-.email-input {
+.field-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--paper-80);
+  margin-bottom: 0.35rem;
+}
+
+.field-req {
+  color: var(--signal);
+}
+
+.field-opt {
+  color: var(--paper-60);
+  font-weight: 600;
+  font-size: 0.625rem;
+}
+
+.form-text-input {
   width: 100%;
-  height: 52px;
+  height: 48px;
   background-color: var(--paper);
   border: 3px solid var(--ink);
-  padding: 0 1.25rem;
+  padding: 0 1rem;
   color: var(--ink);
   font-family: var(--font-main);
-  font-size: 1rem;
+  font-size: 0.9375rem;
   font-weight: 700;
   outline: none;
   transition: transform 150ms var(--ease-out), box-shadow 150ms var(--ease-out), border-color 150ms ease;
-  box-shadow: 4px 4px 0 var(--signal);
+  box-shadow: 3px 3px 0 var(--signal);
 }
 
-.email-input::placeholder {
-  color: rgba(15, 15, 15, 0.5);
+.form-text-input::placeholder {
+  color: rgba(15, 15, 15, 0.45);
   font-weight: 600;
 }
 
-.email-input:focus {
+.form-text-input:focus {
   transform: translate(-2px, -2px);
-  box-shadow: 6px 6px 0 var(--signal);
+  box-shadow: 5px 5px 0 var(--signal);
 }
 
-.email-input.has-error {
+.form-text-input.has-error {
   border-color: var(--error);
-  box-shadow: 4px 4px 0 var(--error);
+  box-shadow: 3px 3px 0 var(--error);
   animation: input-shake 300ms ease;
 }
 
@@ -725,9 +852,18 @@ body {
   font-size: 0.75rem;
   font-weight: 700;
   color: var(--error);
-  margin-top: 0.4rem;
+  margin-top: 0.35rem;
   min-height: 1rem;
   text-align: left;
+}
+
+.form-action-row {
+  width: 100%;
+  margin-top: 0.25rem;
+}
+
+.form-action-row .submit-btn {
+  width: 100%;
 }
 
 /* Primary CTA Button (Strict 1-Primary CTA Rule) */
@@ -899,21 +1035,6 @@ body {
   will-change: transform;
 }
 
-/* 3D Holographic Specular Foil Layer (Feature 3) */
-.foil-glare-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 10;
-  background: radial-gradient(circle 350px at var(--foil-x, 50%) var(--foil-y, 50%), rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0.15) 30%, transparent 70%);
-  mix-blend-mode: overlay;
-  opacity: var(--foil-opacity, 0.85);
-  transition: opacity 300ms ease;
-}
-
 @keyframes success-pop {
   0% { transform: scale(0.9) rotate(-3deg); opacity: 0; }
   100% { transform: scale(1) rotate(0deg); opacity: 1; }
@@ -954,39 +1075,53 @@ body {
   color: var(--paper);
   text-transform: uppercase;
   letter-spacing: -0.02em;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.85rem;
   text-shadow: 2px 2px 0 var(--ink);
 }
 
-.success-meta-row {
+/* Success Details Box */
+.success-details-box {
+  width: 100%;
+  background-color: var(--ink);
+  border: 2px solid var(--paper);
+  padding: 1rem 1.15rem;
+  margin-bottom: 1.15rem;
   display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  text-align: left;
+  box-shadow: 4px 4px 0 var(--ink);
+}
+
+.success-detail-item {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-  flex-wrap: wrap;
-  justify-content: center;
+  gap: 0.75rem;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.15);
+  padding-bottom: 0.4rem;
 }
 
-.success-email {
-  font-family: var(--font-mono);
-  font-size: 0.9375rem;
-  font-weight: 700;
-  color: var(--paper);
-  background-color: rgba(15, 15, 15, 0.3);
-  padding: 0.25rem 0.75rem;
-  border-radius: 4px;
+.success-detail-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
 }
 
-.success-role-badge {
+.detail-label {
   font-family: var(--font-mono);
   font-size: 0.6875rem;
   font-weight: 800;
-  background-color: var(--paper);
-  color: var(--ink);
-  padding: 0.25rem 0.6rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  border: 2px solid var(--ink);
+  color: var(--signal);
+  letter-spacing: 0.08em;
+}
+
+.detail-value {
+  font-family: var(--font-main);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--paper);
+  text-align: right;
+  word-break: break-all;
 }
 
 .success-text {
@@ -1324,6 +1459,277 @@ body {
   color: var(--paper);
   margin-bottom: 3.5rem;
   text-transform: uppercase;
+}
+
+/* ==========================================================================
+   Lahore Architecture Design Showcase Card
+   ========================================================================== */
+.lahore-architecture-card {
+  width: 100%;
+  background-color: var(--ink-surface);
+  border: 3px solid var(--paper);
+  box-shadow: 8px 8px 0 var(--signal);
+  padding: 2.25rem 2rem;
+  margin-bottom: 2.5rem;
+  text-align: left;
+}
+
+.arch-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.75rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 2px dashed var(--paper-20);
+}
+
+.arch-badge-group {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+/* Architecture Blueprint Study Switcher Tabs */
+.arch-study-switcher {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.arch-study-tab {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 0.4rem 0.8rem;
+  background-color: var(--ink);
+  color: var(--paper-80);
+  border: 1.5px solid var(--paper-20);
+  cursor: pointer;
+  transition: all 140ms ease;
+  user-select: none;
+}
+
+.arch-study-tab:hover {
+  color: var(--paper);
+  border-color: var(--paper);
+  transform: translateY(-1px);
+}
+
+.arch-study-tab.active {
+  background-color: var(--signal);
+  color: var(--paper);
+  border-color: var(--paper);
+  box-shadow: 2px 2px 0 var(--paper);
+}
+
+.arch-card-tag {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 900;
+  color: var(--paper);
+  background-color: var(--signal);
+  padding: 0.25rem 0.65rem;
+  border: 1px solid var(--paper);
+}
+
+.arch-card-pill {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--paper-80);
+}
+
+.arch-badge-city {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--paper-60);
+}
+
+.arch-card-content-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  align-items: center;
+}
+
+@media (min-width: 880px) {
+  .arch-card-content-grid {
+    grid-template-columns: 1.15fr 1fr;
+  }
+}
+
+.arch-card-visual {
+  width: 100%;
+  background-color: var(--ink);
+  border: 2px solid var(--paper-40);
+  box-shadow: 5px 5px 0 var(--paper);
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.arch-blueprint-frame {
+  width: 100%;
+}
+
+.arch-blueprint-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.arch-study-panel {
+  transition: opacity 220ms ease;
+}
+
+.arch-study-panel.hidden {
+  display: none !important;
+}
+
+.arch-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  text-align: left;
+}
+
+.arch-info-title {
+  font-size: 1.45rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: var(--paper);
+  line-height: 1.25;
+}
+
+.arch-info-desc {
+  font-size: 0.9375rem;
+  color: var(--paper-80);
+  line-height: 1.6;
+}
+
+.arch-tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.arch-tag-pill {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  color: var(--paper);
+  background-color: var(--ink);
+  border: 1.5px solid var(--paper);
+  box-shadow: 2px 2px 0 var(--signal);
+  padding: 0.35rem 0.65rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.pill-svg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: currentColor;
+}
+
+/* Lahore Design Lineage: 3 Pillars Grid */
+.arch-lineage-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+  margin-top: 2rem;
+  margin-bottom: 2.5rem;
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .arch-lineage-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.lineage-card {
+  background-color: var(--ink-surface);
+  border: 2px solid var(--paper-20);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  box-shadow: 4px 4px 0 var(--ink);
+  transition: transform 140ms ease, border-color 140ms ease;
+  text-align: left;
+}
+
+.lineage-card:hover {
+  border-color: var(--signal);
+  transform: translateY(-2px);
+  box-shadow: 5px 5px 0 var(--signal);
+}
+
+.lineage-card-num {
+  font-family: var(--font-mono);
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: var(--signal);
+  letter-spacing: -0.04em;
+}
+
+.lineage-card-title {
+  font-family: var(--font-main);
+  font-size: 0.875rem;
+  font-weight: 900;
+  color: var(--paper);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.lineage-card-desc {
+  font-size: 0.8125rem;
+  color: var(--paper-80);
+  line-height: 1.5;
+}
+
+.lineage-badge {
+  align-self: flex-start;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 800;
+  color: var(--paper-60);
+  background-color: var(--paper-5);
+  border: 1px solid var(--paper-10);
+  padding: 0.2rem 0.5rem;
+  margin-top: auto;
+  letter-spacing: 0.04em;
+}
+
+/* Subtle Ambient Lahore Skyline Horizon Backdrop */
+.lahore-skyline-backdrop {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 160px;
+  pointer-events: none;
+  z-index: 1;
+  overflow: hidden;
+  opacity: 0.9;
+}
+
+.skyline-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 .bento-grid {
@@ -2068,6 +2474,15 @@ body {
   will-change: opacity, transform;
 }
 
+@keyframes autoRevealFallback {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-on-scroll:not(.in-view) {
+  animation: autoRevealFallback 400ms ease 1.2s forwards;
+}
+
 .reveal-up {
   transform: translateY(50px);
   transition: opacity 700ms var(--ease-out), transform 700ms var(--ease-out);
@@ -2128,6 +2543,7 @@ body {
   }
 
   .cursor-glow,
+  .heritage-shape,
   .memphis-shape {
     display: none !important;
   }
@@ -2135,4 +2551,37 @@ body {
   .marquee-track {
     transform: none !important;
   }
+}
+
+/* ==========================================================================
+   3D layer (scene3d.js)
+   ========================================================================== */
+#scene-3d {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 600ms ease;
+}
+
+/* The WebGL objects take over from the flat heritage SVG accents. */
+body.has-3d .heritage-stage { display: none; }
+
+.tilt-3d {
+  transition: transform 180ms ease-out;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.tilt-3d-title {
+  transition: transform 300ms ease-out;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tilt-3d, .tilt-3d-title { transform: none !important; }
 }

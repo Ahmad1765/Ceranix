@@ -21,6 +21,8 @@ import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useTheme } from '@/context/ThemeContext';
 import { useIsKeyboardShown } from '@/hooks/useIsKeyboardShown';
 import { Text } from '@/lib/rnText';
+import { lightTheme } from '@/lib/theme';
+import { useActivityDot } from '@/hooks/useActivityDot';
 import {
   HomeTabIcon,
   CategoriesTabIcon,
@@ -182,9 +184,12 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
   };
 
   // Mount the tab under the finger BEFORE the finger lifts.
+  // Sheet-only tabs ('discover', 'upload') must not be preloaded, because their
+  // route components redirect back to '/' or mount modals.
   const preload = (pos: number) => {
     const route = routes[pos];
     if (!route || route.key === activeKey) return;
+    if (route.name === 'discover' || route.name === 'upload') return;
     navigation.preload(route.name);
   };
 
@@ -203,11 +208,14 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
   useEffect(() => {
     if (warmed.current || count === 0) return;
     warmed.current = true;
-    const timers = Array.from({ length: count }, (_, i) =>
-      setTimeout(() => preloadAt(i), WARM_DELAY + i * WARM_STEP),
-    );
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    for (let i = 0; i < count; i++) {
+      const route = routes[i];
+      if (route && (route.name === 'discover' || route.name === 'upload')) continue;
+      timers.push(setTimeout(() => preloadAt(i), WARM_DELAY + i * WARM_STEP));
+    }
     return () => timers.forEach(clearTimeout);
-  }, [count, preloadAt]);
+  }, [count, preloadAt, routes]);
 
   // ---- gesture (worklets only) ----
   const gesture = useMemo(() => {
@@ -339,6 +347,33 @@ export function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarP
   );
 }
 
+// Activity tab dot: new messages, offers or a sale. Its own component so the
+// hook's state only ever re-renders this 9px view — never the dock or its
+// gesture worklets (UI_GUARDRAILS Rule 2.3). Signal Purple, ringed in the bar
+// colour so it reads as a notch cut into the icon.
+function ActivityDot({ ringColor }: { ringColor: string }) {
+  const show = useActivityDot();
+  if (!show) return null;
+  return (
+    <View
+      pointerEvents="none"
+      accessible
+      accessibilityLabel="New activity"
+      style={{
+        position: 'absolute',
+        top: -2,
+        right: -4,
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: lightTheme.purple,
+        borderWidth: 2,
+        borderColor: ringColor,
+      }}
+    />
+  );
+}
+
 function TabItem({
   index,
   routeName,
@@ -417,6 +452,7 @@ function TabItem({
         <Animated.View style={[StyleSheet.absoluteFill, filledStyle]}>
           {renderTabIcon(routeName, true, activeColor, ICON, barBg)}
         </Animated.View>
+        {routeName === 'chat' && <ActivityDot ringColor={barBg} />}
       </Animated.View>
       <Text
         style={{

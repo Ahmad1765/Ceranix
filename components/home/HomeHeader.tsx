@@ -14,7 +14,7 @@ import { router } from 'expo-router';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
-import { BellIcon } from '@/components/ui';
+import { PlickNotificationIcon } from '@/components/ui';
 import { radii, shadow, type as typography } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 import {
@@ -247,7 +247,7 @@ export const FeedSearch = memo(function FeedSearch({
               ...shadow.sm,
             } as any)}
           >
-            <BellIcon size={20} color={theme.ink} strokeWidth={2.4} />
+            <PlickNotificationIcon size={20} color={theme.ink} strokeWidth={2.2} />
             {!!unreadNotificationsCount && unreadNotificationsCount > 0 && (
               <View
                 style={{

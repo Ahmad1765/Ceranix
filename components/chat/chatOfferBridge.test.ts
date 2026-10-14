@@ -122,33 +122,39 @@ describe('Chat-to-Order Bridge & Offer Lifecycle', () => {
   });
 
   describe('Product Screen Action Bar Awaiting Payment State', () => {
-    const deriveProductBarState = (order: { status: string; amount_cents?: number } | null) => {
-      const isAwaitingPayment = Boolean(order && order.status === 'awaiting_payment');
+    const deriveProductBarState = (
+      order: { status: string; amount_cents?: number } | null,
+      listingSold = false,
+    ) => {
+      const isSold = listingSold || Boolean(order && order.status !== 'awaiting_payment');
+      const isAwaitingPayment = Boolean(order && order.status === 'awaiting_payment' && !listingSold);
       const hasPurchased = Boolean(order && order.status !== 'awaiting_payment');
       const awaitingAmount = isAwaitingPayment && order?.amount_cents
         ? Math.round(order.amount_cents / 100)
         : undefined;
 
-      return { isAwaitingPayment, hasPurchased, awaitingAmount };
+      return { isSold, isAwaitingPayment, hasPurchased, awaitingAmount };
     };
 
-    it('renders awaiting payment with checkout CTA when order is awaiting_payment', () => {
+    it('renders awaiting payment with checkout CTA when order is awaiting_payment without marking listing as sold', () => {
       const state = deriveProductBarState({
         status: 'awaiting_payment',
         amount_cents: 350000,
       });
 
+      expect(state.isSold).toBe(false);
       expect(state.isAwaitingPayment).toBe(true);
       expect(state.hasPurchased).toBe(false);
       expect(state.awaitingAmount).toBe(3500);
     });
 
-    it('renders hasPurchased track order state when order is paid or pending', () => {
+    it('renders hasPurchased and isSold track order state when order is paid or pending', () => {
       const statePaid = deriveProductBarState({
         status: 'paid',
         amount_cents: 350000,
       });
 
+      expect(statePaid.isSold).toBe(true);
       expect(statePaid.isAwaitingPayment).toBe(false);
       expect(statePaid.hasPurchased).toBe(true);
     });

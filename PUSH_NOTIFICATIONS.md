@@ -1,7 +1,8 @@
 # Push notifications — setup & runbook
 
-Remote push for messages, offers, and sales. Native only (iOS/Android); web push
-is deliberately out of scope for this slice and no-ops cleanly.
+Remote push for messages, offers, and sales on iOS/Android (Expo) **and the web**
+(Chrome, Edge, Firefox — desktop and Android). iOS Safari only supports web push
+for sites added to the home screen, so the toggle is hidden in a Safari tab.
 
 **Nothing here is active until the steps below are run.** Every client entry
 point degrades to a warning, so the app works normally with none of it done.
@@ -196,8 +197,38 @@ The mapper is Deno-free on purpose so vitest can load it directly;
 | `{"sent":0,"reason":"already delivered"}` | Idempotency working — a redelivered webhook. |
 | Notification arrives but tapping does nothing | `data` payload lacks `conversationId`/`listingId`; `routeForNotificationData` returns null by design. |
 
+## Web push
+
+Same pipeline, one extra branch in `send-push`:
+
+```
+Settings toggle (user gesture) → Notification.requestPermission()
+  └─ public/sw.js registered → pushManager.subscribe(VAPID public key)
+       └─ register_web_push() RPC → user_devices (platform=web,
+            expo_push_token=endpoint, web_push_keys={p256dh,auth})
+send-push → web devices → web-push (VAPID-signed, encrypted) → browser push service
+  └─ public/sw.js shows it (skipped if the app tab is focused); tap opens the chat/invoice
+```
+
+- Endpoints are allow-listed to the real push services (FCM, Mozilla, Apple, WNS)
+  in both `register_web_push` and `send-push`, so the function can't be aimed at
+  an arbitrary host.
+- 404/410 from a push service prunes the subscription.
+- **Setup:** Supabase → Edge Functions → Secrets: `VAPID_PUBLIC_KEY`,
+  `VAPID_PRIVATE_KEY` (values in your local `.env.local`; the public key must equal
+  `VAPID_PUBLIC_KEY` in `lib/webPush.ts`). Optional `VAPID_SUBJECT`
+  (`mailto:` or `https:` contact). Without them web push is simply off.
+
+## Native credentials (needed before store builds push)
+
+- **Android:** create a Firebase project, add the app `com.grabsty.app`, then
+  upload the FCM V1 service-account key: `eas credentials` → Android →
+  Push Notifications. Expo routes through it; no code change.
+- **iOS:** `eas credentials` → iOS → Push Notifications key (needs the Apple
+  Developer account).
+
 ## Not in scope
 
-Web push (VAPID + service worker), price-drop / saved-search alerts (needs
+Price-drop / saved-search alerts (needs
 scheduled sends), an in-app notification centre, and rich notifications
 (images, action buttons).

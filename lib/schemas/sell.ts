@@ -81,10 +81,11 @@ export const SellFormSchema = z
       )
       .refine(
         (val) => {
-          const regex = /^\d+(\.\d{1,2})?$/;
+          // listings.price is an integer column: whole rupees only.
+          const regex = /^\d+(\.0{1,2})?$/;
           return regex.test(val);
         },
-        'Price can have at most 2 decimal places',
+        'Price must be a whole rupee amount',
       ),
     category: z.enum(CATEGORY_VALUES).nullable(),
     subcategory: z.string().nullable(),

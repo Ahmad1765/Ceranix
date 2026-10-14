@@ -480,9 +480,10 @@ export async function checkAndCancelInvalidBundleOffers(
 }
 
 /**
- * Atomically accepts an offer in chat, locking inventory and creating an order in awaiting_payment state.
+ * Atomically accepts an offer in chat. Offer state transitions to 'accepted',
+ * and the listing remains public and available until checkout payment is completed.
  */
-export async function acceptChatOffer(offerMessageId: string): Promise<Order | null> {
+export async function acceptChatOffer(offerMessageId: string): Promise<any> {
   const { data, error } = await supabase.rpc('accept_chat_offer', {
     p_offer_message_id: offerMessageId,
   });
@@ -490,7 +491,7 @@ export async function acceptChatOffer(offerMessageId: string): Promise<Order | n
     console.warn('[chat] acceptChatOffer', error.message);
     throw new Error(error.message);
   }
-  return data as Order;
+  return data;
 }
 
 /**

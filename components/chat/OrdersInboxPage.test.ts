@@ -42,6 +42,7 @@ vi.mock('react-native', () => ({
 
 vi.mock('expo-router', () => ({
   router: { push: vi.fn() },
+  useFocusEffect: vi.fn(),
 }));
 import { router } from 'expo-router';
 

@@ -13,6 +13,7 @@ import { Text } from '@/lib/rnText';
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { colors } from '@/lib/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { EmptyState } from '@/components/ui';
 import type { SaveList } from '@/lib/saves';
 
@@ -31,6 +32,11 @@ type ProfileListingTabsProps = {
   loadingListings: boolean;
   gridListingsCount: number;
   onPostItem: () => void;
+  statusFilter?: 'all' | 'available' | 'sold';
+  setStatusFilter?: (f: 'all' | 'available' | 'sold') => void;
+  totalCount?: number;
+  availableCount?: number;
+  soldCount?: number;
 };
 
 export const ProfileListingTabs = memo(function ProfileListingTabs({
@@ -47,6 +53,7 @@ export const ProfileListingTabs = memo(function ProfileListingTabs({
   gridListingsCount,
   onPostItem,
 }: ProfileListingTabsProps) {
+  const { theme, isDark } = useTheme();
   return (
     <>
       {/* ── 3-Segment Icon Tab Bar ── */}
@@ -163,55 +170,49 @@ export const ProfileListingTabs = memo(function ProfileListingTabs({
 
       </View>
 
-      {/* ── Playlist / Category Chips Strip (Collections Tab) ── */}
-      {activeTab === 'collections' ? (
+      {/* ── Playlist Strip (Collections Tab) ── */}
+      {activeTab === 'collections' && (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{
             paddingHorizontal: 12,
-            paddingVertical: 10,
+            paddingTop: 10,
+            paddingBottom: 4,
             gap: 8,
           }}
         >
           <Pressable
             onPress={() => setActiveListId(null)}
-            style={({ pressed }) => ({
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 5,
-              height: 30,
-              paddingHorizontal: 12,
-              borderRadius: 15,
-              backgroundColor: activeListId === null ? colors.purple : colors.surface,
-              borderWidth: 1,
-              borderColor: activeListId === null ? colors.purple : colors.border,
-              opacity: pressed ? 0.7 : 1,
-            })}
+            accessibilityRole="button"
+            accessibilityState={{ selected: activeListId === null }}
+            style={({ pressed }) => {
+              const active = activeListId === null;
+              return {
+                height: 30,
+                paddingHorizontal: 14,
+                borderRadius: 15,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: active
+                  ? isDark ? theme.panel : '#111111'
+                  : isDark ? theme.surface : theme.panel,
+                borderWidth: 1,
+                borderColor: active
+                  ? isDark ? theme.border : '#111111'
+                  : theme.border,
+                opacity: pressed ? 0.7 : 1,
+              };
+            }}
           >
-            <Ionicons
-              name="play-circle-outline"
-              size={14}
-              color={activeListId === null ? '#FFFFFF' : colors.ink}
-            />
             <Text
               style={{
                 fontSize: 12,
                 fontWeight: '700',
-                color: activeListId === null ? '#FFFFFF' : colors.ink,
+                color: activeListId === null ? '#FFFFFF' : theme.ink,
               }}
             >
-              All Items
-            </Text>
-            <Text
-              style={{
-                fontSize: 11,
-                color: activeListId === null ? 'rgba(255,255,255,0.85)' : colors.mute,
-                fontWeight: '600',
-              }}
-            >
-              {savedCount}
+              All ({savedCount})
             </Text>
           </Pressable>
 
@@ -222,42 +223,32 @@ export const ProfileListingTabs = memo(function ProfileListingTabs({
                 key={list.id}
                 onPress={() => setActiveListId(list.id)}
                 onLongPress={() => onManageList(list)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isListActive }}
                 style={({ pressed }) => ({
-                  flexDirection: 'row',
+                  height: 30,
+                  paddingHorizontal: 14,
+                  borderRadius: 15,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: 5,
-                  height: 30,
-                  paddingHorizontal: 12,
-                  borderRadius: 15,
-                  backgroundColor: isListActive ? colors.purple : colors.surface,
+                  backgroundColor: isListActive
+                    ? isDark ? theme.panel : '#111111'
+                    : isDark ? theme.surface : theme.panel,
                   borderWidth: 1,
-                  borderColor: isListActive ? colors.purple : colors.border,
+                  borderColor: isListActive
+                    ? isDark ? theme.border : '#111111'
+                    : theme.border,
                   opacity: pressed ? 0.7 : 1,
                 })}
               >
-                <Ionicons
-                  name="play-circle-outline"
-                  size={14}
-                  color={isListActive ? '#FFFFFF' : colors.ink}
-                />
                 <Text
                   style={{
                     fontSize: 12,
                     fontWeight: '700',
-                    color: isListActive ? '#FFFFFF' : colors.ink,
+                    color: isListActive ? '#FFFFFF' : theme.ink,
                   }}
                 >
-                  {list.name}
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 11,
-                    color: isListActive ? 'rgba(255,255,255,0.85)' : colors.mute,
-                    fontWeight: '600',
-                  }}
-                >
-                  {list.item_count ?? 0}
+                  {list.name} ({list.item_count ?? 0})
                 </Text>
               </Pressable>
             );
@@ -265,64 +256,66 @@ export const ProfileListingTabs = memo(function ProfileListingTabs({
 
           <Pressable
             onPress={onCreateList}
+            accessibilityRole="button"
+            accessibilityLabel="Create collection"
             style={({ pressed }) => ({
               width: 30,
               height: 30,
               borderRadius: 15,
               borderWidth: 1,
-              borderColor: colors.border,
-              backgroundColor: colors.surface,
+              borderColor: theme.border,
+              backgroundColor: isDark ? theme.surface : theme.panel,
               alignItems: 'center',
               justifyContent: 'center',
               opacity: pressed ? 0.7 : 1,
             })}
           >
-            <Feather name="plus" size={14} color={colors.ink} />
+            <Feather name="plus" size={14} color={theme.ink} />
           </Pressable>
         </ScrollView>
-      ) : (
-        <View style={{ height: 12 }} />
       )}
+
+      {activeTab !== 'collections' && <View style={{ height: 12 }} />}
 
       {/* ── Empty States for Lists ── */}
       {loadingListings ? (
-          <View style={{ paddingVertical: 40, alignItems: 'center' }}>
-            <ActivityIndicator color={colors.purple} />
-          </View>
-        ) : gridListingsCount === 0 ? (
-          <View style={{ paddingVertical: 40, alignItems: 'center' }}>
-            <EmptyState
-              icon={
-                activeTab === 'liked'
-                  ? 'heart'
-                  : activeTab === 'collections'
-                    ? 'bookmark'
-                    : 'shopping-bag'
-              }
-              title={
-                activeTab === 'liked'
-                  ? 'No liked items'
-                  : activeTab === 'collections'
-                    ? 'No saved items'
-                    : 'Your shop is empty'
-              }
-              description={
-                activeTab === 'selling'
-                  ? 'Post your first item — takes less than a minute.'
-                  : 'Items you interact with will show up here.'
-              }
-              cta={
-                activeTab === 'selling'
-                  ? {
-                      label: 'Post an item',
-                      icon: 'plus',
-                      onPress: onPostItem,
-                    }
-                  : undefined
-              }
-            />
-          </View>
-        ) : null}
+        <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+          <ActivityIndicator color={colors.purple} />
+        </View>
+      ) : gridListingsCount === 0 ? (
+        <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+          <EmptyState
+            icon={
+              activeTab === 'liked'
+                ? 'heart'
+                : activeTab === 'collections'
+                  ? 'bookmark'
+                  : 'shopping-bag'
+            }
+            title={
+              activeTab === 'liked'
+                ? 'No liked items'
+                : activeTab === 'collections'
+                  ? 'No saved items'
+                  : 'Your shop is empty'
+            }
+            description={
+              activeTab === 'selling'
+                ? 'Post your first item — takes less than a minute.'
+                : 'Items you interact with will show up here.'
+            }
+            cta={
+              activeTab === 'selling'
+                ? {
+                    label: 'Post an item',
+                    icon: 'plus',
+                    onPress: onPostItem,
+                  }
+                : undefined
+            }
+          />
+        </View>
+      ) : null}
     </>
   );
 });

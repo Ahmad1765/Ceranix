@@ -72,6 +72,7 @@ export async function fetchOrderForListing(
     .from("orders")
     .select(SELECT_ORDER_COLS)
     .eq("listing_id", idOrListingId)
+    .neq("status", "awaiting_payment")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -136,9 +137,10 @@ export async function fetchMyOrders(userId: string): Promise<MyOrder[]> {
   const { data, error } = await supabase
     .from("orders")
     .select(
-      "id, status, fulfillment_status, fulfillment_type, amount_cents, fee_cents, currency, payment_method, shipping_address, delivery_notes, courier_name, tracking_number, cancel_reason, cancelled_by, dispute_reason, dispute_evidence_urls, disputed_at, dispute_resolved_at, payment_authorized_at, packed_at, shifted_at, shipped_at, delivered_at, completed_at, cod_paid_at, cod_buyer_confirmed_at, cod_seller_confirmed_at, supplier_name, supplier_order_id, created_at, listing_id, buyer_id, seller_id, listing:listings(id, title, images, thumbnails, price), buyer:profiles!orders_buyer_id_fkey(id, username, full_name, avatar_url), seller:profiles!orders_seller_id_fkey(id, username, full_name, avatar_url)",
+      "id, status, fulfillment_status, fulfillment_type, amount_cents, fee_cents, currency, payment_method, shipping_method, shipping_fee_cents, shipping_address, delivery_notes, courier_name, tracking_number, cancel_reason, cancelled_by, dispute_reason, dispute_evidence_urls, disputed_at, dispute_resolved_at, payment_authorized_at, packed_at, shifted_at, shipped_at, delivered_at, completed_at, cod_paid_at, cod_buyer_confirmed_at, cod_seller_confirmed_at, supplier_name, supplier_order_id, created_at, listing_id, buyer_id, seller_id, listing:listings(id, title, images, thumbnails, price), buyer:profiles!orders_buyer_id_fkey(id, username, full_name, avatar_url), seller:profiles!orders_seller_id_fkey(id, username, full_name, avatar_url)",
     )
     .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
+    .neq("status", "awaiting_payment")
     .order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
   // normalizeMyOrder lives in lib/orders.ts so it is reachable by a test — see

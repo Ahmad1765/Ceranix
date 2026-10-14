@@ -138,7 +138,7 @@ function SystemNotice({ msg }: { msg: ChatMessage }) {
               color: theme.mute,
             }}
           >
-            {msg.content}
+            {msg.content?.replace(/^Done!\s*\n?/, '')}
           </Text>
         </View>
       </View>

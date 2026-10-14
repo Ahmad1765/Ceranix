@@ -43,7 +43,7 @@ import { paymentService, normalizeAddressInput } from '@/lib/paymentService';
 import { ShippingAddressSchema } from '@/lib/schemas/order';
 import { getOrCreateConversation, cancelBundleOffersForSoldItem } from '@/lib/chat';
 import { SELECT_LISTING_WITH_SELLER } from '@/lib/listings';
-import { openCheckout } from '@/lib/payments';
+import { openCheckout, STRIPE_ENABLED } from '@/lib/payments';
 import type { ShippingAddress, Listing } from '@/types';
 
 function tap(style: 'light' | 'medium' = 'light') {
@@ -284,7 +284,9 @@ export default function PaymentScreen() {
     paymentMethodParam === 'easypaisa'
       ? paymentMethodParam
       : 'card';
-  const [selectedMethod, setSelectedMethod] = useState<PaymentMethodOption>(initialMethod);
+  // Without Stripe the only method that can collect money is Cash on Delivery.
+  const defaultMethod: PaymentMethodOption = STRIPE_ENABLED ? initialMethod : 'cod';
+  const [selectedMethod, setSelectedMethod] = useState<PaymentMethodOption>(defaultMethod);
   const [cardBrand, setCardBrand] = useState<string | null>('Visa');
   const [cardLast4, setCardLast4] = useState<string | null>('4242');
   const [walletNumber, setWalletNumber] = useState<string | null>(null);
@@ -331,7 +333,7 @@ export default function PaymentScreen() {
 
   const offerAmount = (() => {
     const n = Number(offer);
-    return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+    return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
   })();
 
   const bundleCalculation = useMemo(() => {
@@ -645,8 +647,10 @@ export default function PaymentScreen() {
         listingPrice: Number(listing.price),
         offerAmount: itemPrice,
         shippingAddress,
-        shippingMethod: 'managed',
+        shippingMethod: fulfillment === 'handshake' ? 'self_ship' : 'managed',
         deliveryNotes: deliveryNotes.trim() || undefined,
+        // The server recomputes the total and refuses to charge anything else.
+        expectedTotal: finalTotal,
       });
 
       if (!result.success) {
@@ -669,18 +673,15 @@ export default function PaymentScreen() {
         queryClient.invalidateQueries({ queryKey: qk.listing(itemId) });
         cancelBundleOffersForSoldItem(itemId).catch(() => {});
       });
-      queryClient.invalidateQueries({ queryKey: ['myOrders'] });
-      queryClient.invalidateQueries({ queryKey: ['feedListings'] });
-      queryClient.invalidateQueries({ queryKey: ['homeFeed'] });
 
       const isPaid = result.status === 'paid';
       const allTitles = allOrderItems.map((item) => item.title).filter(Boolean);
       const orderMessageContent =
         isBundle && allTitles.length > 1
-          ? `Done!\nThank you, your order for a ${allTitles.length}-item bundle (${allTitles.join(', ')}) has been received.`
+          ? `Thank you, your order for a ${allTitles.length}-item bundle (${allTitles.join(', ')}) has been received.`
           : isPaid
-            ? "Done!\nThank you, we have received your payment. It's being processed."
-            : "Done!\nYour order has been placed. It's being processed.";
+            ? "Thank you, we have received your payment. It's being processed."
+            : "Your order has been placed. It's being processed.";
 
       try {
         const conv = await getOrCreateConversation({

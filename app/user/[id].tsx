@@ -63,6 +63,7 @@ export default function UserProfileScreen() {
   const toast = useToast();
   const [shopFilter, setShopFilter] = useState<'all' | 'available' | 'sold'>('all');
   const [likedFilter, setLikedFilter] = useState<'all' | 'available' | 'sold'>('all');
+  const [savedFilter, setSavedFilter] = useState<'all' | 'available' | 'sold'>('all');
   const [activeTab, setActiveTab] = useState<SellerTab>('shop');
 
   const fade = useFadeIn(0, 320);
@@ -225,12 +226,30 @@ export default function UserProfileScreen() {
     [likedListings, likedFilter],
   );
 
+  const savedAvailableCount = useMemo(
+    () => visibleSavedListings.filter((l) => !l.is_sold).length,
+    [visibleSavedListings],
+  );
+  const savedSoldCount = useMemo(
+    () => visibleSavedListings.length - savedAvailableCount,
+    [visibleSavedListings, savedAvailableCount],
+  );
+  const visibleFilteredSavedListings = useMemo(
+    () =>
+      savedFilter === 'available'
+        ? visibleSavedListings.filter((l) => !l.is_sold)
+        : savedFilter === 'sold'
+          ? visibleSavedListings.filter((l) => l.is_sold)
+          : visibleSavedListings,
+    [visibleSavedListings, savedFilter],
+  );
+
   const gridRows = useMemo(() => {
     let list: Listing[] = [];
     if (activeTab === 'shop') list = visibleListings;
     else if (activeTab === 'liked') list = visibleLikedListings;
     else if (activeTab === 'collections') {
-      list = isCollectionsPublic ? visibleSavedListings : [];
+      list = isCollectionsPublic ? visibleFilteredSavedListings : [];
     }
     if (list.length === 0) return [] as Listing[][];
     const out: Listing[][] = [];
@@ -238,7 +257,7 @@ export default function UserProfileScreen() {
       out.push(list.slice(i, i + columns));
     }
     return out;
-  }, [activeTab, visibleListings, visibleLikedListings, isCollectionsPublic, visibleSavedListings, columns]);
+  }, [activeTab, visibleListings, visibleLikedListings, isCollectionsPublic, visibleFilteredSavedListings, columns]);
 
   const renderRow = useCallback(
     ({ item }: { item: Listing[] }) => <GridRow row={item} columns={columns} cardW={cardW} />,
@@ -249,14 +268,6 @@ export default function UserProfileScreen() {
 
   const availableCount = listings.filter((l) => !l.is_sold).length;
   const soldCount = listings.length - availableCount;
-
-  useEffect(() => {
-    if (shopFilter === 'sold' && soldCount === 0) {
-      setShopFilter('all');
-    } else if (shopFilter === 'available' && availableCount === 0) {
-      setShopFilter('all');
-    }
-  }, [shopFilter, soldCount, availableCount]);
 
   if (loading) {
     return (
@@ -707,48 +718,42 @@ export default function UserProfileScreen() {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={{
                   paddingHorizontal: 12,
-                  paddingVertical: 10,
+                  paddingTop: 10,
+                  paddingBottom: 4,
                   gap: 8,
                 }}
               >
                 <Pressable
                   onPress={() => setActiveListId(null)}
-                  style={({ pressed }) => ({
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 5,
-                    height: 30,
-                    paddingHorizontal: 12,
-                    borderRadius: 15,
-                    backgroundColor: activeListId === null ? colors.purple : colors.surface,
-                    borderWidth: 1,
-                    borderColor: activeListId === null ? colors.purple : colors.border,
-                    opacity: pressed ? 0.7 : 1,
-                  })}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: activeListId === null }}
+                  style={({ pressed }) => {
+                    const active = activeListId === null;
+                    return {
+                      height: 30,
+                      paddingHorizontal: 14,
+                      borderRadius: 15,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: active
+                        ? isDark ? theme.panel : '#111111'
+                        : isDark ? theme.surface : theme.panel,
+                      borderWidth: 1,
+                      borderColor: active
+                        ? isDark ? theme.border : '#111111'
+                        : theme.border,
+                      opacity: pressed ? 0.7 : 1,
+                    };
+                  }}
                 >
-                  <Ionicons
-                    name="play-circle-outline"
-                    size={14}
-                    color={activeListId === null ? '#FFFFFF' : colors.ink}
-                  />
                   <Text
                     style={{
                       fontSize: 12,
                       fontWeight: '700',
-                      color: activeListId === null ? '#FFFFFF' : colors.ink,
+                      color: activeListId === null ? '#FFFFFF' : theme.ink,
                     }}
                   >
-                    All Items
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      color: activeListId === null ? 'rgba(255,255,255,0.85)' : colors.mute,
-                      fontWeight: '600',
-                    }}
-                  >
-                    {savedListings.length}
+                    All ({savedListings.length})
                   </Text>
                 </Pressable>
 
@@ -758,42 +763,32 @@ export default function UserProfileScreen() {
                     <Pressable
                       key={list.id}
                       onPress={() => setActiveListId(list.id)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: isListActive }}
                       style={({ pressed }) => ({
-                        flexDirection: 'row',
+                        height: 30,
+                        paddingHorizontal: 14,
+                        borderRadius: 15,
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: 5,
-                        height: 30,
-                        paddingHorizontal: 12,
-                        borderRadius: 15,
-                        backgroundColor: isListActive ? colors.purple : colors.surface,
+                        backgroundColor: isListActive
+                          ? isDark ? theme.panel : '#111111'
+                          : isDark ? theme.surface : theme.panel,
                         borderWidth: 1,
-                        borderColor: isListActive ? colors.purple : colors.border,
+                        borderColor: isListActive
+                          ? isDark ? theme.border : '#111111'
+                          : theme.border,
                         opacity: pressed ? 0.7 : 1,
                       })}
                     >
-                      <Ionicons
-                        name="play-circle-outline"
-                        size={14}
-                        color={isListActive ? '#FFFFFF' : colors.ink}
-                      />
                       <Text
                         style={{
                           fontSize: 12,
                           fontWeight: '700',
-                          color: isListActive ? '#FFFFFF' : colors.ink,
+                          color: isListActive ? '#FFFFFF' : theme.ink,
                         }}
                       >
-                        {list.name}
-                      </Text>
-                      <Text
-                        style={{
-                          fontSize: 11,
-                          color: isListActive ? 'rgba(255,255,255,0.85)' : colors.mute,
-                          fontWeight: '600',
-                        }}
-                      >
-                        {list.item_count}
+                        {list.name} ({list.item_count ?? 0})
                       </Text>
                     </Pressable>
                   );
@@ -801,112 +796,15 @@ export default function UserProfileScreen() {
               </ScrollView>
             )}
 
-            {/* Available / Sold Filter Chips for Shop tab */}
-            {activeTab === 'shop' && soldCount > 0 && availableCount > 0 ? (
-              <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingVertical: 10 }}>
-                {(
-                  [
-                    { id: 'all', label: `All (${listings.length})` },
-                    { id: 'available', label: `Available (${availableCount})` },
-                    { id: 'sold', label: `Sold (${soldCount})` },
-                  ] as const
-                ).map((f) => {
-                  const active = shopFilter === f.id;
-                  return (
-                    <Pressable
-                      key={f.id}
-                      onPress={() => setShopFilter(f.id)}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: active }}
-                      style={({ pressed }) => ({
-                        height: 30,
-                        paddingHorizontal: 12,
-                        borderRadius: 15,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: active
-                          ? isDark ? theme.panel : '#111111'
-                          : isDark ? theme.surface : theme.panel,
-                        borderWidth: 1,
-                        borderColor: active
-                          ? isDark ? theme.border : '#111111'
-                          : theme.border,
-                        opacity: pressed ? 0.7 : 1,
-                      })}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          fontWeight: active ? '700' : '600',
-                          color: active ? '#FFFFFF' : theme.ink,
-                        }}
-                      >
-                        {f.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ) : activeTab === 'liked' && likedSoldCount > 0 && likedAvailableCount > 0 ? (
-              <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingVertical: 10 }}>
-                {(
-                  [
-                    { id: 'all', label: `All (${likedListings.length})` },
-                    { id: 'available', label: `Available (${likedAvailableCount})` },
-                    { id: 'sold', label: `Sold (${likedSoldCount})` },
-                  ] as const
-                ).map((f) => {
-                  const active = likedFilter === f.id;
-                  return (
-                    <Pressable
-                      key={f.id}
-                      onPress={() => setLikedFilter(f.id)}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: active }}
-                      style={({ pressed }) => ({
-                        height: 30,
-                        paddingHorizontal: 12,
-                        borderRadius: 15,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: active
-                          ? isDark ? theme.panel : '#111111'
-                          : isDark ? theme.surface : theme.panel,
-                        borderWidth: 1,
-                        borderColor: active
-                          ? isDark ? theme.border : '#111111'
-                          : theme.border,
-                        opacity: pressed ? 0.7 : 1,
-                      })}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          fontWeight: active ? '700' : '600',
-                          color: active ? '#FFFFFF' : theme.ink,
-                        }}
-                      >
-                        {f.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ) : (
-              <View style={{ height: 12 }} />
-            )}
+            {!(activeTab === 'collections' && isCollectionsPublic) && <View style={{ height: 12 }} />}
 
             {/* Empty States */}
             {activeTab === 'shop' && gridRows.length === 0 && (
               <View style={{ paddingVertical: 40, alignItems: 'center' }}>
                 <EmptyState
                   icon="shopping-bag"
-                  title={shopFilter === 'sold' ? 'Nothing sold yet' : 'No items right now'}
-                  description={
-                    shopFilter === 'sold'
-                      ? 'Sold items will show up here.'
-                      : `${displayName} has no active items right now.`
-                  }
+                  title="No items right now"
+                  description={`${displayName} has no active items right now.`}
                 />
               </View>
             )}
@@ -959,8 +857,20 @@ export default function UserProfileScreen() {
               <View style={{ paddingVertical: 40, alignItems: 'center' }}>
                 <EmptyState
                   icon="bookmark"
-                  title="No saved items yet"
-                  description={`${displayName} hasn't added any items to their collection yet.`}
+                  title={
+                    savedFilter === 'sold'
+                      ? 'Nothing sold yet'
+                      : savedFilter === 'available' && visibleSavedListings.length > 0
+                        ? 'No available items'
+                        : 'No saved items yet'
+                  }
+                  description={
+                    savedFilter === 'sold'
+                      ? 'Sold items will show up here.'
+                      : savedFilter === 'available' && visibleSavedListings.length > 0
+                        ? 'All saved items have been sold.'
+                        : `${displayName} hasn't added any items to their collection yet.`
+                  }
                 />
               </View>
             )}

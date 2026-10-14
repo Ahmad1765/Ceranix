@@ -61,27 +61,25 @@ describe('Foolproof Buying & Selling Lifecycle (End-to-End)', () => {
       const offerMessageId = 'msg_offer_999';
       const buyerId = 'user_buyer_02';
 
-      // 1. Accepted offer sets listing is_sold: true
-      const updatedListing = { ...mockListing, is_sold: true };
-      expect(updatedListing.is_sold).toBe(true);
+      // 1. Accepted offer does NOT set listing is_sold: true (inventory stays active until payment)
+      const updatedListing = { ...mockListing, is_sold: false };
+      expect(updatedListing.is_sold).toBe(false);
 
-      // 2. Order created in awaiting_payment state
-      const createdOrder: Partial<Order> = {
-        id: 'order_bridged_555',
+      // 2. Offer is marked accepted; NO order is created prior to checkout
+      const acceptedOffer = {
+        id: 'offer_123',
+        message_id: offerMessageId,
         listing_id: mockListing.id,
         buyer_id: buyerId,
-        seller_id: mockListing.seller_id,
-        amount_cents: offeredPrice * 100,
-        status: 'awaiting_payment',
-        fulfillment_status: 'awaiting_payment',
-        offer_message_id: offerMessageId,
+        amount: offeredPrice,
+        status: 'accepted',
       };
 
-      expect(createdOrder.status).toBe('awaiting_payment');
-      expect(createdOrder.amount_cents).toBe(1350000);
+      expect(acceptedOffer.status).toBe('accepted');
+      expect(acceptedOffer.amount).toBe(13500);
 
-      // 3. Buyer has canPay = true even though listing.is_sold is true
-      const canPay = createdOrder.status === 'awaiting_payment';
+      // 3. Buyer has canPay = true when offer is accepted
+      const canPay = acceptedOffer.status === 'accepted' && !updatedListing.is_sold;
       expect(canPay).toBe(true);
     });
   });
