@@ -37,3 +37,11 @@
 # "feat: implement saved searches system…". Listed so a scan over a wider commit
 # range than the current PR does not resurface it.
 17763df7eb3ad5ee1a526078db69b00310d452d3:.env.test:jwt:6
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Same Supabase ANON key, embedded in the waitlist landing page (Oct 2026)
+# ─────────────────────────────────────────────────────────────────────────────
+# Decoded payload: {"role":"anon","ref":"ttxestvncdynsssmjqhk"} — byte-identical
+# to EXPO_PUBLIC_SUPABASE_ANON_KEY. The static page needs it to insert waitlist
+# rows; RLS allows anon INSERT only (no reads since 2026-10-15).
+54d7235786b705487e3facb3b9355e10acd3b6c4:waitlist-landing/public/script.js:jwt:344
