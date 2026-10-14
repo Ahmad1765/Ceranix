@@ -358,9 +358,19 @@ export const OrdersInboxPage = memo(function OrdersInboxPage({
     listRef.current?.scrollToOffset({ offset: 0, animated: false });
   }, [filter, subTab]);
 
+  const sanitizedOrders = useMemo(
+    () =>
+      (q.data ?? []).filter(
+        (o) =>
+          o.status !== 'awaiting_payment' &&
+          (o as any).fulfillment_status !== 'awaiting_payment',
+      ),
+    [q.data],
+  );
+
   const { bought, sold } = useMemo(
-    () => partitionOrders(q.data ?? [], userId),
-    [q.data, userId],
+    () => partitionOrders(sanitizedOrders, userId),
+    [sanitizedOrders, userId],
   );
 
   const filterList = useCallback(

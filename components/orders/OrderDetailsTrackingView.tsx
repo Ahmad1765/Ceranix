@@ -254,6 +254,8 @@ function deriveFulfillmentStatus(
   if (fs === 'packing') return 'packing';
   if (fs === 'disputed') return 'disputed';
   if (fs === 'canceled' || fs === 'cancelled') return 'canceled';
+  if (fs === 'pending') return 'pending';
+  if (fs === 'awaiting_payment') return 'awaiting_payment';
 
   // 2. Escrow status on order
   const es = ((order as any)?.escrow_status || '').toUpperCase();
@@ -280,6 +282,8 @@ function deriveFulfillmentStatus(
   if (st === 'packing') return 'packing';
   if (st === 'disputed') return 'disputed';
   if (st === 'canceled' || st === 'cancelled') return 'canceled';
+  if (st === 'pending') return 'pending';
+  if (st === 'awaiting_payment') return 'awaiting_payment';
 
   // 5. Fallback from propStatusLabel if supplied
   if (propStatusLabel) {
@@ -291,10 +295,10 @@ function deriveFulfillmentStatus(
     if (psl.includes('complete')) return 'completed';
     if (psl.includes('dispute') || psl.includes('review')) return 'disputed';
     if (psl.includes('cancel')) return 'canceled';
+    if (psl.includes('placed') || psl.includes('pending') || psl.includes('paid')) return 'pending';
   }
 
-  if (st === 'paid') return 'packing';
-  return 'packing';
+  return 'pending';
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -513,8 +517,7 @@ export function OrderDetailsTrackingView({
     Boolean((order as any)?.picked_up_at || (order as any)?.picked_at || pickupConfirmed);
   const isPacked =
     Boolean(order?.packed_at) ||
-    isPicked ||
-    currentFulfillment === 'packing';
+    isPicked;
 
   const deliveredTimestamp = parseServerDate(order?.delivered_at || order?.completed_at);
   const shippedTimestamp = parseServerDate(order?.shipped_at || (order as any)?.shifted_at);
@@ -525,7 +528,7 @@ export function OrderDetailsTrackingView({
   const placedTime = orderCreatedAt;
   const nowMs = Date.now();
 
-  const packedTime = packedTimestamp || (isPacked
+  const packedTime = packedTimestamp || (isPicked
     ? new Date(Math.min(nowMs, placedTime.getTime() + Math.max(60000, Math.floor((nowMs - placedTime.getTime()) * 0.25))))
     : null);
 
@@ -637,8 +640,10 @@ export function OrderDetailsTrackingView({
       id: 'placed',
       time: formatTime(placedTime),
       date: formatDate(placedTime),
-      title: 'Order Placed & Payment Confirmed',
-      description: `Payment secured under ${BRAND} Buyer Protection escrow guarantee.`,
+      title: order?.payment_method === 'cod' ? 'Order Placed (Cash on Delivery)' : 'Order Placed & Payment Confirmed',
+      description: order?.payment_method === 'cod'
+        ? `Order confirmed and awaiting seller dispatch. Pay upon physical delivery.`
+        : `Payment secured under ${BRAND} Buyer Protection escrow guarantee.`,
       completed: true,
       isLatest: !isPacked && !isPicked && !isShipped && !isDelivered,
     },

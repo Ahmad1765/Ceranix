@@ -167,6 +167,7 @@ export default function ProductScreen() {
     guestGate,
     bundlesEnabled: sellerBundlesEnabled,
     sellerItemsLoading: sellerItemsQ.isLoading,
+    onOpenOfferSheet: () => engagement.setOfferVisible(true),
   });
 
   const selectedSellerItems = useMemo(
@@ -200,7 +201,7 @@ export default function ProductScreen() {
     let active = true;
     fetchOrderForListing(productIdParam)
       .then((ord) => {
-        if (active && ord && ord.buyer_id === user.id && ord.status !== 'canceled') {
+        if (active && ord && ord.buyer_id === user.id && ord.status !== 'canceled' && ord.status !== 'awaiting_payment') {
           setBuyerOrder(ord);
         }
       })
@@ -427,15 +428,20 @@ export default function ProductScreen() {
         Alert.alert('Could not start chat', 'Please try again.');
         return;
       }
+      const bundleItemIds = isBundleActive ? Array.from(bundle.selectedBundleIds) : undefined;
       const saved = await sendOffer({
         conversationId: conv.id,
         senderId: user.id,
         amount,
+        isBundle: isBundleActive,
+        bundleItemIds,
+        bundleCount: isBundleActive ? bundleCount : 1,
+        baseListingId: listing.id,
       });
       if (saved) {
         engagement.setOfferVisible(false);
         toast.show('Offer sent', { variant: 'success', icon: 'check' });
-        capture('offer_made', { listing_id: listing.id, amount });
+        capture('offer_made', { listing_id: listing.id, amount, is_bundle: isBundleActive });
         router.push(`/conversation/${conv.id}` as any);
       } else {
         Alert.alert('Could not send offer', 'Please try again.');
@@ -446,7 +452,7 @@ export default function ProductScreen() {
     } finally {
       setOfferLoading(false);
     }
-  }, [listing, user, engagement, toast]);
+  }, [listing, user, isBundleActive, bundle.selectedBundleIds, bundleCount, engagement, toast]);
 
   const shareListing = useCallback(async () => {
     if (!listing) return;
@@ -682,8 +688,8 @@ export default function ProductScreen() {
         isOwner={isOwnListing}
         isSold={listing.is_sold || Boolean(buyerOrder && buyerOrder.status !== 'awaiting_payment')}
         hasPurchased={Boolean(buyerOrder && buyerOrder.status !== 'awaiting_payment')}
-        isAwaitingPayment={Boolean(buyerOrder && buyerOrder.status === 'awaiting_payment' && !listing.is_sold)}
-        awaitingAmount={buyerOrder?.amount_cents ? Math.round(buyerOrder.amount_cents / 100) : undefined}
+        isAwaitingPayment={false}
+        awaitingAmount={undefined}
         isBundle={isBundleActive}
         bundleCount={bundleCount}
         onCompleteCheckoutPress={() => {
@@ -701,13 +707,6 @@ export default function ProductScreen() {
         onChatPress={() => openChat('message')}
         onOfferPress={() => {
           if (!canOffer()) return;
-          if (isBundleActive) {
-            bundle.handleSendBundleOffer(
-              bundlePricing?.total ?? itemPrice,
-              Array.from(bundle.selectedBundleIds),
-            );
-            return;
-          }
           engagement.setOfferVisible(true);
         }}
         onBuyPress={() => {
@@ -756,8 +755,8 @@ export default function ProductScreen() {
 
       <OfferSheet
         visible={engagement.offerVisible}
-        askingPrice={itemPrice}
-        title={listing?.title}
+        askingPrice={isBundleActive && bundlePricing ? bundlePricing.total : itemPrice}
+        title={isBundleActive ? `Bundle (${bundleCount} items)` : listing?.title}
         imageUrl={listing?.images?.[0] ?? (listing as any)?.image_url ?? null}
         loading={offerLoading}
         onClose={() => engagement.setOfferVisible(false)}

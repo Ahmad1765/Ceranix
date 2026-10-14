@@ -553,7 +553,7 @@ drop function if exists public.accept_chat_offer(uuid) cascade;
 create or replace function public.accept_chat_offer(
   p_offer_message_id uuid
 )
-returns public.orders
+returns jsonb
 language plpgsql
 security definer
 set search_path = ''
@@ -564,15 +564,10 @@ declare
   v_message public.messages;
   v_conversation public.conversations;
   v_listing public.listings;
-  v_order public.orders;
   v_amount numeric;
-  v_amount_cents integer;
   v_is_admin boolean := false;
   v_now timestamptz := clock_timestamp();
 begin
-  -- Bypass trigger locks during atomic transaction
-  perform set_config('ceranix.in_accept_offer', 'on', true);
-
   if v_caller_id is null then
     raise exception 'Authentication required' using errcode = '42501';
   end if;
@@ -680,9 +675,7 @@ begin
     raise exception 'Offer amount cannot exceed listing price' using errcode = '22000';
   end if;
 
-  v_amount_cents := round(v_offer.amount * 100)::integer;
-
-  -- 4. Mark offer accepted
+  -- 5. Mark offer accepted
   update public.offers
      set status = 'accepted',
          accepted_at = v_now,
@@ -698,38 +691,17 @@ begin
   end if;
 
   -- NOTE: Inventory is NOT reserved or marked sold upon offer acceptance.
+  -- NO ORDER ROW IS CREATED.
   -- The listing remains active and purchasable until payment is actually fulfilled.
 
-  -- 5. Check for existing awaiting_payment order or create one
-  select * into v_order
-    from public.orders
-   where listing_id = v_listing.id
-     and buyer_id = v_offer.buyer_id
-     and status in ('awaiting_payment', 'pending')
-   limit 1
-   for update;
-
-  if v_order.id is not null then
-    update public.orders
-       set amount_cents = v_amount_cents,
-           status = 'awaiting_payment',
-           fulfillment_status = 'awaiting_payment'
-     where id = v_order.id
-    returning * into v_order;
-  else
-    insert into public.orders (
-      listing_id, buyer_id, seller_id, amount_cents, fee_cents,
-      status, fulfillment_status, payment_method, payment_status,
-      shipping_method, shipping_fee_cents, stripe_session_id
-    ) values (
-      v_listing.id, v_offer.buyer_id, v_listing.seller_id,
-      v_amount_cents, 0,
-      'awaiting_payment', 'awaiting_payment', 'card', 'unpaid',
-      'managed', 25000, 'offer_' || v_offer.id::text
-    ) returning * into v_order;
-  end if;
-
-  return v_order;
+  return jsonb_build_object(
+    'success', true,
+    'offer_id', v_offer.id,
+    'listing_id', v_listing.id,
+    'buyer_id', v_offer.buyer_id,
+    'amount', v_offer.amount,
+    'status', 'accepted'
+  );
 end;
 $$;
 

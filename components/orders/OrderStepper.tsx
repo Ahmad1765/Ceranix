@@ -42,7 +42,6 @@ export function OrderStepper({
     status === 'canceled' || status === 'refunded' || status === 'failed' ? 'canceled' :
     status === 'shifting' || shippedAt || status === 'shipped' ? 'shifting' :
     status === 'packing' ? 'packing' :
-    status === 'paid' ? 'packing' :
     status === 'awaiting_payment' ? 'awaiting_payment' :
     'pending'
   );

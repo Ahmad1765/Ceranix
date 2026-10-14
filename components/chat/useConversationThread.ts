@@ -807,10 +807,8 @@ export function useConversationThread(
           }
           if (user?.id) {
             queryClient.invalidateQueries({ queryKey: qk.inbox(user.id) });
-            queryClient.invalidateQueries({ queryKey: qk.myOrders(user.id) });
-            queryClient.invalidateQueries({ queryKey: ['myOrders'] });
           }
-          toast.show('Offer accepted! Order created.', {
+          toast.show('Offer accepted! Buyer can now complete purchase.', {
             variant: 'success',
             icon: 'check',
           });
