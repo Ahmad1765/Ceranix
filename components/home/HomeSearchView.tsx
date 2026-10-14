@@ -983,32 +983,64 @@ export const HomeSearchView = memo(function HomeSearchView({
 
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             {historyItems.map((item) => (
-              <Pressable
+              <View
                 key={item.term}
-                onPress={() => handleSelectTag(item.term, item.tab || 'listings')}
-                style={({ pressed }) => ({
+                style={{
                   height: 30,
                   backgroundColor: isDark ? theme.surface : theme.panel,
                   borderWidth: 1,
                   borderColor: theme.border,
                   borderRadius: 15,
-                  paddingHorizontal: 12,
+                  flexDirection: 'row',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  opacity: pressed ? 0.75 : 1,
-                })}
+                  overflow: 'hidden',
+                }}
               >
-                <Text
-                  style={{
-                    fontSize: 12.5,
-                    fontWeight: '500',
-                    fontFamily: typography.family.sansMedium,
-                    color: theme.text,
-                  }}
+                <Pressable
+                  onPress={() => handleSelectTag(item.term, item.tab || 'listings')}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Search for ${item.term}`}
+                  style={({ pressed }) => ({
+                    paddingLeft: 12,
+                    paddingRight: 4,
+                    height: '100%',
+                    justifyContent: 'center',
+                    opacity: pressed ? 0.7 : 1,
+                  })}
                 >
-                  {item.term}
-                </Text>
-              </Pressable>
+                  <Text
+                    style={{
+                      fontSize: 12.5,
+                      fontWeight: '500',
+                      fontFamily: typography.family.sansMedium,
+                      color: theme.text,
+                    }}
+                    numberOfLines={1}
+                  >
+                    {item.term}
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => {
+                    haptic();
+                    removeSearch(item.term);
+                  }}
+                  hitSlop={6}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove ${item.term} from recent searches`}
+                  style={({ pressed }) => ({
+                    paddingRight: 8,
+                    paddingLeft: 2,
+                    height: '100%',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    opacity: pressed ? 0.5 : 0.8,
+                  })}
+                >
+                  <Feather name="x" size={13} color={isDark ? '#9CA3AF' : '#6B7280'} />
+                </Pressable>
+              </View>
             ))}
           </View>
         </View>
