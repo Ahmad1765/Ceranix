@@ -433,9 +433,6 @@ verify_jwt = true
 [functions.remove-background]
 verify_jwt = true
 
-[functions.update-seller-subscription]
-verify_jwt = true
-
 [functions.stripe-webhook]
 verify_jwt = false
 

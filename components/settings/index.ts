@@ -17,7 +17,6 @@ export { PayoutSheet, type PayoutForm } from './PayoutSheet';
 export { VerificationSheet, type VerifyForm } from './VerificationSheet';
 export { ThemeSheet } from './ThemeSheet';
 export { PhoneSheet } from './PhoneSheet';
-export { SubscriptionSheet } from './SubscriptionSheet';
 export {
   useSettingsManager,
   SUPPORT_EMAIL,

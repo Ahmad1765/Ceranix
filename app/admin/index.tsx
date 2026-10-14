@@ -12,7 +12,7 @@
 //    - Escrow & Logistics Management (Courier dispatch, tracking, status transitions)
 //    - Dispute Resolution Workbench (Release escrow to seller or refund buyer)
 //    - Seller Identity Verifications (KYC review, approve, reject)
-//    - User & Pro Seller Management
+//    - User Management
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -121,7 +121,6 @@ export default function AdminConsoleScreen() {
   // Users Directory State
   const [users, setUsers] = useState<User[]>([]);
   const [userSearch, setUserSearch] = useState('');
-  const [togglingProId, setTogglingProId] = useState<string | null>(null);
 
   // Support Team State
   const [supportConvs, setSupportConvs] = useState<AdminSupportConversation[]>([]);
@@ -514,33 +513,6 @@ export default function AdminConsoleScreen() {
       });
     } finally {
       setProcessingKycId(null);
-    }
-  };
-
-  // ── Toggle Pro Seller ─────────────────────────────────────────────────────
-  const handleTogglePro = async (user: User) => {
-    tap('light');
-    setTogglingProId(user.id);
-    const nextVal = !user.is_pro;
-    try {
-      const { error } = await supabase.rpc('admin_toggle_pro_seller', {
-        p_user_id: user.id,
-        p_is_pro: nextVal,
-      });
-      if (error) throw error;
-
-      toast.show(
-        `Seller ${user.username} is now ${nextVal ? 'Pro Verified' : 'Standard'}`,
-        { variant: 'default', icon: 'check' },
-      );
-      loadAllData();
-    } catch (err: any) {
-      toast.show(err?.message || 'Failed to update Pro status', {
-        variant: 'default',
-        icon: 'alert-triangle',
-      });
-    } finally {
-      setTogglingProId(null);
     }
   };
 
@@ -1613,7 +1585,6 @@ export default function AdminConsoleScreen() {
                 keyExtractor={(item) => item.id}
                 showsVerticalScrollIndicator={true}
                 renderItem={({ item }) => {
-                  const isToggling = togglingProId === item.id;
                   const initial = (item.full_name || item.username || 'U').charAt(0).toUpperCase();
 
                   return (
@@ -1660,26 +1631,6 @@ export default function AdminConsoleScreen() {
                       </View>
 
                       <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-                        <Pressable
-                          disabled={isToggling}
-                          onPress={() => handleTogglePro(item)}
-                          style={({ pressed }) => ({
-                            height: 32,
-                            paddingHorizontal: 12,
-                            borderRadius: 6,
-                            borderWidth: 1,
-                            borderColor: item.is_pro ? theme.purple : theme.border,
-                            backgroundColor: item.is_pro ? 'rgba(108,71,255,0.1)' : theme.panel,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            opacity: pressed || isToggling ? 0.7 : 1,
-                          })}
-                        >
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: item.is_pro ? theme.purple : theme.text }}>
-                            {item.is_pro ? 'PRO SELLER' : 'MAKE PRO'}
-                          </Text>
-                        </Pressable>
-
                         <Pressable
                           onPress={() => router.push(`/user/${item.id}` as any)}
                           style={({ pressed }) => ({
