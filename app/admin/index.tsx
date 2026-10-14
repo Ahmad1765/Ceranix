@@ -932,6 +932,9 @@ export default function AdminConsoleScreen() {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
+            // RN-web ScrollViews grow by default; in this column layout the tab
+            // strip would otherwise claim half the phone screen.
+            style={{ flexGrow: 0, flexShrink: 0 }}
             contentContainerStyle={{
               paddingHorizontal: 16,
               paddingVertical: 10,
@@ -987,155 +990,54 @@ export default function AdminConsoleScreen() {
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={{ marginBottom: 20 }}>
                 <Text style={{ fontSize: 22, fontWeight: '800', color: theme.text, letterSpacing: -0.4 }}>
-                  Platform Overview
-                </Text>
-                <Text style={{ fontSize: 13, color: theme.textMuted, marginTop: 4 }}>
-                  Real-time status of marketplace transactions, courier deliveries, and seller verifications.
+                  Overview
                 </Text>
               </View>
 
               {/* Metric Cards Grid */}
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginBottom: 24 }}>
                 <View style={{ flex: 1, minWidth: 200, backgroundColor: theme.panel, borderRadius: 12, padding: 18, borderWidth: 1, borderColor: theme.border }}>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: theme.textMuted }}>ESCROW HELD IN CUSTODY</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: theme.textMuted }}>Money held</Text>
                   <Text style={{ fontSize: 26, fontWeight: '800', color: theme.text, marginTop: 8 }}>
                     {formatPrice(metrics.totalEscrowVolume)}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 4 }}>
-                    {metrics.activeEscrowCount} active order lifecycle transactions
                   </Text>
                 </View>
 
                 <View style={{ flex: 1, minWidth: 200, backgroundColor: theme.panel, borderRadius: 12, padding: 18, borderWidth: 1, borderColor: theme.border }}>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: theme.textMuted }}>IN TRANSIT SHIPMENTS</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: theme.textMuted }}>In transit</Text>
                   <Text style={{ fontSize: 26, fontWeight: '800', color: theme.text, marginTop: 8 }}>
                     {metrics.inTransitCount}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 4 }}>
-                    Courier dispatch tracking active
                   </Text>
                 </View>
 
                 <View style={{ flex: 1, minWidth: 200, backgroundColor: theme.panel, borderRadius: 12, padding: 18, borderWidth: 1, borderColor: metrics.disputedCount > 0 ? 'rgba(239,68,68,0.4)' : theme.border }}>
                   <Text style={{ fontSize: 12, fontWeight: '600', color: metrics.disputedCount > 0 ? theme.danger : theme.textMuted }}>
-                    OPEN DISPUTES
+                    Open disputes
                   </Text>
                   <Text style={{ fontSize: 26, fontWeight: '800', color: metrics.disputedCount > 0 ? theme.danger : theme.text, marginTop: 8 }}>
                     {metrics.disputedCount}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 4 }}>
-                    Requires administrative adjudication
                   </Text>
                 </View>
 
                 <View style={{ flex: 1, minWidth: 200, backgroundColor: theme.panel, borderRadius: 12, padding: 18, borderWidth: 1, borderColor: metrics.pendingKycCount > 0 ? 'rgba(108,71,255,0.4)' : theme.border }}>
                   <Text style={{ fontSize: 12, fontWeight: '600', color: metrics.pendingKycCount > 0 ? theme.purple : theme.textMuted }}>
-                    PENDING SELLER KYC
+                    Seller ID checks
                   </Text>
                   <Text style={{ fontSize: 26, fontWeight: '800', color: metrics.pendingKycCount > 0 ? theme.purple : theme.text, marginTop: 8 }}>
                     {metrics.pendingKycCount}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 4 }}>
-                    Identity documents awaiting review
                   </Text>
                 </View>
 
                 <View style={{ flex: 1, minWidth: 200, backgroundColor: theme.panel, borderRadius: 12, padding: 18, borderWidth: 1, borderColor: metrics.supportCount > 0 ? 'rgba(108,71,255,0.4)' : theme.border }}>
                   <Text style={{ fontSize: 12, fontWeight: '600', color: metrics.supportCount > 0 ? theme.purple : theme.textMuted }}>
-                    USER SUPPORT INQUIRIES
+                    Support chats
                   </Text>
                   <Text style={{ fontSize: 26, fontWeight: '800', color: theme.text, marginTop: 8 }}>
                     {metrics.supportCount}
                   </Text>
-                  <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 4 }}>
-                    {metrics.openSupportDisputes} active dispute inquiries
-                  </Text>
                 </View>
               </View>
 
-              {/* Quick Actions Shortcuts */}
-              <View style={{ backgroundColor: theme.panel, borderRadius: 12, padding: 20, borderWidth: 1, borderColor: theme.border, marginBottom: 24 }}>
-                <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text, marginBottom: 12 }}>
-                  Administrative Quick Workbenches
-                </Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-                  <Pressable
-                    onPress={() => setActiveTab('logistics')}
-                    style={({ pressed }) => ({
-                      paddingHorizontal: 16,
-                      height: 38,
-                      borderRadius: 8,
-                      backgroundColor: theme.surface,
-                      borderWidth: 1,
-                      borderColor: theme.border,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 8,
-                      opacity: pressed ? 0.75 : 1,
-                    })}
-                  >
-                    <Feather name="truck" size={15} color={theme.text} />
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: theme.text }}>Manage Courier Dispatch</Text>
-                  </Pressable>
-
-                  <Pressable
-                    onPress={() => setActiveTab('verifications')}
-                    style={({ pressed }) => ({
-                      paddingHorizontal: 16,
-                      height: 38,
-                      borderRadius: 8,
-                      backgroundColor: theme.surface,
-                      borderWidth: 1,
-                      borderColor: theme.border,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 8,
-                      opacity: pressed ? 0.75 : 1,
-                    })}
-                  >
-                    <Feather name="shield" size={15} color={theme.text} />
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: theme.text }}>Review Seller KYC</Text>
-                  </Pressable>
-
-                  <Pressable
-                    onPress={() => setActiveTab('disputes')}
-                    style={({ pressed }) => ({
-                      paddingHorizontal: 16,
-                      height: 38,
-                      borderRadius: 8,
-                      backgroundColor: theme.surface,
-                      borderWidth: 1,
-                      borderColor: theme.border,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 8,
-                      opacity: pressed ? 0.75 : 1,
-                    })}
-                  >
-                    <Feather name="alert-triangle" size={15} color={theme.danger} />
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: theme.danger }}>Review Disputes ({metrics.disputedCount})</Text>
-                  </Pressable>
-
-                  <Pressable
-                    onPress={() => setActiveTab('support')}
-                    style={({ pressed }) => ({
-                      paddingHorizontal: 16,
-                      height: 38,
-                      borderRadius: 8,
-                      backgroundColor: theme.surface,
-                      borderWidth: 1,
-                      borderColor: theme.border,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 8,
-                      opacity: pressed ? 0.75 : 1,
-                    })}
-                  >
-                    <Feather name="message-square" size={15} color={theme.purple} />
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: theme.purple }}>Support Inquiries ({metrics.supportCount})</Text>
-                  </Pressable>
-                </View>
-              </View>
             </ScrollView>
           )}
 

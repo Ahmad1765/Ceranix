@@ -72,10 +72,13 @@ function formatDate(isoString?: string | null): string {
 export default function AdminLogisticsScreen() {
   const { width } = useWindowDimensions();
   const isLargeScreen = width >= 1024;
+  // The table only gets 58% of the width beside the detail panel; below ~720px
+  // its six columns crush, so rows switch to a stacked card.
+  const compactRows = (isLargeScreen ? width * 0.58 : width) < 720;
   const { profile, loading: authLoading } = useAuth();
   const toast = useToast();
 
-  const [activeFilter, setActiveFilter] = useState<FilterTab>('active');
+  const [activeFilter, setActiveFilter] = useState<FilterTab>('ready_for_pickup');
   const [searchQuery, setSearchQuery] = useState('');
   const [transactions, setTransactions] = useState<EscrowLogisticsItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -363,13 +366,10 @@ export default function AdminLogisticsScreen() {
   }
 
   const filterTabs: { id: FilterTab; label: string; count?: number }[] = [
-    { id: 'active', label: 'Active Escrow' },
-    { id: 'ready_for_pickup', label: 'Needs Pickup' },
-    { id: 'in_transit', label: 'In Transit' },
+    { id: 'ready_for_pickup', label: 'Needs pickup' },
+    { id: 'in_transit', label: 'In transit' },
     { id: 'delivered', label: 'Delivered' },
-    { id: 'completed', label: 'Completed' },
     { id: 'disputed', label: 'Disputed' },
-    { id: 'cancelled', label: 'Cancelled' },
     { id: 'all', label: 'All' },
   ];
 
@@ -390,7 +390,7 @@ export default function AdminLogisticsScreen() {
     <SafeAreaView style={styles.root} edges={['top']}>
       {/* ── Top Header Bar ── */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
+        <View style={[styles.headerLeft, { flex: 1, marginRight: 12 }]}>
           <Pressable
             onPress={() => safeBack()}
             hitSlop={HIT_SLOP_8}
@@ -398,17 +398,8 @@ export default function AdminLogisticsScreen() {
           >
             <Feather name="arrow-left" size={18} color="#FFFFFF" />
           </Pressable>
-          <View>
-            <View style={styles.headerTitleRow}>
-              <Text style={styles.headerTitle}>Internal Logistics</Text>
-              <View style={styles.liveIndicator}>
-                <View style={styles.liveDot} />
-                <Text style={styles.liveText}>Realtime</Text>
-              </View>
-            </View>
-            <Text style={styles.headerSubtitle}>
-              Escrow State Machine & In-House Fulfillment Operations
-            </Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerTitle}>Logistics</Text>
           </View>
         </View>
 
@@ -417,7 +408,7 @@ export default function AdminLogisticsScreen() {
           style={({ pressed }) => [styles.refreshButton, pressed && styles.pressedOpacity]}
         >
           <Feather name="rotate-cw" size={14} color="#A78BFA" />
-          <Text style={styles.refreshButtonText}>Sync</Text>
+          <Text style={styles.refreshButtonText}>Refresh</Text>
         </Pressable>
       </View>
 
@@ -432,7 +423,7 @@ export default function AdminLogisticsScreen() {
               <TextInput
                 value={searchQuery}
                 onChangeText={setSearchQuery}
-                placeholder="Search by ID, buyer, seller, title, tracking..."
+                placeholder="Search orders"
                 placeholderTextColor="#6B7280"
                 style={styles.searchInput}
               />
@@ -446,6 +437,7 @@ export default function AdminLogisticsScreen() {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
+              style={{ flexGrow: 0 }}
               contentContainerStyle={styles.tabsScroll}
             >
               {filterTabs.map((tab) => {
@@ -469,6 +461,7 @@ export default function AdminLogisticsScreen() {
           </View>
 
           {/* ── Orders Table Header ── */}
+          {!compactRows && (
           <View style={styles.tableHeaderRow}>
             <Text style={[styles.tableHeaderCell, { width: 90 }]}>REF ID</Text>
             <Text style={[styles.tableHeaderCell, { flex: 1.6 }]}>ITEM / LISTING</Text>
@@ -477,6 +470,7 @@ export default function AdminLogisticsScreen() {
             <Text style={[styles.tableHeaderCell, { width: 105, textAlign: 'right' }]}>ESCROW</Text>
             <Text style={[styles.tableHeaderCell, { width: 135, textAlign: 'center' }]}>STATUS</Text>
           </View>
+          )}
 
           {/* ── Orders Table List ── */}
           {loading ? (
@@ -514,13 +508,59 @@ export default function AdminLogisticsScreen() {
                 const sellerName = item.seller?.full_name || item.seller?.username || 'Seller';
                 const buyerName = item.buyer?.full_name || item.buyer?.username || 'Buyer';
                 const img = item.listing ? cardImageUrl(item.listing, 0) : null;
+                const thumb = img ? (
+                  <Image source={{ uri: img }} style={styles.thumbnail} transition={IMAGE_TRANSITION} />
+                ) : (
+                  <View style={[styles.thumbnail, styles.thumbnailPlaceholder]}>
+                    <Feather name="image" size={14} color="#6B7280" />
+                  </View>
+                );
+                const onSelect = () => {
+                  tap('light');
+                  setSelectedTx(item);
+                };
+                const statusBadge = (
+                  <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
+                    <View style={[styles.statusBadgeDot, { backgroundColor: statusStyle.dotColor }]} />
+                    <Text style={[styles.statusBadgeText, { color: statusStyle.color }]} numberOfLines={1}>
+                      {statusStyle.label}
+                    </Text>
+                  </View>
+                );
+
+                if (compactRows) {
+                  return (
+                    <Pressable
+                      onPress={onSelect}
+                      style={({ pressed }) => [
+                        styles.tableRow,
+                        isSelected && styles.tableRowSelected,
+                        pressed && styles.tableRowPressed,
+                      ]}
+                    >
+                      {thumb}
+                      <View style={{ flex: 1, minWidth: 0, marginLeft: 10 }}>
+                        <Text style={styles.listingTitleText} numberOfLines={1}>
+                          {item.listing?.title || 'Marketplace Item'}
+                        </Text>
+                        <Text style={styles.timeText} numberOfLines={1}>
+                          {deriveRef(item.id)} · {formatDate(item.created_at)}
+                        </Text>
+                        <Text style={styles.cityText} numberOfLines={1}>
+                          {sellerCity} → {buyerCity}
+                        </Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end', gap: 6, marginLeft: 10 }}>
+                        <Text style={styles.escrowAmountText}>{formatPrice(item.amount_cents / 100)}</Text>
+                        {statusBadge}
+                      </View>
+                    </Pressable>
+                  );
+                }
 
                 return (
                   <Pressable
-                    onPress={() => {
-                      tap('light');
-                      setSelectedTx(item);
-                    }}
+                    onPress={onSelect}
                     style={({ pressed }) => [
                       styles.tableRow,
                       isSelected && styles.tableRowSelected,
@@ -535,17 +575,7 @@ export default function AdminLogisticsScreen() {
 
                     {/* Listing & Thumbnail */}
                     <View style={[styles.listingCell, { flex: 1.6 }]}>
-                      {img ? (
-                        <Image
-                          source={{ uri: img }}
-                          style={styles.thumbnail}
-                          transition={IMAGE_TRANSITION}
-                        />
-                      ) : (
-                        <View style={[styles.thumbnail, styles.thumbnailPlaceholder]}>
-                          <Feather name="image" size={14} color="#6B7280" />
-                        </View>
-                      )}
+                      {thumb}
                       <View style={{ flex: 1, marginLeft: 10 }}>
                         <Text style={styles.listingTitleText} numberOfLines={1}>
                           {item.listing?.title || 'Marketplace Item'}
@@ -562,7 +592,7 @@ export default function AdminLogisticsScreen() {
                         {sellerName}
                       </Text>
                       <Text style={styles.cityText} numberOfLines={1}>
-                        📍 {sellerCity}
+                        {sellerCity}
                       </Text>
                     </View>
 
@@ -572,7 +602,7 @@ export default function AdminLogisticsScreen() {
                         {buyerName}
                       </Text>
                       <Text style={styles.cityText} numberOfLines={1}>
-                        🎯 {buyerCity}
+                        {buyerCity}
                       </Text>
                     </View>
 
@@ -587,19 +617,7 @@ export default function AdminLogisticsScreen() {
                     </View>
 
                     {/* Status Badge */}
-                    <View style={{ width: 135, alignItems: 'center' }}>
-                      <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
-                        <View
-                          style={[styles.statusBadgeDot, { backgroundColor: statusStyle.dotColor }]}
-                        />
-                        <Text
-                          style={[styles.statusBadgeText, { color: statusStyle.color }]}
-                          numberOfLines={1}
-                        >
-                          {statusStyle.label}
-                        </Text>
-                      </View>
-                    </View>
+                    <View style={{ width: 135, alignItems: 'center' }}>{statusBadge}</View>
                   </Pressable>
                 );
               }}
@@ -944,6 +962,7 @@ function DetailContent({
   const sellerPhone = pickupAddress?.phone || (tx.seller as any)?.phone || null;
   const buyerPhone = dropoffAddress?.phone || (tx.buyer as any)?.phone || null;
   const itemImg = tx.listing ? cardImageUrl(tx.listing, 0) : null;
+  const [showHistory, setShowHistory] = useState(false);
 
   return (
     <View style={styles.detailContainer}>
@@ -951,7 +970,7 @@ function DetailContent({
       <View style={styles.detailHeader}>
         <View>
           <View style={styles.refRow}>
-            <Text style={styles.detailRefId}>REF: {deriveRef(tx.id)}</Text>
+            <Text style={styles.detailRefId}>#{deriveRef(tx.id)}</Text>
             <Pressable
               onPress={() => onCopy(deriveRef(tx.id), 'Reference ID')}
               style={styles.copySmallBtn}
@@ -959,7 +978,6 @@ function DetailContent({
               <Feather name="copy" size={12} color="#9CA3AF" />
             </Pressable>
           </View>
-          <Text style={styles.detailOrderIdText}>ORDER: {tx.order_id}</Text>
         </View>
 
         <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
@@ -972,7 +990,6 @@ function DetailContent({
 
       {/* ── Action Controls Bar ── */}
       <View style={styles.actionSection}>
-        <Text style={styles.sectionHeaderTitle}>STATE ADVANCE CONTROLS</Text>
         <View style={styles.actionButtonsContainer}>
           {tx.status === 'READY_FOR_PICKUP' && (
             <Pressable
@@ -981,7 +998,7 @@ function DetailContent({
               style={[styles.primaryActionButton, submitting && styles.disabledButton]}
             >
               <Feather name="truck" size={15} color="#FFFFFF" style={{ marginRight: 8 }} />
-              <Text style={styles.primaryActionText}>Mark Picked Up & In Transit</Text>
+              <Text style={styles.primaryActionText}>Mark picked up</Text>
             </Pressable>
           )}
 
@@ -996,7 +1013,7 @@ function DetailContent({
               ]}
             >
               <Feather name="check-circle" size={15} color="#FFFFFF" style={{ marginRight: 8 }} />
-              <Text style={styles.primaryActionText}>Mark Delivered to Buyer</Text>
+              <Text style={styles.primaryActionText}>Mark delivered</Text>
             </Pressable>
           )}
 
@@ -1011,7 +1028,7 @@ function DetailContent({
               ]}
             >
               <Feather name="unlock" size={15} color="#FFFFFF" style={{ marginRight: 8 }} />
-              <Text style={styles.primaryActionText}>Release Escrow Funds to Seller</Text>
+              <Text style={styles.primaryActionText}>Release payment to seller</Text>
             </Pressable>
           )}
 
@@ -1023,7 +1040,7 @@ function DetailContent({
                 style={({ pressed }) => [styles.dangerActionBtn, pressed && styles.pressedOpacity]}
               >
                 <Feather name="alert-triangle" size={13} color="#EF4444" style={{ marginRight: 6 }} />
-                <Text style={styles.dangerActionText}>Flag Dispute</Text>
+                <Text style={styles.dangerActionText}>Open dispute</Text>
               </Pressable>
             )}
 
@@ -1040,6 +1057,30 @@ function DetailContent({
         </View>
       </View>
 
+      {/* ── Listing & Package Specs ── */}
+      <View style={styles.itemCard}>
+        <View style={styles.itemCardContent}>
+          {itemImg ? (
+            <Image source={{ uri: itemImg }} style={styles.itemImage} transition={IMAGE_TRANSITION} />
+          ) : (
+            <View style={[styles.itemImage, styles.thumbnailPlaceholder]}>
+              <Feather name="image" size={18} color="#6B7280" />
+            </View>
+          )}
+          <View style={{ flex: 1, marginLeft: 14 }}>
+            <Text style={styles.itemTitle} numberOfLines={2}>
+              {tx.listing?.title || 'Marketplace Item'}
+            </Text>
+            {tx.listing?.brand || tx.listing?.category ? (
+              <Text style={styles.cityText} numberOfLines={1}>
+                {[tx.listing?.brand, tx.listing?.category].filter(Boolean).join(' · ')}
+              </Text>
+            ) : null}
+            <Text style={styles.itemPrice}>{formatPrice(tx.amount_cents / 100)}</Text>
+          </View>
+        </View>
+      </View>
+
       {/* ── Two-Column Card: Pickup & Dropoff ── */}
       <View style={styles.cardsRow}>
         {/* Pickup Details (Seller) */}
@@ -1047,7 +1088,7 @@ function DetailContent({
           <View style={styles.infoCardHeader}>
             <View style={styles.infoBadgePickup}>
               <Feather name="arrow-up-right" size={12} color="#FBBF24" />
-              <Text style={styles.infoBadgePickupText}>PICKUP (SELLER)</Text>
+              <Text style={styles.infoBadgePickupText}>Pick up from</Text>
             </View>
             {sellerPhone && (
               <View style={styles.contactActions}>
@@ -1070,7 +1111,6 @@ function DetailContent({
           <Text style={styles.cardPhoneText}>{sellerPhone || 'No phone registered'}</Text>
 
           <View style={styles.addressBlock}>
-            <Text style={styles.addressLabel}>PICKUP LOCATION</Text>
             {pickupAddress ? (
               <>
                 <Text style={styles.addressLine}>{pickupAddress.line1}</Text>
@@ -1093,7 +1133,7 @@ function DetailContent({
           <View style={styles.infoCardHeader}>
             <View style={styles.infoBadgeDropoff}>
               <Feather name="arrow-down-left" size={12} color="#34D399" />
-              <Text style={styles.infoBadgeDropoffText}>DROP-OFF (BUYER)</Text>
+              <Text style={styles.infoBadgeDropoffText}>Deliver to</Text>
             </View>
             {buyerPhone && (
               <View style={styles.contactActions}>
@@ -1116,7 +1156,6 @@ function DetailContent({
           <Text style={styles.cardPhoneText}>{buyerPhone || 'No phone registered'}</Text>
 
           <View style={styles.addressBlock}>
-            <Text style={styles.addressLabel}>DELIVERY ADDRESS</Text>
             {dropoffAddress ? (
               <>
                 <Text style={styles.addressLine}>{dropoffAddress.line1}</Text>
@@ -1130,7 +1169,7 @@ function DetailContent({
                 {dropoffAddress.deliveryInstructions ? (
                   <View style={styles.instructionsCallout}>
                     <Text style={styles.instructionsText}>
-                      💬 Note: {dropoffAddress.deliveryInstructions}
+                      Note: {dropoffAddress.deliveryInstructions}
                     </Text>
                   </View>
                 ) : null}
@@ -1142,72 +1181,41 @@ function DetailContent({
         </View>
       </View>
 
-      {/* ── Listing & Package Specs ── */}
-      <View style={styles.itemCard}>
-        <View style={styles.itemCardContent}>
-          {itemImg ? (
-            <Image source={{ uri: itemImg }} style={styles.itemImage} transition={IMAGE_TRANSITION} />
-          ) : (
-            <View style={[styles.itemImage, styles.thumbnailPlaceholder]}>
-              <Feather name="image" size={18} color="#6B7280" />
-            </View>
-          )}
-          <View style={{ flex: 1, marginLeft: 14 }}>
-            <Text style={styles.itemTitle} numberOfLines={2}>
-              {tx.listing?.title || 'Marketplace Item'}
-            </Text>
-            <View style={styles.itemMetaRow}>
-              {tx.listing?.brand ? (
-                <Text style={styles.itemMetaTag}>🏷️ {tx.listing.brand}</Text>
-              ) : null}
-              {tx.listing?.category ? (
-                <Text style={styles.itemMetaTag}>📁 {tx.listing.category}</Text>
-              ) : null}
-            </View>
-            <Text style={styles.itemPrice}>{formatPrice(tx.amount_cents / 100)}</Text>
-          </View>
-        </View>
-      </View>
-
       {/* ── Financial Escrow Ledger Card (Invariant Check) ── */}
       <View style={styles.ledgerCard}>
-        <Text style={styles.sectionHeaderTitle}>ESCROW FINANCIAL LEDGER</Text>
+        <Text style={styles.sectionHeaderTitle}>PAYMENT</Text>
         <View style={styles.ledgerRow}>
-          <Text style={styles.ledgerLabel}>Gross Escrow Captured (Buyer Paid)</Text>
+          <Text style={styles.ledgerLabel}>Buyer pays</Text>
           <Text style={styles.ledgerValue}>{formatPrice(tx.amount_cents / 100)}</Text>
         </View>
         <View style={styles.ledgerRow}>
-          <Text style={styles.ledgerLabel}>Courier / Shipping Allocation</Text>
+          <Text style={styles.ledgerLabel}>Delivery</Text>
           <Text style={styles.ledgerValueSub}>- {formatPrice(tx.shipping_fee_cents / 100)}</Text>
         </View>
         <View style={styles.ledgerRow}>
-          <Text style={styles.ledgerLabel}>Platform / Buyer Protection Fee</Text>
+          <Text style={styles.ledgerLabel}>Buyer Protection</Text>
           <Text style={styles.ledgerValueSub}>- {formatPrice(tx.platform_fee_cents / 100)}</Text>
         </View>
         <View style={styles.ledgerDivider} />
         <View style={styles.ledgerRow}>
-          <Text style={styles.ledgerPayoutLabel}>Net Seller Payout (Held in Escrow)</Text>
+          <Text style={styles.ledgerPayoutLabel}>Seller receives</Text>
           <Text style={styles.ledgerPayoutValue}>
             {formatPrice(tx.payout_amount_cents / 100)}
-          </Text>
-        </View>
-        <View style={styles.balanceCheckTag}>
-          <Feather name="check" size={11} color="#10B981" />
-          <Text style={styles.balanceCheckText}>
-            Accounting Invariant Balanced (Rs.{tx.amount_cents / 100} = Rs.
-            {tx.payout_amount_cents / 100} + Rs.{tx.shipping_fee_cents / 100} + Rs.
-            {tx.platform_fee_cents / 100})
           </Text>
         </View>
       </View>
 
       {/* ── Audit Trail & Timestamps ── */}
       <View style={styles.auditSection}>
-        <Text style={styles.sectionHeaderTitle}>IMMUTABLE AUDIT TRAIL</Text>
-        {loadingLogs ? (
+        <Pressable onPress={() => setShowHistory((v) => !v)} hitSlop={HIT_SLOP_8}>
+          <Text style={styles.sectionHeaderTitle}>
+            {showHistory ? 'HIDE HISTORY' : `SHOW HISTORY${eventLogs.length ? ` (${eventLogs.length})` : ''}`}
+          </Text>
+        </Pressable>
+        {!showHistory ? null : loadingLogs ? (
           <ActivityIndicator color="#6C47FF" size="small" style={{ marginVertical: 12 }} />
         ) : eventLogs.length === 0 ? (
-          <Text style={styles.noLogsText}>No audit event logs recorded yet.</Text>
+          <Text style={styles.noLogsText}>No history yet.</Text>
         ) : (
           <View style={styles.logsList}>
             {eventLogs.map((log, index) => (
