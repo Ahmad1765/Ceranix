@@ -590,37 +590,38 @@ export function useConversationThread(
             return prev.map((m) => (m.id === tempId ? delivered : m));
           });
 
-          // Trigger intelligent support concierge automated response if talking to Support
+          // Trigger intelligent support concierge automated response ONLY on initial general inquiries
+          // (Disputes and active admin threads are personally handled by the administration team)
           if (isSupport) {
-            let botReply: ChatMessage | null = null;
-            try {
-              botReply = await sendSupportBotReply(conversationId, text);
-            } catch (err) {
-              console.warn('[conversation] support bot reply error', err);
-            }
+            const hasDispute = messages.some((m) => (m.content || '').toLowerCase().includes('dispute'));
+            const isInitialInquiry = messages.length <= 2;
 
-            if (!botReply) {
+            if (!hasDispute && isInitialInquiry) {
+              let botReply: ChatMessage | null = null;
               try {
-                botReply = await sendMessage({
-                  conversationId,
-                  senderId: SUPPORT_BOT_USER_ID,
-                  content: generateSupportResponse(text),
-                });
-              } catch (persistErr) {
-                console.warn('[conversation] support bot fallback persist failed', persistErr);
+                botReply = await sendSupportBotReply(conversationId, text);
+              } catch (err) {
+                console.warn('[conversation] support bot reply error', err);
               }
-            }
 
-            if (botReply) {
-              setMessages((prev) => {
-                if (prev.some((m) => m.id === botReply!.id)) return prev;
-                return [...prev, botReply!];
-              });
-            } else {
-              toast.show('Support is temporarily unavailable. Please try again.', {
-                variant: 'default',
-                icon: 'alert-triangle',
-              });
+              if (!botReply) {
+                try {
+                  botReply = await sendMessage({
+                    conversationId,
+                    senderId: SUPPORT_BOT_USER_ID,
+                    content: generateSupportResponse(text),
+                  });
+                } catch (persistErr) {
+                  console.warn('[conversation] support bot fallback persist failed', persistErr);
+                }
+              }
+
+              if (botReply) {
+                setMessages((prev) => {
+                  if (prev.some((m) => m.id === botReply!.id)) return prev;
+                  return [...prev, botReply!];
+                });
+              }
             }
           }
           return delivered;

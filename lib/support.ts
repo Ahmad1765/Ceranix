@@ -290,3 +290,218 @@ export async function sendSupportBotReply(conversationId: string, userMessage: s
     return null;
   }
 }
+
+// ── Admin Support Team Interfaces & Helpers ─────────────────────────────────
+
+export interface AdminSupportConversation {
+  id: string;
+  user_id: string;
+  username: string;
+  full_name: string;
+  avatar_url?: string | null;
+  last_message?: string | null;
+  updated_at: string;
+  message_count: number;
+  is_dispute: boolean;
+}
+
+/**
+ * Automatically starts a support chat for an order dispute and sends an
+ * alert message informing the buyer that the admin team has been notified.
+ */
+export async function startDisputeSupportChat({
+  orderId,
+  reason,
+  buyerId,
+}: {
+  orderId: string;
+  reason: string;
+  buyerId: string;
+}): Promise<ConversationRow | null> {
+  try {
+    const conv = await getOrCreateSupportConversation(buyerId);
+    if (!conv) return null;
+
+    const shortId = orderId.replace(/-/g, '').slice(0, 8).toUpperCase();
+    const disputeNotice =
+      `🚨 **Support Ticket Opened: Order Dispute**\n\n` +
+      `Order **#${shortId}** has been placed under dispute.\n` +
+      `**Reason:** ${reason.trim()}\n\n` +
+      `Our administration team has been notified and escrow funds are placed securely on hold. An administrator will review your case and personally respond to you here shortly.\n\n` +
+      `You can reply directly in this chat to provide photo evidence, courier receipts, or additional notes.`;
+
+    await sendMessage({
+      conversationId: conv.id,
+      senderId: SUPPORT_BOT_USER_ID,
+      content: disputeNotice,
+    });
+
+    return conv;
+  } catch (err) {
+    console.warn('[support] startDisputeSupportChat failed', err);
+    return null;
+  }
+}
+
+/**
+ * Fetch all support conversations for the administrative workbench.
+ */
+export async function fetchAdminSupportConversations(
+  filter: 'all' | 'disputes' | 'general' = 'all',
+): Promise<AdminSupportConversation[]> {
+  try {
+    const { data, error } = await supabase.rpc('admin_get_support_conversations', {
+      p_filter: filter,
+    });
+    if (!error && data) {
+      return data as AdminSupportConversation[];
+    }
+  } catch (e) {
+    console.warn('[support] admin_get_support_conversations rpc failed, falling back', e);
+  }
+
+  // Fallback: direct query on conversations
+  try {
+    const { data: convs, error } = await supabase
+      .from('conversations')
+      .select(`
+        id,
+        buyer_id,
+        seller_id,
+        last_message,
+        updated_at,
+        buyer:profiles!conversations_buyer_id_fkey(id, username, full_name, avatar_url),
+        seller:profiles!conversations_seller_id_fkey(id, username, full_name, avatar_url)
+      `)
+      .or(`buyer_id.eq.${SUPPORT_BOT_USER_ID},seller_id.eq.${SUPPORT_BOT_USER_ID}`)
+      .order('updated_at', { ascending: false });
+
+    if (error || !convs) return [];
+
+    return convs.map((c: any) => {
+      const isBotBuyer = c.buyer_id === SUPPORT_BOT_USER_ID;
+      const user = isBotBuyer ? c.seller : c.buyer;
+      const isDispute = (c.last_message || '').toLowerCase().includes('dispute');
+      return {
+        id: c.id,
+        user_id: user?.id || (isBotBuyer ? c.seller_id : c.buyer_id),
+        username: user?.username || 'member',
+        full_name: user?.full_name || 'Grabsty Member',
+        avatar_url: user?.avatar_url,
+        last_message: c.last_message,
+        updated_at: c.updated_at,
+        message_count: 1,
+        is_dispute: isDispute,
+      };
+    }).filter((item) => {
+      if (filter === 'disputes') return item.is_dispute;
+      if (filter === 'general') return !item.is_dispute;
+      return true;
+    });
+  } catch (err) {
+    console.warn('[support] fetchAdminSupportConversations fallback failed', err);
+    return [];
+  }
+}
+
+/**
+ * Fetch messages for a support conversation for admin viewing.
+ */
+export async function fetchAdminSupportMessages(
+  conversationId: string,
+): Promise<ChatMessage[]> {
+  try {
+    const { data, error } = await supabase.rpc('admin_get_support_messages', {
+      p_conversation_id: conversationId,
+    });
+    if (!error && data) {
+      return data as ChatMessage[];
+    }
+  } catch (e) {
+    console.warn('[support] admin_get_support_messages rpc failed, falling back', e);
+  }
+
+  // Fallback direct messages query
+  try {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: true });
+
+    if (error || !data) return [];
+    return data as ChatMessage[];
+  } catch (err) {
+    console.warn('[support] fetchAdminSupportMessages fallback failed', err);
+    return [];
+  }
+}
+
+/**
+ * Admin personally responds to a user query in a support conversation.
+ */
+export async function adminSendSupportMessage({
+  conversationId,
+  content,
+}: {
+  conversationId: string;
+  content: string;
+}): Promise<ChatMessage | null> {
+  const trimmed = content.trim();
+  if (!trimmed) return null;
+
+  // 1. Dedicated Admin Support RPC
+  try {
+    const { data, error } = await supabase.rpc('admin_send_support_message', {
+      p_conversation_id: conversationId,
+      p_content: trimmed,
+    });
+    if (!error && data) {
+      return data as ChatMessage;
+    }
+  } catch (e) {
+    console.warn('[support] admin_send_support_message rpc failed, falling back', e);
+  }
+
+  // 2. Dispatch support bot reply RPC
+  try {
+    const { data, error } = await supabase.rpc('dispatch_support_bot_reply', {
+      p_conversation_id: conversationId,
+      p_content: trimmed,
+    });
+    if (!error && data) {
+      return data as ChatMessage;
+    }
+  } catch (e) {
+    console.warn('[support] dispatch_support_bot_reply rpc failed, falling back', e);
+  }
+
+  // 3. Current authenticated user insert with official admin support metadata
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user?.id) {
+      const msg = await sendMessage({
+        conversationId,
+        senderId: user.id,
+        content: trimmed,
+        metadata: { is_admin_support: true, sender_name: 'Grabsty Support' },
+      });
+      if (msg) return msg;
+    }
+  } catch (err) {
+    console.warn('[support] admin authenticated insert fallback failed', err);
+  }
+
+  // 4. Direct bot insert fallback
+  try {
+    return await sendMessage({
+      conversationId,
+      senderId: SUPPORT_BOT_USER_ID,
+      content: trimmed,
+    });
+  } catch (err) {
+    console.warn('[support] adminSendSupportMessage fallback failed', err);
+    return null;
+  }
+}
+

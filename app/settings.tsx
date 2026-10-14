@@ -40,6 +40,7 @@ import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { getOptimizedImageUrl, IMAGE_TRANSITION } from '@/lib/images';
 import { bp } from '@/lib/responsive';
 import { BRAND } from '@/lib/brand';
+import { getOrCreateSupportConversation } from '@/lib/support';
 import {
   BundleDiscountSheet,
   AddressSheet,
@@ -472,14 +473,24 @@ export default function SettingsScreen() {
           <>
             <ChatGPTRow
               label="Customer Support"
-              desc={session ? `Chat live with 24/7 ${BRAND} Concierge` : SUPPORT_EMAIL}
+              desc={session ? `Chat live with our dedicated support and mediation team` : `Email: ${SUPPORT_EMAIL}`}
             >
               <ChatGPTButton
-                label="Contact"
+                label="Start Support Chat"
                 icon="message-square"
-                onPress={() => {
-                  if (session) {
-                    router.push('/conversation/new?support=true' as any);
+                onPress={async () => {
+                  if (session && user) {
+                    tap('light');
+                    try {
+                      const conv = await getOrCreateSupportConversation(user.id);
+                      if (conv) {
+                        router.push(`/conversation/${conv.id}` as any);
+                      } else {
+                        router.push('/conversation/new?support=true' as any);
+                      }
+                    } catch {
+                      router.push('/conversation/new?support=true' as any);
+                    }
                   } else {
                     Linking.openURL(`mailto:${SUPPORT_EMAIL}`).catch(() => {});
                   }
@@ -1117,6 +1128,29 @@ export default function SettingsScreen() {
             label="Report app issue"
             chevron
             onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=App Issue Report`).catch(() => {})}
+          />
+          <ChatGPTItem
+            icon="message-square"
+            label="Contact Support"
+            value={session ? "Chat live" : "Sign in"}
+            chevron
+            onPress={async () => {
+              if (session && user) {
+                tap('light');
+                try {
+                  const conv = await getOrCreateSupportConversation(user.id);
+                  if (conv) {
+                    router.push(`/conversation/${conv.id}` as any);
+                  } else {
+                    router.push('/conversation/new?support=true' as any);
+                  }
+                } catch {
+                  router.push('/conversation/new?support=true' as any);
+                }
+              } else {
+                router.push('/auth/login');
+              }
+            }}
           />
           <ChatGPTItem
             icon="help-circle"

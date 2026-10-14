@@ -29,6 +29,7 @@ import {
 import {
   isSupportConversation,
   getOrCreateSupportConversation,
+  generateSupportResponse,
   SUPPORT_TOPICS,
   SUPPORT_BOT_NAME,
   SUPPORT_BOT_AVATAR,
@@ -362,33 +363,11 @@ function SupportPage({
   bottomInset: number;
 }) {
   const { theme } = useTheme();
-  const [startingChat, setStartingChat] = useState(false);
+  const [expandedTopicId, setExpandedTopicId] = useState<string | null>(null);
 
-  const handleStartSupportChat = async (prompt?: string) => {
-    if (startingChat) return;
+  const toggleTopic = (id: string) => {
     haptic();
-    setStartingChat(true);
-    try {
-      const conv = await getOrCreateSupportConversation(userId);
-      if (conv) {
-        if (prompt) {
-          router.push({
-            pathname: `/conversation/${conv.id}`,
-            params: { prefill: prompt },
-          } as any);
-        } else {
-          router.push(`/conversation/${conv.id}` as any);
-        }
-        setStartingChat(false);
-      } else {
-        setStartingChat(false);
-        Alert.alert('Unable to start support chat', 'Please check your connection and try again.');
-      }
-    } catch (e) {
-      setStartingChat(false);
-      console.warn('[support] failed to start', e);
-      Alert.alert('Support unavailable', 'Failed to connect to Grabsty Support. Please try again later.');
-    }
+    setExpandedTopicId((prev) => (prev === id ? null : id));
   };
 
   return (
@@ -404,7 +383,7 @@ function SupportPage({
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />
         }
       >
-        {/* Grabsty Support Assistant Hero Card */}
+        {/* Grabsty Support Information Card */}
         <View
           style={{
             backgroundColor: theme.surface,
@@ -457,7 +436,7 @@ function SupportPage({
                 </View>
               </View>
               <Text style={{ fontFamily: typography.family.sans, fontSize: 12.5, color: theme.mute, marginTop: 2 }}>
-                Instant AI Help & Dedicated Support Concierge
+                Customer Care & Dispute Resolution Team
               </Text>
             </View>
           </View>
@@ -471,16 +450,20 @@ function SupportPage({
               marginBottom: 14,
             }}
           >
-            Have a question about an order, refund, delivery, or payout? Start a chat to get immediate answers.
+            Support chats are automatically initiated when an order is placed on dispute. To start a new inquiry, you can initiate a support request directly from Settings.
           </Text>
 
           <PressableScale
-            onPress={() => handleStartSupportChat()}
-            disabled={startingChat}
+            onPress={() => {
+              haptic();
+              router.push('/settings?open=help' as any);
+            }}
             style={{
-              height: 44,
+              height: 42,
               borderRadius: radii.pill,
-              backgroundColor: theme.purple,
+              backgroundColor: theme.panel,
+              borderWidth: 1,
+              borderColor: theme.hairline,
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center',
@@ -488,14 +471,14 @@ function SupportPage({
               ...shadow.sm,
             }}
           >
-            <Feather name="message-square" size={16} color="#FFFFFF" />
-            <Text style={{ fontFamily: typography.family.sansBold, fontSize: 14, color: '#FFFFFF' }}>
-              {startingChat ? 'Connecting…' : 'Chat with Grabsty Support'}
+            <Feather name="settings" size={15} color={theme.ink} />
+            <Text style={{ fontFamily: typography.family.sansBold, fontSize: 13.5, color: theme.ink }}>
+              Open Support in Settings
             </Text>
           </PressableScale>
         </View>
 
-        {/* Quick Help Topics */}
+        {/* Quick Help Topics (Interactive Accordion, does not start chats) */}
         <Text
           style={{
             fontFamily: typography.family.sansBold,
@@ -511,82 +494,158 @@ function SupportPage({
         </Text>
 
         <View style={{ gap: 8, marginBottom: 24 }}>
-          {SUPPORT_TOPICS.map((topic) => (
-            <PressableScale
-              key={topic.id}
-              disabled={startingChat}
-              onPress={() => handleStartSupportChat(topic.prompt)}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                backgroundColor: theme.surface,
-                borderRadius: radii.xl,
-                borderWidth: 1,
-                borderColor: theme.hairline,
-                paddingHorizontal: 14,
-                paddingVertical: 12,
-                gap: 12,
-                opacity: startingChat ? 0.6 : 1,
-                ...shadow.sm,
-              }}
-            >
+          {SUPPORT_TOPICS.map((topic) => {
+            const isExpanded = expandedTopicId === topic.id;
+            const answer = generateSupportResponse(topic.prompt);
+            return (
               <View
+                key={topic.id}
                 style={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: 19,
-                  backgroundColor: theme.panel,
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  backgroundColor: theme.surface,
+                  borderRadius: radii.xl,
+                  borderWidth: 1,
+                  borderColor: theme.hairline,
+                  overflow: 'hidden',
+                  ...shadow.sm,
                 }}
               >
-                <Feather name={topic.icon as any} size={17} color={theme.primary} />
-              </View>
+                <PressableScale
+                  onPress={() => toggleTopic(topic.id)}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    gap: 12,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: 19,
+                      backgroundColor: theme.panel,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Feather name={topic.icon as any} size={17} color={theme.primary} />
+                  </View>
 
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontFamily: typography.family.sansBold, fontSize: 14, color: theme.ink }}>
-                  {topic.title}
-                </Text>
-                <Text style={{ fontFamily: typography.family.sans, fontSize: 12, color: theme.mute, marginTop: 1 }}>
-                  {topic.description}
-                </Text>
-              </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontFamily: typography.family.sansBold, fontSize: 14, color: theme.ink }}>
+                      {topic.title}
+                    </Text>
+                    <Text style={{ fontFamily: typography.family.sans, fontSize: 12, color: theme.mute, marginTop: 1 }}>
+                      {topic.description}
+                    </Text>
+                  </View>
 
-              <Feather name="chevron-right" size={18} color={theme.muteSoft} />
-            </PressableScale>
-          ))}
+                  <Feather
+                    name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                    size={18}
+                    color={theme.muteSoft}
+                  />
+                </PressableScale>
+
+                {isExpanded && (
+                  <View
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingBottom: 14,
+                      paddingTop: 4,
+                      borderTopWidth: 1,
+                      borderTopColor: theme.hairline,
+                      backgroundColor: theme.panel,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontFamily: typography.family.sans,
+                        fontSize: 13,
+                        lineHeight: 19,
+                        color: theme.ink,
+                      }}
+                    >
+                      {answer}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            );
+          })}
         </View>
 
-        {/* Existing Support Threads if any */}
-        {data.length > 0 && (
-          <View>
-            <Text
-              style={{
-                fontFamily: typography.family.sansBold,
-                fontSize: 11.5,
-                letterSpacing: 0.8,
-                textTransform: 'uppercase',
-                color: theme.muteSoft,
-                marginBottom: 8,
-                paddingHorizontal: 2,
-              }}
-            >
-              Your Support Threads
-            </Text>
+        {/* Active Support Threads */}
+        <Text
+          style={{
+            fontFamily: typography.family.sansBold,
+            fontSize: 11.5,
+            letterSpacing: 0.8,
+            textTransform: 'uppercase',
+            color: theme.muteSoft,
+            marginBottom: 8,
+            paddingHorizontal: 2,
+          }}
+        >
+          Your Support Threads
+        </Text>
 
+        {data.length > 0 ? (
+          <View
+            style={{
+              backgroundColor: theme.surface,
+              borderRadius: radii.xl,
+              borderWidth: 1,
+              borderColor: theme.hairline,
+              overflow: 'hidden',
+            }}
+          >
+            {data.map((conv) => (
+              <InboxListRow key={conv.id} conv={conv} userId={userId} />
+            ))}
+          </View>
+        ) : (
+          <View
+            style={{
+              backgroundColor: theme.surface,
+              borderRadius: radii.xl,
+              borderWidth: 1,
+              borderColor: theme.hairline,
+              padding: 24,
+              alignItems: 'center',
+              ...shadow.sm,
+            }}
+          >
             <View
               style={{
-                backgroundColor: theme.surface,
-                borderRadius: radii.xl,
-                borderWidth: 1,
-                borderColor: theme.hairline,
-                overflow: 'hidden',
+                width: 48,
+                height: 48,
+                borderRadius: 24,
+                backgroundColor: theme.panel,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 12,
               }}
             >
-              {data.map((conv) => (
-                <InboxListRow key={conv.id} conv={conv} userId={userId} />
-              ))}
+              <Feather name="message-square" size={22} color={theme.muteSoft} />
             </View>
+            <Text style={{ fontFamily: typography.family.sansBold, fontSize: 15, color: theme.ink, textAlign: 'center' }}>
+              No active support chats
+            </Text>
+            <Text
+              style={{
+                fontFamily: typography.family.sans,
+                fontSize: 13,
+                color: theme.mute,
+                textAlign: 'center',
+                marginTop: 6,
+                lineHeight: 18,
+                maxWidth: 280,
+              }}
+            >
+              Support conversations are created when an order is disputed or can be opened from Settings.
+            </Text>
           </View>
         )}
       </ScrollView>
@@ -844,13 +903,13 @@ export default function InboxScreen() {
     (tab: InboxTab) => {
       const to = INBOX_TABS.findIndex((t) => t.value === tab);
       if (to < 0 || pageWidth <= 0) return;
-      if (tab === activeTabRef.current) return;
       activeTabRef.current = tab;
       setActiveTab(tab);
       ignoreListenerUntilRef.current = Date.now() + 450;
+      scrollX.setValue(to * pageWidth);
       pagerRef.current?.scrollToOffset({ offset: to * pageWidth, animated: Platform.OS !== 'web' });
     },
-    [pageWidth],
+    [pageWidth, scrollX],
   );
 
   const onMomentumScrollEnd = useCallback(

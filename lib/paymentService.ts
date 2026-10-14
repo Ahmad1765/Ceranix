@@ -7,6 +7,7 @@ import {
   type ValidatedShippingAddress,
 } from '@/types/validation/order';
 import type { Order, PaymentMethod, OrderStatus, FulfillmentStatus, ShippingMethod, SellerPickupAddress } from '@/types';
+import { startDisputeSupportChat } from '@/lib/support';
 
 export interface CheckoutRequest {
   listingId: string;
@@ -861,8 +862,36 @@ export class PaymentService {
     }
 
     capture('order_disputed', { order_id: orderId, reason });
-    notifyOrderUpdated((data as Order)?.listing_id);
-    return data as Order;
+    const finalOrder = (data as Order);
+    notifyOrderUpdated(finalOrder?.listing_id);
+
+    // Automatically start a support chat when an order is disputed
+    try {
+      let buyerId: string | undefined = finalOrder?.buyer_id;
+      if (!buyerId) {
+        const { data: o } = await supabase
+          .from('orders')
+          .select('buyer_id')
+          .eq('id', orderId)
+          .maybeSingle();
+        buyerId = o?.buyer_id;
+      }
+      if (!buyerId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        buyerId = user?.id;
+      }
+      if (buyerId) {
+        await startDisputeSupportChat({
+          orderId,
+          reason,
+          buyerId,
+        });
+      }
+    } catch (e) {
+      console.warn('[paymentService] failed to auto-start support chat for dispute', e);
+    }
+
+    return finalOrder;
   }
 
   /**

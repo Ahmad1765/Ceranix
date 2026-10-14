@@ -49,8 +49,16 @@ import {
 } from '@/lib/escrowService';
 import type { EscrowStatus, Verification, User } from '@/types';
 import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
+import {
+  fetchAdminSupportConversations,
+  fetchAdminSupportMessages,
+  adminSendSupportMessage,
+  SUPPORT_BOT_USER_ID,
+  type AdminSupportConversation,
+} from '@/lib/support';
+import type { ChatMessage } from '@/lib/chat';
 
-type AdminTab = 'overview' | 'logistics' | 'disputes' | 'verifications' | 'users';
+type AdminTab = 'overview' | 'logistics' | 'disputes' | 'verifications' | 'users' | 'support';
 type LogisticsFilter = 'all' | 'active' | 'IN_TRANSIT' | 'DELIVERED' | 'COMPLETED_FUNDS_RELEASED';
 
 const COURIER_PRESETS = ['Internal Fleet', 'TCS', 'Leopards', 'Trax', 'PostEx', 'M&P', 'Custom'];
@@ -115,19 +123,34 @@ export default function AdminConsoleScreen() {
   const [userSearch, setUserSearch] = useState('');
   const [togglingProId, setTogglingProId] = useState<string | null>(null);
 
+  // Support Team State
+  const [supportConvs, setSupportConvs] = useState<AdminSupportConversation[]>([]);
+  const [supportFilter, setSupportFilter] = useState<'all' | 'disputes' | 'general'>('all');
+  const [supportSearch, setSupportSearch] = useState('');
+  const [selectedSupportConv, setSelectedSupportConv] = useState<AdminSupportConversation | null>(null);
+  const [supportMessages, setSupportMessages] = useState<ChatMessage[]>([]);
+  const [adminReplyText, setAdminReplyText] = useState('');
+  const [sendingAdminReply, setSendingAdminReply] = useState(false);
+  const [loadingSupportMessages, setLoadingSupportMessages] = useState(false);
+  const selectedSupportConvRef = useRef<AdminSupportConversation | null>(null);
+  selectedSupportConvRef.current = selectedSupportConv;
+  const loadSupportMessagesRef = useRef<((convId: string) => Promise<void>) | null>(null);
+
   // ── Load All Operational Data ─────────────────────────────────────────────
   const loadAllData = useCallback(async () => {
     if (!profile?.is_admin) return;
     try {
-      const [txs, kycRes, usersRes] = await Promise.all([
+      const [txs, kycRes, usersRes, supportConvsData] = await Promise.all([
         escrowService.fetchLogisticsTransactions('all', 100),
         supabase.rpc('admin_get_verifications', { p_status: 'all' }),
         supabase.rpc('admin_get_users', { p_limit: 100 }),
+        fetchAdminSupportConversations('all'),
       ]);
 
       setTransactions(txs);
       if (kycRes.data) setVerifications(kycRes.data as Verification[]);
       if (usersRes.data) setUsers(usersRes.data as User[]);
+      if (supportConvsData) setSupportConvs(supportConvsData);
     } catch (err: any) {
       toast.show(err?.message || 'Failed to load administrative data', {
         variant: 'default',
@@ -168,6 +191,16 @@ export default function AdminConsoleScreen() {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => loadDataRef.current(), 400);
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, (payload) => {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => loadDataRef.current(), 400);
+        if (
+          selectedSupportConvRef.current &&
+          (payload?.new as any)?.conversation_id === selectedSupportConvRef.current.id
+        ) {
+          loadSupportMessagesRef.current?.(selectedSupportConvRef.current.id);
+        }
+      })
       .subscribe();
 
     return () => {
@@ -190,6 +223,8 @@ export default function AdminConsoleScreen() {
     const inTransit = transactions.filter((t) => t.status === 'IN_TRANSIT');
     const disputed = transactions.filter((t) => t.status === 'DISPUTED');
     const pendingKyc = verifications.filter((v) => v.status === 'submitted');
+    const supportCount = supportConvs.length;
+    const openSupportDisputes = supportConvs.filter((c) => c.is_dispute).length;
 
     const totalEscrowVolume = activeEscrow.reduce(
       (sum, t) => sum + (t.order?.amount_cents || t.amount_cents || 0),
@@ -203,8 +238,10 @@ export default function AdminConsoleScreen() {
       inTransitCount: inTransit.length,
       disputedCount: disputed.length,
       pendingKycCount: pendingKyc.length,
+      supportCount,
+      openSupportDisputes,
     };
-  }, [transactions, verifications]);
+  }, [transactions, verifications, supportConvs]);
 
   // ── Logistics Filtered Items ──────────────────────────────────────────────
   const filteredLogistics = useMemo(() => {
@@ -255,6 +292,97 @@ export default function AdminConsoleScreen() {
         u.id.toLowerCase().includes(q),
     );
   }, [users, userSearch]);
+
+  // ── Filtered Support Conversations ────────────────────────────────────────
+  const filteredSupportConvs = useMemo(() => {
+    let list = supportConvs;
+    if (supportFilter === 'disputes') {
+      list = list.filter((c) => c.is_dispute);
+    } else if (supportFilter === 'general') {
+      list = list.filter((c) => !c.is_dispute);
+    }
+
+    if (supportSearch.trim()) {
+      const q = supportSearch.toLowerCase().trim();
+      list = list.filter(
+        (c) =>
+          c.username.toLowerCase().includes(q) ||
+          c.full_name.toLowerCase().includes(q) ||
+          (c.last_message || '').toLowerCase().includes(q),
+      );
+    }
+
+    return list;
+  }, [supportConvs, supportFilter, supportSearch]);
+
+  const loadSupportMessages = useCallback(async (convId: string) => {
+    setLoadingSupportMessages(true);
+    try {
+      const msgs = await fetchAdminSupportMessages(convId);
+      setSupportMessages(msgs);
+    } catch (err: any) {
+      toast.show('Failed to load support messages', { variant: 'default', icon: 'alert-triangle' });
+    } finally {
+      setLoadingSupportMessages(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    loadSupportMessagesRef.current = loadSupportMessages;
+  }, [loadSupportMessages]);
+
+  const handleSelectSupportConv = useCallback(
+    (conv: AdminSupportConversation) => {
+      tap('light');
+      setSelectedSupportConv(conv);
+      loadSupportMessages(conv.id);
+    },
+    [loadSupportMessages],
+  );
+
+  const handleSendAdminReply = async () => {
+    if (!selectedSupportConv || !adminReplyText.trim() || sendingAdminReply) return;
+    tap('medium');
+    setSendingAdminReply(true);
+    const textToSend = adminReplyText.trim();
+    setAdminReplyText('');
+
+    try {
+      const sent = await adminSendSupportMessage({
+        conversationId: selectedSupportConv.id,
+        content: textToSend,
+      });
+
+      if (sent) {
+        setSupportMessages((prev) => {
+          if (prev.some((m) => m.id === sent.id)) return prev;
+          return [...prev, sent];
+        });
+      }
+      await loadSupportMessages(selectedSupportConv.id);
+
+      toast.show('Reply sent to user', { variant: 'success', icon: 'check' });
+
+      setSupportConvs((prev) =>
+        prev.map((c) =>
+          c.id === selectedSupportConv.id
+            ? {
+                ...c,
+                last_message: `Grabsty Support: ${textToSend}`,
+                updated_at: new Date().toISOString(),
+              }
+            : c,
+        ),
+      );
+    } catch (err: any) {
+      toast.show(err?.message || 'Failed to send admin reply', {
+        variant: 'default',
+        icon: 'alert-triangle',
+      });
+    } finally {
+      setSendingAdminReply(false);
+    }
+  };
 
   // ── Helper Actions ────────────────────────────────────────────────────────
   const copyText = async (text: string, label: string) => {
@@ -773,6 +901,31 @@ export default function AdminConsoleScreen() {
                 Sellers & Users
               </Text>
             </Pressable>
+
+            <Pressable
+              onPress={() => setActiveTab('support')}
+              style={({ pressed }) => ({
+                height: 38,
+                borderRadius: 8,
+                backgroundColor: activeTab === 'support' ? (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)') : 'transparent',
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 12,
+                gap: 10,
+                opacity: pressed ? 0.8 : 1,
+                marginBottom: 2,
+              })}
+            >
+              <Feather name="message-square" size={16} color={activeTab === 'support' ? theme.purple : theme.textMuted} />
+              <Text style={{ flex: 1, fontSize: 14, fontWeight: activeTab === 'support' ? '600' : '500', color: activeTab === 'support' ? theme.purple : theme.textMuted }}>
+                Support Chats
+              </Text>
+              {metrics.supportCount > 0 && (
+                <View style={{ paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6, backgroundColor: 'rgba(108,71,255,0.15)' }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: theme.purple }}>{metrics.supportCount}</Text>
+                </View>
+              )}
+            </Pressable>
           </View>
         ) : (
           /* Mobile Horizontal Navigation Pills */
@@ -794,6 +947,7 @@ export default function AdminConsoleScreen() {
               { key: 'disputes', label: `Disputes (${metrics.disputedCount})`, icon: 'alert-circle' },
               { key: 'verifications', label: `KYC (${metrics.pendingKycCount})`, icon: 'shield' },
               { key: 'users', label: 'Users', icon: 'users' },
+              { key: 'support', label: `Support (${metrics.supportCount})`, icon: 'message-square' },
             ].map((tab) => {
               const isActive = activeTab === tab.key;
               return (
@@ -885,6 +1039,18 @@ export default function AdminConsoleScreen() {
                     Identity documents awaiting review
                   </Text>
                 </View>
+
+                <View style={{ flex: 1, minWidth: 200, backgroundColor: theme.panel, borderRadius: 12, padding: 18, borderWidth: 1, borderColor: metrics.supportCount > 0 ? 'rgba(108,71,255,0.4)' : theme.border }}>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: metrics.supportCount > 0 ? theme.purple : theme.textMuted }}>
+                    USER SUPPORT INQUIRIES
+                  </Text>
+                  <Text style={{ fontSize: 26, fontWeight: '800', color: theme.text, marginTop: 8 }}>
+                    {metrics.supportCount}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 4 }}>
+                    {metrics.openSupportDisputes} active dispute inquiries
+                  </Text>
+                </View>
               </View>
 
               {/* Quick Actions Shortcuts */}
@@ -948,6 +1114,25 @@ export default function AdminConsoleScreen() {
                   >
                     <Feather name="alert-triangle" size={15} color={theme.danger} />
                     <Text style={{ fontSize: 13, fontWeight: '600', color: theme.danger }}>Review Disputes ({metrics.disputedCount})</Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => setActiveTab('support')}
+                    style={({ pressed }) => ({
+                      paddingHorizontal: 16,
+                      height: 38,
+                      borderRadius: 8,
+                      backgroundColor: theme.surface,
+                      borderWidth: 1,
+                      borderColor: theme.border,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 8,
+                      opacity: pressed ? 0.75 : 1,
+                    })}
+                  >
+                    <Feather name="message-square" size={15} color={theme.purple} />
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: theme.purple }}>Support Inquiries ({metrics.supportCount})</Text>
                   </Pressable>
                 </View>
               </View>
@@ -1264,7 +1449,34 @@ export default function AdminConsoleScreen() {
                         </View>
                       )}
 
-                      <View style={{ flexDirection: 'row', gap: 10, justifyContent: 'flex-end' }}>
+                      <View style={{ flexDirection: 'row', gap: 10, justifyContent: 'flex-end', alignItems: 'center' }}>
+                        <Pressable
+                          onPress={() => {
+                            const buyerId = item.buyer_id || item.buyer?.id;
+                            const match = supportConvs.find((c) => c.user_id === buyerId);
+                            if (match) {
+                              handleSelectSupportConv(match);
+                            }
+                            setActiveTab('support');
+                          }}
+                          style={({ pressed }) => ({
+                            height: 36,
+                            paddingHorizontal: 12,
+                            borderRadius: 8,
+                            backgroundColor: theme.surface,
+                            borderWidth: 1,
+                            borderColor: theme.border,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexDirection: 'row',
+                            gap: 6,
+                            opacity: pressed ? 0.75 : 1,
+                          })}
+                        >
+                          <Feather name="message-square" size={13} color={theme.purple} />
+                          <Text style={{ fontSize: 13, fontWeight: '600', color: theme.purple }}>Support Chat</Text>
+                        </Pressable>
+
                         <Pressable
                           onPress={() => {
                             setSelectedTx(item);
@@ -1585,6 +1797,639 @@ export default function AdminConsoleScreen() {
                   );
                 }}
               />
+            </View>
+          )}
+
+          {/* TAB 6: SUPPORT CHATS & INQUIRIES WORKBENCH */}
+          {activeTab === 'support' && (
+            <View style={{ flex: 1 }}>
+              {/* Header */}
+              <View
+                style={{
+                  flexDirection: isDesktop ? 'row' : 'column',
+                  gap: 12,
+                  marginBottom: 16,
+                  alignItems: isDesktop ? 'center' : 'stretch',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={{ fontSize: 20, fontWeight: '800', color: theme.text, letterSpacing: -0.3 }}>
+                      Support Inquiries & Live Chat
+                    </Text>
+                    <View
+                      style={{
+                        paddingHorizontal: 8,
+                        paddingVertical: 2,
+                        borderRadius: 10,
+                        backgroundColor: 'rgba(108,71,255,0.15)',
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: theme.purple }}>
+                        {filteredSupportConvs.length}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 13, color: theme.textMuted, marginTop: 3 }}>
+                    Personally assist buyers and sellers, investigate order issues, and resolve dispute tickets.
+                  </Text>
+                </View>
+
+                {/* Filter Pills */}
+                <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                  {(['all', 'disputes', 'general'] as const).map((filter) => {
+                    const isActive = supportFilter === filter;
+                    const count =
+                      filter === 'all'
+                        ? supportConvs.length
+                        : filter === 'disputes'
+                        ? supportConvs.filter((c) => c.is_dispute).length
+                        : supportConvs.filter((c) => !c.is_dispute).length;
+
+                    return (
+                      <Pressable
+                        key={filter}
+                        onPress={() => {
+                          tap('light');
+                          setSupportFilter(filter);
+                        }}
+                        style={({ pressed }) => ({
+                          height: 32,
+                          paddingHorizontal: 12,
+                          borderRadius: 16,
+                          backgroundColor: isActive ? theme.ink : theme.panel,
+                          borderWidth: 1,
+                          borderColor: isActive ? theme.ink : theme.border,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexDirection: 'row',
+                          gap: 6,
+                          opacity: pressed ? 0.8 : 1,
+                        })}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: isActive ? '700' : '600',
+                            color: isActive ? theme.background : theme.text,
+                            textTransform: 'capitalize',
+                          }}
+                        >
+                          {filter === 'disputes' ? 'Disputes' : filter === 'general' ? 'General' : 'All'}
+                        </Text>
+                        <View
+                          style={{
+                            paddingHorizontal: 5,
+                            paddingVertical: 1,
+                            borderRadius: 8,
+                            backgroundColor: isActive
+                              ? isDark
+                                ? 'rgba(0,0,0,0.3)'
+                                : 'rgba(255,255,255,0.2)'
+                              : theme.surface,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 10,
+                              fontWeight: '700',
+                              color: isActive ? theme.background : theme.textMuted,
+                            }}
+                          >
+                            {count}
+                          </Text>
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Main Support Area: 2 Columns on Desktop, List/Detail on Mobile */}
+              <View style={{ flex: 1, flexDirection: isDesktop ? 'row' : 'column', gap: 16 }}>
+                {/* Conversations List Column */}
+                {(!selectedSupportConv || isDesktop) && (
+                  <View
+                    style={{
+                      width: isDesktop ? 360 : '100%',
+                      flex: isDesktop ? undefined : 1,
+                      backgroundColor: theme.panel,
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: theme.border,
+                      overflow: 'hidden',
+                      display: !isDesktop && selectedSupportConv ? 'none' : 'flex',
+                    }}
+                  >
+                    {/* Search Bar */}
+                    <View
+                      style={{
+                        padding: 12,
+                        borderBottomWidth: 1,
+                        borderBottomColor: theme.border,
+                      }}
+                    >
+                      <View
+                        style={{
+                          height: 36,
+                          borderRadius: 8,
+                          backgroundColor: theme.surface,
+                          borderWidth: 1,
+                          borderColor: theme.border,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingHorizontal: 10,
+                          gap: 8,
+                        }}
+                      >
+                        <Feather name="search" size={14} color={theme.textMuted} />
+                        <TextInput
+                          value={supportSearch}
+                          onChangeText={setSupportSearch}
+                          placeholder="Search user or message..."
+                          placeholderTextColor={theme.textMuted}
+                          style={{ flex: 1, fontSize: 13, color: theme.text, height: '100%' }}
+                        />
+                        {supportSearch.length > 0 && (
+                          <Pressable onPress={() => setSupportSearch('')} hitSlop={6}>
+                            <Feather name="x" size={14} color={theme.textMuted} />
+                          </Pressable>
+                        )}
+                      </View>
+                    </View>
+
+                    {/* Conversations List */}
+                    <FlatList
+                      data={filteredSupportConvs}
+                      keyExtractor={(item) => item.id}
+                      showsVerticalScrollIndicator={true}
+                      ListEmptyComponent={
+                        <View style={{ padding: 40, alignItems: 'center' }}>
+                          <Feather name="message-square" size={28} color={theme.textMuted} />
+                          <Text style={{ fontSize: 14, fontWeight: '700', color: theme.text, marginTop: 10 }}>
+                            No Support Inquiries
+                          </Text>
+                          <Text style={{ fontSize: 12, color: theme.textMuted, textAlign: 'center', marginTop: 4 }}>
+                            {supportSearch
+                              ? 'No conversations match your search filter.'
+                              : 'Support inquiries and disputed order chats will appear here.'}
+                          </Text>
+                        </View>
+                      }
+                      renderItem={({ item }) => {
+                        const isSelected = selectedSupportConv?.id === item.id;
+                        const initial = (item.full_name || item.username || 'U').charAt(0).toUpperCase();
+
+                        return (
+                          <Pressable
+                            onPress={() => handleSelectSupportConv(item)}
+                            style={({ pressed }) => ({
+                              padding: 14,
+                              borderBottomWidth: 1,
+                              borderBottomColor: theme.border,
+                              backgroundColor: isSelected
+                                ? isDark
+                                  ? 'rgba(108,71,255,0.12)'
+                                  : 'rgba(108,71,255,0.06)'
+                                : pressed
+                                ? isDark
+                                  ? 'rgba(255,255,255,0.03)'
+                                  : 'rgba(0,0,0,0.02)'
+                                : 'transparent',
+                              borderLeftWidth: isSelected ? 3 : 0,
+                              borderLeftColor: theme.purple,
+                            })}
+                          >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                              <View
+                                style={{
+                                  width: 36,
+                                  height: 36,
+                                  borderRadius: 18,
+                                  backgroundColor: theme.surface,
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  overflow: 'hidden',
+                                }}
+                              >
+                                {item.avatar_url ? (
+                                  <Image
+                                    source={{ uri: getOptimizedImageUrl(item.avatar_url, { width: 72 }) }}
+                                    style={{ width: 36, height: 36 }}
+                                    contentFit="cover"
+                                  />
+                                ) : (
+                                  <Text style={{ fontSize: 14, fontWeight: '800', color: theme.text }}>
+                                    {initial}
+                                  </Text>
+                                )}
+                              </View>
+
+                              <View style={{ flex: 1 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                  <Text
+                                    style={{
+                                      fontSize: 13,
+                                      fontWeight: isSelected ? '700' : '600',
+                                      color: theme.text,
+                                    }}
+                                    numberOfLines={1}
+                                  >
+                                    {item.full_name || item.username}
+                                  </Text>
+                                  <Text style={{ fontSize: 11, color: theme.textMuted }}>
+                                    {formatDate(item.updated_at)}
+                                  </Text>
+                                </View>
+
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                                  <Text style={{ fontSize: 11, color: theme.textMuted }}>
+                                    @{item.username}
+                                  </Text>
+                                  {item.is_dispute && (
+                                    <View
+                                      style={{
+                                        paddingHorizontal: 5,
+                                        paddingVertical: 1,
+                                        borderRadius: 4,
+                                        backgroundColor: 'rgba(239,68,68,0.15)',
+                                      }}
+                                    >
+                                      <Text style={{ fontSize: 9, fontWeight: '800', color: theme.danger }}>
+                                        DISPUTE
+                                      </Text>
+                                    </View>
+                                  )}
+                                </View>
+                              </View>
+                            </View>
+
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                color: isSelected ? theme.text : theme.textMuted,
+                                lineHeight: 16,
+                                marginTop: 4,
+                              }}
+                              numberOfLines={2}
+                            >
+                              {item.last_message || 'Inquiry initiated'}
+                            </Text>
+                          </Pressable>
+                        );
+                      }}
+                    />
+                  </View>
+                )}
+
+                {/* Chat Workbench Column */}
+                {(selectedSupportConv || isDesktop) && (
+                  <View
+                    style={{
+                      flex: 1,
+                      backgroundColor: theme.panel,
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: theme.border,
+                      overflow: 'hidden',
+                      display: !isDesktop && !selectedSupportConv ? 'none' : 'flex',
+                    }}
+                  >
+                    {selectedSupportConv ? (
+                      <View style={{ flex: 1 }}>
+                        {/* Chat Header */}
+                        <View
+                          style={{
+                            height: 58,
+                            paddingHorizontal: 16,
+                            borderBottomWidth: 1,
+                            borderBottomColor: theme.border,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            backgroundColor: theme.panel,
+                          }}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                            {!isDesktop && (
+                              <Pressable
+                                onPress={() => setSelectedSupportConv(null)}
+                                hitSlop={8}
+                                style={{ marginRight: 4 }}
+                              >
+                                <Feather name="arrow-left" size={20} color={theme.text} />
+                              </Pressable>
+                            )}
+
+                            <View
+                              style={{
+                                width: 34,
+                                height: 34,
+                                borderRadius: 17,
+                                backgroundColor: theme.surface,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                overflow: 'hidden',
+                              }}
+                            >
+                              {selectedSupportConv.avatar_url ? (
+                                <Image
+                                  source={{ uri: getOptimizedImageUrl(selectedSupportConv.avatar_url, { width: 68 }) }}
+                                  style={{ width: 34, height: 34 }}
+                                  contentFit="cover"
+                                />
+                              ) : (
+                                <Text style={{ fontSize: 14, fontWeight: '700', color: theme.text }}>
+                                  {(selectedSupportConv.full_name || selectedSupportConv.username || 'U').charAt(0).toUpperCase()}
+                                </Text>
+                              )}
+                            </View>
+
+                            <View>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={{ fontSize: 14, fontWeight: '700', color: theme.text }}>
+                                  {selectedSupportConv.full_name || selectedSupportConv.username}
+                                </Text>
+                                {selectedSupportConv.is_dispute && (
+                                  <View
+                                    style={{
+                                      paddingHorizontal: 6,
+                                      paddingVertical: 1,
+                                      borderRadius: 4,
+                                      backgroundColor: 'rgba(239,68,68,0.15)',
+                                    }}
+                                  >
+                                    <Text style={{ fontSize: 10, fontWeight: '800', color: theme.danger }}>
+                                      DISPUTE TICKET
+                                    </Text>
+                                  </View>
+                                )}
+                              </View>
+                              <Text style={{ fontSize: 11, color: theme.textMuted }}>
+                                @{selectedSupportConv.username}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Pressable
+                              onPress={() => loadSupportMessages(selectedSupportConv.id)}
+                              hitSlop={8}
+                              style={({ pressed }) => ({
+                                width: 32,
+                                height: 32,
+                                borderRadius: 6,
+                                borderWidth: 1,
+                                borderColor: theme.border,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                opacity: pressed ? 0.7 : 1,
+                              })}
+                            >
+                              <Feather name="refresh-cw" size={13} color={theme.text} />
+                            </Pressable>
+
+                            <Pressable
+                              onPress={() => router.push(`/user/${selectedSupportConv.user_id}` as any)}
+                              hitSlop={8}
+                              style={({ pressed }) => ({
+                                height: 32,
+                                paddingHorizontal: 10,
+                                borderRadius: 6,
+                                borderWidth: 1,
+                                borderColor: theme.border,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexDirection: 'row',
+                                gap: 6,
+                                opacity: pressed ? 0.7 : 1,
+                              })}
+                            >
+                              <Feather name="external-link" size={13} color={theme.text} />
+                              <Text style={{ fontSize: 12, fontWeight: '600', color: theme.text }}>Profile</Text>
+                            </Pressable>
+                          </View>
+                        </View>
+
+                        {/* Messages Thread */}
+                        {loadingSupportMessages ? (
+                          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                            <ActivityIndicator size="small" color={theme.text} />
+                            <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 8 }}>
+                              Loading conversation...
+                            </Text>
+                          </View>
+                        ) : (
+                          <ScrollView
+                            style={{ flex: 1, padding: 16 }}
+                            contentContainerStyle={{ gap: 12, paddingBottom: 20 }}
+                            showsVerticalScrollIndicator={true}
+                          >
+                            {supportMessages.length === 0 ? (
+                              <View style={{ padding: 40, alignItems: 'center' }}>
+                                <Text style={{ fontSize: 13, color: theme.textMuted }}>
+                                  No messages found in this support conversation.
+                                </Text>
+                              </View>
+                            ) : (
+                              supportMessages.map((msg) => {
+                                const isSupport =
+                                  msg.sender_id === SUPPORT_BOT_USER_ID ||
+                                  Boolean((msg.metadata as any)?.is_admin_support);
+                                return (
+                                  <View
+                                    key={msg.id}
+                                    style={{
+                                      alignSelf: isSupport ? 'flex-end' : 'flex-start',
+                                      maxWidth: isDesktop ? '75%' : '88%',
+                                    }}
+                                  >
+                                    <View
+                                      style={{
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        gap: 6,
+                                        marginBottom: 4,
+                                        alignSelf: isSupport ? 'flex-end' : 'flex-start',
+                                      }}
+                                    >
+                                      {isSupport ? (
+                                        <>
+                                          <Text style={{ fontSize: 11, fontWeight: '700', color: theme.purple }}>
+                                            Grabsty Support
+                                          </Text>
+                                          <ShieldCheckIcon size={12} />
+                                        </>
+                                      ) : (
+                                        <Text style={{ fontSize: 11, fontWeight: '600', color: theme.textMuted }}>
+                                          @{selectedSupportConv.username}
+                                        </Text>
+                                      )}
+                                      <Text style={{ fontSize: 10, color: theme.textMuted }}>
+                                        {formatDate(msg.created_at)}
+                                      </Text>
+                                    </View>
+
+                                    <View
+                                      style={{
+                                        backgroundColor: isSupport
+                                          ? theme.ink
+                                          : theme.surface,
+                                        borderRadius: 12,
+                                        paddingHorizontal: 14,
+                                        paddingVertical: 10,
+                                        borderWidth: isSupport ? 0 : 1,
+                                        borderColor: theme.border,
+                                      }}
+                                    >
+                                      <Text
+                                        style={{
+                                          fontSize: 13,
+                                          lineHeight: 18,
+                                          color: isSupport ? theme.background : theme.text,
+                                        }}
+                                      >
+                                        {msg.content}
+                                      </Text>
+                                    </View>
+                                  </View>
+                                );
+                              })
+                            )}
+                          </ScrollView>
+                        )}
+
+                        {/* Quick Canned Responses */}
+                        <View
+                          style={{
+                            paddingHorizontal: 14,
+                            paddingTop: 8,
+                            paddingBottom: 4,
+                            borderTopWidth: 1,
+                            borderTopColor: theme.border,
+                            backgroundColor: theme.panel,
+                          }}
+                        >
+                          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                            {[
+                              '🚨 We are reviewing your order dispute and will update you shortly.',
+                              '✅ Your dispute has been resolved and refund processed to your account.',
+                              '📦 Please provide clear photos of the packaging and item received.',
+                              '👋 Hello! How can our support team assist you today?',
+                            ].map((canned, idx) => (
+                              <Pressable
+                                key={idx}
+                                onPress={() => {
+                                  tap('light');
+                                  setAdminReplyText(canned);
+                                }}
+                                style={({ pressed }) => ({
+                                  paddingHorizontal: 10,
+                                  height: 26,
+                                  borderRadius: 13,
+                                  backgroundColor: theme.surface,
+                                  borderWidth: 1,
+                                  borderColor: theme.border,
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  opacity: pressed ? 0.7 : 1,
+                                })}
+                              >
+                                <Text style={{ fontSize: 11, color: theme.textMuted }} numberOfLines={1}>
+                                  {canned.slice(0, 32)}…
+                                </Text>
+                              </Pressable>
+                            ))}
+                          </ScrollView>
+                        </View>
+
+                        {/* Reply Composer */}
+                        <View
+                          style={{
+                            padding: 12,
+                            backgroundColor: theme.panel,
+                            flexDirection: 'row',
+                            alignItems: 'flex-end',
+                            gap: 10,
+                          }}
+                        >
+                          <TextInput
+                            value={adminReplyText}
+                            onChangeText={setAdminReplyText}
+                            placeholder="Reply to user as Grabsty Support Team..."
+                            placeholderTextColor={theme.textMuted}
+                            multiline
+                            style={{
+                              flex: 1,
+                              minHeight: 40,
+                              maxHeight: 120,
+                              backgroundColor: theme.surface,
+                              borderRadius: 8,
+                              borderWidth: 1,
+                              borderColor: theme.border,
+                              paddingHorizontal: 12,
+                              paddingVertical: 10,
+                              fontSize: 13,
+                              color: theme.text,
+                            }}
+                          />
+
+                          <Pressable
+                            disabled={!adminReplyText.trim() || sendingAdminReply}
+                            onPress={handleSendAdminReply}
+                            style={({ pressed }) => ({
+                              height: 40,
+                              paddingHorizontal: 16,
+                              borderRadius: 8,
+                              backgroundColor: theme.ink,
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexDirection: 'row',
+                              gap: 6,
+                              opacity: pressed || !adminReplyText.trim() || sendingAdminReply ? 0.6 : 1,
+                            })}
+                          >
+                            {sendingAdminReply ? (
+                              <ActivityIndicator size="small" color={theme.background} />
+                            ) : (
+                              <>
+                                <Feather name="send" size={14} color={theme.background} />
+                                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.background }}>
+                                  Send
+                                </Text>
+                              </>
+                            )}
+                          </Pressable>
+                        </View>
+                      </View>
+                    ) : (
+                      /* Empty State when no conversation is selected on desktop */
+                      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 }}>
+                        <View
+                          style={{
+                            width: 64,
+                            height: 64,
+                            borderRadius: 32,
+                            backgroundColor: theme.surface,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginBottom: 16,
+                          }}
+                        >
+                          <Feather name="message-square" size={28} color={theme.textMuted} />
+                        </View>
+                        <Text style={{ fontSize: 16, fontWeight: '700', color: theme.text, marginBottom: 6 }}>
+                          Select a Support Inquiry
+                        </Text>
+                        <Text style={{ fontSize: 13, color: theme.textMuted, textAlign: 'center', maxWidth: 360, lineHeight: 18 }}>
+                          Choose any conversation from the list to view live message history and personally respond to buyers and sellers as Grabsty Support.
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+              </View>
             </View>
           )}
         </View>
