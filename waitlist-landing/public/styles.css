@@ -1,3 +1,4 @@
+html { overflow-x: clip; }
 :root {
   /* Strict Grabsty 3-Hue Palette */
   --ink: #0F0F0F;

@@ -125,14 +125,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const globalTickerText = document.getElementById('ticker-text');
   if (globalTickerText) {
     const TICKER_ENTRIES = [
-      'Gulberg III, Lahore: Interior architect joined waitlist • Just now',
-      'Walled City (Delhi Gate), Lahore: Archival textile collector joined • 2m ago',
-      'Mall Road (NCA alumni), Lahore: Spatial design studio registered • 4m ago',
-      'DHA Phase 5, Lahore: Architecture enthusiast joined • 6m ago',
-      'Model Town, Lahore: Vintage archive seller secured spot • 9m ago',
-      'Cantt, Lahore: Heritage brick & spatial curator joined • 12m ago',
-      'Gulberg II, Lahore: Structural garment designer registered • 15m ago',
-      'Lahore Fort Quarter: Architectural drawing archivist joined • 18m ago'
+      'Lahore waitlist now open',
+      'Payments held in escrow until delivery',
+      '48 hours to check every order',
+      'Pay by card or cash on delivery',
+      'Sellers paid to bank, JazzCash or Easypaisa'
     ];
     let tickerIdx = 0;
     setInterval(() => {
@@ -349,7 +346,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // 10. Referral Ingestion (?ref= query param)
   // ---------------------------------------------------------------------------
   const urlParams = new URLSearchParams(window.location.search);
-  const referredByCode = urlParams.get('ref') ? urlParams.get('ref').trim().toUpperCase() : null;
+  const referredByCode = (urlParams.get('ref') || '').toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 32) || null;
   const referralBanner = document.getElementById('referral-banner');
   const referrerCodeEl = document.getElementById('referrer-code');
 
@@ -519,11 +516,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (refCountText) {
       refCountText.textContent = '';
       if (count > 0) {
-        const spotsJumped = count * 50;
         const strong = document.createElement('strong');
-        strong.textContent = `${count} Collector${count > 1 ? 's' : ''} Invited`;
+        strong.textContent = `${count} Friend${count > 1 ? "s" : ""} Joined`;
         refCountText.appendChild(strong);
-        refCountText.appendChild(document.createTextNode(` • Jumped ${spotsJumped} spots forward ⚡`));
       } else {
         refCountText.textContent = '0 Referrals Tracked • Priority Queue Locked';
       }
@@ -655,26 +650,26 @@ document.addEventListener('DOMContentLoaded', () => {
     if (confirmedLocation) confirmedLocation.textContent = city ? `${city}, Pakistan` : 'Lahore, Pakistan';
 
     if (confirmedRole) {
-      const roleLabels = { buyer: 'BUYER', seller: 'CURATED SELLER', both: 'BUYER & SELLER' };
+      const roleLabels = { buyer: 'BUYER', seller: 'SELLER', both: 'BUYER & SELLER' };
       const interestLabels = {
-        architecture: 'LAHORE ARCHITECTURE DESIGN',
-        fashion: 'ARCHIVAL FASHION',
-        both: 'ARCHITECTURE & FASHION'
+        clothing: 'CLOTHING',
+        sneakers_bags: 'SNEAKERS & BAGS',
+        both: 'ALL CATEGORIES'
       };
-      confirmedRole.textContent = `${roleLabels[role] || 'COLLECTOR'} • ${interestLabels[interest] || 'ARCHITECTURE & FASHION'}`;
+      confirmedRole.textContent = `${roleLabels[role] || 'BUYER'} • ${interestLabels[interest] || 'ALL CATEGORIES'}`;
     }
 
     if (isReturning) {
       if (successQueueTag) successQueueTag.textContent = 'WELCOME BACK • WAITLIST ACTIVE';
-      if (successTitle) successTitle.textContent = 'Waitlist Entry Retrieved!';
+      if (successTitle) successTitle.textContent = "You're Already On The Waitlist";
       if (successMessage) {
-        successMessage.textContent = 'Your registration is confirmed. We will notify you via SMS / WhatsApp the moment Grabsty opens in Lahore.';
+        successMessage.textContent = 'You joined from this device earlier. We will message you on WhatsApp or SMS as soon as Grabsty opens in your city.';
       }
     } else {
       if (successQueueTag) successQueueTag.textContent = 'WAITLIST SPOT CONFIRMED';
       if (successTitle) successTitle.textContent = "You're On The Waitlist!";
       if (successMessage) {
-        successMessage.textContent = "We will send your invite key directly via SMS or WhatsApp as onboarding begins in Lahore. Keep your wardrobe and design collections ready.";
+        successMessage.textContent = "We will send your invite on WhatsApp or SMS as soon as Grabsty opens in your city.";
       }
     }
 
@@ -684,12 +679,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Social Sharing Links
     if (shareXBtn) {
-      const xText = encodeURIComponent(`Joined the Grabsty waitlist in Lahore — resale fashion and architecture design stripped of clutter: ${uniqueRefUrl}`);
+      const xText = encodeURIComponent(`I joined the Grabsty waitlist: buy and sell pre-loved fashion with your payment held in escrow until delivery. ${uniqueRefUrl}`);
       shareXBtn.href = `https://twitter.com/intent/tweet?text=${xText}`;
     }
 
     if (shareWaBtn) {
-      const waText = encodeURIComponent(`Join the Grabsty waitlist in Lahore (curated resale fashion & architecture design with escrow protection): ${uniqueRefUrl}`);
+      const waText = encodeURIComponent(`Join me on the Grabsty waitlist: buy and sell pre-loved clothes, sneakers and bags without paying strangers upfront. ${uniqueRefUrl}`);
       shareWaBtn.href = `https://api.whatsapp.com/send?text=${waText}`;
     }
 
@@ -697,8 +692,8 @@ document.addEventListener('DOMContentLoaded', () => {
       nativeShareBtn.classList.remove('hidden');
       nativeShareBtn.onclick = () => {
         navigator.share({
-          title: 'Grabsty — Lahore Waitlist',
-          text: 'Resale fashion & Lahore Architecture Design with guaranteed escrow protection.',
+          title: 'Grabsty Waitlist',
+          text: 'Buy and sell pre-loved fashion with your payment held in escrow until delivery.',
           url: uniqueRefUrl
         }).catch(() => {});
       };
@@ -782,9 +777,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      // Fire celebratory Party Popper animation!
-      triggerPartyPopper();
-
       // Check if user already registered locally first (by phone or email)
       const localUsers = getLocalWaitlist();
       const existingLocal = localUsers.find(u => 
@@ -793,6 +785,7 @@ document.addEventListener('DOMContentLoaded', () => {
       );
 
       if (existingLocal) {
+        triggerPartyPopper();
         renderWaitlistSuccess({
           name: existingLocal.name || nameVal,
           phone: existingLocal.phone || phoneVal,
@@ -814,8 +807,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (btnText) btnText.textContent = 'REGISTERING...';
       }
 
-      const nextTicket = 1000 + (localUsers.length + 1);
-      const ticketCode = `GRB-${nextTicket}`;
+      // Random invite code. It used to be 1000 + (signups on this device), so
+      // nearly every visitor got GRB-1001 and they all shared one referral count.
+      const codeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      const codeBytes = new Uint8Array(6);
+      crypto.getRandomValues(codeBytes);
+      const ticketCode = 'GRB-' + Array.from(codeBytes, b => codeAlphabet[b % codeAlphabet.length]).join('');
 
       const payload = {
         name: nameVal,
@@ -824,14 +821,9 @@ document.addEventListener('DOMContentLoaded', () => {
         city: cityVal,
         role: currentRole,
         interest: currentInterest,
-        ticket_number: nextTicket,
         referral_code: ticketCode,
-        referred_by: referredByCode || null,
-        created_at: new Date().toISOString()
+        referred_by: referredByCode || null
       };
-
-      // Save locally immediately
-      saveToLocalStorage({ ...payload, synced: false });
 
       // Dispatch to Supabase
       let supabaseResp = null;
@@ -850,6 +842,25 @@ document.addEventListener('DOMContentLoaded', () => {
         if (btnText) btnText.textContent = 'JOIN WAITLIST';
       }
 
+      // Email already on the list (unique in the DB). Their original invite
+      // code can't be read back, so say so instead of inventing a new one.
+      if (supabaseResp && supabaseResp.conflict) {
+        if (emailInput) {
+          emailInput.classList.add('has-error');
+          emailInput.focus();
+        }
+        if (emailError) emailError.textContent = 'This email is already on the waitlist.';
+        return;
+      }
+
+      // Never show success for a signup that wasn't saved.
+      if (!supabaseResp || !supabaseResp.success) {
+        if (phoneError) phoneError.textContent = "We couldn't save your spot. Check your connection and try again.";
+        return;
+      }
+
+      saveToLocalStorage({ ...payload, created_at: new Date().toISOString() });
+      triggerPartyPopper();
       renderWaitlistSuccess({
         name: nameVal,
         phone: phoneVal,
@@ -978,7 +989,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement('a');
         link.setAttribute('href', encodedUri);
-        link.setAttribute('download', `grabsty_lahore_waitlist_${new Date().toISOString().slice(0, 10)}.csv`);
+        link.setAttribute('download', `grabsty_waitlist_${new Date().toISOString().slice(0, 10)}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
