@@ -487,22 +487,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  async function fetchUserFromSupabase(email) {
-    try {
-      const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/${SUPABASE_CONFIG.tableName}?email=eq.${encodeURIComponent(email)}&select=*`, {
-        headers: {
-          'apikey': SUPABASE_CONFIG.anonKey,
-          'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
-        }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.length > 0) return data[0];
-      }
-    } catch {}
-    return null;
-  }
-
   // ---------------------------------------------------------------------------
   // 14. Live Referral Tracker
   // ---------------------------------------------------------------------------
@@ -510,22 +494,19 @@ document.addEventListener('DOMContentLoaded', () => {
     let count = 0;
     const cleanCode = ticketCode.replace(/^#/, '');
 
-    // 1. Try Supabase count
+    // 1. Try Supabase count (aggregate RPC — the waitlist table itself is not readable)
     try {
-      const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/${SUPABASE_CONFIG.tableName}?referred_by=eq.${encodeURIComponent(cleanCode)}&select=count`, {
-        method: 'HEAD',
+      const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/rpc/waitlist_referral_count`, {
+        method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           'apikey': SUPABASE_CONFIG.anonKey,
-          'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`,
-          'Range': '0-0',
-          'Prefer': 'count=exact'
-        }
+          'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+        },
+        body: JSON.stringify({ p_code: cleanCode })
       });
       if (res.ok) {
-        const range = res.headers.get('content-range');
-        if (range && range.includes('/')) {
-          count = parseInt(range.split('/')[1], 10) || 0;
-        }
+        count = parseInt(await res.json(), 10) || 0;
       }
     } catch {}
 
