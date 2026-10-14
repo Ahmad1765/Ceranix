@@ -17,6 +17,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { type as typography } from '@/lib/theme';
 import { HIT_SLOP_8 } from '@/lib/responsive';
 import { BRAND } from '@/lib/brand';
+import { STRIPE_ENABLED } from '@/lib/payments';
 
 export type PaymentMethodOption = 'card' | 'apple_pay' | 'cod' | 'jazzcash' | 'easypaisa';
 
@@ -42,7 +43,7 @@ export function PaymentOptionsModal({
   onSelect,
 }: PaymentOptionsModalProps) {
   const { theme, isDark } = useTheme();
-  const [selected, setSelected] = useState<PaymentMethodOption>(initialSelected || 'card');
+  const [selected, setSelected] = useState<PaymentMethodOption>(initialSelected || (STRIPE_ENABLED ? 'card' : 'cod'));
   const [cardNumber, setCardNumber] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvc, setCardCvc] = useState('');
@@ -55,7 +56,7 @@ export function PaymentOptionsModal({
 
   useEffect(() => {
     if (visible) {
-      const active = initialSelected || 'card';
+      const active = initialSelected || (STRIPE_ENABLED ? 'card' : 'cod');
       setSelected(active);
       setShowCardForm(active === 'card');
       setCardError(null);
@@ -186,6 +187,9 @@ export function PaymentOptionsModal({
             keyboardDismissMode="on-drag"
             showsVerticalScrollIndicator={false}
           >
+          {/* Online methods all settle through Stripe; without it only COD can actually collect money. */}
+          {STRIPE_ENABLED && (
+          <>
           {/* Option 1: Bank Card */}
           <Pressable
             onPress={() => handleSelect('card')}
@@ -747,6 +751,9 @@ export function PaymentOptionsModal({
           </Pressable>
 
           <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.border, marginVertical: 6 }} />
+
+          </>
+          )}
 
           {/* Option 3: Cash on Delivery (COD) */}
           <Pressable

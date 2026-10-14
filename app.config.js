@@ -130,6 +130,13 @@ module.exports = () => ({
       ],
       'expo-localization',
       [
+        'expo-location',
+        {
+          locationWhenInUsePermission:
+            'Grabsty uses your location to fill in your delivery address.',
+        },
+      ],
+      [
         'expo-contacts',
         {
           contactsPermission: 'Allow Grabsty to access your contacts to find friends on the app.',

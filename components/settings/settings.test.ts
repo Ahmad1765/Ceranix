@@ -128,6 +128,7 @@ describe('ChatGPT Settings UI & Primitives Invariants', () => {
   });
 
   it('renders ChatGPTGroup with 14px radius card container and title', () => {
+    // eslint-disable-next-line react/no-children-prop -- the test calls the component with these props directly
     const group = React.createElement(ChatGPTGroup, {
       title: 'Account',
       children: React.createElement('div', null, 'content'),

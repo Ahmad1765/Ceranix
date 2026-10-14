@@ -155,6 +155,11 @@ describe('SellFormSchema', () => {
 
     const decimals = SellFormSchema.safeParse({ ...validPayload, price: '12.999' });
     expect(decimals.success).toBe(false);
+
+    // listings.price is an integer column, so paisa would fail on insert.
+    const paisa = SellFormSchema.safeParse({ ...validPayload, price: '150.50' });
+    expect(paisa.success).toBe(false);
+    expect(SellFormSchema.safeParse({ ...validPayload, price: '150.00' }).success).toBe(true);
   });
 
   it('requires subcategory when category has subcategories', () => {

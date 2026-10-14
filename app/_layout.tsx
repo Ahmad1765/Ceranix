@@ -25,6 +25,7 @@ import { initOnlineManager } from '@/lib/offline';
 import { initOfflineSync } from '@/lib/offlineSync';
 import { attachResponseListener, configureNotifications } from '@/lib/notifications';
 import { onOrderUpdated } from '@/lib/paymentService';
+import { LISTING_QUERY_PREFIXES } from '@/lib/queries/keys';
 import { AuthProvider } from '@/lib/auth';
 import { ToastProvider } from '@/lib/toast';
 import { GuestGateProvider } from '@/components/GuestGate';
@@ -58,8 +59,11 @@ configureNotifications();
 onOrderUpdated((listingId) => {
   try {
     queryClient.invalidateQueries({ queryKey: ['myOrders'] });
-    queryClient.invalidateQueries({ queryKey: ['feedListings'] });
-    queryClient.invalidateQueries({ queryKey: ['homeFeed'] });
+    // Every listing list, not just two: Home reads myFeedListings, and a sold
+    // (or, after a cancel, relisted) item must leave/return everywhere at once.
+    for (const prefix of LISTING_QUERY_PREFIXES) {
+      queryClient.invalidateQueries({ queryKey: [prefix] });
+    }
     if (listingId) {
       queryClient.invalidateQueries({ queryKey: ['listing', listingId] });
       queryClient.invalidateQueries({ queryKey: ['orderForListing', listingId] });

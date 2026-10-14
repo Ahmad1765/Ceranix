@@ -424,7 +424,7 @@ export function SellerPickupModal({
                         fontFamily: typography.family.sansBold,
                       }}
                     >
-                      Confirm Pickup & Start Packing
+                      Confirm & Mark Ready for Pickup
                     </Text>
                   </>
                 )}

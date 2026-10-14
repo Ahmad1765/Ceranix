@@ -22,7 +22,6 @@ import { supabase } from '@/lib/supabase';
 import { OrderDetailsTrackingView } from '@/components/orders/OrderDetailsTrackingView';
 import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
 import { CancelOrderModal } from '@/components/orders/CancelOrderModal';
-import { MarkShippedModal } from '@/components/orders/MarkShippedModal';
 import { SellerPickupModal, type SellerPickupAddressInput } from '@/components/orders/SellerPickupModal';
 
 function tap(style: 'light' | 'medium' = 'light') {
@@ -91,7 +90,6 @@ export default function InvoiceScreen() {
   const [confirming, setConfirming] = useState(false);
   const [completingCod, setCompletingCod] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
-  const [showShipModal, setShowShipModal] = useState(false);
   const [completingReceipt, setCompletingReceipt] = useState(false);
   const [advancingPacking, setAdvancingPacking] = useState(false);
   const [openingDispute, setOpeningDispute] = useState(false);
@@ -367,7 +365,7 @@ export default function InvoiceScreen() {
       if (user?.id) {
         queryClient.invalidateQueries({ queryKey: qk.myOrders(user.id) });
       }
-      toast.show('Pickup address confirmed & order marked as Packing', {
+      toast.show('Ready for pickup. Our courier will collect it from your address.', {
         variant: 'default',
         icon: 'check',
       });
@@ -404,7 +402,7 @@ export default function InvoiceScreen() {
       toast.show(
         order.fulfillment_type === 'dropship'
           ? 'Sent to supplier for processing'
-          : 'Order marked as Packing',
+          : 'Marked ready for pickup',
         { variant: 'default', icon: 'check' },
       );
     } catch (e: any) {
@@ -414,34 +412,6 @@ export default function InvoiceScreen() {
       });
     } finally {
       setAdvancingPacking(false);
-    }
-  };
-
-  // Seller Mark Shipped Handler
-  const handleMarkShipped = async (courier: string, trackingNumber: string) => {
-    if (!order?.id) return;
-    tap('medium');
-    try {
-      const updated = await paymentService.advanceOrderFulfillment({
-        orderId: order.id,
-        targetStatus: 'shifting',
-        courier,
-        trackingNumber,
-      });
-      setOrder(updated);
-      if (user?.id) {
-        queryClient.invalidateQueries({ queryKey: qk.myOrders(user.id) });
-      }
-      toast.show('Order marked as Shifting / Dispatched!', {
-        variant: 'default',
-        icon: 'check',
-      });
-    } catch (e: any) {
-      toast.show(e?.message || 'Failed to mark order as shipped', {
-        variant: 'default',
-        icon: 'alert-triangle',
-      });
-      throw e;
     }
   };
 
@@ -498,21 +468,18 @@ export default function InvoiceScreen() {
 
     setCompletingReceipt(true);
     try {
-      const updated = await paymentService.advanceOrderFulfillment({
-        orderId: order.id,
-        targetStatus: 'delivered',
-      });
+      const updated = await paymentService.confirmOrderReceived({ orderId: order.id });
       setOrder(updated);
       if (user?.id) {
         queryClient.invalidateQueries({ queryKey: qk.myOrders(user.id) });
         queryClient.invalidateQueries({ queryKey: ['myOrders'] });
       }
-      toast.show('Delivery confirmed', {
+      toast.show('Order completed', {
         variant: 'default',
         icon: 'check',
       });
-    } catch {
-      toast.show('Network error. Please try again.', { variant: 'default', icon: 'alert-triangle' });
+    } catch (e: any) {
+      toast.show(e?.message || 'Could not confirm delivery. Please try again.', { variant: 'default', icon: 'alert-triangle' });
     } finally {
       setCompletingReceipt(false);
     }
@@ -654,33 +621,32 @@ export default function InvoiceScreen() {
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
                 <>
-                  <Feather name="box" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Feather name="package" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
                   <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF', fontFamily: typography.family.sansBold }}>
-                    Start Packing
+                    Ready for Pickup
                   </Text>
                 </>
               )}
             </Pressable>
           ) : isSeller && order?.fulfillment_status === 'packing' ? (
-            <Pressable
-              onPress={() => setShowShipModal(true)}
-              style={({ pressed }) => [
-                {
-                  height: 48,
-                  borderRadius: radii.pill,
-                  backgroundColor: theme.primary,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                },
-                pressed && { opacity: 0.88, transform: [{ scale: 0.99 }] },
-              ]}
+            <View
+              style={{
+                height: 48,
+                borderRadius: radii.pill,
+                backgroundColor: theme.surface,
+                borderWidth: 1,
+                borderColor: theme.border,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingHorizontal: 16,
+              }}
             >
-              <Feather name="truck" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
-              <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF', fontFamily: typography.family.sansBold }}>
-                Mark as Shipped / In-Transit
+              <Feather name="truck" size={16} color={theme.mute} style={{ marginRight: 8 }} />
+              <Text style={{ fontSize: 14, fontWeight: '600', color: theme.mute, fontFamily: typography.family.sansSemibold }}>
+                Ready for Pickup · Our courier will collect it
               </Text>
-            </Pressable>
+            </View>
           ) : isSeller && order?.payment_method === 'cod' && (isShipped || order?.fulfillment_status === 'shifting' || order?.fulfillment_status === 'delivered' || order?.status === 'shifting' || order?.status === 'delivered') && order?.status !== 'completed' && order?.fulfillment_status !== 'completed' ? (
             order?.cod_seller_confirmed_at ? (
               <View
@@ -890,13 +856,6 @@ export default function InvoiceScreen() {
         onClose={() => setShowCancelModal(false)}
         onConfirmCancel={handleCancelOrder}
         isSeller={isSeller}
-      />
-
-      {/* Mark Shipped Modal */}
-      <MarkShippedModal
-        visible={showShipModal}
-        onClose={() => setShowShipModal(false)}
-        onConfirmShipped={handleMarkShipped}
       />
 
       {/* Seller Pickup Modal (Managed Delivery) */}

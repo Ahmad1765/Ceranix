@@ -66,14 +66,16 @@ export function deriveInvoiceStatus(
  * store minor units (paisa).
  */
 export function deriveInvoiceAmounts(
-  order: Pick<Order, 'amount_cents' | 'fee_cents'> | null | undefined,
+  order: (Pick<Order, 'amount_cents' | 'fee_cents'> & { shipping_fee_cents?: number | null }) | null | undefined,
   listingPrice: unknown,
   feeForPrice: (price: number) => number,
 ): { item: number; fee: number; total: number } {
   if (order && order.amount_cents > 0) {
     const item = order.amount_cents / 100;
     const fee = order.fee_cents / 100;
-    return { item, fee, total: item + fee };
+    // Delivery is part of what the buyer pays (and the courier collects on COD).
+    const shipping = (order.shipping_fee_cents ?? 0) / 100;
+    return { item, fee, total: item + fee + shipping };
   }
   const n = typeof listingPrice === 'string' ? parseFloat(listingPrice) : Number(listingPrice);
   const item = Number.isFinite(n) && n > 0 ? n : 0;

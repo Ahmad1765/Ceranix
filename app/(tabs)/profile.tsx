@@ -252,6 +252,16 @@ function ProfileScreenInner() {
     }
   }, [profileId, profileUsername, toast]);
 
+  // Hooks must run before the early return below.
+  const handleStatusFilterChange = useCallback(
+    (f: 'all' | 'available' | 'sold') => {
+      if (activeTab === 'selling') setSellingFilter(f);
+      else if (activeTab === 'liked') setLikedFilter(f);
+      else if (activeTab === 'collections') setSavedFilter(f);
+    },
+    [activeTab],
+  );
+
   if (!profile) {
     return (
       <SafeContainer
@@ -283,15 +293,6 @@ function ProfileScreenInner() {
       : activeTab === 'liked'
         ? likedFilter
         : savedFilter;
-
-  const handleStatusFilterChange = useCallback(
-    (f: 'all' | 'available' | 'sold') => {
-      if (activeTab === 'selling') setSellingFilter(f);
-      else if (activeTab === 'liked') setLikedFilter(f);
-      else if (activeTab === 'collections') setSavedFilter(f);
-    },
-    [activeTab],
-  );
 
   const currentTotalCount =
     activeTab === 'selling'

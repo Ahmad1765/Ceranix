@@ -1292,8 +1292,6 @@ export function SellForm({
                                   bName === UNBRANDED_LOCAL_TAILOR
                                 ) {
                                   setValue('authenticity', null, { shouldValidate: true });
-                                } else if (!authenticity) {
-                                  setTimeout(() => setActiveSheet('authenticity'), 200);
                                 }
                               }}
                               style={({ pressed }) => ({
@@ -1771,13 +1769,6 @@ export function SellForm({
             setValue('authenticity', null, { shouldValidate: true });
           } else if (isCustom) {
             setValue('authenticity', 'not_sure', { shouldValidate: true });
-          } else {
-            if (!authenticity) {
-              setTimeout(() => {
-                isNavigatingSheetRef.current = false;
-                setActiveSheet('authenticity');
-              }, 250);
-            }
           }
         }}
         onClose={closeSheet}

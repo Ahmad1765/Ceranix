@@ -74,6 +74,16 @@ describe('deriveInvoiceAmounts', () => {
     expect(a).toEqual({ item: 500, fee: 100, total: 600 });
   });
 
+  it('includes delivery in the total the buyer pays', () => {
+    // Rs 1000 item + Rs 60 protection + Rs 130 delivery — what checkout showed.
+    const a = deriveInvoiceAmounts(
+      { amount_cents: 100_000, fee_cents: 6_000, shipping_fee_cents: 13_000 } as any,
+      1000,
+      buyerProtectionFee,
+    );
+    expect(a).toEqual({ item: 1000, fee: 60, total: 1190 });
+  });
+
   it('reflects an accepted-offer price, which listing.price does not', () => {
     const a = deriveInvoiceAmounts(
       { amount_cents: 30_000, fee_cents: 10_000 } as any,
