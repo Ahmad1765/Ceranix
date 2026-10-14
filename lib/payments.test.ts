@@ -68,7 +68,8 @@ describe('lib/payments fetchOrderForListing dual-lookup', () => {
     });
     const limitFallback = vi.fn().mockReturnValue({ maybeSingle: maybeSingleFallback });
     const orderFallback = vi.fn().mockReturnValue({ limit: limitFallback });
-    const eqFallback = vi.fn().mockReturnValue({ order: orderFallback });
+    const neqFallback = vi.fn().mockReturnValue({ order: orderFallback });
+    const eqFallback = vi.fn().mockReturnValue({ neq: neqFallback });
 
     const selectMock = vi.fn()
       .mockReturnValueOnce({ eq: eqDirect })
