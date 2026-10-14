@@ -796,98 +796,15 @@ export default function UserProfileScreen() {
               </ScrollView>
             )}
 
-            {/* Status Filter Chips (All, Available, Sold) - Always Visible */}
-            {(activeTab === 'shop' || activeTab === 'liked' || (activeTab === 'collections' && isCollectionsPublic)) ? (
-              <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingVertical: 10 }}>
-                {(
-                  activeTab === 'shop'
-                    ? [
-                        { id: 'all', label: `All (${listings.length})` },
-                        { id: 'available', label: `Available (${availableCount})` },
-                        { id: 'sold', label: `Sold (${soldCount})` },
-                      ]
-                    : activeTab === 'liked'
-                      ? [
-                          { id: 'all', label: `All (${likedListings.length})` },
-                          { id: 'available', label: `Available (${likedAvailableCount})` },
-                          { id: 'sold', label: `Sold (${likedSoldCount})` },
-                        ]
-                      : [
-                          { id: 'all', label: `All (${visibleSavedListings.length})` },
-                          { id: 'available', label: `Available (${savedAvailableCount})` },
-                          { id: 'sold', label: `Sold (${savedSoldCount})` },
-                        ]
-                ).map((f) => {
-                  const currentFilter =
-                    activeTab === 'shop'
-                      ? shopFilter
-                      : activeTab === 'liked'
-                        ? likedFilter
-                        : savedFilter;
-                  const active = currentFilter === f.id;
-                  const onSelect = () => {
-                    if (activeTab === 'shop') setShopFilter(f.id as any);
-                    else if (activeTab === 'liked') setLikedFilter(f.id as any);
-                    else setSavedFilter(f.id as any);
-                  };
-                  return (
-                    <Pressable
-                      key={f.id}
-                      onPress={onSelect}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: active }}
-                      style={({ pressed }) => ({
-                        height: 30,
-                        paddingHorizontal: 14,
-                        borderRadius: 15,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: active
-                          ? isDark ? theme.panel : '#111111'
-                          : isDark ? theme.surface : theme.panel,
-                        borderWidth: 1,
-                        borderColor: active
-                          ? isDark ? theme.border : '#111111'
-                          : theme.border,
-                        opacity: pressed ? 0.7 : 1,
-                      })}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          fontWeight: '700',
-                          color: active ? '#FFFFFF' : theme.ink,
-                        }}
-                      >
-                        {f.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ) : (
-              <View style={{ height: 12 }} />
-            )}
+            {!(activeTab === 'collections' && isCollectionsPublic) && <View style={{ height: 12 }} />}
 
             {/* Empty States */}
             {activeTab === 'shop' && gridRows.length === 0 && (
               <View style={{ paddingVertical: 40, alignItems: 'center' }}>
                 <EmptyState
                   icon="shopping-bag"
-                  title={
-                    shopFilter === 'sold'
-                      ? 'Nothing sold yet'
-                      : shopFilter === 'available' && listings.length > 0
-                        ? 'No available items'
-                        : 'No items right now'
-                  }
-                  description={
-                    shopFilter === 'sold'
-                      ? 'Sold items will show up here.'
-                      : shopFilter === 'available' && listings.length > 0
-                        ? `${displayName} has no available items right now.`
-                        : `${displayName} has no active items right now.`
-                  }
+                  title="No items right now"
+                  description={`${displayName} has no active items right now.`}
                 />
               </View>
             )}
@@ -896,20 +813,8 @@ export default function UserProfileScreen() {
               <View style={{ paddingVertical: 40, alignItems: 'center' }}>
                 <EmptyState
                   icon="heart"
-                  title={
-                    likedFilter === 'sold'
-                      ? 'Nothing sold yet'
-                      : likedFilter === 'available' && likedListings.length > 0
-                        ? 'No available items'
-                        : 'No liked items'
-                  }
-                  description={
-                    likedFilter === 'sold'
-                      ? 'Sold items will show up here.'
-                      : likedFilter === 'available' && likedListings.length > 0
-                        ? 'All liked items have been sold.'
-                        : `${displayName} hasn't liked any items yet.`
-                  }
+                  title="No liked items"
+                  description={`${displayName} hasn't liked any items yet.`}
                 />
               </View>
             )}

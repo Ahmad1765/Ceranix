@@ -32,11 +32,11 @@ type ProfileListingTabsProps = {
   loadingListings: boolean;
   gridListingsCount: number;
   onPostItem: () => void;
-  statusFilter: 'all' | 'available' | 'sold';
-  setStatusFilter: (f: 'all' | 'available' | 'sold') => void;
-  totalCount: number;
-  availableCount: number;
-  soldCount: number;
+  statusFilter?: 'all' | 'available' | 'sold';
+  setStatusFilter?: (f: 'all' | 'available' | 'sold') => void;
+  totalCount?: number;
+  availableCount?: number;
+  soldCount?: number;
 };
 
 export const ProfileListingTabs = memo(function ProfileListingTabs({
@@ -52,11 +52,6 @@ export const ProfileListingTabs = memo(function ProfileListingTabs({
   loadingListings,
   gridListingsCount,
   onPostItem,
-  statusFilter,
-  setStatusFilter,
-  totalCount,
-  availableCount,
-  soldCount,
 }: ProfileListingTabsProps) {
   const { theme, isDark } = useTheme();
   return (
@@ -280,58 +275,7 @@ export const ProfileListingTabs = memo(function ProfileListingTabs({
         </ScrollView>
       )}
 
-      {/* ── Status Filter Chips (All, Available, Sold) - Always Visible ── */}
-      <View
-        style={{
-          flexDirection: 'row',
-          gap: 8,
-          paddingHorizontal: 12,
-          paddingVertical: 10,
-        }}
-      >
-        {(
-          [
-            { id: 'all', label: `All (${totalCount})` },
-            { id: 'available', label: `Available (${availableCount})` },
-            { id: 'sold', label: `Sold (${soldCount})` },
-          ] as const
-        ).map((f) => {
-          const active = statusFilter === f.id;
-          return (
-            <Pressable
-              key={f.id}
-              onPress={() => setStatusFilter(f.id)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-              style={({ pressed }) => ({
-                height: 30,
-                paddingHorizontal: 14,
-                borderRadius: 15,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: active
-                  ? isDark ? theme.panel : '#111111'
-                  : isDark ? theme.surface : theme.panel,
-                borderWidth: 1,
-                borderColor: active
-                  ? isDark ? theme.border : '#111111'
-                  : theme.border,
-                opacity: pressed ? 0.7 : 1,
-              })}
-            >
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontWeight: '700',
-                  color: active ? '#FFFFFF' : theme.ink,
-                }}
-              >
-                {f.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      {activeTab !== 'collections' && <View style={{ height: 12 }} />}
 
       {/* ── Empty States for Lists ── */}
       {loadingListings ? (
@@ -349,27 +293,19 @@ export const ProfileListingTabs = memo(function ProfileListingTabs({
                   : 'shopping-bag'
             }
             title={
-              statusFilter === 'sold'
-                ? 'Nothing sold yet'
-                : statusFilter === 'available' && totalCount > 0
-                  ? 'No available items'
-                  : activeTab === 'liked'
-                    ? 'No liked items'
-                    : activeTab === 'collections'
-                      ? 'No saved items'
-                      : 'Your shop is empty'
+              activeTab === 'liked'
+                ? 'No liked items'
+                : activeTab === 'collections'
+                  ? 'No saved items'
+                  : 'Your shop is empty'
             }
             description={
-              statusFilter === 'sold'
-                ? 'Sold items will show up here.'
-                : statusFilter === 'available' && totalCount > 0
-                  ? 'All items in this section have been sold.'
-                  : activeTab === 'selling'
-                    ? 'Post your first item — takes less than a minute.'
-                    : 'Items you interact with will show up here.'
+              activeTab === 'selling'
+                ? 'Post your first item — takes less than a minute.'
+                : 'Items you interact with will show up here.'
             }
             cta={
-              activeTab === 'selling' && totalCount === 0
+              activeTab === 'selling'
                 ? {
                     label: 'Post an item',
                     icon: 'plus',
