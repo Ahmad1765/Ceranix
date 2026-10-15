@@ -21,6 +21,7 @@ import { paymentService } from '@/lib/paymentService';
 import { supabase } from '@/lib/supabase';
 import { OrderDetailsTrackingView } from '@/components/orders/OrderDetailsTrackingView';
 import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
+import { Confetti } from '@/components/ui/Confetti';
 import { CancelOrderModal } from '@/components/orders/CancelOrderModal';
 import { SellerPickupModal, type SellerPickupAddressInput } from '@/components/orders/SellerPickupModal';
 
@@ -60,6 +61,8 @@ export default function InvoiceScreen() {
     title?: string;
     amount?: string;
   }>();
+  // Celebrate a just-placed order once (checkout passes placed=1; Stripe's return URL adds paid=1).
+  const [showConfetti, setShowConfetti] = useState(placed === '1' || paid === '1');
   const { profile, user } = useAuth();
   const toast = useToast();
   const { theme, isDark } = useTheme();
@@ -866,6 +869,7 @@ export default function InvoiceScreen() {
         initialAddress={sellerDefaultAddress}
         defaultContactName={profile?.full_name || profile?.username}
       />
+      {showConfetti ? <Confetti onDone={() => setShowConfetti(false)} /> : null}
     </SafeAreaView>
   );
 }

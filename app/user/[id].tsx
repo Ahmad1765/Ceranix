@@ -4,9 +4,7 @@ import {
   View,
   Pressable,
   RefreshControl,
-  Share,
   ActivityIndicator,
-  Platform,
   ScrollView,
 } from 'react-native';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
@@ -34,8 +32,6 @@ import { useTheme } from '@/context/ThemeContext';
 import { colors, radii } from '@/lib/theme';
 import { useGridDimensions, GRID_DRAW_DISTANCE } from '@/lib/responsive';
 import { useFadeIn } from '@/lib/motion';
-import { APP_URL, BRAND } from '@/lib/brand';
-import * as Clipboard from 'expo-clipboard';
 import type { Listing } from '@/types';
 import { EmptyState } from '@/components/ui';
 import { BottomSheetModal } from '@/components/ui/BottomSheetModal';
@@ -46,6 +42,8 @@ import {
   formatCount,
 } from '@/components/profile';
 import { ListingCard } from '@/components/ListingCard';
+import { ProfileQrSheet } from '@/components/profile/ProfileQrSheet';
+import { StatusFilterChips } from '@/components/profile/StatusFilterChips';
 import { useUserSafetyActions } from '@/hooks/useUserSafetyActions';
 
 type SellerTab = 'shop' | 'liked' | 'collections';
@@ -121,20 +119,9 @@ export default function UserProfileScreen() {
     );
   };
 
-  const handleShare = async () => {
-    if (!profile) return;
-    const url = `${APP_URL}/user/${profile.id}`;
-    if (Platform.OS === 'web') {
-      try {
-        await Clipboard.setStringAsync(url);
-        toast.show('Profile link copied to clipboard', { variant: 'success', icon: 'link' });
-      } catch {}
-    }
-    try {
-      await Share.share({ message: `Check out @${profile.username} on ${BRAND}\n${url}`, url });
-    } catch {
-      // user dismissed the sheet
-    }
+  // Sharing someone's profile opens the same QR sheet as your own (share + copy live inside it).
+  const handleShare = () => {
+    if (profile) setShowQrSheet(true);
   };
 
   const safety = useUserSafetyActions({
@@ -144,6 +131,7 @@ export default function UserProfileScreen() {
   });
 
   const [moreOptionsOpen, setMoreOptionsOpen] = useState(false);
+  const [showQrSheet, setShowQrSheet] = useState(false);
   const handleMore = () => {
     setMoreOptionsOpen(true);
   };
@@ -796,15 +784,46 @@ export default function UserProfileScreen() {
               </ScrollView>
             )}
 
-            {!(activeTab === 'collections' && isCollectionsPublic) && <View style={{ height: 12 }} />}
+            {/* Collection + Liked keep All/Available/Sold, even at zero counts */}
+            {activeTab === 'shop' ? (
+              <StatusFilterChips
+                value={shopFilter}
+                onChange={setShopFilter}
+                total={listings.length}
+                available={availableCount}
+                sold={soldCount}
+              />
+            ) : activeTab === 'liked' ? (
+              <StatusFilterChips
+                value={likedFilter}
+                onChange={setLikedFilter}
+                total={likedListings.length}
+                available={likedAvailableCount}
+                sold={likedSoldCount}
+              />
+            ) : !isCollectionsPublic ? (
+              <View style={{ height: 12 }} />
+            ) : null}
 
             {/* Empty States */}
             {activeTab === 'shop' && gridRows.length === 0 && (
               <View style={{ paddingVertical: 40, alignItems: 'center' }}>
                 <EmptyState
                   icon="shopping-bag"
-                  title="No items right now"
-                  description={`${displayName} has no active items right now.`}
+                  title={
+                    shopFilter === 'sold' && listings.length > 0
+                      ? 'Nothing sold yet'
+                      : shopFilter === 'available' && listings.length > 0
+                        ? 'No available items'
+                        : 'No items right now'
+                  }
+                  description={
+                    shopFilter === 'sold' && listings.length > 0
+                      ? 'Sold items will show up here.'
+                      : shopFilter === 'available' && listings.length > 0
+                        ? `${displayName} has no available items right now.`
+                        : `${displayName} has no active items right now.`
+                  }
                 />
               </View>
             )}
@@ -813,8 +832,20 @@ export default function UserProfileScreen() {
               <View style={{ paddingVertical: 40, alignItems: 'center' }}>
                 <EmptyState
                   icon="heart"
-                  title="No liked items"
-                  description={`${displayName} hasn't liked any items yet.`}
+                  title={
+                    likedFilter === 'sold' && likedListings.length > 0
+                      ? 'Nothing sold yet'
+                      : likedFilter === 'available' && likedListings.length > 0
+                        ? 'No available items'
+                        : 'No liked items'
+                  }
+                  description={
+                    likedFilter === 'sold' && likedListings.length > 0
+                      ? 'Sold items will show up here.'
+                      : likedFilter === 'available' && likedListings.length > 0
+                        ? 'All liked items have been sold.'
+                        : `${displayName} hasn't liked any items yet.`
+                  }
                 />
               </View>
             )}
@@ -878,6 +909,13 @@ export default function UserProfileScreen() {
         }
       />
 
+      <ProfileQrSheet
+        visible={showQrSheet}
+        onClose={() => setShowQrSheet(false)}
+        username={profile.username}
+        fullName={displayName}
+      />
+
       <BottomSheetModal
         visible={moreOptionsOpen}
         onClose={() => setMoreOptionsOpen(false)}
@@ -890,7 +928,8 @@ export default function UserProfileScreen() {
           <Pressable
             onPress={() => {
               setMoreOptionsOpen(false);
-              handleShare();
+              // Let the options sheet finish closing; stacked modals drop the second one.
+              setTimeout(handleShare, 320);
             }}
             style={({ pressed }) => ({
               flexDirection: 'row',

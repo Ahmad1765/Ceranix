@@ -28,6 +28,7 @@ import { BuyerProtectionSheet } from '@/components/product/BuyerProtectionSheet'
 import { buyerProtectionFee, formatPrice } from '@/lib/fees';
 import type { Order } from '@/lib/payments';
 import type { Listing, FulfillmentStatus } from '@/types';
+import { getOptimizedImageUrl } from '@/lib/images';
 
 export interface OrderDetailsTrackingViewProps {
   order?: Order | null;
@@ -1274,7 +1275,7 @@ export function OrderDetailsTrackingView({
                 >
                   {/* Square Thumbnail with subtle radius */}
                   <Image
-                    source={{ uri: sItem.photo }}
+                    source={{ uri: getOptimizedImageUrl(sItem.photo, { width: 200 }) }}
                     style={{
                       width: 72,
                       height: 72,

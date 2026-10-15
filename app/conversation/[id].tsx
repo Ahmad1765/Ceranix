@@ -262,7 +262,8 @@ export default function ConversationScreen() {
 
   const overviewMaxHeight = slideAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, 72],
+    // Cap, not exact height: the card is ~80dp and grows with system font scale
+    outputRange: [0, 140],
   });
 
   const overviewOpacity = slideAnim.interpolate({
@@ -654,10 +655,7 @@ export default function ConversationScreen() {
         />
       </View>
 
-      {/* Safety Notice Box (At the top of the chat interface, Reference Image 5) */}
-      <SafetyNote onPress={explainCoverage} />
-
-      {/* Message Thread FlatList */}
+      {/* Message Thread FlatList (safety note is the list header so it scrolls away like WhatsApp's notice) */}
       <FlatList
         ref={thread.listRef}
         data={thread.rows}
@@ -689,6 +687,7 @@ export default function ConversationScreen() {
         scrollEventThrottle={16}
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
+        ListHeaderComponent={<SafetyNote onPress={explainCoverage} />}
         ListEmptyComponent={
           <View style={{ paddingHorizontal: 32, paddingVertical: 16 }}>
             <Text

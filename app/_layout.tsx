@@ -335,6 +335,10 @@ function RootLayoutNav() {
             options={{ headerShown: false }}
           />
           <Stack.Screen
+            name="listed/[id]"
+            options={{ headerShown: false, animation: 'fade' }}
+          />
+          <Stack.Screen
             name="payment/[id]"
             options={{ headerShown: false, presentation: 'modal' }}
           />

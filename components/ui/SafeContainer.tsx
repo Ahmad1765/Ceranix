@@ -3,6 +3,7 @@ import {
   View,
   ScrollView,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   StyleSheet,
   ViewStyle,
@@ -41,8 +42,28 @@ export interface SafeContainerProps {
   scrollViewProps?: Omit<ScrollViewProps, 'style' | 'contentContainerStyle'>;
   /** Keyboard vertical offset for KeyboardAvoidingView (when mode='keyboard-avoiding') */
   keyboardVerticalOffset?: number;
-  /** KeyboardAvoidingView behavior override (defaults to 'padding' on iOS, undefined on Android) */
+  /** KeyboardAvoidingView behavior override (defaults to 'padding' on iOS and Android) */
   keyboardBehavior?: 'padding' | 'height' | 'position';
+}
+
+/**
+ * Android only: true while the soft keyboard is up. RN's KeyboardAvoidingView handles
+ * keyboardDidHide like a show event and subtracts its screenY, which under edge-to-edge
+ * is not the screen bottom, leaving ~95dp of stale padding after the keyboard closes.
+ * Pass `enabled={useAndroidKeyboardShown()}` to zero the padding while it's hidden.
+ */
+export function useAndroidKeyboardShown(active = true) {
+  const [shown, setShown] = React.useState(false);
+  React.useEffect(() => {
+    if (!active || Platform.OS !== 'android') return;
+    const show = Keyboard.addListener('keyboardDidShow', () => setShown(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setShown(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, [active]);
+  return Platform.OS !== 'android' || shown;
 }
 
 /**
@@ -128,6 +149,7 @@ export const SafeContainer = React.forwardRef<View, SafeContainerProps>(
     const { theme } = useTheme();
     const backgroundColor = bgOverride ?? theme.background;
     const webViewportStyle = useSafeContainerVisualViewport(mode === 'keyboard-avoiding');
+    const keyboardShown = useAndroidKeyboardShown(mode === 'keyboard-avoiding');
 
   const edgePadding = React.useMemo(() => {
     return {
@@ -232,8 +254,9 @@ export const SafeContainer = React.forwardRef<View, SafeContainerProps>(
   const resolvedBehavior =
     keyboardBehavior ??
     Platform.select({
+      // Edge-to-edge (Expo 54) disables adjustResize, so Android needs padding too
       ios: 'padding' as const,
-      android: undefined,
+      android: 'padding' as const,
       default: undefined,
     });
   const resolvedOffset =
@@ -248,6 +271,7 @@ export const SafeContainer = React.forwardRef<View, SafeContainerProps>(
     <KeyboardAvoidingView
       ref={ref as any}
       behavior={resolvedBehavior}
+      enabled={keyboardShown}
       keyboardVerticalOffset={resolvedOffset}
       className={className}
       style={[

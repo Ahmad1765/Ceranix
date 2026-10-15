@@ -22,6 +22,7 @@ import type { Anchor } from './ReactionPicker';
 import { bubbleStamp } from './format';
 import Svg, { Path } from 'react-native-svg';
 import { ShieldCheckIcon } from '@/components/ui/ShieldCheckIcon';
+import { getOptimizedImageUrl } from '@/lib/images';
 
 const HIT_SLOP_8 = { top: 8, bottom: 8, left: 8, right: 8 };
 const TAIL_RADIUS = 6;
@@ -814,7 +815,9 @@ function ImageBubble({
       }}
     >
       <Image
-        source={{ uri: imageUrl }}
+        // 220pt bubble at 3x. Above 640 so the optimizer never swaps in a
+        // listing-style _thumb sibling, which chat uploads do not have.
+        source={{ uri: getOptimizedImageUrl(imageUrl, { width: 660 }) }}
         style={{ width: '100%', height: '100%' }}
         contentFit="cover"
         transition={200}

@@ -773,13 +773,9 @@ export default function ProfileEditScreen() {
             >
               {saving ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <Feather
-                  name={isOnboarding ? 'arrow-right' : 'check'}
-                  size={16}
-                  color="#FFFFFF"
-                />
-              )}
+              ) : isOnboarding ? (
+                <Feather name="arrow-right" size={16} color="#FFFFFF" />
+              ) : null}
               <Text
                 style={{
                   fontSize: 15,
