@@ -235,11 +235,17 @@ export function useSellerOtherListingsQuery(
 /**
  * Similar listings rail for product detail page.
  */
-export function useSimilarListingsQuery(listingId: string | null, limit = 6) {
+export function useSimilarListingsQuery(
+  listingId: string | null,
+  limit = 6,
+  // Only a hint for the fallback path; never gates the query (it starts
+  // immediately, in parallel with the listing itself).
+  category?: string | null,
+) {
   return useQuery({
     queryKey: qk.similarListings(listingId),
     enabled: !!listingId,
-    queryFn: (): Promise<Listing[]> => fetchSimilarListings(listingId as string, limit),
+    queryFn: (): Promise<Listing[]> => fetchSimilarListings(listingId as string, limit, category),
   });
 }
 
@@ -262,6 +268,13 @@ export function useSaveListsQuery(userId: string | null) {
     queryKey: qk.saveLists(userId),
     enabled: !!userId,
     queryFn: async (): Promise<SaveList[]> => {
+      // List first; seed only when ensure_save_lists would actually create
+      // something (no default list, or no custom lists — its two conditions).
+      // Most users already have both, so this skips a round trip.
+      const lists = await listSaveLists(userId as string);
+      const hasDefault = lists.some((l) => l.is_default);
+      const hasCustom = lists.some((l) => !l.is_default);
+      if (hasDefault && hasCustom) return lists;
       await ensureSaveLists(userId as string);
       return listSaveLists(userId as string);
     },

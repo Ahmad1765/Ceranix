@@ -60,7 +60,7 @@ const EMPTY_LISTINGS: Listing[] = [];
 function ProfileScreenInner() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ tab?: string }>();
-  const { profile, refreshProfile } = useAuth();
+  const { profile, user, refreshProfile } = useAuth();
   const profileId = profile?.id ?? null;
   const profileUsername = profile?.username ?? null;
   const toast = useToast();
@@ -92,7 +92,9 @@ function ProfileScreenInner() {
     gap: GRID_GAP,
   });
 
-  const userId = profile?.id ?? null;
+  // The session user id is known immediately; waiting for the profile row
+  // delayed these three queries by a full round trip.
+  const userId = user?.id ?? profile?.id ?? null;
   const sellingQ = useUserListingsQuery(userId ?? '');
   const likedQ = useLikedListingsQuery(userId);
   const savedQ = useSavedListingsQuery(userId);

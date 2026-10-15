@@ -52,6 +52,7 @@ import { ListingCard } from '@/components/ListingCard';
 import { useGridDimensions } from '@/lib/responsive';
 import { radii, type as typography } from '@/lib/theme';
 import type { Category, Listing } from '@/types';
+import { getOptimizedImageUrl } from '@/lib/images';
 
 function haptic() {
   if (Platform.OS !== 'web') {
@@ -877,7 +878,7 @@ export const HomeSearchView = memo(function HomeSearchView({
           >
             {item.avatar_url ? (
               <Image
-                source={{ uri: item.avatar_url }}
+                source={{ uri: getOptimizedImageUrl(item.avatar_url, { width: 120 }) }}
                 style={{ width: '100%', height: '100%' }}
                 contentFit="cover"
               />
@@ -1152,7 +1153,7 @@ export const HomeSearchView = memo(function HomeSearchView({
             >
               {member.avatar_url ? (
                 <Image
-                  source={{ uri: member.avatar_url }}
+                  source={{ uri: getOptimizedImageUrl(member.avatar_url, { width: 120 }) }}
                   style={{ width: '100%', height: '100%' }}
                   contentFit="cover"
                 />

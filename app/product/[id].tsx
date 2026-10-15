@@ -131,7 +131,7 @@ export default function ProductScreen() {
     listing?.seller_id ?? null,
     listing?.id ?? null,
   );
-  const similarItemsQ = useSimilarListingsQuery(productIdParam ?? null);
+  const similarItemsQ = useSimilarListingsQuery(productIdParam ?? null, 6, listing?.category ?? null);
   const likersQ = useListingLikersQuery(productIdParam ?? null);
   const likers = likersQ.data ?? [];
   const sellerItems = (sellerItemsQ.data ?? EMPTY_LISTINGS).filter((s) => !s.is_sold);
