@@ -76,7 +76,14 @@ export function ProductActionBar({
     if (allowed === false) return;
   };
 
+  // Double-tap guard only. It must release on its own: the screen stays mounted
+  // under checkout, so a latched flag left Buy greyed out and dead on return.
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  React.useEffect(() => {
+    if (!isSubmitting) return;
+    const t = setTimeout(() => setIsSubmitting(false), 800);
+    return () => clearTimeout(t);
+  }, [isSubmitting]);
 
   const handleBuy = () => {
     if (disabled || isSubmitting) return;

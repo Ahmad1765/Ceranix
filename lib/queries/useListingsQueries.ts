@@ -33,7 +33,6 @@ import {
   fetchLikedListings,
   fetchSellerOtherListings,
   fetchSimilarListings,
-  setListingSold,
   toggleLike,
   updateListing,
   fetchListingLikers,
@@ -150,30 +149,6 @@ export function useToggleLike(userId: string | null) {
     },
     onSettled: (_data, _error, { listingId }) => {
       qc.invalidateQueries({ queryKey: qk.listingLikers(listingId) });
-    },
-  });
-}
-
-/**
- * Owner action: flip `is_sold` optimistically with rollback on error.
- */
-export function useSetListingSold(listingId: string | null) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (nextSold: boolean) => setListingSold(listingId as string, nextSold),
-    onMutate: async (nextSold) => {
-      const key = qk.listing(listingId ?? '');
-      await qc.cancelQueries({ queryKey: key });
-      const prev = qc.getQueryData<Listing>(key);
-      patchListing(qc, listingId as string, { is_sold: nextSold });
-      return { prev };
-    },
-    onError: (_e, _nextSold, ctx) => {
-      if (ctx?.prev) patchListing(qc, listingId as string, { is_sold: ctx.prev.is_sold });
-    },
-    onSuccess: (committed, nextSold, ctx) => {
-      if (committed === nextSold) return;
-      if (ctx?.prev) patchListing(qc, listingId as string, { is_sold: ctx.prev.is_sold });
     },
   });
 }

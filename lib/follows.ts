@@ -115,7 +115,8 @@ export async function fetchSuggestedFollows(
     // Buffer limit to ensure we hit the target limit after exclusion
     .limit(limit + Math.max(20, excluded.length * 3));
   if (excluded.length > 0) {
-    query = query.not('id', 'in', excluded);
+    // PostgREST needs the list parenthesised; a bare array serialises to `not.in.a,b` and 400s
+    query = query.not('id', 'in', `(${excluded.join(',')})`);
   }
   const { data, error } = await query;
   if (error) {

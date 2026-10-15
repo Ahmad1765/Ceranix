@@ -33,6 +33,8 @@ export interface OfferSheetProps {
   onSubmit: (amount: number, note?: string) => Promise<void> | void;
   loading?: boolean;
   offersLeftToday?: number;
+  /** Extra seller items bundled with this one. Shows "+N Bundle" under Continue when set. */
+  bundleExtraCount?: number;
 }
 
 /**
@@ -43,7 +45,7 @@ export interface OfferSheetProps {
  * - -20%, -15%, -10%, -5%, Custom discount chips
  * - "Your offer:" summary row with strikethrough original price, discounted price, and + shipping
  * - Signal Purple "Continue" CTA
- * - Reassurance text: "You won't be charged unless the seller accepts the offer. Coupons do not apply to offers."
+ * - "+N Bundle" line under Continue (product page only)
  */
 export function OfferSheet({
   visible,
@@ -55,6 +57,7 @@ export function OfferSheet({
   onSubmit,
   loading = false,
   offersLeftToday = 25,
+  bundleExtraCount,
 }: OfferSheetProps) {
   const { theme, isDark } = useTheme();
   const insets = useSafeAreaInsets();
@@ -249,6 +252,7 @@ export function OfferSheet({
                         style={({ pressed }) => ({
                           flex: 1,
                           height: 42,
+                          paddingHorizontal: 4,
                           borderRadius: 10,
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -265,6 +269,9 @@ export function OfferSheet({
                         accessibilityLabel={tier.label}
                       >
                         <Text
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.75}
                           style={{
                             fontSize: 14.5,
                             fontFamily: type.family.sansBold,
@@ -372,17 +379,21 @@ export function OfferSheet({
                       fontFamily: type.family.sansMedium,
                       color: theme.ink,
                       paddingTop: 2,
+                      flexShrink: 0,
                     }}
                   >
                     Your offer:
                   </Text>
 
-                  <View style={{ alignItems: 'flex-end' }}>
+                  {/* Shrink + wrap so large system font sizes can't push prices off-screen */}
+                  <View style={{ alignItems: 'flex-end', flexShrink: 1, marginLeft: 12 }}>
                     <View
                       style={{
                         flexDirection: 'row',
+                        flexWrap: 'wrap',
+                        justifyContent: 'flex-end',
                         alignItems: 'baseline',
-                        gap: 6,
+                        columnGap: 6,
                       }}
                     >
                       {askingPrice > 0 && (
@@ -426,6 +437,7 @@ export function OfferSheet({
                           fontFamily: type.family.sans,
                           color: theme.mute,
                           marginTop: 4,
+                          textAlign: 'right',
                         }}
                       >
                         (est. {formatPrice(totalWithProtection)} with Buyer Protection)
@@ -478,29 +490,23 @@ export function OfferSheet({
                   )}
                 </Pressable>
 
-                {/* Disclaimer / Reassurance text */}
-                <View style={{ gap: 4 }}>
-                  <Text
-                    style={{
-                      fontSize: 12.5,
-                      fontFamily: type.family.sans,
-                      color: theme.mute,
-                      lineHeight: 17,
-                    }}
+                {bundleExtraCount != null && (
+                  <View
+                    testID="offer-bundle-count"
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}
                   >
-                    You won&apos;t be charged unless the seller accepts the offer.
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 12.5,
-                      fontFamily: type.family.sans,
-                      color: theme.mute,
-                      lineHeight: 17,
-                    }}
-                  >
-                    Coupons do not apply to offers.
-                  </Text>
-                </View>
+                    <Feather name="package" size={14} color={bundleExtraCount > 0 ? theme.purple : theme.mute} />
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontFamily: type.family.sansSemibold,
+                        color: bundleExtraCount > 0 ? theme.purple : theme.mute,
+                      }}
+                    >
+                      +{bundleExtraCount} Bundle
+                    </Text>
+                  </View>
+                )}
               </View>
             </TouchableWithoutFeedback>
           </KeyboardAvoidingView>

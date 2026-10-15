@@ -552,24 +552,6 @@ export async function isLiked(listingId: string, userId: string): Promise<boolea
   return ids.has(listingId);
 }
 
-// Owner action: flip `is_sold`. Caller is the seller; RLS enforces that.
-// Returns the new value on success, the previous value on failure (so the
-// UI's optimistic flip can roll back).
-export async function setListingSold(
-  listingId: string,
-  nextSold: boolean,
-): Promise<boolean> {
-  const { error } = await supabase
-    .from('listings')
-    .update({ is_sold: nextSold })
-    .eq('id', listingId);
-  if (error) {
-    console.warn('[listings] setListingSold', error.message);
-    return !nextSold;
-  }
-  return nextSold;
-}
-
 // Owner action: hard-delete the row. RLS only lets the seller delete their
 // own listing. We return a bool so the UI can show a toast instead of
 // throwing.

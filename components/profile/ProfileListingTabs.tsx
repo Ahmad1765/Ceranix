@@ -16,6 +16,7 @@ import { colors } from '@/lib/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { EmptyState } from '@/components/ui';
 import type { SaveList } from '@/lib/saves';
+import { StatusFilterChips } from './StatusFilterChips';
 
 export type ProfileTab = 'selling' | 'liked' | 'collections' | 'details';
 
@@ -52,8 +53,15 @@ export const ProfileListingTabs = memo(function ProfileListingTabs({
   loadingListings,
   gridListingsCount,
   onPostItem,
+  statusFilter = 'all',
+  setStatusFilter,
+  totalCount = 0,
+  availableCount = 0,
+  soldCount = 0,
 }: ProfileListingTabsProps) {
   const { theme, isDark } = useTheme();
+  // A status filter is narrowing a non-empty list (vs. the list itself being empty).
+  const filtered = activeTab !== 'collections' && statusFilter !== 'all' && totalCount > 0;
   return (
     <>
       {/* ── 3-Segment Icon Tab Bar ── */}
@@ -275,7 +283,18 @@ export const ProfileListingTabs = memo(function ProfileListingTabs({
         </ScrollView>
       )}
 
-      {activeTab !== 'collections' && <View style={{ height: 12 }} />}
+      {/* Collection + Liked keep All/Available/Sold, even at zero counts; Saved has its own list chips */}
+      {activeTab !== 'collections' && setStatusFilter ? (
+        <StatusFilterChips
+          value={statusFilter}
+          onChange={setStatusFilter}
+          total={totalCount}
+          available={availableCount}
+          sold={soldCount}
+        />
+      ) : activeTab !== 'collections' ? (
+        <View style={{ height: 12 }} />
+      ) : null}
 
       {/* ── Empty States for Lists ── */}
       {loadingListings ? (
@@ -293,19 +312,27 @@ export const ProfileListingTabs = memo(function ProfileListingTabs({
                   : 'shopping-bag'
             }
             title={
-              activeTab === 'liked'
-                ? 'No liked items'
-                : activeTab === 'collections'
-                  ? 'No saved items'
-                  : 'Your shop is empty'
+              filtered && statusFilter === 'sold'
+                ? 'Nothing sold yet'
+                : filtered && statusFilter === 'available'
+                  ? 'No available items'
+                  : activeTab === 'liked'
+                    ? 'No liked items'
+                    : activeTab === 'collections'
+                      ? 'No saved items'
+                      : 'Your shop is empty'
             }
             description={
-              activeTab === 'selling'
-                ? 'Post your first item — takes less than a minute.'
-                : 'Items you interact with will show up here.'
+              filtered && statusFilter === 'sold'
+                ? 'Sold items will show up here.'
+                : filtered && statusFilter === 'available'
+                  ? 'Everything here has been sold.'
+                  : activeTab === 'selling'
+                    ? 'Post your first item — takes less than a minute.'
+                    : 'Items you interact with will show up here.'
             }
             cta={
-              activeTab === 'selling'
+              activeTab === 'selling' && totalCount === 0
                 ? {
                     label: 'Post an item',
                     icon: 'plus',

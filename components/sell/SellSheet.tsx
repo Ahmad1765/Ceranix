@@ -772,9 +772,9 @@ export function SellForm({
       capture('listing_created', { listing_id: newListing.id, category: newListing.category, price: newListing.price });
 
       resetForm();
-      toast.show('Listing is live', { variant: 'success', icon: 'check' });
       onClose();
-      router.push(`/product/${newId}`);
+      // The "Item listed" screen is the confirmation now; a toast on top would be noise.
+      router.push(`/listed/${newId}` as any);
     } catch (e: any) {
       Alert.alert('Could not publish', e?.message ?? 'Unknown error');
     } finally {
